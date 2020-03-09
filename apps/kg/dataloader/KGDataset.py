@@ -314,6 +314,7 @@ class KGDatasetUDDRaw(KGDataset):
         format = _parse_srd_format(format)
         self.load_entity_relation(path, files, format)
 
+        # Only train set is provided
         if len(files) == 1:
             super(KGDatasetUDDRaw, self).__init__("entities.tsv",
                                                   "relation.tsv",
@@ -321,6 +322,7 @@ class KGDatasetUDDRaw(KGDataset):
                                                   format=format,
                                                   read_triple=True,
                                                   only_train=True)
+        # Train, validation and test set are provided
         if len(files) == 3:
             super(KGDatasetUDDRaw, self).__init__("entities.tsv",
                                                   "relation.tsv",

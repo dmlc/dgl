@@ -31,7 +31,8 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
         self.add_argument('--format', type=str, default='built_in',
-                          help='the format of the dataset.')
+                          help='the format of the dataset, it can be built_in,'\
+                                'raw_udd_{{htr} and udd_{{htr}')
         self.add_argument('--data_files', type=str, default=None, nargs='+',
                           help='a list of data files, e.g. entity relation train valid test')
         self.add_argument('--save_path', type=str, default='ckpts',
