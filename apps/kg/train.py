@@ -194,7 +194,7 @@ def run(args, logger):
                                                        shuffle=True,
                                                        exclude_positive=False)
         train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                        args.neg_chunk_size, args.neg_sample_size,
+                                                        args.neg_sample_size, args.neg_sample_size,
                                                         True, n_entities)
 
 
