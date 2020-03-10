@@ -164,7 +164,7 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
             if barrier is not None:
                 barrier.wait()
             test(args, model, valid_samplers, rank, mode='Valid')
-            print('test:', time.time() - valid_start)
+            print('validation take {:.3f} seconds:'.format(time.time() - valid_start))
             if args.soft_rel_part:
                 model.prepare_cross_rels(cross_rels)
             if barrier is not None:
@@ -243,8 +243,8 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
         if args.test:
             model_test.share_memory()
 
-        if args.neg_sample_size_test < 0:
-            args.neg_sample_size_test = dataset_full.n_entities
+        if args.neg_sample_size_eval < 0:
+            args.neg_sample_size_eval = dataset_full.n_entities
         args.eval_filter = not args.no_eval_filter
         if args.neg_deg_sample_eval:
             assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
@@ -285,15 +285,15 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             test_sampler_heads = []
             for i in range(args.num_test_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                args.neg_sample_size_test,
-                                                                args.neg_sample_size_test,
+                                                                args.neg_sample_size_eval,
+                                                                args.neg_sample_size_eval,
                                                                 args.eval_filter,
                                                                 mode='chunk-head',
                                                                 num_workers=args.num_workers,
                                                                 rank=i, ranks=args.num_test_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                args.neg_sample_size_test,
-                                                                args.neg_sample_size_test,
+                                                                args.neg_sample_size_eval,
+                                                                args.neg_sample_size_eval,
                                                                 args.eval_filter,
                                                                 mode='chunk-tail',
                                                                 num_workers=args.num_workers,

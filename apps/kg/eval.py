@@ -38,7 +38,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='the place where models are saved')
         self.add_argument('--batch_size_eval', type=int, default=8,
                           help='batch size used for eval and test')
-        self.add_argument('--neg_sample_size_test', type=int, default=-1,
+        self.add_argument('--neg_sample_size_eval', type=int, default=-1,
                           help='negative sampling size for testing')
         self.add_argument('--neg_deg_sample_eval', action='store_true',
                           help='negative sampling proportional to vertex degree for testing')
@@ -105,8 +105,8 @@ def main(args):
     # all positive edges are excluded.
     eval_dataset = EvalDataset(dataset, args)
 
-    if args.neg_sample_size_test < 0:
-        args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
+    if args.neg_sample_size_eval < 0:
+        args.neg_sample_size_eval = args.neg_sample_size = eval_dataset.g.number_of_nodes()
 
     args.num_workers = 8 # fix num_workers to 8
     if args.num_proc > 1:
@@ -114,15 +114,15 @@ def main(args):
         test_sampler_heads = []
         for i in range(args.num_proc):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                            args.neg_sample_size_test,
-                                                            args.neg_sample_size_test,
+                                                            args.neg_sample_size_eval,
+                                                            args.neg_sample_size_eval,
                                                             args.eval_filter,
                                                             mode='chunk-head',
                                                             num_workers=args.num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                            args.neg_sample_size_test,
-                                                            args.neg_sample_size_test,
+                                                            args.neg_sample_size_eval,
+                                                            args.neg_sample_size_eval,
                                                             args.eval_filter,
                                                             mode='chunk-tail',
                                                             num_workers=args.num_workers,
@@ -131,15 +131,15 @@ def main(args):
             test_sampler_tails.append(test_sampler_tail)
     else:
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                        args.neg_sample_size_test,
-                                                        args.neg_sample_size_test,
+                                                        args.neg_sample_size_eval,
+                                                        args.neg_sample_size_eval,
                                                         args.eval_filter,
                                                         mode='chunk-head',
                                                         num_workers=args.num_workers,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                        args.neg_sample_size_test,
-                                                        args.neg_sample_size_test,
+                                                        args.neg_sample_size_eval,
+                                                        args.neg_sample_size_eval,
                                                         args.eval_filter,
                                                         mode='chunk-tail',
                                                         num_workers=args.num_workers,

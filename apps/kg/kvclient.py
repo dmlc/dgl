@@ -51,10 +51,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='negative sample proportional to vertex degree in the training')
         self.add_argument('--neg_deg_sample_eval', action='store_true',
                           help='negative sampling proportional to vertex degree in the evaluation')
-        self.add_argument('--neg_sample_size_valid', type=int, default=1000,
-                          help='negative sampling size for validation')
-        self.add_argument('--neg_sample_size_test', type=int, default=-1,
-                          help='negative sampling size for testing')
+        self.add_argument('--neg_sample_size_eval', type=int, default=-1,
+                          help='negative sampling size for evaluation')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
