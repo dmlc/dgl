@@ -41,7 +41,7 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
         model.prepare_relation(mx.gpu(gpu_id))
 
     start = time.time()
-    for step in range(args.init_step, args.max_step):
+    for step in range(0, args.max_step):
         pos_g, neg_g = next(train_sampler)
         args.step = step
         with mx.autograd.record():
@@ -92,6 +92,6 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
             metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
 
     for k, v in metrics.items():
-        print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
+        print('{} average {}: {}'.format(mode, k, v))
     for i in range(len(test_samplers)):
         test_samplers[i] = test_samplers[i].reset()
