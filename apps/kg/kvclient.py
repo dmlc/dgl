@@ -165,6 +165,14 @@ def get_local_machine_id(server_namebook):
 
     return res
 
+def get_compatible_batch_size(batch_size, neg_sample_size):
+    if neg_sample_size < batch_size and batch_size % neg_sample_size != 0:
+        old_batch_size = batch_size
+        batch_size = int(math.ceil(batch_size / neg_sample_size) * neg_sample_size)
+        print('batch size ({}) is incompatible to the negative sample size ({}). Change the batch size to {}'.format(
+            old_batch_size, neg_sample_size, batch_size))
+    return batch_size
+
 
 def start_worker(args, logger):
     """Start kvclient for training
@@ -201,6 +209,11 @@ def start_worker(args, logger):
     # if there is no cross partition relaiton, we fall back to strict_rel_part
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
     args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
+
+    if args.neg_sample_size_eval < 0:
+        args.neg_sample_size_eval = dataset.n_entities
+    args.batch_size = get_compatible_batch_size(args.batch_size, args.neg_sample_size)
+    args.batch_size_eval = get_compatible_batch_size(args.batch_size_eval, args.neg_sample_size_eval)
 
     args.num_workers = 8 # fix num_workers to 8
     train_samplers = []

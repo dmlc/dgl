@@ -149,7 +149,6 @@ def run(args, logger):
 
     if args.neg_sample_size_eval < 0:
         args.neg_sample_size_eval = dataset.n_entities
-
     args.batch_size = get_compatible_batch_size(args.batch_size, args.neg_sample_size)
     args.batch_size_eval = get_compatible_batch_size(args.batch_size_eval, args.neg_sample_size_eval)
 
