@@ -7,6 +7,7 @@ user_name=ubuntu
 ssh_key=~/mctt.pem
 
 server_count=$(awk 'NR==1 {print $3}' ip_config.txt)
+machine_count=$(awk 'END{print NR}' ip_config.txt)
 
 # run command on remote machine
 LINE_LOW=2
@@ -18,7 +19,7 @@ do
     ip=$(awk 'NR=='$LINE_LOW' {print $1}' ip_config.txt)
     let LINE_LOW+=1
     let s_id+=1
-    ssh -i $ssh_key $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' ' &
+    ssh -i $ssh_key $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' '$machine_count'' &
 done
 
 # run command on local machine
