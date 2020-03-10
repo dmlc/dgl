@@ -6,6 +6,7 @@ import os
 import logging
 import time
 import pickle
+import math
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
@@ -85,6 +86,16 @@ def get_logger(args):
     print("Logs are being recorded at: {}".format(log_file))
     return logger
 
+
+def get_compatible_batch_size(batch_size, neg_sample_size):
+    if neg_sample_size < batch_size and batch_size % neg_sample_size != 0:
+        old_batch_size = batch_size
+        batch_size = int(math.ceil(batch_size / neg_sample_size) * neg_sample_size)
+        print('batch size ({}) is incompatible to the negative sample size ({}). Change the batch size to {}'.format(
+            old_batch_size, neg_sample_size, batch_size))
+    return batch_size
+
+
 def main(args):
     args.eval_filter = not args.no_eval_filter
     if args.neg_deg_sample_eval:
@@ -107,6 +118,7 @@ def main(args):
 
     if args.neg_sample_size_eval < 0:
         args.neg_sample_size_eval = args.neg_sample_size = eval_dataset.g.number_of_nodes()
+    args.batch_size_eval = get_compatible_batch_size(args.batch_size_eval, args.neg_sample_size_eval)
 
     args.num_workers = 8 # fix num_workers to 8
     if args.num_proc > 1:
