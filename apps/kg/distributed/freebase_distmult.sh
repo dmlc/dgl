@@ -6,10 +6,9 @@ machine_id=$1
 server_count=$2
 
 # Delete the temp file
-tmp_file=*-shape
-if test -f "$tmp_file"; then
-    echo "delete tmp file..."
-    rm $tmp_file
+if [ -f "*-shape" ]; then
+    echo "delete temp file..."
+    rm *-shape
 fi
 
 ##################################################################################
