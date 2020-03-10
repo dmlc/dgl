@@ -23,4 +23,4 @@ do
 done
 
 # run command on local machine
-$script_file 0 $server_count
+$script_file 0 $server_count $machine_count
