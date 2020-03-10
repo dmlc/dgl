@@ -1443,9 +1443,9 @@ class DGLGraph(DGLBaseGraph):
         Notes
         -----
         This API excludes the ``_ID`` field in both node frame and edge frame.
-        This being said if user take a subgraph ``sg2`` of a subgraph ``sg1``
+        This being said if user take a subgraph ``sg1`` of a subgraph ``sg``
         whose ``_ID`` field in node/edge frame is not None and
-        apply :func:`~dgl.copy_from_parent` on ``sg2``, it would not polluate
+        apply :func:`~dgl.copy_from_parent` on ``sg1``, it would not polluate
         the ``_ID`` field of node/edge frame of ``sg1``.
 
         See Also
