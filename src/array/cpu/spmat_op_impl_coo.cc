@@ -229,13 +229,14 @@ template COOMatrix COOTranspose<kDLCPU, int64_t>(COOMatrix coo);
 // complexity: time O(NNZ), space O(1)
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
-  coo = COOSort(coo, false);
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
   const IdType* row_data = static_cast<IdType*>(coo.row->data);
+  const IdType* col_data = static_cast<IdType*>(coo.col->data);
+  const IdType* data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
   NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
-  NDArray ret_indices = coo.col;
-  NDArray ret_data = coo.data;
+  NDArray ret_indices;
+  NDArray ret_data;
 
   IdType* Bp = static_cast<IdType*>(ret_indptr->data);
 
@@ -251,6 +252,30 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     cumsum += temp;
   }
   Bp[N] = NNZ;
+
+  if (coo.row_sorted == true) {
+    ret_indices = coo.col;
+    ret_data = coo.data;
+  } else {
+    ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+    IdType* Bi = static_cast<IdType*>(ret_indices->data);
+    IdType* Bx = static_cast<IdType*>(ret_data->data);
+
+    for (int64_t i = 0; i < NNZ; ++i) {
+      const IdType r = row_data[i];
+      Bi[Bp[r]] = col_data[i];
+      Bx[Bp[r]] = data? data[i] : i;
+      Bp[r]++;
+    }
+
+    // correct the indptr
+    for (int64_t i = 0, last = 0; i <= N; ++i) {
+      IdType temp = Bp[i];
+      Bp[i] = last;
+      last = temp;
+    }
+  }
 
   return CSRMatrix(coo.num_rows, coo.num_cols,
                    ret_indptr, ret_indices, ret_data,
