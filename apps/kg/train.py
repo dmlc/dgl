@@ -6,7 +6,8 @@ import os
 import logging
 import time
 import json
-import math
+
+from utils import get_compatible_batch_size
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
@@ -131,15 +132,6 @@ def get_logger(args):
     logger = logging.getLogger(__name__)
     print("Logs are being recorded at: {}".format(log_file))
     return logger
-
-
-def get_compatible_batch_size(batch_size, neg_sample_size):
-    if neg_sample_size < batch_size and batch_size % neg_sample_size != 0:
-        old_batch_size = batch_size
-        batch_size = int(math.ceil(batch_size / neg_sample_size) * neg_sample_size)
-        print('batch size ({}) is incompatible to the negative sample size ({}). Change the batch size to {}'.format(
-            old_batch_size, neg_sample_size, batch_size))
-    return batch_size
 
 
 def run(args, logger):
