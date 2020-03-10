@@ -46,6 +46,7 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
   }
 
   // Reorder according to shuffle
+#pragma omp parallel for
   for (IdType i = 0; i < nnz; ++i) {
     new_row_data[i] = coo_row_data[new_idx_data[i]];
     new_col_data[i] = coo_col_data[new_idx_data[i]];
@@ -55,6 +56,7 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
     const IdType* coo_data_data = static_cast<IdType*>(coo.data->data);
     IdArray new_data= IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
     IdType* new_data_data = static_cast<IdType*>(new_data->data);
+#pragma omp parallel for
     for (IdType i = 0; i < nnz; ++i) {
       new_data_data[i] = coo_data_data[new_idx_data[i]];
     }
