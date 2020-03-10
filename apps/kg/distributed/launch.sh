@@ -2,7 +2,7 @@
 # User runs this script to launch distrobited jobs on cluster
 ##################################################################################
 script_path=~/dgl/apps/kg/distributed
-script_file=./freebase_transe_l2.sh
+script_file=./fb15k_transe_l2.sh
 user_name=ubuntu
 ssh_key=~/mctt.pem
 

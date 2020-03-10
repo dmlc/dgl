@@ -552,7 +552,6 @@ if __name__ == '__main__':
     test_laplacian_lambda_max()
     test_remove_self_loop()
     test_add_self_loop()
-    test_partition()
     test_compact()
     test_to_simple()
     test_in_subgraph()
