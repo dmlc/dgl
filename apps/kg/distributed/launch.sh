@@ -1,10 +1,10 @@
 ##################################################################################
 # User runs this script to launch distrobited jobs on cluster
 ##################################################################################
-script_path=~/dgl/apps/kg/distributed
-script_file=./fb15k_transe_l2.sh
-user_name=ubuntu
-ssh_key=~/mctt.pem
+script_path=$1
+script_file=$2
+user_name=$3
+ssh_key=$4
 
 server_count=$(awk 'NR==1 {print $3}' ip_config.txt)
 machine_count=$(awk 'END{print NR}' ip_config.txt)
