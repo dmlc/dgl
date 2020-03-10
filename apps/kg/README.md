@@ -1,4 +1,4 @@
-# DGL - Knowledge Graph Embedding
+<img src="https://github.com/aksnzhy/dgl/blob/master/apps/kg/img/logo.png" width = "400"/>
 
 
 ## Introduction
