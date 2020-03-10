@@ -10,6 +10,7 @@ if os.name != 'nt':
 
 import torch.multiprocessing as mp
 from train_pytorch import load_model, dist_train_test
+from utils import get_compatible_batch_size
 
 from train import get_logger
 from dataloader import TrainDataset, NewBidirectionalOneShotIterator
@@ -51,10 +52,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='negative sample proportional to vertex degree in the training')
         self.add_argument('--neg_deg_sample_eval', action='store_true',
                           help='negative sampling proportional to vertex degree in the evaluation')
-        self.add_argument('--neg_sample_size_valid', type=int, default=1000,
-                          help='negative sampling size for validation')
-        self.add_argument('--neg_sample_size_test', type=int, default=-1,
-                          help='negative sampling size for testing')
+        self.add_argument('--neg_sample_size_eval', type=int, default=-1,
+                          help='negative sampling size for evaluation')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
@@ -203,6 +202,11 @@ def start_worker(args, logger):
     # if there is no cross partition relaiton, we fall back to strict_rel_part
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
     args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
+
+    if args.neg_sample_size_eval < 0:
+        args.neg_sample_size_eval = dataset.n_entities
+    args.batch_size = get_compatible_batch_size(args.batch_size, args.neg_sample_size)
+    args.batch_size_eval = get_compatible_batch_size(args.batch_size_eval, args.neg_sample_size_eval)
 
     args.num_workers = 8 # fix num_workers to 8
     train_samplers = []
