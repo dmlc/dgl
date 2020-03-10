@@ -5,6 +5,7 @@ import argparse
 import os
 import logging
 import time
+import json
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
@@ -30,8 +31,11 @@ class ArgParser(argparse.ArgumentParser):
                           help='root path of all dataset')
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
-        self.add_argument('--format', type=str, default='1',
-                          help='the format of the dataset.')
+        self.add_argument('--format', type=str, default='built_in',
+                          help='the format of the dataset, it can be built_in,'\
+                                'raw_udd_{htr} and udd_{htr}')
+        self.add_argument('--data_files', type=str, default=None, nargs='+',
+                          help='a list of data files, e.g. entity relation train valid test')
         self.add_argument('--save_path', type=str, default='ckpts',
                           help='place to save models and logs')
         self.add_argument('--save_emb', type=str, default=None,
@@ -155,7 +159,7 @@ def get_logger(args):
 def run(args, logger):
     train_time_start = time.time()
     # load dataset and samplers
-    dataset = get_dataset(args.data_path, args.dataset, args.format)
+    dataset = get_dataset(args.data_path, args.dataset, args.format, args.data_files)
     n_entities = dataset.n_entities
     n_relations = dataset.n_relations
     if args.neg_sample_size_test < 0:
@@ -364,6 +368,25 @@ def run(args, logger):
         if not os.path.exists(args.save_emb):
             os.mkdir(args.save_emb)
         model.save_emb(args.save_emb, args.dataset)
+
+        # We need to save the model configurations as well.
+        conf_file = os.path.join(args.save_emb, 'config.json')
+        with open(conf_file, 'w') as outfile:
+            json.dump({'dataset': args.dataset,
+                       'model': args.model_name,
+                       'emb_size': args.hidden_dim,
+                       'max_train_step': args.max_step,
+                       'batch_size': args.batch_size,
+                       'neg_sample_size': args.neg_sample_size,
+                       'lr': args.lr,
+                       'gamma': args.gamma,
+                       'double_ent': args.double_ent,
+                       'double_rel': args.double_rel,
+                       'neg_adversarial_sampling': args.neg_adversarial_sampling,
+                       'adversarial_temperature': args.adversarial_temperature,
+                       'regularization_coef': args.regularization_coef,
+                       'regularization_norm': args.regularization_norm},
+                       outfile, indent=4)
 
     # test
     if args.test:
