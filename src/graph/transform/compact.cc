@@ -39,8 +39,15 @@ CompactGraphs(
   std::vector<int64_t> max_vertex_cnt(num_ntypes, 0);
   for (size_t i = 0; i < graphs.size(); ++i) {
     const HeteroGraphPtr curr_graph = graphs[i];
-    for (IdType ntype = 0; ntype < num_ntypes; ++ntype) {
-      max_vertex_cnt[ntype] += curr_graph->NumVertices(ntype);
+    const int64_t num_etypes = curr_graph->NumEdgeTypes();
+
+    for (IdType etype = 0; etype < num_etypes; ++etype) {
+      IdType srctype, dsttype;
+      std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
+
+      const int64_t n_edges = curr_graph->NumEdges(etype);
+      max_vertex_cnt[srctype] += n_edges;
+      max_vertex_cnt[dsttype] += n_edges;
     }
   }
 
