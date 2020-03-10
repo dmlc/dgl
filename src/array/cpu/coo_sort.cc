@@ -7,6 +7,7 @@
 #include <numeric>
 #include <algorithm>
 #include <vector>
+#include <parallel/algorithm>
 
 namespace dgl {
 namespace aten {
@@ -27,20 +28,20 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
   IdType* new_data_data = static_cast<IdType*>(new_data->data);
   std::iota(new_data_data, new_data_data + nnz, 0);
   if (sort_column) {
-    std::sort(
+    __gnu_parallel::sort(
         new_data_data,
         new_data_data + nnz,
-        [coo_row_data, coo_col_data](IdType a, IdType b) {
+        [coo_row_data, coo_col_data](const IdType a, const IdType b) {
           return (coo_row_data[a] != coo_row_data[b]) ?
             (coo_row_data[a] < coo_row_data[b]) :
             (coo_col_data[a] < coo_col_data[b]);
         });
   } else {
-    std::sort(
+    __gnu_parallel::sort(
         new_data_data,
         new_data_data + nnz,
-        [coo_row_data](IdType a, IdType b) {
-          return coo_row_data[a] <= coo_row_data[b];
+        [coo_row_data](const IdType a, const IdType b) {
+          return coo_row_data[a] < coo_row_data[b];
         });
   }
 
