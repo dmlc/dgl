@@ -25,7 +25,7 @@ gk_csr_t *Convert2GKCsr(CSRPtr csr, bool is_row) {
   gk_csr_t *gk_csr = gk_csr_Create();
   gk_csr->nrows = mat.num_rows;
   gk_csr->ncols = mat.num_cols;
-  size_t nnz = csr->NumEdges();
+  uint64_t nnz = csr->NumEdges();
   auto gk_indptr = gk_csr->rowptr;
   auto gk_indices = gk_csr->rowind;
   size_t num_ptrs;
@@ -96,6 +96,8 @@ GraphPtr GraphOp::ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig) {
   gk_csr_t *gk_csr = Convert2GKCsr(csr, true);
   gk_csr_t *sym_gk_csr = gk_csr_MakeSymmetric(gk_csr, GK_CSR_SYM_SUM);
   csr = Convert2DGLCsr(sym_gk_csr, true);
+  gk_csr_Free(&gk_csr);
+  gk_csr_Free(&sym_gk_csr);
   // This is a symmetric graph now. The in-csr and out-csr are the same.
   return GraphPtr(new ImmutableGraph(csr, csr));
 #else
