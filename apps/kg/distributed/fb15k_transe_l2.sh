@@ -6,7 +6,11 @@ machine_id=$1
 server_count=$2
 
 # Delete the temp file
-rm *-shape
+tmp_file=*-shape
+if test -f "$tmp_file"; then
+    echo "delete tmp file..."
+    rm $tmp_file
+fi
 
 ##################################################################################
 # Start kvserver
