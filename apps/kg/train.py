@@ -179,7 +179,7 @@ def run(args, logger):
         if len(args.gpu) > 1:
             args.num_test_proc = args.num_proc if args.num_proc < len(args.gpu) else len(args.gpu)
         else:
-            args.num_test_proc = mp.cpu_count() / 2 # We also use full cores for testing
+            args.num_test_proc = int(mp.cpu_count() / 2) # We also use full cores for testing
         eval_dataset = EvalDataset(dataset, args)
 
     if args.valid:
