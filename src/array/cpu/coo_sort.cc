@@ -4,7 +4,9 @@
  * \brief COO sorting
  */
 #include <dgl/array.h>
+#ifdef PARALLEL_ALGORITHMS
 #include <parallel/algorithm>
+#endif
 #include <numeric>
 #include <algorithm>
 #include <vector>
@@ -28,7 +30,11 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
   IdType* new_idx_data = static_cast<IdType*>(new_idx->data);
   std::iota(new_idx_data, new_idx_data + nnz, 0);
   if (sort_column) {
+#ifdef PARALLEL_ALGORITHMS
     __gnu_parallel::sort(
+#else
+    std::sort(
+#endif
         new_idx_data,
         new_idx_data + nnz,
         [coo_row_data, coo_col_data](const IdType a, const IdType b) {
@@ -37,7 +43,11 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
             (coo_col_data[a] < coo_col_data[b]);
         });
   } else {
+#ifdef PARALLEL_ALGORITHMS
     __gnu_parallel::sort(
+#else
+    std::sort(
+#endif
         new_idx_data,
         new_idx_data + nnz,
         [coo_row_data](const IdType a, const IdType b) {
