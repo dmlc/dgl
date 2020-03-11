@@ -645,7 +645,18 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
-    *rv = GraphOp::ToBidirectedImmutableGraph(g.sptr());
+    auto gptr = g.sptr();
+    auto immutable_g = std::dynamic_pointer_cast<ImmutableGraph>(gptr);
+    GraphPtr ret;
+    // For immutable graphs, we can try a faster version.
+    if (immutable_g) {
+      ret = GraphOp::ToBidirectedSimpleImmutableGraph(immutable_g);
+    }
+    // If the above option doesn't work, we call a general implementation.
+    if (!ret) {
+      ret = GraphOp::ToBidirectedImmutableGraph(gptr);
+    }
+    *rv = ret;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
@@ -654,6 +665,5 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     const IdArray query = args[1];
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
   });
-
 
 }  // namespace dgl
