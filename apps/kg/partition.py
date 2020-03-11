@@ -8,8 +8,11 @@ from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
 def write_graph_txt(path, graph):
-    print(graph.NID)
-    print(graph.ndata['part_id'])
+    print('number_of_edges: %d' graph.number_of_edges())
+    edge_ids = F.arange(0, graph.number_of_edges())
+    src, dst = graph.find_edges(edge_ids)
+    print(src)
+    print(dst)
 
 
 def main():
