@@ -42,6 +42,7 @@ def main():
               num_inner_nodes, num_inner_edges))
         tot_num_inner_edges += num_inner_edges
 
+        part.copy_from_parent()
         save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
