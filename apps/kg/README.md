@@ -18,29 +18,19 @@ Get started with our [tutorials](https://docs.dgl.ai)!
 
 DGL-KE is built in Python (version 3.6 or later) and relies on [DGL](https://github.com/dmlc/dgl) (at least version 0.4.2). The package can run with both [Pytorch](https://pytorch.org/) and [MXNet](https://mxnet.apache.org/). For Pytorch, it works with Pytorch v1.2 or newer. For MXNet, it works with MXNet 1.5 or newer.
 
-### Using anaconda
+#### Using anaconda
 
 ```
-conda install -c dglteam xxx           # cpu version
-conda install -c dglteam xxx           # CUDA 9.0
-conda install -c dglteam xxx           # CUDA 9.2
-conda install -c dglteam xxx           # CUDA 10.0
-conda install -c dglteam xxx           # CUDA 10.1
+conda install -c dglteam xxx
 ```
 
-### Using pip
+#### Using pip
 
+```
+pip install xxx
+```
 
-|           | Latest Nightly Build Version  | Stable Version          |
-|-----------|-------------------------------|-------------------------|
-| CPU       | `pip install --pre xxx`       | `pip install xxx`       |
-| CUDA 9.0  | `pip install --pre xxxxxxxx`  | `pip install xxxxxxxx`  |
-| CUDA 9.2  | `pip install --pre xxxxxxxx`  | `pip install xxxxxxxx`  |
-| CUDA 10.0 | `pip install --pre xxxxxxxxx` | `pip install xxxxxxxxx` |
-| CUDA 10.1 | `pip install --pre xxxxxxxxx` | `pip install xxxxxxxxx` |
-
-
-### Build from source
+#### Build from source
 
 Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-source).
 
