@@ -10,7 +10,7 @@ from dgl.data.utils import load_graphs, save_graphs
 def write_graph_txt(path, graph):
     edge_ids = F.arange(0, graph.number_of_edges())
     src, dst = graph.find_edges(edge_ids)
-    edges = graph.all_edges(form='all', order='srcdst'):
+    edges = graph.all_edges(form='all', order='srcdst')
     print(edges)
 
 
