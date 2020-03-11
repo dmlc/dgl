@@ -12,6 +12,7 @@ def write_graph_txt(path, graph):
     src, dst = graph.find_edges(edge_ids)
     edges = graph.all_edges(form='all', order='srcdst')
     print(graph.ndata['part_id'])
+    print(graph.parent_nid)
 
 
 
