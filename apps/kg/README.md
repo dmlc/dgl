@@ -1,7 +1,11 @@
 <img src="https://github.com/aksnzhy/dgl/blob/master/apps/kg/img/logo.png" width = "400"/>
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
-## Introduction
+
+DGL-KE is a fast and scalable package for learning large-scale knowledge graph embeddings. Developers can run DGL-KE on CPU machine, GPU machine, as well as clusters. The package is implemented with Python on top of [Deep Graph Library (DGL)](https://github.com/dmlc/dgl) and it supports a number of popular models, including [TransE](https://www.utc.fr/~bordesan/dokuwiki/_media/en/transe_nips13.pdf), [TransR](file:///Users/alex/Downloads/9571-44393-1-PB.pdf), [RESCAL](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.383.2015&rep=rep1&type=pdf), [DistMult](https://arxiv.org/abs/1412.6575), [ComplEx](http://proceedings.mlr.press/v48/trouillon16.pdf), and [RotatE](https://arxiv.org/pdf/1902.10197.pdf).
+
+
 
 DGL-KE is a DGL-based package for computing node embeddings and relation embeddings of
 knowledge graphs efficiently. This package is adapted from
