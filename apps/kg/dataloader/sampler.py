@@ -434,15 +434,20 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, neg_sample_size, is_chunked,
     # We use all nodes to create negative edges. Regardless of the sampling algorithm,
     # we can always view the subgraph with one chunk.
     if (neg_head and len(neg_g.head_nid) == num_nodes) \
-       or (not neg_head and len(neg_g.tail_nid) == num_nodes) \
-       or pos_g.number_of_edges() < chunk_size:
+            or (not neg_head and len(neg_g.tail_nid) == num_nodes):
         num_chunks = 1
         chunk_size = pos_g.number_of_edges()
     elif is_chunked:
-        # This is probably the last batch. Let's ignore it.
-        if pos_g.number_of_edges() % chunk_size > 0:
+        # This is probably for evaluation.
+        if pos_g.number_of_edges() < chunk_size \
+                and neg_g.number_of_edges() % neg_sample_size == 0:
+            num_chunks = 1
+            chunk_size = pos_g.number_of_edges()
+        # This is probably the last batch in the training. Let's ignore it.
+        elif pos_g.number_of_edges() % chunk_size > 0:
             return None
-        num_chunks = int(pos_g.number_of_edges() / chunk_size)
+        else:
+            num_chunks = int(pos_g.number_of_edges() / chunk_size)
         assert num_chunks * chunk_size == pos_g.number_of_edges()
     else:
         num_chunks = pos_g.number_of_edges()
