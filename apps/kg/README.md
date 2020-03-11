@@ -10,67 +10,19 @@ DGL-KE is a ***high performance***, ***easy-to-use***, and ***scalable*** packag
   <b>Figure</b>: DGL-KE Overall Architecture
 </p>
 
+DGL-KE is designed for learning at scale, and it introduces various novel optimizations that accelerate training on knowledge graphs with millions of nodes and billions of edges. The benchmark results represent a 2×∼5× speedup over the best competing approaches.
+
 Get started with our [tutorials](https://docs.dgl.ai)!
-
-### Using DGL-KE
-
-### Performance and Scalability
-
-
-DGL-KE is a DGL-based package for computing node embeddings and relation embeddings of
-knowledge graphs efficiently. This package is adapted from
-[KnowledgeGraphEmbedding](https://github.com/DeepGraphLearning/KnowledgeGraphEmbedding).
-We enable fast and scalable training of knowledge graph embedding,
-while still keeping the package as extensible as
-[KnowledgeGraphEmbedding](https://github.com/DeepGraphLearning/KnowledgeGraphEmbedding).
-On a single machine,
-it takes only a few minutes for medium-size knowledge graphs, such as FB15k and wn18, and
-takes a couple of hours on Freebase, which has hundreds of millions of edges.
-
-DGL-KE includes the following knowledge graph embedding models:
- 
-- TransE (TransE_l1 with L1 distance and TransE_l2 with L2 distance)
-- DistMult
-- ComplEx
-- RESCAL
-- TransR
-- RotatE
-
-It will add other popular models in the future.
-
-DGL-KE supports multiple training modes:
-
-- CPU training
-- GPU training
-- Joint CPU & GPU training
-- Multiprocessing training on CPUs
-
-For joint CPU & GPU training, node embeddings are stored on CPU and mini-batches are trained on GPU. This is designed for training KGE models on large knowledge graphs
-
-For multiprocessing training, each process train mini-batches independently and use shared memory for communication between processes. This is designed to train KGE models on large knowledge graphs with many CPU cores.
-
-We will support multi-GPU training and distributed training in a near future.
 
 ## Requirements
 
 The package can run with both Pytorch and MXNet. For Pytorch, it works with Pytorch v1.2 or newer.
 For MXNet, it works with MXNet 1.5 or newer.
 
-## Built-in Datasets
+## Installation
 
-DGL-KE provides five built-in knowledge graphs:
 
-| Dataset | #nodes | #edges | #relations |
-|---------|--------|--------|------------|
-| [FB15k](https://data.dgl.ai/dataset/FB15k.zip) | 14951 | 592213 | 1345 |
-| [FB15k-237](https://data.dgl.ai/dataset/FB15k-237.zip) | 14541 | 310116 | 237 |
-| [wn18](https://data.dgl.ai/dataset/wn18.zip) | 40943 | 151442 | 18 |
-| [wn18rr](https://data.dgl.ai/dataset/wn18rr.zip) | 40943 | 93003 | 11 |
-| [Freebase](https://data.dgl.ai/dataset/Freebase.zip) | 86054151 | 338586276 | 14824 |
-
-Users can specify one of the datasets with `--dataset` in `train.py` and `eval.py`.
-
-## Performance
+## Performance and Scalability
 
 The speed is measured with 16 CPU cores and one Nvidia V100 GPU.
 
