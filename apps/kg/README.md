@@ -10,6 +10,8 @@ DGL-KE is a ***high performance***, ***easy-to-use***, and ***scalable*** packag
   <b>Figure</b>: DGL-KE Overall Architecture
 </p>
 
+Get started with our [tutorials](https://docs.dgl.ai)!
+
 ### Using DGL-KE
 
 ### Performance and Scalability
