@@ -10,8 +10,6 @@ DGL-KE is a ***high performance***, ***easy-to-use***, and ***scalable*** packag
   <b>Figure</b>: DGL-KE Overall Architecture
 </p>
 
-DGL-KE is designed for learning at scale, and it introduces various novel optimizations that accelerate training on knowledge graphs with millions of nodes and billions of edges. The benchmark results represent a 2×∼5× speedup over the best competing approaches.
-
 Get started with our [tutorials](https://docs.dgl.ai)!
 
 ## Installation
@@ -35,6 +33,8 @@ pip install xxx
 Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-source).
 
 ## Performance and Scalability
+
+DGL-KE is designed for learning at scale, and it introduces various novel optimizations that accelerate training on knowledge graphs with millions of nodes and billions of edges. The benchmark results represent a 2×∼5× speedup over the best competing approaches.
 
 ## License
 
