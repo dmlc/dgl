@@ -7,6 +7,11 @@ import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
+def write_graph_txt(path, graph):
+    print(graph.NID)
+    print(graph.ndata['part_id'])
+
+
 def main():
     parser = argparse.ArgumentParser(description='Partition a knowledge graph')
     parser.add_argument('--data_path', type=str, default='data',
@@ -43,7 +48,8 @@ def main():
         tot_num_inner_edges += num_inner_edges
 
         part.copy_from_parent()
-        save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
+        #save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
+        write_graph_txt(args.data_path +'/partition_' + str[part_id], part)
 
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
