@@ -16,9 +16,13 @@ namespace dgl {
 
 namespace {
 
-gk_csr_t *Convert2GKCsr(CSRPtr csr, bool is_row) {
+/*!
+ * Convert DGL CSR to GKLib CSR.
+ * GKLib CSR actually stores both row-wise CSR and column-wise CSR.
+ * We need to specify if the input DGL CSR stores a row-wise CSR.
+ */
+gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row) {
   // TODO(zhengda) The conversion will be zero-copy in the future.
-  const aten::CSRMatrix mat = csr->ToCSRMatrix();
   const dgl_id_t *indptr = static_cast<dgl_id_t*>(mat.indptr->data);
   const dgl_id_t *indices = static_cast<dgl_id_t*>(mat.indices->data);
 
@@ -48,7 +52,12 @@ gk_csr_t *Convert2GKCsr(CSRPtr csr, bool is_row) {
   return gk_csr;
 }
 
-CSRPtr Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
+/*!
+ * Convert GKLib CSR to DGL CSR.
+ * GKLib CSR actually stores both row-wise CSR and column-wise CSR.
+ * We need to specify if we convert the row-wise CSR in GKLib to DGL CSR.
+ */
+aten::CSRMatrix Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
   // TODO(zhengda) The conversion will be zero-copy in the future.
   size_t num_ptrs;
   size_t nnz;
@@ -69,7 +78,6 @@ CSRPtr Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
   IdArray indptr_arr = aten::NewIdArray(num_ptrs);
   IdArray indices_arr = aten::NewIdArray(nnz);
   IdArray eids_arr = aten::NewIdArray(nnz);
-  CSRPtr csr = CSRPtr(new CSR(indptr_arr, indices_arr, eids_arr));
 
   dgl_id_t *indptr = static_cast<dgl_id_t *>(indptr_arr->data);
   dgl_id_t *indices = static_cast<dgl_id_t *>(indices_arr->data);
@@ -82,7 +90,7 @@ CSRPtr Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
     eids[i] = i;
   }
 
-  return csr;
+  return aten::CSRMatrix(gk_csr->nrows, gk_csr->ncols, indptr_arr, indices_arr, eids_arr);
 }
 
 }  // namespace
@@ -93,9 +101,11 @@ GraphPtr GraphOp::ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig) {
 #if !defined(_WIN32)
   // TODO(zhengda) should we get whatever CSR exists in the graph.
   CSRPtr csr = ig->GetInCSR();
-  gk_csr_t *gk_csr = Convert2GKCsr(csr, true);
+  gk_csr_t *gk_csr = Convert2GKCsr(csr->ToCSRMatrix(), true);
   gk_csr_t *sym_gk_csr = gk_csr_MakeSymmetric(gk_csr, GK_CSR_SYM_SUM);
-  csr = Convert2DGLCsr(sym_gk_csr, true);
+  auto mat = Convert2DGLCsr(sym_gk_csr, true);
+
+  CSRPtr csr = CSRPtr(new CSR(mat.indptr, mat.indices, mat.data));
   gk_csr_Free(&gk_csr);
   gk_csr_Free(&sym_gk_csr);
   // This is a symmetric graph now. The in-csr and out-csr are the same.
