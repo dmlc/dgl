@@ -1,5 +1,8 @@
 <img src="https://github.com/aksnzhy/dgl/blob/master/apps/kg/img/logo.png" width = "400"/>
 
+Learning Knowledge Graph Embeddings at Scale
+=========================================================
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 
