@@ -4,10 +4,10 @@
  * \brief COO sorting
  */
 #include <dgl/array.h>
+#include <parallel/algorithm>
 #include <numeric>
 #include <algorithm>
 #include <vector>
-#include <parallel/algorithm>
 
 namespace dgl {
 namespace aten {
@@ -54,7 +54,7 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
 
   if (COOHasData(coo)) {
     const IdType* coo_data_data = static_cast<IdType*>(coo.data->data);
-    IdArray new_data= IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
+    IdArray new_data = IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
     IdType* new_data_data = static_cast<IdType*>(new_data->data);
 #pragma omp parallel for
     for (IdType i = 0; i < nnz; ++i) {
