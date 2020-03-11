@@ -28,9 +28,6 @@ dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." ON)
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
-  if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
-    add_definitions(-DPARALLEL_ALGORITHMS)
-  endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 endif(NOT MSVC)
 
@@ -140,6 +137,11 @@ include(${GKLIB_PATH}/GKlibSystem.cmake)
 include_directories(${GKLIB_PATH})
 add_subdirectory("third_party/METIS/libmetis/")
 list(APPEND DGL_LINKER_LIBS metis)
+
+  # support PARALLEL_ALGORITHMS
+  if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
+    add_definitions(-DPARALLEL_ALGORITHMS)
+  endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 endif(NOT MSVC)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
