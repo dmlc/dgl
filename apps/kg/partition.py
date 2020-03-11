@@ -13,6 +13,7 @@ def write_graph_txt(path, graph):
     edges = graph.all_edges(form='all', order='srcdst')
     print(len(graph.ndata['part_id']))
     print(len(graph.parent_nid))
+    print(graph.edata['tid'])
 
 
 
