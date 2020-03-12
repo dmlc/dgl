@@ -11,6 +11,8 @@ from dgl.data.utils import load_graphs, save_graphs
 def write_graph_txt(path, file_name, part_dict):
     for part_id in part_dict:
         new_path = path + str(part_id)
+        if not os.path.exists(new_path):
+            os.mkdir(new_path)
         new_file_name = os.path.join(new_path, file_name)
         f = open(new_file_name, 'w')
         graph = part_dict[part_id]
