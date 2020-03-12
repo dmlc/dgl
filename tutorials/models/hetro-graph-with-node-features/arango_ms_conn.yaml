@@ -1,0 +1,10 @@
+arangodb:
+  DB_end_point: createDB
+  DB_service_host: arangoml.arangodb.cloud
+  DB_service_name: createDB
+  DB_service_port: 8529
+  arangodb_replication_factor: null
+  conn_protocol: https
+  dbName: MLlj5byxcuzm6l39bojxgbq
+  password: ML4eomq90dcxvdbnxwfyafoc
+  username: MLg04n3jy5smk7ab9as6h08

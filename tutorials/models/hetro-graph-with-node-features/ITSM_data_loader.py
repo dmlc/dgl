@@ -16,13 +16,18 @@ import networkx as nx
 import dgl
 #import numpy as np
 from collections import OrderedDict
-import numpy as np
+
 import torch as th
+import yaml
+import os
+import requests
+import json
+from custom_http_client import CustomHTTPClient
 
 class ITSM_Dataloader:
 
     def __init__(self, input_file = "pp_recoded_incident_event_log.csv",\
-                 create_db = True):
+                 create_db = True, frac = 0.01):
         self.emlg = None
         self.db = None
         self.labels = list()
@@ -31,11 +36,15 @@ class ITSM_Dataloader:
         self.feature_dict = {}
         self.feature_data = None
         self.setup_schema()
+        self.sampling_frac = frac
+        self.replication_factor = None
+        self.cfg = None
         if create_db:
             self.input_file = input_file
             self.delete_db()
             self.create_db()
             self.create_graph()
+            
             self.load_data()
         else:
             self.set_db_connection()
@@ -66,10 +75,26 @@ class ITSM_Dataloader:
 
 
     def set_db_connection(self):
-        client = ArangoClient(hosts= 'http://localhost:8529')
-        db = client.db('ITSM_db',\
-                       username='ITSM_db_admin',\
-                       password='open sesame')
+        self.cfg = self.get_conn_config()
+        db_conn_protocol = self.cfg['arangodb']['conn_protocol']
+        db_srv_host = self.cfg['arangodb']['DB_service_host']
+        db_srv_port = self.cfg['arangodb']['DB_service_port']
+
+        
+        
+        host_connection = db_conn_protocol + "://" + db_srv_host + ":" + str(
+            db_srv_port)
+        ms_user_name = self.cfg['arangodb']['username']
+        ms_password =  self.cfg['arangodb']['password']
+        ms_dbName = self.cfg['arangodb']['dbName']
+        
+        client = ArangoClient(hosts= host_connection,\
+                              http_client=CustomHTTPClient(username = ms_user_name,\
+                                                           password = ms_password))
+        
+
+        db = client.db(ms_dbName, ms_user_name, ms_password)
+
         self.db = db
         self.emlg = self.db.graph('ITSMg')
 
@@ -86,40 +111,107 @@ class ITSM_Dataloader:
             sys_db.delete_database('ITSM_db')
 
         return
-
+    
+    def get_conn_config(self, file_path = 'arango_ms_conn.yaml'):
+        file_name = os.path.join(os.path.dirname(__file__), file_path)
+        with open(file_name, "r") as file_descriptor:
+            cfg = yaml.load(file_descriptor, Loader=yaml.FullLoader)
+        return cfg
+    
+    def dump_data(self):
+        file_name = os.path.join(os.path.dirname(__file__),
+                                 "arango_ms_conn.yaml")
+        with open(file_name, "w") as file_descriptor:
+            cfg = yaml.dump(self.cfg, file_descriptor)
+        return cfg
     def create_db(self):
-        client = ArangoClient(hosts= 'http://localhost:8529')
+#        client = ArangoClient(hosts= 'http://localhost:8529')
+#
+#        # Connect to "_system" database as root user.
+#        # This returns an API wrapper for "_system" database.
+#        sys_db = client.db('_system',\
+#                       username='root',
+#                       password='open sesame')
+#
+#        # Create a new arangopipe database if it does not exist.
+#        if not sys_db.has_database('ITSM_db'):
+#            sys_db.create_database('ITSM_db')
+#
+#        if not sys_db.has_user('ITSM_db_admin'):
+#            sys_db.create_user(username = 'ITSM_db_admin',\
+#                               password = 'open sesame')
+#
+#        sys_db.update_permission(username = 'ITSM_db_admin',\
+#                                 database = 'ITSM_db', permission = "rw")
+#
+#        # Connect to arangopipe database as administrative user.
+#         #This returns an API wrapper for "test" database.
+#        db = client.db('ITSM_db',\
+#                       username='ITSM_db_admin',\
+#                       password='open sesame')
+#        self.db = db
+        
+        self.cfg = self.get_conn_config()
+        db_conn_protocol = self.cfg['arangodb']['conn_protocol']
+        db_srv_host = self.cfg['arangodb']['DB_service_host']
+        db_srv_port = self.cfg['arangodb']['DB_service_port']
+        db_end_point = self.cfg['arangodb']['DB_end_point']
+        db_serv_name = self.cfg['arangodb']['DB_service_name']
+        self.replication_factor = self.cfg['arangodb']['arangodb_replication_factor']
+        
+        
+        host_connection = db_conn_protocol + "://" + db_srv_host + ":" + str(
+            db_srv_port)
+        print("Host Connection: " + str(host_connection))
+        
+        client = ArangoClient(hosts=host_connection)
+            
+        api_data = {}
+        
+        API_ENDPOINT = host_connection + "/_db/_system/" + db_end_point + \
+                            "/" + db_serv_name
 
-        # Connect to "_system" database as root user.
-        # This returns an API wrapper for "_system" database.
-        sys_db = client.db('_system',\
-                       username='root',
-                       password='open sesame')
+        r = requests.post(url=API_ENDPOINT, json=api_data, verify=False)
+        
+        if r.status_code == 409 or r.status_code == 400:
+            print("It appears that you are attempting to connecting using \
+                             existing connection information. So either set reconnect = True when you create ArangoPipeAdmin or recreate a connection config and try again!"
+                )
+            return
 
-        # Create a new arangopipe database if it does not exist.
-        if not sys_db.has_database('ITSM_db'):
-            sys_db.create_database('ITSM_db')
+        assert r.status_code == 200, \
+            "Managed DB endpoint is unavailable !, reason: " + r.reason + " err code: " +\
+            str(r.status_code)
+        result = json.loads(r.text)
+        print("Managed service database was created !")
+        ms_dbName = result['dbName']
+        ms_user_name = result['username']
+        ms_password = result['password']
+        self.cfg['arangodb']['username'] = ms_user_name
+        self.cfg['arangodb']['password'] = ms_password
+        self.cfg['arangodb']['dbName'] = ms_dbName
+        self.dump_data()
+           
+            
+        
 
-        if not sys_db.has_user('ITSM_db_admin'):
-            sys_db.create_user(username = 'ITSM_db_admin',\
-                               password = 'open sesame')
+        client = ArangoClient(hosts= host_connection,\
+                              http_client=CustomHTTPClient(username = ms_user_name,\
+                                                           password = ms_password))
+        
 
-        sys_db.update_permission(username = 'ITSM_db_admin',\
-                                 database = 'ITSM_db', permission = "rw")
-
-        # Connect to arangopipe database as administrative user.
-         #This returns an API wrapper for "test" database.
-        db = client.db('ITSM_db',\
-                       username='ITSM_db_admin',\
-                       password='open sesame')
+        db = client.db(ms_dbName, ms_user_name, ms_password)
         self.db = db
-
+        
         return
 
 
+    
     def create_graph(self):
         if not self.db.has_graph('ITSMg'):
             self.emlg = self.db.create_graph('ITSMg')
+        else:
+            self.emlg = self.db.graph("ITSMg")
 
 
         self.create_graph_vertices()
@@ -132,6 +224,8 @@ class ITSM_Dataloader:
             src_vertex = self.edge_dict[edge]['from']
             dest_vertex = self.edge_dict[edge]['to']
             if not self.emlg.has_edge_definition(edge):
+                self.db.create_collection(edge, edge = True,\
+                                          replication_factor = self.replication_factor)
                 self.emlg.create_edge_definition(edge_collection = edge,\
                                                       from_vertex_collections=[src_vertex],\
                                                       to_vertex_collections=[dest_vertex] )
@@ -141,6 +235,7 @@ class ITSM_Dataloader:
     def create_graph_vertices(self):
         for v in self.vertex_list:
             if not self.emlg.has_vertex_collection(v):
+                self.db.create_collection(v, self.replication_factor)
                 self.emlg.create_vertex_collection(v)
         return
 
@@ -188,7 +283,9 @@ class ITSM_Dataloader:
     def load_data(self):
         t0 = time.time()
         df = pd.read_csv(self.input_file)
-        #df = df.sample(n = 7000)
+        df = df.sample(frac = self.sampling_frac)
+        num_rows = df.shape[0]
+        print("A dataset with %d rows is being used for this run" % (num_rows) )
         df = df.reset_index()
 
         node_val_ids = {v: dict() for v in self.vertex_list}
@@ -199,7 +296,7 @@ class ITSM_Dataloader:
                           'customer': 'opened_by', 'vendor': 'vendor'}
         for row_index, row in df.iterrows():
             try:
-                if row_index % 500 == 0:
+                if row_index % 5 == 0:
                     print("Processing row: " + str(row_index))
                 # insert the vertices
                 record_vertex_keys = dict()
@@ -299,7 +396,8 @@ class ITSM_Dataloader:
 
 
     def load_data_from_db(self):
-        query = 'FOR doc in incident\
+        query = 'WITH support_org, customer, vendor\
+        FOR doc in incident\
     FOR s IN 1..1 OUTBOUND doc `incident-support_org`\
     FOR c IN 1..1 OUTBOUND doc `incident-customer`\
     FOR v IN 1..1 OUTBOUND doc `incident-vendor`\
