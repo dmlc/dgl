@@ -38,13 +38,14 @@ def write_graph_txt(path, file_name, part_dict, total_nodes):
         part_id = F.asnumpy(graph.ndata['part_id'])
         for i in range(len(pid)):
             partition_book[pid[i]] = part_id[i]
+    # Write partition_book.txt
     for part_id in part_dict:
         new_path = path + str(part_id)
         new_file_name = os.path.join(new_path, 'partition_book.txt')
         f = open(new_file_name, 'w')
         for i in range(len(partition_book)):
             f.write(str(partition_book[i])+'\n')
-    f.close()
+        f.close()
 
 
 def main():
