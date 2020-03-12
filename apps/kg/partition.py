@@ -8,15 +8,15 @@ from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
 def write_graph_txt(path, graph):
-    edge_ids = F.arange(0, graph.number_of_edges())
-    src, dst = graph.find_edges(edge_ids)
-    edges = graph.all_edges(form='all', order='srcdst')
+    # Get triples
+    edges = graph.all_edges(form='all', order='eid')
+    relation_id = graph.edata['tid']
+    print(edges)
+    print(relation_id)
     print(len(graph.ndata['part_id']))
+    print(graph.ndata)
     print(len(graph.parent_nid))
-    print(graph.edata['tid'])
-
-
-
+    print(graph.parent_nid)
 
 
 def main():
