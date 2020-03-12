@@ -11,7 +11,7 @@ def write_graph_txt(path, file_name, part_dict):
     # Get triple and local2global
     for part_id in part_dict:
         new_path = path + str(part_id)
-        part = part_dict[part_id]
+        graph = part_dict[part_id]
         src, dst = graph.all_edges(form='uv', order='eid')
         relation_id = graph.edata['tid']
         assert len(src) == len(relation_id)
