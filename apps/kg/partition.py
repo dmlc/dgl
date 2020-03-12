@@ -3,6 +3,7 @@ import scipy as sp
 import numpy as np
 import argparse
 import signal
+import os
 import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
@@ -10,8 +11,8 @@ from dgl.data.utils import load_graphs, save_graphs
 def write_graph_txt(path, file_name, part_dict):
     for part_id in part_dict:
         new_path = path + str(part_id)
-        new_path = os.path.join(new_path, file_name)
-        f = open(new_path, 'w')
+        new_file_name = os.path.join(new_path, file_name)
+        f = open(new_file_name, 'w')
         graph = part_dict[part_id]
         src, dst = graph.all_edges(form='uv', order='eid')
         rel = graph.edata['tid']
