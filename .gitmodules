@@ -10,3 +10,6 @@
 [submodule "third_party/minigun"]
 	path = third_party/minigun
 	url = https://github.com/jermainewang/minigun.git
+[submodule "third_party/METIS"]
+	path = third_party/METIS
+	url = https://github.com/KarypisLab/METIS.git

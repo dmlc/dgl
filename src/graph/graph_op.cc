@@ -424,15 +424,17 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
   const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
   for (int64_t i = 0; i < num_edges; i++) {
-    edge_src.push_back(src_data[i]);
-    edge_dst.push_back(dst_data[i]);
-    edge_eid.push_back(eid_data[i]);
     // We check if the source node is in the original node.
     auto it1 = orig_nodes.find(src_data[i]);
-    inner_edges.push_back(it1 != orig_nodes.end());
+    if (it1 != orig_nodes.end() || num_hops > 0) {
+      edge_src.push_back(src_data[i]);
+      edge_dst.push_back(dst_data[i]);
+      edge_eid.push_back(eid_data[i]);
+      inner_edges.push_back(it1 != orig_nodes.end());
+    }
     // We need to expand only if the node hasn't been seen before.
     auto it = all_nodes.find(src_data[i]);
-    if (it == all_nodes.end()) {
+    if (it == all_nodes.end() && num_hops > 0) {
       all_nodes[src_data[i]] = false;
       outer_nodes[0].push_back(src_data[i]);
     }
@@ -652,5 +654,6 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     const IdArray query = args[1];
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
   });
+
 
 }  // namespace dgl

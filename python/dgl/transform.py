@@ -575,6 +575,46 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
+def metis_partition(g, k, extra_cached_hops=0):
+    '''
+    This is to partition a graph with Metis partitioning.
+
+    Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
+    to the partitions and their incoming edges.
+
+    The partitioned graph is stored in DGLGraph. The DGLGraph has the `part_id`
+    node data that indicates the partition a node belongs to.
+
+    Parameters
+    ------------
+    g: DGLGraph
+        The graph to be partitioned
+
+    k: int
+        The number of partitions.
+
+    extra_cached_hops: int
+        The number of hops a HALO node can be accessed.
+
+    Returns
+    --------
+    a dict of DGLGraphs
+        The key is the partition Id and the value is the DGLGraph of the partition.
+    '''
+    # METIS works only on symmetric graphs.
+    g = to_bidirected(g, readonly=True)
+    node_part = _CAPI_DGLMetisPartition(g._graph, k)
+    if len(node_part) == 0:
+        return None
+
+    node_part = utils.toindex(node_part)
+    parts = partition_graph_with_halo(g, node_part, extra_cached_hops)
+    node_part = node_part.tousertensor()
+    for part_id in parts:
+        part = parts[part_id]
+        part.ndata['part_id'] = F.gather_row(node_part, part.parent_nid)
+    return parts
+
 def compact_graphs(graphs, always_preserve=None):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
     isolated nodes across all graphs.

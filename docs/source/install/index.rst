@@ -83,7 +83,7 @@ Download the source files from GitHub.
 .. code:: bash
 
    git submodule init
-   git submodule update
+   git submodule update --recursive
 
 Linux
 `````
