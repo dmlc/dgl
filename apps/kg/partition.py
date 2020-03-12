@@ -7,7 +7,7 @@ import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
-def write_graph_txt(path, file_name, graph_dict):
+def write_graph_txt(path, file_name, part_dict):
     # Get triple and local2global
     for part_id in part_dict:
         new_path = path + str(part_id)
