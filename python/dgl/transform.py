@@ -708,7 +708,7 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
+def to_block(g, rhs_nodes=None, lhs_suffix="", rhs_suffix=""):
     """Convert a graph into a bipartite-structured "block" for message passing.
 
     Specifically, we create one node type ``ntype_l`` on the "left hand" side and another
@@ -843,10 +843,11 @@ def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
     new_ntypes = [ntype + lhs_suffix for ntype in g.ntypes] + \
                  [ntype + rhs_suffix for ntype in g.ntypes]
     new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, g.etypes)
+    assert new_graph.is_unibipartite  # sanity check
 
     for i, ntype in enumerate(g.ntypes):
-        new_graph.nodes[ntype + lhs_suffix].data[NID] = lhs_nodes[i]
-        new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[i]
+        new_graph.srcnodes[ntype + lhs_suffix].data[NID] = lhs_nodes[i]
+        new_graph.dstnodes[ntype + rhs_suffix].data[NID] = rhs_nodes[i]
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)

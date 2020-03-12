@@ -124,30 +124,31 @@ class RelGraphConvHetero(nn.Module):
         """
         g = g.local_var()
         for ntype, x in xs.items():
-            g.nodes[ntype + '_l'].data['x'] = x
+            g.srcnodes[ntype].data['x'] = x
         if self.use_weight:
             ws = self.basis_weight()
             funcs = {}
             for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-                if srctype[:-2] not in xs:
+                if srctype not in xs:
                     continue
-                g.nodes[srctype].data['h%d' % i] = th.matmul(
-                    g.nodes[srctype].data['x'], ws[etype])
+                g.srcnodes[srctype].data['h%d' % i] = th.matmul(
+                    g.srcnodes[srctype].data['x'], ws[etype])
                 funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
         else:
             funcs = {}
             for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-                if srctype[:-2] not in xs:
+                if srctype not in xs:
                     continue
-                g.nodes[srctype].data['h%d' % i] = g.nodes[srctype].data['x']
+                g.srcnodes[srctype].data['h%d' % i] = g.srcnodes[srctype].data['x']
                 funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
         # message passing
         g.multi_update_all(funcs, 'sum')
 
         hs = {}
-        for ntype in g.ntypes:
-            if ntype.endswith('_r') and 'h' in g.nodes[ntype].data:
-                hs[ntype[:-2]] = g.nodes[ntype].data['h']
+        for ntype in g.dsttypes:
+            print(ntype, 'h' in g.dstnodes[ntype].data)
+            if 'h' in g.dstnodes[ntype].data:
+                hs[ntype] = g.dstnodes[ntype].data['h']
         def _apply(h):
             # apply bias and activation
             if self.self_loop:
@@ -259,19 +260,16 @@ class HeteroNeighborSampler:
                 frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
             block = dgl.to_block(frontier, cur)
             cur = {}
-            for ntype in block.ntypes:
-                if ntype.endswith('_l'):
-                    cur[ntype[:-2]] = block.nodes[ntype].data[dgl.NID]
+            for ntype in block.srctypes:
+                cur[ntype] = block.srcnodes[ntype].data[dgl.NID]
             blocks.insert(0, block)
         return seeds, blocks
 
 def extract_embed(node_embed, block):
     emb = {}
-    for ntype in block.ntypes:
-        if ntype.endswith('_l'):
-            orig_ntype = ntype[:-2]
-            nid = block.nodes[ntype].data[dgl.NID]
-            emb[orig_ntype] = node_embed[orig_ntype][nid]
+    for ntype in block.srctypes:
+        nid = block.nodes[ntype].data[dgl.NID]
+        emb[ntype] = node_embed[ntype][nid]
     return emb
 
 
