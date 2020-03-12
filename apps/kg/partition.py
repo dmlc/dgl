@@ -7,18 +7,28 @@ import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
-def write_graph_txt(path, graph):
-    # Get triples
-    edges = graph.all_edges(form='all', order='eid')
-    relation_id = graph.edata['tid']
-    print(len(edges))
-    print(edges)
-    print(len(relation_id))
-    print(relation_id)
-    print(len(graph.ndata['part_id']))
-    print(graph.ndata)
-    print(len(graph.parent_nid))
-    print(graph.parent_nid)
+def write_graph_txt(path, file_name, graph_dict):
+    # Get triple and local2global
+    for part_id in part_dict:
+        new_path = path + str(part_id)
+        part = part_dict[part_id]
+        src, dst = graph.all_edges(form='uv', order='eid')
+        relation_id = graph.edata['tid']
+        assert len(src) == len(relation_id)
+
+
+
+
+    #edges = graph.all_edges(form='all', order='eid')
+    #relation_id = graph.edata['tid']
+    #print(len(edges))
+    #print(edges)
+    #print(len(relation_id))
+    #print(relation_id)
+    #print(len(graph.ndata['part_id']))
+    #print(graph.ndata)
+    #print(len(graph.parent_nid))
+    #print(graph.parent_nid)
 
 
 def main():
@@ -58,7 +68,7 @@ def main():
 
         part.copy_from_parent()
         #save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
-        write_graph_txt(args.data_path + '/partition_' + str(part_id), part)
+    write_graph_txt(args.data_path+'/partition_', args.data_files, part_id)
 
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
