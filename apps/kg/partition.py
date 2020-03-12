@@ -8,7 +8,8 @@ import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
-def write_graph_txt(path, file_name, part_dict):
+def write_graph_txt(path, file_name, part_dict, total_nodes):
+    partition_book = [0] * total_nodes
     for part_id in part_dict:
         # Get (h,r,t) triples
         new_path = path + str(part_id)
@@ -33,19 +34,17 @@ def write_graph_txt(path, file_name, part_dict):
         for i in range(len(pid)):
             f.write(str(pid[i])+'\n')
         f.close()
-        
-        print("--------------------")
-        print(graph.parent_nid)
-        print(graph.ndata['part_id'])
-        print("--------------------")
-
-    # Get partition book
-
-   
-
-
-    #print(len(graph.ndata['part_id']))
-
+        # Update partition_book
+        part_id = F.asnumpy(graph.ndata['part_id'])
+        for i in range(len(pid)):
+            partition_book[pid[i]] = part_id[i]
+    for part_id in part_dict:
+        new_path = path + str(part_id)
+        new_file_name = os.path.join(new_path, 'partition_book.txt')
+        f = open(new_file_name, 'w')
+        for i in range(len(partition_book)):
+            f.write(str(partition_book[i])+'\n')
+    f.close()
 
 
 def main():
@@ -85,7 +84,7 @@ def main():
 
         part.copy_from_parent()
         #save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
-    write_graph_txt(args.data_path+'/partition_', args.data_files[0], part_dict)
+    write_graph_txt(args.data_path+'/partition_', args.data_files[0], part_dict, g.number_of_nodes())
 
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
