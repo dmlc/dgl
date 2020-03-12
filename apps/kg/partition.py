@@ -27,24 +27,23 @@ def write_graph_txt(path, file_name, part_dict):
             f.write(str(src[i])+'\t'+str(rel[i])+'\t'+str(dst[i])+'\n')
         f.close()
         # Get local2global
-        new_file_name = os.path.join(new_path, 'local2global.txt')
+        new_file_name = os.path.join(new_path, 'local_to_global.txt')
         f = open(new_file_name, 'w')
         pid = F.asnumpy(graph.parent_nid)
         for i in range(len(pid)):
             f.write(str(pid[i])+'\n')
         f.close()
+    # Get partition book
+    print("--------------------")
+    graph.parent_nid
+    graph.ndata['part_id']
+    print("--------------------")
+
+   
 
 
-    #edges = graph.all_edges(form='all', order='eid')
-    #relation_id = graph.edata['tid']
-    #print(len(edges))
-    #print(edges)
-    #print(len(relation_id))
-    #print(relation_id)
     #print(len(graph.ndata['part_id']))
-    #print(graph.ndata)
-    #print(len(graph.parent_nid))
-    #print(graph.parent_nid)
+
 
 
 def main():
