@@ -33,11 +33,13 @@ def write_graph_txt(path, file_name, part_dict):
         for i in range(len(pid)):
             f.write(str(pid[i])+'\n')
         f.close()
+        
+        print("--------------------")
+        print(graph.parent_nid)
+        print(graph.ndata['part_id'])
+        print("--------------------")
+
     # Get partition book
-    print("--------------------")
-    graph.parent_nid
-    graph.ndata['part_id']
-    print("--------------------")
 
    
 
