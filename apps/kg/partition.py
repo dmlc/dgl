@@ -18,7 +18,7 @@ def write_graph_txt(path, file_name, part_dict):
         graph = part_dict[part_id]
         src, dst = graph.all_edges(form='uv', order='eid')
         rel = graph.edata['tid']
-        assert len(src) == len(relation_id)
+        assert len(src) == len(rel)
         src = F.asnumpy(src)
         dst = F.asnumpy(dst)
         rel = F.asnumpy(rel)
