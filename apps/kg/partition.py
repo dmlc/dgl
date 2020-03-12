@@ -11,7 +11,9 @@ def write_graph_txt(path, graph):
     # Get triples
     edges = graph.all_edges(form='all', order='eid')
     relation_id = graph.edata['tid']
+    print(len(edges))
     print(edges)
+    print(len(relation_id))
     print(relation_id)
     print(len(graph.ndata['part_id']))
     print(graph.ndata)
