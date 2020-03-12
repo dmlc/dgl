@@ -47,7 +47,6 @@ def write_graph_txt(path, file_name, part_dict, total_nodes):
             f.write(str(partition_book[i])+'\n')
         f.close()
 
-
 def main():
     parser = argparse.ArgumentParser(description='Partition a knowledge graph')
     parser.add_argument('--data_path', type=str, default='data',

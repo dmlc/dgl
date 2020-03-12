@@ -59,17 +59,25 @@ class KGDataset:
     The triples are stored as 'head_name\trelation_name\ttail_name'.
     '''
     def __init__(self, entity_path, relation_path,
-                 train_path, valid_path=None, test_path=None,
-                 format=[0,1,2], read_triple=True, only_train=False,
-                 skip_first_line=False):
-        self.entity2id, self.n_entities = self.read_entity(entity_path)
-        self.relation2id, self.n_relations = self.read_relation(relation_path)
+                 train_path, valid_path=None, test_path=None, local2global_path=None,
+                 partition_book_path=None, format=[0,1,2], read_triple=True, only_train=False,
+                 skip_first_line=False, partition=False):
+        if partition = False:
+            self.entity2id, self.n_entities = self.read_entity(entity_path)
+            self.relation2id, self.n_relations = self.read_relation(relation_path)
+            if read_triple == True:
+                self.train = self.read_triple(train_path, "train", skip_first_line, format)
+                if only_train == False:
+                    self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
+                    self.test = self.read_triple(test_path, "test", skip_first_line, format)
+        else:
+            with open(local2global_path) as f_ent:
+                self.n_entities = len(f_ent.readlines())
+            with open(relation_path) as f_rel:
+                self.n_relations = len(f_rel.readlines())
+            if read_triple == True:
+                self.train = self.read_triple(train_path, "train", skip_first_line, format, False)
 
-        if read_triple == True:
-            self.train = self.read_triple(train_path, "train", skip_first_line, format)
-            if only_train == False:
-                self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
-                self.test = self.read_triple(test_path, "test", skip_first_line, format)
 
     def read_entity(self, entity_path):
         with open(entity_path) as f:
@@ -89,7 +97,7 @@ class KGDataset:
 
         return relation2id, len(relation2id)
 
-    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2]):
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], has_map=True):
         # mode: train/valid/test
         if path is None:
             return None
@@ -103,9 +111,14 @@ class KGDataset:
             for line in f:
                 triple = line.strip().split('\t')
                 h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
-                heads.append(self.entity2id[h])
-                rels.append(self.relation2id[r])
-                tails.append(self.entity2id[t])
+                if has_map == True:
+                    heads.append(self.entity2id[h])
+                    rels.append(self.relation2id[r])
+                    tails.append(self.entity2id[t])
+                else:
+                    heads.append(int(h))
+                    rels.append(int(r))
+                    tails.append(int(t))
         heads = np.array(heads, dtype=np.int64)
         tails = np.array(tails, dtype=np.int64)
         rels = np.array(rels, dtype=np.int64)
@@ -125,7 +138,7 @@ class KGDatasetFB15k(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name='FB15k', read_triple=True, only_train=False):
+    def __init__(self, path, name='FB15k', read_triple=True, only_train=False, partition=False):
         self.name = name
         url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
@@ -139,6 +152,9 @@ class KGDatasetFB15k(KGDataset):
                                              os.path.join(self.path, 'train.txt'),
                                              os.path.join(self.path, 'valid.txt'),
                                              os.path.join(self.path, 'test.txt'),
+                                             os.path.join(self.path, 'local_to_global.txt'),
+                                             os.path.join(self.path, 'partition_book.txt'),
+                                             partition = partition,
                                              read_triple=read_triple,
                                              only_train=only_train)
 
@@ -464,13 +480,14 @@ def get_dataset(data_path, data_name, format_str, files=None):
     return dataset
 
 
+
 def get_partition_dataset(data_path, data_name, format_str, part_id):
-    part_name = os.path.join(data_name, 'part_'+str(part_id))
+    part_name = os.path.join(data_name, 'partition_'+str(part_id))
     if format_str == 'built_in':
         if data_name == 'Freebase':
             dataset = KGDatasetFreebase(data_path, part_name, read_triple=True, only_train=True)
         elif data_name == 'FB15k':
-            dataset = KGDatasetFB15k(data_path, part_name, read_triple=True, only_train=True)
+            dataset = KGDatasetFB15k(data_path, part_name, read_triple=True, only_train=True, partition=True)
         elif data_name == 'FB15k-237':
             dataset = KGDatasetFB15k237(data_path, part_name, read_triple=True, only_train=True)
         elif data_name == 'wn18':
