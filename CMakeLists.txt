@@ -39,6 +39,7 @@ endif(USE_CUDA)
 # include directories
 include_directories("include")
 include_directories("third_party/dlpack/include")
+include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
@@ -85,6 +86,10 @@ if(USE_OPENMP)
   endif(OPENMP_FOUND)
 endif(USE_OPENMP)
 
+# To compile METIS correct for DGL.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+
 # configure minigun
 add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
 # Source file lists
@@ -92,6 +97,8 @@ file(GLOB DGL_SRC
   src/*.cc
   src/array/*.cc
   src/array/cpu/*.cc
+  src/random/*.cc
+  src/random/cpu/*.cc
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
@@ -121,6 +128,15 @@ endif(USE_CUDA)
 add_subdirectory("third_party/dmlc-core")
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
+
+if(NOT MSVC)
+# Compile METIS
+set(GKLIB_PATH "third_party/METIS/GKlib")
+include(${GKLIB_PATH}/GKlibSystem.cmake)
+include_directories(${GKLIB_PATH})
+add_subdirectory("third_party/METIS/libmetis/")
+list(APPEND DGL_LINKER_LIBS metis)
+endif(NOT MSVC)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 

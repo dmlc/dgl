@@ -84,7 +84,6 @@ class MovieLens(object):
 
         self.data_split()
         self.build_graph()
-        self.find_neighbors(0.2, 2000, 1000)
 
     def split_user(self, df, filter_counts=False):
         df_new = df.copy()
@@ -156,7 +155,7 @@ class MovieLens(object):
         # bag-of-words
         g.ndata['title'] = torch.zeros(g.number_of_nodes(), len(vocab))
         for i, tw in enumerate(tqdm.tqdm(title_words)):
-            g.ndata['title'][i, [vocab_invmap[w] for w in tw]] = 1
+            g.ndata['title'][len(user_ids) + i, [vocab_invmap[w] for w in tw]] = 1
         self.vocab = vocab
         self.vocab_invmap = vocab_invmap
 
@@ -175,21 +174,6 @@ class MovieLens(object):
                 rating_user_vertices,
                 data={'inv': torch.ones(self.ratings.shape[0], dtype=torch.uint8)})
         self.g = g
-
-    def find_neighbors(self, restart_prob, max_nodes, top_T):
-        # TODO: replace with more efficient PPR estimation
-        neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
-                self.g, self.g.nodes(), restart_prob, max_nodes, top_T)
-
-        self.user_neighbors = []
-        for i in range(len(self.user_ids)):
-            user_neighbor = neighbors[i]
-            self.user_neighbors.append(user_neighbor.tolist())
-
-        self.movie_neighbors = []
-        for i in range(len(self.user_ids), len(self.user_ids) + len(self.movie_ids)):
-            movie_neighbor = neighbors[i]
-            self.movie_neighbors.append(movie_neighbor.tolist())
 
     def generate_mask(self):
         while True:

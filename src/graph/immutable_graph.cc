@@ -4,8 +4,11 @@
  * \brief DGL immutable graph index implementation
  */
 
-#include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/packed_func_ext.h>
+#include <dgl/runtime/smart_ptr_serializer.h>
+#include <dmlc/io.h>
+#include <dmlc/type_traits.h>
 #include <string.h>
 #include <bitset>
 #include <numeric>
@@ -274,6 +277,15 @@ DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
   return DGLIdIters(eid_data + start, eid_data + end);
 }
 
+bool CSR::Load(dmlc::Stream *fs) {
+  fs->Read(const_cast<dgl::aten::CSRMatrix*>(&adj_));
+  return true;
+}
+
+void CSR::Save(dmlc::Stream *fs) const {
+  fs->Write(adj_);
+}
+
 //////////////////////////////////////////////////////////
 //
 // COO graph implementation
@@ -303,8 +315,8 @@ bool COO::IsMultigraph() const {
 
 std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
   CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
-  const auto src = aten::IndexSelect(adj_.row, eid);
-  const auto dst = aten::IndexSelect(adj_.col, eid);
+  const dgl_id_t src = aten::IndexSelect<dgl_id_t>(adj_.row, eid);
+  const dgl_id_t dst = aten::IndexSelect<dgl_id_t>(adj_.col, eid);
   return std::pair<dgl_id_t, dgl_id_t>(src, dst);
 }
 
@@ -632,6 +644,25 @@ ImmutableGraphPtr ImmutableGraph::Reverse() const {
   } else {
     return ImmutableGraphPtr(new ImmutableGraph(out_csr_, in_csr_));
   }
+}
+
+constexpr uint64_t kDGLSerialize_ImGraph = 0xDD3c5FFE20046ABF;
+
+/*! \return Load HeteroGraph from stream, using OutCSR Matrix*/
+bool ImmutableGraph::Load(dmlc::Stream *fs) {
+  uint64_t magicNum;
+  aten::CSRMatrix out_csr_matrix;
+  CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+  CHECK_EQ(magicNum, kDGLSerialize_ImGraph)
+      << "Invalid ImmutableGraph Magic Number";
+  CHECK(fs->Read(&out_csr_)) << "Invalid csr matrix";
+  return true;
+}
+
+/*! \return Save HeteroGraph to stream, using OutCSR Matrix */
+void ImmutableGraph::Save(dmlc::Stream *fs) const {
+  fs->Write(kDGLSerialize_ImGraph);
+  fs->Write(GetOutCSR());
 }
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")

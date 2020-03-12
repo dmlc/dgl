@@ -21,6 +21,11 @@ MXNet uses uint32 as the default data type for integer tensors, which only suppo
 size smaller than 2^32. To enable large graph training, *build* MXNet with ``USE_INT64_TENSOR_SIZE=1``
 flag. See `this FAQ <https://mxnet.apache.org/api/faq/large_tensor_support>`_ for more information.
 
+MXNet 1.5 and later has an option to enable Numpy shape mode for ``NDArray`` objects, some DGL models
+need this mode to be enabled to run correctly. However, this mode may not compatible with pretrained 
+model parameters with this mode disabled, e.g. pretrained models from GluonCV and GluonNLP.
+By setting ``DGL_MXNET_SET_NP_SHAPE``, users can switch this mode on or off.
+
 Tensorflow backend
 ------------------
 

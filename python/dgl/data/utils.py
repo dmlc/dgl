@@ -9,15 +9,9 @@ import zipfile
 import tarfile
 import numpy as np
 import warnings
+import requests
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
-
-try:
-    import requests
-except ImportError:
-    class requests_failed_to_import(object):
-        pass
-    requests = requests_failed_to_import
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset',
@@ -35,7 +29,7 @@ def loadtxt(path, delimiter, dtype=None):
 
 def _get_dgl_url(file_url):
     """Get DGL online url for download."""
-    dgl_repo_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/'
+    dgl_repo_url = 'https://data.dgl.ai/'
     repo_url = os.environ.get('DGL_REPO', dgl_repo_url)
     if repo_url[-1] != '/':
         repo_url = repo_url + '/'
@@ -71,7 +65,7 @@ def split_dataset(dataset, frac_list=None, shuffle=False, random_state=None):
     from itertools import accumulate
     if frac_list is None:
         frac_list = [0.8, 0.1, 0.1]
-    frac_list = np.array(frac_list)
+    frac_list = np.asarray(frac_list)
     assert np.allclose(np.sum(frac_list), 1.), \
         'Expect frac_list sum to 1, got {:.4f}'.format(np.sum(frac_list))
     num_data = len(dataset)

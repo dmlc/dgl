@@ -111,14 +111,46 @@ on the training and validation set for reference.
 
 [8] visualizes the weights of atoms in readout for possible interpretations like the figure below. 
 We provide a jupyter notebook for performing the visualization and you can download it with 
-`wget https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/AttentiveFP/atom_weight_visualization.ipynb`.
+`wget https://data.dgl.ai/model_zoo/drug_discovery/AttentiveFP/atom_weight_visualization.ipynb`.
 
-![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/AttentiveFP/vis_example.png)
+![](https://data.dgl.ai/dgllife/attentive_fp_vis_example.png)
 
 ## Dataset Customization
 
-To customize your own dataset, see the instructions
-[here](https://github.com/dmlc/dgl/tree/master/python/dgl/data/chem).
+Generally we follow the practice of PyTorch.
+
+A Dataset class should implement `__getitem__(self, index)` and `__len__(self)` method
+
+```python
+class CustomDataset(object):
+    def __init__(self):
+        pass
+
+    def __getitem__(self, index):
+        """
+        Parameters
+        ----------
+        index : int
+            Index for the datapoint.
+        
+        Returns
+        -------
+        str
+            SMILES for the molecule
+        DGLGraph
+            Constructed DGLGraph for the molecule
+        1D Tensor of dtype float32
+            Labels of the datapoint
+        """
+        return self.smiles[index], self.graphs[index], self.labels[index]
+    
+    def __len__(self):
+        return len(self.smiles)
+```
+
+We provide various methods for graph construction in `dgl.data.chem.utils.mol_to_graph`. If your dataset can 
+be converted to a pandas dataframe, e.g. a .csv file, you may use `MoleculeCSVDataset` in 
+`dgl.data.chem.datasets.csv_dataset`.
 
 ## References
 [1] Wu et al. (2017) MoleculeNet: a benchmark for molecular machine learning. *Chemical Science* 9, 513-530.

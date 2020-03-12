@@ -142,7 +142,12 @@ class RDFGraphDataset:
         dst = []
         ntid = []
         etid = []
-        for i, (sbj, pred, obj) in enumerate(raw_tuples):
+        sorted_tuples = []
+        for t in raw_tuples:
+            sorted_tuples.append(t)
+        sorted_tuples.sort()
+
+        for i, (sbj, pred, obj) in enumerate(sorted_tuples):
             if i % self._print_every == 0:
                 print('Processed %d tuples, found %d valid tuples.' % (i, len(src)))
             sbjent = self.parse_entity(sbj)
@@ -170,10 +175,10 @@ class RDFGraphDataset:
             dst.append(dst_id)
             etid.append(relclsid)
 
-        src = np.array(src)
-        dst = np.array(dst)
-        ntid = np.array(ntid)
-        etid = np.array(etid)
+        src = np.asarray(src)
+        dst = np.asarray(dst)
+        ntid = np.asarray(ntid)
+        etid = np.asarray(etid)
         ntypes = list(ent_classes.keys())
         etypes = list(rel_classes.keys())
 

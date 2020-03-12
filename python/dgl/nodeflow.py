@@ -82,7 +82,7 @@ class NodeFlow(DGLBaseGraph):
     We store extra information, such as the node and edge mapping from
     the NodeFlow graph to the parent graph.
 
-    .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/api/sampling.nodeflow.png
+    .. image:: https://data.dgl.ai/api/sampling.nodeflow.png
 
     DO NOT create NodeFlow object directly. Use sampling method to
     generate NodeFlow instead.
@@ -1016,6 +1016,12 @@ class NodeFlow(DGLBaseGraph):
 
             self.block_compute(i, message_func, reduce_func, apply_node_func,
                                inplace=inplace)
+
+    @property
+    def canonical_etype(self):
+        """Return canonical edge type to be compatible with GraphAdapter
+        """
+        return (None, None, None)
 
 def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))

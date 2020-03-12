@@ -4,6 +4,7 @@
  * \brief DGL sampler implementation
  */
 #include <dgl/sampler.h>
+#include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
@@ -14,7 +15,6 @@
 #include <cmath>
 #include <numeric>
 #include "../c_api_common.h"
-#include "../array/common.h"  // for ATEN_FLOAT_TYPE_SWITCH
 
 using namespace dgl::runtime;
 
@@ -931,7 +931,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
       {
         const FloatType *prob;
 
-        if (probability->ndim == 1 && probability->shape[0] == 0) {
+        if (aten::IsNullArray(probability)) {
           prob = nullptr;
         } else {
           CHECK(probability->shape[0] == gptr->NumEdges())
@@ -1227,13 +1227,7 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
-  // If we didn't sample all nodes to form negative edges, some of the nodes
-  // in the vector might be redundant.
-  if (neg_sample_size < num_tot_nodes) {
-    std::sort(neg_vids.begin(), neg_vids.end());
-    auto it = std::unique(neg_vids.begin(), neg_vids.end());
-    neg_vids.resize(it - neg_vids.begin());
-  }
+
   if (IsNegativeHeadMode(neg_mode)) {
     neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
     neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
@@ -1243,7 +1237,7 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   }
   // TODO(zhengda) we should provide an array of 1s if exclude_positive
   if (check_false_neg) {
-    if (relations_->shape[0] == 0) {
+    if (aten::IsNullArray(relations_)) {
       neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
     } else {
       neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
@@ -1392,7 +1386,7 @@ NegSubgraph EdgeSamplerObject::genChunkedNegEdgeSubgraph(const Subgraph &pos_sub
     neg_subg.tail_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
   }
   if (check_false_neg) {
-    if (relations_->shape[0] == 0) {
+    if (aten::IsNullArray(relations_)) {
       neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
     } else {
       neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,

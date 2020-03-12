@@ -6,6 +6,7 @@ import pandas as pd
 from ..utils import multiprocess_load_molecules, ACNN_graph_construction_and_featurization
 from ...utils import get_download_dir, download, _get_dgl_url, extract_archive
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 class PDBBind(object):
     """PDBbind dataset processed by MoleculeNet.
@@ -67,6 +68,7 @@ class PDBBind(object):
         Number of worker processes to use. If None,
         then we will use the number of CPUs in the system. Default to 64.
     """
+    @deprecated('Import PDBBind from dgllife.data instead.', 'class')
     def __init__(self, subset, load_binding_pocket=True, add_hydrogens=False,
                  sanitize=False, calc_charges=False, remove_hs=False, use_conformation=True,
                  construct_graph_and_featurize=ACNN_graph_construction_and_featurization,

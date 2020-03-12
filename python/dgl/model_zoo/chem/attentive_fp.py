@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ... import function as fn
+from ...contrib.deprecation import deprecated
 from ...nn.pytorch.softmax import edge_softmax
 
 class AttentiveGRU1(nn.Module):
@@ -146,7 +147,7 @@ class GetContext(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.
@@ -201,7 +202,7 @@ class GNNLayer(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.
@@ -247,7 +248,7 @@ class GlobalPool(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.
@@ -296,6 +297,7 @@ class AttentiveFP(nn.Module):
     dropout : float
         The probability for performing dropout.
     """
+    @deprecated('Import AttentiveFPPredictor from dgllife.model instead.', 'class')
     def __init__(self,
                  node_feat_size,
                  edge_feat_size,
@@ -324,7 +326,7 @@ class AttentiveFP(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.

@@ -144,7 +144,7 @@ TEST(ArrayTest, TestHStack) {
 template <typename IDX>
 void _TestIndexSelect() {
   IdArray a = aten::Range(0, 100, sizeof(IDX)*8, CTX);
-  ASSERT_EQ(aten::IndexSelect(a, 50), 50);
+  ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
   IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, CTX);
   IdArray c = aten::IndexSelect(a, b);
   ASSERT_TRUE(ArrayEQ<IDX>(b, c));

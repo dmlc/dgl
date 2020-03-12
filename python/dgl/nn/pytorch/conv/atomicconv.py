@@ -1,4 +1,5 @@
 """Torch Module for Atomic Convolution Layer"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -202,7 +203,7 @@ class AtomicConv(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             Topology based on which message passing is performed.
         feat : Float32 tensor of shape (V, 1)
             Initial node features, which are atomic numbers in the paper.

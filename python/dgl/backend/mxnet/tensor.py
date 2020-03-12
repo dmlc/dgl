@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from distutils.version import LooseVersion
 
+import os
 import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
@@ -17,7 +18,7 @@ if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
-mx.set_np_shape(True)
+mx.set_np_shape(bool(os.environ.get('DGL_MXNET_SET_NP_SHAPE', True)))
 
 def data_type_dict():
     return {'float16' : np.float16,
@@ -189,7 +190,10 @@ def repeat(input, repeats, dim):
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
     if len(row_index) == 0:
-        return data[0:0]
+        if data.shape[0] == 0:
+            return data
+        else:
+            return data[0:0]
 
     if isinstance(row_index, nd.NDArray):
         return nd.take(data, row_index)
@@ -445,7 +449,7 @@ class BinaryReduce(mx.autograd.Function):
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+                  out_size, lhs_map=(None, None), rhs_map=(None, None), out_map=(None, None)):
     func = BinaryReduce(reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
                         rhs_map, out_map)
     return func(lhs_data, rhs_data)
@@ -508,7 +512,8 @@ class CopyReduce(mx.autograd.Function):
         return grad_in
 
 
-def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
+                out_map=(None, None)):
     func = CopyReduce(reducer, graph, target, out_size, in_map, out_map)
     return func(in_data)
 
@@ -539,7 +544,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad in_shape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))[0]
+    reduce_idx = np.nonzero(np.asarray(grad_shape) - np.asarray(in_shape))[0]
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)

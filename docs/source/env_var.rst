@@ -13,11 +13,11 @@ Backend Options
 Data Repository
 ---------------
 * ``DGL_REPO``:
-    * Values: String (default='https://s3.us-east-2.amazonaws.com/dgl.ai/')
+    * Values: String (default='https://data.dgl.ai/')
     * The repository url to be used for DGL datasets and pre-trained models.
     * Suggested values:
-        * 'https://s3.us-east-2.amazonaws.com/dgl.ai/': DGL repo for U.S.
-        * 'https://s3-ap-southeast-1.amazonaws.com/dgl.ai.asia/': DGL repo for Asia
+        * 'https://data.dgl.ai/': DGL repo for Global Region.
+        * 'https://dgl-data.s3.cn-north-1.amazonaws.com.cn/': DGL repo for Mainland China
 * ``DGL_DOWNLOAD_DIR``:
     * Values: String (default="${HOME}/.dgl")
     * The local directory to cache the downloaded data.

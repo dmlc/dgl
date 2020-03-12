@@ -1,8 +1,8 @@
 """
 .. currentmodule:: dgl
 
-Tutorial: Batched graph classification with DGL
-================================================
+Graph Classification Tutorial
+=============================
 
 **Author**: `Mufei Li <https://github.com/mufeili>`_,
 `Minjie Wang <https://jermainewang.github.io/>`_,
@@ -30,7 +30,7 @@ networks to this problem has been a popular approach recently. This can be seen 
 # In this tutorial, you learn how to perform batched graph classification
 # with DGL. The example task objective is to classify eight types of topologies shown here.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/dataset_overview.png
+# .. image:: https://data.dgl.ai/tutorial/batch/dataset_overview.png
 #     :align: center
 #
 # Implement a synthetic dataset :class:`data.MiniGCDataset` in DGL. The dataset has eight 
@@ -64,7 +64,7 @@ plt.show()
 # a batch of graphs can be viewed as a large graph that has many disjointed 
 # connected components. Below is a visualization that gives the general idea.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/batch.png
+# .. image:: https://data.dgl.ai/tutorial/batch/batch.png
 #     :width: 400pt
 #     :align: center
 #
@@ -91,7 +91,7 @@ def collate(samples):
 # ----------------
 # Graph classification proceeds as follows.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/graph_classifier.png
+# .. image:: https://data.dgl.ai/tutorial/batch/graph_classifier.png
 #
 # From a batch of graphs, perform message passing and graph convolution
 # for nodes to communicate with others. After message passing, compute a
@@ -254,16 +254,16 @@ print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
 ###############################################################################
 # The animation here plots the probability that a trained model predicts the correct graph type.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/test_eval4.gif
+# .. image:: https://data.dgl.ai/tutorial/batch/test_eval4.gif
 #
 # To understand the node and graph representations that a trained model learned,
 # we use `t-SNE, <https://lvdmaaten.github.io/tsne/>`_ for dimensionality reduction
 # and visualization.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/tsne_node2.png
+# .. image:: https://data.dgl.ai/tutorial/batch/tsne_node2.png
 #     :align: center
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/tsne_graph2.png
+# .. image:: https://data.dgl.ai/tutorial/batch/tsne_graph2.png
 #     :align: center
 #
 # The two small figures on the top separately visualize node representations after one and two

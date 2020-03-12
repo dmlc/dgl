@@ -63,7 +63,7 @@ class Index(object):
             self._slice_data = slice(data.start, data.stop)
         else:
             try:
-                data = np.array(data).astype(np.int64)
+                data = np.asarray(data, dtype=np.int64)
             except Exception:  # pylint: disable=broad-except
                 raise DGLError('Error index data: %s' % str(data))
             if data.ndim == 0:  # scalar array
@@ -442,11 +442,14 @@ def cached_member(cache, prefix):
     """
     def _creator(func):
         @wraps(func)
-        def wrapper(self, *args):
+        def wrapper(self, *args, **kwargs):
             dic = getattr(self, cache)
-            key = '%s-%s' % (prefix, '-'.join([str(a) for a in args]))
+            key = '%s-%s-%s' % (
+                prefix,
+                '-'.join([str(a) for a in args]),
+                '-'.join([str(k) + ':' + str(v) for k, v in kwargs.items()]))
             if key not in dic:
-                dic[key] = func(self, *args)
+                dic[key] = func(self, *args, **kwargs)
             return dic[key]
         return wrapper
     return _creator
@@ -514,5 +517,5 @@ def make_invmap(array, use_numpy=True):
     else:
         uniques = list(set(array))
     invmap = {x: i for i, x in enumerate(uniques)}
-    remapped = np.array([invmap[x] for x in array])
+    remapped = np.asarray([invmap[x] for x in array])
     return uniques, invmap, remapped

@@ -5,8 +5,6 @@ import numpy as np
 import backend as F
 from itertools import product
 
-np.random.seed(31)
-
 def udf_copy_src(edges):
     return {'m': edges.src['u']}
 
@@ -36,6 +34,7 @@ def generate_feature(g, broadcast='none', binary_op='none'):
     """Create graph with src, edge, dst feature. broadcast can be 'u',
     'e', 'v', 'none'
     """
+    np.random.seed(31)
     nv = g.number_of_nodes()
     ne = g.number_of_edges()
     if binary_op == 'dot':
@@ -303,8 +302,21 @@ def test_all_binary_builtins():
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
                   format(lhs, binary_op, rhs, reducer, broadcast, partial))
-            print("lhs", F.asnumpy(lhs).tolist())
-            print("rhs", F.asnumpy(rhs).tolist())
+            if lhs == 'u':
+                lhs_data = hu
+            elif lhs == 'v':
+                lhs_data = hv
+            elif lhs == 'e':
+                lhs_data = he
+
+            if rhs == 'u':
+                rhs_data = hu
+            elif rhs == 'v':
+                rhs_data = hv
+            elif rhs == 'e':
+                rhs_data = he
+            print("lhs", F.asnumpy(lhs_data).tolist())
+            print("rhs", F.asnumpy(rhs_data).tolist())
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))

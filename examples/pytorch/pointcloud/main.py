@@ -28,7 +28,7 @@ data_filename = 'modelnet40-sampled-2048.h5'
 local_path = args.dataset_path or os.path.join(get_download_dir(), data_filename)
 
 if not os.path.exists(local_path):
-    download('https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/modelnet40-sampled-2048.h5', local_path)
+    download('https://data.dgl.ai/dataset/modelnet40-sampled-2048.h5', local_path)
 
 CustomDataLoader = partial(
         DataLoader,

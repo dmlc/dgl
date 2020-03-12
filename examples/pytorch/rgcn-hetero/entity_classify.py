@@ -156,11 +156,11 @@ class RelGraphConvHeteroEmbed(nn.Module):
         self.self_loop = self_loop
 
         # create weight embeddings for each node for each relation
-        self.embeds = nn.ParameterList()
+        self.embeds = nn.ParameterDict()
         for srctype, etype, dsttype in g.canonical_etypes:
             embed = nn.Parameter(th.Tensor(g.number_of_nodes(srctype), self.embed_size))
             nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
-            self.embeds.append(embed)
+            self.embeds["{}-{}-{}".format(srctype, etype, dsttype)] = embed
 
         # bias
         if self.bias:
@@ -189,7 +189,7 @@ class RelGraphConvHeteroEmbed(nn.Module):
         g = self.g.local_var()
         funcs = {}
         for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-            g.nodes[srctype].data['embed-%d' % i] = self.embeds[i]
+            g.nodes[srctype].data['embed-%d' % i] = self.embeds["{}-{}-{}".format(srctype, etype, dsttype)]
             funcs[(srctype, etype, dsttype)] = (fn.copy_u('embed-%d' % i, 'm'), fn.mean('m', 'h'))
         g.multi_update_all(funcs, 'sum')
         
@@ -220,6 +220,7 @@ class EntityClassify(nn.Module):
         self.h_dim = h_dim
         self.out_dim = out_dim
         self.rel_names = list(set(g.etypes))
+        self.rel_names.sort()
         self.num_bases = None if num_bases < 0 else num_bases
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
@@ -238,7 +239,7 @@ class EntityClassify(nn.Module):
         # h2o
         self.layers.append(RelGraphConvHetero(
             self.h_dim, self.out_dim, self.rel_names, "basis",
-            self.num_bases, activation=partial(F.softmax, dim=1),
+            self.num_bases, activation=None,
             self_loop=self.use_self_loop))
 
     def forward(self):
@@ -285,7 +286,6 @@ def main(args):
         labels = labels.cuda()
         train_idx = train_idx.cuda()
         test_idx = test_idx.cuda()
-        labels = labels.cuda()
 
     # create model
     model = EntityClassify(g,
@@ -324,6 +324,8 @@ def main(args):
         print("Epoch {:05d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
               format(epoch, train_acc, loss.item(), val_acc, val_loss.item(), np.average(dur)))
     print()
+    if args.model_path is not None:
+        th.save(model.state_dict(), args.model_path)
 
     model.eval()
     logits = model.forward()[category_id]
@@ -350,6 +352,8 @@ if __name__ == '__main__':
             help="number of training epochs")
     parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
+    parser.add_argument("--model_path", type=str, default=None,
+            help='path for save the model')
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
     parser.add_argument("--use-self-loop", default=False, action='store_true',

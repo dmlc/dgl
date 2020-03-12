@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 
 from ._ffi.function import _init_api
-from .ndarray import empty
+from .ndarray import null
 
 # pylint: disable=invalid-name
 def infer_binary_feature_shape(op, lhs, rhs):
@@ -46,9 +46,9 @@ def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
          node ID, destination node ID, or edge ID, according to ``A_target``
          and ``B_target`` which could take either
 
-         - "source" (0),
-         - "destination" (1), or
-         - "edge" (2).
+         - "source" (dgl.function.TargetCode.SRC),
+         - "destination" (dgl.function.TargetCode.DST), or
+         - "edge" (dgl.function.TargetCode.EDGE).
 
        * ``A`` and ``B`` are data tensors.  If ``A_target`` is "edge", then
          ``A.shape[0]`` should equal the number of edges of ``G``. Otherwise
@@ -136,11 +136,11 @@ def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
         The rows to write to output tensor.
     """
     if A_rows is None:
-        A_rows = empty([])
+        A_rows = null()
     if B_rows is None:
-        B_rows = empty([])
+        B_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -200,11 +200,11 @@ def backward_lhs_binary_op_reduce(
         The rows written to output tensor.
     """
     if A_rows is None:
-        A_rows = empty([])
+        A_rows = null()
     if B_rows is None:
-        B_rows = empty([])
+        B_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -265,11 +265,11 @@ def backward_rhs_binary_op_reduce(
         The rows written to output tensor.
     """
     if A_rows is None:
-        A_rows = empty([])
+        A_rows = null()
     if B_rows is None:
-        B_rows = empty([])
+        B_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -298,9 +298,9 @@ def copy_reduce(reducer, G, target,
        * ``select_target`` would return the source node ID, destination node,
          ID, or edge ID, according to ``target`` which could take either
 
-         - "source" (0),
-         - "destination" (1), or
-         - "edge" (2)
+         - "source" (dgl.function.TargetCode.SRC),
+         - "destination" (dgl.function.TargetCode.DST), or
+         - "edge" (dgl.function.TargetCode.EDGE).
 
        * ``X`` is a data tensor.  If ``target`` is "edge", then ``X.shape[0]``
          should equal the number of edges of ``G``.  Otherwise that should
@@ -364,9 +364,9 @@ def copy_reduce(reducer, G, target,
         The rows to write to output tensor.
     """
     if X_rows is None:
-        X_rows = empty([])
+        X_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelCopyReduce(
         reducer, G, int(target),
         X, out, X_rows, out_rows)
@@ -406,9 +406,9 @@ def backward_copy_reduce(reducer, G, target,
         The rows written to output tensor.
     """
     if X_rows is None:
-        X_rows = empty([])
+        X_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBackwardCopyReduce(
         reducer, G, int(target),
         X, out, grad_out, grad_X,

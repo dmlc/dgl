@@ -8,20 +8,21 @@ import socket
 from .backend import load_backend
 
 from . import function
-from . import nn
 from . import contrib
 from . import container
 from . import random
+from . import sampling
 
 from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
 from ._ffi.base import DGLError, __version__
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
-from .batched_graph import *
+from .readout import *
 from .batched_heterograph import *
 from .convert import *
-from .graph import DGLGraph
+from .graph import DGLGraph, batch, unbatch
+from .generators import *
 from .heterograph import DGLHeteroGraph
 from .nodeflow import *
 from .traversal import *

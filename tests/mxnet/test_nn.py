@@ -4,6 +4,7 @@ import numpy as np
 import scipy as sp
 import dgl
 import dgl.nn.mxnet as nn
+import dgl.function as fn
 import backend as F
 from mxnet import autograd, gluon, nd
 
@@ -327,7 +328,7 @@ def test_set2set():
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = s2s(g, h0)
-    assert h1.shape[0] == 10 and h1.ndim == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.ndim == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g])
@@ -345,7 +346,7 @@ def test_glob_att_pool():
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = gap(g, h0)
-    assert h1.shape[0] == 10 and h1.ndim == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.ndim == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
@@ -365,13 +366,13 @@ def test_simple_pool():
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = sum_pool(g, h0)
-    check_close(h1, F.sum(h0, 0))
+    check_close(F.squeeze(h1, 0), F.sum(h0, 0))
     h1 = avg_pool(g, h0)
-    check_close(h1, F.mean(h0, 0))
+    check_close(F.squeeze(h1, 0), F.mean(h0, 0))
     h1 = max_pool(g, h0)
-    check_close(h1, F.max(h0, 0))
+    check_close(F.squeeze(h1, 0), F.max(h0, 0))
     h1 = sort_pool(g, h0)
-    assert h1.shape[0] == 10 * 5 and h1.ndim == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
@@ -508,6 +509,60 @@ def test_rgcn():
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
+def test_sequential():
+    ctx = F.ctx()
+    # test single graph
+    class ExampleLayer(gluon.nn.Block):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def forward(self, graph, n_feat, e_feat):
+            graph = graph.local_var()
+            graph.ndata['h'] = n_feat
+            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            n_feat += graph.ndata['h']
+            graph.apply_edges(fn.u_add_v('h', 'h', 'e'))
+            e_feat += graph.edata['e']
+            return n_feat, e_feat
+
+    g = dgl.DGLGraph()
+    g.add_nodes(3)
+    g.add_edges([0, 1, 2, 0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1, 2, 2, 2])
+    net = nn.Sequential()
+    net.add(ExampleLayer())
+    net.add(ExampleLayer())
+    net.add(ExampleLayer())
+    net.initialize(ctx=ctx)
+    n_feat = F.randn((3, 4))
+    e_feat = F.randn((9, 4))
+    n_feat, e_feat = net(g, n_feat, e_feat)
+    assert n_feat.shape == (3, 4)
+    assert e_feat.shape == (9, 4)
+
+    # test multiple graphs
+    class ExampleLayer(gluon.nn.Block):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def forward(self, graph, n_feat):
+            graph = graph.local_var()
+            graph.ndata['h'] = n_feat
+            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            n_feat += graph.ndata['h']
+            return n_feat.reshape(graph.number_of_nodes() // 2, 2, -1).sum(1)
+
+    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05))
+    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2))
+    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8))
+    net = nn.Sequential()
+    net.add(ExampleLayer())
+    net.add(ExampleLayer())
+    net.add(ExampleLayer())
+    net.initialize(ctx=ctx)
+    n_feat = F.randn((32, 4))
+    n_feat = net([g1, g2, g3], n_feat)
+    assert n_feat.shape == (4, 4)
+
 if __name__ == '__main__':
     test_graph_conv()
     test_gat_conv()
@@ -530,3 +585,4 @@ if __name__ == '__main__':
     test_glob_att_pool()
     test_simple_pool()
     test_rgcn()
+    test_sequential()
