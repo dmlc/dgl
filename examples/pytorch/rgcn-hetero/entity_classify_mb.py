@@ -146,7 +146,6 @@ class RelGraphConvHetero(nn.Module):
 
         hs = {}
         for ntype in g.dsttypes:
-            print(ntype, 'h' in g.dstnodes[ntype].data)
             if 'h' in g.dstnodes[ntype].data:
                 hs[ntype] = g.dstnodes[ntype].data['h']
         def _apply(h):
