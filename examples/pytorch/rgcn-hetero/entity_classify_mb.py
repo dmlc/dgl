@@ -243,9 +243,6 @@ class EntityClassify(nn.Module):
 
 class HeteroNeighborSampler:
     def __init__(self, g, category, fanouts, full_neighbor=False):
-        """
-        if fanouts is None, sample full neighbor
-        """
         self.g = g
         self.category = category
         self.fanouts = fanouts
