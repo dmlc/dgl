@@ -595,12 +595,14 @@ def metis_partition(g, k, extra_cached_hops=0):
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
     # METIS works only on symmetric graphs.
-    g = to_bidirected(g, readonly=True)
-    node_part = _CAPI_DGLMetisPartition(g._graph, k)
+    # The METIS runs on the symmetric graph to generate the node assignment to partitions.
+    sym_g = to_bidirected(g, readonly=True)
+    node_part = _CAPI_DGLMetisPartition(sym_g._graph, k)
     if len(node_part) == 0:
         return None
 
     node_part = utils.toindex(node_part)
+    # Then we split the original graph into parts based on the METIS partitioning results.
     parts = partition_graph_with_halo(g, node_part, extra_cached_hops)
     node_part = node_part.tousertensor()
     for part_id in parts:
