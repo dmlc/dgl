@@ -288,7 +288,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False):
+    def read_triple(self, path, mode, skip_first_line=False, format=None):
         heads = []
         tails = []
         rels = []
