@@ -16,7 +16,7 @@ from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdge
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from .udf import NodeBatch, EdgeBatch
 
-__all__ = ['DGLHeteroGraph', 'combine_names']
+__all__ = ['DGLHeteroGraph', 'combine_names', 'UniBipartiteGraph']
 
 class DGLHeteroGraph(object):
     """Base heterogeneous graph class.
@@ -183,6 +183,19 @@ class DGLHeteroGraph(object):
         Edge feature storage. If None, empty frame is created.
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
+    is_unibipartite : bool, optional
+        True if the graph represents a uni-bipartite graph where the nodes (could
+        have many types) can be further categorized into two sets: SRC and DST.
+        All edges are from nodes in SRC to nodes in DST. The following APIs are
+        enabled only when this flag is True:
+
+        * :func:`srctype` and :func:`dsttype`
+        * :func:`srcdata` and :func:`dstdata`
+        * :func:`srcnodes` and :func:`dstnodes`
+
+        In this case, we allow two node types to have the same name as long as one
+        belongs to SRC while the other belongs to DST. To distinguish them, prepend
+        the name with ``"SRC/"`` or ``"DST/"`` when specifying a node type.
     """
     # pylint: disable=unused-argument
     def __init__(self,
@@ -190,10 +203,11 @@ class DGLHeteroGraph(object):
                  ntypes,
                  etypes,
                  node_frames=None,
-                 edge_frames=None):
-        self._init(gidx, ntypes, etypes, node_frames, edge_frames)
+                 edge_frames=None,
+                 is_unibipartite=False):
+        self._init(gidx, ntypes, etypes, node_frames, edge_frames, is_unibipartite)
 
-    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
+    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames, is_unibipartite):
         """Init internal states."""
         self._graph = gidx
         self._ntypes = ntypes
@@ -201,15 +215,22 @@ class DGLHeteroGraph(object):
         self._nx_metagraph = None
         self._canonical_etypes = make_canonical_etypes(
             self._etypes, self._ntypes, self._graph.metagraph)
+        self._is_unibipartite = is_unibipartite
+        if is_unibipartite:
+            self._srctypes_invmap, self._dsttypes_invmap = find_src_dst_ntypes(
+                self._ntypes, self._graph.metagraph)
+        else:
+            self._srctypes_invmap = {t : i for i, t in enumerate(self._ntypes)}
+            self._dsttypes_invmap = self._srctypes_invmap
         # An internal map from etype to canonical etype tuple.
-        # If two etypes have the same name, an empty tuple is stored instead to indicte ambiguity.
+        # If two etypes have the same name, an empty tuple is stored instead to indicate
+        # ambiguity.
         self._etype2canonical = {}
         for i, ety in enumerate(self._etypes):
             if ety in self._etype2canonical:
                 self._etype2canonical[ety] = tuple()
             else:
                 self._etype2canonical[ety] = self._canonical_etypes[i]
-        self._ntypes_invmap = {t : i for i, t in enumerate(self._ntypes)}
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
 
         # node and edge frame
@@ -238,7 +259,8 @@ class DGLHeteroGraph(object):
         self._is_multigraph = None
 
     def __getstate__(self):
-        return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
+        return (self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames,
+                self._is_unibipartite)
 
     def __setstate__(self, state):
         self._init(*state)
@@ -303,6 +325,11 @@ class DGLHeteroGraph(object):
     #################################################################
     # Metagraph query
     #################################################################
+
+    @property
+    def is_unibipartite(self):
+        """Return whether the graph is a uni-bipartite graph."""
+        return self._is_unibipartite
 
     @property
     def ntypes(self):
@@ -479,14 +506,73 @@ class DGLHeteroGraph(object):
         -------
         int
         """
+        if self.is_unibipartite:
+            # Only check 'SRC/' and 'DST/' prefix when is_unibipartite graph is True.
+            if ntype.startswith('SRC/'):
+                return self.get_srctype_id(ntype[4:])
+            elif ntype.startswith('DST/'):
+                return self.get_dsttype_id(ntype[4:])
+            # If there is no prefix, fallback to normal lookup.
+
+        # Lookup both SRC and DST
         if ntype is None:
-            if self._graph.number_of_ntypes() != 1:
+            if self.is_unibipartite or len(self._srctypes_invmap) != 1:
                 raise DGLError('Node type name must be specified if there are more than one '
                                'node types.')
             return 0
-        ntid = self._ntypes_invmap.get(ntype, None)
+        ntid = self._srctypes_invmap.get(ntype, self._dsttypes_invmap.get(ntype, None))
         if ntid is None:
             raise DGLError('Node type "{}" does not exist.'.format(ntype))
+        return ntid
+
+    def get_srctype_id(self, ntype):
+        """Return the id of the given SRC node type.
+
+        ntype can also be None. If so, there should be only one node type in the
+        SRC category. Callable even when the self graph is not uni-bipartite.
+
+        Parameters
+        ----------
+        ntype : str
+            Node type
+
+        Returns
+        -------
+        int
+        """
+        if ntype is None:
+            if len(self._srctypes_invmap) != 1:
+                raise DGLError('SRC node type name must be specified if there are more than one '
+                               'SRC node types.')
+            return 0
+        ntid = self._srctypes_invmap.get(ntype, None)
+        if ntid is None:
+            raise DGLError('SRC node type "{}" does not exist.'.format(ntype))
+        return ntid
+
+    def get_dsttype_id(self, ntype):
+        """Return the id of the given DST node type.
+
+        ntype can also be None. If so, there should be only one node type in the
+        DST category. Callable even when the self graph is not uni-bipartite.
+
+        Parameters
+        ----------
+        ntype : str
+            Node type
+
+        Returns
+        -------
+        int
+        """
+        if ntype is None:
+            if len(self._dsttypes_invmap) != 1:
+                raise DGLError('DST node type name must be specified if there are more than one '
+                               'DST node types.')
+            return 0
+        ntid = self._dsttypes_invmap.get(ntype, None)
+        if ntid is None:
+            raise DGLError('DST node type "{}" does not exist.'.format(ntype))
         return ntid
 
     def get_etype_id(self, etype):
@@ -715,9 +801,9 @@ class DGLHeteroGraph(object):
         if len(etypes) == 1:
             # no ambiguity: return the unitgraph itself
             srctype, etype, dsttype = self._canonical_etypes[etypes[0]]
-            stid = self.get_ntype_id(srctype)
+            stid = self.get_srctype_id(srctype)
             etid = self.get_etype_id((srctype, etype, dsttype))
-            dtid = self.get_ntype_id(dsttype)
+            dtid = self.get_dsttype_id(dsttype)
             new_g = self._graph.get_relation_graph(etid)
 
             if stid == dtid:
@@ -729,7 +815,8 @@ class DGLHeteroGraph(object):
             new_etypes = [etype]
             new_eframes = [self._edge_frames[etid]]
 
-            return DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            return DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes,
+                                  is_unibipartite=self.is_unibipartite)
         else:
             flat = self._graph.flatten_relations(etypes)
             new_g = flat.graph
@@ -739,7 +826,8 @@ class DGLHeteroGraph(object):
             dtids = flat.induced_dsttype_set.asnumpy()
             etids = flat.induced_etype_set.asnumpy()
             new_ntypes = [combine_names(self.ntypes, stids)]
-            if new_g.number_of_ntypes() == 2:
+            is_unibipartite = self.is_unibipartite or new_g.number_of_ntypes() == 2
+            if is_unibipartite:
                 new_ntypes.append(combine_names(self.ntypes, dtids))
                 new_nframes = [
                     combine_frames(self._node_frames, stids),
@@ -751,10 +839,11 @@ class DGLHeteroGraph(object):
             new_eframes = [combine_frames(self._edge_frames, etids)]
 
             # create new heterograph
-            new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes,
+                                    is_unibipartite=is_unibipartite)
 
             src = new_ntypes[0]
-            dst = new_ntypes[1] if new_g.number_of_ntypes() == 2 else src
+            dst = new_ntypes[1] if is_unibipartite else src
             # put the parent node/edge type and IDs
             new_hg.nodes[src].data[NTYPE] = F.zerocopy_from_dgl_ndarray(flat.induced_srctype)
             new_hg.nodes[src].data[NID] = F.zerocopy_from_dgl_ndarray(flat.induced_srcid)
@@ -2728,7 +2817,7 @@ class DGLHeteroGraph(object):
         """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, reducer_dict)
-        ntid = self.get_ntype_id(ntype)
+        ntid = self.get_dsttype_id(ntype)
         if is_all(v):
             v = F.arange(0, self.number_of_nodes(ntid))
         elif isinstance(v, int):
@@ -2937,7 +3026,7 @@ class DGLHeteroGraph(object):
         """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, etype_dict)
-        dtid = self.get_ntype_id(ntype)
+        dtid = self.get_dsttype_id(ntype)
 
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
@@ -3129,7 +3218,7 @@ class DGLHeteroGraph(object):
             return
         # infer receive node type
         ntype = infer_ntype_from_dict(self, etype_dict)
-        dtid = self.get_ntype_id(ntype)
+        dtid = self.get_dsttype_id(ntype)
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
@@ -3863,6 +3952,27 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     src, dst, eid = metagraph.edges()
     rst = [(ntypes[sid], etypes[eid], ntypes[did]) for sid, did, eid in zip(src, dst, eid)]
     return rst
+
+def find_src_dst_ntypes(ntypes, metagraph):
+    """Internal function to split ntypes into SRC and DST categories.
+
+    Parameters
+    ----------
+    ntypes : list of str
+        Node type list
+    metagraph : GraphIndex
+        Meta graph.
+
+    Returns
+    -------
+    (dict[int, str], dict[int, str])
+        Node types belonging to SRC and DST categories. Types are stored in
+        a dictionary from type name to type id.
+    """
+    src, dst, _ = metagraph.edges()
+    srctypes = {ntypes[tid] : tid for tid in src}
+    dsttypes = {ntypes[tid] : tid for tid in dst}
+    return srctypes, dsttypes
 
 def infer_ntype_from_dict(graph, etype_dict):
     """Infer node type from dictionary of edge type to values.
