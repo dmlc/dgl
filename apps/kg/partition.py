@@ -8,14 +8,20 @@ from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
 def write_graph_txt(path, file_name, part_dict):
-    # Get triple and local2global
     for part_id in part_dict:
         new_path = path + str(part_id)
+        new_path = os.path.join(new_path, file_name)
+        f = open(new_path, 'w')
         graph = part_dict[part_id]
         src, dst = graph.all_edges(form='uv', order='eid')
-        relation_id = graph.edata['tid']
+        rel = graph.edata['tid']
         assert len(src) == len(relation_id)
-
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        rel = F.asnumpy(rel)
+        for i in range(len(src)):
+            f.write(str(src[i])+'\t'+str(rel[i])+'\t'+str(dst[i])+'\n')
+        f.close()
 
 
 
