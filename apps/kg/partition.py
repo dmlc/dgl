@@ -10,6 +10,7 @@ from dgl.data.utils import load_graphs, save_graphs
 
 def write_graph_txt(path, file_name, part_dict):
     for part_id in part_dict:
+        # Get (h,r,t) triples
         new_path = path + str(part_id)
         if not os.path.exists(new_path):
             os.mkdir(new_path)
@@ -25,7 +26,13 @@ def write_graph_txt(path, file_name, part_dict):
         for i in range(len(src)):
             f.write(str(src[i])+'\t'+str(rel[i])+'\t'+str(dst[i])+'\n')
         f.close()
-
+        # Get local2global
+        new_file_name = os.path.join(new_path, 'local2global.txt')
+        f = open(new_file_name, 'w')
+        pid = F.asnumpy(graph.parent_nid)
+        for i in range(len(pid)):
+            f.write(str(pid[i])+'\n')
+        f.close()
 
 
     #edges = graph.all_edges(form='all', order='eid')
