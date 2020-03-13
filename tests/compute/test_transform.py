@@ -426,13 +426,13 @@ def test_to_simple():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 def test_to_block():
-    def check(g, bg, ntype, etype, rhs_nodes):
-        if rhs_nodes is not None:
-            assert F.array_equal(bg.nodes[ntype + '_r'].data[dgl.NID], rhs_nodes)
-        n_rhs_nodes = bg.number_of_nodes(ntype + '_r')
+    def check(g, bg, ntype, etype, dst_nodes):
+        if dst_nodes is not None:
+            assert F.array_equal(bg.dstnodes[ntype].data[dgl.NID], dst_nodes)
+        n_dst_nodes = bg.number_of_nodes('DST/' + ntype)
         assert F.array_equal(
-            bg.nodes[ntype + '_l'].data[dgl.NID][:n_rhs_nodes],
-            bg.nodes[ntype + '_r'].data[dgl.NID])
+            bg.srcnodes[ntype].data[dgl.NID][:n_dst_nodes],
+            bg.dstnodes[ntype].data[dgl.NID])
 
         g = g[etype]
         bg = bg[etype]
@@ -450,11 +450,11 @@ def test_to_block():
         assert F.array_equal(induced_src_bg, induced_src_ans)
         assert F.array_equal(induced_dst_bg, induced_dst_ans)
 
-    def checkall(g, bg, rhs_nodes):
+    def checkall(g, bg, dst_nodes):
         for etype in g.etypes:
             ntype = g.to_canonical_etype(etype)[2]
-            if rhs_nodes is not None and ntype in rhs_nodes:
-                check(g, bg, ntype, etype, rhs_nodes[ntype])
+            if dst_nodes is not None and ntype in dst_nodes:
+                check(g, bg, ntype, etype, dst_nodes[ntype])
             else:
                 check(g, bg, ntype, etype, None)
 
@@ -467,36 +467,36 @@ def test_to_block():
     bg = dgl.to_block(g_a)
     check(g_a, bg, 'A', 'AA', None)
 
-    rhs_nodes = F.tensor([3, 4], dtype=F.int64)
-    bg = dgl.to_block(g_a, rhs_nodes)
-    check(g_a, bg, 'A', 'AA', rhs_nodes)
+    dst_nodes = F.tensor([3, 4], dtype=F.int64)
+    bg = dgl.to_block(g_a, dst_nodes)
+    check(g_a, bg, 'A', 'AA', dst_nodes)
 
-    rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
-    bg = dgl.to_block(g_a, rhs_nodes)
-    check(g_a, bg, 'A', 'AA', rhs_nodes)
+    dst_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
+    bg = dgl.to_block(g_a, dst_nodes)
+    check(g_a, bg, 'A', 'AA', dst_nodes)
 
     g_ab = g['AB']
 
     bg = dgl.to_block(g_ab)
-    assert bg.number_of_nodes('B_l') == 4
-    assert F.array_equal(bg.nodes['B_l'].data[dgl.NID], bg.nodes['B_r'].data[dgl.NID])
-    assert bg.number_of_nodes('A_r') == 0
+    assert bg.number_of_nodes('SRC/B') == 4
+    assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
+    assert bg.number_of_nodes('DST/A') == 0
     checkall(g_ab, bg, None)
 
-    rhs_nodes = {'B': F.tensor([5, 6], dtype=F.int64)}
-    bg = dgl.to_block(g, rhs_nodes)
-    assert bg.number_of_nodes('B_l') == 2
-    assert F.array_equal(bg.nodes['B_l'].data[dgl.NID], bg.nodes['B_r'].data[dgl.NID])
-    assert bg.number_of_nodes('A_r') == 0
-    checkall(g, bg, rhs_nodes)
+    dst_nodes = {'B': F.tensor([5, 6], dtype=F.int64)}
+    bg = dgl.to_block(g, dst_nodes)
+    assert bg.number_of_nodes('SRC/B') == 2
+    assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
+    assert bg.number_of_nodes('DST/A') == 0
+    checkall(g, bg, dst_nodes)
 
-    rhs_nodes = {'A': F.tensor([3, 4], dtype=F.int64), 'B': F.tensor([5, 6], dtype=F.int64)}
-    bg = dgl.to_block(g, rhs_nodes)
-    checkall(g, bg, rhs_nodes)
+    dst_nodes = {'A': F.tensor([3, 4], dtype=F.int64), 'B': F.tensor([5, 6], dtype=F.int64)}
+    bg = dgl.to_block(g, dst_nodes)
+    checkall(g, bg, dst_nodes)
 
-    rhs_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
-    bg = dgl.to_block(g, rhs_nodes=rhs_nodes)
-    checkall(g, bg, rhs_nodes)
+    dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
+    bg = dgl.to_block(g, dst_nodes=dst_nodes)
+    checkall(g, bg, dst_nodes)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_remove_edges():
@@ -552,7 +552,6 @@ if __name__ == '__main__':
     test_laplacian_lambda_max()
     test_remove_self_loop()
     test_add_self_loop()
-    test_partition()
     test_compact()
     test_to_simple()
     test_in_subgraph()

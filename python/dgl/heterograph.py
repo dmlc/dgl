@@ -173,8 +173,10 @@ class DGLHeteroGraph(object):
     ----------
     gidx : HeteroGraphIndex
         Graph index object.
-    ntypes : list of str
+    ntypes : list of str, pair of list of str
         Node type list. ``ntypes[i]`` stores the name of node type i.
+        If a pair is given, the graph created is a uni-directional bipartite graph,
+        and its SRC node types and DST node types are given as in the pair.
     etypes : list of str
         Edge type list. ``etypes[i]`` stores the name of edge type i.
     node_frames : list of FrameRef, optional
@@ -198,18 +200,35 @@ class DGLHeteroGraph(object):
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
         """Init internal states."""
         self._graph = gidx
-        self._ntypes = ntypes
+
+        # Handle node types
+        if isinstance(ntypes, tuple):
+            if len(ntypes) != 2:
+                errmsg = 'Invalid input. Expect a pair (srctypes, dsttypes) but got {}'.format(
+                    ntypes)
+                raise TypeError(errmsg)
+            if not is_unibipartite(self._graph.metagraph):
+                raise ValueError('Invalid input. The metagraph must be a uni-directional'
+                                 ' bipartite graph.')
+            self._ntypes = ntypes[0] + ntypes[1]
+            self._srctypes_invmap = {t : i for i, t in enumerate(ntypes[0])}
+            self._dsttypes_invmap = {t : i + len(ntypes[0]) for i, t in enumerate(ntypes[1])}
+            self._is_unibipartite = True
+        else:
+            self._ntypes = ntypes
+            src_dst_map = find_src_dst_ntypes(self._ntypes, self._graph.metagraph)
+            self._is_unibipartite = (src_dst_map is not None)
+            if self._is_unibipartite:
+                self._srctypes_invmap, self._dsttypes_invmap = src_dst_map
+            else:
+                self._srctypes_invmap = {t : i for i, t in enumerate(self._ntypes)}
+                self._dsttypes_invmap = self._srctypes_invmap
+
+        # Handle edge types
         self._etypes = etypes
-        self._nx_metagraph = None
         self._canonical_etypes = make_canonical_etypes(
             self._etypes, self._ntypes, self._graph.metagraph)
-        src_dst_map = find_src_dst_ntypes(self._ntypes, self._graph.metagraph)
-        self._is_unibipartite = (src_dst_map is not None)
-        if self._is_unibipartite:
-            self._srctypes_invmap, self._dsttypes_invmap = src_dst_map
-        else:
-            self._srctypes_invmap = {t : i for i, t in enumerate(self._ntypes)}
-            self._dsttypes_invmap = self._srctypes_invmap
+
         # An internal map from etype to canonical etype tuple.
         # If two etypes have the same name, an empty tuple is stored instead to indicate
         # ambiguity.
@@ -220,6 +239,9 @@ class DGLHeteroGraph(object):
             else:
                 self._etype2canonical[ety] = self._canonical_etypes[i]
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
+
+        # Cached metagraph in networkx
+        self._nx_metagraph = None
 
         # node and edge frame
         if node_frames is None:
@@ -3987,6 +4009,23 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     src, dst, eid = metagraph.edges()
     rst = [(ntypes[sid], etypes[eid], ntypes[did]) for sid, did, eid in zip(src, dst, eid)]
     return rst
+
+def is_unibipartite(graph):
+    """Internal function that returns whether the given graph is a uni-directional
+    bipartite graph.
+
+    Parameters
+    ----------
+    graph : GraphIndex
+        Input graph
+
+    Returns
+    -------
+    bool
+        True if the graph is a uni-bipartite.
+    """
+    src, dst, _ = graph.edges()
+    return set(src.tonumpy()).isdisjoint(set(dst.tonumpy()))
 
 def find_src_dst_ntypes(ntypes, metagraph):
     """Internal function to split ntypes into SRC and DST categories.
