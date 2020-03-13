@@ -51,6 +51,30 @@ By default, we store the model per 10000 iterations in `center_results`.
 **Speedup**: For an epoch of training, our implementation takes about 5095s for the first epoch  while the authors' 
 implementation takes about 11657s, which is roughly a speedup by 2.3x.
 
+For model evaluation, we can choose whether to exclude reactants not contributing atoms to the product 
+(e.g. reagents and solvents) in top-k atom pair selection, which will make the task easier. 
+For the easier evaluation, do
+
+```bash
+python find_reaction_center.py --easy
+```
+
+A summary of the model performance is as follows:
+
+| Item            | Top 6 accuracy | Top 8 accuracy | Top 10 accuracy |
+| --------------- | -------------- | -------------- | --------------- |
+| Paper           | 89.8           | 92.0           | 93.3            |
+| Hard evaluation | 86.5           | 89.6           | 91.2            |
+| Easy evaluation | 88.9           | 92.0           | 93.5            |
+
+### Pre-trained Model
+
+We provide a pre-trained model so users do not need to train from scratch. To evaluate the pre-trained model, simply do
+
+```bash
+python find_reaction_center.py -p
+```
+
 ### Adapting to a new dataset.
 
 New datasets should be processed such that each line corresponds to the SMILES for a reaction like below:
