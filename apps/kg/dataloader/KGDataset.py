@@ -76,7 +76,7 @@ class KGDataset:
             with open(relation_path) as f_rel:
                 self.n_relations = len(f_rel.readlines())
             if read_triple == True:
-                self.train = self.read_triple(train_path, "train", skip_first_line, format, False)
+                self.train = self.read_triple(train_path, "train", skip_first_line, format, has_map=False)
 
 
     def read_entity(self, entity_path):
@@ -261,7 +261,7 @@ class KGDatasetFreebase(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name='Freebase', read_triple=True, only_train=False):
+    def __init__(self, path, name='Freebase', read_triple=True, only_train=False, partition=False):
         self.name = name
         url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
@@ -485,7 +485,7 @@ def get_partition_dataset(data_path, data_name, format_str, part_id):
     part_name = os.path.join(data_name, 'partition_'+str(part_id))
     if format_str == 'built_in':
         if data_name == 'Freebase':
-            dataset = KGDatasetFreebase(data_path, part_name, read_triple=True, only_train=True)
+            dataset = KGDatasetFreebase(data_path, part_name, read_triple=True, only_train=True, partition=True)
         elif data_name == 'FB15k':
             dataset = KGDatasetFB15k(data_path, part_name, read_triple=True, only_train=True, partition=True)
         elif data_name == 'FB15k-237':
@@ -521,13 +521,13 @@ def get_partition_dataset(data_path, data_name, format_str, part_id):
     return dataset, partition_book, local_to_global
 
 def get_server_partition_dataset(data_path, data_name, format_str, part_id):
-    part_name = os.path.join(data_name, 'part_'+str(part_id))
+    part_name = os.path.join(data_name, 'partition_'+str(part_id))
 
     if format_str == 'built_in':
         if data_name == 'Freebase':
-            dataset = KGDatasetFreebase(data_path, part_name, read_triple=False, only_train=True)
+            dataset = KGDatasetFreebase(data_path, part_name, read_triple=False, only_train=True, partition=True)
         elif data_name == 'FB15k':
-            dataset = KGDatasetFB15k(data_path, part_name, read_triple=False, only_train=True)
+            dataset = KGDatasetFB15k(data_path, part_name, read_triple=False, only_train=True, partition=True)
         elif data_name == 'FB15k-237':
             dataset = KGDatasetFB15k237(data_path, part_name, read_triple=False, only_train=True)
         elif data_name == 'wn18':
