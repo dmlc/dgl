@@ -10,7 +10,7 @@ reaction_center_config = {
     'n_layers': 3,
     'n_tasks': 5,
     'lr': 0.001,
-    'num_epochs': 50,
+    'num_epochs': 25,
     'print_every': 50,
     'decay_every': 10000,      # Learning rate decay
     'lr_decay_factor': 0.9,

@@ -10,76 +10,8 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
-from utils import setup, collate
-
-def perform_prediction(device, model, mol_graphs, complete_graphs):
-    node_feats = mol_graphs.ndata.pop('hv').to(device)
-    edge_feats = mol_graphs.edata.pop('he').to(device)
-    node_pair_feats = complete_graphs.edata.pop('feats').to(device)
-
-    return model(mol_graphs, complete_graphs, node_feats, edge_feats, node_pair_feats)
-
-def eval(complete_graphs, preds, graph_edits, mols, num_correct, max_k):
-    # 0 for losing the bond
-    # 1, 2, 3, 1.5 separately for forming a single, double, triple or aromatic bond.
-    bond_change_to_id = {0.0: 0, 1:1, 2:2, 3:3, 1.5:4}
-    id_to_bond_change = {v: k for k, v in bond_change_to_id.items()}
-    num_change_types = len(bond_change_to_id)
-
-    batch_size = complete_graphs.batch_size
-    start = 0
-    for i in range(batch_size):
-        num_nodes = complete_graphs.batch_num_nodes[i]
-        end = start + complete_graphs.batch_num_edges[i]
-        preds_i = preds[start:end, :].flatten()
-        mol_i = mols[i]
-        candidate_bonds = []
-        topk_values, topk_indices = torch.topk(preds_i, max_k)
-        for j in range(max_k):
-            preds_i_j = topk_indices[j].cpu().item()
-            # A bond change can be either losing the bond or forming a
-            # single, double, triple or aromatic bond
-            change_id = preds_i_j % num_change_types
-            change_type = id_to_bond_change[change_id]
-            pair_id = preds_i_j // num_change_types
-            atom1 = pair_id // num_nodes
-            atom2 = pair_id % num_nodes
-            if atom1 >= atom2:
-                continue
-            bond = mol_i.GetBondBetweenAtoms(atom1, atom2)
-            # Filter out existing bonds in the reactants
-            if (bond is None) or (bond.GetBondTypeAsDouble() != change_type):
-                candidate_bonds.append((int(atom1), int(atom2), float(change_type)))
-
-        gold_bonds = []
-        gold_edits = graph_edits[i]
-        for edit in gold_edits.split(';'):
-            atom1, atom2, change_type = edit.split('-')
-            atom1, atom2 = int(atom1) - 1, int(atom2) - 1
-            gold_bonds.append((min(atom1, atom2), max(atom1, atom2), float(change_type)))
-
-        for k in num_correct.keys():
-            if set(gold_bonds) <= set(candidate_bonds[:k]):
-                num_correct[k] += 1
-        start = end
-
-def eval_on_a_loader(args, model, data_loader):
-    model.eval()
-    num_correct = {k: 0 for k in args['top_ks']}
-    for batch_id, batch_data in enumerate(data_loader):
-        batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
-        batch_complete_graphs, batch_atom_pair_labels = batch_data
-        with torch.no_grad():
-            pred, biased_pred = perform_prediction(
-                args['device'], model, batch_mol_graphs, batch_complete_graphs)
-        eval(batch_complete_graphs, biased_pred,
-             batch_graph_edits, batch_mols, num_correct, args['max_k'])
-
-    msg = '|'
-    for k, correct_count in num_correct.items():
-        msg += ' acc@{:d} {:.4f} |'.format(k, correct_count / len(data_loader.dataset))
-
-    return msg
+from utils import setup, collate, reaction_center_prediction, \
+    rough_eval_on_a_loader, reaction_center_final_eval
 
 def main(args):
     setup(args)
@@ -133,8 +65,8 @@ def main(args):
             batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
             labels = batch_atom_pair_labels.to(args['device'])
-            pred, biased_pred = perform_prediction(args['device'], model,
-                                                   batch_mol_graphs, batch_complete_graphs)
+            pred, biased_pred = reaction_center_prediction(
+                args['device'], model, batch_mol_graphs, batch_complete_graphs)
             loss = criterion(pred, labels) / len(batch_reactions)
             loss_sum += loss.cpu().detach().data.item()
             optimizer.zero_grad()
@@ -159,14 +91,14 @@ def main(args):
 
         dur.append(time.time() - t0)
         print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
-              eval_on_a_loader(args, model, val_loader))
+              rough_eval_on_a_loader(args, model, val_loader))
 
     del train_loader
     del val_loader
     del train_set
     del val_set
     print('Evaluation on the test set.')
-    test_result = eval_on_a_loader(args, model, test_loader)
+    test_result = reaction_center_final_eval(args, model, test_loader)
     print(test_result)
     with open(args['result_path'] + '/results.txt', 'w') as f:
         f.write(test_result)
@@ -191,6 +123,10 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--pre-trained', action='store_true', default=False,
                         help='If true, we will directly evaluate a '
                              'pretrained model on the test set.')
+    parser.add_argument('--easy', action='store_true', default=False,
+                        help='Whether to exclude reactants not contributing atoms to the '
+                             'product in top-k atom pair selection, which will make the '
+                             'task easier.')
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)
 
