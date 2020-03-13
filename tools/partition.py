@@ -27,7 +27,12 @@ def main():
     glist, _ = load_graphs(data_path)
     g = glist[0]
 
-    if args.method == 'metis':
+    if num_parts == 1:
+        server_parts = {0: g}
+        client_parts = {0: g}
+        g.ndata['part_id'] = F.zeros((g.number_of_nodes()), F.int64, F.cpu())
+        g.ndata[dgl.NID] = F.arange(0, g.number_of_nodes())
+    elif args.method == 'metis':
         node_parts = dgl.transform.metis_partition_assignment(g, num_parts)
         server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
         client_parts = dgl.transform.partition_graph_with_halo(g, node_parts, num_hops)
@@ -49,18 +54,22 @@ def main():
         serv_part = server_parts[part_id]
         part = client_parts[part_id]
 
-        num_inner_nodes = len(np.nonzero(F.asnumpy(part.ndata['inner_node']))[0])
-        num_inner_edges = len(np.nonzero(F.asnumpy(part.edata['inner_edge']))[0])
-        print('part {} has {} nodes and {} edges. {} nodes and {} edges are inside the partition'.format(
-              part_id, part.number_of_nodes(), part.number_of_edges(),
-              num_inner_nodes, num_inner_edges))
-        tot_num_inner_edges += num_inner_edges
+        if num_parts > 1:
+            num_inner_nodes = len(np.nonzero(F.asnumpy(part.ndata['inner_node']))[0])
+            num_inner_edges = len(np.nonzero(F.asnumpy(part.edata['inner_edge']))[0])
+            print('part {} has {} nodes and {} edges. {} nodes and {} edges are inside the partition'.format(
+                part_id, part.number_of_nodes(), part.number_of_edges(),
+                num_inner_nodes, num_inner_edges))
+            tot_num_inner_edges += num_inner_edges
+            serv_part.copy_from_parent()
 
-        serv_part.copy_from_parent()
         save_graphs(output + '/server-' + str(part_id) + '.dgl', [serv_part])
         save_graphs(output + '/client-' + str(part_id) + '.dgl', [part])
+    num_cuts = g.number_of_edges() - tot_num_inner_edges
+    if num_parts == 1:
+        num_cuts = 0
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
-        g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, num_parts))
+        g.number_of_edges(), num_cuts, num_parts))
 
 if __name__ == '__main__':
     main()
