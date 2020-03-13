@@ -1139,12 +1139,15 @@ def from_networkx(nx_graph, readonly):
     dst = utils.toindex(dst)
     return from_coo(num_nodes, src, dst, is_multigraph, readonly)
 
-def from_scipy_sparse_matrix(adj, readonly):
+def from_scipy_sparse_matrix(adj, multigraph, readonly):
     """Convert from scipy sparse matrix.
 
     Parameters
     ----------
     adj : scipy sparse matrix
+    multigraph : bool
+        Whether the graph would be a multigraph. If none, the flag will be determined
+        by the data.
     readonly : bool
         True if the returned graph is readonly.
 
@@ -1156,8 +1159,9 @@ def from_scipy_sparse_matrix(adj, readonly):
     if adj.getformat() != 'csr' or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
-        return from_coo(num_nodes, adj_coo.row, adj_coo.col, None, readonly)
+        return from_coo(num_nodes, adj_coo.row, adj_coo.col, multigraph, readonly)
     else:
+        # If the input matrix is csr, it's guaranteed to be a simple graph.
         return from_csr(adj.indptr, adj.indices, False, "out")
 
 def from_edge_list(elist, is_multigraph, readonly):
@@ -1298,7 +1302,7 @@ def create_graph_index(graph_data, multigraph, readonly):
         return from_edge_list(graph_data, multigraph, readonly)
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         # scipy format
-        return from_scipy_sparse_matrix(graph_data, readonly)
+        return from_scipy_sparse_matrix(graph_data, multigraph, readonly)
     else:
         # networkx - any format
         try:
