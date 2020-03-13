@@ -18,9 +18,13 @@ full_train = {}
 with open('./data/FB15k/train.txt') as f:
     for line in f:
         h, r, t = line.strip().split('\t')
+        if int(entities2id[h]) == 4424 and int(relation2id[r]) == 326 and int(entities2id[r]) == 2241:
+            print("get!")
         str_data = str(entities2id[h])+' '+str(relation2id[r])+' '+str(entities2id[t])
         full_train[str_data] = 0
 
+
+exit()
 
 local2global_0 = []
 local2global_1 = []
