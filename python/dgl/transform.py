@@ -342,8 +342,11 @@ def to_bidirected(g, readonly=True):
     """Convert the graph to a bidirected graph.
 
     The function generates a new graph with no node/edge feature.
-    If g has m edges for i->j and n edges for j->i, then the
-    returned graph will have max(m, n) edges for both i->j and j->i.
+    If g has an edge for i->j but no edge for j->i, then the
+    returned graph will have both i->j and j->i.
+
+    If the input graph is a multigraph (there are multiple edges from node i to node j),
+    the returned graph isn't well defined.
 
     Parameters
     ----------
@@ -361,22 +364,12 @@ def to_bidirected(g, readonly=True):
     The following two examples use PyTorch backend, one for non-multi graph
     and one for multi-graph.
 
-    >>> # non-multi graph
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(2)
     >>> g.add_edges([0, 0], [0, 1])
     >>> bg1 = dgl.to_bidirected(g)
     >>> bg1.edges()
     (tensor([0, 1, 0]), tensor([0, 0, 1]))
-
-    >>> # multi-graph
-    >>> g.add_edges([0, 1], [1, 0])
-    >>> g.edges()
-    (tensor([0, 0, 0, 1]), tensor([0, 1, 1, 0]))
-
-    >>> bg2 = dgl.to_bidirected(g)
-    >>> bg2.edges()
-    (tensor([0, 1, 1, 0, 0]), tensor([0, 0, 0, 1, 1]))
     """
     if readonly:
         newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
@@ -602,12 +595,14 @@ def metis_partition(g, k, extra_cached_hops=0):
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
     # METIS works only on symmetric graphs.
-    g = to_bidirected(g, readonly=True)
-    node_part = _CAPI_DGLMetisPartition(g._graph, k)
+    # The METIS runs on the symmetric graph to generate the node assignment to partitions.
+    sym_g = to_bidirected(g, readonly=True)
+    node_part = _CAPI_DGLMetisPartition(sym_g._graph, k)
     if len(node_part) == 0:
         return None
 
     node_part = utils.toindex(node_part)
+    # Then we split the original graph into parts based on the METIS partitioning results.
     parts = partition_graph_with_halo(g, node_part, extra_cached_hops)
     node_part = node_part.tousertensor()
     for part_id in parts:

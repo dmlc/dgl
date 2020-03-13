@@ -224,7 +224,6 @@ class KVServer(object):
         else: # Read shared-tensor
             while True:
                 if (os.path.exists(name+'-data-shape')):
-                    time.sleep(2) # wait writing finish
                     break
                 else:
                     time.sleep(2) # wait until the file been created
