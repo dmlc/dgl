@@ -43,9 +43,11 @@ class MoleculeCSVDataset(object):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
+    log_every : bool
+        Print a message every time ``log_every`` molecules are processed. Default to 1000.
     """
     def __init__(self, df, smiles_to_graph, node_featurizer, edge_featurizer,
-                 smiles_column, cache_file_path, task_names=None, load=True):
+                 smiles_column, cache_file_path, task_names=None, load=True, log_every=1000):
         self.df = df
         self.smiles = self.df[smiles_column].tolist()
         if task_names is None:
@@ -54,9 +56,9 @@ class MoleculeCSVDataset(object):
             self.task_names = task_names
         self.n_tasks = len(self.task_names)
         self.cache_file_path = cache_file_path
-        self._pre_process(smiles_to_graph, node_featurizer, edge_featurizer, load)
+        self._pre_process(smiles_to_graph, node_featurizer, edge_featurizer, load, log_every)
 
-    def _pre_process(self, smiles_to_graph, node_featurizer, edge_featurizer, load):
+    def _pre_process(self, smiles_to_graph, node_featurizer, edge_featurizer, load, log_every):
         """Pre-process the dataset
 
         * Convert molecules from smiles format into DGLGraphs
@@ -78,6 +80,8 @@ class MoleculeCSVDataset(object):
             Whether to load the previously pre-processed dataset or pre-process from scratch.
             ``load`` should be False when we want to try different graph construction and
             featurization methods and need to preprocess from scratch. Default to True.
+        log_every : bool
+            Print a message every time ``log_every`` molecules are processed.
         """
         if os.path.exists(self.cache_file_path) and load:
             # DGLGraphs have been constructed before, reload them
@@ -89,7 +93,8 @@ class MoleculeCSVDataset(object):
             print('Processing dgl graphs from scratch...')
             self.graphs = []
             for i, s in enumerate(self.smiles):
-                print('Processing molecule {:d}/{:d}'.format(i+1, len(self)))
+                if (i + 1) % log_every == 0:
+                    print('Processing molecule {:d}/{:d}'.format(i+1, len(self)))
                 self.graphs.append(smiles_to_graph(s, node_featurizer=node_featurizer,
                                                    edge_featurizer=edge_featurizer))
             _label_values = self.df[self.task_names].values
