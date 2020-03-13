@@ -76,7 +76,7 @@ class KGDataset:
             with open(relation_path) as f_rel:
                 self.n_relations = len(f_rel.readlines())
             if read_triple == True:
-                self.train = self.read_triple(train_path, "train", skip_first_line, format, has_map=True)
+                self.train = self.read_triple(train_path, "train", skip_first_line, format, has_map=False)
 
 
     def read_entity(self, entity_path):
