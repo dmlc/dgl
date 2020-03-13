@@ -1156,7 +1156,7 @@ def from_scipy_sparse_matrix(adj, readonly):
     if adj.getformat() != 'csr' or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
-        return from_coo(num_nodes, adj_coo.row, adj_coo.col, False, readonly)
+        return from_coo(num_nodes, adj_coo.row, adj_coo.col, None, readonly)
     else:
         return from_csr(adj.indptr, adj.indices, False, "out")
 
