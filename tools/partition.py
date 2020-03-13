@@ -31,10 +31,16 @@ def main():
         node_parts = dgl.transform.metis_partition_assignment(g, num_parts)
         server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
         client_parts = dgl.transform.partition_graph_with_halo(g, node_parts, num_hops)
+        for part_id in client_parts:
+            part = client_parts[part_id]
+            part.ndata['part_id'] = F.gather_row(node_parts, part.ndata[dgl.NID])
     elif args.method == 'random':
         node_parts = np.random.choice(num_parts, g.number_of_nodes())
         server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
         client_parts = dgl.transform.partition_graph_with_halo(g, node_parts, num_hops)
+        for part_id in client_parts:
+            part = client_parts[part_id]
+            part.ndata['part_id'] = F.gather_row(node_parts, part.ndata[dgl.NID])
     else:
         raise Exception('unknown partitioning method: ' + args.method)
 
