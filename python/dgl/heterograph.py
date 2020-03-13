@@ -650,10 +650,42 @@ class DGLHeteroGraph(object):
 
     @property
     def srcnodes(self):
+        """Return a SRC node view that can be used to set/get feature
+        data of a single node type.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        To set features of all users
+
+        >>> g = dgl.biparite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.srcnodes['user'].data['h'] = torch.zeros(2, 5)
+
+        See Also
+        --------
+        srcdata
+        """
         return HeteroNodeView(self, self.get_srctype_id)
 
     @property
     def dstnodes(self):
+        """Return a DST node view that can be used to set/get feature
+        data of a single node type.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        To set features of all games
+
+        >>> g = dgl.biparite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.dstnodes['game'].data['h'] = torch.zeros(3, 5)
+
+        See Also
+        --------
+        dstdata
+        """
         return HeteroNodeView(self, self.get_dsttype_id)
 
     @property
