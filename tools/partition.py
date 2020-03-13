@@ -28,16 +28,20 @@ def main():
     g = glist[0]
 
     if args.method == 'metis':
-        part_dict = dgl.transform.metis_partition(g, num_parts, num_hops)
+        node_parts = dgl.transform.metis_partition_assignment(g, num_parts)
+        server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
+        client_parts = dgl.transform.partition_graph_with_halo(g, node_parts, num_hops)
     elif args.method == 'random':
         node_parts = np.random.choice(num_parts, g.number_of_nodes())
-        part_dict = dgl.transform.partition_graph_with_halo(g, node_parts, num_hops)
+        server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
+        client_parts = dgl.transform.partition_graph_with_halo(g, node_parts, num_hops)
     else:
         raise Exception('unknown partitioning method: ' + args.method)
 
     tot_num_inner_edges = 0
-    for part_id in part_dict:
-        part = part_dict[part_id]
+    for part_id in range(num_parts):
+        serv_part = server_parts[part_id]
+        part = client_parts[part_id]
 
         num_inner_nodes = len(np.nonzero(F.asnumpy(part.ndata['inner_node']))[0])
         num_inner_edges = len(np.nonzero(F.asnumpy(part.edata['inner_edge']))[0])
@@ -46,11 +50,11 @@ def main():
               num_inner_nodes, num_inner_edges))
         tot_num_inner_edges += num_inner_edges
 
-        # TODO I duplicate some node features.
-        part.copy_from_parent()
-        save_graphs(output + '/' + str(part_id) + '.dgl', [part])
+        serv_part.copy_from_parent()
+        save_graphs(output + '/server-' + str(part_id) + '.dgl', [serv_part])
+        save_graphs(output + '/client-' + str(part_id) + '.dgl', [part])
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
-        g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
+        g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, num_parts))
 
 if __name__ == '__main__':
     main()

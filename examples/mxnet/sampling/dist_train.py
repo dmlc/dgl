@@ -12,11 +12,13 @@ from mxnet import gluon
 import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.contrib import KVServer
+from dgl.contrib import KVServer, KVClient
+from dgl.data.utils import load_graphs
 import socket
 
 from gcn_ns_dist import gcn_ns_train
 
+'''
 def load_node_data(args):
     if args.num_parts > 1:
         import pickle
@@ -35,19 +37,41 @@ def load_node_data(args):
                 'train_mask': train_mask,
                 'val_mask': val_mask,
                 'test_mask': test_mask}
+'''
+
+class DistGraphStoreServer:
+    def __init__(self, ip_config, server_id, server_data, num_client):
+        host_name = socket.gethostname()
+        host_ip = socket.gethostbyname(host_name)
+        print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
+
+        server_namebook = dgl.contrib.read_ip_config(filename=ip_config)
+        self._server = KVServer(server_id=server_id, server_namebook=server_namebook, num_client=num_client)
+
+        part_g = load_graphs(server_data)[0][0]
+        num_nodes = np.max(part_g.ndata[dgl.NID].asnumpy()) + 1
+        g2l = mx.nd.zeros((num_nodes), dtype=np.int64)
+        g2l[part_g.ndata[dgl.NID]] = mx.nd.arange(part_g.number_of_nodes())
+        if self._server.get_id() % self._server.get_group_count() == 0: # master server
+            for ndata_name in part_g.ndata.keys():
+                print(ndata_name)
+                self._server.set_global2local(name=ndata_name, global2local=g2l)
+                self._server.init_data(name=ndata_name, data_tensor=part_g.ndata[ndata_name])
+        else:
+            for ndata_name in part_g.ndata.keys():
+                self._server.set_global2local(name=ndata_name)
+                self._server.init_data(name=ndata_name)
+        # TODO Do I need synchronization?
+
+    def start(self):
+        self._server.print()
+        self._server.start()
 
 def start_server(args):
-    host_name = socket.gethostname()
-    host_ip = socket.gethostbyname(host_name)
-    print('Server {}: host name: {}, ip: {}'.format(args.id, host_name, host_ip))
+    serv = DistGraphStoreServer(args.ip_config, args.id, args.server_data, args.num_client)
+    serv.start()
 
-    ndata = load_node_data(args)
-    dgl.contrib.start_server(server_id=args.id,
-                             ip_config='ip_config.txt',
-                             num_client=4,
-                             ndata=ndata)
-
-
+'''
 def load_local_part(args):
     # We need to know:
     # * local nodes and local edges.
@@ -71,25 +95,46 @@ def load_local_part(args):
         g.ndata['node_loc'] = mx.nd.zeros(g.number_of_nodes(), dtype=np.int64)
         g.ndata['local'] = mx.nd.ones(g.number_of_nodes(), dtype=np.int64)
         return g, g.ndata['node_loc']
+'''
 
-def get_from_kvstore(args, kv, g, name):
-    name = args.graph_name + "_" + name
-    print('client pull ' + name, flush=True)
-    return kv.pull(name=name, id_tensor=g.ndata['global_id'])
+class DistGraphStore:
+    def __init__(self, ip_config, graph_path):
+        server_namebook = dgl.contrib.read_ip_config(filename=ip_config)
+        self._client = KVClient(server_namebook=server_namebook)
+        self._client.connect()
 
+        # TODO this cannot guarantee data locality.
+        self.g = load_graphs(graph_path + '/client-' + str(self._client.get_id()) + '.dgl')[0][0]
+        # TODO If we don't have HALO nodes, how do we set partition?
+        num_nodes = np.max(self.g.ndata[dgl.NID].asnumpy()) + 1
+        partition = mx.nd.ones(shape=(num_nodes,), dtype=np.int64)
+        partition[self.g.ndata[dgl.NID]] = mx.nd.arange(self.g.number_of_nodes())
+        # TODO what is the node data name?
+        self._client.set_partition_book(name='entity_embed', partition_book=partition)
+
+        self._client.print()
+        self._client.barrier()
+
+        self.local_gnid = self.g.ndata[dgl.NID][local_nids]
+
+    def get_ndata(self, name, nids=None):
+        if nids is None:
+            gnid = self.local_gnid
+        else:
+            gnid = self.local_gnid[nids]
+        return self._client.pull(name=name, id_tensor=gnid)
 
 def main(args):
-    g, all_locs = load_local_part(args)
-    print('graph size:', g.number_of_nodes(), flush=True)
-    print('#inner nodes:', mx.nd.sum(g.ndata['local']).asnumpy(), flush=True)
-    kv = dgl.contrib.KVClient(ip_config='ip_config.txt', ndata_partition_book=all_locs)
+    print('test1')
+    g = DistGraphStore(args.ip_config, args.graph_path)
+    print('test2')
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(args.id)
-    local_mask = g.ndata['local'].astype(np.float32)
-    train_mask = get_from_kvstore(args, kv, g, 'train_mask').astype(np.float32) * local_mask
-    val_mask = get_from_kvstore(args, kv, g, 'val_mask').astype(np.float32) * local_mask
-    test_mask = get_from_kvstore(args, kv, g, 'test_mask').astype(np.float32) * local_mask
+    train_mask = g.get_ndata('train_mask').astype(np.float32)
+    val_mask = g.get_ndata('val_mask').astype(np.float32)
+    test_mask = g.get_ndata('test_mask').astype(np.float32)
+    print('test3')
     print('train: {}, val: {}, test: {}'.format(mx.nd.sum(train_mask).asnumpy(),
         mx.nd.sum(val_mask).asnumpy(),
         mx.nd.sum(test_mask).asnumpy()), flush=True)
@@ -101,9 +146,10 @@ def main(args):
 
     train_nid = mx.nd.array(np.nonzero(train_mask.asnumpy())[0]).astype(np.int64)
     test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
+    print('test4')
 
     if args.model == "gcn_ns":
-        gcn_ns_train(g, kv, ctx, args, args.n_classes, train_nid, test_nid)
+        gcn_ns_train(g, ctx, args, args.n_classes, train_nid, test_nid)
     else:
         print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
     print("parent ends")
@@ -118,16 +164,11 @@ if __name__ == '__main__':
             help='whether this is a server.')
     parser.add_argument('--id', type=int,
             help='the partition id')
-    parser.add_argument('--num-parts', type=int,
-            help='the number of partitions')
-    parser.add_argument('--n-classes', type=int,
-            help='the number of classes')
-    parser.add_argument('--n-features', type=int,
-            help='the number of input features')
-    parser.add_argument("--graph-name", type=str, default="",
-            help="graph name")
-    parser.add_argument("--num-feats", type=int, default=100,
-            help="the number of features")
+    parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
+    parser.add_argument('--server_data', type=str, help='The file with the server data')
+    parser.add_argument('--num-client', type=int, help='The number of clients')
+    parser.add_argument('--n-classes', type=int, help='the number of classes')
+    parser.add_argument('--graph-path', type=str, help='the directory that stores graph structure')
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
     parser.add_argument("--num-gpus", type=int, default=0,
