@@ -36,7 +36,7 @@ def eval(complete_graphs, preds, graph_edits, mols, num_correct, max_k):
         candidate_bonds = []
         topk_values, topk_indices = torch.topk(preds_i, max_k)
         for j in range(max_k):
-            preds_i_j = topk_indices[j]
+            preds_i_j = topk_indices[j].cpu().item()
             # A bond change can be either losing the bond or forming a
             # single, double, triple or aromatic bond
             change_id = preds_i_j % num_change_types
