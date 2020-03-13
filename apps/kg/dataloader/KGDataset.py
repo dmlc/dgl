@@ -62,7 +62,7 @@ class KGDataset:
                  train_path, valid_path=None, test_path=None, local2global_path=None,
                  partition_book_path=None, format=[0,1,2], read_triple=True, only_train=False,
                  skip_first_line=False, partition=False):
-        if partition = False:
+        if partition == False:
             self.entity2id, self.n_entities = self.read_entity(entity_path)
             self.relation2id, self.n_relations = self.read_relation(relation_path)
             if read_triple == True:
