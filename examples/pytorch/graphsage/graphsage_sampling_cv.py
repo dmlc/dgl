@@ -176,7 +176,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
+def evaluate(model, g, labels, val_mask, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -188,7 +188,8 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        inputs = g.ndata['features']
+        pred, _ = model.inference(g, inputs, batch_size, device)
     model.train()
     return compute_acc(pred[val_mask], labels[val_mask])
 
@@ -206,7 +207,7 @@ def load_subtensor(g, labels, blocks, dev_id):
 
 def init_history(g, model, dev_id):
     with th.no_grad():
-        history = model.inference(g, g.ndata['features'], args.batch_size, dev_id)[1]
+        history = model.inference(g, g.ndata['features'], 1000, dev_id)[1]
         for layer in range(args.num_layers + 1):
             if layer > 0:
                 hist_col = 'hist_%d' % layer
@@ -214,6 +215,8 @@ def init_history(g, model, dev_id):
             else:
                 hist_col = 'features'
             agg_hist_col = 'sum_hist_%d' % layer
+            # TODO: can we avoid this column?
+            g.ndata['hist_delta_%d' % layer] = g.ndata[hist_col].clone().zero_()
             g.update_all(fn.copy_u(hist_col, 'm'), fn.sum('m', agg_hist_col))
 
         g.ndata['deg'] = g.in_degrees().float()
@@ -223,14 +226,18 @@ def update_history(g, blocks):
         for i, block in enumerate(blocks):
             ids = block.dstdata[dgl.NID]
             hist_col = 'hist_%d' % (i + 1)
+            hist_delta_col = 'hist_delta_%d' % (i + 1)
             agg_hist_col = 'sum_hist_%d' % (i + 1)
             agg_new_col = 'agg_new_%d' % (i + 1)
+
+            h_new = block.dstdata['h_new'].cpu()
             old_hist = g.ndata[hist_col][ids]
-            g.ndata[hist_col][ids] = block.dstdata['h_new'].cpu() - old_hist
+            g.ndata[hist_delta_col][ids] = h_new - old_hist
+            g.ndata[hist_col][ids] = h_new
             # TODO: can we avoid creating a new feature called agg_new_col?
             g.push(
                 ids,
-                fn.copy_u(hist_col, 'm'),
+                fn.copy_u(hist_delta_col, 'm'),
                 fn.sum('m', agg_new_col),
                 lambda nodes: {agg_hist_col: nodes.data[agg_hist_col] + nodes.data[agg_new_col]},
                 inplace=True)
@@ -356,7 +363,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument('--gpu', type=str, default='0')
     argparser.add_argument('--num-epochs', type=int, default=20)
-    argparser.add_argument('--num-hidden', type=int, default=64)
+    argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
     argparser.add_argument('--fan-out', type=str, default='1,1')
     argparser.add_argument('--batch-size', type=int, default=1000)
