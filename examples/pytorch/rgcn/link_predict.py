@@ -186,7 +186,7 @@ def main(args):
             model.eval()
             print("start eval")
             embed = model(test_graph, test_node_id, test_rel, test_norm)
-            mrr = utils.calc_mrr(embed, model.w_relation, torch.FloatTensor(train_data),
+            mrr = utils.calc_mrr(embed, model.w_relation, torch.LongTensor(train_data),
                                  valid_data, test_data, hits=[1, 3, 10], eval_bz=args.eval_batch_size,
                                  eval_p=args.eval_protocol)
             # save best model
