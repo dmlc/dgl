@@ -53,11 +53,16 @@ following steps. We have a notebook corresponding to each step:
    the size = number of features for the node * size of the embedding for each
    feature.  The network consists of two layers. A cross-entropy loss was used
    for this problem.  20% of the data was used for testing and 80% of the data
-   was used for training. The notebook [TSM_Graph_Embedding.ipynb
+   was used for training. The notebook [ITSM_Graph_Embedding.ipynb
 contains](
    https://github.com/arangoml/dgl/blob/managed_services_version_with_sampling/tutorials/models/hetro-graph-with-node-features/ITSM_Graph_Embedding.ipynb)
 contains
    the details of model development.
+
+**NOTE**
+
+__To explore the model developed in this exercise you only need to work through the notebook [ITSM_Graph_Embedding.ipynb](
+   https://github.com/arangoml/dgl/blob/managed_services_version_with_sampling/tutorials/models/hetro-graph-with-node-features/ITSM_Graph_Embedding.ipynb)__. 
 
 As a result of developing this model, the following outcomes are achieved:
 
