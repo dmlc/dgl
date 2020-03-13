@@ -751,7 +751,7 @@ def to_block(g, dst_nodes=None):
     nodes to DST nodes.
 
     Specifically, for each relation graph of canonical edge type ``(utype, etype, vtype)``,
-    node type ``utype`` belongs to SRC while ``vtype`` belongs to DST.  
+    node type ``utype`` belongs to SRC while ``vtype`` belongs to DST.
     Edges from node type ``utype`` to node type ``vtype`` are preserved. If
     ``utype == vtype``, the result graph will have two node types of the same name ``utype``,
     but one belongs to SRC while the other belongs to DST. This is because although
@@ -773,7 +773,7 @@ def to_block(g, dst_nodes=None):
     .. code::
 
         X[:block.number_of_nodes('vtype')]
-    
+
     If the ``dst_nodes`` argument is given, the DST nodes would contain the given nodes.
     Otherwise, the DST nodes would be determined by DGL via the rules above.
 

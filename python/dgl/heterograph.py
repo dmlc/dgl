@@ -16,7 +16,7 @@ from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdge
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from .udf import NodeBatch, EdgeBatch
 
-__all__ = ['DGLHeteroGraph', 'combine_names', 'UniBipartiteGraph']
+__all__ = ['DGLHeteroGraph', 'combine_names']
 
 class DGLHeteroGraph(object):
     """Base heterogeneous graph class.
@@ -338,7 +338,7 @@ class DGLHeteroGraph(object):
     @property
     def is_unibipartite(self):
         """Return whether the graph is a uni-bipartite graph.
-        
+
         A uni-bipartite heterograph can further divide its node types into two sets:
         SRC and DST. All edges are from nodes in SRC to nodes in DST. The following APIs
         can be used to get the nodes and types that belong to SRC and DST sets:
