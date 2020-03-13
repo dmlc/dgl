@@ -9,13 +9,16 @@
 #ifndef DGL_ARRAY_H_
 #define DGL_ARRAY_H_
 
-#include <dgl/runtime/ndarray.h>
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 #include <algorithm>
 #include <vector>
 #include <tuple>
 #include <utility>
+#include <string>
+
+#include "./runtime/ndarray.h"
+#include "./runtime/object.h"
 
 namespace dgl {
 
@@ -31,11 +34,74 @@ typedef NDArray IntArray;
 typedef NDArray FloatArray;
 typedef NDArray TypeArray;
 
+/*!
+ * \brief Sparse format.
+ */
+enum class SparseFormat {
+  kAny = 0,
+  kCOO = 1,
+  kCSR = 2,
+  kCSC = 3
+};
+
+// Parse sparse format from string.
+inline SparseFormat ParseSparseFormat(const std::string& name) {
+  if (name == "coo")
+    return SparseFormat::kCOO;
+  else if (name == "csr")
+    return SparseFormat::kCSR;
+  else if (name == "csc")
+    return SparseFormat::kCSC;
+  else
+    return SparseFormat::kAny;
+}
+
+// Sparse matrix object that is exposed to python API.
+struct SparseMatrix : public runtime::Object {
+  // Sparse format.
+  int32_t format = 0;
+
+  // Shape of this matrix.
+  int64_t num_rows = 0, num_cols = 0;
+
+  // Index arrays. For CSR, it is {indptr, indices, data}. For COO, it is {row, col, data}.
+  std::vector<IdArray> indices;
+
+  // Boolean flags.
+  // TODO(minjie): We might revisit this later to provide a more general solution. Currently,
+  //   we only consider aten::COOMatrix and aten::CSRMatrix.
+  std::vector<bool> flags;
+
+  SparseMatrix() {}
+
+  SparseMatrix(int32_t fmt, int64_t nrows, int64_t ncols,
+               const std::vector<IdArray>& idx,
+               const std::vector<bool>& flg)
+    : format(fmt), num_rows(nrows), num_cols(ncols), indices(idx), flags(flg) {}
+
+  static constexpr const char* _type_key = "aten.SparseMatrix";
+  DGL_DECLARE_OBJECT_TYPE_INFO(SparseMatrix, runtime::Object);
+};
+// Define SparseMatrixRef
+DGL_DEFINE_OBJECT_REF(SparseMatrixRef, SparseMatrix);
+
 namespace aten {
 
 //////////////////////////////////////////////////////////////////////
 // ID array
 //////////////////////////////////////////////////////////////////////
+
+/*! \return A special array to represent null. */
+inline NDArray NullArray() {
+  return NDArray::Empty({0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+}
+
+/*!
+ * \return Whether the input array is a null array.
+ */
+inline bool IsNullArray(NDArray array) {
+  return array->shape[0] == 0;
+}
 
 /*!
  * \brief Create a new id array with given length
@@ -114,6 +180,26 @@ IdArray HStack(IdArray arr1, IdArray arr2);
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, uint64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);
+
+/*!
+ * \brief Permute the elements of an array according to given indices.
+ *
+ * Equivalent to:
+ *
+ * <code>
+ *     result = np.zeros_like(array)
+ *     result[indices] = array
+ * </code>
+ */
+NDArray Scatter(NDArray array, IdArray indices);
+
+/*!
+ * \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
+ * \param array A 1D vector
+ * \param repeats A 1D integer vector for number of times to repeat for each element in
+ *                \c array.  Must have the same shape as \c array.
+ */
+NDArray Repeat(NDArray array, IdArray repeats);
 
 /*!
  * \brief Relabel the given ids to consecutive ids.
@@ -200,41 +286,157 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 /*!
  * \brief Plain CSR matrix
  *
- * The column indices are 0-based and are not necessarily sorted.
+ * The column indices are 0-based and are not necessarily sorted. The data array stores
+ * integer ids for reading edge features.
  *
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- */ 
+ */
+
+constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
+
 struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
-  int64_t num_rows, num_cols;
+  int64_t num_rows = 0, num_cols = 0;
   /*! \brief CSR index arrays */
-  runtime::NDArray indptr, indices;
-  /*! \brief data array, could be empty. */
-  runtime::NDArray data;
+  IdArray indptr, indices;
+  /*! \brief data index array. When is null, assume it is from 0 to NNZ - 1. */
+  IdArray data;
   /*! \brief whether the column indices per row are sorted */
-  bool sorted;
+  bool sorted = false;
+  /*! \brief default constructor */
+  CSRMatrix() = default;
+  /*! \brief constructor */
+  CSRMatrix(int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
+            IdArray darr = NullArray(), bool sorted_flag = false)
+      : num_rows(nrows),
+        num_cols(ncols),
+        indptr(parr),
+        indices(iarr),
+        data(darr),
+        sorted(sorted_flag) {}
+
+  /*! \brief constructor from SparseMatrix object */
+  explicit CSRMatrix(const SparseMatrix& spmat)
+      : num_rows(spmat.num_rows),
+        num_cols(spmat.num_cols),
+        indptr(spmat.indices[0]),
+        indices(spmat.indices[1]),
+        data(spmat.indices[2]),
+        sorted(spmat.flags[0]) {}
+
+  // Convert to a SparseMatrix object that can return to python.
+  SparseMatrix ToSparseMatrix() const {
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCSR), num_rows,
+                        num_cols, {indptr, indices, data}, {sorted});
+  }
+
+  bool Load(dmlc::Stream* fs) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
+        << "Invalid CSRMatrix Data";
+    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&indptr)) << "Invalid indptr";
+    CHECK(fs->Read(&indices)) << "Invalid indices";
+    CHECK(fs->Read(&data)) << "Invalid data";
+    CHECK(fs->Read(&sorted)) << "Invalid sorted";
+    return true;
+  }
+
+  void Save(dmlc::Stream* fs) const {
+    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
+    fs->Write(num_cols);
+    fs->Write(num_rows);
+    fs->Write(indptr);
+    fs->Write(indices);
+    fs->Write(data);
+    fs->Write(sorted);
+  }
 };
 
 /*!
  * \brief Plain COO structure
- * 
+ *
+ * The data array stores integer ids for reading edge features.
+
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- *
- * We call a COO matrix is *coalesced* if its row index is sorted.
  */
+
+constexpr uint64_t kDGLSerialize_AtenCooMatrixMagic = 0xDD61ffd305dff127;
+
+// TODO(BarclayII): Graph queries on COO formats should support the case where
+// data ordered by rows/columns instead of EID.
 struct COOMatrix {
   /*! \brief the dense shape of the matrix */
-  int64_t num_rows, num_cols;
+  int64_t num_rows = 0, num_cols = 0;
   /*! \brief COO index arrays */
-  runtime::NDArray row, col;
-  /*!
-   * \brief data array, could be empty.  When empty, assume it is from 0 to NNZ - 1.
-   */
-  runtime::NDArray data;
+  IdArray row, col;
+  /*! \brief data index array. When is null, assume it is from 0 to NNZ - 1. */
+  IdArray data;
+  /*! \brief whether the row indices are sorted */
+  bool row_sorted = false;
+  /*! \brief whether the column indices per row are sorted */
+  bool col_sorted = false;
+  /*! \brief default constructor */
+  COOMatrix() = default;
+  /*! \brief constructor */
+  COOMatrix(int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
+            IdArray darr = NullArray(), bool rsorted = false,
+            bool csorted = false)
+      : num_rows(nrows),
+        num_cols(ncols),
+        row(rarr),
+        col(carr),
+        data(darr),
+        row_sorted(rsorted),
+        col_sorted(csorted) {}
+
+  /*! \brief constructor from SparseMatrix object */
+  explicit COOMatrix(const SparseMatrix& spmat)
+      : num_rows(spmat.num_rows),
+        num_cols(spmat.num_cols),
+        row(spmat.indices[0]),
+        col(spmat.indices[1]),
+        data(spmat.indices[2]),
+        row_sorted(spmat.flags[0]),
+        col_sorted(spmat.flags[1]) {}
+
+  // Convert to a SparseMatrix object that can return to python.
+  SparseMatrix ToSparseMatrix() const {
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCOO), num_rows,
+                        num_cols, {row, col, data}, {row_sorted, col_sorted});
+  }
+
+  bool Load(dmlc::Stream* fs) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCooMatrixMagic)
+        << "Invalid COOMatrix Data";
+    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&row)) << "Invalid row";
+    CHECK(fs->Read(&col)) << "Invalid col";
+    CHECK(fs->Read(&data)) << "Invalid data";
+    CHECK(fs->Read(&row_sorted)) << "Invalid row_sorted";
+    CHECK(fs->Read(&col_sorted)) << "Invalid col_sorted";
+    return true;
+  }
+
+  void Save(dmlc::Stream* fs) const {
+    fs->Write(kDGLSerialize_AtenCooMatrixMagic);
+    fs->Write(num_cols);
+    fs->Write(num_rows);
+    fs->Write(row);
+    fs->Write(col);
+    fs->Write(data);
+    fs->Write(row_sorted);
+    fs->Write(col_sorted);
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -259,7 +461,7 @@ runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
 /*! \brief Whether the CSR matrix contains data */
 inline bool CSRHasData(CSRMatrix csr) {
-  return csr.data.defined();
+  return !IsNullArray(csr.data);
 }
 
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
@@ -330,8 +532,113 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 /*! \return True if the matrix has duplicate entries */
 bool CSRHasDuplicate(CSRMatrix csr);
 
-/*! Sort the columns in each row in the ascending order. */
-void CSRSort(CSRMatrix csr);
+/*!
+ * \brief Sort the column index at each row in the ascending order.
+ *
+ * Examples:
+ * num_rows = 4
+ * num_cols = 4
+ * indptr = [0, 2, 3, 3, 5]
+ * indices = [1, 0, 2, 3, 1]
+ *
+ *  After CSRSort_(&csr)
+ *
+ * indptr = [0, 2, 3, 3, 5]
+ * indices = [0, 1, 1, 2, 3]
+ */
+void CSRSort_(CSRMatrix* csr);
+
+/*!
+ * \brief Remove entries from CSR matrix by entry indices (data indices)
+ * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
+ *         entries.
+ */
+CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
+
+/*!
+ * \brief Randomly select a fixed number of non-zero entries along each given row independently.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = [2, 3, 0, 1, 4]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = CSRRowWiseSampling(csr, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [3, 0, 4]
+ *
+ * \param mat Input CSR matrix.
+ * \param rows Rows to sample from.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \return A COOMatrix storing the picked row, col and data indices.
+ */
+COOMatrix CSRRowWiseSampling(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true);
+
+/*!
+ * \brief Select K non-zero entries with the largest weights along each given row.
+ *
+ * The function performs top-k selection along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than k,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = [2, 3, 0, 1, 4]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ;  // [0, 1, 3]
+ * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
+ * COOMatrix sampled = CSRRowWiseTopk(csr, rows, 1, weight);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 1, 3]
+ * // sampled.cols = [1, 1, 2]
+ * // sampled.data = [3, 0, 1]
+ *
+ * \param mat Input CSR matrix.
+ * \param rows Rows to sample from.
+ * \param k The K value.
+ * \param weight Weight associated with each entry. Should be of the same length as the
+ *               data array. If an empty array is provided, assume uniform.
+ * \param ascending If true, elements are sorted by ascending order, equivalent to find
+ *                 the K smallest values. Otherwise, find K largest values.
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix CSRRowWiseTopk(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t k,
+    FloatArray weight,
+    bool ascending = false);
 
 ///////////////////////// COO routines //////////////////////////
 
@@ -353,7 +660,7 @@ COOGetRowDataAndIndices(COOMatrix , int64_t row);
 
 /*! \brief Whether the COO matrix contains data */
 inline bool COOHasData(COOMatrix csr) {
-  return csr.data.defined();
+  return !IsNullArray(csr.data);
 }
 
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
@@ -404,6 +711,117 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
 /*! \return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix coo);
 
+/*!
+ * \brief Deduplicate the entries of a sorted COO matrix, replacing the data with the
+ * number of occurrences of the row-col coordinates.
+ */
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
+
+/*!
+ * \brief Sort the indices of a COO matrix.
+ *
+ * The function sorts row indices in ascending order. If sort_column is true,
+ * col indices are sorted in ascending order too. The data array of the returned COOMatrix
+ * stores the shuffled index which could be used to fetch edge data.
+ *
+ * \param mat The input coo matrix
+ * \param sort_column True if column index should be sorted too.
+ * \return COO matrix with index sorted.
+ */
+COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
+
+/*!
+ * \brief Remove entries from COO matrix by entry indices (data indices)
+ * \return A new COO matrix as well as a mapping from the new COO entries to the old COO
+ *         entries.
+ */
+COOMatrix COORemove(COOMatrix coo, IdArray entries);
+
+/*!
+ * \brief Randomly select a fixed number of non-zero entries along each given row independently.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = COORowWiseSampling(coo, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [3, 0, 4]
+ *
+ * \param mat Input coo matrix.
+ * \param rows Rows to sample from.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowWiseSampling(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true);
+
+/*!
+ * \brief Select K non-zero entries with the largest weights along each given row.
+ *
+ * The function performs top-k selection along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than k,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ;  // [0, 1, 3]
+ * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
+ * COOMatrix sampled = COORowWiseTopk(coo, rows, 1, weight);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 1, 3]
+ * // sampled.cols = [1, 1, 2]
+ * // sampled.data = [3, 0, 1]
+ *
+ * \param mat Input COO matrix.
+ * \param rows Rows to sample from.
+ * \param k The K value.
+ * \param weight Weight associated with each entry. Should be of the same length as the
+ *               data array. If an empty array is provided, assume uniform.
+ * \param ascending If true, elements are sorted by ascending order, equivalent to find
+ *                  the K smallest values. Otherwise, find K largest values.
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowWiseTopk(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t k,
+    NDArray weight,
+    bool ascending = false);
 
 // inline implementations
 template <typename T>
@@ -420,8 +838,6 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }
   return ret.CopyTo(ctx);
 }
-
-
 
 ///////////////////////// Dispatchers //////////////////////////
 
@@ -530,40 +946,18 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }                                                         \
 } while (0)
 
-// Macro to dispatch according to device context, index type and data type
-// TODO(minjie): In our current use cases, data type and id type are the
-//   same. For example, data array is used to store edge ids.
-#define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
-      typedef IdType DType;                                 \
+// Macro to dispatch according to device context and index type.
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, ...)              \
+  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {        \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
 
-// Macro to dispatch according to device context and index type
-#define ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, ...)          \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
-      {__VA_ARGS__}                                         \
-    });                                                     \
-  });
-
-// Macro to dispatch according to device context, index type and data type
-// TODO(minjie): In our current use cases, data type and id type are the
-//   same. For example, data array is used to store edge ids.
-#define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
-      typedef IdType DType;                                 \
-      {__VA_ARGS__}                                         \
-    });                                                     \
-  });
-
-// Macro to dispatch according to device context and index type
-#define ATEN_COO_IDX_SWITCH(coo, XPU, IdType, ...)          \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+// Macro to dispatch according to device context and index type.
+#define ATEN_COO_SWITCH(coo, XPU, IdType, ...)              \
+  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {           \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
@@ -602,39 +996,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 }  // namespace dgl
 
 namespace dmlc {
-
-namespace serializer {
-
-using dgl::aten::CSRMatrix;
-
-constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
-
-template <>
-struct Handler<CSRMatrix> {
-  inline static void Write(Stream* fs, const CSRMatrix& csr) {
-    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
-    fs->Write(csr.num_cols);
-    fs->Write(csr.num_rows);
-    fs->Write(csr.indptr);
-    fs->Write(csr.indices);
-    fs->Write(csr.data);
-    fs->Write(csr.sorted);
-  }
-  inline static bool Read(Stream* fs, CSRMatrix* csr) {
-    uint64_t magicNum;
-    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
-    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
-        << "Invalid CSRMatrix Data";
-    CHECK(fs->Read(&csr->num_cols)) << "Invalid num_cols";
-    CHECK(fs->Read(&csr->num_rows)) << "Invalid num_rows";
-    CHECK(fs->Read(&csr->indptr)) << "Invalid indptr";
-    CHECK(fs->Read(&csr->indices)) << "Invalid indices";
-    CHECK(fs->Read(&csr->data)) << "Invalid data";
-    CHECK(fs->Read(&csr->sorted)) << "Invalid sorted";
-    return true;
-  }
-};
-}  // namespace serializer
+DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::CSRMatrix, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::COOMatrix, true);
 }  // namespace dmlc
 
 #endif  // DGL_ARRAY_H_

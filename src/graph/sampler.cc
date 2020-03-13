@@ -931,7 +931,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
       {
         const FloatType *prob;
 
-        if (probability->ndim == 1 && probability->shape[0] == 0) {
+        if (aten::IsNullArray(probability)) {
           prob = nullptr;
         } else {
           CHECK(probability->shape[0] == gptr->NumEdges())
@@ -1237,7 +1237,7 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   }
   // TODO(zhengda) we should provide an array of 1s if exclude_positive
   if (check_false_neg) {
-    if (relations_->shape[0] == 0) {
+    if (aten::IsNullArray(relations_)) {
       neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
     } else {
       neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
@@ -1386,7 +1386,7 @@ NegSubgraph EdgeSamplerObject::genChunkedNegEdgeSubgraph(const Subgraph &pos_sub
     neg_subg.tail_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
   }
   if (check_false_neg) {
-    if (relations_->shape[0] == 0) {
+    if (aten::IsNullArray(relations_)) {
       neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
     } else {
       neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,

@@ -35,7 +35,6 @@ class List(ObjectBase):
     def __len__(self):
         return _api_internal._ListSize(self)
 
-
 @register_object
 class Map(ObjectBase):
     """Map container of DGL.

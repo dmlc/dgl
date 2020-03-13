@@ -25,9 +25,10 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
+dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
- set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 endif(NOT MSVC)
 
 if(USE_CUDA)
@@ -39,6 +40,7 @@ endif(USE_CUDA)
 # include directories
 include_directories("include")
 include_directories("third_party/dlpack/include")
+include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
@@ -85,6 +87,10 @@ if(USE_OPENMP)
   endif(OPENMP_FOUND)
 endif(USE_OPENMP)
 
+# To compile METIS correct for DGL.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+
 # configure minigun
 add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
 # Source file lists
@@ -123,6 +129,20 @@ endif(USE_CUDA)
 add_subdirectory("third_party/dmlc-core")
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
+
+if(NOT MSVC)
+# Compile METIS
+set(GKLIB_PATH "third_party/METIS/GKlib")
+include(${GKLIB_PATH}/GKlibSystem.cmake)
+include_directories(${GKLIB_PATH})
+add_subdirectory("third_party/METIS/libmetis/")
+list(APPEND DGL_LINKER_LIBS metis)
+
+  # support PARALLEL_ALGORITHMS
+  if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
+    add_definitions(-DPARALLEL_ALGORITHMS)
+  endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
+endif(NOT MSVC)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 

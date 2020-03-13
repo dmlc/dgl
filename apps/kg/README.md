@@ -42,17 +42,17 @@ We will support multi-GPU training and distributed training in a near future.
 The package can run with both Pytorch and MXNet. For Pytorch, it works with Pytorch v1.2 or newer.
 For MXNet, it works with MXNet 1.5 or newer.
 
-## Datasets
+## Built-in Datasets
 
-DGL-KE provides five knowledge graphs:
+DGL-KE provides five built-in knowledge graphs:
 
 | Dataset | #nodes | #edges | #relations |
 |---------|--------|--------|------------|
-| [FB15k](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/FB15k.zip) | 14951 | 592213 | 1345 |
-| [FB15k-237](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/FB15k-237.zip) | 14541 | 310116 | 237 |
-| [wn18](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wn18.zip) | 40943 | 151442 | 18 |
-| [wn18rr](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wn18rr.zip) | 40943 | 93003 | 11 |
-| [Freebase](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/Freebase.zip) | 86054151 | 338586276 | 14824 |
+| [FB15k](https://data.dgl.ai/dataset/FB15k.zip) | 14951 | 592213 | 1345 |
+| [FB15k-237](https://data.dgl.ai/dataset/FB15k-237.zip) | 14541 | 310116 | 237 |
+| [wn18](https://data.dgl.ai/dataset/wn18.zip) | 40943 | 151442 | 18 |
+| [wn18rr](https://data.dgl.ai/dataset/wn18rr.zip) | 40943 | 93003 | 11 |
+| [Freebase](https://data.dgl.ai/dataset/Freebase.zip) | 86054151 | 338586276 | 14824 |
 
 Users can specify one of the datasets with `--dataset` in `train.py` and `eval.py`.
 
@@ -129,24 +129,20 @@ when given (?, rel, tail).
 
 ### Input formats:
 
-DGL-KE supports two knowledge graph input formats. A knowledge graph is stored
-using five files.
+DGL-KE supports two knowledge graph input formats for user defined dataset
 
-Format 1:
-
-- entities.dict contains pairs of (entity Id, entity name). The number of rows is the number of entities (nodes).
-- relations.dict contains pairs of (relation Id, relation name). The number of rows is the number of relations.
-- train.txt stores edges in the training set. They are stored as triples of (head, rel, tail).
-- valid.txt stores edges in the validation set. They are stored as triples of (head, rel, tail).
-- test.txt stores edges in the test set. They are stored as triples of (head, rel, tail).
+- raw_udd_[h|r|t], raw user defined dataset. In this format, user only need to provide triples and let the dataloader generate and manipulate the id mapping. The dataloader will generate two files: entities.tsv for entity id mapping and relations.tsv for relation id mapping. The order of head, relation and tail entities are described in [h|r|t], for example, raw_udd_trh means the triples are stored in the order of tail, relation and head. It should contains three files:
+  - *train* stores the triples in the training set. In format of a triple, e.g., [src_name, rel_name, dst_name] and should follow the order specified in [h|r|t]
+  - *valid* stores the triples in the validation set. In format of a triple, e.g., [src_name, rel_name, dst_name] and should follow the order specified in [h|r|t]
+  - *test* stores the triples in the test set. In format of a triple, e.g., [src_name, rel_name, dst_name] and should follow the order specified in [h|r|t]
 
 Format 2:
-
-- entity2id.txt contains pairs of (entity name, entity Id). The number of rows is the number of entities (nodes).
-- relation2id.txt contains pairs of (relation name, relation Id). The number of rows is the number of relations.
-- train.txt stores edges in the training set. They are stored as triples of (head, tail, rel).
-- valid.txt stores edges in the validation set. They are stored as a triple of (head, tail, rel).
-- test.txt stores edges in the test set. They are stored as a triple of (head, tail, rel).
+- udd_[h|r|t], user defined dataset. In this format, user should provide the id mapping for entities and relations. The order of head, relation and tail entities are described in [h|r|t], for example, raw_udd_trh means the triples are stored in the order of tail, relation and head. It should contains five files:
+  - *entities* stores the mapping between entity name and entity Id
+  - *relations* stores the mapping between relation name relation Id
+  - *train* stores the triples in the training set. In format of a triple, e.g., [src_id, rel_id, dst_id] and should follow the order specified in [h|r|t]
+  - *valid* stores the triples in the validation set. In format of a triple, e.g., [src_id, rel_id, dst_id] and should follow the order specified in [h|r|t]
+  - *test* stores the triples in the test set. In format of a triple, e.g., [src_id, rel_id, dst_id] and should follow the order specified in [h|r|t]
 
 ### Output formats:
 

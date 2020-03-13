@@ -78,7 +78,7 @@ class SST(object):
                 for line in pf.readlines():
                     sp = line.split(' ')
                     if sp[0].lower() in self.vocab:
-                        glove_emb[sp[0].lower()] = np.array([float(x) for x in sp[1:]])
+                        glove_emb[sp[0].lower()] = np.asarray([float(x) for x in sp[1:]])
         files = ['{}.txt'.format(self.mode)]
         corpus = BracketParseCorpusReader('{}/sst'.format(self.dir), files)
         sents = corpus.parsed_sents(files[0])

@@ -56,7 +56,7 @@ class ListDataset(Dataset):
 
 def _get_sudoku_dataset(segment='train'):
     assert segment in ['train', 'valid', 'test']
-    url = "https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/sudoku-hard.zip"
+    url = "https://data.dgl.ai/dataset/sudoku-hard.zip"
     zip_fname = "/tmp/sudoku-hard.zip"
     dest_dir = '/tmp/sudoku-hard/'
 
