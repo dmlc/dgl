@@ -1,4 +1,5 @@
 """Classes for heterogeneous graphs."""
+#pylint: disable= too-many-lines
 from collections import defaultdict
 from contextlib import contextmanager
 import networkx as nx
@@ -182,12 +183,6 @@ class DGLHeteroGraph(object):
         Edge feature storage. If None, empty frame is created.
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
-    multigraph : bool, optional
-        Whether the graph would be a multigraph. If none, the flag will be
-        determined by scanning the whole graph. (default: None)
-    readonly : bool, optional
-        Whether the graph structure is read-only. Currently, only readonly
-        is allowed. (default: True).
     """
     # pylint: disable=unused-argument
     def __init__(self,
@@ -195,25 +190,26 @@ class DGLHeteroGraph(object):
                  ntypes,
                  etypes,
                  node_frames=None,
-                 edge_frames=None,
-                 multigraph=None,
-                 readonly=True):
-        assert readonly, "Only readonly heterogeneous graphs are supported"
+                 edge_frames=None):
+        self._init(gidx, ntypes, etypes, node_frames, edge_frames)
 
+    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
+        """Init internal states."""
         self._graph = gidx
-        self._nx_metagraph = None
         self._ntypes = ntypes
         self._etypes = etypes
-        self._canonical_etypes = make_canonical_etypes(etypes, ntypes, self._graph.metagraph)
+        self._nx_metagraph = None
+        self._canonical_etypes = make_canonical_etypes(
+            self._etypes, self._ntypes, self._graph.metagraph)
         # An internal map from etype to canonical etype tuple.
         # If two etypes have the same name, an empty tuple is stored instead to indicte ambiguity.
         self._etype2canonical = {}
-        for i, ety in enumerate(etypes):
+        for i, ety in enumerate(self._etypes):
             if ety in self._etype2canonical:
                 self._etype2canonical[ety] = tuple()
             else:
                 self._etype2canonical[ety] = self._canonical_etypes[i]
-        self._ntypes_invmap = {t : i for i, t in enumerate(ntypes)}
+        self._ntypes_invmap = {t : i for i, t in enumerate(self._ntypes)}
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
 
         # node and edge frame
@@ -239,9 +235,16 @@ class DGLHeteroGraph(object):
             frame.set_initializer(init.zero_initializer)
             self._msg_frames.append(frame)
 
-        self._is_multigraph = multigraph
+        self._is_multigraph = None
+
+    def __getstate__(self):
+        return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
+
+    def __setstate__(self, state):
+        self._init(*state)
 
     def _get_msg_index(self, etid):
+        """Internal function for getting the message index array of the given edge type id."""
         if self._msg_indices[etid] is None:
             self._msg_indices[etid] = utils.zero_index(
                 size=self._graph.number_of_edges(etid))
@@ -359,6 +362,24 @@ class DGLHeteroGraph(object):
         [('user', 'follows', 'user'), ('user', 'plays', 'game')]
         """
         return self._canonical_etypes
+
+    @property
+    def ntype(self):
+        """Return the node type if the graph has only one node type."""
+        assert len(self.ntypes) == 1, "The graph has more than one node type."
+        return self.ntypes[0]
+
+    @property
+    def srctype(self):
+        """Return the source node type if the graph has only one edge type."""
+        assert len(self.etypes) == 1, "The graph has more than one edge type."
+        return self.canonical_etypes[0][0]
+
+    @property
+    def dsttype(self):
+        """Return the destination node type if the graph has only one edge type."""
+        assert len(self.etypes) == 1, "The graph has more than one edge type."
+        return self.canonical_etypes[0][2]
 
     @property
     def metagraph(self):
@@ -540,6 +561,68 @@ class DGLHeteroGraph(object):
         return HeteroNodeDataView(self, None, ALL)
 
     @property
+    def srcdata(self):
+        """Return the data view of all source nodes.
+
+        **Only works if the graph has only one edge type.**
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        To set features of all source nodes in a graph with only one edge type:
+
+        >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.srcdata['h'] = torch.zeros(2, 5)
+
+        This is equivalent to
+
+        >>> g.nodes['user'].data['h'] = torch.zeros(2, 5)
+
+        Notes
+        -----
+        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+
+        See Also
+        --------
+        nodes
+        """
+        assert len(self.etypes) == 1, "Graph has more than one edge type."
+        srctype = self.canonical_etypes[0][0]
+        return HeteroNodeDataView(self, srctype, ALL)
+
+    @property
+    def dstdata(self):
+        """Return the data view of all destination nodes.
+
+        **Only works if the graph has only one edge type.**
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        To set features of all source nodes in a graph with only one edge type:
+
+        >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.dstdata['h'] = torch.zeros(3, 5)
+
+        This is equivalent to
+
+        >>> g.nodes['game'].data['h'] = torch.zeros(3, 5)
+
+        Notes
+        -----
+        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+
+        See Also
+        --------
+        nodes
+        """
+        assert len(self.etypes) == 1, "Graph has more than one edge type."
+        dsttype = self.canonical_etypes[0][2]
+        return HeteroNodeDataView(self, dsttype, ALL)
+
+    @property
     def edges(self):
         """Return an edge view that can be used to set/get feature
         data of a single edge type.
@@ -617,6 +700,7 @@ class DGLHeteroGraph(object):
                   "to get view of one relation type. Use : to slice multiple types (e.g. " +\
                   "G['srctype', :, 'dsttype'])."
 
+        orig_key = key
         if not isinstance(key, tuple):
             key = (SLICE_FULL, key, SLICE_FULL)
 
@@ -624,6 +708,10 @@ class DGLHeteroGraph(object):
             raise DGLError(err_msg)
 
         etypes = self._find_etypes(key)
+
+        if len(etypes) == 0:
+            raise DGLError('Invalid key "{}". Must be one of the edge types.'.format(orig_key))
+
         if len(etypes) == 1:
             # no ambiguity: return the unitgraph itself
             srctype, etype, dsttype = self._canonical_etypes[etypes[0]]
@@ -1676,6 +1764,7 @@ class DGLHeteroGraph(object):
         node_frames = [self._node_frames[self.get_ntype_id(ntype)] for ntype in ntypes]
         edge_frames = []
 
+        num_nodes_per_type = [self.number_of_nodes(ntype) for ntype in ntypes]
         ntypes_invmap = {ntype: i for i, ntype in enumerate(ntypes)}
         srctype_id, dsttype_id, _ = self._graph.metagraph.edges('eid')
         for i in range(len(self._etypes)):
@@ -1689,7 +1778,8 @@ class DGLHeteroGraph(object):
                 edge_frames.append(self._edge_frames[i])
 
         metagraph = graph_index.from_edge_list(meta_edges, True, True)
-        hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_type))
         hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
         return hg
 
@@ -1759,9 +1849,11 @@ class DGLHeteroGraph(object):
         edge_frames = [self._edge_frames[i] for i in etype_ids]
         induced_ntypes = [self._ntypes[i] for i in ntypes_invmap]
         induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
+        num_nodes_per_induced_type = [self.number_of_nodes(ntype) for ntype in induced_ntypes]
 
         metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)
-        hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type))
         hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
         return hg
 
@@ -2276,7 +2368,7 @@ class DGLHeteroGraph(object):
             v_ntype = utils.toindex(v)
         with ir.prog() as prog:
             scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
-                                           inplace=inplace)
+                                           inplace=inplace, ntype=self._ntypes[ntid])
             Runtime.run(prog)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
@@ -2647,6 +2739,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
+        merge_order = []
         with ir.prog() as prog:
             for ety, args in reducer_dict.items():
                 outframe = FrameRef(frame_like(self._node_frames[ntid]._frame))
@@ -2661,9 +2754,10 @@ class DGLHeteroGraph(object):
                                         v, rfunc, afunc,
                                         inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[ntid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[ntid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             self.apply_nodes(apply_node_func, v, ntype, inplace)
@@ -2849,6 +2943,7 @@ class DGLHeteroGraph(object):
         #   Should replace it with fused kernel.
         all_out = []
         all_vs = []
+        merge_order = []
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -2877,9 +2972,10 @@ class DGLHeteroGraph(object):
                                        mfunc, rfunc, afunc,
                                        inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             dstnodes = F.unique(F.cat([x.tousertensor() for x in all_vs], 0))
@@ -3037,6 +3133,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
+        merge_order = []
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -3052,9 +3149,10 @@ class DGLHeteroGraph(object):
                                         mfunc, rfunc, afunc,
                                         inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             self.apply_nodes(apply_node_func, v, ntype, inplace)
@@ -3257,6 +3355,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = defaultdict(list)
+        merge_order = defaultdict(list)
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -3271,10 +3370,12 @@ class DGLHeteroGraph(object):
                                               mfunc, rfunc, afunc,
                                               outframe=outframe)
                 all_out[dtid].append(outframe)
+                merge_order[dtid].append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         for dtid, frames in all_out.items():
             # merge by cross_reducer
-            self._node_frames[dtid].update(merge_frames(frames, cross_reducer))
+            self._node_frames[dtid].update(
+                merge_frames(frames, cross_reducer, merge_order[dtid]))
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid], inplace=False)
@@ -3496,7 +3597,7 @@ class DGLHeteroGraph(object):
             v = utils.toindex(nodes)
 
         n_repr = self._get_n_repr(ntid, v)
-        nbatch = NodeBatch(v, n_repr)
+        nbatch = NodeBatch(v, n_repr, ntype=self.ntypes[ntid])
         n_mask = F.copy_to(predicate(nbatch), F.cpu())
 
         if is_all(nodes):
@@ -3557,7 +3658,8 @@ class DGLHeteroGraph(object):
         src_data = self._get_n_repr(stid, u)
         edge_data = self._get_e_repr(etid, eid)
         dst_data = self._get_n_repr(dtid, v)
-        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
+        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data,
+                           canonical_etype=self.canonical_etypes[etid])
         e_mask = F.copy_to(predicate(ebatch), F.cpu())
 
         if is_all(edges):
@@ -3806,28 +3908,38 @@ def pad_tuple(tup, length, pad_val=None):
     else:
         return tup + (pad_val,) * (length - len(tup))
 
-def merge_frames(frames, reducer):
+def merge_frames(frames, reducer, order=None):
     """Merge input frames into one. Resolve conflict fields using reducer.
 
     Parameters
     ----------
-    frames : list of FrameRef
+    frames : list[FrameRef]
         Input frames
     reducer : str
         One of "sum", "max", "min", "mean", "stack"
+    order : list[Int], optional
+        Merge order hint. Useful for "stack" reducer.
+        If provided, each integer indicates the relative order
+        of the ``frames`` list. Frames are sorted according to this list
+        in ascending order. Tie is not handled so make sure the order values
+        are distinct.
 
     Returns
     -------
     FrameRef
         Merged frame
     """
-    if len(frames) == 1:
+    if len(frames) == 1 and reducer != 'stack':
+        # Directly return the only one input. Stack reducer requires
+        # modifying tensor shape.
         return frames[0]
     if reducer == 'stack':
-        # TODO(minjie): Stack order does not matter. However, it must
-        #   be consistent! Need to enforce one type of order.
+        # Stack order does not matter. However, it must be consistent!
+        if order:
+            assert len(order) == len(frames)
+            sorted_with_key = sorted(zip(frames, order), key=lambda x: x[1])
+            frames = list(zip(*sorted_with_key))[0]
         def merger(flist):
-            flist = [F.unsqueeze(f, 1) for f in flist]
             return F.stack(flist, 1)
     else:
         redfn = getattr(F, reducer, None)
@@ -3835,7 +3947,7 @@ def merge_frames(frames, reducer):
             raise DGLError('Invalid cross type reducer. Must be one of '
                            '"sum", "max", "min", "mean" or "stack".')
         def merger(flist):
-            return redfn(F.stack(flist, 0), 0)
+            return redfn(F.stack(flist, 0), 0) if len(flist) > 1 else flist[0]
     ret = FrameRef(frame_like(frames[0]._frame))
     keys = set()
     for frm in frames:
@@ -3845,10 +3957,7 @@ def merge_frames(frames, reducer):
         for frm in frames:
             if k in frm:
                 flist.append(frm[k])
-        if len(flist) > 1:
-            ret[k] = merger(flist)
-        else:
-            ret[k] = flist[0]
+        ret[k] = merger(flist)
     return ret
 
 def combine_frames(frames, ids):
@@ -3988,3 +4097,8 @@ class AdaptedHeteroGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed(self.etid)
+
+    @property
+    def canonical_etype(self):
+        """Canonical edge type."""
+        return self.graph.canonical_etypes[self.etid]

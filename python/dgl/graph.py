@@ -1,12 +1,14 @@
 """Base graph class specialized for neural networks on graphs."""
+# pylint: disable=too-many-lines
 from __future__ import absolute_import
 
 from collections import defaultdict
 from contextlib import contextmanager
+from typing import Iterable
 import networkx as nx
 
 import dgl
-from .base import ALL, is_all, DGLError, dgl_warning
+from .base import ALL, NID, EID, is_all, DGLError, dgl_warning
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
@@ -16,7 +18,7 @@ from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
 
-__all__ = ['DGLGraph']
+__all__ = ['DGLGraph', 'batch', 'unbatch']
 
 class DGLBaseGraph(object):
     """Base graph class.
@@ -734,6 +736,24 @@ class DGLBaseGraph(object):
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
+
+def mutation(func):
+    """A decorator to decorate functions that might change graph structure."""
+    def inner(g, *args, **kwargs):
+        if g.is_readonly:
+            raise DGLError("Readonly graph. Mutation is not allowed.")
+        if g.batch_size > 1:
+            dgl_warning("The graph has batch_size > 1, and mutation would break"
+                        " batching related properties, call `flatten` to remove"
+                        " batching information of the graph.")
+        if g._parent is not None:
+            dgl_warning("The graph is a subgraph of a parent graph, and mutation"
+                        " would break subgraph related properties, call `detach"
+                        "_parent` to remove its connection with its parent.")
+        func(g, *args, **kwargs)
+    return inner
+
+
 class DGLGraph(DGLBaseGraph):
     """Base graph class.
 
@@ -902,7 +922,10 @@ class DGLGraph(DGLBaseGraph):
                  edge_frame=None,
                  multigraph=None,
                  readonly=False,
-                 sort_csr=False):
+                 sort_csr=False,
+                 batch_num_nodes=None,
+                 batch_num_edges=None,
+                 parent=None):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
@@ -936,6 +959,22 @@ class DGLGraph(DGLBaseGraph):
         self._apply_node_func = None
         self._apply_edge_func = None
 
+        # batched graph
+        self._batch_num_nodes = batch_num_nodes
+        self._batch_num_edges = batch_num_edges
+
+        # set parent if the graph is a subgraph.
+        self._parent = parent
+
+    def _create_subgraph(self, sgi, induced_nodes, induced_edges):
+        """Internal function to create a subgraph from index."""
+        subg = DGLGraph(graph_data=sgi.graph,
+                        readonly=True,
+                        parent=self)
+        subg.ndata[NID] = induced_nodes.tousertensor()
+        subg.edata[EID] = induced_edges.tousertensor()
+        return subg
+
     def _get_msg_index(self):
         if self._msg_index is None:
             self._msg_index = utils.zero_index(size=self.number_of_edges())
@@ -944,6 +983,7 @@ class DGLGraph(DGLBaseGraph):
     def _set_msg_index(self, index):
         self._msg_index = index
 
+    @mutation
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
 
@@ -995,6 +1035,7 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._node_frame.append(data)
 
+    @mutation
     def add_edge(self, u, v, data=None):
         """Add one new edge between u and v.
 
@@ -1053,6 +1094,7 @@ class DGLGraph(DGLBaseGraph):
             self._msg_index = self._msg_index.append_zeros(1)
         self._msg_frame.add_rows(1)
 
+    @mutation
     def add_edges(self, u, v, data=None):
         """Add multiple edges for list of source nodes u and destination nodes
         v.  A single edge is added between every pair of ``u[i]`` and ``v[i]``.
@@ -1114,6 +1156,7 @@ class DGLGraph(DGLBaseGraph):
             self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
 
+    @mutation
     def remove_nodes(self, vids):
         """Remove multiple nodes, edges that have connection with these nodes would also be removed.
 
@@ -1163,8 +1206,6 @@ class DGLGraph(DGLBaseGraph):
         add_edges
         remove_edges
         """
-        if self.is_readonly:
-            raise DGLError("remove_nodes is not supported by read-only graph.")
         induced_nodes = utils.set_diff(utils.toindex(self.nodes()), utils.toindex(vids))
         sgi = self._graph.node_subgraph(induced_nodes)
 
@@ -1180,6 +1221,7 @@ class DGLGraph(DGLBaseGraph):
 
         self._graph = sgi.graph
 
+    @mutation
     def remove_edges(self, eids):
         """Remove multiple edges.
 
@@ -1226,8 +1268,6 @@ class DGLGraph(DGLBaseGraph):
         add_edges
         remove_nodes
         """
-        if self.is_readonly:
-            raise DGLError("remove_edges is not supported by read-only graph.")
         induced_edges = utils.set_diff(
             utils.toindex(range(self.number_of_edges())), utils.toindex(eids))
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=True)
@@ -1243,6 +1283,330 @@ class DGLGraph(DGLBaseGraph):
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
         self._graph = sgi.graph
+
+    @property
+    def parent_nid(self):
+        """Get the parent node ids.
+
+        The returned tensor can be used as a map from the node id
+        in this subgraph to the node id in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            The parent node id array.
+
+        Notes
+        -----
+        The parent node id information is stored in ``_ID`` field in the
+        node frame of the graph, so please do not manually change
+        this field.
+        """
+        if self._parent is None:
+            raise DGLError("We only support parent_nid for subgraphs.")
+        return self.ndata[NID]
+
+    @property
+    def parent_eid(self):
+        """Get the parent edge ids.
+
+        The returned tensor can be used as a map from the edge id
+        in this subgraph to the edge id in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            The parent edge id array.
+
+        Notes
+        -----
+        The parent edge id information is stored in ``_ID`` field in the
+        edge frame of the graph, so please do not manually change
+        this field.
+        """
+        if self._parent is None:
+            raise DGLError("We only support parent_eid for subgraphs.")
+        return self.edata[EID]
+
+    def copy_to_parent(self, inplace=False):
+        """Write node/edge features to the parent graph.
+
+        Parameters
+        ----------
+        inplace : bool
+            If true, use inplace write (no gradient but faster)
+
+        Examples
+        --------
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(5)                  # Create a DGLGraph with 5 nodes
+        >>> g.add_edges([0,1,2,3,4], [1,2,3,4,0])
+        >>> subg.ndata['h'] = th.rand(4, 3)
+        >>> subg.edata['h'] = th.rand(3, 3)
+        >>> subg.ndata
+        {'_ID': tensor([0, 1, 3, 4]), 'h': tensor([[0.3803, 0.9351, 0.0611],
+                [0.6492, 0.4327, 0.3610],
+                [0.7471, 0.4257, 0.4130],
+                [0.9766, 0.6280, 0.6075]])}
+        >>> subg.edata
+        {'_ID': tensor([0, 3, 4]), 'h': tensor([[0.8192, 0.2409, 0.6278],
+                [0.9600, 0.3501, 0.8037],
+                [0.6521, 0.9029, 0.4901]])}
+        >>> g
+        DGLGraph(num_nodes=5, num_edges=5,
+                ndata_schemes={}
+                edata_schemes={})
+        >>> subg.copy_to_parent()
+        >>> g.ndata
+        {'h': tensor([[0.3803, 0.9351, 0.0611],
+                [0.6492, 0.4327, 0.3610],
+                [0.0000, 0.0000, 0.0000],
+                [0.7471, 0.4257, 0.4130],
+                [0.9766, 0.6280, 0.6075]])}
+        >>> g.edata
+        {'h': tensor([[0.8192, 0.2409, 0.6278],
+                [0.0000, 0.0000, 0.0000],
+                [0.0000, 0.0000, 0.0000],
+                [0.9600, 0.3501, 0.8037],
+                [0.6521, 0.9029, 0.4901]])}
+
+        Notes
+        -----
+        This API excludes the ``_ID`` field in both node frame and edge frame.
+        This being said if user take a subgraph ``sg`` of a graph ``g`` and
+        apply :func:`~dgl.copy_from_parent` on ``sg``, it would not polluate the
+        ``_ID`` field of node/edge frame of ``g``.
+
+        See Also
+        --------
+        """
+        if self._parent is None:
+            raise DGLError("We only support copy_to_parent for subgraphs.")
+        nids = self.ndata.pop(NID)
+        eids = self.edata.pop(EID)
+        self._parent._node_frame.update_rows(
+            utils.toindex(nids), self._node_frame, inplace=inplace)
+        if self._parent._edge_frame.num_rows != 0:
+            self._parent._edge_frame.update_rows(
+                utils.toindex(eids), self._edge_frame, inplace=inplace)
+        self.ndata[NID] = nids
+        self.edata[EID] = eids
+
+    def copy_from_parent(self):
+        """Copy node/edge features from the parent graph.
+
+        All old features will be removed.
+
+        Examples
+        --------
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(5)                  # Create a DGLGraph with 5 nodes
+        >>> g.add_edges([0,1,2,3,4], [1,2,3,4,0])
+        >>> g.ndata['h'] = th.rand(5, 3)
+        >>> g.ndata['h']
+        tensor([[0.3749, 0.5681, 0.4749],
+                [0.6312, 0.7955, 0.3682],
+                [0.0215, 0.0303, 0.0282],
+                [0.8840, 0.6842, 0.3645],
+                [0.9253, 0.8427, 0.6626]])
+        >>> g.edata['h'] = th.rand(5, 3)
+        >>> g.edata['h']
+        tensor([[0.0659, 0.8552, 0.9208],
+                [0.8238, 0.0332, 0.7864],
+                [0.1629, 0.4149, 0.1363],
+                [0.0648, 0.6582, 0.4400],
+                [0.4321, 0.1612, 0.7893]])
+        >>> g
+        DGLGraph(num_nodes=5, num_edges=5,
+                ndata_schemes={'h': Scheme(shape=(3,), dtype=torch.float32)}
+                edata_schemes={'h': Scheme(shape=(3,), dtype=torch.float32)})
+        >>> subg = g.subgraph([0,1,3,4])    # Take subgraph induced by node 0,1,3,4
+        >>> subg                            # '_ID' field records node/edge mapping
+        DGLGraph(num_nodes=4, num_edges=3,
+                ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+                edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+        >>> subg.copy_from_parent()
+        >>> subg.ndata
+        {'h': tensor([[0.3749, 0.5681, 0.4749],
+                [0.6312, 0.7955, 0.3682],
+                [0.8840, 0.6842, 0.3645],
+                [0.9253, 0.8427, 0.6626]]), '_ID': tensor([0, 1, 3, 4])}
+        >>> subg.edata
+        {'h': tensor([[0.0659, 0.8552, 0.9208],
+                [0.0648, 0.6582, 0.4400],
+                [0.4321, 0.1612, 0.7893]]), '_ID': tensor([0, 3, 4])}
+
+        Notes
+        -----
+        This API excludes the ``_ID`` field in both node frame and edge frame.
+        This being said if user take a subgraph ``sg1`` of a subgraph ``sg``
+        whose ``_ID`` field in node/edge frame is not None and
+        apply :func:`~dgl.copy_from_parent` on ``sg1``, it would not polluate
+        the ``_ID`` field of node/edge frame of ``sg1``.
+
+        See Also
+        --------
+        subgraph
+        edge_subgraph
+        parent_nid
+        parent_eid
+        copy_to_parent
+        map_to_subgraph_nid
+        """
+        if self._parent is None:
+            raise DGLError("We only support copy_from_parent for subgraphs.")
+        nids = self.ndata[NID]
+        eids = self.edata[EID]
+        if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
+            self._node_frame = FrameRef(Frame(
+                self._parent._node_frame[utils.toindex(nids)]))
+        if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
+            self._edge_frame = FrameRef(Frame(
+                self._parent._edge_frame[utils.toindex(eids)]))
+        self.ndata[NID] = nids
+        self.edata[NID] = eids
+
+    def map_to_subgraph_nid(self, parent_vids):
+        """Map the node Ids in the parent graph to the node Ids in the subgraph.
+
+        Parameters
+        ----------
+        parent_vids : list, tensor
+            The node ID array in the parent graph.
+
+        Returns
+        -------
+        tensor
+            The node ID array in the subgraph.
+
+        Examples
+        --------
+        >>> import dgl
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(5)
+        >>> sg = g.subgrph([0,2,4])
+        >>> sg.map_to_subgraph([2,4])
+        tensor([1, 2])
+
+        See Also
+        --------
+        subgraph
+        edge_subgraph
+        parent_nid
+        parent_eid
+        copy_to_parent
+        copy_from_parent
+        """
+        if self._parent is None:
+            raise DGLError("We only support map_to_subgraph_nid for subgraphs.")
+        v = graph_index.map_to_subgraph_nid(
+            utils.toindex(self.ndata[NID]), utils.toindex(parent_vids))
+        return v.tousertensor()
+
+    def flatten(self):
+        """Remove all batching information of the graph, and regard the current
+        graph as an independent graph rather then a batched graph.
+        Graph topology and attributes would not be affected.
+
+        User can change the structure of the flattened graph.
+
+        Examples
+        --------
+        >>> import dgl
+        >>> import torch as th
+        >>> g_list = []
+        >>> for _ in range(3)            # Create three graphs, each with #nodes 4
+        >>>     g = dgl.DGLGraph()
+        >>>     g.add_nodes(4)
+        >>>     g.add_edges([0,1,2,3], [1,2,3,0])
+        >>>     g.ndata['h'] = th.rand(4, 3)
+        >>>     g_list.append(g)
+        >>> bg = dgl.batch(g_list)
+        >>> bg.ndata
+        {'h': tensor([[0.0463, 0.1251, 0.5967],
+                [0.8633, 0.9812, 0.8601],
+                [0.7828, 0.3624, 0.7845],
+                [0.2169, 0.8761, 0.3237],
+                [0.1752, 0.1478, 0.5611],
+                [0.5279, 0.2556, 0.2304],
+                [0.8950, 0.8203, 0.5604],
+                [0.2999, 0.2946, 0.2676],
+                [0.3419, 0.2935, 0.6618],
+                [0.8137, 0.8927, 0.8953],
+                [0.6229, 0.7153, 0.5041],
+                [0.5659, 0.0612, 0.2351]])}
+        >>> bg.batch_size
+        3
+        >>> bg.batch_num_nodes
+        [4, 4, 4]
+        >>> bg.batch_num_edges
+        [4, 4, 4]
+        >>> bg.flatten()
+        >>> bg.batch_size
+        1
+        >>> bg.batch_num_nodes
+        [12]
+        >>> bg.batch_num_edges
+        [12]
+        >>> bg.remove_nodes([1,3,5,7,9,11])
+        >>> bg.ndata
+        {'h': tensor([[0.0463, 0.1251, 0.5967],
+                [0.7828, 0.3624, 0.7845],
+                [0.1752, 0.1478, 0.5611],
+                [0.8950, 0.8203, 0.5604],
+                [0.3419, 0.2935, 0.6618],
+                [0.6229, 0.7153, 0.5041]])}
+        """
+        self._batch_num_nodes = None
+        self._batch_num_edges = None
+
+    def detach_parent(self):
+        """Detach the current graph from its parent, and regard the current graph
+        as an independent graph rather then a subgraph.
+        Graph topology and attributes would not be affected.
+
+        User can change the structure of the detached graph.
+
+        Examples
+        --------
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()              # Graph 1
+        >>> g.add_nodes(5)
+        >>> g.ndata['h'] = th.rand(5, 3)
+        >>> g.ndata['h']
+        {'h': tensor([[0.9595, 0.7450, 0.5495],
+                [0.8253, 0.2902, 0.4393],
+                [0.3783, 0.4548, 0.6075],
+                [0.2323, 0.0936, 0.6580],
+                [0.1624, 0.3484, 0.3750]])}
+        >>> subg = g.subgraph([0,1,3])      # Create a subgraph
+        >>> subg.parent                     # Get the parent reference of subg
+        DGLGraph(num_nodes=5, num_edges=0,
+                 ndata_schemes={'h': Scheme(shape=(3,), dtype=torch.float32)}
+                 edata_schemes={})
+        >>> subg.copy_from_parent()
+        >>> subg.detach_parent()            # Detach the subgraph from its parent
+        >>> subg.parent == None
+        True
+        >>> subg.add_nodes(1)               # Change the structure of the subgraph
+        >>> subg
+        DGLGraph(num_nodes=4, num_edges=0,
+                 ndata_schemes={'h': Scheme(shape=(3,), dtype=torch.float32)}
+                 edata_schemes={})
+        >>> subg.ndata
+        {'h': tensor([[0.9595, 0.7450, 0.5495],
+                [0.8253, 0.2902, 0.4393],
+                [0.2323, 0.0936, 0.6580],
+                [0.0000, 0.0000, 0.0000]])}
+        """
+        self._parent = None
+        self.ndata.pop(NID)
+        self.edata.pop(EID)
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -1651,6 +2015,16 @@ class DGLGraph(DGLBaseGraph):
         return self.nodes[:].data
 
     @property
+    def srcdata(self):
+        """Compatibility interface with heterogeneous graphs; identical to ``ndata``"""
+        return self.ndata
+
+    @property
+    def dstdata(self):
+        """Compatibility interface with heterogeneous graphs; identical to ``ndata``"""
+        return self.ndata
+
+    @property
     def edges(self):
         """Return a edges view that can used to set/get feature data.
 
@@ -1710,6 +2084,53 @@ class DGLGraph(DGLBaseGraph):
         """
         return self.edges[:].data
 
+    @property
+    def batch_size(self):
+        """Number of graphs in this batch.
+
+        Returns
+        -------
+        int
+            Number of graphs in this batch."""
+        return 1 if self.batch_num_nodes is None else len(self.batch_num_nodes)
+
+    @property
+    def batch_num_nodes(self):
+        """Number of nodes of each graph in this batch.
+
+        Returns
+        -------
+        list
+            Number of nodes of each graph in this batch."""
+        if self._batch_num_nodes is None:
+            return [self.number_of_nodes()]
+        else:
+            return self._batch_num_nodes
+
+    @property
+    def batch_num_edges(self):
+        """Number of edges of each graph in this batch.
+
+        Returns
+        -------
+        list
+            Number of edges of each graph in this batch."""
+        if self._batch_num_edges is None:
+            return [self.number_of_edges()]
+        else:
+            return self._batch_num_edges
+
+    @property
+    def parent(self):
+        """If current graph is a subgraph of a parent graph, return
+        its parent graph, else return None.
+
+        Returns
+        -------
+        DGLGraph or None
+            The parent graph of current graph.
+        """
+        return self._parent
 
     def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
         """Create node embedding.
@@ -2914,7 +3335,7 @@ class DGLGraph(DGLBaseGraph):
 
         Returns
         -------
-        G : DGLSubGraph
+        G : DGLGraph
             The subgraph.
             The nodes are relabeled so that node `i` in the subgraph is mapped
             to node `nodes[i]` in the original graph.
@@ -2942,14 +3363,17 @@ class DGLGraph(DGLBaseGraph):
 
         See Also
         --------
-        DGLSubGraph
         subgraphs
         edge_subgraph
+        parent_nid
+        parent_eid
+        copy_from_parent
+        copy_to_parent
+        map_to_subgraph_nid
         """
-        from . import subgraph
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return subgraph.DGLSubGraph(self, sgi)
+        return self._create_subgraph(sgi, sgi.induced_nodes, sgi.induced_edges)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -2966,18 +3390,22 @@ class DGLGraph(DGLBaseGraph):
 
         Returns
         -------
-        G : A list of DGLSubGraph
+        G : A list of DGLGraph
             The subgraphs.
 
         See Also
         --------
-        DGLSubGraph
         subgraph
+        parent_nid
+        parent_eid
+        copy_from_parent
+        copy_to_parent
+        map_to_subgraph_nid
         """
-        from . import subgraph
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [subgraph.DGLSubGraph(self, sgi) for sgi in sgis]
+        return [self._create_subgraph(
+            sgi, sgi.induced_nodes, sgi.induced_edges) for sgi in sgis]
 
     def edge_subgraph(self, edges, preserve_nodes=False):
         """Return the subgraph induced on given edges.
@@ -2994,7 +3422,7 @@ class DGLGraph(DGLBaseGraph):
 
         Returns
         -------
-        G : DGLSubGraph
+        G : DGLGraph
             The subgraph.
             The edges are relabeled so that edge `i` in the subgraph is mapped
             to edge `edges[i]` in the original graph.
@@ -3031,13 +3459,14 @@ class DGLGraph(DGLBaseGraph):
 
         See Also
         --------
-        DGLSubGraph
         subgraph
+        copy_from_parent
+        copy_to_parent
+        map_to_subgraph_nid
         """
-        from . import subgraph
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
-        return subgraph.DGLSubGraph(self, sgi)
+        return self._create_subgraph(sgi, sgi.induced_nodes, sgi.induced_edges)
 
     def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
@@ -3427,9 +3856,13 @@ class DGLGraph(DGLBaseGraph):
         # otherwise the default initializer will be used.
         sync_frame_initializer(local_node_frame._frame, self._node_frame._frame)
         sync_frame_initializer(local_edge_frame._frame, self._edge_frame._frame)
-        return DGLGraph(self._graph,
-                        local_node_frame,
-                        local_edge_frame)
+        return DGLGraph(graph_data=self._graph,
+                        node_frame=local_node_frame,
+                        edge_frame=local_edge_frame,
+                        readonly=self.is_readonly,
+                        batch_num_nodes=self.batch_num_nodes,
+                        batch_num_edges=self.batch_num_edges,
+                        parent=self._parent)
 
     @contextmanager
     def local_scope(self):
@@ -3488,6 +3921,257 @@ class DGLGraph(DGLBaseGraph):
         yield
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
+
+############################################################
+# Batch/Unbatch APIs
+############################################################
+
+def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
+    """Batch a collection of :class:`~dgl.DGLGraph` and return a batched
+    :class:`DGLGraph` object that is independent of the :attr:`graph_list` so that
+    one can perform message passing and readout over a batch of graphs
+    simultaneously, the batch size of the returned graph is the length of
+    :attr:`graph_list`.
+
+    The nodes and edges are re-indexed with a new id in the batched graph with the
+    rule below:
+    ======  ==========  ========================  ===  ==========================
+    item    Graph 1     Graph 2                   ...  Graph k
+    ======  ==========  ========================  ===  ==========================
+    raw id  0, ..., N1       0, ..., N2           ...  ..., Nk
+    new id  0, ..., N1  N1 + 1, ..., N1 + N2 + 1  ...  ..., N1 + ... + Nk + k - 1
+    ======  ==========  ========================  ===  ==========================
+
+    To modify the features in the batched graph has no effect on the original
+    graphs. See the examples below about how to work around.
+
+    Parameters
+    ----------
+    graph_list : iterable
+        A collection of :class:`~dgl.DGLGraph` to be batched.
+    node_attrs : None, str or iterable
+        The node attributes to be batched. If ``None``, the returned :class:`DGLGraph`
+        object will not have any node attributes. By default, all node attributes will
+        be batched. If ``str`` or iterable, this should specify exactly what node
+        attributes to be batched.
+    edge_attrs : None, str or iterable, optional
+        Same as for the case of :attr:`node_attrs`
+
+    Returns
+    -------
+    DGLGraph
+        One single batched graph.
+
+    Examples
+    --------
+    Create two :class:`~dgl.DGLGraph` objects.
+    **Instantiation:**
+    >>> import dgl
+    >>> import torch as th
+    >>> g1 = dgl.DGLGraph()
+    >>> g1.add_nodes(2)                                # Add 2 nodes
+    >>> g1.add_edge(0, 1)                              # Add edge 0 -> 1
+    >>> g1.ndata['hv'] = th.tensor([[0.], [1.]])       # Initialize node features
+    >>> g1.edata['he'] = th.tensor([[0.]])             # Initialize edge features
+    >>> g2 = dgl.DGLGraph()
+    >>> g2.add_nodes(3)                                # Add 3 nodes
+    >>> g2.add_edges([0, 2], [1, 1])                   # Add edges 0 -> 1, 2 -> 1
+    >>> g2.ndata['hv'] = th.tensor([[2.], [3.], [4.]]) # Initialize node features
+    >>> g2.edata['he'] = th.tensor([[1.], [2.]])       # Initialize edge features
+    Merge two :class:`~dgl.DGLGraph` objects into one :class:`DGLGraph` object.
+    When merging a list of graphs, we can choose to include only a subset of the attributes.
+    >>> bg = dgl.batch([g1, g2], edge_attrs=None)
+    >>> bg.edata
+    {}
+    Below one can see that the nodes are re-indexed. The edges are re-indexed in
+    the same way.
+    >>> bg.nodes()
+    tensor([0, 1, 2, 3, 4])
+    >>> bg.ndata['hv']
+    tensor([[0.],
+            [1.],
+            [2.],
+            [3.],
+            [4.]])
+    **Property:**
+    We can still get a brief summary of the graphs that constitute the batched graph.
+    >>> bg.batch_size
+    2
+    >>> bg.batch_num_nodes
+    [2, 3]
+    >>> bg.batch_num_edges
+    [1, 2]
+    **Readout:**
+    Another common demand for graph neural networks is graph readout, which is a
+    function that takes in the node attributes and/or edge attributes for a graph
+    and outputs a vector summarizing the information in the graph.
+    DGL also supports performing readout for a batch of graphs at once.
+    Below we take the built-in readout function :func:`sum_nodes` as an example, which
+    sums over a particular kind of node attribute for each graph.
+    >>> dgl.sum_nodes(bg, 'hv') # Sum the node attribute 'hv' for each graph.
+    tensor([[1.],               # 0 + 1
+            [9.]])              # 2 + 3 + 4
+    **Message passing:**
+    For message passing and related operations, batched :class:`DGLGraph` acts exactly
+    the same as a single :class:`~dgl.DGLGraph` with batch size 1.
+    **Update Attributes:**
+    Updating the attributes of the batched graph has no effect on the original graphs.
+    >>> bg.edata['he'] = th.zeros(3, 2)
+    >>> g2.edata['he']
+    tensor([[1.],
+            [2.]])}
+    Instead, we can decompose the batched graph back into a list of graphs and use them
+    to replace the original graphs.
+    >>> g1, g2 = dgl.unbatch(bg)    # returns a list of DGLGraph objects
+    >>> g2.edata['he']
+    tensor([[0., 0.],
+            [0., 0.]])}
+
+    See Also
+    --------
+    unbatch
+    """
+    if len(graph_list) == 1:
+        return graph_list[0]
+
+    def _init_attrs(attrs, mode):
+        """Collect attributes of given mode (node/edge) from graph_list.
+
+        Parameters
+        ----------
+        attrs: None or ALL or str or iterator
+            The attributes to collect. If ALL, check if all graphs have the same
+            attribute set and return the attribute set. If None, return an empty
+            list. If it is a string or a iterator of string, return these
+            attributes.
+        mode: str
+            Suggest to collect node attributes or edge attributes.
+
+        Returns
+        -------
+        Iterable
+            The obtained attribute set.
+        """
+        if mode == 'node':
+            nitems_list = [g.number_of_nodes() for g in graph_list]
+            attrs_list = [set(g.node_attr_schemes().keys()) for g in graph_list]
+        else:
+            nitems_list = [g.number_of_edges() for g in graph_list]
+            attrs_list = [set(g.edge_attr_schemes().keys()) for g in graph_list]
+
+        if attrs is None:
+            return []
+        elif is_all(attrs):
+            attrs = set()
+            # Check if at least a graph has mode items and associated features.
+            for i, (g_num_items, g_attrs) in enumerate(zip(nitems_list, attrs_list)):
+                if g_num_items > 0 and len(g_attrs) > 0:
+                    attrs = g_attrs
+                    ref_g_index = i
+                    break
+            # Check if all the graphs with mode items have the same associated features.
+            if len(attrs) > 0:
+                for i, (g_num_items, g_attrs) in enumerate(zip(nitems_list, attrs_list)):
+                    if g_attrs != attrs and g_num_items > 0:
+                        raise ValueError('Expect graph {0} and {1} to have the same {2} '
+                                         'attributes when {2}_attrs=ALL, got {3} and {4}.'
+                                         .format(ref_g_index, i, mode, attrs, g_attrs))
+            return attrs
+        elif isinstance(attrs, str):
+            return [attrs]
+        elif isinstance(attrs, Iterable):
+            return attrs
+        else:
+            raise ValueError('Expected {} attrs to be of type None str or Iterable, '
+                             'got type {}'.format(mode, type(attrs)))
+
+    node_attrs = _init_attrs(node_attrs, 'node')
+    edge_attrs = _init_attrs(edge_attrs, 'edge')
+
+    # create batched graph index
+    batched_index = graph_index.disjoint_union([g._graph for g in graph_list])
+    # create batched node and edge frames
+    if len(node_attrs) == 0:
+        batched_node_frame = FrameRef(Frame(num_rows=batched_index.number_of_nodes()))
+    else:
+        # NOTE: following code will materialize the columns of the input graphs.
+        cols = {key: F.cat([gr._node_frame[key] for gr in graph_list
+                            if gr.number_of_nodes() > 0], dim=0)
+                for key in node_attrs}
+        batched_node_frame = FrameRef(Frame(cols))
+
+    if len(edge_attrs) == 0:
+        batched_edge_frame = FrameRef(Frame(num_rows=batched_index.number_of_edges()))
+    else:
+        cols = {key: F.cat([gr._edge_frame[key] for gr in graph_list
+                            if gr.number_of_edges() > 0], dim=0)
+                for key in edge_attrs}
+        batched_edge_frame = FrameRef(Frame(cols))
+
+    batch_size = 0
+    batch_num_nodes = []
+    batch_num_edges = []
+    for grh in graph_list:
+        # handle the input is again a batched graph.
+        batch_size += grh.batch_size
+        batch_num_nodes += grh.batch_num_nodes
+        batch_num_edges += grh.batch_num_edges
+
+    return DGLGraph(graph_data=batched_index,
+                    node_frame=batched_node_frame,
+                    edge_frame=batched_edge_frame,
+                    batch_num_nodes=batch_num_nodes,
+                    batch_num_edges=batch_num_edges)
+
+def unbatch(graph):
+    """Return the list of graphs in this batch.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The batched graph.
+
+    Returns
+    -------
+    list
+        A list of :class:`~dgl.DGLGraph` objects whose attributes are obtained
+        by partitioning the attributes of the :attr:`graph`. The length of the
+        list is the same as the batch size of :attr:`graph`.
+
+    Notes
+    -----
+    Unbatching will break each field tensor of the batched graph into smaller
+    partitions.
+
+    For simpler tasks such as node/edge state aggregation, try to use
+    readout functions.
+
+    See Also
+    --------
+    batch
+    """
+    if graph.batch_size == 1:
+        return [graph]
+
+    bsize = graph.batch_size
+    bnn = graph.batch_num_nodes
+    bne = graph.batch_num_edges
+    pttns = graph_index.disjoint_partition(graph._graph, utils.toindex(bnn))
+    # split the frames
+    node_frames = [FrameRef(Frame(num_rows=n)) for n in bnn]
+    edge_frames = [FrameRef(Frame(num_rows=n)) for n in bne]
+    for attr, col in graph._node_frame.items():
+        col_splits = F.split(col, bnn, dim=0)
+        for i in range(bsize):
+            node_frames[i][attr] = col_splits[i]
+    for attr, col in graph._edge_frame.items():
+        col_splits = F.split(col, bne, dim=0)
+        for i in range(bsize):
+            edge_frames[i][attr] = col_splits[i]
+    return [DGLGraph(graph_data=pttns[i],
+                     node_frame=node_frames[i],
+                     edge_frame=edge_frames[i]) for i in range(bsize)]
+
 
 ############################################################
 # Internal APIs
@@ -3564,3 +4248,8 @@ class AdaptedDGLGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed()
+
+    @property
+    def canonical_etype(self):
+        """Canonical edge type (None for homogeneous graph)"""
+        return (None, None, None)

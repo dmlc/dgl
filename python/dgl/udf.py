@@ -17,12 +17,17 @@ class EdgeBatch(object):
     dst_data : dict of tensors
         The dst node features, in the form of ``dict``
         with ``str`` keys and ``tensor`` values
+    canonical_etype : tuple of (str, str, str), optional
+        Canonical edge type of the edge batch, if UDF is
+        running on a heterograph.
     """
-    def __init__(self, edges, src_data, edge_data, dst_data):
+    def __init__(self, edges, src_data, edge_data, dst_data,
+                 canonical_etype=(None, None, None)):
         self._edges = edges
         self._src_data = src_data
         self._edge_data = edge_data
         self._dst_data = dst_data
+        self._canonical_etype = canonical_etype
 
     @property
     def src(self):
@@ -89,6 +94,12 @@ class EdgeBatch(object):
         """
         return self.batch_size()
 
+    @property
+    def canonical_etype(self):
+        """Return the canonical edge type (i.e. triplet of source, edge, and
+        destination node type) for this edge batch, if available."""
+        return self._canonical_etype
+
 class NodeBatch(object):
     """The class that can represent a batch of nodes.
 
@@ -102,11 +113,15 @@ class NodeBatch(object):
     msgs : dict, optional
         The messages, , in the form of ``dict``
         with ``str`` keys and ``tensor`` values
+    ntype : str, optional
+        The node type of this node batch, if running
+        on a heterograph.
     """
-    def __init__(self, nodes, data, msgs=None):
+    def __init__(self, nodes, data, msgs=None, ntype=None):
         self._nodes = nodes
         self._data = data
         self._msgs = msgs
+        self._ntype = ntype
 
     @property
     def data(self):
@@ -160,3 +175,8 @@ class NodeBatch(object):
         int
         """
         return self.batch_size()
+
+    @property
+    def ntype(self):
+        """Return the node type of this node batch, if available."""
+        return self._ntype

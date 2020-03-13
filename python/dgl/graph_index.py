@@ -1172,8 +1172,8 @@ def from_edge_list(elist, is_multigraph, readonly):
         src, dst = elist
     else:
         src, dst = zip(*elist)
-    src = np.array(src)
-    dst = np.array(dst)
+    src = np.asarray(src)
+    dst = np.asarray(dst)
     src_ids = utils.toindex(src)
     dst_ids = utils.toindex(dst)
     num_nodes = max(src.max(), dst.max()) + 1
@@ -1182,13 +1182,13 @@ def from_edge_list(elist, is_multigraph, readonly):
         raise DGLError('Invalid edge list. Nodes must start from 0.')
     return from_coo(num_nodes, src_ids, dst_ids, is_multigraph, readonly)
 
-def map_to_subgraph_nid(subgraph, parent_nids):
+def map_to_subgraph_nid(induced_nodes, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 
     Parameters
     ----------
-    subgraph: SubgraphIndex
-        the graph index of a subgraph
+    induced_nodes: utils.Index
+        Induced nodes of the subgraph.
 
     parent_nids: utils.Index
         Node Ids in the parent graph.
@@ -1198,7 +1198,7 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     utils.Index
         Node Ids in the subgraph.
     """
-    return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(induced_nodes.todgltensor(),
                                                  parent_nids.todgltensor()))
 
 def transform_ids(mapping, ids):

@@ -35,6 +35,17 @@ inline bool ArrayEQ(dgl::runtime::NDArray a1, dgl::runtime::NDArray a2) {
   return true;
 }
 
+template <typename T>
+inline bool IsInArray(dgl::runtime::NDArray a, T x) {
+  if (!a.defined() || a->shape[0] == 0)
+    return false;
+  for (int64_t i = 0; i < a->shape[0]; ++i) {
+    if (x == static_cast<T*>(a->data)[i])
+      return true;
+  }
+  return false;
+}
+
 static constexpr DLContext CTX = DLContext{kDLCPU, 0};
 
 #endif  // TEST_COMMON_H_

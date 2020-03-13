@@ -101,10 +101,20 @@ class GATConv(nn.Module):
         graph = graph.local_var()
         h = self.feat_drop(feat)
         feat = self.fc(h).view(-1, self._num_heads, self._out_feats)
+        # NOTE: GAT paper uses "first concatenation then linear projection"
+        # to compute attention scores, while ours is "first projection then
+        # addition", the two approaches are mathematically equivalent:
+        # We decompose the weight vector a mentioned in the paper into
+        # [a_l || a_r], then
+        # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
+        # Our implementation is much efficient because we do not need to
+        # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
+        # addition could be optimized with DGL's built-in function u_add_v,
+        # which further speeds up computation and saves memory footprint.
         el = (feat * self.attn_l).sum(dim=-1).unsqueeze(-1)
         er = (feat * self.attn_r).sum(dim=-1).unsqueeze(-1)
         graph.ndata.update({'ft': feat, 'el': el, 'er': er})
-        # compute edge attention
+        # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
         graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
         e = self.leaky_relu(graph.edata.pop('e'))
         # compute softmax
