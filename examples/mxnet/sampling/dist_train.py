@@ -108,8 +108,8 @@ class DistGraphStore:
         self.g = load_graphs(graph_path + '/client-' + str(self.part_id) + '.dgl')[0][0]
         # TODO If we don't have HALO nodes, how do we set partition?
         num_nodes = np.max(self.g.ndata[dgl.NID].asnumpy()) + 1
-        partition = mx.nd.ones(shape=(num_nodes,), dtype=np.int64)
-        partition[self.g.ndata[dgl.NID]] = mx.nd.arange(self.g.number_of_nodes())
+        partition = mx.nd.zeros(shape=(num_nodes,), dtype=np.int64)
+        partition[self.g.ndata[dgl.NID]] = self.g.ndata['part_id']
         # TODO what is the node data name?
         self._client.set_partition_book(name='feats', partition_book=partition)
         self._client.set_partition_book(name='labels', partition_book=partition)
@@ -130,7 +130,7 @@ class DistGraphStore:
         if nids is None:
             gnid = self.local_gnid
         else:
-            gnid = self.local_gnid[nids]
+            gnid = self.g.ndata[dgl.NID][nids]
         return self._client.pull(name=name, id_tensor=gnid)
 
 def main(args):
@@ -170,6 +170,7 @@ if __name__ == '__main__':
             help='whether this is a server.')
     parser.add_argument('--id', type=int,
             help='the partition id')
+    parser.add_argument('--n-features', type=int, help='the input feature size')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--server_data', type=str, help='The file with the server data')
     parser.add_argument('--num-client', type=int, help='The number of clients')
