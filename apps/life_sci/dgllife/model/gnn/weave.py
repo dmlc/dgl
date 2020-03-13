@@ -1,16 +1,13 @@
 """Weave"""
 import dgl.function as fn
-from dgl.nn.pytorch import WeightAndSum
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import tensorflow as tf
-import dgl
+
 from dgl import DGLGraph
 from torch.distributions import Normal
-import collections
 
-__all__ = ['WeaveLayer']
+__all__ = ['WeaveLayer', 'WeaveGather', 'WeaveModel' ]
 
 
 class WeaveLayer(nn.Module):
