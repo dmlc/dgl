@@ -55,7 +55,7 @@ def eval(complete_graphs, preds, graph_edits, mols, num_correct, max_k):
         gold_edits = graph_edits[i]
         for edit in gold_edits.split(';'):
             atom1, atom2, change_type = edit.split('-')
-            atom1, atom2 = int(atom1), int(atom2)
+            atom1, atom2 = int(atom1) - 1, int(atom2) - 1
             gold_bonds.append((min(atom1, atom2), max(atom1, atom2), float(change_type)))
 
         for k in num_correct.keys():
