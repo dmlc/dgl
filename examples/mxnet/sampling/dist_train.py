@@ -111,7 +111,11 @@ class DistGraphStore:
         partition = mx.nd.ones(shape=(num_nodes,), dtype=np.int64)
         partition[self.g.ndata[dgl.NID]] = mx.nd.arange(self.g.number_of_nodes())
         # TODO what is the node data name?
-        self._client.set_partition_book(name='entity_embed', partition_book=partition)
+        self._client.set_partition_book(name='feats', partition_book=partition)
+        self._client.set_partition_book(name='labels', partition_book=partition)
+        self._client.set_partition_book(name='test_mask', partition_book=partition)
+        self._client.set_partition_book(name='val_mask', partition_book=partition)
+        self._client.set_partition_book(name='train_mask', partition_book=partition)
 
         self._client.print()
         self._client.barrier()
@@ -137,7 +141,6 @@ def main(args):
     train_mask = g.get_ndata('train_mask').astype(np.float32)
     val_mask = g.get_ndata('val_mask').astype(np.float32)
     test_mask = g.get_ndata('test_mask').astype(np.float32)
-    print('test3')
     print('train: {}, val: {}, test: {}'.format(mx.nd.sum(train_mask).asnumpy(),
         mx.nd.sum(val_mask).asnumpy(),
         mx.nd.sum(test_mask).asnumpy()), flush=True)
@@ -149,7 +152,7 @@ def main(args):
 
     train_nid = mx.nd.array(np.nonzero(train_mask.asnumpy())[0]).astype(np.int64)
     test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
-    print('test4')
+    print('test5')
 
     if args.model == "gcn_ns":
         gcn_ns_train(g, ctx, args, args.n_classes, train_nid, test_nid)
