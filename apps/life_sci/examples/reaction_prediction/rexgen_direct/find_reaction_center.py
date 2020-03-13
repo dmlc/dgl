@@ -72,7 +72,7 @@ def eval_on_a_loader(args, model, data_loader):
         with torch.no_grad():
             pred, biased_pred = perform_prediction(
                 args['device'], model, batch_mol_graphs, batch_complete_graphs)
-        eval(batch_complete_graphs, biased_pred,  batch_atom_pair_labels,
+        eval(batch_complete_graphs, biased_pred,
              batch_graph_edits, batch_mols, num_correct, args['max_k'])
 
     msg = '|'
