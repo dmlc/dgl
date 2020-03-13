@@ -104,7 +104,8 @@ class DistGraphStore:
         self._client.connect()
 
         # TODO this cannot guarantee data locality.
-        self.g = load_graphs(graph_path + '/client-' + str(self._client.get_id()) + '.dgl')[0][0]
+        self.part_id = self._client.get_id()
+        self.g = load_graphs(graph_path + '/client-' + str(self.part_id) + '.dgl')[0][0]
         # TODO If we don't have HALO nodes, how do we set partition?
         num_nodes = np.max(self.g.ndata[dgl.NID].asnumpy()) + 1
         partition = mx.nd.ones(shape=(num_nodes,), dtype=np.int64)
@@ -115,7 +116,11 @@ class DistGraphStore:
         self._client.print()
         self._client.barrier()
 
+        local_nids = np.nonzero((self.g.ndata['part_id'] == self.part_id).asnumpy())[0]
         self.local_gnid = self.g.ndata[dgl.NID][local_nids]
+
+    def get_id(self):
+        return self.part_id
 
     def get_ndata(self, name, nids=None):
         if nids is None:
@@ -125,12 +130,10 @@ class DistGraphStore:
         return self._client.pull(name=name, id_tensor=gnid)
 
 def main(args):
-    print('test1')
     g = DistGraphStore(args.ip_config, args.graph_path)
-    print('test2')
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
-    mx.random.seed(args.id)
+    mx.random.seed(g.get_id())
     train_mask = g.get_ndata('train_mask').astype(np.float32)
     val_mask = g.get_ndata('val_mask').astype(np.float32)
     test_mask = g.get_ndata('test_mask').astype(np.float32)
