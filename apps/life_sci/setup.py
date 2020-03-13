@@ -26,7 +26,6 @@ setup(
     packages=[package for package in find_packages()
               if package.startswith('dgllife')],
     install_requires=[
-        'dgl>=0.4',
         'torch>=1'
         'scikit-learn>=0.21.2',
         'pandas>=0.25.1',
@@ -35,6 +34,7 @@ setup(
     ],
     url='https://github.com/dmlc/dgl/tree/master/apps/life_sci',
     classifiers=[
+        'Development Status :: 3 - Alpha',
         'Programming Language :: Python :: 3',
-    ]
+    ],
 )

@@ -98,7 +98,7 @@ def main(args):
     del train_set
     del val_set
     print('Evaluation on the test set.')
-    test_result = reaction_center_final_eval(args, model, test_loader)
+    test_result = reaction_center_final_eval(args, model, test_loader, args['easy'])
     print(test_result)
     with open(args['result_path'] + '/results.txt', 'w') as f:
         f.write(test_result)
