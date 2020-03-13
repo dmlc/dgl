@@ -185,7 +185,7 @@ def rough_eval_on_a_loader(args, model, data_loader):
 
     return msg
 
-def eval(complete_graphs, preds, reactions, graph_edits, mols, num_correct, max_k, easy):
+def eval(complete_graphs, preds, reactions, graph_edits, num_correct, max_k, easy):
     """Evaluate top-k accuracies for reaction center prediction.
 
     Parameters
@@ -199,8 +199,6 @@ def eval(complete_graphs, preds, reactions, graph_edits, mols, num_correct, max_
         List of reactions.
     graph_edits : list of str
         List of graph edits in the reactions.
-    mols : list of rdkit.Chem.rdchem.Mol
-        List of RDKit molecule instances for the reactants.
     num_correct : dict
         Counting the number of datapoints for meeting top-k accuracies.
     max_k : int
@@ -242,7 +240,6 @@ def eval(complete_graphs, preds, reactions, graph_edits, mols, num_correct, max_
         num_nodes = complete_graphs.batch_num_nodes[i]
         end = start + complete_graphs.batch_num_edges[i]
         preds_i = preds[start:end, :].flatten()
-        mol_i = mols[i]
         candidate_bonds = []
         topk_values, topk_indices = torch.topk(preds_i, max_k)
         for j in range(max_k):
@@ -261,12 +258,10 @@ def eval(complete_graphs, preds, reactions, graph_edits, mols, num_correct, max_
                 continue
             if atom2 not in reaction_atoms_i:
                 continue
-            bond = mol_i.GetBondBetweenAtoms(atom1 - 1, atom2 - 1)
-            if bond is None:
+            candidate = (int(atom1), int(atom2), float(change_type))
+            if reaction_bonds_i[candidate]:
                 continue
-            if not reaction_bonds_i[(atom1, atom2, bond.GetBondTypeAsDouble())]:
-                continue
-            candidate_bonds.append((int(atom1), int(atom2), float(change_type)))
+            candidate_bonds.append(candidate)
 
         gold_bonds = []
         gold_edits = graph_edits[i]
@@ -307,7 +302,7 @@ def reaction_center_final_eval(args, model, data_loader, easy):
             pred, biased_pred = reaction_center_prediction(
                 args['device'], model, batch_mol_graphs, batch_complete_graphs)
         eval(batch_complete_graphs, biased_pred, batch_reactions,
-             batch_graph_edits, batch_mols, num_correct, args['max_k'], easy)
+             batch_graph_edits, num_correct, args['max_k'], easy)
 
     msg = '|'
     for k, correct_count in num_correct.items():
