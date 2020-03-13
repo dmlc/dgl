@@ -1,4 +1,4 @@
-#Heterograph Convolution with ArangoDB for Incidence Management
+# Heterograph Convolution with ArangoDB for Incidence Management
 
 This example illustrates the use of DGL to develop node embedding and perform supervised learning on a heterogeneous graph with node features. The data for this example comes from the [UCI machine learning repository](https://archive.ics.uci.edu/ml/datasets/Incident+management+process+enriched+event+log) and is the event log from incident management (help desk) application. The data is
 a dump from a relational database. We modeled this as a graph problem with
