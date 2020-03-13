@@ -236,6 +236,7 @@ def test_partition_with_halo():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    orig_src, orig_dst = g.all_edges(form='uv', order='eid')
     subgs = dgl.transform.metis_partition(g, 4, 0)
     num_inner_nodes = 0
     num_inner_edges = 0
@@ -246,20 +247,36 @@ def test_metis_partition():
             assert np.all(F.asnumpy(subg.ndata['part_id']) == part_id)
             num_inner_nodes += subg.number_of_nodes()
             num_inner_edges += subg.number_of_edges()
+            src, dst = subg.all_edges(form='uv', order='eid')
+            psrc = subg.ndata[dgl.NID][src]
+            pdst = subg.ndata[dgl.NID][dst]
+            peid = subg.edata[dgl.EID]
+            assert np.all(F.asnumpy(orig_src[peid]) == F.asnumpy(psrc))
+            assert np.all(F.asnumpy(orig_dst[peid]) == F.asnumpy(pdst))
         assert num_inner_nodes == g.number_of_nodes()
         print(g.number_of_edges() - num_inner_edges)
 
     subgs = dgl.transform.metis_partition(g, 4, 1)
     num_inner_nodes = 0
     num_inner_edges = 0
+    num_tot_edges = 0
     if subgs is not None:
         for part_id, subg in subgs.items():
+            num_tot_edges += subg.number_of_edges()
             lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
             ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
             num_inner_nodes += len(lnode_ids)
             num_inner_edges += len(ledge_ids)
+
+            src, dst = subg.all_edges(form='uv', order='eid')
+            psrc = subg.ndata[dgl.NID][src]
+            pdst = subg.ndata[dgl.NID][dst]
+            peid = subg.edata[dgl.EID]
+            assert np.all(F.asnumpy(orig_src[peid]) == F.asnumpy(psrc))
+            assert np.all(F.asnumpy(orig_dst[peid]) == F.asnumpy(pdst))
             assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
         assert num_inner_nodes == g.number_of_nodes()
+        assert num_tot_edges == g.number_of_edges()
         print(g.number_of_edges() - num_inner_edges)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
