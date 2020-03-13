@@ -109,13 +109,14 @@ def test_simple_graph():
 
 def test_bidirected_graph():
     def _test(in_readonly, out_readonly):
-        elist = [(0, 0), (0, 1), (0, 1), (1, 0),
-                 (1, 1), (2, 1), (2, 2), (2, 2)]
+        elist = [(0, 0), (0, 1), (1, 0),
+                (1, 1), (2, 1), (2, 2)]
+        num_edges = 7
         g = dgl.DGLGraph(elist, readonly=in_readonly)
         elist.append((1, 2))
         elist = set(elist)
         big = dgl.to_bidirected(g, out_readonly)
-        assert big.number_of_edges() == 10
+        assert big.number_of_edges() == num_edges
         src, dst = big.edges()
         eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
         assert eset == set(elist)
@@ -211,7 +212,7 @@ def get_nodeflow(g, node_ids, num_layers):
             seed_nodes=node_ids)
     return next(iter(sampler))
 
-def test_partition():
+def test_partition_with_halo():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
     node_part = np.random.choice(4, g.number_of_nodes())
     subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2)
@@ -231,6 +232,35 @@ def test_partition():
             block_eids2 = lnf.block_parent_eid(i)
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
+def test_metis_partition():
+    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    subgs = dgl.transform.metis_partition(g, 4, 0)
+    num_inner_nodes = 0
+    num_inner_edges = 0
+    if subgs is not None:
+        for part_id, subg in subgs.items():
+            assert np.all(F.asnumpy(subg.ndata['inner_node']) == 1)
+            assert np.all(F.asnumpy(subg.edata['inner_edge']) == 1)
+            assert np.all(F.asnumpy(subg.ndata['part_id']) == part_id)
+            num_inner_nodes += subg.number_of_nodes()
+            num_inner_edges += subg.number_of_edges()
+        assert num_inner_nodes == g.number_of_nodes()
+        print(g.number_of_edges() - num_inner_edges)
+
+    subgs = dgl.transform.metis_partition(g, 4, 1)
+    num_inner_nodes = 0
+    num_inner_edges = 0
+    if subgs is not None:
+        for part_id, subg in subgs.items():
+            lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+            ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
+            num_inner_nodes += len(lnode_ids)
+            num_inner_edges += len(ledge_ids)
+            assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
+        assert num_inner_nodes == g.number_of_nodes()
+        print(g.number_of_edges() - num_inner_edges)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_in_subgraph():
@@ -395,6 +425,121 @@ def test_to_simple():
         for i, e in enumerate(uv):
             assert eid_map[i] == suv.index(e)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
+def test_to_block():
+    def check(g, bg, ntype, etype, rhs_nodes):
+        if rhs_nodes is not None:
+            assert F.array_equal(bg.nodes[ntype + '_r'].data[dgl.NID], rhs_nodes)
+        n_rhs_nodes = bg.number_of_nodes(ntype + '_r')
+        assert F.array_equal(
+            bg.nodes[ntype + '_l'].data[dgl.NID][:n_rhs_nodes],
+            bg.nodes[ntype + '_r'].data[dgl.NID])
+
+        g = g[etype]
+        bg = bg[etype]
+        induced_src = bg.srcdata[dgl.NID]
+        induced_dst = bg.dstdata[dgl.NID]
+        induced_eid = bg.edata[dgl.EID]
+        bg_src, bg_dst = bg.all_edges(order='eid')
+        src_ans, dst_ans = g.all_edges(order='eid')
+
+        induced_src_bg = F.gather_row(induced_src, bg_src)
+        induced_dst_bg = F.gather_row(induced_dst, bg_dst)
+        induced_src_ans = F.gather_row(src_ans, induced_eid)
+        induced_dst_ans = F.gather_row(dst_ans, induced_eid)
+
+        assert F.array_equal(induced_src_bg, induced_src_ans)
+        assert F.array_equal(induced_dst_bg, induced_dst_ans)
+
+    def checkall(g, bg, rhs_nodes):
+        for etype in g.etypes:
+            ntype = g.to_canonical_etype(etype)[2]
+            if rhs_nodes is not None and ntype in rhs_nodes:
+                check(g, bg, ntype, etype, rhs_nodes[ntype])
+            else:
+                check(g, bg, ntype, etype, None)
+
+    g = dgl.heterograph({
+        ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
+        ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
+        ('B', 'BA', 'A'): [(2, 3), (3, 2)]})
+    g_a = g['AA']
+
+    bg = dgl.to_block(g_a)
+    check(g_a, bg, 'A', 'AA', None)
+
+    rhs_nodes = F.tensor([3, 4], dtype=F.int64)
+    bg = dgl.to_block(g_a, rhs_nodes)
+    check(g_a, bg, 'A', 'AA', rhs_nodes)
+
+    rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
+    bg = dgl.to_block(g_a, rhs_nodes)
+    check(g_a, bg, 'A', 'AA', rhs_nodes)
+
+    g_ab = g['AB']
+
+    bg = dgl.to_block(g_ab)
+    assert bg.number_of_nodes('B_l') == 4
+    assert F.array_equal(bg.nodes['B_l'].data[dgl.NID], bg.nodes['B_r'].data[dgl.NID])
+    assert bg.number_of_nodes('A_r') == 0
+    checkall(g_ab, bg, None)
+
+    rhs_nodes = {'B': F.tensor([5, 6], dtype=F.int64)}
+    bg = dgl.to_block(g, rhs_nodes)
+    assert bg.number_of_nodes('B_l') == 2
+    assert F.array_equal(bg.nodes['B_l'].data[dgl.NID], bg.nodes['B_r'].data[dgl.NID])
+    assert bg.number_of_nodes('A_r') == 0
+    checkall(g, bg, rhs_nodes)
+
+    rhs_nodes = {'A': F.tensor([3, 4], dtype=F.int64), 'B': F.tensor([5, 6], dtype=F.int64)}
+    bg = dgl.to_block(g, rhs_nodes)
+    checkall(g, bg, rhs_nodes)
+
+    rhs_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
+    bg = dgl.to_block(g, rhs_nodes=rhs_nodes)
+    checkall(g, bg, rhs_nodes)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_remove_edges():
+    def check(g1, etype, g, edges_removed):
+        src, dst, eid = g.edges(etype=etype, form='all')
+        src1, dst1 = g1.edges(etype=etype, order='eid')
+        if etype is not None:
+            eid1 = g1.edges[etype].data[dgl.EID]
+        else:
+            eid1 = g1.edata[dgl.EID]
+        src1 = F.asnumpy(src1)
+        dst1 = F.asnumpy(dst1)
+        eid1 = F.asnumpy(eid1)
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        eid = F.asnumpy(eid)
+        sde_set = set(zip(src, dst, eid))
+
+        for s, d, e in zip(src1, dst1, eid1):
+            assert (s, d, e) in sde_set
+        assert not np.isin(edges_removed, eid1).any()
+
+    for fmt in ['coo', 'csr', 'csc']:
+        for edges_to_remove in [[2], [2, 2], [3, 2], [1, 3, 1, 2]]:
+            g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], restrict_format=fmt)
+            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove))
+            check(g1, None, g, edges_to_remove)
+
+            g = dgl.graph(
+                spsp.csr_matrix(([1, 1, 1, 1], ([0, 2, 1, 3], [1, 3, 2, 4])), shape=(5, 5)),
+                restrict_format=fmt)
+            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove))
+            check(g1, None, g, edges_to_remove)
+
+    g = dgl.heterograph({
+        ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
+        ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
+        ('B', 'BA', 'A'): [(2, 3), (3, 2)]})
+    g2 = dgl.remove_edges(g, {'AA': F.tensor([2]), 'AB': F.tensor([3]), 'BA': F.tensor([1])})
+    check(g2, 'AA', g, [2])
+    check(g2, 'AB', g, [3])
+    check(g2, 'BA', g, [1])
 
 if __name__ == '__main__':
     test_line_graph()
@@ -408,8 +553,11 @@ if __name__ == '__main__':
     test_laplacian_lambda_max()
     test_remove_self_loop()
     test_add_self_loop()
-    test_partition()
+    test_partition_with_halo()
+    test_metis_partition()
     test_compact()
     test_to_simple()
     test_in_subgraph()
     test_out_subgraph()
+    test_to_block()
+    test_remove_edges()

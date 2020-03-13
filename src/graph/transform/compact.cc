@@ -32,16 +32,42 @@ CompactGraphs(
     const std::vector<IdArray> &always_preserve) {
   // TODO(BarclayII): check whether the node space and metagraph of each graph is the same.
   // Step 1: Collect the nodes that has connections for each type.
-  std::vector<aten::IdHashMap<IdType>> hashmaps(graphs[0]->NumVertexTypes());
+  const int64_t num_ntypes = graphs[0]->NumVertexTypes();
+  std::vector<aten::IdHashMap<IdType>> hashmaps(num_ntypes);
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
 
-  for (size_t i = 0; i < always_preserve.size(); ++i)
+  std::vector<int64_t> max_vertex_cnt(num_ntypes, 0);
+  for (size_t i = 0; i < graphs.size(); ++i) {
+    const HeteroGraphPtr curr_graph = graphs[i];
+    const int64_t num_etypes = curr_graph->NumEdgeTypes();
+
+    for (IdType etype = 0; etype < num_etypes; ++etype) {
+      IdType srctype, dsttype;
+      std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
+
+      const int64_t n_edges = curr_graph->NumEdges(etype);
+      max_vertex_cnt[srctype] += n_edges;
+      max_vertex_cnt[dsttype] += n_edges;
+    }
+  }
+
+  // Reserve the space for hash maps before ahead to aoivd rehashing
+  for (size_t i = 0; i < num_ntypes; ++i) {
+    if (i < always_preserve.size())
+      hashmaps[i].Reserve(always_preserve[i]->shape[0] + max_vertex_cnt[i]);
+    else
+      hashmaps[i].Reserve(max_vertex_cnt[i]);
+  }
+
+  for (size_t i = 0; i < always_preserve.size(); ++i) {
     hashmaps[i].Update(always_preserve[i]);
+  }
 
   for (size_t i = 0; i < graphs.size(); ++i) {
     const HeteroGraphPtr curr_graph = graphs[i];
     const int64_t num_etypes = curr_graph->NumEdgeTypes();
 
+    all_edges[i].reserve(num_etypes);
     for (IdType etype = 0; etype < num_etypes; ++etype) {
       IdType srctype, dsttype;
       std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
@@ -56,9 +82,12 @@ CompactGraphs(
   }
 
   // Step 2: Relabel the nodes for each type to a smaller ID space and save the mapping.
-  std::vector<IdArray> induced_nodes;
-  for (auto &hashmap : hashmaps)
-    induced_nodes.push_back(hashmap.Values());
+  std::vector<IdArray> induced_nodes(num_ntypes);
+  std::vector<int64_t> num_induced_nodes(num_ntypes);
+  for (int64_t i = 0; i < num_ntypes; ++i) {
+    induced_nodes[i] = hashmaps[i].Values();
+    num_induced_nodes[i] = hashmaps[i].Size();
+  }
 
   // Step 3: Remap the edges of each graph.
   std::vector<HeteroGraphPtr> new_graphs;
@@ -84,7 +113,7 @@ CompactGraphs(
           mapped_cols));
     }
 
-    new_graphs.push_back(CreateHeteroGraph(meta_graph, rel_graphs));
+    new_graphs.push_back(CreateHeteroGraph(meta_graph, rel_graphs, num_induced_nodes));
   }
 
   return std::make_pair(new_graphs, induced_nodes);

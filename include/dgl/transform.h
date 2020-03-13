@@ -22,7 +22,7 @@ namespace transform {
  * outbound edges.
  *
  * The graphs should have identical node ID space (i.e. should have the same set of nodes,
- * including types and IDs) and metagraph.
+ * including types and IDs).
  *
  * \param graphs The list of graphs.
  * \param always_preserve The list of nodes to preserve regardless of whether the inbound
@@ -35,6 +35,48 @@ std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
 CompactGraphs(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve);
+
+/*!
+ * \brief Convert a graph into a bipartite-structured graph for message passing.
+ *
+ * Specifically, we create one node type \c ntype_l on the "left" side and another
+ * node type \c ntype_r on the "right" side for each node type \c ntype.  The nodes of
+ * type \c ntype_r would contain the nodes designated by the caller, and node type
+ * \c ntype_l would contain the nodes that has an edge connecting to one of the
+ * designated nodes.
+ *
+ * The nodes of \c ntype_l would also contain the nodes in node type \c ntype_r.
+ *
+ * This function is often used for constructing a series of dependency graphs for
+ * multi-layer message passing, where we first construct a series of frontier graphs
+ * on the original node space, and run the following to get the bipartite graph needed
+ * for message passing with each GNN layer:
+ *
+ * <code>
+ *     bipartites = [None] * len(num_layers)
+ *     for l in reversed(range(len(layers))):
+ *         bipartites[l], seeds = to_bipartite(frontier[l], seeds)
+ *     x = graph.ndata["h"][seeds]
+ *     for g, layer in zip(bipartites, layers):
+ *         x_src = x
+ *         x_dst = x[:len(g.dsttype)]
+ *         x = sageconv(g, (x_src, x_dst))
+ *     output = x
+ * </code>
+ *
+ * \param graph The graph.
+ * \param rhs_nodes Designated nodes that would appear on the right side.
+ *
+ * \return A triplet containing
+ *         * The bipartite-structured graph,
+ *         * The induced node from the left side for each graph,
+ *         * The induced edges.
+ *
+ * \note For each node type \c ntype, the nodes in rhs_nodes[ntype] would always
+ *       appear first in the nodes of type \c ntype_l in the new graph.
+ */
+std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes);
 
 /*!
  * \brief Convert a multigraph to a simple graph.
@@ -66,6 +108,18 @@ CompactGraphs(
  */
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 ToSimpleGraph(const HeteroGraphPtr graph);
+
+/*!
+ * \brief Remove edges from a graph.
+ *
+ * \param graph The graph.
+ * \param eids The edge IDs to remove per edge type.
+ *
+ * \return A pair of the graph with edges removed, as well as the edge ID mapping from
+ *         the original graph to the new graph per edge type.
+ */
+std::pair<HeteroGraphPtr, std::vector<IdArray>>
+RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids);
 
 };  // namespace transform
 
