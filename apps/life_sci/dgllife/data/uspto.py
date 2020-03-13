@@ -449,6 +449,7 @@ class USPTO(WLNReactionDataset):
                  load=True):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
+        print('Preparing {} subset of USPTO'.format(subset))
         self._subset = subset
         if subset == 'val':
             subset = 'valid'
