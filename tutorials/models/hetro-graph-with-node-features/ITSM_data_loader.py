@@ -27,7 +27,7 @@ from custom_http_client import CustomHTTPClient
 class ITSM_Dataloader:
 
     def __init__(self, input_file = "pp_recoded_incident_event_log.csv",\
-                 create_db = True, frac = 0.01):
+                 create_db = True, frac = 0.10):
         self.emlg = None
         self.db = None
         self.labels = list()
@@ -296,7 +296,7 @@ class ITSM_Dataloader:
                           'customer': 'opened_by', 'vendor': 'vendor'}
         for row_index, row in df.iterrows():
             try:
-                if row_index % 5 == 0:
+                if row_index % 50 == 0:
                     print("Processing row: " + str(row_index))
                 # insert the vertices
                 record_vertex_keys = dict()

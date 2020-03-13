@@ -5,6 +5,6 @@ arangodb:
   DB_service_port: 8529
   arangodb_replication_factor: null
   conn_protocol: https
-  dbName: MLlj5byxcuzm6l39bojxgbq
-  password: ML4eomq90dcxvdbnxwfyafoc
-  username: MLg04n3jy5smk7ab9as6h08
+  dbName: MLk0sjyrxg83oi07yaibwfe
+  password: MLhhwpq4fbjo41906ef12xzk
+  username: MLrf2bzx1funbejaaie5baud
