@@ -57,18 +57,18 @@ class DistGraphStoreServer(KVServer):
             for ndata_name in self.part_g.ndata.keys():
                 if '_mask' in ndata_name:
                     print(ndata_name, ':', np.nonzero(self.part_g.ndata[ndata_name].asnumpy())[0])
-                #self.set_global2local(name=ndata_name, global2local=g2l)
+                self.set_global2local(name=ndata_name, global2local=self.g2l)
                 self.init_data(name=ndata_name, data_tensor=self.part_g.ndata[ndata_name])
         else:
             for ndata_name in self.part_g.ndata.keys():
-                #self.set_global2local(name=ndata_name)
+                self.set_global2local(name=ndata_name)
                 self.init_data(name=ndata_name)
         # TODO Do I need synchronization?
 
-    def _pull_handler(self, name, gID, target):
-        lID = self.g2l[gID].asnumpy()
-        gID = gID.asnumpy()
-        print(gID[lID == -1])
+    def _pull_handler(self, name, lID, target):
+        #lID = self.g2l[gID].asnumpy()
+        #gID = gID.asnumpy()
+        #print(gID[lID == -1])
         assert np.sum(lID == -1) == 0
         return target[name][lID]
 
