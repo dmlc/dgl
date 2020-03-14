@@ -11,6 +11,7 @@ from dgl.data.utils import load_graphs, save_graphs
 def write_graph_txt(path, file_name, part_dict, total_nodes):
     partition_book = [0] * total_nodes
     for part_id in part_dict:
+        print('write graph %d...' % part_id)
         # Get (h,r,t) triples
         new_path = path + str(part_id)
         if not os.path.exists(new_path):
@@ -63,14 +64,20 @@ def main():
     args = parser.parse_args()
     num_parts = args.num_parts
 
+    print('load dataset..')
+
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format, args.data_files)
+
+    print('construct graph...')
 
     src, etype_id, dst = dataset.train
     coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
             shape=[dataset.n_entities, dataset.n_entities])
     g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
     g.edata['tid'] = F.tensor(etype_id, F.int64)
+
+    print('partition graph...')
 
     part_dict = dgl.transform.metis_partition(g, num_parts, 1)
 
@@ -86,8 +93,11 @@ def main():
         tot_num_inner_edges += num_inner_edges
 
         part.copy_from_parent()
-        #save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
-    write_graph_txt(args.data_path+'/FB15k/partition_', 'train.txt', part_dict, g.number_of_nodes())
+
+    print('write graph to txt file...')
+
+    write_graph_txt(args.data_path+'/freebase/partition_', 'train.txt', part_dict, g.number_of_nodes())
+    
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
 
