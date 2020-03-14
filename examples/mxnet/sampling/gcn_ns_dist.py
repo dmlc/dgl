@@ -143,7 +143,7 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
     print(model.collect_params(), flush=True)
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('local'))
+                            kvstore=mx.kv.create('dist_sync'))
 
     # initialize graph
     dur = []
