@@ -87,12 +87,9 @@ def main():
 
         part.copy_from_parent()
         #save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
-    write_graph_txt(args.data_path+'/partition_', 'train.txt', part_dict, g.number_of_nodes())
+    write_graph_txt(args.data_path+'FB15k/partition_', 'train.txt', part_dict, g.number_of_nodes())
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()
