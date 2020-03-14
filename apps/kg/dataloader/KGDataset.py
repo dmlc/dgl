@@ -70,6 +70,7 @@ class KGDataset:
                 if only_train == False:
                     self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
                     self.test = self.read_triple(test_path, "test", skip_first_line, format)
+            self.partition = partition
         else:
             with open(local2global_path) as f_ent:
                 self.n_entities = len(f_ent.readlines())
@@ -77,6 +78,7 @@ class KGDataset:
                 self.n_relations = len(f_rel.readlines())
             if read_triple == True:
                 self.train = self.read_triple(train_path, "train", skip_first_line, format, partition=False)
+            self.partition = partition
 
 
     def read_entity(self, entity_path):
@@ -97,7 +99,7 @@ class KGDataset:
 
         return relation2id, len(relation2id)
 
-    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=partition):
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=self.partition):
         # mode: train/valid/test
         if path is None:
             return None
@@ -269,6 +271,7 @@ class KGDatasetFreebase(KGDataset):
             print('File not found. Downloading from', url)
             _download_and_extract(url, path, '{}.zip'.format(name))
         self.path = os.path.join(path, name)
+        self.partition = partition
 
         if partition == False:
             super(KGDatasetFreebase, self).__init__(os.path.join(self.path, 'entity2id.txt'),
@@ -301,7 +304,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False, format=None, partition=partition):
+    def read_triple(self, path, mode, skip_first_line=False, format=None, partition=self.partition):
         heads = []
         tails = []
         rels = []
