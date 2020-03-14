@@ -183,4 +183,4 @@ def gcn_ns_train(g, args, cuda, n_classes, train_nid, test_nid):
                 batch_labels = nf.layers[-1].data['labels'].long()
                 num_acc += (pred.argmax(dim=1) == batch_labels).sum().cpu().item()
 
-        print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
+        print("Test Accuracy {:.4f}". format(num_acc/len(test_nid)))
