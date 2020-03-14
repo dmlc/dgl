@@ -97,7 +97,7 @@ class KGDataset:
 
         return relation2id, len(relation2id)
 
-    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=True):
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=partition):
         # mode: train/valid/test
         if path is None:
             return None
@@ -111,7 +111,7 @@ class KGDataset:
             for line in f:
                 triple = line.strip().split('\t')
                 h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
-                if partition == True:
+                if partition == False:
                     heads.append(self.entity2id[h])
                     rels.append(self.relation2id[r])
                     tails.append(self.entity2id[t])
@@ -301,7 +301,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False, format=None, partition=False):
+    def read_triple(self, path, mode, skip_first_line=False, format=None, partition=partition):
         heads = []
         tails = []
         rels = []
