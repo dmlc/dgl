@@ -77,7 +77,7 @@ class KGDataset:
             with open(relation_path) as f_rel:
                 self.n_relations = len(f_rel.readlines())
             if read_triple == True:
-                self.train = self.read_triple(train_path, "train", skip_first_line, format, partition=False)
+                self.train = self.read_triple(train_path, "train", skip_first_line, format, partition=True)
             self.partition = partition
 
 
@@ -99,7 +99,7 @@ class KGDataset:
 
         return relation2id, len(relation2id)
 
-    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=self.partition):
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=False):
         # mode: train/valid/test
         if path is None:
             return None
@@ -304,7 +304,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False, format=None, partition=self.partition):
+    def read_triple(self, path, mode, skip_first_line=False, format=None, partition=False):
         heads = []
         tails = []
         rels = []
