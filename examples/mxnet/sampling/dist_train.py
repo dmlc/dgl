@@ -18,27 +18,6 @@ import socket
 
 from gcn_ns_dist import gcn_ns_train
 
-'''
-def load_node_data(args):
-    if args.num_parts > 1:
-        import pickle
-        ndata = pickle.load(open('Reddit8/reddit_ndata.pkl', 'rb'))
-        print('load reddit ndata')
-        return ndata
-    else:
-        data = load_data(args)
-        features = mx.nd.array(data.features)
-        labels = mx.nd.array(data.labels)
-        train_mask = mx.nd.array(data.train_mask)
-        val_mask = mx.nd.array(data.val_mask)
-        test_mask = mx.nd.array(data.test_mask)
-        return {'feature': features,
-                'label': labels,
-                'train_mask': train_mask,
-                'val_mask': val_mask,
-                'test_mask': test_mask}
-'''
-
 class DistGraphStoreServer(KVServer):
     def __init__(self, ip_config, server_id, server_data, num_client):
         host_name = socket.gethostname()
@@ -76,32 +55,6 @@ def start_server(args):
     serv = DistGraphStoreServer(args.ip_config, args.id, args.server_data, args.num_client)
     serv.start()
 
-'''
-def load_local_part(args):
-    # We need to know:
-    # * local nodes and local edges.
-    # * mapping to global nodes and global edges.
-    # * mapping to the right machine.
-    # TODO for now, I use pickle to store partitioned graph.
-    if args.num_parts > 1:
-        import pickle
-        part, part_nodes, part_loc = pickle.load(open('Reddit8/reddit_part_{}.pkl'.format(args.id), 'rb'))
-        all_locs = np.loadtxt('Reddit8/reddit.adj.part.{}'.format(args.num_parts))
-        g = dgl.DGLGraph(part, readonly=True)
-        g.ndata['global_id'] = mx.nd.array(part_nodes, dtype=np.int64)
-        g.ndata['node_loc'] = mx.nd.array(part_loc, dtype=np.int64)
-        g.ndata['local'] = mx.nd.array(part_loc == args.id, dtype=np.int64)
-        assert np.all(all_locs[part_nodes] == part_loc)
-        return g, mx.nd.array(all_locs, dtype=np.int64)
-    else:
-        data = load_data(args)
-        g = dgl.DGLGraph(data.graph, readonly=True)
-        g.ndata['global_id'] = mx.nd.arange(g.number_of_nodes(), dtype=np.int64)
-        g.ndata['node_loc'] = mx.nd.zeros(g.number_of_nodes(), dtype=np.int64)
-        g.ndata['local'] = mx.nd.ones(g.number_of_nodes(), dtype=np.int64)
-        return g, g.ndata['node_loc']
-'''
-
 class DistGraphStore:
     def __init__(self, ip_config, graph_path):
         server_namebook = dgl.contrib.read_ip_config(filename=ip_config)
@@ -122,7 +75,6 @@ class DistGraphStore:
         self._client.set_partition_book(name='val_mask', partition_book=partition)
         self._client.set_partition_book(name='train_mask', partition_book=partition)
 
-        self._client.print()
         self._client.barrier()
 
         local_nids = np.nonzero((self.g.ndata['part_id'] == self.part_id).asnumpy())[0]
