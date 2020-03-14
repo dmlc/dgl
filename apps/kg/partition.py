@@ -96,8 +96,8 @@ def main():
 
     print('write graph to txt file...')
 
-    write_graph_txt(args.data_path+'/freebase/partition_', 'train.txt', part_dict, g.number_of_nodes())
-    
+    write_graph_txt(args.data_path+'/Freebase/partition_', 'train.txt', part_dict, g.number_of_nodes())
+
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
 
