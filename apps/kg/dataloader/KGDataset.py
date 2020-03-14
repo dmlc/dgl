@@ -76,7 +76,7 @@ class KGDataset:
             with open(relation_path) as f_rel:
                 self.n_relations = len(f_rel.readlines())
             if read_triple == True:
-                self.train = self.read_triple(train_path, "train", skip_first_line, format, has_map=False)
+                self.train = self.read_triple(train_path, "train", skip_first_line, format, partition=False)
 
 
     def read_entity(self, entity_path):
@@ -97,7 +97,7 @@ class KGDataset:
 
         return relation2id, len(relation2id)
 
-    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], has_map=True):
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=True):
         # mode: train/valid/test
         if path is None:
             return None
@@ -111,7 +111,7 @@ class KGDataset:
             for line in f:
                 triple = line.strip().split('\t')
                 h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
-                if has_map == True:
+                if partition == True:
                     heads.append(self.entity2id[h])
                     rels.append(self.relation2id[r])
                     tails.append(self.entity2id[t])
@@ -301,7 +301,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False, format=None, has_map=False):
+    def read_triple(self, path, mode, skip_first_line=False, format=None, partition=False):
         heads = []
         tails = []
         rels = []
@@ -309,11 +309,17 @@ class KGDatasetFreebase(KGDataset):
         with open(path) as f:
             if skip_first_line:
                 _ = f.readline()
-            for line in f:
-                h, t, r = line.strip().split('\t')
+            if partition == True:
+                h, r, t = line.strip().split('\t')
                 heads.append(int(h))
                 tails.append(int(t))
                 rels.append(int(r))
+            else:
+                for line in f:
+                    h, t, r = line.strip().split('\t')
+                    heads.append(int(h))
+                    tails.append(int(t))
+                    rels.append(int(r))
         heads = np.array(heads, dtype=np.int64)
         tails = np.array(tails, dtype=np.int64)
         rels = np.array(rels, dtype=np.int64)
