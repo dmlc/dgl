@@ -270,13 +270,27 @@ class KGDatasetFreebase(KGDataset):
             _download_and_extract(url, path, '{}.zip'.format(name))
         self.path = os.path.join(path, name)
 
-        super(KGDatasetFreebase, self).__init__(os.path.join(self.path, 'entity2id.txt'),
-                                                os.path.join(self.path, 'relation2id.txt'),
-                                                os.path.join(self.path, 'train.txt'),
-                                                os.path.join(self.path, 'valid.txt'),
-                                                os.path.join(self.path, 'test.txt'),
-                                                read_triple=read_triple,
-                                                only_train=only_train)
+        if partition == False:
+            super(KGDatasetFreebase, self).__init__(os.path.join(self.path, 'entity2id.txt'),
+                                                    os.path.join(self.path, 'relation2id.txt'),
+                                                    os.path.join(self.path, 'train.txt'),
+                                                    os.path.join(self.path, 'valid.txt'),
+                                                    os.path.join(self.path, 'test.txt'),
+                                                    None, None,
+                                                    partition=partition,
+                                                    read_triple=read_triple,
+                                                    only_train=only_train)
+        else:
+            parent_path = os.path.join('..', self.path)
+            super(KGDatasetFreebase, self).__init__(os.path.join(parent_path, 'entity2id.txt'),
+                                                    os.path.join(parent_path, 'relation2id.txt'),
+                                                    os.path.join(self.path, 'train.txt'),
+                                                    None, None,
+                                                    os.path.join(self.path, 'local_to_global.txt'),
+                                                    os.path.join(self.path, 'partition_book.txt'),
+                                                    partition=partition,
+                                                    read_triple=read_triple,
+                                                    only_train=only_train)
 
     def read_entity(self, entity_path):
         with open(entity_path) as f_ent:
@@ -288,7 +302,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False, format=None):
+    def read_triple(self, path, mode, skip_first_line=False, format=None, has_map=False):
         heads = []
         tails = []
         rels = []
