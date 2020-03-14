@@ -190,10 +190,10 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
 
         mx.nd.waitall()
         train_time = time.time() - start
-        print('Trainer {}: Train Time {:.4f}, Throughput: {:.4f}'.format(args.id, train_time,
+        print('Trainer {}: Train Time {:.4f}, Throughput: {:.4f}'.format(g.get_id(), train_time,
             num_bytes / copy_time), flush=True)
         print('Trainer {}: copy {:.4f}, forward_backward: {:.4f}, gradient update:{:.4f}'.format(
-            args.id, copy_time, for_back_time, agg_grad_time))
+            g.get_id(), copy_time, for_back_time, agg_grad_time))
 
         num_acc = 0.
         num_tests = 0
@@ -214,4 +214,4 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
         eval_time = time.time() - start
 
         print("Trainer {}: Test Accuracy {:.4f}, Train Time {:.4f}, Eval time {:.4f}". format(
-            args.id, num_acc/num_tests, train_time, eval_time), flush=True)
+            g.get_id(), num_acc/num_tests, train_time, eval_time), flush=True)
