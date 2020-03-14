@@ -310,10 +310,11 @@ class KGDatasetFreebase(KGDataset):
             if skip_first_line:
                 _ = f.readline()
             if partition == True:
-                h, r, t = line.strip().split('\t')
-                heads.append(int(h))
-                tails.append(int(t))
-                rels.append(int(r))
+                for line in f:
+                    h, r, t = line.strip().split('\t')
+                    heads.append(int(h))
+                    tails.append(int(t))
+                    rels.append(int(r))
             else:
                 for line in f:
                     h, t, r = line.strip().split('\t')
