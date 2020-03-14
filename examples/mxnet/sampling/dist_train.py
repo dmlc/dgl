@@ -39,33 +39,38 @@ def load_node_data(args):
                 'test_mask': test_mask}
 '''
 
-class DistGraphStoreServer:
+class DistGraphStoreServer(KVServer):
     def __init__(self, ip_config, server_id, server_data, num_client):
         host_name = socket.gethostname()
         host_ip = socket.gethostbyname(host_name)
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
         server_namebook = dgl.contrib.read_ip_config(filename=ip_config)
-        self._server = KVServer(server_id=server_id, server_namebook=server_namebook, num_client=num_client)
+        super(DistGraphStoreServer, self).__init__(server_id=server_id, server_namebook=server_namebook, num_client=num_client)
 
-        part_g = load_graphs(server_data)[0][0]
-        num_nodes = np.max(part_g.ndata[dgl.NID].asnumpy()) + 1
-        g2l = mx.nd.zeros((num_nodes), dtype=np.int64)
-        g2l[part_g.ndata[dgl.NID]] = mx.nd.arange(part_g.number_of_nodes())
-        if self._server.get_id() % self._server.get_group_count() == 0: # master server
-            for ndata_name in part_g.ndata.keys():
-                print(ndata_name)
-                self._server.set_global2local(name=ndata_name, global2local=g2l)
-                self._server.init_data(name=ndata_name, data_tensor=part_g.ndata[ndata_name])
+        self.part_g = load_graphs(server_data)[0][0]
+        num_nodes = np.max(self.part_g.ndata[dgl.NID].asnumpy()) + 1
+        self.g2l = mx.nd.zeros((num_nodes), dtype=np.int64)
+        self.g2l[:] = -1
+        self.g2l[self.part_g.ndata[dgl.NID]] = mx.nd.arange(self.part_g.number_of_nodes())
+        if self.get_id() % self.get_group_count() == 0: # master server
+            for ndata_name in self.part_g.ndata.keys():
+                if '_mask' in ndata_name:
+                    print(ndata_name, ':', np.nonzero(self.part_g.ndata[ndata_name].asnumpy())[0])
+                #self.set_global2local(name=ndata_name, global2local=g2l)
+                self.init_data(name=ndata_name, data_tensor=self.part_g.ndata[ndata_name])
         else:
-            for ndata_name in part_g.ndata.keys():
-                self._server.set_global2local(name=ndata_name)
-                self._server.init_data(name=ndata_name)
+            for ndata_name in self.part_g.ndata.keys():
+                #self.set_global2local(name=ndata_name)
+                self.init_data(name=ndata_name)
         # TODO Do I need synchronization?
 
-    def start(self):
-        self._server.print()
-        self._server.start()
+    def _pull_handler(self, name, gID, target):
+        lID = self.g2l[gID].asnumpy()
+        gID = gID.asnumpy()
+        print(gID[lID == -1])
+        assert np.sum(lID == -1) == 0
+        return target[name][lID]
 
 def start_server(args):
     serv = DistGraphStoreServer(args.ip_config, args.id, args.server_data, args.num_client)
@@ -123,6 +128,9 @@ class DistGraphStore:
         local_nids = np.nonzero((self.g.ndata['part_id'] == self.part_id).asnumpy())[0]
         self.local_gnid = self.g.ndata[dgl.NID][local_nids]
 
+    def number_of_nodes(self):
+        return len(self.local_gnid)
+
     def get_id(self):
         return self.part_id
 
@@ -141,7 +149,8 @@ def main(args):
     train_mask = g.get_ndata('train_mask').astype(np.float32)
     val_mask = g.get_ndata('val_mask').astype(np.float32)
     test_mask = g.get_ndata('test_mask').astype(np.float32)
-    print('train: {}, val: {}, test: {}'.format(mx.nd.sum(train_mask).asnumpy(),
+    print('part {}, train: {}, val: {}, test: {}'.format(g.get_id(),
+        mx.nd.sum(train_mask).asnumpy(),
         mx.nd.sum(val_mask).asnumpy(),
         mx.nd.sum(test_mask).asnumpy()), flush=True)
 
@@ -152,7 +161,6 @@ def main(args):
 
     train_nid = mx.nd.array(np.nonzero(train_mask.asnumpy())[0]).astype(np.int64)
     test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
-    print('test5')
 
     if args.model == "gcn_ns":
         gcn_ns_train(g, ctx, args, args.n_classes, train_nid, test_nid)
