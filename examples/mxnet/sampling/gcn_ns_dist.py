@@ -151,14 +151,9 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
         print(epoch, flush=True)
         start = time.time()
         num_bytes = 0
-        copy_time = 1
+        copy_time = 0
         for_back_time = 0
         agg_grad_time = 0
-        def prepare(nf):
-            nbytes, copy_time1 = copy_from_kvstore(nf, g, ctx, ['feats', 'labels'])
-            #num_bytes += nbytes
-            #copy_time += copy_time1
-            return nf
 
         for nf in dgl.contrib.sampling.NeighborSampler(g.g, args.batch_size,
                                                        args.num_neighbors,
@@ -167,8 +162,10 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
                                                        num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid,
-                                                       prefetch=True,
-                                                       prepare=prepare):
+                                                       prefetch=True):
+            nbytes, copy_time1 = copy_from_kvstore(nf, g, ctx, ['feats', 'labels'])
+            num_bytes += nbytes
+            copy_time += copy_time1
             # forward
             start1 = time.time()
             with mx.autograd.record():
@@ -203,7 +200,7 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
 
         start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g.g, args.test_batch_size,
-                                                       100,
+                                                       g.g.number_of_nodes(),
                                                        neighbor_type='in',
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=test_nid):
