@@ -51,17 +51,20 @@ def main():
     parser = argparse.ArgumentParser(description='Partition a knowledge graph')
     parser.add_argument('--data_path', type=str, default='data',
                         help='root path of all dataset')
+    parser.add_argument('--dataset', type=str, default='FB15k',
+                        help='dataset name, under data_path')
     parser.add_argument('--data_files', type=str, default=None, nargs='+',
                         help='a list of data files, e.g. entity relation train valid test')
-    parser.add_argument('--format', type=str, required=True,
-                        help='the format of the dataset, it can be raw_udd_{htr} and udd_{htr}')
+    parser.add_argument('--format', type=str, default='built_in',
+                        help='the format of the dataset, it can be built_in,'\
+                                'raw_udd_{htr} and udd_{htr}')
     parser.add_argument('-k', '--num-parts', required=True, type=int,
                         help='The number of partitions')
     args = parser.parse_args()
     num_parts = args.num_parts
 
     # load dataset and samplers
-    dataset = get_dataset(args.data_path, None, args.format, args.data_files)
+    dataset = get_dataset(args.data_path, args.dataset, args.format, args.data_files)
 
     src, etype_id, dst = dataset.train
     coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
@@ -85,9 +88,11 @@ def main():
         part.copy_from_parent()
         #save_graphs(args.data_path + '/part_' + str(part_id) + '.dgl', [part])
     write_graph_txt(args.data_path+'/partition_', args.data_files[0], part_dict, g.number_of_nodes())
-
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
+
+if __name__ == '__main__':
+    main()
 
 if __name__ == '__main__':
     main()

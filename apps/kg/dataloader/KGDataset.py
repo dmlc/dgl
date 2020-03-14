@@ -403,8 +403,7 @@ class KGDatasetUDD(KGDataset):
             super(KGDatasetUDD, self).__init__(os.path.join(path, files[0]),
                                                os.path.join(path, files[1]),
                                                os.path.join(path, files[2]),
-                                               os.path.join(path, None),
-                                               os.path.join(path, None),
+                                               None, None,
                                                format=format,
                                                read_triple=read_triple,
                                                only_train=only_train)
