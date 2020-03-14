@@ -281,9 +281,8 @@ class KGDatasetFreebase(KGDataset):
                                                     read_triple=read_triple,
                                                     only_train=only_train)
         else:
-            parent_path = os.path.join('..', self.path)
-            super(KGDatasetFreebase, self).__init__(os.path.join(parent_path, 'entity2id.txt'),
-                                                    os.path.join(parent_path, 'relation2id.txt'),
+            super(KGDatasetFreebase, self).__init__(os.path.join(self.path, 'entity2id.txt'),
+                                                    os.path.join(self.path, 'relation2id.txt'),
                                                     os.path.join(self.path, 'train.txt'),
                                                     None, None,
                                                     os.path.join(self.path, 'local_to_global.txt'),
