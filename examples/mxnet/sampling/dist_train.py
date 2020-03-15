@@ -105,9 +105,7 @@ def main(args):
     val_mask = g.get_ndata('val_mask').asnumpy()
     test_mask = g.get_ndata('test_mask').asnumpy()
     print('part {}, train: {}, val: {}, test: {}'.format(g.get_id(),
-        mx.nd.sum(train_mask).asnumpy(),
-        mx.nd.sum(val_mask).asnumpy(),
-        mx.nd.sum(test_mask).asnumpy()), flush=True)
+        np.sum(train_mask), np.sum(val_mask), np.sum(test_mask)), flush=True)
 
     if args.num_gpus > 0:
         ctx = mx.gpu(g.worker_id % args.num_gpus)
