@@ -54,6 +54,16 @@ def test_atom_total_degree():
     assert atom_total_degree(mol.GetAtomWithIdx(0)) == [4]
     assert atom_total_degree(mol.GetAtomWithIdx(2)) == [2]
 
+def test_atom_explicit_valence_one_hot():
+    mol = test_mol1()
+    assert atom_implicit_valence_one_hot(mol.GetAtomWithIdx(0), [1, 2, 3]) == [1, 0, 0]
+    assert atom_implicit_valence_one_hot(mol.GetAtomWithIdx(1), [1, 2, 3]) == [0, 1, 0]
+
+def test_atom_explicit_valence():
+    mol = test_mol1()
+    assert atom_explicit_valence(mol.GetAtomWithIdx(0)) == [1]
+    assert atom_explicit_valence(mol.GetAtomWithIdx(1)) == [2]
+
 def test_atom_implicit_valence_one_hot():
     mol = test_mol1()
     assert atom_implicit_valence_one_hot(mol.GetAtomWithIdx(0), [1, 2, 3]) == [0, 0, 1]
@@ -105,6 +115,18 @@ def test_atom_is_aromatic():
     assert atom_is_aromatic(mol.GetAtomWithIdx(0)) == [0]
     mol = test_mol2()
     assert atom_is_aromatic(mol.GetAtomWithIdx(0)) == [1]
+
+def test_atom_is_in_ring_one_hot():
+    mol = test_mol1()
+    assert atom_is_in_ring_one_hot(mol.GetAtomWithIdx(0)) == [1, 0]
+    mol = test_mol2()
+    assert atom_is_in_ring_one_hot(mol.GetAtomWithIdx(0)) == [0, 1]
+
+def test_atom_is_in_ring():
+    mol = test_mol1()
+    assert atom_is_in_ring(mol.GetAtomWithIdx(0)) == [0]
+    mol = test_mol2()
+    assert atom_is_in_ring(mol.GetAtomWithIdx(0)) == [1]
 
 def test_atom_chiral_tag_one_hot():
     mol = test_mol1()
@@ -246,6 +268,7 @@ if __name__ == '__main__':
     test_atom_degree()
     test_atom_total_degree_one_hot()
     test_atom_total_degree()
+    test_atom_explicit_valence()
     test_atom_implicit_valence_one_hot()
     test_atom_implicit_valence()
     test_atom_hybridization_one_hot()
@@ -257,6 +280,8 @@ if __name__ == '__main__':
     test_atom_num_radical_electrons()
     test_atom_is_aromatic_one_hot()
     test_atom_is_aromatic()
+    test_atom_is_in_ring_one_hot()
+    test_atom_is_in_ring()
     test_atom_chiral_tag_one_hot()
     test_atom_mass()
     test_concat_featurizer()
