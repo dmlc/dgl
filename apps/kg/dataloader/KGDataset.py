@@ -524,15 +524,15 @@ def get_server_partition_dataset(data_path, data_name, format_str, part_id):
 
     if format_str == 'built_in':
         if data_name == 'Freebase':
-            dataset = KGDatasetFreebase(data_path, part_name, partition=True, read_triple=True)
+            dataset = KGDatasetFreebase(data_path, part_name, partition=True, read_triple=False)
         elif data_name == 'FB15k':
-            dataset = KGDatasetFB15k(data_path, part_name, partition=True, read_triple=True)
+            dataset = KGDatasetFB15k(data_path, part_name, partition=True, read_triple=False)
         elif data_name == 'FB15k-237':
-            dataset = KGDatasetFB15k237(data_path, part_name, partition=True, read_triple=True)
+            dataset = KGDatasetFB15k237(data_path, part_name, partition=True, read_triple=False)
         elif data_name == 'wn18':
-            dataset = KGDatasetWN18(data_path, part_name, partition=True, read_triple=True)
+            dataset = KGDatasetWN18(data_path, part_name, partition=True, read_triple=False)
         elif data_name == 'wn18rr':
-            dataset = KGDatasetWN18rr(data_path, part_name, partition=True, read_triple=True)
+            dataset = KGDatasetWN18rr(data_path, part_name, partition=True, read_triple=False)
         else:
             assert False, "Unknown dataset {}".format(data_name)
     elif format_str == 'raw_udd':

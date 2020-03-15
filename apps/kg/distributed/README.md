@@ -14,9 +14,9 @@ Partition Freebase:
 ./partition.sh  ../data Freebase 4
 ```
 
-2. Copy dgl-ke to all the machines
+2. Modify `ip_config.txt` and copy dgl-ke to all the machines
 
-3. Modify `ip_config.txt` and run:
+3. Run
 
 ```bash
 ./launch.sh \
