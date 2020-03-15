@@ -112,8 +112,8 @@ def main(args):
     else:
         ctx = mx.cpu()
 
-    train_nid = g.get_local_nids()[train_mask == 1]
-    test_nid = g.get_local_nids()[test_mask == 1]
+    train_nid = mx.nd.array(g.get_local_nids()[train_mask == 1], dtype=np.int64)
+    test_nid = mx.nd.array(g.get_local_nids()[test_mask == 1], dtype=np.int64)
 
     if args.model == "gcn_ns":
         gcn_ns_train(g, ctx, args, args.n_classes, train_nid, test_nid)
