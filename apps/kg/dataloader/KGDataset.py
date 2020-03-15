@@ -213,7 +213,7 @@ class KGDatasetWN18(KGDataset):
                                             os.path.join(self.path, 'relations.dict'),
                                             os.path.join(self.path, 'train.txt'),
                                             os.path.join(self.path, 'valid.txt'),
-                                            os.path.join(self.path, 'test.txt'),,
+                                            os.path.join(self.path, 'test.txt'),
                                             os.path.join(self.path, 'local_to_global.txt'),
                                             partition=partition,
                                             read_triple=read_triple)
