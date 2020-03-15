@@ -77,11 +77,14 @@ class DistGraphStore:
 
         self._client.barrier()
 
-        local_nids = np.nonzero((self.g.ndata['part_id'] == self.part_id).asnumpy())[0]
-        self.local_gnid = self.g.ndata[dgl.NID][local_nids]
+        self.local_nids = np.nonzero((self.g.ndata['part_id'] == self.part_id).asnumpy())[0]
+        self.local_gnid = self.g.ndata[dgl.NID][self.local_nids]
 
     def number_of_nodes(self):
         return len(self.local_gnid)
+
+    def get_local_nids(self):
+        return self.local_nids
 
     def get_id(self):
         return self.part_id
@@ -98,9 +101,9 @@ def main(args):
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(g.get_id())
-    train_mask = g.get_ndata('train_mask').astype(np.float32)
-    val_mask = g.get_ndata('val_mask').astype(np.float32)
-    test_mask = g.get_ndata('test_mask').astype(np.float32)
+    train_mask = g.get_ndata('train_mask').asnumpy()
+    val_mask = g.get_ndata('val_mask').asnumpy()
+    test_mask = g.get_ndata('test_mask').asnumpy()
     print('part {}, train: {}, val: {}, test: {}'.format(g.get_id(),
         mx.nd.sum(train_mask).asnumpy(),
         mx.nd.sum(val_mask).asnumpy(),
@@ -111,8 +114,8 @@ def main(args):
     else:
         ctx = mx.cpu()
 
-    train_nid = mx.nd.array(np.nonzero(train_mask.asnumpy())[0]).astype(np.int64)
-    test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
+    train_nid = g.get_local_nids()[train_mask == 1]
+    test_nid = g.get_local_nids()[test_mask == 1]
 
     if args.model == "gcn_ns":
         gcn_ns_train(g, ctx, args, args.n_classes, train_nid, test_nid)
