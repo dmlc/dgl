@@ -280,7 +280,7 @@ class KGDatasetFreebase(KGDataset):
                                                 partition=partition,
                                                 read_triple=read_triple)
         if partition == True:
-            self.relation2id, self.n_relations = self.read_relation(relation_path)
+            self.relation2id, self.n_relations = self.read_relation(os.path.join(self.path, 'relation2id.txt'))
 
     def read_entity(self, entity_path):
         with open(entity_path) as f_ent:
