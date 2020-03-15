@@ -279,6 +279,8 @@ class KGDatasetFreebase(KGDataset):
                                                 os.path.join(self.path, 'local_to_global.txt'),
                                                 partition=partition,
                                                 read_triple=read_triple)
+        if partition == True:
+            self.relation2id, self.n_relations = self.read_relation(relation_path)
 
     def read_entity(self, entity_path):
         with open(entity_path) as f_ent:
