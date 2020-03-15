@@ -13,7 +13,6 @@ import argparse
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
-from torch.nn.parallel import DistributedDataParallel
 import tqdm
 import traceback
 
@@ -218,7 +217,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
+            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
