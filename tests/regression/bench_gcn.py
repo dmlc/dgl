@@ -20,7 +20,7 @@ class GCNBenchmark:
     #     self.tmp_dir = Path(tempfile.mkdtemp())
 
     def setup(self, backend, dataset, gpu_id):
-        log_filename = Path("{}_{}_{}.log".format(backend, dataset, gpu_id))
+        log_filename = Path("gcn_{}_{}_{}.log".format(backend, dataset, gpu_id))
         if log_filename.exists():
             return
         gcn_path = base_path / "examples/{}/gcn/train.py".format(backend)

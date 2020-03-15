@@ -239,8 +239,6 @@ def run(proc_id, n_gpus, args, devices, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        extract_time = 0
-        extract_GB = 0.
         for step, blocks in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
@@ -269,7 +267,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             if proc_id == 0:
                 iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
-            if step % args.log_every == 0 and proc_id == 0 and False:
+            if step % args.log_every == 0 and proc_id == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), th.cuda.max_memory_allocated() / 1000000))
@@ -278,7 +276,6 @@ def run(proc_id, n_gpus, args, devices, data):
             th.distributed.barrier()
 
         toc = time.time()
-        print('Extract Time(s): {:.4f}, Amount(GB): {:.4f}'.format(extract_time, extract_GB))
         if proc_id == 0:
             print('Epoch Time(s): {:.4f}'.format(toc - tic))
             if epoch >= 5:
