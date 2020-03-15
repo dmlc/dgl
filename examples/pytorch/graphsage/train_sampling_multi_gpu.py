@@ -15,13 +15,15 @@ from functools import wraps
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
+import traceback
 
 #### Neighbor sampler
 
 class NeighborSampler(object):
-    def __init__(self, g, fanouts):
+    def __init__(self, g, fanouts, labels):
         self.g = g
         self.fanouts = fanouts
+        self.labels = labels
 
     def sample_blocks(self, seeds):
         seeds = th.LongTensor(np.asarray(seeds))
@@ -179,6 +181,9 @@ def load_subtensor(g, labels, seeds, input_nodes, dev_id):
     batch_labels = labels[seeds].to(dev_id)
     return batch_inputs, batch_labels
 
+def to_device(batch_inputs, batch_labels, dev_id):
+    return batch_inputs.to(dev_id), batch_labels.to(dev_id)
+
 #### Entry point
 
 @thread_wrapped_func
@@ -208,7 +213,7 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], labels)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
@@ -236,6 +241,8 @@ def run(proc_id, n_gpus, args, devices, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
+        extract_time = 0
+        extract_GB = 0.
         for step, blocks in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
@@ -264,7 +271,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             if proc_id == 0:
                 iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
-            if step % args.log_every == 0 and proc_id == 0:
+            if step % args.log_every == 0 and proc_id == 0 and False:
                 acc = compute_acc(batch_pred, batch_labels)
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), th.cuda.max_memory_allocated() / 1000000))
@@ -273,6 +280,7 @@ def run(proc_id, n_gpus, args, devices, data):
             th.distributed.barrier()
 
         toc = time.time()
+        print('Extract Time(s): {:.4f}, Amount(GB): {:.4f}'.format(extract_time, extract_GB))
         if proc_id == 0:
             print('Epoch Time(s): {:.4f}'.format(toc - tic))
             if epoch >= 5:
@@ -283,6 +291,7 @@ def run(proc_id, n_gpus, args, devices, data):
                 else:
                     eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
                 print('Eval Acc {:.4f}'.format(eval_acc))
+
 
     if n_gpus > 1:
         th.distributed.barrier()
