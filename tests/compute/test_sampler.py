@@ -71,14 +71,9 @@ def test_1neighbor_sampler():
 
 def test_prefetch_neighbor_sampler():
     g = generate_rand_graph(100)
-    g.ndata['feat'] = F.ones((g.number_of_nodes(), 10))
-    def prepare(nf):
-        nf.copy_from_parent()
-        return nf
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
     for subg in dgl.contrib.sampling.NeighborSampler(g, 1, 5, neighbor_type='in',
-                                                     num_workers=4, prefetch=True, prepare=prepare):
-        assert 'feat' in subg.layers[0].data
+                                                     num_workers=4, prefetch=True):
         seed_ids = subg.layer_parent_nid(-1)
         assert len(seed_ids) == 1
         assert subg.number_of_nodes() <= 6
