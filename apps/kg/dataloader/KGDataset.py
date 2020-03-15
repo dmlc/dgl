@@ -60,16 +60,13 @@ class KGDataset:
     '''
     def __init__(self, entity_path, relation_path,
                  train_path, valid_path=None, test_path=None,
-                 format=[0,1,2], read_triple=True, only_train=False,
-                 skip_first_line=False):
+                 format=[0,1,2], skip_first_line=False):
         self.entity2id, self.n_entities = self.read_entity(entity_path)
         self.relation2id, self.n_relations = self.read_relation(relation_path)
 
-        if read_triple == True:
-            self.train = self.read_triple(train_path, "train", skip_first_line, format)
-            if only_train == False:
-                self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
-                self.test = self.read_triple(test_path, "test", skip_first_line, format)
+        self.train = self.read_triple(train_path, "train", skip_first_line, format)
+        self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
+        self.test = self.read_triple(test_path, "test", skip_first_line, format)
 
     def read_entity(self, entity_path):
         with open(entity_path) as f:
@@ -125,7 +122,7 @@ class KGDatasetFB15k(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name='FB15k', read_triple=True, only_train=False):
+    def __init__(self, path, name='FB15k'):
         self.name = name
         url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
@@ -138,9 +135,7 @@ class KGDatasetFB15k(KGDataset):
                                              os.path.join(self.path, 'relations.dict'),
                                              os.path.join(self.path, 'train.txt'),
                                              os.path.join(self.path, 'valid.txt'),
-                                             os.path.join(self.path, 'test.txt'),
-                                             read_triple=read_triple,
-                                             only_train=only_train)
+                                             os.path.join(self.path, 'test.txt'))
 
 class KGDatasetFB15k237(KGDataset):
     '''Load a knowledge graph FB15k-237
@@ -155,7 +150,7 @@ class KGDatasetFB15k237(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name='FB15k-237', read_triple=True, only_train=False):
+    def __init__(self, path, name='FB15k-237'):
         self.name = name
         url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
@@ -168,9 +163,7 @@ class KGDatasetFB15k237(KGDataset):
                                                 os.path.join(self.path, 'relations.dict'),
                                                 os.path.join(self.path, 'train.txt'),
                                                 os.path.join(self.path, 'valid.txt'),
-                                                os.path.join(self.path, 'test.txt'),
-                                                read_triple=read_triple,
-                                                only_train=only_train)
+                                                os.path.join(self.path, 'test.txt'))
 
 class KGDatasetWN18(KGDataset):
     '''Load a knowledge graph wn18
@@ -185,7 +178,7 @@ class KGDatasetWN18(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name='wn18', read_triple=True, only_train=False):
+    def __init__(self, path, name='wn18'):
         self.name = name
         url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
@@ -198,9 +191,7 @@ class KGDatasetWN18(KGDataset):
                                             os.path.join(self.path, 'relations.dict'),
                                             os.path.join(self.path, 'train.txt'),
                                             os.path.join(self.path, 'valid.txt'),
-                                            os.path.join(self.path, 'test.txt'),
-                                            read_triple=read_triple,
-                                            only_train=only_train)
+                                            os.path.join(self.path, 'test.txt'))
 
 class KGDatasetWN18rr(KGDataset):
     '''Load a knowledge graph wn18rr
@@ -215,7 +206,7 @@ class KGDatasetWN18rr(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name='wn18rr', read_triple=True, only_train=False):
+    def __init__(self, path, name='wn18rr'):
         self.name = name
         url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
@@ -228,9 +219,7 @@ class KGDatasetWN18rr(KGDataset):
                                               os.path.join(self.path, 'relations.dict'),
                                               os.path.join(self.path, 'train.txt'),
                                               os.path.join(self.path, 'valid.txt'),
-                                              os.path.join(self.path, 'test.txt'),
-                                              read_triple=read_triple,
-                                              only_train=only_train)
+                                              os.path.join(self.path, 'test.txt'))
 
 class KGDatasetFreebase(KGDataset):
     '''Load a knowledge graph Full Freebase
@@ -245,7 +234,7 @@ class KGDatasetFreebase(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name='Freebase', read_triple=True, only_train=False):
+    def __init__(self, path, name='Freebase'):
         self.name = name
         url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
@@ -258,9 +247,7 @@ class KGDatasetFreebase(KGDataset):
                                                 os.path.join(self.path, 'relation2id.txt'),
                                                 os.path.join(self.path, 'train.txt'),
                                                 os.path.join(self.path, 'valid.txt'),
-                                                os.path.join(self.path, 'test.txt'),
-                                                read_triple=read_triple,
-                                                only_train=only_train)
+                                                os.path.join(self.path, 'test.txt'))
 
     def read_entity(self, entity_path):
         with open(entity_path) as f_ent:
@@ -319,9 +306,7 @@ class KGDatasetUDDRaw(KGDataset):
             super(KGDatasetUDDRaw, self).__init__("entities.tsv",
                                                   "relation.tsv",
                                                   os.path.join(path, files[0]),
-                                                  format=format,
-                                                  read_triple=True,
-                                                  only_train=True)
+                                                  format=format)
         # Train, validation and test set are provided
         if len(files) == 3:
             super(KGDatasetUDDRaw, self).__init__("entities.tsv",
@@ -329,9 +314,7 @@ class KGDatasetUDDRaw(KGDataset):
                                                   os.path.join(path, files[0]),
                                                   os.path.join(path, files[1]),
                                                   os.path.join(path, files[2]),
-                                                  format=format,
-                                                  read_triple=True,
-                                                  only_train=False)
+                                                  format=format)
 
     def load_entity_relation(self, path, files, format):
         entity_map = {}
@@ -376,7 +359,7 @@ class KGDatasetUDD(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name, files, format, read_triple=True, only_train=False):
+    def __init__(self, path, name, files, format):
         self.name = name
         for f in files:
             assert os.path.exists(os.path.join(path, f)), \
@@ -388,18 +371,14 @@ class KGDatasetUDD(KGDataset):
                                                os.path.join(path, files[1]),
                                                os.path.join(path, files[2]),
                                                None, None,
-                                               format=format,
-                                               read_triple=read_triple,
-                                               only_train=only_train)
+                                               format=format)
         if len(files) == 5:
             super(KGDatasetUDD, self).__init__(os.path.join(path, files[0]),
                                                os.path.join(path, files[1]),
                                                os.path.join(path, files[2]),
                                                os.path.join(path, files[3]),
                                                os.path.join(path, files[4]),
-                                               format=format,
-                                               read_triple=read_triple,
-                                               only_train=only_train)
+                                               format=format)
 
     def read_entity(self, entity_path):
         n_entities = 0
@@ -467,15 +446,15 @@ def get_partition_dataset(data_path, data_name, format_str, part_id):
     part_name = os.path.join(data_name, 'part_'+str(part_id))
     if format_str == 'built_in':
         if data_name == 'Freebase':
-            dataset = KGDatasetFreebase(data_path, part_name, read_triple=True, only_train=True)
+            dataset = KGDatasetFreebase(data_path, part_name)
         elif data_name == 'FB15k':
-            dataset = KGDatasetFB15k(data_path, part_name, read_triple=True, only_train=True)
+            dataset = KGDatasetFB15k(data_path, part_name)
         elif data_name == 'FB15k-237':
-            dataset = KGDatasetFB15k237(data_path, part_name, read_triple=True, only_train=True)
+            dataset = KGDatasetFB15k237(data_path, part_name)
         elif data_name == 'wn18':
-            dataset = KGDatasetWN18(data_path, part_name, read_triple=True, only_train=True)
+            dataset = KGDatasetWN18(data_path, part_name)
         elif data_name == 'wn18rr':
-            dataset = KGDatasetWN18rr(data_path, part_name, read_triple=True, only_train=True)
+            dataset = KGDatasetWN18rr(data_path, part_name)
         else:
             assert False, "Unknown dataset {}".format(data_name)
     elif format_str == 'raw_udd':
@@ -484,7 +463,7 @@ def get_partition_dataset(data_path, data_name, format_str, part_id):
     elif format_str == 'udd':
         # user defined dataset
         format = format_str[4:]
-        dataset = KGDatasetUDD(data_path, data_name, files, format, read_triple=True, only_train=True)
+        dataset = KGDatasetUDD(data_path, data_name, files, format)
     else:
         assert False, "Unknown format {}".format(format_str)
 
@@ -507,15 +486,15 @@ def get_server_partition_dataset(data_path, data_name, format_str, part_id):
 
     if format_str == 'built_in':
         if data_name == 'Freebase':
-            dataset = KGDatasetFreebase(data_path, part_name, read_triple=False, only_train=True)
+            dataset = KGDatasetFreebase(data_path, part_name)
         elif data_name == 'FB15k':
-            dataset = KGDatasetFB15k(data_path, part_name, read_triple=False, only_train=True)
+            dataset = KGDatasetFB15k(data_path, part_name)
         elif data_name == 'FB15k-237':
-            dataset = KGDatasetFB15k237(data_path, part_name, read_triple=False, only_train=True)
+            dataset = KGDatasetFB15k237(data_path, part_name)
         elif data_name == 'wn18':
-            dataset = KGDatasetWN18(data_path, part_name, read_triple=False, only_train=True)
+            dataset = KGDatasetWN18(data_path, part_name)
         elif data_name == 'wn18rr':
-            dataset = KGDatasetWN18rr(data_path, part_name, read_triple=False, only_train=True)
+            dataset = KGDatasetWN18rr(data_path, part_name)
         else:
             assert False, "Unknown dataset {}".format(data_name)
     elif format_str == 'raw_udd':
@@ -524,7 +503,7 @@ def get_server_partition_dataset(data_path, data_name, format_str, part_id):
     elif format_str == 'udd':
         # user defined dataset
         format = format_str[4:]
-        dataset = KGDatasetUDD(data_path, data_name, files, format, read_triple=False, only_train=True)
+        dataset = KGDatasetUDD(data_path, data_name, files, format)
     else:
         assert False, "Unknown format {}".format(format_str)
 
