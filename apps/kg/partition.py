@@ -7,7 +7,7 @@ import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
-def write_txt_graph(path, file_name, part_dict, total_nodes, total_relations):
+def write_txt_graph(path, file_name, part_dict, total_nodes):
     partition_book = [0] * total_nodes
     for part_id in part_dict:
         print('write graph %d...' % part_id)
@@ -26,11 +26,6 @@ def write_txt_graph(path, file_name, part_dict, total_nodes, total_relations):
         rel = F.asnumpy(rel)
         for i in range(len(src)):
             f.write(str(src[i])+'\t'+str(rel[i])+'\t'+str(dst[i])+'\n')
-        f.close()
-        # Get relatition count
-        rel_count_file = os.path.join(partition_path, 'relation_count.txt')
-        f = open(rel_count_file, 'w')
-        f.write(str(total_relations)+'\n')
         f.close()
         # Get local2global
         l2g_file = os.path.join(partition_path, 'local_to_global.txt')
@@ -80,7 +75,6 @@ def main():
             shape=[dataset.n_entities, dataset.n_entities])
     g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
     g.edata['tid'] = F.tensor(etype_id, F.int64)
-    relation_count = len(np.unique(F.asnumpy(g.edata['tid'])))
 
     print('partition graph...')
 
@@ -103,7 +97,7 @@ def main():
 
     txt_file_graph = os.path.join(args.data_path, args.dataset)
     txt_file_graph = os.path.join(txt_file_graph, 'partition_')
-    write_txt_graph(txt_file_graph, 'train.txt', part_dict, g.number_of_nodes(), relation_count)
+    write_txt_graph(txt_file_graph, 'train.txt', part_dict, g.number_of_nodes())
 
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
