@@ -2,21 +2,21 @@ from dataloader import get_dataset
 import scipy as sp
 import numpy as np
 import argparse
-import signal
+import os
 import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
 
-def write_graph_txt(path, file_name, part_dict, total_nodes):
+def write_txt_graph(path, file_name, part_dict, total_nodes, total_relations):
     partition_book = [0] * total_nodes
     for part_id in part_dict:
         print('write graph %d...' % part_id)
         # Get (h,r,t) triples
-        new_path = path + str(part_id)
-        if not os.path.exists(new_path):
-            os.mkdir(new_path)
-        new_file_name = os.path.join(new_path, file_name)
-        f = open(new_file_name, 'w')
+        partition_path = path + str(part_id)
+        if not os.path.exists(partition_path):
+            os.mkdir(partition_path)
+        triple_file = os.path.join(partition_path, file_name)
+        f = open(triple_file, 'w')
         graph = part_dict[part_id]
         src, dst = graph.all_edges(form='uv', order='eid')
         rel = graph.edata['tid']
@@ -27,22 +27,27 @@ def write_graph_txt(path, file_name, part_dict, total_nodes):
         for i in range(len(src)):
             f.write(str(src[i])+'\t'+str(rel[i])+'\t'+str(dst[i])+'\n')
         f.close()
+        # Get relatition count
+        rel_count_file = os.path.join(partition_path, 'relation_count.txt')
+        f = open(rel_count_file, 'w')
+        f.write(str(total_relations)+'\n')
+        f.close()
         # Get local2global
-        new_file_name = os.path.join(new_path, 'local_to_global.txt')
-        f = open(new_file_name, 'w')
+        l2g_file = os.path.join(partition_path, 'local_to_global.txt')
+        f = open(l2g_file, 'w')
         pid = F.asnumpy(graph.parent_nid)
         for i in range(len(pid)):
             f.write(str(pid[i])+'\n')
         f.close()
         # Update partition_book
-        part_id = F.asnumpy(graph.ndata['part_id'])
+        partition = F.asnumpy(graph.ndata['part_id'])
         for i in range(len(pid)):
-            partition_book[pid[i]] = part_id[i]
+            partition_book[pid[i]] = partition[i]
     # Write partition_book.txt
     for part_id in part_dict:
-        new_path = path + str(part_id)
-        new_file_name = os.path.join(new_path, 'partition_book.txt')
-        f = open(new_file_name, 'w')
+        partition_path = path + str(part_id)
+        pb_file = os.path.join(partition_path, 'partition_book.txt')
+        f = open(pb_file, 'w')
         for i in range(len(partition_book)):
             f.write(str(partition_book[i])+'\n')
         f.close()
@@ -73,8 +78,9 @@ def main():
     src, etype_id, dst = dataset.train
     coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
             shape=[dataset.n_entities, dataset.n_entities])
-    g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+    g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
     g.edata['tid'] = F.tensor(etype_id, F.int64)
+    relation_count = len(np.unique(F.asnumpy(g.edata['tid'])))
 
     print('partition graph...')
 
@@ -94,8 +100,10 @@ def main():
         part.copy_from_parent()
 
     print('write graph to txt file...')
-    
-    write_graph_txt(args.data_path+'/Freebase/partition_', 'train.txt', part_dict, g.number_of_nodes())
+
+    txt_file_graph = os.path.join(args.data_path, args.dataset)
+    txt_file_graph = os.path.join(txt_file_graph, 'partition_')
+    write_txt_graph(txt_file_graph, 'train.txt', part_dict, g.number_of_nodes(), relation_count)
 
     print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), g.number_of_edges() - tot_num_inner_edges, len(part_dict)))
