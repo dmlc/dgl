@@ -34,8 +34,7 @@ class DistGraphStoreServer(KVServer):
         self.g2l[self.part_g.ndata[dgl.NID]] = mx.nd.arange(self.part_g.number_of_nodes())
         if self.get_id() % self.get_group_count() == 0: # master server
             for ndata_name in self.part_g.ndata.keys():
-                if '_mask' in ndata_name:
-                    print(ndata_name, ':', np.nonzero(self.part_g.ndata[ndata_name].asnumpy())[0])
+                print(ndata_name)
                 self.set_global2local(name=ndata_name, global2local=self.g2l)
                 self.init_data(name=ndata_name, data_tensor=self.part_g.ndata[ndata_name])
         else:
@@ -69,7 +68,7 @@ class DistGraphStore:
         partition = mx.nd.zeros(shape=(num_nodes,), dtype=np.int64)
         partition[self.g.ndata[dgl.NID]] = self.g.ndata['part_id']
         # TODO what is the node data name?
-        self._client.set_partition_book(name='feats', partition_book=partition)
+        self._client.set_partition_book(name='features', partition_book=partition)
         self._client.set_partition_book(name='labels', partition_book=partition)
         self._client.set_partition_book(name='test_mask', partition_book=partition)
         self._client.set_partition_book(name='val_mask', partition_book=partition)
