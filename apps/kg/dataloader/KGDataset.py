@@ -481,7 +481,7 @@ def get_dataset(data_path, data_name, format_str, files=None):
 
 
 def get_partition_dataset(data_path, data_name, format_str, part_id):
-    part_name = os.path.join(data_name, 'part_'+str(part_id))
+    part_name = os.path.join(data_name, 'partition_'+str(part_id))
     if format_str == 'built_in':
         if data_name == 'Freebase':
             dataset = KGDatasetFreebase(data_path, part_name, partition=True, read_triple=True)
@@ -520,7 +520,7 @@ def get_partition_dataset(data_path, data_name, format_str, part_id):
     return dataset, partition_book, local_to_global
 
 def get_server_partition_dataset(data_path, data_name, format_str, part_id):
-    part_name = os.path.join(data_name, 'part_'+str(part_id))
+    part_name = os.path.join(data_name, 'partition_'+str(part_id))
 
     if format_str == 'built_in':
         if data_name == 'Freebase':
