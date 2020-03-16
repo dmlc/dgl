@@ -133,7 +133,7 @@ class PartitionKGDataset():
     '''
     def __init__(self, relation_path, train_path, local2global_path, 
                  read_triple=True, skip_first_line=False):
-        self.n_entities = file_line(local2global_path)
+        self.n_entities = _file_line(local2global_path)
         if skip_first_line == False:
             self.n_relations = _file_line(relation_path)
         else:
@@ -158,7 +158,7 @@ class PartitionKGDataset():
         tails = np.array(tails, dtype=np.int64)
         rels = np.array(rels, dtype=np.int64)
         print('Finished. Read {} {} triples.'.format(len(heads), mode))
-        
+
         return (heads, rels, tails)
 
 
