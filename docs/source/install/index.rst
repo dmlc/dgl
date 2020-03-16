@@ -76,14 +76,13 @@ Download the source files from GitHub.
 
 .. code:: bash
 
-   git clone --recursive https://github.com/dmlc/dgl.git
+   git clone --recurse-submodules https://github.com/dmlc/dgl.git
 
 (Optional) Clone the repository first, and then run the following:
 
 .. code:: bash
 
-   git submodule init
-   git submodule update
+   git submodule update --init --recursive
 
 Linux
 `````

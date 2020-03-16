@@ -30,8 +30,18 @@ class IdHashMap {
 
   // Construct the hashmap using the given id array.
   // The id array could contain duplicates.
+  // If the id array has no duplicates, the array will be relabeled to consecutive
+  // integers starting from 0.
   explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
+    oldv2newv_.reserve(ids->shape[0]);
     Update(ids);
+  }
+
+  // copy ctor
+  IdHashMap(const IdHashMap &other) = default;
+
+  void Reserve(const int64_t size) {
+    oldv2newv_.reserve(size);
   }
 
   // Update the hashmap with given id array.
@@ -39,13 +49,12 @@ class IdHashMap {
   void Update(IdArray ids) {
     const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
-    IdType newid = oldv2newv_.size();
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
-      if (!Contains(id)) {
-        oldv2newv_[id] = newid++;
-        filter_[id & kFilterMask] = true;
-      }
+      // std::unorderd_map::insert assures that an insertion will not happen if the
+      // key already exists.
+      oldv2newv_.insert({id, oldv2newv_.size()});
+      filter_[id & kFilterMask] = true;
     }
   }
 
@@ -83,6 +92,10 @@ class IdHashMap {
     for (auto pair : oldv2newv_)
       values_data[pair.second] = pair.first;
     return values;
+  }
+
+  inline size_t Size() const {
+    return oldv2newv_.size();
   }
 
  private:

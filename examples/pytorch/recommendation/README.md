@@ -4,7 +4,7 @@ NOTE: this version is not using NodeFlow yet.
       
 This example only work with Python 3.6+
 
-First, download and extract from https://dgl.ai.s3.us-east-2.amazonaws.com/dataset/ml-1m.tar.gz
+First, download and extract from https://data.dgl.ai/dataset/ml-1m.tar.gz
 
 One can then run the following to train PinSage on MovieLens-1M:
 

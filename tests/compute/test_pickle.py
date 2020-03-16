@@ -268,3 +268,4 @@ if __name__ == '__main__':
     test_pickling_graph()
     test_pickling_nodeflow()
     test_pickling_batched_graph()
+    test_pickling_heterograph()

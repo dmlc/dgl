@@ -250,10 +250,11 @@ class BlockDataView(MutableMapping):
 
 class HeteroNodeView(object):
     """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
-    __slots__ = ['_graph']
+    __slots__ = ['_graph', '_typeid_getter']
 
-    def __init__(self, graph):
+    def __init__(self, graph, typeid_getter):
         self._graph = graph
+        self._typeid_getter = typeid_getter
 
     def __getitem__(self, key):
         if isinstance(key, slice):
@@ -271,7 +272,8 @@ class HeteroNodeView(object):
         else:
             nodes = key
             ntype = None
-        return NodeSpace(data=HeteroNodeDataView(self._graph, ntype, nodes))
+        ntid = self._typeid_getter(ntype)
+        return NodeSpace(data=HeteroNodeDataView(self._graph, ntype, ntid, nodes))
 
     def __call__(self, ntype=None):
         """Return the nodes."""
@@ -281,10 +283,10 @@ class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""
     __slots__ = ['_graph', '_ntype', '_ntid', '_nodes']
 
-    def __init__(self, graph, ntype, nodes):
+    def __init__(self, graph, ntype, ntid, nodes):
         self._graph = graph
         self._ntype = ntype
-        self._ntid = self._graph.get_ntype_id(ntype)
+        self._ntid = ntid
         self._nodes = nodes
 
     def __getitem__(self, key):

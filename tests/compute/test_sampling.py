@@ -37,6 +37,7 @@ def test_random_walk():
         ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
 
     g2.edata['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
+    g2.edata['p2'] = F.tensor([[3], [0], [3], [3], [3]], dtype=F.float32)
     g4.edges['follow'].data['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
     g4.edges['viewed-by'].data['p'] = F.tensor([1, 1, 1, 1, 1, 1], dtype=F.float32)
 
@@ -61,6 +62,14 @@ def test_random_walk():
     traces, ntypes = dgl.sampling.random_walk(
         g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p')
     check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p')
+
+    try:
+        traces, ntypes = dgl.sampling.random_walk(
+            g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p2')
+        fail = False
+    except dgl.DGLError:
+        fail = True
+    assert fail
 
     metapath = ['follow', 'view', 'viewed-by'] * 2
     traces, ntypes = dgl.sampling.random_walk(
@@ -102,6 +111,35 @@ def test_pack_traces():
     assert F.array_equal(result[1], F.tensor([0, 0, 0, 0, 1, 0, 0, 1, 0], dtype=F.int64))
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
+
+def test_pinsage_sampling():
+    def _test_sampler(g, sampler, ntype):
+        neighbor_g = sampler(F.tensor([0, 2], dtype=F.int64))
+        assert neighbor_g.ntypes == [ntype]
+        u, v = neighbor_g.all_edges(form='uv', order='eid')
+        uv = list(zip(F.asnumpy(u).tolist(), F.asnumpy(v).tolist()))
+        assert (1, 0) in uv or (0, 0) in uv
+        assert (2, 2) in uv or (3, 2) in uv
+
+    g = dgl.heterograph({
+        ('item', 'bought-by', 'user'): [(0, 0), (0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2), (3, 3)],
+        ('user', 'bought', 'item'): [(0, 0), (1, 0), (0, 1), (1, 1), (2, 2), (3, 2), (2, 3), (3, 3)]})
+    sampler = dgl.sampling.PinSAGESampler(g, 'item', 'user', 4, 0.5, 3, 2)
+    _test_sampler(g, sampler, 'item')
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['bought-by', 'bought'])
+    _test_sampler(g, sampler, 'item')
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, 
+        [('item', 'bought-by', 'user'), ('user', 'bought', 'item')])
+    _test_sampler(g, sampler, 'item')
+    g = dgl.graph([(0, 0), (0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2), (3, 3)])
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2)
+    _test_sampler(g, sampler, g.ntypes[0])
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): [(0, 1), (2, 3)],
+        ('B', 'BC', 'C'): [(1, 2), (3, 1)],
+        ('C', 'CA', 'A'): [(2, 0), (1, 2)]})
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['AB', 'BC', 'CA'])
+    _test_sampler(g, sampler, 'A')
 
 def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
     if hypersparse:
@@ -233,7 +271,7 @@ def _test_sample_neighbors(hypersparse):
 
     # test different fanouts for different relations
     for i in range(10):
-        subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, [1, 2, 0, 2])
+        subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, [1, 2, 0, 2], replace=True)
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
         assert subg['follow'].number_of_edges() == 2
@@ -305,7 +343,7 @@ def _test_sample_neighbors_topk(hypersparse):
     g, hg = _gen_neighbor_topk_test_graph(hypersparse, False)
 
     def _test1():
-        subg = dgl.sampling.sample_neighbors_topk(g, [0, 1], 2, 'weight')
+        subg = dgl.sampling.select_topk(g, 2, 'weight', [0, 1])
         assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 4
         u, v = subg.edges()
@@ -315,7 +353,7 @@ def _test_sample_neighbors_topk(hypersparse):
     _test1()
 
     def _test2():  # k > #neighbors
-        subg = dgl.sampling.sample_neighbors_topk(g, [0, 2], 2, 'weight')
+        subg = dgl.sampling.select_topk(g, 2, 'weight', [0, 2])
         assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 3
         u, v = subg.edges()
@@ -325,7 +363,7 @@ def _test_sample_neighbors_topk(hypersparse):
     _test2()
 
     def _test3():
-        subg = dgl.sampling.sample_neighbors_topk(hg, {'user' : [0,1], 'game' : 0}, 2, 'weight')
+        subg = dgl.sampling.select_topk(hg, 2, 'weight', {'user' : [0,1], 'game' : 0})
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
         u, v = subg['follow'].edges()
@@ -344,7 +382,7 @@ def _test_sample_neighbors_topk(hypersparse):
     _test3()
 
     # test different k for different relations
-    subg = dgl.sampling.sample_neighbors_topk(hg, {'user' : [0,1], 'game' : 0}, [1, 2, 0, 2], 'weight')
+    subg = dgl.sampling.select_topk(hg, [1, 2, 0, 2], 'weight', {'user' : [0,1], 'game' : 0})
     assert len(subg.ntypes) == 3
     assert len(subg.etypes) == 4
     assert subg['follow'].number_of_edges() == 2
@@ -356,7 +394,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
     g, hg = _gen_neighbor_topk_test_graph(hypersparse, True)
 
     def _test1():
-        subg = dgl.sampling.sample_neighbors_topk(g, [0, 1], 2, 'weight', edge_dir='out')
+        subg = dgl.sampling.select_topk(g, 2, 'weight', [0, 1], edge_dir='out')
         assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 4
         u, v = subg.edges()
@@ -366,7 +404,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
     _test1()
 
     def _test2():  # k > #neighbors
-        subg = dgl.sampling.sample_neighbors_topk(g, [0, 2], 2, 'weight', edge_dir='out')
+        subg = dgl.sampling.select_topk(g, 2, 'weight', [0, 2], edge_dir='out')
         assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 3
         u, v = subg.edges()
@@ -376,7 +414,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
     _test2()
 
     def _test3():
-        subg = dgl.sampling.sample_neighbors_topk(hg, {'user' : [0,1], 'game' : 0}, 2, 'weight', edge_dir='out')
+        subg = dgl.sampling.select_topk(hg, 2, 'weight', {'user' : [0,1], 'game' : 0}, edge_dir='out')
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
         u, v = subg['follow'].edges()
@@ -417,6 +455,7 @@ def test_sample_neighbors_topk_outedge():
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
+    test_pinsage_sampling()
     test_sample_neighbors()
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()

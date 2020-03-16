@@ -72,7 +72,7 @@ def read_ip_config(filename):
                 server_id += 1
             machine_id += 1
     except:
-        print("Error: data format on each line should be: [machine_id] [ip] [base_port] [server_count]")
+        print("Error: data format on each line should be: [ip] [base_port] [server_count]")
 
     return server_namebook
 
@@ -224,7 +224,6 @@ class KVServer(object):
         else: # Read shared-tensor
             while True:
                 if (os.path.exists(name+'-data-shape')):
-                    time.sleep(2) # wait writing finish
                     break
                 else:
                     time.sleep(2) # wait until the file been created

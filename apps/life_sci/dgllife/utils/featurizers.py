@@ -14,6 +14,8 @@ __all__ = ['one_hot_encoding',
            'atom_degree',
            'atom_total_degree_one_hot',
            'atom_total_degree',
+           'atom_explicit_valence_one_hot',
+           'atom_explicit_valence',
            'atom_implicit_valence_one_hot',
            'atom_implicit_valence',
            'atom_hybridization_one_hot',
@@ -25,6 +27,8 @@ __all__ = ['one_hot_encoding',
            'atom_num_radical_electrons',
            'atom_is_aromatic_one_hot',
            'atom_is_aromatic',
+           'atom_is_in_ring_one_hot',
+           'atom_is_in_ring',
            'atom_chiral_tag_one_hot',
            'atom_mass',
            'ConcatFeaturizer',
@@ -224,8 +228,45 @@ def atom_total_degree(atom):
     """
     return [atom.GetTotalDegree()]
 
+def atom_explicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False):
+    """One hot encoding for the explicit valence of an aotm.
+
+    Parameters
+    ----------
+    atom : rdkit.Chem.rdchem.Atom
+        RDKit atom instance.
+    allowable_set : list of int
+        Atom explicit valences to consider. Default: ``1`` - ``6``.
+    encode_unknown : bool
+        If True, map inputs not in the allowable set to the
+        additional last element. (Default: False)
+
+    Returns
+    -------
+    list
+        List of boolean values where at most one value is True.
+    """
+    if allowable_set is None:
+        allowable_set = list(range(1, 7))
+    return one_hot_encoding(atom.GetExplicitValence(), allowable_set, encode_unknown)
+
+def atom_explicit_valence(atom):
+    """Get the explicit valence of an atom.
+
+    Parameters
+    ----------
+    atom : rdkit.Chem.rdchem.Atom
+        RDKit atom instance.
+
+    Returns
+    -------
+    list
+        List containing one int only.
+    """
+    return [atom.GetExplicitValence()]
+
 def atom_implicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False):
-    """One hot encoding for the implicit valences of an atom.
+    """One hot encoding for the implicit valence of an atom.
 
     Parameters
     ----------
@@ -436,6 +477,43 @@ def atom_is_aromatic(atom):
         List containing one bool only.
     """
     return [atom.GetIsAromatic()]
+
+def atom_is_in_ring_one_hot(atom, allowable_set=None, encode_unknown=False):
+    """One hot encoding for whether the atom is in ring.
+
+    Parameters
+    ----------
+    atom : rdkit.Chem.rdchem.Atom
+        RDKit atom instance.
+    allowable_set : list of bool
+        Conditions to consider. Default: ``False`` and ``True``.
+    encode_unknown : bool
+        If True, map inputs not in the allowable set to the
+        additional last element. (Default: False)
+
+    Returns
+    -------
+    list
+        List of boolean values where at most one value is True.
+    """
+    if allowable_set is None:
+        allowable_set = [False, True]
+    return one_hot_encoding(atom.IsInRing(), allowable_set, encode_unknown)
+
+def atom_is_in_ring(atom):
+    """Get whether the atom is in ring.
+
+    Parameters
+    ----------
+    atom : rdkit.Chem.rdchem.Atom
+        RDKit atom instance.
+
+    Returns
+    -------
+    list
+        List containing one bool only.
+    """
+    return [atom.IsInRing()]
 
 def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the chiral tag of an atom.

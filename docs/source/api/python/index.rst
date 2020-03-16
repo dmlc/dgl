@@ -6,7 +6,7 @@ API Reference
 
    graph
    heterograph
-   batch
+   readout
    batch_heterograph
    nn
    init
@@ -17,7 +17,6 @@ API Reference
    sampler
    data
    transform
-   subgraph
    graph_store
    nodeflow
    random
