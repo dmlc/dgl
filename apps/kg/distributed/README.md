@@ -22,5 +22,5 @@ Partition Freebase:
 ./launch.sh \
   ~/dgl/apps/kg/distributed \
   ./fb15k_transe_l2.sh \
-  ubuntu ~/mctt.pem
+  ubuntu ~/mykey.pem
 ```
