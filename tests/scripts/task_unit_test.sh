@@ -37,6 +37,6 @@ python3 -m pytest -v --junitxml=pytest_gindex.xml tests/graph_index || fail "gra
 python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "backend-specific"
 
 export OMP_NUM_THREADS=1
-if [ $2 != "gpu" ] && [ $1 != "tensorflow"]; then
+if [ $2 != "gpu" ] && [ $1 != "tensorflow" ]; then
     python3 -m pytest -v --junitxml=pytest_distributed.xml tests/distributed || fail "distributed"
 fi
