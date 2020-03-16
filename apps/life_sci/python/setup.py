@@ -27,7 +27,7 @@ setup(
               if package.startswith('dgllife')],
     install_requires=[
         'torch>=1'
-        'scikit-learn>=0.21.2',
+        'scikit-learn>=0.22.2',
         'pandas>=0.25.1',
         'requests>=2.22.0',
         'tqdm'
