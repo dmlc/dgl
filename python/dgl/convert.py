@@ -1,6 +1,5 @@
 """Module for converting graph from/to other object."""
 from collections import defaultdict
-from collections.abc import Iterable
 import numpy as np
 import scipy as sp
 import networkx as nx
@@ -20,7 +19,6 @@ __all__ = [
     'to_hetero',
     'to_homo',
     'to_networkx',
-    'compact_graphs',
 ]
 
 def graph(data, ntype='_N', etype='_E', card=None, validate=True, restrict_format='any',
@@ -283,7 +281,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
-def hetero_from_relations(rel_graphs):
+def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     """Create a heterograph from graphs representing connections of each relation.
 
     The input is a list of heterographs where the ``i``th graph contains edges of type
@@ -296,6 +294,9 @@ def hetero_from_relations(rel_graphs):
     ----------
     rel_graphs : list of DGLHeteroGraph
         Each element corresponds to a heterograph for one (src, edge, dst) relation.
+    num_nodes_per_type : dict[str, Tensor], optional
+        Number of nodes per node type.  If not given, DGL will infer the number of nodes
+        from the given relation graphs.
 
     Returns
     -------
@@ -351,32 +352,35 @@ def hetero_from_relations(rel_graphs):
     # TODO(minjie): this API can be generalized as a union operation of the input graphs
     # TODO(minjie): handle node/edge data
     # infer meta graph
-    ntype_set = set()
-    meta_edges = []
+    meta_edges_src, meta_edges_dst = [], []
     ntypes = []
     etypes = []
     # TODO(BarclayII): I'm keeping the node type names sorted because even if
     # the metagraph is the same, the same node type name in different graphs may
     # map to different node type IDs.
     # In the future, we need to lower the type names into C++.
-    for rgrh in rel_graphs:
-        assert len(rgrh.etypes) == 1
-        stype, etype, dtype = rgrh.canonical_etypes[0]
-        ntype_set.add(stype)
-        ntype_set.add(dtype)
-    ntypes = list(sorted(ntype_set))
+    if num_nodes_per_type is None:
+        ntype_set = set()
+        for rgrh in rel_graphs:
+            assert len(rgrh.etypes) == 1
+            stype, etype, dtype = rgrh.canonical_etypes[0]
+            ntype_set.add(stype)
+            ntype_set.add(dtype)
+        ntypes = list(sorted(ntype_set))
+    else:
+        ntypes = list(sorted(num_nodes_per_type.keys()))
+        num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes])
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
     for rgrh in rel_graphs:
         stype, etype, dtype = rgrh.canonical_etypes[0]
-        stid = ntype_dict[stype]
-        dtid = ntype_dict[dtype]
-        meta_edges.append((stid, dtid))
+        meta_edges_src.append(ntype_dict[stype])
+        meta_edges_dst.append(ntype_dict[dtype])
         etypes.append(etype)
-    metagraph = graph_index.from_edge_list(meta_edges, True, True)
+    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True, True)
 
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
-        metagraph, [rgrh._graph for rgrh in rel_graphs])
+        metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
     retg = DGLHeteroGraph(hgidx, ntypes, etypes)
     for i, rgrh in enumerate(rel_graphs):
         for ntype in rgrh.ntypes:
@@ -443,8 +447,12 @@ def heterograph(data_dict, num_nodes_dict=None):
                     nsrc = len({n for n, d in data.nodes(data=True) if d['bipartite'] == 0})
                     ndst = data.number_of_nodes() - nsrc
             elif isinstance(data, DGLHeteroGraph):
-                # Do nothing; handled in the next loop
-                continue
+                # original node type and edge type of ``data`` is ignored.
+                assert len(data.canonical_etypes) == 1, \
+                    "Relational graphs must have only one edge type."
+                srctype, _, dsttype = data.canonical_etypes[0]
+                nsrc = data.number_of_nodes(srctype)
+                ndst = data.number_of_nodes(dsttype)
             else:
                 raise DGLError('Unsupported graph data type %s for %s' % (
                     type(data), (srctype, etype, dsttype)))
@@ -466,7 +474,7 @@ def heterograph(data_dict, num_nodes_dict=None):
                 data, srctype, etype, dsttype,
                 card=(num_nodes_dict[srctype], num_nodes_dict[dsttype]), validate=False))
 
-    return hetero_from_relations(rel_graphs)
+    return hetero_from_relations(rel_graphs, num_nodes_dict)
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph=None):
     """Convert the given homogeneous graph to a heterogeneous graph.
@@ -606,7 +614,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
             etype_id = etypes_invmap[etype]
             dsttype_id = ntypes_invmap[dsttype]
             canonical_etids.append((srctype_id, etype_id, dsttype_id))
-        canonical_etids = np.array(canonical_etids)
+        canonical_etids = np.asarray(canonical_etids)
         etype_mask = (edge_ctids[None, :] == canonical_etids[:, None]).all(2)
     edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
@@ -624,7 +632,8 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
                 card=(ntype_count[stid], ntype_count[dtid]), validate=False)
         rel_graphs.append(rel_graph)
 
-    hg = hetero_from_relations(rel_graphs)
+    hg = hetero_from_relations(
+        rel_graphs, {ntype: count for ntype, count in zip(ntypes, ntype_count)})
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
     for ntid, ntype in enumerate(hg.ntypes):
@@ -723,98 +732,6 @@ def to_homo(G):
         retg.edata.update(comb_ef)
 
     return retg
-
-def compact_graphs(graphs):
-    """Given a list of graphs with the same set of nodes, find and eliminate the common
-    isolated nodes across all graphs.
-
-    This function requires the graphs to have the same set of nodes (i.e. the node types
-    must be the same, and the number of nodes of each node type must be the same).  The
-    metagraph does not have to be the same.
-
-    It finds all the nodes that have zero in-degree and zero out-degree in all the given
-    graphs, and eliminates them from all the graphs.
-
-    Useful for graph sampling where we have a giant graph but we only wish to perform
-    message passing on a smaller graph with a (tiny) subset of nodes.
-
-    The node and edge features are not preserved.
-
-    Parameters
-    ----------
-    graphs : DGLHeteroGraph or list[DGLHeteroGraph]
-        The graph, or list of graphs
-
-    Returns
-    -------
-    DGLHeteroGraph or list[DGLHeteroGraph]
-        The compacted graph or list of compacted graphs.
-
-        Each returned graph would have a feature ``dgl.NID`` containing the mapping
-        of node IDs for each type from the compacted graph(s) to the original graph(s).
-        Note that the mapping is the same for all the compacted graphs.
-
-    Examples
-    --------
-    The following code constructs a bipartite graph with 20 users and 10 games, but
-    only user #1 and #3, as well as game #3 and #5, have connections:
-
-    >>> g = dgl.bipartite([(1, 3), (3, 5)], 'user', 'plays', 'game', card=(20, 10))
-
-    The following would compact the graph above to another bipartite graph with only
-    two users and two games.
-
-    >>> new_g, induced_nodes = dgl.compact_graphs(g)
-    >>> induced_nodes
-    {'user': tensor([1, 3]), 'game': tensor([3, 5])}
-
-    The mapping tells us that only user #1 and #3 as well as game #3 and #5 are kept.
-    Furthermore, the first user and second user in the compacted graph maps to
-    user #1 and #3 in the original graph.  Games are similar.
-
-    One can verify that the edge connections are kept the same in the compacted graph.
-
-    >>> new_g.edges(form='all', order='eid', etype='plays')
-    (tensor([0, 1]), tensor([0, 1]), tensor([0, 1]))
-
-    When compacting multiple graphs, nodes that do not have any connections in any
-    of the given graphs are removed.  So if we compact ``g`` and the following ``g2``
-    graphs together:
-
-    >>> g2 = dgl.bipartite([(1, 6), (6, 8)], 'user', 'plays', 'game', card=(20, 10))
-    >>> (new_g, new_g2), induced_nodes = dgl.compact_graphs([g, g2])
-    >>> induced_nodes
-    {'user': tensor([1, 3, 6]), 'game': tensor([3, 5, 6, 8])}
-
-    Then one can see that user #1 from both graphs, users #3 from the first graph, as
-    well as user #6 from the second graph, are kept.  Games are similar.
-
-    Similarly, one can also verify the connections:
-
-    >>> new_g.edges(form='all', order='eid', etype='plays')
-    (tensor([0, 1]), tensor([0, 1]), tensor([0, 1]))
-    >>> new_g2.edges(form='all', order='eid', etype='plays')
-    (tensor([0, 2]), tensor([2, 3]), tensor([0, 1]))
-    """
-    return_single = False
-    if not isinstance(graphs, Iterable):
-        graphs = [graphs]
-        return_single = True
-
-    new_graph_indexes, induced_nodes = heterograph_index.compact_graph_indexes(
-        [g._graph for g in graphs])
-
-    new_graphs = [
-        DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
-        for new_graph_index, graph in zip(new_graph_indexes, graphs)]
-    for g in new_graphs:
-        for i, ntype in enumerate(graphs[0].ntypes):
-            g.nodes[ntype].data[NID] = induced_nodes[i]
-    if return_single:
-        new_graphs = new_graphs[0]
-
-    return new_graphs
-
 
 ############################################################
 # Internal APIs
@@ -942,6 +859,8 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
         If True, the entries in the sparse matrix are treated as edge IDs.
         Otherwise, the entries are ignored and edges will be added in
         (source, destination) order.
+        Note that this option only affects CSR matrices; COO matrices' rows and cols
+        are always assumed to be ordered by edge ID already.
     validate : bool, optional
         If True, checks if node IDs are within range.
     restrict_format : 'any', 'coo', 'csr', 'csc', optional

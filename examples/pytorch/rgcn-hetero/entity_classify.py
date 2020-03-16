@@ -34,6 +34,9 @@ class RelGraphConvHetero(nn.Module):
         Activation function. Default: None
     self_loop : bool, optional
         True to include self loop message. Default: False
+    use_weight : bool, optional
+        If True, multiply the input node feature with a learnable weight matrix
+        before message passing.
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
@@ -46,6 +49,7 @@ class RelGraphConvHetero(nn.Module):
                  bias=True,
                  activation=None,
                  self_loop=False,
+                 use_weight=True,
                  dropout=0.0):
         super(RelGraphConvHetero, self).__init__()
         self.in_feat = in_feat
@@ -60,18 +64,20 @@ class RelGraphConvHetero(nn.Module):
         self.activation = activation
         self.self_loop = self_loop
 
-        if regularizer == "basis":
-            # add basis weights
-            self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
-            if self.num_bases < self.num_rels:
-                # linear combination coefficients
-                self.w_comp = nn.Parameter(th.Tensor(self.num_rels, self.num_bases))
-            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
-            if self.num_bases < self.num_rels:
-                nn.init.xavier_uniform_(self.w_comp,
-                                        gain=nn.init.calculate_gain('relu'))
-        else:
-            raise ValueError("Only basis regularizer is supported.")
+        self.use_weight = use_weight
+        if use_weight:
+            if regularizer == "basis":
+                # add basis weights
+                self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
+                if self.num_bases < self.num_rels:
+                    # linear combination coefficients
+                    self.w_comp = nn.Parameter(th.Tensor(self.num_rels, self.num_bases))
+                nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+                if self.num_bases < self.num_rels:
+                    nn.init.xavier_uniform_(self.w_comp,
+                                            gain=nn.init.calculate_gain('relu'))
+            else:
+                raise ValueError("Only basis regularizer is supported.")
 
         # bias
         if self.bias:
@@ -99,13 +105,13 @@ class RelGraphConvHetero(nn.Module):
         return {self.rel_names[i] : w.squeeze(0) for i, w in enumerate(th.split(weight, 1, dim=0))}
 
     def forward(self, g, xs):
-        """ Forward computation
+        """Forward computation
 
         Parameters
         ----------
         g : DGLHeteroGraph
             Input graph.
-        xs : list of torch.Tensor
+        xs : dict[str, torch.Tensor]
             Node feature for each node type.
 
         Returns
@@ -114,98 +120,76 @@ class RelGraphConvHetero(nn.Module):
             New node features for each node type.
         """
         g = g.local_var()
-        for i, ntype in enumerate(g.ntypes):
-            g.nodes[ntype].data['x'] = xs[i]
-        ws = self.basis_weight()
-        funcs = {}
-        for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-            g.nodes[srctype].data['h%d' % i] = th.matmul(
-                g.nodes[srctype].data['x'], ws[etype])
-            funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
+        for ntype in g.ntypes:
+            g.nodes[ntype].data['x'] = xs[ntype]
+        if self.use_weight:
+            ws = self.basis_weight()
+            funcs = {}
+            for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
+                g.nodes[srctype].data['h%d' % i] = th.matmul(
+                    g.nodes[srctype].data['x'], ws[etype])
+                funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
+        else:
+            funcs = {}
+            for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
+                g.nodes[srctype].data['h%d' % i] = g.nodes[srctype].data['x']
+                funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
         # message passing
         g.multi_update_all(funcs, 'sum')
 
-        hs = [g.nodes[ntype].data['h'] for ntype in g.ntypes]
-        for i in range(len(hs)):
-            h = hs[i]
+        hs = {ntype : g.nodes[ntype].data['h'] for ntype in g.ntypes}
+        new_hs = {}
+        for ntype, h in hs.items():
             # apply bias and activation
             if self.self_loop:
-                h = h + th.matmul(xs[i], self.loop_weight)
+                h = h + th.matmul(xs[ntype], self.loop_weight)
             if self.bias:
                 h = h + self.h_bias
             if self.activation:
                 h = self.activation(h)
             h = self.dropout(h)
-            hs[i] = h
-        return hs
+            new_hs[ntype] = h
+        return new_hs
 
-class RelGraphConvHeteroEmbed(nn.Module):
+class RelGraphEmbed(nn.Module):
     r"""Embedding layer for featureless heterograph."""
     def __init__(self,
-                 embed_size,
                  g,
-                 bias=True,
+                 embed_size,
+                 embed_name='embed',
                  activation=None,
-                 self_loop=False,
                  dropout=0.0):
-        super(RelGraphConvHeteroEmbed, self).__init__()
-        self.embed_size = embed_size
+        super(RelGraphEmbed, self).__init__()
         self.g = g
-        self.bias = bias
+        self.embed_size = embed_size
+        self.embed_name = embed_name
         self.activation = activation
-        self.self_loop = self_loop
+        self.dropout = nn.Dropout(dropout)
 
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
-        for srctype, etype, dsttype in g.canonical_etypes:
-            embed = nn.Parameter(th.Tensor(g.number_of_nodes(srctype), self.embed_size))
+        for ntype in g.ntypes:
+            embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
             nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
-            self.embeds["{}-{}-{}".format(srctype, etype, dsttype)] = embed
+            self.embeds[ntype] = embed
 
-        # bias
-        if self.bias:
-            self.h_bias = nn.Parameter(th.Tensor(embed_size))
-            nn.init.zeros_(self.h_bias)
 
-        # weight for self loop
-        if self.self_loop:
-            self.self_embeds = nn.ParameterList()
-            for ntype in g.ntypes:
-                embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), embed_size))
-                nn.init.xavier_uniform_(embed,
-                                        gain=nn.init.calculate_gain('relu'))
-                self.self_embeds.append(embed)
+    def forward(self, block=None):
+        """Forward computation
 
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self):
-        """ Forward computation
+        Parameters
+        ----------
+        block : DGLHeteroGraph, optional
+            If not specified, directly return the full graph with embeddings stored in
+            :attr:`embed_name`. Otherwise, extract and store the embeddings to the block
+            graph and return.
 
         Returns
         -------
-        torch.Tensor
-            New node features.
+        DGLHeteroGraph
+            The block graph fed with embeddings.
         """
-        g = self.g.local_var()
-        funcs = {}
-        for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-            g.nodes[srctype].data['embed-%d' % i] = self.embeds["{}-{}-{}".format(srctype, etype, dsttype)]
-            funcs[(srctype, etype, dsttype)] = (fn.copy_u('embed-%d' % i, 'm'), fn.mean('m', 'h'))
-        g.multi_update_all(funcs, 'sum')
-        
-        hs = [g.nodes[ntype].data['h'] for ntype in g.ntypes]
-        for i in range(len(hs)):
-            h = hs[i]
-            # apply bias and activation
-            if self.self_loop:
-                h = h + self.self_embeds[i]
-            if self.bias:
-                h = h + self.h_bias
-            if self.activation:
-                h = self.activation(h)
-            h = self.dropout(h)
-            hs[i] = h
-        return hs
+        return self.embeds
 
 class EntityClassify(nn.Module):
     def __init__(self,
@@ -226,10 +210,13 @@ class EntityClassify(nn.Module):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
 
-        self.embed_layer = RelGraphConvHeteroEmbed(
-            self.h_dim, g, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout)
+        self.embed_layer = RelGraphEmbed(g, self.h_dim)
         self.layers = nn.ModuleList()
+        # i2h
+        self.layers.append(RelGraphConvHetero(
+            self.h_dim, self.h_dim, self.rel_names, "basis",
+            self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+            dropout=self.dropout, use_weight=False))
         # h2h
         for i in range(self.num_hidden_layers):
             self.layers.append(RelGraphConvHetero(
@@ -310,7 +297,7 @@ def main(args):
         optimizer.zero_grad()
         if epoch > 5:
             t0 = time.time()
-        logits = model()[category_id]
+        logits = model()[category]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         loss.backward()
         optimizer.step()
@@ -328,7 +315,7 @@ def main(args):
         th.save(model.state_dict(), args.model_path)
 
     model.eval()
-    logits = model.forward()[category_id]
+    logits = model.forward()[category]
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))

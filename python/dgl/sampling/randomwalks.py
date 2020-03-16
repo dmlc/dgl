@@ -46,7 +46,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         The feature tensor must be non-negative.
         If omitted, we assume the neighbors are picked uniformly.
     restart_prob : float or Tensor, optional
-        Probability to stop after each step.
+        Probability to stop at each step.
         If a tensor is given, ``restart_prob`` should have the same length as ``metapath``.
 
     Returns

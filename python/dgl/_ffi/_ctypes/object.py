@@ -40,9 +40,10 @@ C_TO_PY_ARG_SWITCH[TypeCode.OBJECT_HANDLE] = _wrap_arg_func(
 class ObjectBase(object):
     """Object base class"""
     __slots__ = ["handle"]
+
     # pylint: disable=no-member
     def __del__(self):
-        if _LIB is not None:
+        if _LIB is not None and hasattr(self, 'handle'):
             check_call(_LIB.DGLObjectFree(self.handle))
 
     def __getattr__(self, name):

@@ -4,9 +4,8 @@ import torch as th
 import torch.nn as nn
 import numpy as np
 
-from ... import BatchedDGLGraph
 from ...backend import pytorch as F
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
+from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
 
@@ -29,7 +28,7 @@ class SumPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
@@ -38,9 +37,8 @@ class SumPooling(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -62,7 +60,7 @@ class AvgPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
@@ -71,9 +69,8 @@ class AvgPooling(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -95,7 +92,7 @@ class MaxPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
@@ -104,9 +101,8 @@ class MaxPooling(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -132,7 +128,7 @@ class SortPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
@@ -141,9 +137,8 @@ class SortPooling(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(k * D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, k * D)`.
+            The output feature with shape :math:`(B, k * D)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             # Sort the feature of each node in ascending order.
@@ -152,10 +147,7 @@ class SortPooling(nn.Module):
             # Sort nodes according to their last features.
             ret = topk_nodes(graph, 'h', self.k, idx=-1)[0].view(
                 -1, self.k * feat.shape[-1])
-            if isinstance(graph, BatchedDGLGraph):
-                return ret
-            else:
-                return ret.squeeze(0)
+            return ret
 
 
 class GlobalAttentionPooling(nn.Module):
@@ -193,9 +185,8 @@ class GlobalAttentionPooling(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            The output feature with shape :math:`(B, D)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
@@ -257,7 +248,7 @@ class Set2Set(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
@@ -266,14 +257,11 @@ class Set2Set(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            The output feature with shape :math:`(B, D)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            batch_size = 1
-            if isinstance(graph, BatchedDGLGraph):
-                batch_size = graph.batch_size
+            batch_size = graph.batch_size
 
             h = (feat.new_zeros((self.n_layers, batch_size, self.input_dim)),
                  feat.new_zeros((self.n_layers, batch_size, self.input_dim)))
@@ -283,23 +271,14 @@ class Set2Set(nn.Module):
             for _ in range(self.n_iters):
                 q, h = self.lstm(q_star.unsqueeze(0), h)
                 q = q.view(batch_size, self.input_dim)
-
                 e = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
                 graph.ndata['e'] = e
                 alpha = softmax_nodes(graph, 'e')
-
                 graph.ndata['r'] = feat * alpha
                 readout = sum_nodes(graph, 'r')
-
-                if readout.dim() == 1: # graph is not a BatchedDGLGraph
-                    readout = readout.unsqueeze(0)
-
                 q_star = th.cat([q, readout], dim=-1)
 
-            if isinstance(graph, BatchedDGLGraph):
-                return q_star
-            else:
-                return q_star.squeeze(0)
+            return q_star
 
     def extra_repr(self):
         """Set the extra representation of the module.
@@ -574,7 +553,7 @@ class SetTransformerEncoder(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
@@ -585,14 +564,9 @@ class SetTransformerEncoder(nn.Module):
         torch.Tensor
             The output feature with shape :math:`(N, D)`.
         """
-        if isinstance(graph, BatchedDGLGraph):
-            lengths = graph.batch_num_nodes
-        else:
-            lengths = [graph.number_of_nodes()]
-
+        lengths = graph.batch_num_nodes
         for layer in self.layers:
             feat = layer(feat, lengths)
-
         return feat
 
 
@@ -640,7 +614,7 @@ class SetTransformerDecoder(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
@@ -649,25 +623,15 @@ class SetTransformerDecoder(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            The output feature with shape :math:`(B, D)`, where
+            :math:`B` refers to the batch size.
         """
-        if isinstance(graph, BatchedDGLGraph):
-            len_pma = graph.batch_num_nodes
-            len_sab = [self.k] * graph.batch_size
-        else:
-            len_pma = [graph.number_of_nodes()]
-            len_sab = [self.k]
-
+        len_pma = graph.batch_num_nodes
+        len_sab = [self.k] * graph.batch_size
         feat = self.pma(feat, len_pma)
         for layer in self.layers:
             feat = layer(feat, len_sab)
-
-        if isinstance(graph, BatchedDGLGraph):
-            return feat.view(graph.batch_size, self.k * self.d_model)
-        else:
-            return feat.view(self.k * self.d_model)
+        return feat.view(graph.batch_size, self.k * self.d_model)
 
 
 class WeightAndSum(nn.Module):
@@ -686,13 +650,13 @@ class WeightAndSum(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, bg, feats):
+    def forward(self, g, feats):
         """Compute molecule representations out of atom representations
 
         Parameters
         ----------
-        bg : BatchedDGLGraph
-            B Batched DGLGraphs for processing multiple molecules in parallel
+        g : DGLGraph
+            DGLGraph with batch size B for processing multiple molecules in parallel
         feats : FloatTensor of shape (N, self.in_feats)
             Representations for all atoms in the molecules
             * N is the total number of atoms in all molecules
@@ -702,9 +666,9 @@ class WeightAndSum(nn.Module):
         FloatTensor of shape (B, self.in_feats)
             Representations for B molecules
         """
-        with bg.local_scope():
-            bg.ndata['h'] = feats
-            bg.ndata['w'] = self.atom_weighting(bg.ndata['h'])
-            h_g_sum = sum_nodes(bg, 'h', 'w')
+        with g.local_scope():
+            g.ndata['h'] = feats
+            g.ndata['w'] = self.atom_weighting(g.ndata['h'])
+            h_g_sum = sum_nodes(g, 'h', 'w')
 
         return h_g_sum

@@ -45,6 +45,24 @@ Querying graph structure
     DGLGraph.out_degree
     DGLGraph.out_degrees
 
+Querying batch summary
+----------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.batch_size
+    DGLGraph.batch_num_nodes
+    DGLGraph.batch_num_edges
+
+Querying sub-graph/parent-graph belonging information
+-----------------------------------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.parent
+
 Removing nodes and edges
 ------------------------
 
@@ -66,6 +84,8 @@ Transforming graph
     DGLGraph.line_graph
     DGLGraph.reverse
     DGLGraph.readonly
+    DGLGraph.flatten
+    DGLGraph.detach_parent
 
 Converting from/to other format
 -------------------------------
@@ -121,3 +141,29 @@ Computing with DGLGraph
     DGLGraph.filter_nodes
     DGLGraph.filter_edges
     DGLGraph.to
+
+Batch and Unbatch
+-------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    batch
+    unbatch
+
+Mapping between subgraph and parent graph
+-----------------------------------------
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.parent_nid
+    DGLGraph.parent_eid
+    DGLGraph.map_to_subgraph_nid  
+
+Synchronize features between subgraph and parent graph
+------------------------------------------------------
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.copy_from_parent
+    DGLGraph.copy_to_parent

@@ -1365,51 +1365,6 @@ def test_empty_heterograph():
     assert g.number_of_nodes('developer') == 2
 
 
-def test_compact():
-    g1 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(1, 3), (3, 5)],
-        ('user', 'plays', 'game'): [(2, 4), (3, 4), (2, 5)],
-        ('game', 'wished-by', 'user'): [(6, 7), (5, 7)]},
-        {'user': 20, 'game': 10})
-
-    g2 = dgl.heterograph({
-        ('game', 'clicked-by', 'user'): [(3, 1)],
-        ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
-        {'user': 20, 'game': 10})
-
-    def _check(g, new_g, induced_nodes):
-        assert g.ntypes == new_g.ntypes
-        assert g.canonical_etypes == new_g.canonical_etypes
-
-        for ntype in g.ntypes:
-            assert -1 not in induced_nodes[ntype]
-
-        for etype in g.canonical_etypes:
-            g_src, g_dst = g.all_edges(order='eid', etype=etype)
-            g_src = F.asnumpy(g_src)
-            g_dst = F.asnumpy(g_dst)
-            new_g_src, new_g_dst = new_g.all_edges(order='eid', etype=etype)
-            new_g_src_mapped = induced_nodes[etype[0]][F.asnumpy(new_g_src)]
-            new_g_dst_mapped = induced_nodes[etype[2]][F.asnumpy(new_g_dst)]
-            assert (g_src == new_g_src_mapped).all()
-            assert (g_dst == new_g_dst_mapped).all()
-
-    new_g1 = dgl.compact_graphs(g1)
-    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
-    assert set(induced_nodes['game']) == set([4, 5, 6])
-    _check(g1, new_g1, induced_nodes)
-
-    new_g1, new_g2 = dgl.compact_graphs([g1, g2])
-    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
-    assert set(induced_nodes['game']) == set([3, 4, 5, 6])
-    _check(g1, new_g1, induced_nodes)
-    _check(g2, new_g2, induced_nodes)
-
-
 def test_types_in_function():
     def mfunc1(edges):
         assert edges.canonical_etype == ('user', 'follow', 'user')
@@ -1493,6 +1448,68 @@ def test_stack_reduce():
             'stack')
     assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 1, 200)
 
+def test_isolated_ntype():
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): [(0, 1), (1, 2), (2, 3)]},
+        num_nodes_dict={'A': 3, 'B': 4, 'C': 4})
+    assert g.number_of_nodes('A') == 3
+    assert g.number_of_nodes('B') == 4
+    assert g.number_of_nodes('C') == 4
+
+    g = dgl.heterograph({
+        ('A', 'AC', 'C'): [(0, 1), (1, 2), (2, 3)]},
+        num_nodes_dict={'A': 3, 'B': 4, 'C': 4})
+    assert g.number_of_nodes('A') == 3
+    assert g.number_of_nodes('B') == 4
+    assert g.number_of_nodes('C') == 4
+
+    G = dgl.DGLGraph()
+    G.add_nodes(11)
+    G.add_edges([0, 1, 2], [4, 5, 6])
+    G.ndata[dgl.NTYPE] = F.tensor([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2], dtype=F.int64)
+    G.edata[dgl.ETYPE] = F.tensor([0, 0, 0], dtype=F.int64)
+    g = dgl.to_hetero(G, ['A', 'B', 'C'], ['AB'])
+    assert g.number_of_nodes('A') == 3
+    assert g.number_of_nodes('B') == 4
+    assert g.number_of_nodes('C') == 4
+
+def test_bipartite():
+    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B')
+    assert g1.is_unibipartite
+    assert len(g1.ntypes) == 2
+    assert g1.etypes == ['AB']
+    assert g1.srctypes == ['A']
+    assert g1.dsttypes == ['B']
+    assert g1.number_of_nodes('A') == 2
+    assert g1.number_of_nodes('B') == 6
+    assert g1.number_of_edges() == 3
+    g1.srcdata['h'] = F.randn((2, 5))
+    assert F.array_equal(g1.srcnodes['A'].data['h'], g1.srcdata['h'])
+    assert F.array_equal(g1.nodes['A'].data['h'], g1.srcdata['h'])
+    assert F.array_equal(g1.nodes['SRC/A'].data['h'], g1.srcdata['h'])
+    g1.dstdata['h'] = F.randn((6, 3))
+    assert F.array_equal(g1.dstnodes['B'].data['h'], g1.dstdata['h'])
+    assert F.array_equal(g1.nodes['B'].data['h'], g1.dstdata['h'])
+    assert F.array_equal(g1.nodes['DST/B'].data['h'], g1.dstdata['h'])
+
+    # more complicated bipartite
+    g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C')
+    g3 = dgl.hetero_from_relations([g1, g2])
+    assert g3.is_unibipartite
+    assert g3.srctypes == ['A']
+    assert set(g3.dsttypes) == {'B', 'C'}
+    assert g3.number_of_nodes('A') == 2
+    assert g3.number_of_nodes('B') == 6
+    assert g3.number_of_nodes('C') == 1
+    g3.srcdata['h'] = F.randn((2, 5))
+    assert F.array_equal(g3.srcnodes['A'].data['h'], g3.srcdata['h'])
+    assert F.array_equal(g3.nodes['A'].data['h'], g3.srcdata['h'])
+    assert F.array_equal(g3.nodes['SRC/A'].data['h'], g3.srcdata['h'])
+
+    g4 = dgl.graph([(0, 0), (1, 1)], 'A', 'AA')
+    g5 = dgl.hetero_from_relations([g1, g2, g4])
+    assert not g5.is_unibipartite
+
 if __name__ == '__main__':
     test_create()
     test_query()
@@ -1513,6 +1530,7 @@ if __name__ == '__main__':
     test_updates()
     test_backward()
     test_empty_heterograph()
-    test_compact()
     test_types_in_function()
     test_stack_reduce()
+    test_isolated_ntype()
+    test_bipartite()

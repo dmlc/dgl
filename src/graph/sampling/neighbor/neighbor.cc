@@ -41,21 +41,21 @@ HeteroSubgraph SampleNeighbors(
     const dgl_type_t dst_vtype = pair.second;
     const IdArray nodes_ntype = nodes[(dir == EdgeDir::kOut)? src_vtype : dst_vtype];
     const int64_t num_nodes = nodes_ntype->shape[0];
-    if (num_nodes == 0) {
-      // No node provided in the type, create a placeholder relation graph
+    if (num_nodes == 0 || fanouts[etype] == 0) {
+      // Nothing to sample for this etype, create a placeholder relation graph
       subrels[etype] = UnitGraph::Empty(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
-      induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
+      induced_edges[etype] = aten::NullArray();
     } else {
       // sample from one relation graph
-      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::CSR : SparseFormat::CSC;
+      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::kCSR : SparseFormat::kCSC;
       auto avail_fmt = hg->SelectFormat(etype, req_fmt);
       COOMatrix sampled_coo;
       switch (avail_fmt) {
-        case SparseFormat::COO:
+        case SparseFormat::kCOO:
           if (dir == EdgeDir::kIn) {
             sampled_coo = aten::COOTranspose(aten::COORowWiseSampling(
               aten::COOTranspose(hg->GetCOOMatrix(etype)),
@@ -65,12 +65,12 @@ HeteroSubgraph SampleNeighbors(
               hg->GetCOOMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
           }
           break;
-        case SparseFormat::CSR:
+        case SparseFormat::kCSR:
           CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
           sampled_coo = aten::CSRRowWiseSampling(
             hg->GetCSRMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
           break;
-        case SparseFormat::CSC:
+        case SparseFormat::kCSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           sampled_coo = aten::CSRRowWiseSampling(
             hg->GetCSCMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
@@ -80,17 +80,14 @@ HeteroSubgraph SampleNeighbors(
           LOG(FATAL) << "Unsupported sparse format.";
       }
       subrels[etype] = UnitGraph::CreateFromCOO(
-        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
-      if (sampled_coo.data.defined()) {
-        induced_edges[etype] = sampled_coo.data;
-      } else {
-        induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
-      }
+        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows, sampled_coo.num_cols,
+        sampled_coo.row, sampled_coo.col);
+      induced_edges[etype] = sampled_coo.data;
     }
   }
 
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels);
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels, hg->NumVerticesPerType());
   ret.induced_vertices.resize(hg->NumVertexTypes());
   ret.induced_edges = std::move(induced_edges);
   return ret;
@@ -119,21 +116,21 @@ HeteroSubgraph SampleNeighborsTopk(
     const dgl_type_t dst_vtype = pair.second;
     const IdArray nodes_ntype = nodes[(dir == EdgeDir::kOut)? src_vtype : dst_vtype];
     const int64_t num_nodes = nodes_ntype->shape[0];
-    if (num_nodes == 0) {
-      // No node provided in the type, create a placeholder relation graph
+    if (num_nodes == 0 || k[etype] == 0) {
+      // Nothing to sample for this etype, create a placeholder relation graph
       subrels[etype] = UnitGraph::Empty(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
-      induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
+      induced_edges[etype] = aten::NullArray();
     } else {
       // sample from one relation graph
-      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::CSR : SparseFormat::CSC;
+      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::kCSR : SparseFormat::kCSC;
       auto avail_fmt = hg->SelectFormat(etype, req_fmt);
       COOMatrix sampled_coo;
       switch (avail_fmt) {
-        case SparseFormat::COO:
+        case SparseFormat::kCOO:
           if (dir == EdgeDir::kIn) {
             sampled_coo = aten::COOTranspose(aten::COORowWiseTopk(
               aten::COOTranspose(hg->GetCOOMatrix(etype)),
@@ -143,12 +140,12 @@ HeteroSubgraph SampleNeighborsTopk(
               hg->GetCOOMatrix(etype), nodes_ntype, k[etype], weight[etype], ascending);
           }
           break;
-        case SparseFormat::CSR:
+        case SparseFormat::kCSR:
           CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
           sampled_coo = aten::CSRRowWiseTopk(
             hg->GetCSRMatrix(etype), nodes_ntype, k[etype], weight[etype], ascending);
           break;
-        case SparseFormat::CSC:
+        case SparseFormat::kCSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           sampled_coo = aten::CSRRowWiseTopk(
             hg->GetCSCMatrix(etype), nodes_ntype, k[etype], weight[etype], ascending);
@@ -158,17 +155,14 @@ HeteroSubgraph SampleNeighborsTopk(
           LOG(FATAL) << "Unsupported sparse format.";
       }
       subrels[etype] = UnitGraph::CreateFromCOO(
-        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
-      if (sampled_coo.data.defined()) {
-        induced_edges[etype] = sampled_coo.data;
-      } else {
-        induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
-      }
+        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows, sampled_coo.num_cols,
+        sampled_coo.row, sampled_coo.col);
+      induced_edges[etype] = sampled_coo.data;
     }
   }
 
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels);
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels, hg->NumVerticesPerType());
   ret.induced_vertices.resize(hg->NumVertexTypes());
   ret.induced_edges = std::move(induced_edges);
   return ret;

@@ -42,6 +42,12 @@ NDArray IndexSelect(NDArray array, IdArray index);
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, uint64_t index);
 
+template <DLDeviceType XPU, typename DType, typename IdType>
+NDArray Scatter(NDArray array, IdArray indices);
+
+template <DLDeviceType XPU, typename DType, typename IdType>
+NDArray Repeat(NDArray array, IdArray repeats);
+
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
@@ -107,6 +113,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 template <DLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr);
 
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
+
 // FloatType is the type of probability data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWiseSampling(
@@ -117,9 +126,9 @@ COOMatrix CSRRowWiseSamplingUniform(
     CSRMatrix mat, IdArray rows, int64_t num_samples, bool replace);
 
 // FloatType is the type of weight data.
-template <DLDeviceType XPU, typename IdType, typename FloatType>
+template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
-    CSRMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
+    CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -165,7 +174,13 @@ template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType>
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
+
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSort(COOMatrix mat, bool sort_column);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 // FloatType is the type of probability data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>

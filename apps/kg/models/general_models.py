@@ -462,3 +462,36 @@ class KEModel(object):
         """Terminate the async update for entity embedding.
         """
         self.entity_emb.finish_async_update()
+
+
+    def pull_model(self, client, pos_g, neg_g):
+        with th.no_grad():
+            entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
+            relation_id = pos_g.edata['id']
+            entity_id = F.tensor(np.unique(F.asnumpy(entity_id)))
+            relation_id = F.tensor(np.unique(F.asnumpy(relation_id)))
+
+            l2g = client.get_local2global()
+            global_entity_id = l2g[entity_id]
+
+            entity_data = client.pull(name='entity_emb', id_tensor=global_entity_id)
+            relation_data = client.pull(name='relation_emb', id_tensor=relation_id)
+
+            self.entity_emb.emb[entity_id] = entity_data
+            self.relation_emb.emb[relation_id] = relation_data
+
+
+    def push_gradient(self, client):
+        with th.no_grad():
+            l2g = client.get_local2global()
+            for entity_id, entity_data in self.entity_emb.trace:
+                grad = entity_data.grad.data
+                global_entity_id =l2g[entity_id]
+                client.push(name='entity_emb', id_tensor=global_entity_id, data_tensor=grad)
+
+            for relation_id, relation_data in self.relation_emb.trace:
+                grad = relation_data.grad.data
+                client.push(name='relation_emb', id_tensor=relation_id, data_tensor=grad)
+
+        self.entity_emb.trace = []
+        self.relation_emb.trace = []

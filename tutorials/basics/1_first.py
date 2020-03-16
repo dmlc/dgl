@@ -32,7 +32,7 @@ At the end of this tutorial, we hope you get a brief feeling of how DGL works.
 # 33). The network is visualized as follows with the color indicating the
 # community:
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/karate-club.png
+# .. image:: https://data.dgl.ai/tutorial/img/karate-club.png
 #    :align: center
 #
 # The task is to predict which side (0 or 33) each member tends to join given
@@ -135,7 +135,7 @@ print(G.nodes[[10, 11]].data['feat'])
 # node will update its own feature with information sent from neighboring
 # nodes. A graphical demonstration is displayed below.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/1_first/mailbox.png
+# .. image:: https://data.dgl.ai/tutorial/1_first/mailbox.png
 #    :alt: mailbox
 #    :align: center
 #
@@ -266,7 +266,7 @@ draw(0)  # draw the prediction of the first epoch
 plt.close()
 
 ###############################################################################
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/1_first/karate0.png
+# .. image:: https://data.dgl.ai/tutorial/1_first/karate0.png
 #    :height: 300px
 #    :width: 400px
 #    :align: center
@@ -278,7 +278,7 @@ plt.close()
 ani = animation.FuncAnimation(fig, draw, frames=len(all_logits), interval=200)
 
 ###############################################################################
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/1_first/karate.gif
+# .. image:: https://data.dgl.ai/tutorial/1_first/karate.gif
 #    :height: 300px
 #    :width: 400px
 #    :align: center

@@ -19,9 +19,17 @@ Results
 
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-python3 graphsage.py --dataset cora --gpu 0
+python3 train_full.py --dataset cora --gpu 0
 ```
 
 * cora: ~0.8330 
 * citeseer: ~0.7110
 * pubmed: ~0.7830
+
+
+Train w/ mini-batch sampling (on the Reddit dataset)
+```bash
+python3 train_sampling.py
+```
+
+Accuracy: 0.9504

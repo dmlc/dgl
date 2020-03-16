@@ -83,18 +83,20 @@ def load_dataset_for_regression(args):
 
 def collate_molgraphs(data):
     """Batching a list of datapoints for dataloader.
+
     Parameters
     ----------
     data : list of 3-tuples or 4-tuples.
         Each tuple is for a single datapoint, consisting of
         a SMILES, a DGLGraph, all-task labels and optionally
         a binary mask indicating the existence of labels.
+
     Returns
     -------
     smiles : list
         List of smiles
-    bg : BatchedDGLGraph
-        Batched DGLGraphs
+    bg : DGLGraph
+        The batched DGLGraph.
     labels : Tensor of dtype float32 and shape (B, T)
         Batched datapoint labels. B is len(data) and
         T is the number of total tasks.

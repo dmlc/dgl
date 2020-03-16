@@ -62,6 +62,9 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   // array. The implementation consumes a little extra memory than the actual requirement.
   //
   // Otherwise, directly use the row and col arrays to construct the result COO matrix.
+  //
+  // [02/29/2020 update]: OMP is disabled for now since batch-wise parallelism is more
+  //   significant. (minjie)
   IdArray picked_row = Full(-1, num_rows * num_picks, sizeof(IdxType) * 8, ctx);
   IdArray picked_col = Full(-1, num_rows * num_picks, sizeof(IdxType) * 8, ctx);
   IdArray picked_idx = Full(-1, num_rows * num_picks, sizeof(IdxType) * 8, ctx);
