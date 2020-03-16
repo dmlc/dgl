@@ -194,7 +194,8 @@ class SampleGCMCLayer(GCMCLayer):
                  agg='stack',  # or 'sum'
                  agg_act=None,
                  out_act=None,
-                 share_user_item_param=False):
+                 share_user_item_param=False,
+                 device=None):
         super(SampleGCMCLayer, self).__init__(rating_vals,
                                               user_in_units,
                                               movie_in_units,
@@ -206,7 +207,7 @@ class SampleGCMCLayer(GCMCLayer):
                                               out_act,
                                               share_user_item_param)
         # move part of mode params into GPU when required
-        self.device = None
+        self.device = device
         self.share_user_item_param
         
     def partial_to(self, device):
@@ -260,8 +261,8 @@ class SampleGCMCLayer(GCMCLayer):
             x_u = dot_or_identity(ufeat, self.W_r[rating.replace('.', '_')], self.device)
             x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating.replace('.', '_')], self.device)
             # left norm and dropout
-            x_u = x_u * self.dropout(igraph.nodes['user'].data['cj'])
-            x_i = x_i * self.dropout(ugraph.nodes['movie'].data['cj'])
+            x_u = x_u * self.dropout(igraph.nodes['user'].data['cj'].to(self.device))
+            x_i = x_i * self.dropout(ugraph.nodes['movie'].data['cj'].to(self.device))
             igraph.nodes['user'].data['h%d' % i] = x_u
             ugraph.nodes['movie'].data['h%d' % i] = x_i
             ifuncs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
@@ -272,8 +273,8 @@ class SampleGCMCLayer(GCMCLayer):
         ufeat = ugraph.nodes['user'].data.pop('h').view(num_u, -1)
         ifeat = igraph.nodes['movie'].data.pop('h').view(num_i, -1)
         # right norm
-        ufeat = ufeat * ugraph.nodes['user'].data['ci']
-        ifeat = ifeat * igraph.nodes['movie'].data['ci']
+        ufeat = ufeat * ugraph.nodes['user'].data['ci'].to(self.device)
+        ifeat = ifeat * igraph.nodes['movie'].data['ci'].to(self.device)
         # fc and non-linear
         ufeat = self.agg_act(ufeat)
         ifeat = self.agg_act(ifeat)
