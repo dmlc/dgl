@@ -125,6 +125,89 @@ class KGDataset:
 
         return (heads, rels, tails)
 
+
+class PartitionKGDataset(KGDataset):
+    '''Load a partitioned knowledge graph
+
+    The folder with a knowledge graph has five files:
+    * entities stores the mapping between entity Id and entity name.
+    * relations stores the mapping between relation Id and relation name.
+    * train stores the triples in the training set.
+    * valid stores the triples in the validation set.
+    * test stores the triples in the test set.
+
+    The mapping between entity (relation) Id and entity (relation) name is stored as 'id\tname'.
+
+    The triples are stored as 'head_name\trelation_name\ttail_name'.
+    '''
+    def __init__(self, entity_path, relation_path,
+                 train_path, valid_path=None, test_path=None, local2global_path=None,
+                 format=[0,1,2], skip_first_line=False, partition=False, read_triple=True):
+        if partition == False:
+            self.entity2id, self.n_entities = self.read_entity(entity_path)
+            self.relation2id, self.n_relations = self.read_relation(relation_path)
+            self.train = self.read_triple(train_path, "train", skip_first_line, format)
+            self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
+            self.test = self.read_triple(test_path, "test", skip_first_line, format)
+        else:
+            with open(local2global_path) as f_ent:
+                self.n_entities = len(f_ent.readlines())
+            with open(relation_path) as f_rel:
+                self.n_relations = len(f_rel.readlines())
+            if read_triple == True:
+                self.train = self.read_triple(train_path, "train", skip_first_line, format, partition=True)
+
+
+    def read_entity(self, entity_path):
+        with open(entity_path) as f:
+            entity2id = {}
+            for line in f:
+                eid, entity = line.strip().split('\t')
+                entity2id[entity] = int(eid)
+
+        return entity2id, len(entity2id)
+
+    def read_relation(self, relation_path):
+        with open(relation_path) as f:
+            relation2id = {}
+            for line in f:
+                rid, relation = line.strip().split('\t')
+                relation2id[relation] = int(rid)
+
+        return relation2id, len(relation2id)
+
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2], partition=False):
+        # mode: train/valid/test
+        if path is None:
+            return None
+
+        heads = []
+        tails = []
+        rels = []
+        with open(path) as f:
+            if partition == False:
+                if skip_first_line:
+                    _ = f.readline()
+                for line in f:
+                    triple = line.strip().split('\t')
+                    h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
+                    heads.append(self.entity2id[h])
+                    rels.append(self.relation2id[r])
+                    tails.append(self.entity2id[t])
+            else:
+                for line in f:
+                    triple = line.strip().split('\t')
+                    h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
+                    heads.append(int(h))
+                    rels.append(int(r))
+                    tails.append(int(t))
+        heads = np.array(heads, dtype=np.int64)
+        tails = np.array(tails, dtype=np.int64)
+        rels = np.array(rels, dtype=np.int64)
+
+        return (heads, rels, tails)
+
+
 class KGDatasetFB15k(KGDataset):
     '''Load a knowledge graph FB15k
 
