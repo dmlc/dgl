@@ -87,7 +87,6 @@ def get_server_data(args, machine_id):
    g2l, dataset = get_server_partition_dataset(
     args.data_path, 
     args.dataset, 
-    args.format, 
     machine_id)
 
    # Note that the dataset doesn't ccontain the triple
