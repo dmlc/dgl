@@ -275,7 +275,7 @@ def ConstructGraph(edges, n_entities, args):
     else:
         src, etype_id, dst = edges
         coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[n_entities, n_entities])
-        g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+        g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
         g.edata['tid'] = F.tensor(etype_id, F.int64)
         if args.pickle_graph:
             with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
@@ -562,7 +562,7 @@ class EvalDataset(object):
             dst = np.concatenate((dataset.train[2], dataset.valid[2], dataset.test[2]))
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
                                        shape=[dataset.n_entities, dataset.n_entities])
-            g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+            g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
             g.edata['tid'] = F.tensor(etype_id, F.int64)
             if args.pickle_graph:
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:

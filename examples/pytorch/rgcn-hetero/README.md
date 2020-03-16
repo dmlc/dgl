@@ -34,7 +34,7 @@ Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 
 ### Entity Classification
 
-(all experiments use one-hot encoding as featureless input)
+All experiments use one-hot encoding as featureless input. Best accuracy reported.
 
 AIFB: accuracy 97.22% (DGL), 95.83% (paper)
 ```
@@ -54,6 +54,30 @@ python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 AM: accuracy 91.41% (DGL), 89.29% (paper)
 ```
 python3 entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
+```
+
+### Entity Classification w/ minibatch training
+
+Accuracy numbers are reported by 10 runs.
+
+AIFB: accuracy best=97.22% avg=93.33%
+```
+python3 entity_classify_mb.py -d aifb --testing --gpu 0 --fanout=8
+```
+
+MUTAG: accuracy best=76.47% avg=68.38%
+```
+python3 entity_classify_mb.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size=50 --fanout=8
+```
+
+BGS: accuracy best=96.55% avg=92.41%
+```
+python3 entity_classify_mb.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0
+```
+
+AM: accuracy best=90.91% avg=88.43%
+```
+python3 entity_classify_mb.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
 
 ### Offline Inferencing
