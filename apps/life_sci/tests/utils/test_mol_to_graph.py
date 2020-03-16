@@ -7,6 +7,9 @@ from rdkit import Chem
 
 test_smiles1 = 'CCO'
 test_smiles2 = 'Fc1ccccc1'
+test_smiles3 = '[CH2:1]([CH3:2])[N:3]1[CH2:4][CH2:5][C:6]([CH3:16])' \
+               '([CH3:17])[c:7]2[cH:8][cH:9][c:10]([N+:13]([O-:14])=[O:15])' \
+               '[cH:11][c:12]21.[CH3:18][CH2:19][O:20][C:21]([CH3:22])=[O:23]'
 
 class TestAtomFeaturizer(BaseAtomFeaturizer):
     def __init__(self):
@@ -37,6 +40,16 @@ def test_smiles_to_bigraph():
                                                         [1.], [1.], [1.], [1.], [1.],
                                                         [1.], [1.], [1.], [1.]]))
 
+    # Test the case where atoms come with a default order and we do not
+    # want to change the order, which is related to the application of
+    # reaction center prediction.
+    g3 = smiles_to_bigraph(test_smiles3, node_featurizer=test_node_featurizer,
+                           canonical_atom_order=False)
+    assert torch.allclose(g3.ndata['hv'], torch.tensor([[6.], [6.], [7.], [6.], [6.], [6.],
+                                                        [6.], [6.], [6.], [6.], [6.], [6.],
+                                                        [7.], [8.], [8.], [6.], [6.], [6.],
+                                                        [6.], [8.], [6.], [6.], [8.]]))
+
 def test_mol_to_bigraph():
     mol1 = Chem.MolFromSmiles(test_smiles1)
     g1 = mol_to_bigraph(mol1, add_self_loop=True)
@@ -57,24 +70,56 @@ def test_mol_to_bigraph():
                                                         [1.], [1.], [1.], [1.], [1.],
                                                         [1.], [1.], [1.], [1.]]))
 
+    # Test the case where atoms come with a default order and we do not
+    # want to change the order, which is related to the application of
+    # reaction center prediction.
+    mol3 = Chem.MolFromSmiles(test_smiles3)
+    g3 = mol_to_bigraph(mol3, node_featurizer=test_node_featurizer,
+                        canonical_atom_order=False)
+    assert torch.allclose(g3.ndata['hv'], torch.tensor([[6.], [6.], [7.], [6.], [6.], [6.],
+                                                        [6.], [6.], [6.], [6.], [6.], [6.],
+                                                        [7.], [8.], [8.], [6.], [6.], [6.],
+                                                        [6.], [8.], [6.], [6.], [8.]]))
+
 def test_smiles_to_complete_graph():
     test_node_featurizer = TestAtomFeaturizer()
-    g = smiles_to_complete_graph(test_smiles1, add_self_loop=False,
+    g1 = smiles_to_complete_graph(test_smiles1, add_self_loop=False,
                                  node_featurizer=test_node_featurizer)
-    src, dst = g.edges()
+    src, dst = g1.edges()
     assert torch.allclose(src, torch.LongTensor([0, 0, 1, 1, 2, 2]))
     assert torch.allclose(dst, torch.LongTensor([1, 2, 0, 2, 0, 1]))
-    assert torch.allclose(g.ndata['hv'], torch.tensor([[6.], [8.], [6.]]))
+    assert torch.allclose(g1.ndata['hv'], torch.tensor([[6.], [8.], [6.]]))
+
+    # Test the case where atoms come with a default order and we do not
+    # want to change the order, which is related to the application of
+    # reaction center prediction.
+    g2 = smiles_to_complete_graph(test_smiles3, node_featurizer=test_node_featurizer,
+                                  canonical_atom_order=False)
+    assert torch.allclose(g2.ndata['hv'], torch.tensor([[6.], [6.], [7.], [6.], [6.], [6.],
+                                                        [6.], [6.], [6.], [6.], [6.], [6.],
+                                                        [7.], [8.], [8.], [6.], [6.], [6.],
+                                                        [6.], [8.], [6.], [6.], [8.]]))
 
 def test_mol_to_complete_graph():
     test_node_featurizer = TestAtomFeaturizer()
     mol1 = Chem.MolFromSmiles(test_smiles1)
-    g = mol_to_complete_graph(mol1, add_self_loop=False,
-                              node_featurizer=test_node_featurizer)
-    src, dst = g.edges()
+    g1 = mol_to_complete_graph(mol1, add_self_loop=False,
+                               node_featurizer=test_node_featurizer)
+    src, dst = g1.edges()
     assert torch.allclose(src, torch.LongTensor([0, 0, 1, 1, 2, 2]))
     assert torch.allclose(dst, torch.LongTensor([1, 2, 0, 2, 0, 1]))
-    assert torch.allclose(g.ndata['hv'], torch.tensor([[6.], [8.], [6.]]))
+    assert torch.allclose(g1.ndata['hv'], torch.tensor([[6.], [8.], [6.]]))
+
+    # Test the case where atoms come with a default order and we do not
+    # want to change the order, which is related to the application of
+    # reaction center prediction.
+    mol2 = Chem.MolFromSmiles(test_smiles3)
+    g2 = mol_to_complete_graph(mol2, node_featurizer=test_node_featurizer,
+                               canonical_atom_order=False)
+    assert torch.allclose(g2.ndata['hv'], torch.tensor([[6.], [6.], [7.], [6.], [6.], [6.],
+                                                        [6.], [6.], [6.], [6.], [6.], [6.],
+                                                        [7.], [8.], [8.], [6.], [6.], [6.],
+                                                        [6.], [8.], [6.], [6.], [8.]]))
 
 def test_k_nearest_neighbors():
     coordinates = np.array([[0.1, 0.1, 0.1],
