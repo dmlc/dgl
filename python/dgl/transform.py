@@ -743,38 +743,46 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
+def to_block(g, dst_nodes=None):
     """Convert a graph into a bipartite-structured "block" for message passing.
 
-    Specifically, we create one node type ``ntype_l`` on the "left hand" side and another
-    node type ``ntype_r`` on the "right hand" side for each node type ``ntype``.  The
-    nodes of type ``ntype_r`` would contain the nodes that have an inbound edge of any type,
-    while ``ntype_l`` would contain all the nodes on the right hand side, as well as any
-    nodes that have an outbound edge of any type pointing to any node on the right hand side.
+    A block graph is uni-directional bipartite graph consisting of two sets of nodes
+    SRC and DST. Each set can have many node types while all the edges are from SRC
+    nodes to DST nodes.
 
-    For each relation graph of canonical edge type ``(utype, etype, vtype)``, edges
-    from node type ``utype`` to node type ``vtype`` are preserved, except that the
-    source node type and destination node type become ``utype_l`` and ``vtype_r`` in
-    the new graph.  The resulting relation graph would have a canonical edge type
-    ``(utype_l, etype, vtype_r)``.
+    Specifically, for each relation graph of canonical edge type ``(utype, etype, vtype)``,
+    node type ``utype`` belongs to SRC while ``vtype`` belongs to DST.
+    Edges from node type ``utype`` to node type ``vtype`` are preserved. If
+    ``utype == vtype``, the result graph will have two node types of the same name ``utype``,
+    but one belongs to SRC while the other belongs to DST. This is because although
+    they have the same name, their node ids are relabeled differently (see below). In
+    both cases, the canonical edge type in the new graph is still
+    ``(utype, etype, vtype)``, so there is no difference when referring to it.
 
-    We refer to such bipartite-structured graphs a **block**.
+    Moreover, the function also relabels node ids in each type to make the graph more compact.
+    Specifically, the nodes of type ``vtype`` would contain the nodes that have at least one
+    inbound edge of any type, while ``utype`` would contain all the DST nodes of type ``utype``,
+    as well as the nodes that have at least one outbound edge to any DST node.
 
-    If ``rhs_nodes`` is given, the right hand side would contain the given nodes.
-    Otherwise, the right hand side would be determined by DGL via the rules above.
+    Since DST nodes are included in SRC nodes, a common requirement is to fetch
+    the DST node features from the SRC nodes features. To avoid expensive sparse lookup,
+    the function assures that the DST nodes in both SRC and DST sets have the same ids.
+    As a result, given the node feature tensor ``X`` of type ``utype``,
+    the following code finds the corresponding DST node features of type ``vtype``:
+
+    .. code::
+
+        X[:block.number_of_nodes('DST/vtype')]
+
+    If the ``dst_nodes`` argument is given, the DST nodes would contain the given nodes.
+    Otherwise, the DST nodes would be determined by DGL via the rules above.
 
     Parameters
     ----------
     graph : DGLHeteroGraph
         The graph.
-    rhs_nodes : Tensor or dict[str, Tensor], optional
-        Optional nodes that would appear on the right hand side.
-
-        If a tensor is given, the graph must have only one node type.
-    lhs_suffix : str, default "_l"
-        The suffix attached to all node types on the left hand side.
-    rhs_suffix : str, default "_r"
-        The suffix attached to all node types on the right hand side.
+    dst_nodes : Tensor or dict[str, Tensor], optional
+        Optional DST nodes. If a tensor is given, the graph must have only one node type.
 
     Returns
     -------
@@ -786,12 +794,9 @@ def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
 
         The edge IDs induced for each type would be stored in feature ``dgl.EID``.
 
-        For each node type ``ntype``, the first few nodes with type ``ntype_l`` are
-        guaranteed to be identical to the nodes with type ``ntype_r``.
-
     Notes
     -----
-    This function is primarily for creating graph structures for efficient
+    This function is primarily for creating the structures for efficient
     computation of message passing.  See [TODO] for a detailed example.
 
     Examples
@@ -830,63 +835,64 @@ def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
     the right hand side nodes, you have to give a dict:
     >>> g = dgl.bipartite([(0, 1), (1, 2), (2, 3)], utype='A', vtype='B')
 
-    If you don't specify any node of type A on the right hand side, the node type ``A_r``
+    If you don't specify any node of type A on the right hand side, the node type ``A``
     in the block would have zero nodes.
     >>> block = dgl.to_block(g, {'B': torch.LongTensor([3, 2])})
-    >>> block.number_of_nodes('A_r')
+    >>> block.number_of_nodes('A')
     0
-    >>> block.number_of_nodes('B_r')
+    >>> block.number_of_nodes('B')
     2
-    >>> block.nodes['B_r'].data[dgl.NID]
+    >>> block.nodes['B'].data[dgl.NID]
     tensor([3, 2])
 
     The left hand side would contain all the nodes on the right hand side:
-    >>> block.nodes['B_l'].data[dgl.NID]
+    >>> block.nodes['B'].data[dgl.NID]
     tensor([3, 2])
 
     As well as all the nodes that have connections to the nodes on the right hand side:
-    >>> block.nodes['A_l'].data[dgl.NID]
+    >>> block.nodes['A'].data[dgl.NID]
     tensor([2, 1])
     """
-    if rhs_nodes is None:
+    if dst_nodes is None:
         # Find all nodes that appeared as destinations
-        rhs_nodes = defaultdict(list)
+        dst_nodes = defaultdict(list)
         for etype in g.canonical_etypes:
             _, dst = g.edges(etype=etype)
-            rhs_nodes[etype[2]].append(dst)
-        rhs_nodes = {ntype: F.unique(F.cat(values, 0)) for ntype, values in rhs_nodes.items()}
-    elif not isinstance(rhs_nodes, Mapping):
-        # rhs_nodes is a Tensor, check if the g has only one type.
+            dst_nodes[etype[2]].append(dst)
+        dst_nodes = {ntype: F.unique(F.cat(values, 0)) for ntype, values in dst_nodes.items()}
+    elif not isinstance(dst_nodes, Mapping):
+        # dst_nodes is a Tensor, check if the g has only one type.
         if len(g.ntypes) > 1:
             raise ValueError(
-                'Graph has more than one node type; please specify a dict for rhs_nodes.')
-        rhs_nodes = {g.ntypes[0]: rhs_nodes}
+                'Graph has more than one node type; please specify a dict for dst_nodes.')
+        dst_nodes = {g.ntypes[0]: dst_nodes}
 
-    # rhs_nodes is now a dict
-    rhs_nodes_nd = []
+    # dst_nodes is now a dict
+    dst_nodes_nd = []
     for ntype in g.ntypes:
-        nodes = rhs_nodes.get(ntype, None)
+        nodes = dst_nodes.get(ntype, None)
         if nodes is not None:
-            rhs_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
+            dst_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
         else:
-            rhs_nodes_nd.append(nd.null())
+            dst_nodes_nd.append(nd.null())
 
-    new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(g._graph, rhs_nodes_nd)
-    lhs_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in lhs_nodes_nd]
-    rhs_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd) for nodes_nd in rhs_nodes_nd]
+    new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(g._graph, dst_nodes_nd)
+    src_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in src_nodes_nd]
+    dst_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd) for nodes_nd in dst_nodes_nd]
 
-    new_ntypes = [ntype + lhs_suffix for ntype in g.ntypes] + \
-                 [ntype + rhs_suffix for ntype in g.ntypes]
+    # The new graph duplicates the original node types to SRC and DST sets.
+    new_ntypes = ([ntype for ntype in g.ntypes], [ntype for ntype in g.ntypes])
     new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, g.etypes)
+    assert new_graph.is_unibipartite  # sanity check
 
     for i, ntype in enumerate(g.ntypes):
-        new_graph.nodes[ntype + lhs_suffix].data[NID] = lhs_nodes[i]
-        new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[i]
+        new_graph.srcnodes[ntype].data[NID] = src_nodes[i]
+        new_graph.dstnodes[ntype].data[NID] = dst_nodes[i]
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
         utype, etype, vtype = canonical_etype
-        new_canonical_etype = (utype + lhs_suffix, etype, vtype + rhs_suffix)
+        new_canonical_etype = (utype, etype, vtype)
         new_graph.edges[new_canonical_etype].data[EID] = induced_edges
 
     return new_graph

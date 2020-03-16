@@ -3,13 +3,16 @@ Paper: https://arxiv.org/abs/1703.06103
 Reference Code: https://github.com/tkipf/relational-gcn
 """
 import argparse
+import itertools
 import numpy as np
 import time
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 from functools import partial
 
+import dgl
 import dgl.function as fn
 from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 
@@ -110,7 +113,7 @@ class RelGraphConvHetero(nn.Module):
         Parameters
         ----------
         g : DGLHeteroGraph
-            Input graph.
+            Input block graph.
         xs : dict[str, torch.Tensor]
             Node feature for each node type.
 
@@ -120,49 +123,52 @@ class RelGraphConvHetero(nn.Module):
             New node features for each node type.
         """
         g = g.local_var()
-        for ntype in g.ntypes:
-            g.nodes[ntype].data['x'] = xs[ntype]
+        for ntype, x in xs.items():
+            g.srcnodes[ntype].data['x'] = x
         if self.use_weight:
             ws = self.basis_weight()
             funcs = {}
             for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-                g.nodes[srctype].data['h%d' % i] = th.matmul(
-                    g.nodes[srctype].data['x'], ws[etype])
+                if srctype not in xs:
+                    continue
+                g.srcnodes[srctype].data['h%d' % i] = th.matmul(
+                    g.srcnodes[srctype].data['x'], ws[etype])
                 funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
         else:
             funcs = {}
             for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-                g.nodes[srctype].data['h%d' % i] = g.nodes[srctype].data['x']
+                if srctype not in xs:
+                    continue
+                g.srcnodes[srctype].data['h%d' % i] = g.srcnodes[srctype].data['x']
                 funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
         # message passing
         g.multi_update_all(funcs, 'sum')
 
-        hs = {ntype : g.nodes[ntype].data['h'] for ntype in g.ntypes}
-        new_hs = {}
-        for ntype, h in hs.items():
+        hs = {}
+        for ntype in g.dsttypes:
+            if 'h' in g.dstnodes[ntype].data:
+                hs[ntype] = g.dstnodes[ntype].data['h']
+        def _apply(ntype, h):
             # apply bias and activation
             if self.self_loop:
-                h = h + th.matmul(xs[ntype], self.loop_weight)
-            if self.bias:
-                h = h + self.h_bias
+                h = h + th.matmul(xs[ntype][:h.shape[0]], self.loop_weight)
             if self.activation:
                 h = self.activation(h)
             h = self.dropout(h)
-            new_hs[ntype] = h
-        return new_hs
+            return h
+        hs = {ntype : _apply(ntype, h) for ntype, h in hs.items()}
+        return hs
 
 class RelGraphEmbed(nn.Module):
     r"""Embedding layer for featureless heterograph."""
     def __init__(self,
                  g,
                  embed_size,
-                 embed_name='embed',
                  activation=None,
                  dropout=0.0):
         super(RelGraphEmbed, self).__init__()
         self.g = g
         self.embed_size = embed_size
-        self.embed_name = embed_name
         self.activation = activation
         self.dropout = nn.Dropout(dropout)
 
@@ -210,7 +216,6 @@ class EntityClassify(nn.Module):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
 
-        self.embed_layer = RelGraphEmbed(g, self.h_dim)
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConvHetero(
@@ -229,11 +234,64 @@ class EntityClassify(nn.Module):
             self.num_bases, activation=None,
             self_loop=self.use_self_loop))
 
-    def forward(self):
-        h = self.embed_layer()
-        for layer in self.layers:
-            h = layer(self.g, h)
+    def forward(self, h, blocks):
+        for layer, block in zip(self.layers, blocks):
+            h = layer(block, h)
         return h
+
+class HeteroNeighborSampler:
+    """Neighbor sampler on heterogeneous graphs
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Full graph
+    category : str
+        Category name of the seed nodes.
+    fanouts : list of int
+        Fanout of each hop starting from the seed nodes. If a fanout is None,
+        sample full neighbors.
+    """
+    def __init__(self, g, category, fanouts):
+        self.g = g
+        self.category = category
+        self.fanouts = fanouts
+
+    def sample_blocks(self, seeds):
+        blocks = []
+        seeds = {self.category : th.tensor(seeds).long()}
+        cur = seeds
+        for fanout in self.fanouts:
+            if fanout is None:
+                frontier = dgl.in_subgraph(self.g, cur)
+            else:
+                frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
+            block = dgl.to_block(frontier, cur)
+            cur = {}
+            for ntype in block.srctypes:
+                cur[ntype] = block.srcnodes[ntype].data[dgl.NID]
+            blocks.insert(0, block)
+        return seeds, blocks
+
+def extract_embed(node_embed, block):
+    emb = {}
+    for ntype in block.srctypes:
+        nid = block.srcnodes[ntype].data[dgl.NID]
+        emb[ntype] = node_embed[ntype][nid]
+    return emb
+
+
+def evaluate(model, seeds, blocks, node_embed, labels, category, use_cuda):
+    model.eval()
+    emb = extract_embed(node_embed, blocks[0])
+    lbl = labels[seeds]
+    if use_cuda:
+        emb = {k : e.cuda() for k, e in emb.items()}
+        lbl = lbl.cuda()
+    logits = model(emb, blocks)[category]
+    loss = F.cross_entropy(logits, lbl)
+    acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
+    return loss, acc
 
 def main(args):
     # load graph data
@@ -254,10 +312,6 @@ def main(args):
     train_idx = dataset.train_idx
     test_idx = dataset.test_idx
     labels = dataset.labels
-    category_id = len(g.ntypes)
-    for i, ntype in enumerate(g.ntypes):
-        if ntype == category:
-            category_id = i
 
     # split dataset into train, validate, test
     if args.validation:
@@ -270,10 +324,14 @@ def main(args):
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
-        labels = labels.cuda()
-        train_idx = train_idx.cuda()
-        test_idx = test_idx.cuda()
 
+    train_label = labels[train_idx]
+    val_label = labels[val_idx]
+    test_label = labels[test_idx]
+
+    # create embeddings
+    embed_layer = RelGraphEmbed(g, args.n_hidden)
+    node_embed = embed_layer()
     # create model
     model = EntityClassify(g,
                            args.n_hidden,
@@ -286,38 +344,62 @@ def main(args):
     if use_cuda:
         model.cuda()
 
+    # train sampler
+    sampler = HeteroNeighborSampler(g, category, [args.fanout] * args.n_layers)
+    loader = DataLoader(dataset=train_idx.numpy(),
+                        batch_size=args.batch_size,
+                        collate_fn=sampler.sample_blocks,
+                        shuffle=True,
+                        num_workers=0)
+
+    # validation sampler
+    val_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
+    _, val_blocks = val_sampler.sample_blocks(val_idx)
+
+    # test sampler
+    test_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
+    _, test_blocks = test_sampler.sample_blocks(test_idx)
+
     # optimizer
-    optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
+    all_params = itertools.chain(model.parameters(), embed_layer.parameters())
+    optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
 
     # training loop
     print("start training...")
     dur = []
-    model.train()
     for epoch in range(args.n_epochs):
+        model.train()
         optimizer.zero_grad()
-        if epoch > 5:
+        if epoch > 3:
             t0 = time.time()
-        logits = model()[category]
-        loss = F.cross_entropy(logits[train_idx], labels[train_idx])
-        loss.backward()
-        optimizer.step()
-        t1 = time.time()
 
-        if epoch > 5:
-            dur.append(t1 - t0)
-        train_acc = th.sum(logits[train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
-        val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
-        val_acc = th.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
-        print("Epoch {:05d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
-              format(epoch, train_acc, loss.item(), val_acc, val_loss.item(), np.average(dur)))
+        for i, (seeds, blocks) in enumerate(loader):
+            batch_tic = time.time()
+            emb = extract_embed(node_embed, blocks[0])
+            lbl = labels[seeds[category]]
+            if use_cuda:
+                emb = {k : e.cuda() for k, e in emb.items()}
+                lbl = lbl.cuda()
+            logits = model(emb, blocks)[category]
+            loss = F.cross_entropy(logits, lbl)
+            loss.backward()
+            optimizer.step()
+
+            train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds[category])
+            print("Epoch {:05d} | Batch {:03d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Time: {:.4f}".
+                  format(epoch, i, train_acc, loss.item(), time.time() - batch_tic))
+
+        if epoch > 3:
+            dur.append(time.time() - t0)
+
+        val_loss, val_acc = evaluate(model, val_idx, val_blocks, node_embed, labels, category, use_cuda)
+        print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
+              format(epoch, val_acc, val_loss.item(), np.average(dur)))
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
-    model.eval()
-    logits = model.forward()[category]
-    test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
-    test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
+    test_loss, test_acc = evaluate(model, test_idx, test_blocks, node_embed, labels, category, use_cuda)
     print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()
 
@@ -335,7 +417,7 @@ if __name__ == '__main__':
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=2,
             help="number of propagation rounds")
-    parser.add_argument("-e", "--n-epochs", type=int, default=50,
+    parser.add_argument("-e", "--n-epochs", type=int, default=20,
             help="number of training epochs")
     parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
@@ -345,6 +427,10 @@ if __name__ == '__main__':
             help="l2 norm coef")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
+    parser.add_argument("--batch-size", type=int, default=100,
+            help="Mini-batch size. If -1, use full graph training.")
+    parser.add_argument("--fanout", type=int, default=4,
+            help="Fan-out of neighbor sampling.")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
