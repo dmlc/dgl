@@ -26,10 +26,6 @@ def main(args):
     num_classes = dataset.num_classes
     test_idx = dataset.test_idx
     labels = dataset.labels
-    category_id = len(g.ntypes)
-    for i, ntype in enumerate(g.ntypes):
-        if ntype == category:
-            category_id = i
 
     # check cuda
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
@@ -52,7 +48,7 @@ def main(args):
 
     print("start testing...")
     model.eval()
-    logits = model.forward()[category_id]
+    logits = model.forward()[category]
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
