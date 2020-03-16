@@ -772,7 +772,7 @@ def to_block(g, dst_nodes=None):
 
     .. code::
 
-        X[:block.number_of_nodes('vtype')]
+        X[:block.number_of_nodes('DST/vtype')]
 
     If the ``dst_nodes`` argument is given, the DST nodes would contain the given nodes.
     Otherwise, the DST nodes would be determined by DGL via the rules above.

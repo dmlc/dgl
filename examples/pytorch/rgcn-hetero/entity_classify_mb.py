@@ -148,17 +148,15 @@ class RelGraphConvHetero(nn.Module):
         for ntype in g.dsttypes:
             if 'h' in g.dstnodes[ntype].data:
                 hs[ntype] = g.dstnodes[ntype].data['h']
-        def _apply(h):
+        def _apply(ntype, h):
             # apply bias and activation
             if self.self_loop:
-                h = h + th.matmul(xs[ntype], self.loop_weight)
-            if self.bias:
-                h = h + self.h_bias
+                h = h + th.matmul(xs[ntype][:h.shape[0]], self.loop_weight)
             if self.activation:
                 h = self.activation(h)
             h = self.dropout(h)
             return h
-        hs = {ntype : _apply(h) for ntype, h in hs.items()}
+        hs = {ntype : _apply(ntype, h) for ntype, h in hs.items()}
         return hs
 
 class RelGraphEmbed(nn.Module):
@@ -242,18 +240,29 @@ class EntityClassify(nn.Module):
         return h
 
 class HeteroNeighborSampler:
-    def __init__(self, g, category, fanouts, full_neighbor=False):
+    """Neighbor sampler on heterogeneous graphs
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Full graph
+    category : str
+        Category name of the seed nodes.
+    fanouts : list of int
+        Fanout of each hop starting from the seed nodes. If a fanout is None,
+        sample full neighbors.
+    """
+    def __init__(self, g, category, fanouts):
         self.g = g
         self.category = category
         self.fanouts = fanouts
-        self.full_neighbor = full_neighbor
 
     def sample_blocks(self, seeds):
         blocks = []
-        seeds = {self.category : th.tensor(seeds)}
+        seeds = {self.category : th.tensor(seeds).long()}
         cur = seeds
         for fanout in self.fanouts:
-            if self.full_neighbor:
+            if fanout is None:
                 frontier = dgl.in_subgraph(self.g, cur)
             else:
                 frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
@@ -267,7 +276,7 @@ class HeteroNeighborSampler:
 def extract_embed(node_embed, block):
     emb = {}
     for ntype in block.srctypes:
-        nid = block.nodes[ntype].data[dgl.NID]
+        nid = block.srcnodes[ntype].data[dgl.NID]
         emb[ntype] = node_embed[ntype][nid]
     return emb
 
@@ -337,18 +346,18 @@ def main(args):
 
     # train sampler
     sampler = HeteroNeighborSampler(g, category, [args.fanout] * args.n_layers)
-    loader = DataLoader(dataset=list(train_idx.numpy()),
+    loader = DataLoader(dataset=train_idx.numpy(),
                         batch_size=args.batch_size,
                         collate_fn=sampler.sample_blocks,
                         shuffle=True,
                         num_workers=0)
 
     # validation sampler
-    val_sampler = HeteroNeighborSampler(g, category, [args.fanout] * args.n_layers, True)
+    val_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
     _, val_blocks = val_sampler.sample_blocks(val_idx)
 
     # test sampler
-    test_sampler = HeteroNeighborSampler(g, category, [args.fanout] * args.n_layers, True)
+    test_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
     _, test_blocks = test_sampler.sample_blocks(test_idx)
 
     # optimizer

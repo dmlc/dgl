@@ -533,9 +533,9 @@ class DGLHeteroGraph(object):
         if self.is_unibipartite:
             # Only check 'SRC/' and 'DST/' prefix when is_unibipartite graph is True.
             if ntype.startswith('SRC/'):
-                return self.get_srctype_id(ntype[4:])
+                return self.get_ntype_id_from_src(ntype[4:])
             elif ntype.startswith('DST/'):
-                return self.get_dsttype_id(ntype[4:])
+                return self.get_ntype_id_from_dst(ntype[4:])
             # If there is no prefix, fallback to normal lookup.
 
         # Lookup both SRC and DST
@@ -549,7 +549,7 @@ class DGLHeteroGraph(object):
             raise DGLError('Node type "{}" does not exist.'.format(ntype))
         return ntid
 
-    def get_srctype_id(self, ntype):
+    def get_ntype_id_from_src(self, ntype):
         """Return the id of the given SRC node type.
 
         ntype can also be None. If so, there should be only one node type in the
@@ -574,7 +574,7 @@ class DGLHeteroGraph(object):
             raise DGLError('SRC node type "{}" does not exist.'.format(ntype))
         return ntid
 
-    def get_dsttype_id(self, ntype):
+    def get_ntype_id_from_dst(self, ntype):
         """Return the id of the given DST node type.
 
         ntype can also be None. If so, there should be only one node type in the
@@ -666,7 +666,7 @@ class DGLHeteroGraph(object):
         --------
         srcdata
         """
-        return HeteroNodeView(self, self.get_srctype_id)
+        return HeteroNodeView(self, self.get_ntype_id_from_src)
 
     @property
     def dstnodes(self):
@@ -686,7 +686,7 @@ class DGLHeteroGraph(object):
         --------
         dstdata
         """
-        return HeteroNodeView(self, self.get_dsttype_id)
+        return HeteroNodeView(self, self.get_ntype_id_from_dst)
 
     @property
     def ndata(self):
@@ -753,7 +753,7 @@ class DGLHeteroGraph(object):
         assert self.is_unibipartite, 'srcdata is only allowed for uni-bipartite graph.'
         assert len(self.srctypes) == 1, 'srcdata is only allowed when there is only one SRC type.'
         ntype = self.srctypes[0]
-        ntid = self.get_srctype_id(ntype)
+        ntid = self.get_ntype_id_from_src(ntype)
         return HeteroNodeDataView(self, ntype, ntid, ALL)
 
     @property
@@ -797,7 +797,7 @@ class DGLHeteroGraph(object):
         assert self.is_unibipartite, 'dstdata is only allowed for uni-bipartite graph.'
         assert len(self.dsttypes) == 1, 'dstdata is only allowed when there is only one DST type.'
         ntype = self.dsttypes[0]
-        ntid = self.get_dsttype_id(ntype)
+        ntid = self.get_ntype_id_from_dst(ntype)
         return HeteroNodeDataView(self, ntype, ntid, ALL)
 
     @property
@@ -893,9 +893,9 @@ class DGLHeteroGraph(object):
         if len(etypes) == 1:
             # no ambiguity: return the unitgraph itself
             srctype, etype, dsttype = self._canonical_etypes[etypes[0]]
-            stid = self.get_srctype_id(srctype)
+            stid = self.get_ntype_id_from_src(srctype)
             etid = self.get_etype_id((srctype, etype, dsttype))
-            dtid = self.get_dsttype_id(dsttype)
+            dtid = self.get_ntype_id_from_dst(dsttype)
             new_g = self._graph.get_relation_graph(etid)
 
             if stid == dtid:
@@ -2906,7 +2906,7 @@ class DGLHeteroGraph(object):
         """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, reducer_dict)
-        ntid = self.get_dsttype_id(ntype)
+        ntid = self.get_ntype_id_from_dst(ntype)
         if is_all(v):
             v = F.arange(0, self.number_of_nodes(ntid))
         elif isinstance(v, int):
@@ -3115,7 +3115,7 @@ class DGLHeteroGraph(object):
         """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, etype_dict)
-        dtid = self.get_dsttype_id(ntype)
+        dtid = self.get_ntype_id_from_dst(ntype)
 
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
@@ -3307,7 +3307,7 @@ class DGLHeteroGraph(object):
             return
         # infer receive node type
         ntype = infer_ntype_from_dict(self, etype_dict)
-        dtid = self.get_dsttype_id(ntype)
+        dtid = self.get_ntype_id_from_dst(ntype)
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
@@ -4064,6 +4064,9 @@ def find_src_dst_ntypes(ntypes, metagraph):
 
     If the metagraph is not a uni-bipartite graph (so that the SRC and DST categories
     are not well-defined), return None.
+
+    For node types that are isolated (i.e, no relation is associated with it), they
+    are assigned to the SRC category.
 
     Parameters
     ----------
