@@ -109,13 +109,14 @@ def test_simple_graph():
 
 def test_bidirected_graph():
     def _test(in_readonly, out_readonly):
-        elist = [(0, 0), (0, 1), (0, 1), (1, 0),
-                 (1, 1), (2, 1), (2, 2), (2, 2)]
+        elist = [(0, 0), (0, 1), (1, 0),
+                (1, 1), (2, 1), (2, 2)]
+        num_edges = 7
         g = dgl.DGLGraph(elist, readonly=in_readonly)
         elist.append((1, 2))
         elist = set(elist)
         big = dgl.to_bidirected(g, out_readonly)
-        assert big.number_of_edges() == 10
+        assert big.number_of_edges() == num_edges
         src, dst = big.edges()
         eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
         assert eset == set(elist)
@@ -552,7 +553,8 @@ if __name__ == '__main__':
     test_laplacian_lambda_max()
     test_remove_self_loop()
     test_add_self_loop()
-    test_partition()
+    test_partition_with_halo()
+    test_metis_partition()
     test_compact()
     test_to_simple()
     test_in_subgraph()

@@ -36,13 +36,38 @@ CompactGraphs(
   std::vector<aten::IdHashMap<IdType>> hashmaps(num_ntypes);
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
 
-  for (size_t i = 0; i < always_preserve.size(); ++i)
+  std::vector<int64_t> max_vertex_cnt(num_ntypes, 0);
+  for (size_t i = 0; i < graphs.size(); ++i) {
+    const HeteroGraphPtr curr_graph = graphs[i];
+    const int64_t num_etypes = curr_graph->NumEdgeTypes();
+
+    for (IdType etype = 0; etype < num_etypes; ++etype) {
+      IdType srctype, dsttype;
+      std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
+
+      const int64_t n_edges = curr_graph->NumEdges(etype);
+      max_vertex_cnt[srctype] += n_edges;
+      max_vertex_cnt[dsttype] += n_edges;
+    }
+  }
+
+  // Reserve the space for hash maps before ahead to aoivd rehashing
+  for (size_t i = 0; i < num_ntypes; ++i) {
+    if (i < always_preserve.size())
+      hashmaps[i].Reserve(always_preserve[i]->shape[0] + max_vertex_cnt[i]);
+    else
+      hashmaps[i].Reserve(max_vertex_cnt[i]);
+  }
+
+  for (size_t i = 0; i < always_preserve.size(); ++i) {
     hashmaps[i].Update(always_preserve[i]);
+  }
 
   for (size_t i = 0; i < graphs.size(); ++i) {
     const HeteroGraphPtr curr_graph = graphs[i];
     const int64_t num_etypes = curr_graph->NumEdgeTypes();
 
+    all_edges[i].reserve(num_etypes);
     for (IdType etype = 0; etype < num_etypes; ++etype) {
       IdType srctype, dsttype;
       std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);

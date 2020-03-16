@@ -275,7 +275,7 @@ def ConstructGraph(edges, n_entities, args):
     else:
         src, etype_id, dst = edges
         coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[n_entities, n_entities])
-        g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+        g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
         g.edata['tid'] = F.tensor(etype_id, F.int64)
         if args.pickle_graph:
             with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
@@ -434,16 +434,19 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, neg_sample_size, is_chunked,
     # We use all nodes to create negative edges. Regardless of the sampling algorithm,
     # we can always view the subgraph with one chunk.
     if (neg_head and len(neg_g.head_nid) == num_nodes) \
-       or (not neg_head and len(neg_g.tail_nid) == num_nodes):
+            or (not neg_head and len(neg_g.tail_nid) == num_nodes):
         num_chunks = 1
         chunk_size = pos_g.number_of_edges()
     elif is_chunked:
-        if pos_g.number_of_edges() < chunk_size:
+        # This is probably for evaluation.
+        if pos_g.number_of_edges() < chunk_size \
+                and neg_g.number_of_edges() % neg_sample_size == 0:
+            num_chunks = 1
+            chunk_size = pos_g.number_of_edges()
+        # This is probably the last batch in the training. Let's ignore it.
+        elif pos_g.number_of_edges() % chunk_size > 0:
             return None
         else:
-            # This is probably the last batch. Let's ignore it.
-            if pos_g.number_of_edges() % chunk_size > 0:
-                return None
             num_chunks = int(pos_g.number_of_edges() / chunk_size)
         assert num_chunks * chunk_size == pos_g.number_of_edges()
     else:
@@ -559,7 +562,7 @@ class EvalDataset(object):
             dst = np.concatenate((dataset.train[2], dataset.valid[2], dataset.test[2]))
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
                                        shape=[dataset.n_entities, dataset.n_entities])
-            g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+            g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
             g.edata['tid'] = F.tensor(etype_id, F.int64)
             if args.pickle_graph:
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:

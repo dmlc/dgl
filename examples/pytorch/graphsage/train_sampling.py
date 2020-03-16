@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
+from torch.utils.data import DataLoader
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
@@ -12,8 +13,8 @@ import argparse
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
-from torch.nn.parallel import DistributedDataParallel
 import tqdm
+import traceback
 
 #### Neighbor sampler
 
@@ -23,10 +24,11 @@ class NeighborSampler(object):
         self.fanouts = fanouts
 
     def sample_blocks(self, seeds):
+        seeds = th.LongTensor(np.asarray(seeds))
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout)
+            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -48,17 +50,16 @@ class SAGE(nn.Module):
         self.n_hidden = n_hidden
         self.n_classes = n_classes
         self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(
-            in_feats, n_hidden, 'mean', feat_drop=dropout, activation=activation))
+        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
         for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(
-                n_hidden, n_hidden, 'mean', feat_drop=dropout, activation=activation))
-        self.layers.append(dglnn.SAGEConv(
-            n_hidden, n_classes, 'mean', feat_drop=dropout))
+            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
+        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
+        self.dropout = nn.Dropout(dropout)
+        self.activation = activation
 
     def forward(self, blocks, x):
         h = x
-        for layer, block in zip(self.layers, blocks):
+        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             # We need to first copy the representation of nodes on the RHS from the
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
@@ -67,6 +68,9 @@ class SAGE(nn.Module):
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             h = layer(block, (h, h_dst))
+            if l != len(self.layers) - 1:
+                h = self.activation(h)
+                h = self.dropout(h)
         return h
 
     def inference(self, g, x, batch_size, device):
@@ -91,49 +95,31 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                induced_nodes = block.srcdata[dgl.NID]
+                input_nodes = block.srcdata[dgl.NID]
 
-                h = x[induced_nodes].to(device)
+                h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_nodes(block.dsttype)]
                 h = layer(block, (h, h_dst))
+                if l != len(self.layers) - 1:
+                    h = self.activation(h)
+                    h = self.dropout(h)
 
                 y[start:end] = h.cpu()
 
             x = y
         return y
 
-#### Miscellaneous functions
-
-# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
-# is necessary to make fork() and openmp work together.
-#
-# TODO: confirm if this is necessary for MXNet and Tensorflow.  If so, we need
-# to standardize worker process creation since our operators are implemented with
-# OpenMP.
-def thread_wrapped_func(func):
+def prepare_mp(g):
     """
-    Wraps a process entry point to make it work with OpenMP.
-    """
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        queue = mp.Queue()
-        def _queue_result():
-            exception, trace, res = None, None, None
-            try:
-                res = func(*args, **kwargs)
-            except Exception as e:
-                exception = e
-                trace = traceback.format_exc()
-            queue.put((res, exception, trace))
+    Explicitly materialize the CSR, CSC and COO representation of the given graph
+    so that they could be shared via copy-on-write to sampler workers and GPU
+    trainers.
 
-        start_new_thread(_queue_result, ())
-        result, exception, trace = queue.get()
-        if exception is None:
-            return result
-        else:
-            assert isinstance(exception, Exception)
-            raise exception.__class__(trace)
-    return decorated_function
+    This is a workaround before full shared memory support on heterogeneous graphs.
+    """
+    g.in_degree(0)
+    g.out_degree(0)
+    g.find_edges([0])
 
 def compute_acc(pred, labels):
     """
@@ -157,32 +143,16 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     model.train()
     return compute_acc(pred[val_mask], labels[val_mask])
 
-def load_subtensor(g, labels, seeds, induced_nodes, dev_id):
+def load_subtensor(g, labels, seeds, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    batch_inputs = g.ndata['features'][induced_nodes].to(dev_id)
-    batch_labels = labels[seeds].to(dev_id)
+    batch_inputs = g.ndata['features'][input_nodes].to(device)
+    batch_labels = labels[seeds].to(device)
     return batch_inputs, batch_labels
 
 #### Entry point
-
-@thread_wrapped_func
-def run(proc_id, n_gpus, args, devices, data):
-    dropout = 0.2
-
-    # Start up distributed training, if enabled.
-    dev_id = devices[proc_id]
-    if n_gpus > 1:
-        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
-            master_ip='127.0.0.1', master_port='12345')
-        world_size = n_gpus
-        th.distributed.init_process_group(backend="nccl",
-                                          init_method=dist_init_method,
-                                          world_size=world_size,
-                                          rank=dev_id)
-    th.cuda.set_device(dev_id)
-
+def run(args, device, data):
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
     train_nid = th.LongTensor(np.nonzero(train_mask)[0])
@@ -190,19 +160,23 @@ def run(proc_id, n_gpus, args, devices, data):
     train_mask = th.BoolTensor(train_mask)
     val_mask = th.BoolTensor(val_mask)
 
-    # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
-
     # Create sampler
-    sampler = NeighborSampler(g, [args.fan_out] * args.num_layers)
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+
+    # Create PyTorch DataLoader for constructing blocks
+    dataloader = DataLoader(
+        dataset=train_nid.numpy(),
+        batch_size=args.batch_size,
+        collate_fn=sampler.sample_blocks,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_workers)
 
     # Define model and optimizer
-    model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, dropout)
-    model = model.to(dev_id)
-    if n_gpus > 1:
-        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+    model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
+    model = model.to(device)
     loss_fcn = nn.CrossEntropyLoss()
-    loss_fcn = loss_fcn.to(dev_id)
+    loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Training loop
@@ -210,72 +184,65 @@ def run(proc_id, n_gpus, args, devices, data):
     iter_tput = []
     for epoch in range(args.num_epochs):
         tic = time.time()
-        train_nid_batches = train_nid[th.randperm(len(train_nid))]
-        n_batches = (len(train_nid_batches) + args.batch_size - 1) // args.batch_size
-        for step in range(n_batches):
-            seeds = train_nid_batches[step * args.batch_size:(step+1) * args.batch_size]
-            if proc_id == 0:
-                tic_step = time.time()
 
-            # Sample blocks for message propagation
-            blocks = sampler.sample_blocks(seeds)
-            induced_nodes = blocks[0].srcdata[dgl.NID]
+        # Loop over the dataloader to sample the computation dependency graph as a list of
+        # blocks.
+        for step, blocks in enumerate(dataloader):
+            tic_step = time.time()
+
+            # The nodes for input lies at the LHS side of the first block.
+            # The nodes for output lies at the RHS side of the last block.
+            input_nodes = blocks[0].srcdata[dgl.NID]
+            seeds = blocks[-1].dstdata[dgl.NID]
+
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, induced_nodes, dev_id)
+            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
             optimizer.zero_grad()
             loss.backward()
-
-            if n_gpus > 1:
-                for param in model.parameters():
-                    if param.requires_grad and param.grad is not None:
-                        th.distributed.all_reduce(param.grad.data,
-                                                  op=th.distributed.ReduceOp.SUM)
-                        param.grad.data /= n_gpus
             optimizer.step()
 
-            if proc_id == 0:
-                iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
-            if step % args.log_every == 0 and proc_id == 0:
+            iter_tput.append(len(seeds) / (time.time() - tic_step))
+            if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}'.format(
-                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:])))
-
-        if n_gpus > 1:
-            th.distributed.barrier()
+                gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
+                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
 
         toc = time.time()
-        if proc_id == 0:
-            print('Epoch Time(s): {:.4f}'.format(toc - tic))
-            if epoch >= 5:
-                avg += toc - tic
-            if epoch % args.eval_every == 0 and epoch != 0:
-                eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
-                print('Eval Acc {:.4f}'.format(eval_acc))
+        print('Epoch Time(s): {:.4f}'.format(toc - tic))
+        if epoch >= 5:
+            avg += toc - tic
+        if epoch % args.eval_every == 0 and epoch != 0:
+            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, device)
+            print('Eval Acc {:.4f}'.format(eval_acc))
 
-    if n_gpus > 1:
-        th.distributed.barrier()
-    if proc_id == 0:
-        print('Avg epoch time: {}'.format(avg / (epoch - 4)))
+    print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
-    argparser.add_argument('--gpu', type=str, default='0')
+    argparser.add_argument('--gpu', type=int, default=0,
+        help="GPU device ID. Use -1 for CPU training")
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
-    argparser.add_argument('--fan-out', type=int, default=10)
+    argparser.add_argument('--fan-out', type=str, default='10,25')
     argparser.add_argument('--batch-size', type=int, default=1000)
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.003)
+    argparser.add_argument('--dropout', type=float, default=0.5)
+    argparser.add_argument('--num-workers', type=int, default=0,
+        help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
     
-    devices = list(map(int, args.gpu.split(',')))
-    n_gpus = len(devices)
+    if args.gpu >= 0:
+        device = th.device('cuda:%d' % args.gpu)
+    else:
+        device = th.device('cpu')
 
     # load reddit data
     data = RedditDataset(self_loop=True)
@@ -288,16 +255,8 @@ if __name__ == '__main__':
     # Construct graph
     g = dgl.graph(data.graph.all_edges())
     g.ndata['features'] = features
+    prepare_mp(g)
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 
-    if n_gpus == 1:
-        run(0, n_gpus, args, devices, data)
-    else:
-        procs = []
-        for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
-            p.start()
-            procs.append(p)
-        for p in procs:
-            p.join()
+    run(args, device, data)

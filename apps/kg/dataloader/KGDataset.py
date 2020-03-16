@@ -272,7 +272,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False):
+    def read_triple(self, path, mode, skip_first_line=False, format=None):
         heads = []
         tails = []
         rels = []
@@ -387,8 +387,7 @@ class KGDatasetUDD(KGDataset):
             super(KGDatasetUDD, self).__init__(os.path.join(path, files[0]),
                                                os.path.join(path, files[1]),
                                                os.path.join(path, files[2]),
-                                               os.path.join(path, None),
-                                               os.path.join(path, None),
+                                               None, None,
                                                format=format,
                                                read_triple=read_triple,
                                                only_train=only_train)
