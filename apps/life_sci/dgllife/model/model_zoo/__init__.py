@@ -9,3 +9,4 @@ from .schnet_predictor import *
 from .mgcn_predictor import *
 from .mpnn_predictor import *
 from .acnn import *
+from .weave_predictor import *

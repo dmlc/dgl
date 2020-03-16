@@ -222,20 +222,16 @@ def test_weave():
                                              batch_edge_feats.to(device)
 
     # Test default setting
-    gnn = WeaveLayer(node_in_feats=1,
-                     edge_in_feats=2)
+    gnn = WeaveGNN(node_in_feats=1,
+                   edge_in_feats=2).to(device)
     assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 50])
     assert gnn(bg, batch_node_feats, batch_edge_feats).shape == torch.Size([8, 50])
 
     # Test configured setting
-    gnn = WeaveLayer(node_in_feats=1,
-                     edge_in_feats=2,
-                     node_node_hidden_feats=2,
-                     edge_node_hidden_feats=2,
-                     node_out_feats=2,
-                     node_edge_hidden_feats=2,
-                     edge_edge_hidden_feats=2,
-                     edge_out_feats=2)
+    gnn = WeaveGNN(node_in_feats=1,
+                   edge_in_feats=2,
+                   num_layers=1,
+                   hidden_feats=2)
     assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 2])
     assert gnn(bg, batch_node_feats, batch_edge_feats).shape == torch.Size([8, 2])
 
