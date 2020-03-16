@@ -148,8 +148,7 @@ class PartitionKGDataset():
         print('Reading {} triples....'.format(mode))
         with open(path) as f:
             for line in f:
-                triple = line.strip().split('\t')
-                h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
+                h, r, t = line.strip().split('\t')
                 heads.append(int(h))
                 rels.append(int(r))
                 tails.append(int(t))
