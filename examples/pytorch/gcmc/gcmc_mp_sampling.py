@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from torch.multiprocessing import Queue
+from torch.nn.parallel import DistributedDataParallel
 from _thread import start_new_thread
 from functools import wraps
 from data import MovieLens
@@ -52,9 +53,10 @@ def prepare_mp(g):
     trainers.
     This is a workaround before full shared memory support on heterogeneous graphs.
     """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
+    for etype in g.canonical_etypes:
+        g.in_degree(0, etype=etype)
+        g.out_degree(0, etype=etype)
+        g.find_edges([0], etype=etype)
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
