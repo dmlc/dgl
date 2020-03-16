@@ -141,7 +141,7 @@ class PartitionKGDataset():
         if read_triple == True:
             self.train = self.read_triple(train_path, "train")
 
-    def read_triple(self, path, model):
+    def read_triple(self, path, mode):
         heads = []
         tails = []
         rels = []
