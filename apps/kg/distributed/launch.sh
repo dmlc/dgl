@@ -21,9 +21,9 @@ do
     let s_id+=1
     if test -z "$ssh_key" 
     then
-        ssh -i $ssh_key $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' '$machine_count'' &
-    else
         ssh $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' '$machine_count'' &
+    else
+        ssh -i $ssh_key $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' '$machine_count'' &
     fi
     
 done
