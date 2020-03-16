@@ -97,3 +97,10 @@ Results: RMSE=0.7809 (0.777 reported)
 Speed: 1414.38s/epoch (Run with only 60 epoches instead of 15000)
 Speed: 1746.97s/epoch (mix_cpu_gpu)
 Testbed: EC2 p3.2xlarge instance(Amazon Linux 2)
+
+
+### Train with minibatch and multigpu
+ml-100k, with feature
+```bash
+python gcmc_mp_sampling.py --data_name=ml-100k --gcn_agg_accum=stack --gpu 0,1,2,3,4,5,6,7
+```

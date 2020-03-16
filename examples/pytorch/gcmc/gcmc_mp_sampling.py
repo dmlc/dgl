@@ -19,6 +19,8 @@ from model import SampleGCMCLayer, GCMCLayer, SampleBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 import dgl
 
+from gcmc_sampling import GCMCSampler
+
 # According to https://github.com/pytorch/pytorch/issues/17199, this decorator
 # is necessary to make fork() and openmp work together.
 def thread_wrapped_func(func):
@@ -90,75 +92,6 @@ class Net(nn.Module):
         
         pred_ratings = self.decoder(user_out, movie_out)
         return pred_ratings
-
-class GCMCSampler:
-    """ GCMCSampler
-    """
-    def __init__(self, dev_id, num_edges, minibatch_size, dataset):
-        self.dev_id = dev_id
-        self.num_edges = num_edges
-        self.minibatch_size = minibatch_size
-        self.seed = th.randperm(num_edges)
-        self.dataset = dataset
-        self.sample_idx = 0
-        self.train_labels = dataset.train_labels
-        self.train_truths = dataset.train_truths
-
-        self.train_user_ids = th.zeros((dataset.train_enc_graph.number_of_nodes('user'),), dtype=th.int64)
-        self.train_movie_ids = th.zeros((dataset.train_enc_graph.number_of_nodes('movie'),), dtype=th.int64)
-
-    def sample_blocks(self, seeds):
-        dataset = self.dataset
-        edge_ids = seeds
-        # generate frontiners for user and item
-        true_relation_ratings = self.train_truths[edge_ids]
-        true_relation_labels = self.train_labels[edge_ids]
-
-        head_id, tail_id = dataset.train_dec_graph.find_edges(edge_ids)
-        head_type, _, tail_type = dataset.train_dec_graph.canonical_etypes[0]
-        heads = {head_type : th.unique(head_id)}
-        tails = {tail_type : th.unique(tail_id)}
-        head_frontier = dgl.in_subgraph(dataset.train_enc_graph, heads)
-        tail_frontier = dgl.in_subgraph(dataset.train_enc_graph, tails)
-        head_frontier = dgl.compact_graphs(head_frontier)
-        tail_frontier = dgl.compact_graphs(tail_frontier)
-        
-        # copy from parent
-        head_frontier.nodes['user'].data['ci'] = \
-            dataset.train_enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
-        head_frontier.nodes['movie'].data['cj'] = \
-            dataset.train_enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
-        tail_frontier.nodes['user'].data['cj'] = \
-            dataset.train_enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_frontier.nodes['movie'].data['ci'] = \
-            dataset.train_enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
-        
-        self.train_user_ids[head_frontier.nodes['user'].data[dgl.NID]] = \
-            th.arange(head_frontier.nodes['user'].data[dgl.NID].shape[0])
-        self.train_movie_ids[tail_frontier.nodes['movie'].data[dgl.NID]] = \
-            th.arange(tail_frontier.nodes['movie'].data[dgl.NID].shape[0])
-
-        # handle features
-        head_feat = tail_frontier.nodes['user'].data[dgl.NID].long() \
-                    if dataset.user_feature is None else \
-                       dataset.user_feature[tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_feat = head_frontier.nodes['movie'].data[dgl.NID].long()\
-                    if dataset.movie_feature is None else \
-                       dataset.movie_feature[head_frontier.nodes['movie'].data[dgl.NID]]
-        head_feat = head_feat
-        tail_feat = tail_feat
-        head_id = self.train_user_ids[head_id]
-        tail_id = self.train_movie_ids[tail_id]
-
-        # force generate CSC and CSR for seed
-        for etype in head_frontier.canonical_etypes:
-            head_frontier.in_degree(0, etype=etype)
-            head_frontier.out_degree(0, etype=etype)
-        for etype in tail_frontier.canonical_etypes:
-            tail_frontier.in_degree(0, etype=etype)
-            tail_frontier.out_degree(0, etype=etype)
-
-        return (head_frontier, tail_frontier, head_feat, tail_feat, head_id, tail_id, true_relation_labels, true_relation_ratings)
 
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
