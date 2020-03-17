@@ -513,8 +513,11 @@ def get_partition_dataset(data_path, data_name, part_id):
     if data_name == 'Freebase':
         relation_path = os.path.join(path, 'relation2id.txt')
         skip_first_line = True
-    else:
+    elif data_name in ['FB15k', 'FB15k-237', 'wn18', 'wn18rr']:
         relation_path = os.path.join(path, 'relations.dict')
+        skip_first_line = False
+    else:
+        relation_path = os.path.join(path, 'relation.tsv')
         skip_first_line = False
 
     dataset = PartitionKGDataset(relation_path, 
@@ -550,8 +553,11 @@ def get_server_partition_dataset(data_path, data_name, part_id):
     if data_name == 'Freebase':
         relation_path = os.path.join(path, 'relation2id.txt')
         skip_first_line = True
-    else:
+    elif data_name in ['FB15k', 'FB15k-237', 'wn18', 'wn18rr']:
         relation_path = os.path.join(path, 'relations.dict')
+        skip_first_line = False
+    else:
+        relation_path = os.path.join(path, 'relation.tsv')
         skip_first_line = False
 
     dataset = PartitionKGDataset(relation_path,
