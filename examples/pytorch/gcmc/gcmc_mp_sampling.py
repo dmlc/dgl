@@ -59,40 +59,7 @@ def prepare_mp(g):
         g.in_degree(0, etype=etype)
         g.out_degree(0, etype=etype)
         g.find_edges([0], etype=etype)
-'''
-class Net(nn.Module):
-    def __init__(self, args, dev_id):
-        super(Net, self).__init__()
-        self._act = get_activation(args.model_activation)
-        self.encoder = SampleGCMCLayer(args.rating_vals,
-                                       args.src_in_units,
-                                       args.dst_in_units,
-                                       args.gcn_agg_units,
-                                       args.gcn_out_units,
-                                       args.gcn_dropout,
-                                       args.gcn_agg_accum,
-                                       agg_act=self._act,
-                                       share_user_item_param=args.share_param,
-                                       device=dev_id)
-        self.encoder.to(dev_id)
-        self.decoder = SampleBiDecoder(args.rating_vals,
-                                       in_units=args.gcn_out_units,
-                                       num_basis_functions=args.gen_r_num_basis_func)
-        self.decoder.to(dev_id)
 
-    def forward(self, head_enc, tail_enc, ufeat, ifeat, head_id, tail_id):
-        user_out, movie_out = self.encoder(
-            head_enc,
-            tail_enc,
-            ufeat,
-            ifeat)
-
-        user_out = user_out[head_id]
-        movie_out = movie_out[tail_id]
-        
-        pred_ratings = self.decoder(user_out, movie_out)
-        return pred_ratings
-'''
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
     parser.add_argument('--seed', default=123, type=int)
@@ -263,6 +230,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
                                 p['lr'] = learning_rate
                             no_better_valid = 0
                             print("Change the LR to %g" % new_lr)
+            # sync on evalution
             if n_gpus > 1:
                 th.distributed.barrier()
 
