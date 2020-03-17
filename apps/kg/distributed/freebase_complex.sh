@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ##################################################################################
 # This script runing ComplEx model on Freebase dataset in distributed setting.
 # You can change the hyper-parameter in this file but DO NOT run script manually

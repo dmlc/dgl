@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ##################################################################################
 # User runs this script to launch distrobited jobs on cluster
 ##################################################################################
@@ -25,7 +27,6 @@ do
     else
         ssh -i $ssh_key $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' '$machine_count'' &
     fi
-    
 done
 
 # run command on local machine
