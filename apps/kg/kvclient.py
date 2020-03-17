@@ -180,7 +180,6 @@ def start_worker(args, logger):
     dataset, entity_partition_book, local2global = get_partition_dataset(
         args.data_path,
         args.dataset,
-        args.format,
         args.machine_id)
 
     n_entities = dataset.n_entities
