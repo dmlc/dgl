@@ -261,20 +261,20 @@ class SampleGCMCLayer(GCMCLayer):
             x_u = dot_or_identity(ufeat, self.W_r[rating.replace('.', '_')], self.device)
             x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating.replace('.', '_')], self.device)
             # left norm and dropout
-            x_u = x_u * self.dropout(igraph.nodes['user'].data['cj'].to(self.device))
-            x_i = x_i * self.dropout(ugraph.nodes['movie'].data['cj'].to(self.device))
-            igraph.nodes['user'].data['h%d' % i] = x_u
-            ugraph.nodes['movie'].data['h%d' % i] = x_i
+            x_u = x_u * self.dropout(igraph.srcnodes['user'].data['cj'].to(self.device))
+            x_i = x_i * self.dropout(ugraph.srcnodes['movie'].data['cj'].to(self.device))
+            igraph.srcnodes['user'].data['h%d' % i] = x_u
+            ugraph.srcnodes['movie'].data['h%d' % i] = x_i
             ifuncs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
             ufuncs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
         # message passing
         ugraph.multi_update_all(ufuncs, self.agg)
         igraph.multi_update_all(ifuncs, self.agg)
-        ufeat = ugraph.nodes['user'].data.pop('h').view(num_u, -1)
-        ifeat = igraph.nodes['movie'].data.pop('h').view(num_i, -1)
+        ufeat = ugraph.dstnodes['user'].data.pop('h').view(num_u, -1)
+        ifeat = igraph.dstnodes['movie'].data.pop('h').view(num_i, -1)
         # right norm
-        ufeat = ufeat * ugraph.nodes['user'].data['ci'].to(self.device)
-        ifeat = ifeat * igraph.nodes['movie'].data['ci'].to(self.device)
+        ufeat = ufeat * ugraph.dstnodes['user'].data['ci'].to(self.device)
+        ifeat = ifeat * igraph.dstnodes['movie'].data['ci'].to(self.device)
         # fc and non-linear
         ufeat = self.agg_act(ufeat)
         ifeat = self.agg_act(ifeat)

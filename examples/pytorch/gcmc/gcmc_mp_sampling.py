@@ -19,7 +19,7 @@ from model import SampleGCMCLayer, GCMCLayer, SampleBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 import dgl
 
-from gcmc_sampling import GCMCSampler
+from gcmc_sampling import GCMCSampler, Net, evaluate
 
 # According to https://github.com/pytorch/pytorch/issues/17199, this decorator
 # is necessary to make fork() and openmp work together.
@@ -59,7 +59,7 @@ def prepare_mp(g):
         g.in_degree(0, etype=etype)
         g.out_degree(0, etype=etype)
         g.find_edges([0], etype=etype)
-
+'''
 class Net(nn.Module):
     def __init__(self, args, dev_id):
         super(Net, self).__init__()
@@ -92,7 +92,7 @@ class Net(nn.Module):
         
         pred_ratings = self.decoder(user_out, movie_out)
         return pred_ratings
-
+'''
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
     parser.add_argument('--seed', default=123, type=int)
@@ -111,7 +111,7 @@ def config():
     parser.add_argument('--gcn_agg_accum', type=str, default="sum")
     parser.add_argument('--gcn_out_units', type=int, default=75)
     parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
-    parser.add_argument('--train_max_epoch', type=int, default=200)
+    parser.add_argument('--train_max_epoch', type=int, default=100)
     parser.add_argument('--train_log_interval', type=int, default=1)
     parser.add_argument('--train_valid_interval', type=int, default=1)
     parser.add_argument('--train_optimizer', type=str, default="adam")
@@ -120,10 +120,9 @@ def config():
     parser.add_argument('--train_min_lr', type=float, default=0.0001)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.5)
     parser.add_argument('--train_decay_patience', type=int, default=5)
-    parser.add_argument('--train_early_stopping_patience', type=int, default=10)
     parser.add_argument('--share_param', default=False, action='store_true')
     parser.add_argument('--minibatch_size', type=int, default=10000)
-    parser.add_argument('--num_workers_per_gpu', type=int, default=4)
+    parser.add_argument('--num_workers_per_gpu', type=int, default=8)
 
     args = parser.parse_args()
     ### configure save_fir to save all the info
@@ -137,88 +136,13 @@ def config():
 
     return args
 
-def evaluate(args, dev_id, net, dataset, segment='valid'):
-    possible_rating_values = dataset.possible_rating_values
-    nd_possible_rating_values = th.FloatTensor(possible_rating_values).to(dev_id)
-
-    if segment == "valid":
-        rating_values = dataset.valid_truths
-        enc_graph = dataset.valid_enc_graph
-        dec_graph = dataset.valid_dec_graph
-    elif segment == "test":
-        rating_values = dataset.test_truths
-        enc_graph = dataset.test_enc_graph
-        dec_graph = dataset.test_dec_graph
-    else:
-        raise NotImplementedError
-
-    rating_values = rating_values.to(dev_id)
-    num_edges = rating_values.shape[0]
-    seed = th.arange(num_edges)
-    count_rmse = 0
-    count_num = 0
-    real_pred_ratings = []
-    for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
-        net.eval()
-        edge_ids = seed[sample_idx * args.minibatch_size: \
-                        (sample_idx + 1) * args.minibatch_size \
-                        if (sample_idx + 1) * args.minibatch_size < num_edges \
-                        else num_edges]
-
-        head_id, tail_id = dec_graph.find_edges(edge_ids)
-        head_type, _, tail_type = dec_graph.canonical_etypes[0]
-        heads = {head_type : th.unique(head_id)}
-        tails = {tail_type : th.unique(tail_id)}
-
-        head_frontier = dgl.in_subgraph(enc_graph, heads)
-        tail_frontier = dgl.in_subgraph(enc_graph, tails)
-
-        head_frontier = dgl.compact_graphs(head_frontier)
-        tail_frontier = dgl.compact_graphs(tail_frontier)
-        head_frontier.nodes['user'].data['ci'] = \
-            enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]].to(dev_id)
-        head_frontier.nodes['movie'].data['cj'] = \
-            enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]].to(dev_id)
-        tail_frontier.nodes['user'].data['cj'] = \
-            enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]].to(dev_id)
-        tail_frontier.nodes['movie'].data['ci'] = \
-            enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]].to(dev_id)
-
-        enc_graph.nodes['user'].data['ids'][head_frontier.nodes['user'].data[dgl.NID]] = \
-            th.arange(head_frontier.nodes['user'].data[dgl.NID].shape[0])
-        enc_graph.nodes['movie'].data['ids'][tail_frontier.nodes['movie'].data[dgl.NID]] = \
-            th.arange(tail_frontier.nodes['movie'].data[dgl.NID].shape[0])
-
-        head_feat = tail_frontier.nodes['user'].data[dgl.NID].long() \
-                    if dataset.user_feature is None else \
-                       dataset.user_feature[tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_feat = head_frontier.nodes['movie'].data[dgl.NID].long() \
-                    if dataset.movie_feature is None else \
-                        dataset.movie_feature[head_frontier.nodes['movie'].data[dgl.NID]]
-        head_feat = head_feat.to(dev_id)
-        tail_feat = tail_feat.to(dev_id)
-        head_id = enc_graph.nodes['user'].data['ids'][head_id]
-        tail_id = enc_graph.nodes['movie'].data['ids'][tail_id]
-        with th.no_grad():
-            pred_ratings = net(head_frontier, tail_frontier,
-                               head_feat, tail_feat,
-                               head_id, tail_id)
-        batch_pred_ratings = (th.softmax(pred_ratings, dim=1) *
-                         nd_possible_rating_values.view(1, -1)).sum(dim=1)
-        real_pred_ratings.append(batch_pred_ratings)
-    real_pred_ratings = th.cat(real_pred_ratings, dim=0)
-    rmse = ((real_pred_ratings - rating_values) ** 2.).mean().item()
-    rmse = np.sqrt(rmse)
-    return rmse
-
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset):
     dev_id = devices[proc_id]
     train_labels = dataset.train_labels
     train_truths = dataset.train_truths
     num_edges = train_truths.shape[0]
-    sampler = GCMCSampler(dev_id,
-                          num_edges,
+    sampler = GCMCSampler(num_edges,
                           args.minibatch_size,
                           dataset)
 
@@ -330,10 +254,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
                     logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
                 else:
                     no_better_valid += 1
-                    if no_better_valid > args.train_early_stopping_patience\
-                        and learning_rate <= args.train_min_lr:
-                        logging.info("Early stopping threshold reached. Stop training.")
-                        break
                     if no_better_valid > args.train_decay_patience:
                         new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
                         if new_lr < learning_rate:
@@ -350,6 +270,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
 
 if __name__ == '__main__':
     args = config()
+    args.mix_cpu_gpu = True
+    args.use_one_hot_fea = False
 
     devices = list(map(int, args.gpu.split(',')))
     n_gpus = len(devices)
@@ -358,7 +280,7 @@ if __name__ == '__main__':
     # Otherwise (node_id is the feature), the model can not scale
     dataset = MovieLens(args.data_name,
                         'cpu',
-                        use_one_hot_fea=False,
+                        use_one_hot_fea=args.use_one_hot_fea,
                         symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio,
                         valid_ratio=args.data_valid_ratio)
@@ -373,8 +295,6 @@ if __name__ == '__main__':
     else:
         prepare_mp(dataset.train_enc_graph)
         prepare_mp(dataset.train_dec_graph)
-        prepare_mp(dataset.valid_enc_graph)
-        prepare_mp(dataset.valid_dec_graph)
         procs = []
         for proc_id in range(n_gpus):
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))

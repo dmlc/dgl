@@ -7,6 +7,7 @@ import string
 import numpy as np
 import torch as th
 import torch.nn as nn
+from torch.utils.data import DataLoader
 from data import MovieLens
 from model import SampleGCMCLayer, GCMCLayer, SampleBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
@@ -15,8 +16,7 @@ import dgl
 class GCMCSampler:
     """ GCMCSampler
     """
-    def __init__(self, dev_id, num_edges, minibatch_size, dataset):
-        self.dev_id = dev_id
+    def __init__(self, num_edges, minibatch_size, dataset):
         self.num_edges = num_edges
         self.minibatch_size = minibatch_size
         self.seed = th.randperm(num_edges)
@@ -41,48 +41,40 @@ class GCMCSampler:
         tails = {tail_type : th.unique(tail_id)}
         head_frontier = dgl.in_subgraph(dataset.train_enc_graph, heads)
         tail_frontier = dgl.in_subgraph(dataset.train_enc_graph, tails)
-        head_frontier = dgl.compact_graphs(head_frontier)
-        tail_frontier = dgl.compact_graphs(tail_frontier)
+        head_frontier = dgl.to_block(head_frontier, heads)
+        tail_frontier = dgl.to_block(tail_frontier, tails)
         
         # copy from parent
-        head_frontier.nodes['user'].data['ci'] = \
+        head_frontier.dstnodes['user'].data['ci'] = \
             dataset.train_enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
-        head_frontier.nodes['movie'].data['cj'] = \
+        head_frontier.srcnodes['movie'].data['cj'] = \
             dataset.train_enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
-        tail_frontier.nodes['user'].data['cj'] = \
+        tail_frontier.srcnodes['user'].data['cj'] = \
             dataset.train_enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_frontier.nodes['movie'].data['ci'] = \
+        tail_frontier.dstnodes['movie'].data['ci'] = \
             dataset.train_enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
         
-        self.train_user_ids[head_frontier.nodes['user'].data[dgl.NID]] = \
-            th.arange(head_frontier.nodes['user'].data[dgl.NID].shape[0])
-        self.train_movie_ids[tail_frontier.nodes['movie'].data[dgl.NID]] = \
-            th.arange(tail_frontier.nodes['movie'].data[dgl.NID].shape[0])
+        self.train_user_ids[head_frontier.dstnodes['user'].data[dgl.NID]] = \
+            th.arange(head_frontier.dstnodes['user'].data[dgl.NID].shape[0])
+        self.train_movie_ids[tail_frontier.dstnodes['movie'].data[dgl.NID]] = \
+            th.arange(tail_frontier.dstnodes['movie'].data[dgl.NID].shape[0])
 
         # handle features
-        head_feat = tail_frontier.nodes['user'].data[dgl.NID].long() \
+        head_feat = tail_frontier.srcnodes['user'].data[dgl.NID].long() \
                     if dataset.user_feature is None else \
-                       dataset.user_feature[tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_feat = head_frontier.nodes['movie'].data[dgl.NID].long()\
+                       dataset.user_feature[tail_frontier.srcnodes['user'].data[dgl.NID]]
+        tail_feat = head_frontier.srcnodes['movie'].data[dgl.NID].long()\
                     if dataset.movie_feature is None else \
-                       dataset.movie_feature[head_frontier.nodes['movie'].data[dgl.NID]]
+                       dataset.movie_feature[head_frontier.srcnodes['movie'].data[dgl.NID]]
         head_feat = head_feat
         tail_feat = tail_feat
         head_id = self.train_user_ids[head_id]
         tail_id = self.train_movie_ids[tail_id]
 
-        # force generate CSC and CSR for seed
-        for etype in head_frontier.canonical_etypes:
-            head_frontier.in_degree(0, etype=etype)
-            head_frontier.out_degree(0, etype=etype)
-        for etype in tail_frontier.canonical_etypes:
-            tail_frontier.in_degree(0, etype=etype)
-            tail_frontier.out_degree(0, etype=etype)
-
         return (head_frontier, tail_frontier, head_feat, tail_feat, head_id, tail_id, true_relation_labels, true_relation_ratings)
 
 class Net(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, dev_id):
         super(Net, self).__init__()
         self._act = get_activation(args.model_activation)
         self.encoder = SampleGCMCLayer(args.rating_vals,
@@ -93,18 +85,19 @@ class Net(nn.Module):
                                        args.gcn_dropout,
                                        args.gcn_agg_accum,
                                        agg_act=self._act,
-                                       share_user_item_param=args.share_param)
+                                       share_user_item_param=args.share_param,
+                                       device=dev_id)
         if args.mix_cpu_gpu and args.use_one_hot_fea:
             # if use_one_hot_fea, user and movie feature is None
             # W can be extremely large, with mix_cpu_gpu W should be stored in CPU
-            self.encoder.partial_to(args.device)
+            self.encoder.partial_to(dev_id)
         else:
-            self.encoder.to(args.device)
+            self.encoder.to(dev_id)
 
         self.decoder = SampleBiDecoder(args.rating_vals,
                                        in_units=args.gcn_out_units,
                                        num_basis_functions=args.gen_r_num_basis_func)
-        self.decoder.to(args.device)
+        self.decoder.to(dev_id)
 
     def forward(self, head_enc, tail_enc, ufeat, ifeat, head_id, tail_id):
         user_out, movie_out = self.encoder(
@@ -119,9 +112,9 @@ class Net(nn.Module):
         pred_ratings = self.decoder(user_out, movie_out)
         return pred_ratings
 
-def evaluate(args, net, dataset, segment='valid'):
+def evaluate(args, dev_id, net, dataset, segment='valid'):
     possible_rating_values = dataset.possible_rating_values
-    nd_possible_rating_values = th.FloatTensor(possible_rating_values).to(args.device)
+    nd_possible_rating_values = th.FloatTensor(possible_rating_values).to(dev_id)
 
     if segment == "valid":
         rating_values = dataset.valid_truths
@@ -134,6 +127,7 @@ def evaluate(args, net, dataset, segment='valid'):
     else:
         raise NotImplementedError
 
+    rating_values = rating_values.to(dev_id)
     num_edges = rating_values.shape[0]
     seed = th.arange(num_edges)
     count_rmse = 0
@@ -153,30 +147,31 @@ def evaluate(args, net, dataset, segment='valid'):
 
         head_frontier = dgl.in_subgraph(enc_graph, heads)
         tail_frontier = dgl.in_subgraph(enc_graph, tails)
+        head_frontier = dgl.to_block(head_frontier, heads)
+        tail_frontier = dgl.to_block(tail_frontier, tails)
 
-        head_frontier = dgl.compact_graphs(head_frontier)
-        tail_frontier = dgl.compact_graphs(tail_frontier)
-        head_frontier.nodes['user'].data['ci'] = \
+        head_frontier.dstnodes['user'].data['ci'] = \
             enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
-        head_frontier.nodes['movie'].data['cj'] = \
+        head_frontier.srcnodes['movie'].data['cj'] = \
             enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
-        tail_frontier.nodes['user'].data['cj'] = \
+        tail_frontier.srcnodes['user'].data['cj'] = \
             enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_frontier.nodes['movie'].data['ci'] = \
+        tail_frontier.dstnodes['movie'].data['ci'] = \
             enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
 
-        enc_graph.nodes['user'].data['ids'][head_frontier.nodes['user'].data[dgl.NID]] = \
-            th.arange(head_frontier.nodes['user'].data[dgl.NID].shape[0])
-        enc_graph.nodes['movie'].data['ids'][tail_frontier.nodes['movie'].data[dgl.NID]] = \
-            th.arange(tail_frontier.nodes['movie'].data[dgl.NID].shape[0])
+        enc_graph.nodes['user'].data['ids'][head_frontier.dstnodes['user'].data[dgl.NID]] = \
+            th.arange(head_frontier.dstnodes['user'].data[dgl.NID].shape[0])
+        enc_graph.nodes['movie'].data['ids'][tail_frontier.dstnodes['movie'].data[dgl.NID]] = \
+            th.arange(tail_frontier.dstnodes['movie'].data[dgl.NID].shape[0])
 
-        head_feat = tail_frontier.nodes['user'].data[dgl.NID].long().to(args.device) \
+        head_feat = tail_frontier.srcnodes['user'].data[dgl.NID].long() \
                     if dataset.user_feature is None else \
-                       dataset.user_feature[tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_feat = head_frontier.nodes['movie'].data[dgl.NID].long().to(args.device) \
+                       dataset.user_feature[tail_frontier.srcnodes['user'].data[dgl.NID]]
+        tail_feat = head_frontier.srcnodes['movie'].data[dgl.NID].long() \
                     if dataset.movie_feature is None else \
-                        dataset.movie_feature[head_frontier.nodes['movie'].data[dgl.NID]]
-
+                        dataset.movie_feature[head_frontier.srcnodes['movie'].data[dgl.NID]]
+        head_feat = head_feat.to(dev_id)
+        tail_feat = tail_feat.to(dev_id)
         head_id = enc_graph.nodes['user'].data['ids'][head_id]
         tail_id = enc_graph.nodes['movie'].data['ids'][tail_id]
         with th.no_grad():
@@ -194,7 +189,7 @@ def evaluate(args, net, dataset, segment='valid'):
 def train(args):
     print(args)
     dataset = MovieLens(args.data_name,
-                        args.device,
+                        'cpu',
                         mix_cpu_gpu=args.mix_cpu_gpu,
                         use_one_hot_fea=args.use_one_hot_fea,
                         symm=args.gcn_agg_norm_symm,
@@ -206,8 +201,24 @@ def train(args):
     args.dst_in_units = dataset.movie_feature_shape[1]
     args.rating_vals = dataset.possible_rating_values
 
+    train_labels = dataset.train_labels
+    train_truths = dataset.train_truths
+    num_edges = train_truths.shape[0]
+    sampler = GCMCSampler(num_edges,
+                          args.minibatch_size,
+                          dataset)
+
+    seeds = th.arange(num_edges)
+    dataloader = DataLoader(
+        dataset=seeds,
+        batch_size=args.minibatch_size,
+        collate_fn=sampler.sample_blocks,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_workers)
+
     ### build the net
-    net = Net(args=args)
+    net = Net(args=args, dev_id=args.device)
     #net = net.to(args.device)
     nd_possible_rating_values = \
         th.FloatTensor(dataset.possible_rating_values).to(args.device)
@@ -233,12 +244,6 @@ def train(args):
     count_rmse = 0
     count_num = 0
     count_loss = 0
-    train_labels = dataset.train_labels
-    train_truths = dataset.train_truths
-    dataset.train_enc_graph.nodes['user'].data['ids'] = \
-        th.zeros((dataset.train_enc_graph.number_of_nodes('user'),), dtype=th.int64)
-    dataset.train_enc_graph.nodes['movie'].data['ids'] = \
-        th.zeros((dataset.train_enc_graph.number_of_nodes('movie'),), dtype=th.int64)
     dataset.valid_enc_graph.nodes['user'].data['ids'] = \
         th.zeros((dataset.valid_enc_graph.number_of_nodes('user'),), dtype=th.int64)
     dataset.valid_enc_graph.nodes['movie'].data['ids'] = \
@@ -251,60 +256,16 @@ def train(args):
     dur = []
     iter_idx = 1
     for epoch in range(1, args.train_max_epoch):
-        # generate edge seed
-        num_edges = train_truths.shape[0]
-        seed = th.randperm(num_edges)
-
         if epoch > 1:
             t0 = time.time()
-        for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
-            net.train()
-            edge_ids = seed[sample_idx * args.minibatch_size: \
-                             (sample_idx + 1) * args.minibatch_size \
-                             if (sample_idx + 1) * args.minibatch_size < num_edges \
-                             else num_edges]
-
-            # generate frontiners for user and item
-            true_relation_ratings = train_truths[edge_ids]
-            true_relation_labels = train_labels[edge_ids]
-            head_id, tail_id = dataset.train_dec_graph.find_edges(edge_ids)
-            head_type, _, tail_type = dataset.train_dec_graph.canonical_etypes[0]
-            heads = {head_type : th.unique(head_id)}
-            tails = {tail_type : th.unique(tail_id)}
-            head_frontier = dgl.in_subgraph(dataset.train_enc_graph, heads)
-            tail_frontier = dgl.in_subgraph(dataset.train_enc_graph, tails)
-            head_frontier = dgl.compact_graphs(head_frontier)
-            tail_frontier = dgl.compact_graphs(tail_frontier)
-
-            # copy from parent
-            head_frontier.nodes['user'].data['ci'] = \
-                dataset.train_enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
-            head_frontier.nodes['movie'].data['cj'] = \
-                dataset.train_enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
-            tail_frontier.nodes['user'].data['cj'] = \
-                dataset.train_enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
-            tail_frontier.nodes['movie'].data['ci'] = \
-                dataset.train_enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
-
-            dataset.train_enc_graph.nodes['user'].data['ids'][head_frontier.nodes['user'].data[dgl.NID]] = \
-                th.arange(head_frontier.nodes['user'].data[dgl.NID].shape[0])
-            dataset.train_enc_graph.nodes['movie'].data['ids'][tail_frontier.nodes['movie'].data[dgl.NID]] = \
-                th.arange(tail_frontier.nodes['movie'].data[dgl.NID].shape[0])
-
-            # handle features
-            head_feat = tail_frontier.nodes['user'].data[dgl.NID].long().to(args.device) \
-                        if dataset.user_feature is None else \
-                           dataset.user_feature[tail_frontier.nodes['user'].data[dgl.NID]]
-            tail_feat = head_frontier.nodes['movie'].data[dgl.NID].long().to(args.device) \
-                        if dataset.movie_feature is None else \
-                            dataset.movie_feature[head_frontier.nodes['movie'].data[dgl.NID]]
+        for step, sample_data in enumerate(dataloader):           
+            head_frontier, tail_frontier, head_feat, tail_feat, \
+            head_id, tail_id, true_relation_labels, true_relation_ratings = sample_data
             head_feat = head_feat.to(args.device)
             tail_feat = tail_feat.to(args.device)
-            head_id = dataset.train_enc_graph.nodes['user'].data['ids'][head_id]
-            tail_id = dataset.train_enc_graph.nodes['movie'].data['ids'][tail_id]
 
             pred_ratings = net(head_frontier, tail_frontier, head_feat, tail_feat, head_id, tail_id)
-            loss = rating_loss_net(pred_ratings, true_relation_labels).mean()
+            loss = rating_loss_net(pred_ratings, true_relation_labels.to(args.device)).mean()
             count_loss += loss.item()
             optimizer.zero_grad()
             loss.backward()
@@ -317,7 +278,7 @@ def train(args):
 
             real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
                                 nd_possible_rating_values.view(1, -1)).sum(dim=1)
-            rmse = ((real_pred_ratings - true_relation_ratings) ** 2).sum()
+            rmse = ((real_pred_ratings - true_relation_ratings.to(args.device)) ** 2).sum()
             count_rmse += rmse.item()
             count_num += pred_ratings.shape[0]
 
@@ -339,7 +300,7 @@ def train(args):
             print("Epoch {} time {}".format(epoch, epoch_time))
 
         if epoch % args.train_valid_interval == 0:
-            valid_rmse = evaluate(args=args, net=net, dataset=dataset, segment='valid')
+            valid_rmse = evaluate(args=args, dev_id=args.device, net=net, dataset=dataset, segment='valid')
             valid_loss_logger.log(iter = iter_idx, rmse = valid_rmse)
             logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
 
@@ -347,7 +308,7 @@ def train(args):
                 best_valid_rmse = valid_rmse
                 no_better_valid = 0
                 best_iter = iter_idx
-                test_rmse = evaluate(args=args, net=net, dataset=dataset, segment='test')
+                test_rmse = evaluate(args=args, dev_id=args.device, net=net, dataset=dataset, segment='test')
                 best_test_rmse = test_rmse
                 test_loss_logger.log(iter=iter_idx, rmse=test_rmse)
                 logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
@@ -408,6 +369,7 @@ def config():
     parser.add_argument('--share_param', default=False, action='store_true')
     parser.add_argument('--mix_cpu_gpu', default=False, action='store_true')
     parser.add_argument('--minibatch_size', type=int, default=10000)
+    parser.add_argument('--num_workers', type=int, default=8)
 
     args = parser.parse_args()
     args.device = th.device(args.device) if args.device >= 0 else th.device('cpu')
