@@ -118,7 +118,7 @@ def test_create():
     try:
         g = dgl.graph(
             ([0, 0, 0, 1, 1, 2], [0, 1, 2, 0, 1, 2]),
-            card=2,
+            num_nodes=2,
             validate=True
         )
     except DGLError:
@@ -131,7 +131,7 @@ def test_create():
         try:
             g = dgl.bipartite(
                 ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3]),
-                card=card,
+                num_nodes=card,
                 validate=True
             )
         except DGLError:
@@ -720,14 +720,14 @@ def test_to_device():
 def test_convert_bound():
     def _test_bipartite_bound(data, card):
         try:
-            dgl.bipartite(data, card=card)
+            dgl.bipartite(data, num_nodes=card)
         except dgl.DGLError:
             return
         assert False, 'bipartite bound test with wrong uid failed'
 
     def _test_graph_bound(data, card):
         try:
-            dgl.graph(data, card=card)
+            dgl.graph(data, num_nodes=card)
         except dgl.DGLError:
             return
         assert False, 'graph bound test with wrong uid failed'
@@ -827,7 +827,7 @@ def test_convert():
         assert len(hg.etypes) == 2
 
     # hetero_to_homo test case 2
-    hg = dgl.bipartite([(0, 0), (1, 1)], card=(2, 3))
+    hg = dgl.bipartite([(0, 0), (1, 1)], num_nodes=(2, 3))
     g = dgl.to_homo(hg)
     assert g.number_of_nodes() == 5
 

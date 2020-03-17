@@ -60,6 +60,23 @@ def generate_graph(grad=False):
     g.set_e_initializer(dgl.init.zero_initializer)
     return g
 
+def test_isolated_nodes():
+    g = dgl.graph([(0, 1), (1, 2)], num_nodes=5)
+    assert g.number_of_nodes() == 5
+
+    # Test backward compatibility
+    g = dgl.graph([(0, 1), (1, 2)], card=5)
+    assert g.number_of_nodes() == 5
+
+    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays', 'game', num_nodes=(5, 7))
+    assert g.number_of_nodes('user') == 5
+    assert g.number_of_nodes('game') == 7
+
+    # Test backward compatibility
+    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays', 'game', card=(5, 7))
+    assert g.number_of_nodes('user') == 5
+    assert g.number_of_nodes('game') == 7
+
 def test_batch_setter_getter():
     def _pfc(x):
         return list(F.zerocopy_to_numpy(x)[:,0])
@@ -452,8 +469,8 @@ def test_update_all_0deg():
     assert F.allclose(new_repr[1:], 2*(2+F.zeros((4,5))))
     assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
-    # test#2: graph with no edge
-    g = dgl.graph([], card=5)
+    # test#2:
+    g = dgl.graph([], num_nodes=5)
     g.set_n_initializer(_init2, 'h')
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, _apply)
@@ -592,7 +609,7 @@ def _test_dynamic_addition():
 
 
 def test_repr():
-    G = dgl.graph([(0,1), (0,2), (1,2)], card=10)
+    G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10)
     repr_string = G.__repr__()
     print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
@@ -773,6 +790,7 @@ def test_issue_1088():
     g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
 
 if __name__ == '__main__':
+    test_isolated_nodes()
     test_nx_conversion()
     test_batch_setter_getter()
     test_batch_setter_autograd()
