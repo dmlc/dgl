@@ -568,7 +568,7 @@ class DGLHeteroGraph(object):
             if len(self._srctypes_invmap) != 1:
                 raise DGLError('SRC node type name must be specified if there are more than one '
                                'SRC node types.')
-            return 0
+            return next(iter(self._srctypes_invmap.values()))
         ntid = self._srctypes_invmap.get(ntype, None)
         if ntid is None:
             raise DGLError('SRC node type "{}" does not exist.'.format(ntype))
@@ -593,7 +593,7 @@ class DGLHeteroGraph(object):
             if len(self._dsttypes_invmap) != 1:
                 raise DGLError('DST node type name must be specified if there are more than one '
                                'DST node types.')
-            return 0
+            return next(iter(self._dsttypes_invmap.values()))
         ntid = self._dsttypes_invmap.get(ntype, None)
         if ntid is None:
             raise DGLError('DST node type "{}" does not exist.'.format(ntype))
@@ -971,6 +971,62 @@ class DGLHeteroGraph(object):
         3
         """
         return self._graph.number_of_nodes(self.get_ntype_id(ntype))
+
+    def number_of_src_nodes(self, ntype=None):
+        """Return the number of nodes of the given SRC node type in the heterograph.
+
+        The heterograph is usually a unidirectional bipartite graph.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            Node type.
+            If omitted, there should be only one node type in the SRC category.
+
+        Returns
+        -------
+        int
+            The number of nodes
+
+        Examples
+        --------
+        >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.number_of_src_nodes('user')
+        2
+        >>> g.number_of_src_nodes()
+        2
+        >>> g.number_of_nodes('user')
+        2
+        """
+        return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
+
+    def number_of_dst_nodes(self, ntype=None):
+        """Return the number of nodes of the given DST node type in the heterograph.
+
+        The heterograph is usually a unidirectional bipartite graph.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            Node type.
+            If omitted, there should be only one node type in the DST category.
+
+        Returns
+        -------
+        int
+            The number of nodes
+
+        Examples
+        --------
+        >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.number_of_dst_nodes('game')
+        3
+        >>> g.number_of_dst_nodes()
+        3
+        >>> g.number_of_nodes('game')
+        3
+        """
+        return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
         """Return the number of edges of the given type in the heterograph.
