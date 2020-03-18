@@ -66,8 +66,6 @@ class GCMCSampler:
         tail_feat = head_frontier.srcnodes['movie'].data[dgl.NID].long()\
                     if dataset.movie_feature is None else \
                        dataset.movie_feature[head_frontier.srcnodes['movie'].data[dgl.NID]]
-        head_feat = head_feat
-        tail_feat = tail_feat
         head_id = self.train_user_ids[head_id]
         tail_id = self.train_movie_ids[tail_id]
 

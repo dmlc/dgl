@@ -71,6 +71,7 @@ def config():
                         help='The dataset name: ml-100k, ml-1m, ml-10m')
     parser.add_argument('--data_test_ratio', type=float, default=0.1) ## for ml-100k the test ration is 0.2
     parser.add_argument('--data_valid_ratio', type=float, default=0.1)
+    parser.add_argument('--use_one_hot_fea', action='store_true', default=False)
     parser.add_argument('--model_activation', type=str, default="leaky")
     parser.add_argument('--gcn_dropout', type=float, default=0.7)
     parser.add_argument('--gcn_agg_norm_symm', type=bool, default=True)
@@ -78,7 +79,7 @@ def config():
     parser.add_argument('--gcn_agg_accum', type=str, default="sum")
     parser.add_argument('--gcn_out_units', type=int, default=75)
     parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
-    parser.add_argument('--train_max_epoch', type=int, default=100)
+    parser.add_argument('--train_max_epoch', type=int, default=30)
     parser.add_argument('--train_log_interval', type=int, default=1)
     parser.add_argument('--train_valid_interval', type=int, default=1)
     parser.add_argument('--train_optimizer', type=str, default="adam")
@@ -88,6 +89,7 @@ def config():
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.5)
     parser.add_argument('--train_decay_patience', type=int, default=5)
     parser.add_argument('--share_param', default=False, action='store_true')
+    parser.add_argument('--mix_cpu_gpu', default=False, action='store_true')
     parser.add_argument('--minibatch_size', type=int, default=10000)
     parser.add_argument('--num_workers_per_gpu', type=int, default=8)
 
@@ -235,11 +237,12 @@ def run(proc_id, n_gpus, args, devices, dataset):
                 th.distributed.barrier()
 
         print(logging_str)
+    if proc_id == 0:
+        print('Best Iter Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
+              best_iter, best_valid_rmse, best_test_rmse))
 
 if __name__ == '__main__':
     args = config()
-    args.mix_cpu_gpu = True
-    args.use_one_hot_fea = False
 
     devices = list(map(int, args.gpu.split(',')))
     n_gpus = len(devices)
@@ -248,6 +251,7 @@ if __name__ == '__main__':
     # Otherwise (node_id is the feature), the model can not scale
     dataset = MovieLens(args.data_name,
                         'cpu',
+                        mix_cpu_gpu=args.mix_cpu_gpu,
                         use_one_hot_fea=args.use_one_hot_fea,
                         symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio,
