@@ -7,3 +7,7 @@ pygraphviz
 graphviz
 pandas
 rdflib
+python-arango
+arangopipe
+PyYAML==5.1.1
+
