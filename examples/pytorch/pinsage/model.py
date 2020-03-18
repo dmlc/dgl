@@ -31,39 +31,6 @@ class PinSAGEModel(nn.Module):
         h_item_dst = self.proj(blocks[-1].dstdata)
         return h_item_dst + self.sage(blocks, h_item)
 
-class LatestNNRecommender(object):
-    def __init__(self, user_ntype, item_ntype, user_to_item_etype, timestamp, batch_size):
-        self.user_ntype = user_ntype
-        self.item_ntype = item_ntype
-        self.user_to_item_etype = user_to_item_etype
-        self.batch_size = batch_size
-        self.timestamp = timestamp
-
-    def recommend(self, full_graph, K, h_user, h_item):
-        """
-        Return a (n_user, K) matrix of recommended items for each user
-        """
-        graph_slice = full_graph.edge_type_subgraph([self.user_to_item_etype])
-        n_users = full_graph.number_of_nodes(self.user_ntype)
-        latest_interactions = dgl.sampling.select_topk(graph_slice, 1, self.timestamp, edge_dir='out')
-        user, latest_items = latest_interactions.all_edges(form='uv', order='srcdst')
-        # each user should have at least one "latest" interaction
-        assert torch.equal(user, torch.arange(n_users))
-
-        recommended_batches = []
-        user_batches = torch.arange(n_users).split(self.batch_size)
-        for user_batch in user_batches:
-            latest_item_batch = latest_items[user_batch].to(device=h_item.device)
-            dist = h_item[latest_item_batch] @ h_item.t()
-            # exclude items that are already interacted
-            for i, u in enumerate(user_batch.tolist()):
-                interacted_items = full_graph.successors(u, etype=self.user_to_item_etype)
-                dist[i, interacted_items] = -np.inf
-            recommended_batches.append(dist.topk(K, 1)[1])
-
-        recommendations = torch.cat(recommended_batches, 0)
-        return recommendations
-
 def train(dataset, args):
     g = dataset['train-graph']
     val_matrix = dataset['val-matrix'].tocsr()
@@ -109,9 +76,6 @@ def train(dataset, args):
 
     # Model
     model = PinSAGEModel(g, item_ntype, textset, args.hidden_dims, args.num_layers).to(device)
-    rec_engine = LatestNNRecommender(
-        user_ntype, item_ntype, user_to_item_etype, timestamp, args.batch_size)
-
     # Optimizer
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -145,8 +109,7 @@ def train(dataset, args):
             h_item_batches.append(model.get_repr(blocks))
         h_item = torch.cat(h_item_batches, 0)
 
-        recommendations = rec_engine.recommend(g, args.k, None, h_item).cpu().numpy()
-        print(evaluation.prec(recommendations, val_matrix))
+        print(evaluation.evaluate_nn(dataset, h_item, args.k, args.batch_size))
 
 if __name__ == '__main__':
     # Arguments
