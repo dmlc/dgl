@@ -23,6 +23,7 @@ import dgl
 import torch
 import torchtext
 from builder import PandasGraphBuilder
+from data_utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('directory', type=str)
@@ -115,63 +116,13 @@ g.edges['watched-by'].data['timestamp'] = torch.LongTensor(ratings['timestamp'].
 # This is a little bit tricky as we want to select the last interaction for test, and the
 # second-to-last interaction for validation.
 n_edges = g.number_of_edges('watched')
-with g.local_scope():
-    def splits(edges):
-        num_edges, count = edges.data['train_mask'].shape
-
-        # sort by timestamp
-        _, sorted_idx = edges.data['timestamp'].sort(1)
-
-        train_mask = edges.data['train_mask']
-        val_mask = edges.data['val_mask']
-        test_mask = edges.data['test_mask']
-
-        x = torch.arange(num_edges)
-
-        # If one user has more than one interactions, select the latest one for test.
-        if count > 1:
-            train_mask[x, sorted_idx[:, -1]] = False
-            test_mask[x, sorted_idx[:, -1]] = True
-        # If one user has more than two interactions, select the second latest one for validation.
-        if count > 2:
-            train_mask[x, sorted_idx[:, -2]] = False
-            val_mask[x, sorted_idx[:, -2]] = True
-        return {'train_mask': train_mask, 'val_mask': val_mask, 'test_mask': test_mask}
-
-    g.edges['watched'].data['train_mask'] = torch.ones(n_edges, dtype=torch.bool)
-    g.edges['watched'].data['val_mask'] = torch.zeros(n_edges, dtype=torch.bool)
-    g.edges['watched'].data['test_mask'] = torch.zeros(n_edges, dtype=torch.bool)
-    g.nodes['movie'].data['count'] = g.in_degrees(etype='watched')
-    g.group_apply_edges('src', splits, etype='watched')
-
-    train_indices = g.filter_edges(lambda edges: edges.data['train_mask'], etype='watched')
-    val_indices = g.filter_edges(lambda edges: edges.data['val_mask'], etype='watched')
-    test_indices = g.filter_edges(lambda edges: edges.data['test_mask'], etype='watched')
+train_indices, val_indices, test_indices = train_test_split_by_time(g, 'timestamp')
 
 # Build the graph with training interactions only.
-train_g = g.edge_subgraph(
-    {'watched': train_indices, 'watched-by': train_indices},
-    preserve_nodes=True)
-del train_g.nodes['movie'].data[dgl.NID]      # remove the induced node IDs - should be assigned by model instead
-del train_g.nodes['user'].data[dgl.NID]       # remove the induced user IDs - shoule be assigned by model instead
-for ntype in g.ntypes:
-    for col, data in g.nodes[ntype].data.items():
-        train_g.nodes[ntype].data[col] = data
-for etype in g.etypes:
-    for col, data in g.edges[etype].data.items():
-        train_g.edges[etype].data[col] = data[train_g.edges[etype].data[dgl.EID]]
+train_g = build_train_graph(g, train_indices, 'user', 'movie', 'watched', 'watched-by')
 
 # Build the user-item sparse matrix for validation and test set.
-n_users = g.number_of_nodes('user')
-n_items = g.number_of_nodes('movie')
-val_src, val_dst = g.find_edges(val_indices, etype='watched')
-test_src, test_dst = g.find_edges(test_indices, etype='watched')
-val_src = val_src.numpy()
-val_dst = val_dst.numpy()
-test_src = test_src.numpy()
-test_dst = test_dst.numpy()
-val_matrix = ssp.coo_matrix((np.ones_like(val_src), (val_src, val_dst)), (n_users, n_items))
-test_matrix = ssp.coo_matrix((np.ones_like(test_src), (test_src, test_dst)), (n_users, n_items))
+val_matrix, test_matrix = build_val_test_matrix(g, val_indices, test_indices, 'user', 'movie', 'watched')
 
 ## Build title set
 
