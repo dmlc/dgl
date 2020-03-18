@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 import torchtext
 import dgl
 import tqdm
@@ -98,11 +99,13 @@ def train(dataset, args):
     # Sampler
     batch_sampler = sampler_module.ItemToItemBatchSampler(
         g, user_ntype, item_ntype, args.batch_size)
-    batch_sampler_it = iter(batch_sampler)
     neighbor_sampler = sampler_module.NeighborSampler(
         g, user_ntype, item_ntype, args.random_walk_length,
         args.random_walk_restart_prob, args.num_random_walks, args.num_neighbors,
         args.num_layers)
+    collator = sampler_module.PinSAGECollator(neighbor_sampler, g, item_ntype, textset)
+    dataloader = DataLoader(batch_sampler, collate_fn=collator, num_workers=args.num_workers)
+    dataloader_it = iter(dataloader)
 
     # Model
     model = PinSAGEModel(g, item_ntype, textset, args.hidden_dims, args.num_layers).to(device)
@@ -116,18 +119,7 @@ def train(dataset, args):
     for epoch_id in range(args.num_epochs):
         model.train()
         for batch_id in tqdm.trange(args.batches_per_epoch):
-            heads, tails, neg_tails = next(batch_sampler_it)
-            # Train
-            # Construct multilayer neighborhood via PinSAGE...
-            pos_graph, neg_graph, blocks = \
-                neighbor_sampler.sample_from_item_pairs(heads, tails, neg_tails)
-            # For the first block (which is closest to the input), copy the features from
-            # the original graph as well as the texts.
-            sampler_module.assign_simple_node_features(blocks[0].srcdata, g, item_ntype)
-            sampler_module.assign_textual_node_features(blocks[0].srcdata, textset, item_ntype)
-            sampler_module.assign_simple_node_features(blocks[-1].dstdata, g, item_ntype)
-            sampler_module.assign_textual_node_features(blocks[-1].dstdata, textset, item_ntype)
-
+            pos_graph, neg_graph, blocks = next(dataloader_it)
             # Copy to GPU
             for i in range(len(blocks)):
                 blocks[i] = blocks[i].to(device)
@@ -145,10 +137,7 @@ def train(dataset, args):
         h_item_batches = []
         for item_batch in item_batches:
             blocks = neighbor_sampler.sample_blocks(item_batch)
-            sampler_module.assign_simple_node_features(blocks[0].srcdata, g, item_ntype)
-            sampler_module.assign_textual_node_features(blocks[0].srcdata, textset, item_ntype)
-            sampler_module.assign_simple_node_features(blocks[-1].dstdata, g, item_ntype)
-            sampler_module.assign_textual_node_features(blocks[-1].dstdata, textset, item_ntype)
+            sampler_module.assign_features_to_blocks(blocks, g, textset, item_ntype)
 
             for i in range(len(blocks)):
                 blocks[i] = blocks[i].to(device)
@@ -173,6 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cpu')        # can also be "cuda:0"
     parser.add_argument('--num-epochs', type=int, default=1)
     parser.add_argument('--batches-per-epoch', type=int, default=20000)
+    parser.add_argument('--num-workers', type=int, default=0)
     parser.add_argument('--lr', type=float, default=3e-5)
     parser.add_argument('-k', type=int, default=10)
     args = parser.parse_args()

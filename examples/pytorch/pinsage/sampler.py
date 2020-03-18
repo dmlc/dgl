@@ -1,6 +1,7 @@
 import numpy as np
 import dgl
 import torch
+from torch.utils.data import IterableDataset, DataLoader
 
 def compact_and_copy(frontier, seeds):
     block = dgl.to_block(frontier, seeds)
@@ -8,7 +9,7 @@ def compact_and_copy(frontier, seeds):
         block.edata[col] = data
     return block
 
-class ItemToItemBatchSampler(object):
+class ItemToItemBatchSampler(IterableDataset):
     def __init__(self, g, user_type, item_type, batch_size):
         self.g = g
         self.user_type = user_type
@@ -117,3 +118,26 @@ def assign_textual_node_features(ndata, textset, ntype):
 
         ndata[field_name] = tokens
         ndata[field_name + '__len'] = lengths
+
+def assign_features_to_blocks(blocks, g, textset, ntype):
+    # For the first block (which is closest to the input), copy the features from
+    # the original graph as well as the texts.
+    assign_simple_node_features(blocks[0].srcdata, g, ntype)
+    assign_textual_node_features(blocks[0].srcdata, textset, ntype)
+    assign_simple_node_features(blocks[-1].dstdata, g, ntype)
+    assign_textual_node_features(blocks[-1].dstdata, textset, ntype)
+
+class PinSAGECollator(object):
+    def __init__(self, sampler, g, ntype, textset):
+        self.sampler = sampler
+        self.ntype = ntype
+        self.g = g
+        self.textset = textset
+
+    def __call__(self, batches):
+        heads, tails, neg_tails = batches[0]
+        # Construct multilayer neighborhood via PinSAGE...
+        pos_graph, neg_graph, blocks = self.sampler.sample_from_item_pairs(heads, tails, neg_tails)
+        assign_features_to_blocks(blocks, self.g, self.textset, self.ntype)
+
+        return pos_graph, neg_graph, blocks

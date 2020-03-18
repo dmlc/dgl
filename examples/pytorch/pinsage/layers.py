@@ -162,7 +162,7 @@ class SAGENet(nn.Module):
 
     def forward(self, blocks, h):
         for layer, block in zip(self.convs, blocks):
-            h_dst = h[:block.number_of_nodes(block.dsttype)]
+            h_dst = h[:block.number_of_nodes('DST/' + block.ntypes[0])]
             h = layer(block, (h, h_dst), block.edata['weights'])
         return h
 

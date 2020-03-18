@@ -3,7 +3,8 @@ import dgl
 import numpy as np
 import scipy.sparse as ssp
 
-def train_test_split_by_time(g, column):
+def train_test_split_by_time(g, column, etype, itype):
+    n_edges = g.number_of_edges(etype)
     with g.local_scope():
         def splits(edges):
             num_edges, count = edges.data['train_mask'].shape
@@ -27,15 +28,15 @@ def train_test_split_by_time(g, column):
                 val_mask[x, sorted_idx[:, -2]] = True
             return {'train_mask': train_mask, 'val_mask': val_mask, 'test_mask': test_mask}
 
-        g.edges['watched'].data['train_mask'] = torch.ones(n_edges, dtype=torch.bool)
-        g.edges['watched'].data['val_mask'] = torch.zeros(n_edges, dtype=torch.bool)
-        g.edges['watched'].data['test_mask'] = torch.zeros(n_edges, dtype=torch.bool)
-        g.nodes['movie'].data['count'] = g.in_degrees(etype='watched')
-        g.group_apply_edges('src', splits, etype='watched')
+        g.edges[etype].data['train_mask'] = torch.ones(n_edges, dtype=torch.bool)
+        g.edges[etype].data['val_mask'] = torch.zeros(n_edges, dtype=torch.bool)
+        g.edges[etype].data['test_mask'] = torch.zeros(n_edges, dtype=torch.bool)
+        g.nodes[itype].data['count'] = g.in_degrees(etype=etype)
+        g.group_apply_edges('src', splits, etype=etype)
 
-        train_indices = g.filter_edges(lambda edges: edges.data['train_mask'], etype='watched')
-        val_indices = g.filter_edges(lambda edges: edges.data['val_mask'], etype='watched')
-        test_indices = g.filter_edges(lambda edges: edges.data['test_mask'], etype='watched')
+        train_indices = g.filter_edges(lambda edges: edges.data['train_mask'], etype=etype)
+        val_indices = g.filter_edges(lambda edges: edges.data['val_mask'], etype=etype)
+        test_indices = g.filter_edges(lambda edges: edges.data['test_mask'], etype=etype)
 
     return train_indices, val_indices, test_indices
 
@@ -70,3 +71,7 @@ def build_val_test_matrix(g, val_indices, test_indices, utype, itype, etype):
     test_matrix = ssp.coo_matrix((np.ones_like(test_src), (test_src, test_dst)), (n_users, n_items))
 
     return val_matrix, test_matrix
+
+def linear_normalize(values):
+    return (values - values.min(0, keepdims=True)) / \
+        (values.max(0, keepdims=True) - values.min(0, keepdims=True))
