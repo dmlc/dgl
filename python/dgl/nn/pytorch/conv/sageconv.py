@@ -1,7 +1,6 @@
 """Torch Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from numbers import Integral
-import torch
 from torch import nn
 from torch.nn import functional as F
 
