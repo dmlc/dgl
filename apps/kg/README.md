@@ -158,7 +158,7 @@ The accuracy on Freebase (it is tested when 1000 negative edges are sampled for 
 | RotatE    | 93.3   | 0.770 | 0.749  | 0.780  | 0.805   |
 
 The speed on Freebase (48 CPU)
-This measured with 48 CPU cores on an AWS r5
+This measured with 48 CPU cores on an AWS r5dn.24xlarge
 
 |  Models | TransE_l2 | DistMult | ComplEx |
 |---------|-----------|----------|---------|
