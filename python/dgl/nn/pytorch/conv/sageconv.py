@@ -124,11 +124,11 @@ class SAGEConv(nn.Module):
         """
         graph = graph.local_var()
 
-        if torch.is_tensor(feat):
-            feat_src = feat_dst = self.feat_drop(feat)
-        else:
+        if isinstance(feat, tuple):
             feat_src = self.feat_drop(feat[0])
             feat_dst = self.feat_drop(feat[1])
+        else:
+            feat_src = feat_dst = self.feat_drop(feat)
 
         h_self = feat_dst
 
@@ -141,8 +141,7 @@ class SAGEConv(nn.Module):
             graph.dstdata['h'] = feat_dst     # same as above if homogeneous
             graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
             # divide in_degrees
-            degs = graph.in_degrees().float()
-            degs = degs.to(feat_dst.device)
+            degs = graph.in_degrees().to(feat_dst)
             h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.unsqueeze(-1) + 1)
         elif self._aggre_type == 'pool':
             graph.srcdata['h'] = F.relu(self.fc_pool(feat_src))
