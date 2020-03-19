@@ -755,7 +755,7 @@ class DGLHeteroGraph(object):
         nodes
         """
         err_msg = (
-            'srcdata is only allowed when there is only one %s type.' % 
+            'srcdata is only allowed when there is only one %s type.' %
             ('SRC' if self.is_unibipartite else 'node'))
         assert len(self.srctypes) == 1, err_msg
         ntype = self.srctypes[0]
@@ -805,7 +805,7 @@ class DGLHeteroGraph(object):
         nodes
         """
         err_msg = (
-            'dstdata is only allowed when there is only one %s type.' % 
+            'dstdata is only allowed when there is only one %s type.' %
             ('DST' if self.is_unibipartite else 'node'))
         assert len(self.dsttypes) == 1, err_msg
         ntype = self.dsttypes[0]
