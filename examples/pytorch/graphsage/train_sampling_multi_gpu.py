@@ -15,6 +15,7 @@ from functools import wraps
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
+import traceback
 
 #### Neighbor sampler
 
@@ -50,25 +51,27 @@ class SAGE(nn.Module):
         self.n_hidden = n_hidden
         self.n_classes = n_classes
         self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(
-            in_feats, n_hidden, 'mean', feat_drop=dropout, activation=activation))
+        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
         for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(
-                n_hidden, n_hidden, 'mean', feat_drop=dropout, activation=activation))
-        self.layers.append(dglnn.SAGEConv(
-            n_hidden, n_classes, 'mean', feat_drop=dropout))
+            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
+        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
+        self.dropout = nn.Dropout(dropout)
+        self.activation = activation
 
     def forward(self, blocks, x):
         h = x
-        for layer, block in zip(self.layers, blocks):
+        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             # We need to first copy the representation of nodes on the RHS from the
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_nodes(block.dsttype)]
+            h_dst = h[:block.number_of_dst_nodes()]
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             h = layer(block, (h, h_dst))
+            if l != len(self.layers) - 1:
+                h = self.activation(h)
+                h = self.dropout(h)
         return h
 
     def inference(self, g, x, batch_size, device):
@@ -96,8 +99,11 @@ class SAGE(nn.Module):
                 input_nodes = block.srcdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_nodes(block.dsttype)]
+                h_dst = h[:block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
+                if l != len(self.layers) - 1:
+                    h = self.activation(h)
+                    h = self.dropout(h)
 
                 y[start:end] = h.cpu()
 
@@ -181,10 +187,7 @@ def load_subtensor(g, labels, seeds, input_nodes, dev_id):
 
 #### Entry point
 
-@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
-    dropout = 0.2
-
     # Start up distributed training, if enabled.
     dev_id = devices[proc_id]
     if n_gpus > 1:
@@ -217,10 +220,10 @@ def run(proc_id, n_gpus, args, devices, data):
         collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
-        num_workers=args.num_workers_per_gpu)
+        num_workers=args.num_workers)
 
     # Define model and optimizer
-    model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, dropout)
+    model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(dev_id)
     if n_gpus > 1:
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
@@ -284,6 +287,7 @@ def run(proc_id, n_gpus, args, devices, data):
                     eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
                 print('Eval Acc {:.4f}'.format(eval_acc))
 
+
     if n_gpus > 1:
         th.distributed.barrier()
     if proc_id == 0:
@@ -291,7 +295,8 @@ def run(proc_id, n_gpus, args, devices, data):
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
-    argparser.add_argument('--gpu', type=str, default='0')
+    argparser.add_argument('--gpu', type=str, default='0',
+        help="Comma separated list of GPU device IDs.")
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
@@ -300,7 +305,9 @@ if __name__ == '__main__':
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.003)
-    argparser.add_argument('--num-workers-per-gpu', type=int, default=0)
+    argparser.add_argument('--dropout', type=float, default=0.5)
+    argparser.add_argument('--num-workers', type=int, default=0,
+        help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
     
     devices = list(map(int, args.gpu.split(',')))
@@ -326,7 +333,8 @@ if __name__ == '__main__':
     else:
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
+            p = mp.Process(target=thread_wrapped_func(run),
+                           args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:

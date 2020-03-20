@@ -309,11 +309,26 @@ def test_gat_conv():
 
 def test_sage_conv():
     for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:
+        ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         sage = nn.SAGEConv(5, 10, aggre_type)
         feat = F.randn((100, 5))
         h = sage(g, feat)
         assert h.shape[-1] == 10
+
+        g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
+        sage = nn.SAGEConv(5, 10, aggre_type)
+        feat = F.randn((100, 5))
+        h = sage(g, feat)
+        assert h.shape[-1] == 10
+
+        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+        dst_dim = 5 if aggre_type != 'gcn' else 10
+        sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
+        feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 200
 
 def test_sgc_conv():
     ctx = F.ctx()

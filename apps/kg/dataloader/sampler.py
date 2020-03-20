@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+#
+# setup.py
+#
+# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import math
 import numpy as np
 import scipy as sp
@@ -275,7 +294,7 @@ def ConstructGraph(edges, n_entities, args):
     else:
         src, etype_id, dst = edges
         coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[n_entities, n_entities])
-        g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+        g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
         g.edata['tid'] = F.tensor(etype_id, F.int64)
         if args.pickle_graph:
             with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
@@ -562,7 +581,7 @@ class EvalDataset(object):
             dst = np.concatenate((dataset.train[2], dataset.valid[2], dataset.test[2]))
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
                                        shape=[dataset.n_entities, dataset.n_entities])
-            g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+            g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
             g.edata['tid'] = F.tensor(etype_id, F.int64)
             if args.pickle_graph:
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
