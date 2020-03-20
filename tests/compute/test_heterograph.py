@@ -1482,6 +1482,10 @@ def test_bipartite():
     assert g1.dsttypes == ['B']
     assert g1.number_of_nodes('A') == 2
     assert g1.number_of_nodes('B') == 6
+    assert g1.number_of_src_nodes('A') == 2
+    assert g1.number_of_src_nodes() == 2
+    assert g1.number_of_dst_nodes('B') == 6
+    assert g1.number_of_dst_nodes() == 6
     assert g1.number_of_edges() == 3
     g1.srcdata['h'] = F.randn((2, 5))
     assert F.array_equal(g1.srcnodes['A'].data['h'], g1.srcdata['h'])
@@ -1501,6 +1505,10 @@ def test_bipartite():
     assert g3.number_of_nodes('A') == 2
     assert g3.number_of_nodes('B') == 6
     assert g3.number_of_nodes('C') == 1
+    assert g3.number_of_src_nodes('A') == 2
+    assert g3.number_of_src_nodes() == 2
+    assert g3.number_of_dst_nodes('B') == 6
+    assert g3.number_of_dst_nodes('C') == 1
     g3.srcdata['h'] = F.randn((2, 5))
     assert F.array_equal(g3.srcnodes['A'].data['h'], g3.srcdata['h'])
     assert F.array_equal(g3.nodes['A'].data['h'], g3.srcdata['h'])
