@@ -19,7 +19,176 @@ from model import SampleGCMCLayer, GCMCLayer, SampleBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 import dgl
 
-from gcmc_sampling import GCMCSampler, Net, evaluate
+class GCMCSampler:
+    """ GCMCSampler
+    """
+    def __init__(self, num_edges, minibatch_size, dataset):
+        self.num_edges = num_edges
+        self.minibatch_size = minibatch_size
+        self.seed = th.randperm(num_edges)
+        self.dataset = dataset
+        self.sample_idx = 0
+        self.train_labels = dataset.train_labels
+        self.train_truths = dataset.train_truths
+
+        self.train_user_ids = th.zeros((dataset.train_enc_graph.number_of_nodes('user'),), dtype=th.int64)
+        self.train_movie_ids = th.zeros((dataset.train_enc_graph.number_of_nodes('movie'),), dtype=th.int64)
+
+    def sample_blocks(self, seeds):
+        dataset = self.dataset
+        edge_ids = seeds
+        # generate frontiners for user and item
+        true_relation_ratings = self.train_truths[edge_ids]
+        true_relation_labels = self.train_labels[edge_ids]
+
+        head_id, tail_id = dataset.train_dec_graph.find_edges(edge_ids)
+        head_type, _, tail_type = dataset.train_dec_graph.canonical_etypes[0]
+        heads = {head_type : th.unique(head_id)}
+        tails = {tail_type : th.unique(tail_id)}
+        head_frontier = dgl.in_subgraph(dataset.train_enc_graph, heads)
+        tail_frontier = dgl.in_subgraph(dataset.train_enc_graph, tails)
+        head_frontier = dgl.to_block(head_frontier, heads)
+        tail_frontier = dgl.to_block(tail_frontier, tails)
+
+        # copy from parent
+        head_frontier.dstnodes['user'].data['ci'] = \
+            dataset.train_enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
+        head_frontier.srcnodes['movie'].data['cj'] = \
+            dataset.train_enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
+        tail_frontier.srcnodes['user'].data['cj'] = \
+            dataset.train_enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
+        tail_frontier.dstnodes['movie'].data['ci'] = \
+            dataset.train_enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
+
+        self.train_user_ids[head_frontier.dstnodes['user'].data[dgl.NID]] = \
+            th.arange(head_frontier.dstnodes['user'].data[dgl.NID].shape[0])
+        self.train_movie_ids[tail_frontier.dstnodes['movie'].data[dgl.NID]] = \
+            th.arange(tail_frontier.dstnodes['movie'].data[dgl.NID].shape[0])
+
+        # handle features
+        head_feat = tail_frontier.srcnodes['user'].data[dgl.NID].long() \
+                    if dataset.user_feature is None else \
+                       dataset.user_feature[tail_frontier.srcnodes['user'].data[dgl.NID]]
+        tail_feat = head_frontier.srcnodes['movie'].data[dgl.NID].long()\
+                    if dataset.movie_feature is None else \
+                       dataset.movie_feature[head_frontier.srcnodes['movie'].data[dgl.NID]]
+        head_id = self.train_user_ids[head_id]
+        tail_id = self.train_movie_ids[tail_id]
+
+        return (head_frontier, tail_frontier, head_feat, tail_feat, head_id, tail_id, true_relation_labels, true_relation_ratings)
+
+class Net(nn.Module):
+    def __init__(self, args, dev_id):
+        super(Net, self).__init__()
+        self._act = get_activation(args.model_activation)
+        self.encoder = SampleGCMCLayer(args.rating_vals,
+                                       args.src_in_units,
+                                       args.dst_in_units,
+                                       args.gcn_agg_units,
+                                       args.gcn_out_units,
+                                       args.gcn_dropout,
+                                       args.gcn_agg_accum,
+                                       agg_act=self._act,
+                                       share_user_item_param=args.share_param,
+                                       device=dev_id)
+        if args.mix_cpu_gpu and args.use_one_hot_fea:
+            # if use_one_hot_fea, user and movie feature is None
+            # W can be extremely large, with mix_cpu_gpu W should be stored in CPU
+            self.encoder.partial_to(dev_id)
+        else:
+            self.encoder.to(dev_id)
+
+        self.decoder = SampleBiDecoder(args.rating_vals,
+                                       in_units=args.gcn_out_units,
+                                       num_basis_functions=args.gen_r_num_basis_func)
+        self.decoder.to(dev_id)
+
+    def forward(self, head_enc, tail_enc, ufeat, ifeat, head_id, tail_id):
+        user_out, movie_out = self.encoder(
+            head_enc,
+            tail_enc,
+            ufeat,
+            ifeat)
+
+        user_out = user_out[head_id]
+        movie_out = movie_out[tail_id]
+
+        pred_ratings = self.decoder(user_out, movie_out)
+        return pred_ratings
+
+def evaluate(args, dev_id, net, dataset, segment='valid'):
+    possible_rating_values = dataset.possible_rating_values
+    nd_possible_rating_values = th.FloatTensor(possible_rating_values).to(dev_id)
+
+    if segment == "valid":
+        rating_values = dataset.valid_truths
+        enc_graph = dataset.valid_enc_graph
+        dec_graph = dataset.valid_dec_graph
+    elif segment == "test":
+        rating_values = dataset.test_truths
+        enc_graph = dataset.test_enc_graph
+        dec_graph = dataset.test_dec_graph
+    else:
+        raise NotImplementedError
+
+    rating_values = rating_values.to(dev_id)
+    num_edges = rating_values.shape[0]
+    seed = th.arange(num_edges)
+    count_rmse = 0
+    count_num = 0
+    real_pred_ratings = []
+    for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
+        net.eval()
+        edge_ids = seed[sample_idx * args.minibatch_size: \
+                        (sample_idx + 1) * args.minibatch_size \
+                        if (sample_idx + 1) * args.minibatch_size < num_edges \
+                        else num_edges]
+
+        head_id, tail_id = dec_graph.find_edges(edge_ids)
+        head_type, _, tail_type = dec_graph.canonical_etypes[0]
+        heads = {head_type : th.unique(head_id)}
+        tails = {tail_type : th.unique(tail_id)}
+
+        head_frontier = dgl.in_subgraph(enc_graph, heads)
+        tail_frontier = dgl.in_subgraph(enc_graph, tails)
+        head_frontier = dgl.to_block(head_frontier, heads)
+        tail_frontier = dgl.to_block(tail_frontier, tails)
+
+        head_frontier.dstnodes['user'].data['ci'] = \
+            enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
+        head_frontier.srcnodes['movie'].data['cj'] = \
+            enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
+        tail_frontier.srcnodes['user'].data['cj'] = \
+            enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
+        tail_frontier.dstnodes['movie'].data['ci'] = \
+            enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
+
+        enc_graph.nodes['user'].data['ids'][head_frontier.dstnodes['user'].data[dgl.NID]] = \
+            th.arange(head_frontier.dstnodes['user'].data[dgl.NID].shape[0])
+        enc_graph.nodes['movie'].data['ids'][tail_frontier.dstnodes['movie'].data[dgl.NID]] = \
+            th.arange(tail_frontier.dstnodes['movie'].data[dgl.NID].shape[0])
+
+        head_feat = tail_frontier.srcnodes['user'].data[dgl.NID].long() \
+                    if dataset.user_feature is None else \
+                       dataset.user_feature[tail_frontier.srcnodes['user'].data[dgl.NID]]
+        tail_feat = head_frontier.srcnodes['movie'].data[dgl.NID].long() \
+                    if dataset.movie_feature is None else \
+                        dataset.movie_feature[head_frontier.srcnodes['movie'].data[dgl.NID]]
+        head_feat = head_feat.to(dev_id)
+        tail_feat = tail_feat.to(dev_id)
+        head_id = enc_graph.nodes['user'].data['ids'][head_id]
+        tail_id = enc_graph.nodes['movie'].data['ids'][tail_id]
+        with th.no_grad():
+            pred_ratings = net(head_frontier, tail_frontier,
+                               head_feat, tail_feat,
+                               head_id, tail_id)
+        batch_pred_ratings = (th.softmax(pred_ratings, dim=1) *
+                         nd_possible_rating_values.view(1, -1)).sum(dim=1)
+        real_pred_ratings.append(batch_pred_ratings)
+    real_pred_ratings = th.cat(real_pred_ratings, dim=0)
+    rmse = ((real_pred_ratings - rating_values) ** 2.).mean().item()
+    rmse = np.sqrt(rmse)
+    return rmse
 
 # According to https://github.com/pytorch/pytorch/issues/17199, this decorator
 # is necessary to make fork() and openmp work together.
@@ -79,7 +248,7 @@ def config():
     parser.add_argument('--gcn_agg_accum', type=str, default="sum")
     parser.add_argument('--gcn_out_units', type=int, default=75)
     parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
-    parser.add_argument('--train_max_epoch', type=int, default=30)
+    parser.add_argument('--train_max_epoch', type=int, default=70)
     parser.add_argument('--train_log_interval', type=int, default=1)
     parser.add_argument('--train_valid_interval', type=int, default=1)
     parser.add_argument('--train_optimizer', type=str, default="adam")
