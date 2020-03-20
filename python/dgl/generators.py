@@ -31,6 +31,6 @@ def rand_graph(num_nodes, num_edges, restrict_format='any'):
     rows = F.astype(eids / num_nodes, F.dtype(eids))
     cols = F.astype(eids % num_nodes, F.dtype(eids))
     g = convert.graph((rows, cols),
-                      card=num_nodes, validate=False,
+                      num_nodes=num_nodes, validate=False,
                       restrict_format=restrict_format)
     return g

@@ -3831,7 +3831,7 @@ class DGLHeteroGraph(object):
         >>> import torch
         >>> import dgl
         >>> import dgl.function as fn
-        >>> g = dgl.graph([], 'user', 'follows', card=4)
+        >>> g = dgl.graph([], 'user', 'follows', num_nodes=4)
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
         >>> g.filter_nodes(lambda nodes: (nodes.data['h'] == 1.).squeeze(1), ntype='user')
         tensor([1, 2])
