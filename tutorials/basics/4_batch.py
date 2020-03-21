@@ -100,7 +100,7 @@ def collate(samples):
 # be called readout or aggregation. Finally, the graph 
 # representations are fed into a classifier :math:`g` to predict the graph labels.
 #
-# Graph convolution layer can be found in the ``dgl.nn.<backend>` submodule.
+# Graph convolution layer can be found in the ``dgl.nn.<backend>`` submodule.
 
 from dgl.nn.pytorch import GraphConv
 

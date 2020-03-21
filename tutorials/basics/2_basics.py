@@ -34,7 +34,7 @@ plt.show()
 
 ###############################################################################
 # There are many ways to construct a :class:`DGLGraph`. Below are the allowed
-# data types to create a graph from (in our recommended order):
+# data types ordered by our recommendataion.
 #
 # * A pair of arrays ``(u, v)`` storing the source and destination nodes respectively.
 #   They can be numpy arrays or tensor objects from the backend framework.

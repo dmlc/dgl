@@ -155,7 +155,7 @@ class GCN(nn.Module):
         h = self.conv2(g, h)
         return h
 
-# The first layer transforms input features of size of 34 to a hidden size of 5.
+# The first layer transforms input features of size of 5 to a hidden size of 5.
 # The second layer transforms the hidden layer and produces output features of
 # size 2, corresponding to the two groups of the karate club.
 net = GCN(5, 5, 2)
