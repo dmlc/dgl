@@ -109,7 +109,7 @@ class RandomWalkNeighborSampler(object):
 
         # count the number of visits and pick the K-most frequent neighbors for each node
         neighbor_graph = convert.graph(
-            (src, dst), card=self.G.number_of_nodes(self.ntype), ntype=self.ntype)
+            (src, dst), num_nodes=self.G.number_of_nodes(self.ntype), ntype=self.ntype)
         neighbor_graph = transform.to_simple(neighbor_graph, return_counts=self.weight_column)
         counts = neighbor_graph.edata[self.weight_column]
         neighbor_graph = select_topk(neighbor_graph, self.num_neighbors, self.weight_column)

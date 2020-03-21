@@ -64,7 +64,7 @@ class SAGE(nn.Module):
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_nodes(block.dsttype)]
+            h_dst = h[:block.number_of_dst_nodes()]
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             h = layer(block, (h, h_dst))
@@ -98,7 +98,7 @@ class SAGE(nn.Module):
                 input_nodes = block.srcdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_nodes(block.dsttype)]
+                h_dst = h[:block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
                 if l != len(self.layers) - 1:
                     h = self.activation(h)

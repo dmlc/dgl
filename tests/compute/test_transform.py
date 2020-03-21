@@ -326,8 +326,8 @@ def test_compact():
         ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
         {'user': 20, 'game': 10})
 
-    g3 = dgl.graph([(0, 1), (1, 2)], card=10, ntype='user')
-    g4 = dgl.graph([(1, 3), (3, 5)], card=10, ntype='user')
+    g3 = dgl.graph([(0, 1), (1, 2)], num_nodes=10, ntype='user')
+    g4 = dgl.graph([(1, 3), (3, 5)], num_nodes=10, ntype='user')
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes

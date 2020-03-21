@@ -1,5 +1,6 @@
 """Tensorflow Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+from numbers import Integral
 import tensorflow as tf
 from tensorflow.keras import layers
 
@@ -21,8 +22,16 @@ class SAGEConv(layers.Layer):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int, or pair of ints
         Input feature size.
+
+        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
+
+        If aggregator type is ``gcn``, the feature size of source and destination nodes
+        are required to be the same.
     out_feats : int
         Output feature size.
     feat_drop : float
@@ -47,7 +56,15 @@ class SAGEConv(layers.Layer):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
-        self._in_feats = in_feats
+
+        if isinstance(in_feats, tuple):
+            self._in_src_feats = in_feats[0]
+            self._in_dst_feats = in_feats[1]
+        elif isinstance(in_feats, Integral):
+            self._in_src_feats = self._in_dst_feats = in_feats
+        else:
+            raise TypeError('in_feats must be either int or pair of ints')
+
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         self.norm = norm
@@ -55,9 +72,9 @@ class SAGEConv(layers.Layer):
         self.activation = activation
         # aggregator type: mean/pool/lstm/gcn
         if aggregator_type == 'pool':
-            self.fc_pool = layers.Dense(in_feats)
+            self.fc_pool = layers.Dense(self._in_src_feats)
         if aggregator_type == 'lstm':
-            self.lstm = layers.LSTM(units=in_feats)
+            self.lstm = layers.LSTM(units=self._in_src_feats)
         if aggregator_type != 'gcn':
             self.fc_self = layers.Dense(out_feats, use_bias=bias)
         self.fc_neigh = layers.Dense(out_feats, use_bias=bias)
@@ -89,27 +106,35 @@ class SAGEConv(layers.Layer):
             is size of output feature.
         """
         graph = graph.local_var()
-        feat = self.feat_drop(feat)
-        h_self = feat
+
+        if isinstance(feat, tuple):
+            feat_src = self.feat_drop(feat[0])
+            feat_dst = self.feat_drop(feat[1])
+        else:
+            feat_src = feat_dst = self.feat_drop(feat)
+
+        h_self = feat_dst
+
         if self._aggre_type == 'mean':
-            graph.ndata['h'] = feat
+            graph.srcdata['h'] = feat_src
             graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
-            h_neigh = graph.ndata['neigh']
+            h_neigh = graph.dstdata['neigh']
         elif self._aggre_type == 'gcn':
-            graph.ndata['h'] = feat
+            graph.srcdata['h'] = feat_src
+            graph.dstdata['h'] = feat_dst       # same as above if homogeneous
             graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
             # divide in_degrees
             degs = tf.cast(graph.in_degrees(), tf.float32)
-            h_neigh = (graph.ndata['neigh'] + graph.ndata['h']
+            h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']
                        ) / (tf.expand_dims(degs, -1) + 1)
         elif self._aggre_type == 'pool':
-            graph.ndata['h'] = tf.nn.relu(self.fc_pool(feat))
+            graph.srcdata['h'] = tf.nn.relu(self.fc_pool(feat_src))
             graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
-            h_neigh = graph.ndata['neigh']
+            h_neigh = graph.dstdata['neigh']
         elif self._aggre_type == 'lstm':
-            graph.ndata['h'] = feat
+            graph.srcdata['h'] = feat_src
             graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
-            h_neigh = graph.ndata['neigh']
+            h_neigh = graph.dstdata['neigh']
         else:
             raise KeyError(
                 'Aggregator type {} not recognized.'.format(self._aggre_type))

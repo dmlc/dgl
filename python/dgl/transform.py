@@ -654,7 +654,7 @@ def compact_graphs(graphs, always_preserve=None):
     The following code constructs a bipartite graph with 20 users and 10 games, but
     only user #1 and #3, as well as game #3 and #5, have connections:
 
-    >>> g = dgl.bipartite([(1, 3), (3, 5)], 'user', 'plays', 'game', card=(20, 10))
+    >>> g = dgl.bipartite([(1, 3), (3, 5)], 'user', 'plays', 'game', num_nodes=(20, 10))
 
     The following would compact the graph above to another bipartite graph with only
     two users and two games.
@@ -676,7 +676,7 @@ def compact_graphs(graphs, always_preserve=None):
     of the given graphs are removed.  So if we compact ``g`` and the following ``g2``
     graphs together:
 
-    >>> g2 = dgl.bipartite([(1, 6), (6, 8)], 'user', 'plays', 'game', card=(20, 10))
+    >>> g2 = dgl.bipartite([(1, 6), (6, 8)], 'user', 'plays', 'game', num_nodes=(20, 10))
     >>> (new_g, new_g2), induced_nodes = dgl.compact_graphs([g, g2])
     >>> induced_nodes
     {'user': tensor([1, 3, 6]), 'game': tensor([3, 5, 6, 8])}
