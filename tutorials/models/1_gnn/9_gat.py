@@ -94,6 +94,15 @@ structure-free normalization, in the style of attention.
 # GAT in DGL
 # ----------
 #
+# DGL provides an off-the-shelf implementation of a GAT layer under the ``dgl.nn.<backend>``
+# subpackage. Simply import the ``GATConv`` as the follows.
+
+from dgl.nn.pytorch import GATConv
+
+###############################################################
+# Readers can skip the following step-by-step explanation of implementation and
+# jump to the `Put everything together`_ for training and visualization results.
+#
 # To begin, you can get an overall impression about how a ``GATLayer`` module is
 # implemented in DGL. In this section, the four equations above are broken down 
 # one at a time.
@@ -277,11 +286,7 @@ def load_cora_data():
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
     mask = torch.BoolTensor(data.train_mask)
-    g = data.graph
-    # add self loop
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
-    g.add_edges(g.nodes(), g.nodes())
+    g = DGLGraph(data.graph)
     return g, features, labels, mask
 
 ##############################################################################

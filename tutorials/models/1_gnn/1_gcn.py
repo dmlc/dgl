@@ -9,9 +9,14 @@ Yu Gai, Quan Gan, Zheng Zhang
 
 This is a gentle introduction of using DGL to implement Graph Convolutional
 Networks (Kipf & Welling et al., `Semi-Supervised Classification with Graph
-Convolutional Networks <https://arxiv.org/pdf/1609.02907.pdf>`_). We build upon
-the :doc:`earlier tutorial <../../basics/3_pagerank>` on DGLGraph and demonstrate
-how DGL combines graph with deep neural network and learn structural representations.
+Convolutional Networks <https://arxiv.org/pdf/1609.02907.pdf>`_). We explain
+what is under the hood of the :class:`~dgl.nn.pytorch.GraphConv` module.
+The reader is expected to learn how to define a new GNN layer using DGL's
+message passing APIs.
+
+We build upon the :doc:`earlier tutorial <../../basics/3_pagerank>` on DGLGraph
+and demonstrate how DGL combines graph with deep neural network and learn
+structural representations.
 """
 
 ###############################################################################
@@ -28,8 +33,8 @@ how DGL combines graph with deep neural network and learn structural representat
 # representation :math:`\hat{h}_{u}` with a linear projection followed by a
 # non-linearity: :math:`h_{u} = f(W_{u} \hat{h}_u)`.
 # 
-# We will implement step 1 with DGL message passing, and step 2 with the
-# ``apply_nodes`` method, whose node UDF will be a PyTorch ``nn.Module``.
+# We will implement step 1 with DGL message passing, and step 2 by
+# PyTorch ``nn.Module``.
 # 
 # GCN implementation with DGL
 # ``````````````````````````````````````````
@@ -48,35 +53,23 @@ gcn_msg = fn.copy_src(src='h', out='m')
 gcn_reduce = fn.sum(msg='m', out='h')
 
 ###############################################################################
-# We then define the node UDF for ``apply_nodes``, which is a fully-connected layer:
+# We then proceed to define the GCNLayer module. A GCNLayer essentially performs
+# message passing on all the nodes then applies a fully-connected layer.
 
-class NodeApplyModule(nn.Module):
-    def __init__(self, in_feats, out_feats, activation):
-        super(NodeApplyModule, self).__init__()
+class GCNLayer(nn.Module):
+    def __init__(self, in_feats, out_feats):
+        super(GCNLayer, self).__init__()
         self.linear = nn.Linear(in_feats, out_feats)
-        self.activation = activation
-
-    def forward(self, node):
-        h = self.linear(node.data['h'])
-        if self.activation is not None:
-            h = self.activation(h)
-        return {'h' : h}
-
-###############################################################################
-# We then proceed to define the GCN module. A GCN layer essentially performs
-# message passing on all the nodes then applies the `NodeApplyModule`. Note
-# that we omitted the dropout in the paper for simplicity.
-
-class GCN(nn.Module):
-    def __init__(self, in_feats, out_feats, activation):
-        super(GCN, self).__init__()
-        self.apply_mod = NodeApplyModule(in_feats, out_feats, activation)
 
     def forward(self, g, feature):
-        g.ndata['h'] = feature
-        g.update_all(gcn_msg, gcn_reduce)
-        g.apply_nodes(func=self.apply_mod)
-        return g.ndata.pop('h')
+        # Creating a local scope so that all the stored ndata and edata
+        # (such as the `'h'` ndata below) are automatically popped out
+        # when the scope exits.
+        with g.local_scope():
+            g.ndata['h'] = feature
+            g.update_all(gcn_msg, gcn_reduce)
+            h = g.ndata['h']
+            return self.linear(h)
 
 ###############################################################################
 # The forward function is essentially the same as any other commonly seen NNs
@@ -84,17 +77,17 @@ class GCN(nn.Module):
 # let's define a simple neural network consisting of two GCN layers. Suppose we
 # are training the classifier for the cora dataset (the input feature size is
 # 1433 and the number of classes is 7). The last GCN layer computes node embeddings,
-# so the last layer in general doesn't apply activation.
+# so the last layer in general does not apply activation.
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.gcn1 = GCN(1433, 16, F.relu)
-        self.gcn2 = GCN(16, 7, None)
+        self.layer1 = GCNLayer(1433, 16)
+        self.layer2 = GCNLayer(16, 7)
     
     def forward(self, g, features):
-        x = self.gcn1(g, features)
-        x = self.gcn2(g, x)
+        x = F.relu(self.layer1(g, features))
+        x = self.layer2(g, x)
         return x
 net = Net()
 print(net)
@@ -110,11 +103,7 @@ def load_cora_data():
     labels = th.LongTensor(data.labels)
     train_mask = th.BoolTensor(data.train_mask)
     test_mask = th.BoolTensor(data.test_mask)
-    g = data.graph
-    # add self loop
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
-    g.add_edges(g.nodes(), g.nodes())
+    g = DGLGraph(data.graph)
     return g, features, labels, train_mask, test_mask
 
 ###############################################################################
@@ -137,7 +126,7 @@ def evaluate(model, g, features, labels, mask):
 import time
 import numpy as np
 g, features, labels, train_mask, test_mask = load_cora_data()
-optimizer = th.optim.Adam(net.parameters(), lr=1e-3)
+optimizer = th.optim.Adam(net.parameters(), lr=1e-2)
 dur = []
 for epoch in range(50):
     if epoch >=3:
