@@ -107,10 +107,10 @@ G.ndata['feat'] = embed.weight
 # Print out the node features to verify:
 
 # print out node 2's input feature
-print(G.nodes[2].data['feat'])
+print(G.ndata['feat'][2])
 
 # print out node 10 and 11's input features
-print(G.nodes[[10, 11]].data['feat'])
+print(G.ndata['feat'][[10, 11]])
 
 ###############################################################################
 # Step 3: Define a Graph Convolutional Network (GCN)
