@@ -15,7 +15,6 @@ from functools import wraps
 from dgl.data import RedditDataset
 import tqdm
 import traceback
-from pyinstrument import Profiler
 
 #### Neighbor sampler
 
@@ -65,7 +64,7 @@ class SAGE(nn.Module):
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_nodes('DST/' + block.dsttypes[0])]
+            h_dst = h[:block.number_of_nodes(block.dsttype)]
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             h = layer(block, (h, h_dst))
@@ -99,7 +98,7 @@ class SAGE(nn.Module):
                 input_nodes = block.srcdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_nodes('DST/' + block.dsttypes[0])]
+                h_dst = h[:block.number_of_nodes(block.dsttype)]
                 h = layer(block, (h, h_dst))
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
@@ -144,74 +143,11 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     model.train()
     return compute_acc(pred[val_mask], labels[val_mask])
 
-
-class Cache:
-    def __init__(self, device, cache_size, feats):
-        self.device = device
-        self.cache_size = cache_size  # cache size in terms of number of nodes
-        self.feats = feats
-        self.total_size = feats.shape[0]
-        self.feat_size = feats.shape[1]
-
-        # a map from node id to cached position
-        self.cached_map = th.zeros((self.total_size + 1,)).long() + cache_size
-        self.freq = th.zeros((self.total_size + 1,)).long()
-        self.cached_nodes = th.zeros((self.cache_size,)).long() + self.total_size
-        # each row stores the cached feature
-        self.cached_feats = th.zeros((cache_size, self.feat_size)).float().to(device)
-
-        self.count = 0
-        self.hit_rate = 0.
-
-    def get(self, nodes):
-        if self.cache_size == 0:
-            return self.feats[nodes].to(self.device)
-        # find hit and miss
-        pos = self.cached_map[nodes]
-        hit = th.where(pos != self.cache_size)[0]
-        miss = th.where(pos == self.cache_size)[0]
-        miss_nodes = nodes[miss]
-
-        self.hit_rate = (self.hit_rate * self.count + len(hit) / len(nodes)) / (self.count + 1)
-        self.count += 1
-
-        rst = th.zeros((len(nodes), self.feat_size), dtype=self.feats.dtype, device=self.device)
-        rst[hit.to(self.device)] = self.cached_feats[pos[hit].to(self.device)]
-        miss_feats = self.feats[miss_nodes].to(self.device)
-        rst[miss.to(self.device)] = miss_feats
-
-        self.freq[nodes] += 1
-
-        # calculate admit and evict
-        miss_and_cached = th.cat([miss_nodes, self.cached_nodes])
-        all_freq = self.freq[miss_and_cached]
-        _, sorted_pos = th.sort(all_freq, descending=True)
-        keep = sorted_pos[:self.cache_size]
-        evict = sorted_pos[self.cache_size:]
-        admit = keep[keep < len(miss_nodes)]
-        evict = evict[evict >= len(miss_nodes)] - len(miss_nodes)
-        #print(evict)
-
-        # update cache
-        admit_nodes = miss_nodes[admit]
-        #print('admit nodes', th.sort(admit_nodes)[0])
-        #print('evict pos', evict[th.sort(admit_nodes)[1]])
-        evict_nodes = self.cached_nodes[evict]
-        self.cached_map[admit_nodes] = evict
-        self.cached_map[evict_nodes] = self.cache_size
-        self.cached_nodes[evict] = admit_nodes
-        self.cached_feats[evict] = miss_feats[admit]
-
-        #print(self.cached_feats[self.cached_map[nodes]])
-        #print('admit', len(admit), admit_nodes)
-        return rst
-
-def load_subtensor(g, labels, seeds, input_nodes, device, cache):
+def load_subtensor(g, labels, seeds, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    #batch_inputs = g.ndata['features'][input_nodes].to(device)
-    batch_inputs = cache.get(input_nodes)
+    batch_inputs = g.ndata['features'][input_nodes].to(device)
     batch_labels = labels[seeds].to(device)
     return batch_inputs, batch_labels
 
@@ -243,22 +179,14 @@ def run(args, device, data):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    # Feature cache
-    cache = Cache(device, args.cache_size, g.ndata['features'])
-
     # Training loop
     avg = 0
     iter_tput = []
-    #profiler = Profiler()
     for epoch in range(args.num_epochs):
         tic = time.time()
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        extract_time = 0.
-        extract_GB = 0.
-        train_time = 0.
-        copy_time = 0.
         for step, blocks in enumerate(dataloader):
             tic_step = time.time()
 
@@ -268,22 +196,14 @@ def run(args, device, data):
             seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
-            t0 = time.time()
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device, cache)
-            extract_time += time.time() - t0
-            extract_GB += batch_inputs.numel() * 4 / 1000 / 1000 / 1000
+            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
 
             # Compute loss and prediction
-            t0 = time.time()
-            #profiler.start()
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            loss.item()
-            #profiler.stop()
-            train_time += time.time() - t0
 
             iter_tput.append(len(seeds) / (time.time() - tic_step))
             if step % args.log_every == 0:
@@ -294,16 +214,13 @@ def run(args, device, data):
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
-        print('Extract Time(s): {:.4f} | Copy Time(s): {:.4f} | Amount(GB): {:.4f} | Train Time (s): {:.4f}'.format(extract_time, copy_time, extract_GB, train_time))
-        print('Avg cache hit rate: {:.4f}'.format(cache.hit_rate))
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
             eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
-    #print(profiler.output_text(unicode=True, color=True))
 
-    print('Avg epoch time: {:.4f}'.format(avg / (epoch - 4)))
+    print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
@@ -320,8 +237,6 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
-    argparser.add_argument('--cache-size', type=int, default=10000,
-        help="Node feature GPU cache size (number of nodes)")
     args = argparser.parse_args()
     
     if args.gpu >= 0:
