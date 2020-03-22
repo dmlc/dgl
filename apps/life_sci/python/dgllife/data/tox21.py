@@ -30,7 +30,7 @@ class Tox21(MoleculeCSVDataset):
     ----------
     smiles_to_graph: callable, str -> DGLGraph
         A function turning smiles into a DGLGraph.
-        Default to :func:`dgl.data.chem.smiles_to_bigraph`.
+        Default to :func:`dgllife.utils.smiles_to_bigraph`.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. Default to None.
@@ -41,11 +41,14 @@ class Tox21(MoleculeCSVDataset):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
+    log_every : bool
+        Print a message every time ``log_every`` molecules are processed. Default to 1000.
     """
     def __init__(self, smiles_to_graph=smiles_to_bigraph,
                  node_featurizer=None,
                  edge_featurizer=None,
-                 load=True):
+                 load=True,
+                 log_every=1000):
         self._url = 'dataset/tox21.csv.gz'
         data_path = get_download_dir() + '/tox21.csv.gz'
         download(_get_dgl_url(self._url), path=data_path)
@@ -55,7 +58,8 @@ class Tox21(MoleculeCSVDataset):
         df = df.drop(columns=['mol_id'])
 
         super(Tox21, self).__init__(df, smiles_to_graph, node_featurizer, edge_featurizer,
-                                    "smiles", "tox21_dglgraph.bin", load=load)
+                                    "smiles", "tox21_dglgraph.bin",
+                                    load=load, log_every=log_every)
         self._weight_balancing()
 
     def _weight_balancing(self):

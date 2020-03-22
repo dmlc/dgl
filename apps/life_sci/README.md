@@ -10,6 +10,8 @@ with graph neural networks.
 We provide various functionalities, including but not limited to methods for graph construction, 
 featurization, and evaluation, model architectures, training scripts and pre-trained models.
 
+**For a full list of work implemented in DGL-LifeSci, see [here](examples/README.md).**
+
 ## Dependencies
 
 For the time being, we only support PyTorch.
@@ -19,13 +21,17 @@ Depending on the features you want to use, you may need to manually install the 
 - RDKit 2018.09.3
     - We recommend installation with `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes,
     see the [official documentation](https://www.rdkit.org/docs/Install.html).
-- MDTraj
-    - We recommend installation with `conda install -c conda-forge mdtraj`. For alternative ways of installation, 
-    see the [official documentation](http://mdtraj.org/1.9.3/installation.html).
+    
+## Installation
+
+To install the package, 
+
+```bash
+cd python
+python setup.py install
+```
 
 ## Organization
-
-For a full list of work implemented in DGL-LifeSci, **see implemented.md**.
 
 ```
 dgllife
@@ -123,8 +129,9 @@ SVG(Draw.MolsToGridImage(mols, molsPerRow=4, subImgSize=(180, 150), useSVG=True)
 
 Below we provide some reference numbers to show how DGL improves the speed of training models per epoch in seconds.
 
-| Model                      | Original Implementation | DGL Implementation | Improvement |
-| -------------------------- | ----------------------- | ------------------ | ----------- |
-| GCN on Tox21               | 5.5 (DeepChem)          | 1.0                | 5.5x        |
-| AttentiveFP on Aromaticity | 6.0                     | 1.2                | 5x          |
-| JTNN on ZINC               | 1826                    | 743                | 2.5x        |
+| Model                              | Original Implementation | DGL Implementation | Improvement |
+| ---------------------------------- | ----------------------- | ------------------ | ----------- |
+| GCN on Tox21                       | 5.5 (DeepChem)          | 1.0                | 5.5x        |
+| AttentiveFP on Aromaticity         | 6.0                     | 1.2                | 5x          |
+| JTNN on ZINC                       | 1826                    | 743                | 2.5x        |
+| WLN for reaction center prediction | 11657                   | 5095               | 2.3x        |                                                           |

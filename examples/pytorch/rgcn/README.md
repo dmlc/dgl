@@ -40,5 +40,9 @@ python3 entity_classify.py -d am --n-bases=40 --n-hidden=10 --l2norm=5e-4 --test
 ### Link Prediction
 FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
 ```
-python3 link_predict.py -d FB15k-237 --gpu 0
+python3 link_predict.py -d FB15k-237 --gpu 0 --raw
+```
+FB15k-237: Filtered-MRR 0.2044
+```
+python3 link_predict.py -d FB15k-237 --gpu 0 --filtered
 ```

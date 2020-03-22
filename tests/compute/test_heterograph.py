@@ -118,7 +118,7 @@ def test_create():
     try:
         g = dgl.graph(
             ([0, 0, 0, 1, 1, 2], [0, 1, 2, 0, 1, 2]),
-            card=2,
+            num_nodes=2,
             validate=True
         )
     except DGLError:
@@ -131,7 +131,7 @@ def test_create():
         try:
             g = dgl.bipartite(
                 ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3]),
-                card=card,
+                num_nodes=card,
                 validate=True
             )
         except DGLError:
@@ -720,14 +720,14 @@ def test_to_device():
 def test_convert_bound():
     def _test_bipartite_bound(data, card):
         try:
-            dgl.bipartite(data, card=card)
+            dgl.bipartite(data, num_nodes=card)
         except dgl.DGLError:
             return
         assert False, 'bipartite bound test with wrong uid failed'
 
     def _test_graph_bound(data, card):
         try:
-            dgl.graph(data, card=card)
+            dgl.graph(data, num_nodes=card)
         except dgl.DGLError:
             return
         assert False, 'graph bound test with wrong uid failed'
@@ -827,7 +827,7 @@ def test_convert():
         assert len(hg.etypes) == 2
 
     # hetero_to_homo test case 2
-    hg = dgl.bipartite([(0, 0), (1, 1)], card=(2, 3))
+    hg = dgl.bipartite([(0, 0), (1, 1)], num_nodes=(2, 3))
     g = dgl.to_homo(hg)
     assert g.number_of_nodes() == 5
 
@@ -1473,6 +1473,51 @@ def test_isolated_ntype():
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4
 
+def test_bipartite():
+    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B')
+    assert g1.is_unibipartite
+    assert len(g1.ntypes) == 2
+    assert g1.etypes == ['AB']
+    assert g1.srctypes == ['A']
+    assert g1.dsttypes == ['B']
+    assert g1.number_of_nodes('A') == 2
+    assert g1.number_of_nodes('B') == 6
+    assert g1.number_of_src_nodes('A') == 2
+    assert g1.number_of_src_nodes() == 2
+    assert g1.number_of_dst_nodes('B') == 6
+    assert g1.number_of_dst_nodes() == 6
+    assert g1.number_of_edges() == 3
+    g1.srcdata['h'] = F.randn((2, 5))
+    assert F.array_equal(g1.srcnodes['A'].data['h'], g1.srcdata['h'])
+    assert F.array_equal(g1.nodes['A'].data['h'], g1.srcdata['h'])
+    assert F.array_equal(g1.nodes['SRC/A'].data['h'], g1.srcdata['h'])
+    g1.dstdata['h'] = F.randn((6, 3))
+    assert F.array_equal(g1.dstnodes['B'].data['h'], g1.dstdata['h'])
+    assert F.array_equal(g1.nodes['B'].data['h'], g1.dstdata['h'])
+    assert F.array_equal(g1.nodes['DST/B'].data['h'], g1.dstdata['h'])
+
+    # more complicated bipartite
+    g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C')
+    g3 = dgl.hetero_from_relations([g1, g2])
+    assert g3.is_unibipartite
+    assert g3.srctypes == ['A']
+    assert set(g3.dsttypes) == {'B', 'C'}
+    assert g3.number_of_nodes('A') == 2
+    assert g3.number_of_nodes('B') == 6
+    assert g3.number_of_nodes('C') == 1
+    assert g3.number_of_src_nodes('A') == 2
+    assert g3.number_of_src_nodes() == 2
+    assert g3.number_of_dst_nodes('B') == 6
+    assert g3.number_of_dst_nodes('C') == 1
+    g3.srcdata['h'] = F.randn((2, 5))
+    assert F.array_equal(g3.srcnodes['A'].data['h'], g3.srcdata['h'])
+    assert F.array_equal(g3.nodes['A'].data['h'], g3.srcdata['h'])
+    assert F.array_equal(g3.nodes['SRC/A'].data['h'], g3.srcdata['h'])
+
+    g4 = dgl.graph([(0, 0), (1, 1)], 'A', 'AA')
+    g5 = dgl.hetero_from_relations([g1, g2, g4])
+    assert not g5.is_unibipartite
+
 if __name__ == '__main__':
     test_create()
     test_query()
@@ -1496,3 +1541,4 @@ if __name__ == '__main__':
     test_types_in_function()
     test_stack_reduce()
     test_isolated_ntype()
+    test_bipartite()

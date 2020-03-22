@@ -246,9 +246,9 @@ class MovieLens(object):
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
             bg = dgl.bipartite((rrow, rcol), 'user', str(rating), 'movie',
-                               card=(self._num_user, self._num_movie))
+                               num_nodes=(self._num_user, self._num_movie))
             rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % str(rating), 'user',
-                               card=(self._num_movie, self._num_user))
+                               num_nodes=(self._num_movie, self._num_user))
             rating_graphs.append(bg)
             rating_graphs.append(rev_bg)
         graph = dgl.hetero_from_relations(rating_graphs)
