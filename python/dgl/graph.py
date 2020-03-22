@@ -51,6 +51,30 @@ class DGLBaseGraph(object):
         """
         return self._graph.number_of_nodes()
 
+    def number_of_src_nodes(self):
+        """Return the number of nodes in the graph.
+
+        For compatibility with heterographs.
+
+        Returns
+        -------
+        int
+            The number of nodes
+        """
+        return self._graph.number_of_nodes()
+
+    def number_of_dst_nodes(self):
+        """Return the number of nodes in the graph.
+
+        For compatibility with heterographs.
+
+        Returns
+        -------
+        int
+            The number of nodes
+        """
+        return self._graph.number_of_nodes()
+
     def __len__(self):
         """Return the number of nodes in the graph."""
         return self.number_of_nodes()
@@ -1781,13 +1805,17 @@ class DGLGraph(DGLBaseGraph):
                         raise DGLError('Not all edges have attribute {}.'.format(attr))
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
-    def from_scipy_sparse_matrix(self, spmat):
+    def from_scipy_sparse_matrix(self, spmat, multigraph=False):
         """ Convert from scipy sparse matrix.
 
         Parameters
         ----------
         spmat : scipy sparse matrix
             The graph's adjacency matrix
+
+        multigraph : bool, optional
+            Whether the graph would be a multigraph. If the input scipy sparse matrix is CSR,
+            this argument is ignored.
 
         Examples
         --------
@@ -1800,7 +1828,7 @@ class DGLGraph(DGLBaseGraph):
         >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
-        self._graph = graph_index.from_scipy_sparse_matrix(spmat, self.is_readonly)
+        self._graph = graph_index.from_scipy_sparse_matrix(spmat, multigraph, self.is_readonly)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())

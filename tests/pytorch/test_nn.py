@@ -290,23 +290,28 @@ def test_edge_softmax():
     print(score.grad[:10], grad_score[:10])
     
     # Test 2
-    def generate_rand_graph(n):
-      arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-      return dgl.DGLGraph(arr, readonly=True)
-    
-    g = generate_rand_graph(50)
-    a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
-    a2 = a1.clone().detach().requires_grad_()
-    g.edata['s'] = a1
-    g.group_apply_edges('dst', lambda edges: {'ss':F.softmax(edges.data['s'], 1)})
-    g.edata['ss'].sum().backward()
-    
-    builtin_sm = nn.edge_softmax(g, a2)
-    builtin_sm.sum().backward()
-    print(a1.grad - a2.grad)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 2
-    assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
+    def generate_rand_graph(n, m=None, ctor=dgl.DGLGraph):
+        if m is None:
+            m = n
+        arr = (sp.sparse.random(m, n, density=0.1, format='coo') != 0).astype(np.int64)
+        return ctor(arr, readonly=True)
+
+    for g in [generate_rand_graph(50),
+              generate_rand_graph(50, ctor=dgl.graph),
+              generate_rand_graph(100, 50, ctor=dgl.bipartite)]:
+        a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
+        a2 = a1.clone().detach().requires_grad_()
+        g.edata['s'] = a1
+        g.group_apply_edges('dst', lambda edges: {'ss':F.softmax(edges.data['s'], 1)})
+        g.edata['ss'].sum().backward()
+        
+        builtin_sm = nn.edge_softmax(g, a2)
+        builtin_sm.sum().backward()
+        print(a1.grad - a2.grad)
+        assert len(g.srcdata) == 0
+        assert len(g.dstdata) == 0
+        assert len(g.edata) == 2
+        assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
 
 def test_partial_edge_softmax():
     g = dgl.DGLGraph()
@@ -396,6 +401,13 @@ def test_sage_conv():
     for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        sage = nn.SAGEConv(5, 10, aggre_type)
+        feat = F.randn((100, 5))
+        sage = sage.to(ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 10
+
+        g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
         sage = nn.SAGEConv(5, 10, aggre_type)
         feat = F.randn((100, 5))
         sage = sage.to(ctx)

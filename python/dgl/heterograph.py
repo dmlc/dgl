@@ -716,8 +716,12 @@ class DGLHeteroGraph(object):
     def srcdata(self):
         """Return the data view of all nodes in the SRC category.
 
-        **Only works if the graph is uni-bipartite and has one node type in the
-        SRC category.**
+        Only works if the graph is either
+
+        * Uni-bipartite and has one node type in the SRC category.
+
+        * Non-uni-bipartite and has only one node type (in this case identical to
+        :any:`DGLHeteroGraph.ndata`)
 
         Examples
         --------
@@ -750,8 +754,10 @@ class DGLHeteroGraph(object):
         --------
         nodes
         """
-        assert self.is_unibipartite, 'srcdata is only allowed for uni-bipartite graph.'
-        assert len(self.srctypes) == 1, 'srcdata is only allowed when there is only one SRC type.'
+        err_msg = (
+            'srcdata is only allowed when there is only one %s type.' %
+            ('SRC' if self.is_unibipartite else 'node'))
+        assert len(self.srctypes) == 1, err_msg
         ntype = self.srctypes[0]
         ntid = self.get_ntype_id_from_src(ntype)
         return HeteroNodeDataView(self, ntype, ntid, ALL)
@@ -760,8 +766,12 @@ class DGLHeteroGraph(object):
     def dstdata(self):
         """Return the data view of all destination nodes.
 
-        **Only works if the graph is uni-bipartite and has one node type in the
-        DST category.**
+        Only works if the graph is either
+
+        * Uni-bipartite and has one node type in the SRC category.
+
+        * Non-uni-bipartite and has only one node type (in this case identical to
+        :any:`DGLHeteroGraph.ndata`)
 
         Examples
         --------
@@ -794,8 +804,10 @@ class DGLHeteroGraph(object):
         --------
         nodes
         """
-        assert self.is_unibipartite, 'dstdata is only allowed for uni-bipartite graph.'
-        assert len(self.dsttypes) == 1, 'dstdata is only allowed when there is only one DST type.'
+        err_msg = (
+            'dstdata is only allowed when there is only one %s type.' %
+            ('DST' if self.is_unibipartite else 'node'))
+        assert len(self.dsttypes) == 1, err_msg
         ntype = self.dsttypes[0]
         ntid = self.get_ntype_id_from_dst(ntype)
         return HeteroNodeDataView(self, ntype, ntid, ALL)
@@ -3819,7 +3831,7 @@ class DGLHeteroGraph(object):
         >>> import torch
         >>> import dgl
         >>> import dgl.function as fn
-        >>> g = dgl.graph([], 'user', 'follows', card=4)
+        >>> g = dgl.graph([], 'user', 'follows', num_nodes=4)
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
         >>> g.filter_nodes(lambda nodes: (nodes.data['h'] == 1.).squeeze(1), ntype='user')
         tensor([1, 2])

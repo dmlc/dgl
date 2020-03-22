@@ -202,7 +202,8 @@ def create_large_graph_index(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
-    return from_scipy_sparse_matrix(spm, True)
+    # It's possible that we generate a multigraph.
+    return from_scipy_sparse_matrix(spm, True, True)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -326,8 +327,8 @@ def test_compact():
         ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
         {'user': 20, 'game': 10})
 
-    g3 = dgl.graph([(0, 1), (1, 2)], card=10, ntype='user')
-    g4 = dgl.graph([(1, 3), (3, 5)], card=10, ntype='user')
+    g3 = dgl.graph([(0, 1), (1, 2)], num_nodes=10, ntype='user')
+    g4 = dgl.graph([(1, 3), (3, 5)], num_nodes=10, ntype='user')
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes

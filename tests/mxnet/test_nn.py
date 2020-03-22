@@ -127,17 +127,30 @@ def test_gat_conv():
     assert h1.shape == (20, 5, 20)
 
 def test_sage_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
-    ctx = F.ctx()
+    for aggre_type in ['mean', 'pool', 'gcn']:
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        sage = nn.SAGEConv(5, 10, aggre_type)
+        feat = F.randn((100, 5))
+        sage.initialize(ctx=ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 10
 
-    graphsage = nn.SAGEConv(10, 20)
-    graphsage.initialize(ctx=ctx)
-    print(graphsage)
+        g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
+        sage = nn.SAGEConv(5, 10, aggre_type)
+        feat = F.randn((100, 5))
+        sage.initialize(ctx=ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 10
 
-    # test#1: basic
-    h0 = F.randn((20, 10))
-    h1 = graphsage(g, h0)
-    assert h1.shape == (20, 20)
+        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+        dst_dim = 5 if aggre_type != 'gcn' else 10
+        sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
+        feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
+        sage.initialize(ctx=ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 200
 
 def test_gg_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
