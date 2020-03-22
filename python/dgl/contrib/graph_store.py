@@ -13,7 +13,7 @@ from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
-from ..graph_index import GraphIndex, create_graph_index, from_csr, from_shared_mem_csr_matrix
+from ..graph_index import GraphIndex, create_graph_index, from_csr, from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
@@ -21,9 +21,6 @@ from ..init import zero_initializer
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name
-
-def _get_edata_path(graph_name, edata_name):
-    return "/" + graph_name + "_edge_" + edata_name
 
 def _get_edata_path(graph_name, edata_name):
     return "/" + graph_name + "_edge_" + edata_name
@@ -558,8 +555,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
         num_nodes, num_edges = int(num_nodes), int(num_edges)
 
-        graph_idx = from_shared_mem_csr_matrix(_get_graph_path(graph_name),
-                num_nodes, num_edges, edge_dir, multigraph)
+        graph_idx = from_shared_mem_graph_index(_get_graph_path(graph_name))
         super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
         self._init_manager = InitializerManager()
 

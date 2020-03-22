@@ -81,13 +81,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const std::string shared_mem_name = args[0];
-    const int64_t num_vertices = args[1];
-    const int64_t num_edges = args[2];
-    const bool multigraph = args[3];
-    const std::string edge_dir = args[4];
-    // TODO(minjie): how to know multigraph
-    *rv = GraphRef(ImmutableGraph::CreateFromCSR(
-      shared_mem_name, num_vertices, num_edges, multigraph, edge_dir));
+    *rv = GraphRef(ImmutableGraph::CreateFromCSR(shared_mem_name));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphAddVertices")

@@ -888,15 +888,13 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLImmutableGraphCopyTo(self, ctx.device_type, ctx.device_id)
 
-    def copyto_shared_mem(self, edge_dir, shared_mem_name):
+    def copyto_shared_mem(self, shared_mem_name):
         """Copy this immutable graph index to shared memory.
 
         NOTE: this method only works for immutable graph index
 
         Parameters
         ----------
-        edge_dir : string
-            Indicate which CSR should copy ("in", "out", "both").
         shared_mem_name : string
             The name of the shared memory.
 
@@ -905,7 +903,7 @@ class GraphIndex(ObjectBase):
         GraphIndex
             The graph index on the given device context.
         """
-        return _CAPI_DGLImmutableGraphCopyToSharedMem(self, edge_dir, shared_mem_name)
+        return _CAPI_DGLImmutableGraphCopyToSharedMem(self, shared_mem_name)
 
     def nbits(self):
         """Return the number of integer bits used in the storage (32 or 64).
@@ -1061,28 +1059,15 @@ def from_csr(indptr, indices, is_multigraph,
         direction)
     return gidx
 
-def from_shared_mem_csr_matrix(shared_mem_name,
-                               num_nodes, num_edges, edge_dir,
-                               is_multigraph):
-    """Load a graph from the shared memory in the CSR format.
+def from_shared_mem_graph_index(shared_mem_name):
+    """Load a graph index from the shared memory.
 
     Parameters
     ----------
     shared_mem_name : string
         the name of shared memory
-    num_nodes : int
-        the number of nodes
-    num_edges : int
-        the number of edges
-    edge_dir : string
-        the edge direction. The supported option is "in" and "out".
     """
-    gidx = _CAPI_DGLGraphCSRCreateMMap(
-        shared_mem_name,
-        int(num_nodes), int(num_edges),
-        is_multigraph,
-        edge_dir)
-    return gidx
+    return _CAPI_DGLGraphCSRCreateMMap(shared_mem_name)
 
 def from_networkx(nx_graph, readonly):
     """Convert from networkx graph.

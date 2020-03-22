@@ -237,8 +237,7 @@ def test_sync_barrier():
 def create_mem(gidx, cond_v, shared_v):
     # serialize create_mem before check_mem
     cond_v.acquire()
-    gidx1 = gidx.copyto_shared_mem("in", "test_graph5")
-    gidx2 = gidx.copyto_shared_mem("out", "test_graph6")
+    gidx1 = gidx.copyto_shared_mem("test_graph5")
     shared_v.value = 1;
     cond_v.notify()
     cond_v.release()
@@ -256,10 +255,7 @@ def check_mem(gidx, cond_v, shared_v):
       cond_v.wait()
     cond_v.release()
 
-    gidx1 = dgl.graph_index.from_shared_mem_csr_matrix("test_graph5", gidx.number_of_nodes(),
-                                                       gidx.number_of_edges(), "in", False)
-    gidx2 = dgl.graph_index.from_shared_mem_csr_matrix("test_graph6", gidx.number_of_nodes(),
-                                                       gidx.number_of_edges(), "out", False)
+    gidx1 = dgl.graph_index.from_shared_mem_graph_index("test_graph5")
     in_csr = gidx.adjacency_matrix_scipy(False, "csr")
     out_csr = gidx.adjacency_matrix_scipy(True, "csr")
 
@@ -270,15 +266,7 @@ def check_mem(gidx, cond_v, shared_v):
     assert_array_equal(out_csr.indptr, out_csr1.indptr)
     assert_array_equal(out_csr.indices, out_csr1.indices)
 
-    in_csr2 = gidx2.adjacency_matrix_scipy(False, "csr")
-    assert_array_equal(in_csr.indptr, in_csr2.indptr)
-    assert_array_equal(in_csr.indices, in_csr2.indices)
-    out_csr2 = gidx2.adjacency_matrix_scipy(True, "csr")
-    assert_array_equal(out_csr.indptr, out_csr2.indptr)
-    assert_array_equal(out_csr.indices, out_csr2.indices)
-
-    gidx1 = gidx1.copyto_shared_mem("in", "test_graph5")
-    gidx2 = gidx2.copyto_shared_mem("out", "test_graph6")
+    gidx1 = gidx1.copyto_shared_mem("test_graph5")
 
     #sync for exit
     cond_v.acquire()
