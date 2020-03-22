@@ -1030,8 +1030,7 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
         gidx.add_edges(src, dst)
     return gidx
 
-def from_csr(indptr, indices, is_multigraph,
-             direction, shared_mem_name=""):
+def from_csr(indptr, indices, is_multigraph, direction):
     """Load a graph from CSR arrays.
 
     Parameters
@@ -1044,8 +1043,6 @@ def from_csr(indptr, indices, is_multigraph,
         True if the graph is a multigraph. None means determined by data.
     direction : str
         the edge direction. Either "in" or "out".
-    shared_mem_name : str
-        the name of shared memory
     """
     indptr = utils.toindex(indptr)
     indices = utils.toindex(indices)
