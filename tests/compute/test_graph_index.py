@@ -170,20 +170,6 @@ def test_load_csr():
     assert np.all(F.asnumpy(src) == coo.row)
     assert np.all(F.asnumpy(dst) == coo.col)
 
-    # Load CSR to shared memory.
-    # Shared memory isn't supported in Windows.
-    if os.name is not 'nt':
-        idx = dgl.graph_index.from_csr(
-                utils.toindex(csr.indptr), utils.toindex(csr.indices),
-                False, 'out', '/test_graph_struct')
-        assert idx.number_of_nodes() == n
-        assert idx.number_of_edges() == csr.nnz
-        src, dst, eid = idx.edges()
-        src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
-        coo = csr.tocoo()
-        assert np.all(F.asnumpy(src) == coo.row)
-        assert np.all(F.asnumpy(dst) == coo.col)
-
 def test_edge_ids():
     np.random.seed(0)
     csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(np.int64)
