@@ -10,7 +10,7 @@ import pickle as pkl
 import networkx as nx
 import scipy.sparse as sp
 import os, sys
-from dgl import DGLGraph
+from ..graph import DGLGraph
 
 import dgl
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url

@@ -2,7 +2,7 @@
 """
 import numpy as np
 import networkx as nx
-from dgl import DGLGraph
+from ..graph import DGLGraph
 
 
 class KarateClub(object):
