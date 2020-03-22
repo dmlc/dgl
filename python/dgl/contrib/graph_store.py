@@ -115,21 +115,6 @@ class EdgeDataView(MutableMapping):
         data = self._graph.get_e_repr(self._edges)
         return repr({key : data[key] for key in self._graph._edge_frame})
 
-def _to_csr(graph_data, edge_dir, multigraph):
-    try:
-        indptr = graph_data.indptr
-        indices = graph_data.indices
-        return indptr, indices
-    except:
-        if isinstance(graph_data, scipy.sparse.spmatrix):
-            csr = graph_data.tocsr()
-            return csr.indptr, csr.indices
-        else:
-            idx = create_graph_index(graph_data=graph_data, multigraph=multigraph, readonly=True)
-            transpose = (edge_dir != 'in')
-            csr = idx.adjacency_matrix_scipy(transpose, 'csr')
-            return csr.indptr, csr.indices
-
 class Barrier(object):
     """ A barrier in the KVStore server used for one synchronization.
 
@@ -316,16 +301,15 @@ class SharedMemoryStoreServer(object):
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
         if isinstance(graph_data, GraphIndex):
-            graph_data = graph_data.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
-            self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
+            graph_data = graph_data.copyto_shared_mem(_get_graph_path(graph_name))
         elif isinstance(graph_data, DGLGraph):
-            graph_data = graph_data._graph.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
-            self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
+            graph_data = graph_data._graph.copyto_shared_mem(_get_graph_path(graph_name))
         else:
-            indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
-            graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
-                                 multigraph, edge_dir, _get_graph_path(graph_name))
-            self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
+            if edge_dir == 'in':
+                graph_data = graph_data.transpose()
+            graph_data = create_graph_index(graph_data, multigraph, True)
+            graph_data = graph_data.copyto_shared_mem(_get_graph_path(graph_name))
+        self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
 
         self._num_workers = num_workers
         self._graph_name = graph_name

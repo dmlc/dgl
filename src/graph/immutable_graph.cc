@@ -653,14 +653,12 @@ ImmutableGraphPtr ImmutableGraph::CopyTo(ImmutableGraphPtr g, const DLContext& c
 
 ImmutableGraphPtr ImmutableGraph::CopyToSharedMem(ImmutableGraphPtr g, const std::string &name) {
   CSRPtr new_incsr, new_outcsr;
-  if (g->in_csr_) {
-    std::string shared_mem_name = GetSharedMemName(name, "in");
-    new_incsr = CSRPtr(new CSR(g->in_csr_->CopyToSharedMem(shared_mem_name)));
-  }
-  if (g->out_csr_) {
-    std::string shared_mem_name = GetSharedMemName(name, "out");
-    new_outcsr = CSRPtr(new CSR(g->out_csr_->CopyToSharedMem(shared_mem_name)));
-  }
+  std::string shared_mem_name = GetSharedMemName(name, "in");
+  new_incsr = CSRPtr(new CSR(g->GetInCSR()->CopyToSharedMem(shared_mem_name)));
+
+  shared_mem_name = GetSharedMemName(name, "out");
+  new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->CopyToSharedMem(shared_mem_name)));
+
   auto new_g = ImmutableGraphPtr(new ImmutableGraph(new_incsr, new_outcsr, name));
   new_g->serialized_shared_meta_ = SerializeMetadata(new_g, GetSharedMemName(name, "meta"));
   return new_g;
