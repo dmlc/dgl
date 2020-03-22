@@ -12,7 +12,7 @@ import scipy.sparse as sp
 import os, sys
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
-from ..graph import DGLGraph
+from ..graph import DGLGraph, batch
 
 _urls = {
     'cora' : 'dataset/cora_raw.zip',
@@ -313,13 +313,13 @@ class CoraBinary(object):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(dgl.DGLGraph(elist))
+                        self.graphs.append(DGLGraph(elist))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(dgl.DGLGraph(elist))
+                self.graphs.append(DGLGraph(elist))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
             self.pmpds = _pickle_load(f)
         self.labels = []
@@ -347,7 +347,7 @@ class CoraBinary(object):
     @staticmethod
     def collate_fn(batch):
         graphs, pmpds, labels = zip(*batch)
-        batched_graphs = dgl.batch(graphs)
+        batched_graphs = batch(graphs)
         batched_pmpds = sp.block_diag(pmpds)
         batched_labels = np.concatenate(labels, axis=0)
         return batched_graphs, batched_pmpds, batched_labels
