@@ -24,6 +24,9 @@ inline std::string GetSharedMemName(const std::string &name, const std::string &
   return name + "_" + edge_dir;
 }
 
+/*
+ * The metadata of a graph index that are needed for shared-memory graph.
+ */
 struct GraphIndexMetadata {
   int64_t num_nodes;
   int64_t num_edges;
@@ -33,6 +36,10 @@ struct GraphIndexMetadata {
   bool multigraph;
 };
 
+/*
+ * Serialize the metadata of a graph index and place it in a shared-memory tensor.
+ * In this way, another process can reconstruct a GraphIndex from a shared-memory tensor.
+ */
 NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
 #ifndef _WIN32
   GraphIndexMetadata meta;
@@ -53,6 +60,9 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
 #endif  // _WIN32
 }
 
+/*
+ * Deserialize the metadata of a graph index.
+ */
 GraphIndexMetadata DeserializeMetadata(const std::string &name) {
   GraphIndexMetadata meta;
 #ifndef _WIN32
