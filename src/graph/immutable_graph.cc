@@ -50,8 +50,8 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
   meta.has_coo = false;
   meta.multigraph = gidx->IsMultigraph();
 
-  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)},
-		  DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
+  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DLDataType{kDLInt, 8, 1},
+                                          DLContext{kDLCPU, 0}, true);
   memcpy(meta_arr->data, &meta, sizeof(meta));
   return meta_arr;
 #else
@@ -66,8 +66,8 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
 GraphIndexMetadata DeserializeMetadata(const std::string &name) {
   GraphIndexMetadata meta;
 #ifndef _WIN32
-  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)},
-		  DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, false);
+  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DLDataType{kDLInt, 8, 1},
+                                          DLContext{kDLCPU, 0}, false);
   memcpy(&meta, meta_arr->data, sizeof(meta));
 #else
   LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
