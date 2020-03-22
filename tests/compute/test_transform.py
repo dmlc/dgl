@@ -542,6 +542,16 @@ def test_remove_edges():
     check(g2, 'AB', g, [3])
     check(g2, 'BA', g, [1])
 
+    g3 = dgl.remove_edges(g, {'AA': F.tensor([]), 'AB': F.tensor([3]), 'BA': F.tensor([1])})
+    check(g3, 'AA', g, [])
+    check(g3, 'AB', g, [3])
+    check(g3, 'BA', g, [1])
+
+    g4 = dgl.remove_edges(g, {'AB': F.tensor([3])})
+    check(g4, 'AA', g, [])
+    check(g4, 'AB', g, [3])
+    check(g4, 'BA', g, [])
+
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()

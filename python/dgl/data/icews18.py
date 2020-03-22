@@ -1,11 +1,11 @@
 from scipy import io
 import numpy as np
-from dgl import DGLGraph
 import os
 import datetime
 import warnings
 
 from .utils import get_download_dir, download, extract_archive, loadtxt
+from ..graph import DGLGraph
 
 
 class ICEWS18(object):
