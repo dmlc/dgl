@@ -42,8 +42,13 @@ class GraphConv(nn.Module):
         Input feature size.
     out_feats : int
         Output feature size.
-    norm : bool, optional
-        If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
+    norm : str, optional
+        How to apply the normalizer. If is `'right'`, divide the aggregated messages
+        by each node's in-degrees, which is equivalent to averaging the received messages.
+        If is `'none'`, no normalization is applied. Default is `'both'`,
+        where the :math:`c_{ij}` in the paper is applied.
+    weight : bool, optional
+        If True, apply a linear layer after message passing.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
@@ -60,7 +65,8 @@ class GraphConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 norm=True,
+                 norm='both',
+                 weight=True,
                  bias=True,
                  activation=None):
         super(GraphConv, self).__init__()
@@ -68,18 +74,24 @@ class GraphConv(nn.Module):
         self._out_feats = out_feats
         self._norm = norm
 
-        self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
+        if weight:
+            self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
+        else:
+            self.weight = None
+
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
-            self.register_parameter('bias', None)
+            self.bias = None
+
         self.reset_parameters()
 
         self._activation = activation
 
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
-        init.xavier_uniform_(self.weight)
+        if self.weight is not None:
+            init.xavier_uniform_(self.weight)
         if self.bias is not None:
             init.zeros_(self.bias)
 
@@ -106,28 +118,37 @@ class GraphConv(nn.Module):
             The output feature
         """
         graph = graph.local_var()
-        if self._norm:
-            norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+
+        if self._norm != 'none':
+            degs = graph.in_degrees().to(feat.device).float().clamp(min=1)
+            if self._norm == 'both':
+                norm = th.pow(degs, -0.5)
+            else:
+                norm = 1.0 / degs
             shp = norm.shape + (1,) * (feat.dim() - 1)
-            norm = th.reshape(norm, shp).to(feat.device)
+            norm = th.reshape(norm, shp)
+
+        if self._norm == 'both':
             feat = feat * norm
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = th.matmul(feat, self.weight)
-            graph.ndata['h'] = feat
+            if self.weight is not None:
+                feat = th.matmul(feat, self.weight)
+            graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.ndata['h']
+            rst = graph.dstdata['h']
         else:
             # aggregate first then mult W
-            graph.ndata['h'] = feat
+            graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.ndata['h']
-            rst = th.matmul(rst, self.weight)
+            rst = graph.dstdata['h']
+            if self.weight is not None:
+                rst = th.matmul(rst, self.weight)
 
-        if self._norm:
+        if self._norm in ('right', 'both'):
             rst = rst * norm
 
         if self.bias is not None:

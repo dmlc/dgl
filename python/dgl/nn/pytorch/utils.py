@@ -216,3 +216,33 @@ class Sequential(nn.Sequential):
             raise TypeError('The first argument of forward must be a DGLGraph'
                             ' or a list of DGLGraph s')
         return feats
+
+class WeightBasis(nn.Module):
+    def __init__(self,
+                 in_feat,
+                 out_feat,
+                 num_bases,
+                 num_outputs=None):
+        super(WeightBasis, self).__init__()
+        self.in_feat = in_feat
+        self.out_feat = out_feat
+        self.num_bases = num_bases
+        self.num_outputs = num_outputs
+
+        self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
+        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+        if num_outputs is not None:
+            # linear combination coefficients
+            self.w_comp = nn.Parameter(th.Tensor(self.num_outputs, self.num_bases))
+            nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
+
+    def forward(self):
+        if self.num_outputs is not None:
+            # generate all weights from bases
+            weight = self.weight.view(self.num_bases,
+                                      self.in_feat * self.out_feat)
+            weight = th.matmul(self.w_comp, weight).view(
+                self.num_outputs, self.in_feat, self.out_feat)
+        else:
+            weight = self.weight
+        return weight
