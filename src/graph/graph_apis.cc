@@ -51,30 +51,19 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray indptr = args[0];
     const IdArray indices = args[1];
-    const std::string shared_mem_name = args[2];
-    const int multigraph = args[3];
-    const std::string edge_dir = args[4];
+    const int multigraph = args[2];
+    const std::string edge_dir = args[3];
 
     IdArray edge_ids = IdArray::Empty({indices->shape[0]},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
-    if (shared_mem_name.empty()) {
-      if (multigraph == kBoolUnknown) {
-        *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, edge_dir));
-      } else {
-        *rv = GraphRef(ImmutableGraph::CreateFromCSR(
-            indptr, indices, edge_ids, multigraph, edge_dir));
-      }
+    if (multigraph == kBoolUnknown) {
+      *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, edge_dir));
     } else {
-      if (multigraph == kBoolUnknown) {
-        *rv = GraphRef(ImmutableGraph::CreateFromCSR(
-            indptr, indices, edge_ids, edge_dir, shared_mem_name));
-      } else {
-        *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
-            multigraph, edge_dir, shared_mem_name));
-      }
+      *rv = GraphRef(ImmutableGraph::CreateFromCSR(
+          indptr, indices, edge_ids, multigraph, edge_dir));
     }
   });
 

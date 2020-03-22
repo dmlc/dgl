@@ -570,37 +570,6 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
   }
 }
 
-ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
-    IdArray indptr, IdArray indices, IdArray edge_ids,
-    const std::string &edge_dir,
-    const std::string &shared_mem_name) {
-  CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
-  if (edge_dir == "in") {
-    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
-  } else if (edge_dir == "out") {
-    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
-  } else {
-    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphPtr();
-  }
-}
-
-ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
-    IdArray indptr, IdArray indices, IdArray edge_ids,
-    bool multigraph, const std::string &edge_dir,
-    const std::string &shared_mem_name) {
-  CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
-                     GetSharedMemName(shared_mem_name, edge_dir)));
-  if (edge_dir == "in") {
-    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
-  } else if (edge_dir == "out") {
-    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
-  } else {
-    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphPtr();
-  }
-}
-
 ImmutableGraphPtr ImmutableGraph::CreateFromCSR(const std::string &name) {
   GraphIndexMetadata meta = DeserializeMetadata(GetSharedMemName(name, "meta"));
   CSRPtr in_csr, out_csr;

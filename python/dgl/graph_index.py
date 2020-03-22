@@ -1051,7 +1051,6 @@ def from_csr(indptr, indices, is_multigraph, direction):
     gidx = _CAPI_DGLGraphCSRCreate(
         indptr.todgltensor(),
         indices.todgltensor(),
-        shared_mem_name,
         int(is_multigraph),
         direction)
     return gidx
