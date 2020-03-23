@@ -1,0 +1,40 @@
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.211223
+micro-f1: 0.368261
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.206221
+micro-f1: 0.367222
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.209437
+micro-f1: 0.368431
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.210370
+micro-f1: 0.370392
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.205753
+micro-f1: 0.364749
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.206760
+micro-f1: 0.366486
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.203298
+micro-f1: 0.363754
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.212857
+micro-f1: 0.370092
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.209381
+micro-f1: 0.371448
+number of tests: 7218
+number of labels: 39
+macro-f1: 0.210109
+micro-f1: 0.369701

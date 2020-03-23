@@ -1,0 +1,33 @@
+                               Ma      Mi       Ma      Mi
+tmpfile/net.txt -alpha 0     19.49   34.70    20.11   35.00(line-2nd)
+tmpfile/net.txt -alpha 0.1   20.70   35.66                 
+tmpfile/net.txt -alpha 0.3   20.89   35.86
+tmpfile/net.txt -alpha 0.6   20.85   35.93
+tmpfile/net.txt -alpha 0.9   21.28   36.07
+                             28.59   35.21(line-1st-mynet)
+                             28.39   35.33(mine-u)
+                             28.48   35.36(mine-u-dprob-0.01)
+                             28.48   35.43(mine-u-dprob-auto-0.125)
+                             28.51   35.41(mine-u-dprob-auto-1)
+                             21.38   36.14(mine-d-dprob-0.01))
+                             27.92   38.93(line-1st-mynet + mine)
+                             27.95   38.96(mine-u + mine-d)
+tmpfile/net.txt -alpha 1.2   21.07   35.95
+                       1.5   20.96   35.93
+                       1.8   21.06   35.95
+                       2.1   21.07   35.92
+                       2.4   21.04   35.90
+                       2.7   21.05   35.89
+                       3.0   21.27   36.13
+                       3.3   20.95   35.80
+                       3.6   20.87   35.80
+                       3.9   20.93   35.79
+net_youtube.txt           
+                               line-1+2
+                             27.69   38.87
+                               line-1st
+                             28.39   34.96    
+                               line-2nd
+                             19.85   34.86
+                              line-joint
+                             26.01   35.55
