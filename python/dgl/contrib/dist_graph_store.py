@@ -1,4 +1,5 @@
 from ..graph import DGLGraph
+from .. import backend as F
 from ..base import ALL, NID, EID
 from ..data.utils import load_graphs
 from .graph_store import _move_data_to_shared_mem_array
@@ -6,26 +7,31 @@ from .graph_store import _get_ndata_path, _get_edata_path, _get_graph_path
 from .dis_kvstore import KVServer, KVClient
 
 import socket
+import numpy as np
 
 def copy_graph_to_shared_mem(g, graph_name):
-    gidx = g._graph.copyto_shared_mem('in', _get_graph_path(graph_name))
-    g = DGLGraph(gidx)
+    gidx = g._graph.copyto_shared_mem(_get_graph_path(graph_name))
+    new_g = DGLGraph(gidx)
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
-    g.ndata['part_id'] = _move_data_to_shared_mem_array(g.ndata['part_id'],
-                                                        _get_ndata_path(graph_name, 'part_id'))
-    g.ndata['local_node'] = _move_data_to_shared_mem_array(g.ndata['local_node'],
-                                                           _get_ndata_path(graph_name, 'local_node'))
-    g.ndata[NID] = _move_data_to_shared_mem_array(g.ndata[NID],
-                                                  _get_ndata_path(graph_name, NID))
-    g.edata[EID] = _move_data_to_shared_mem_array(g.edata[EID],
-                                                  _get_edata_path(graph_name, EID))
-    return g
+    new_g.ndata['part_id'] = _move_data_to_shared_mem_array(g.ndata['part_id'],
+                                                            _get_ndata_path(graph_name, 'part_id'))
+    new_g.ndata['local_node'] = _move_data_to_shared_mem_array(g.ndata['local_node'],
+                                                               _get_ndata_path(graph_name, 'local_node'))
+    new_g.ndata[NID] = _move_data_to_shared_mem_array(g.ndata[NID],
+                                                      _get_ndata_path(graph_name, NID))
+    new_g.edata[EID] = _move_data_to_shared_mem_array(g.edata[EID],
+                                                      _get_edata_path(graph_name, EID))
+    return new_g
+
+dtype_dict = {'part_id': F.int64,
+              'local_node': F.int32,
+              NID: F.int64,
+              EID: F.int64}
 
 def get_shared_mem_ndata(g, graph_name, ndata_name):
     shape = (g.number_of_nodes(),)
-    #TODO this may not always be true
-    dtype = 'int64'
+    dtype = dtype_dict[ndata_name]
     data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name), False, shape, dtype)
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -48,12 +54,14 @@ class DistGraphStoreServer(KVServer):
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
         self.part_g = load_graphs(server_data)[0][0]
-        self.client_g = copy_graph_to_shared_mem(load_graphs(client_data)[0][0], graph_name)
+        client_g = load_graphs(client_data)[0][0]
+        client_g.ndata['local_node'] = F.astype(client_g.ndata['part_id'] == server_id, F.int32)
+        self.client_g = copy_graph_to_shared_mem(client_g, graph_name)
 
-        num_nodes = np.max(self.part_g.ndata[NID].asnumpy()) + 1
-        self.g2l = mx.nd.zeros((num_nodes), dtype=np.int64)
+        num_nodes = F.as_scalar(F.max(self.part_g.ndata[NID], 0)) + 1
+        self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu())
         self.g2l[:] = -1
-        self.g2l[self.part_g.ndata[NID]] = mx.nd.arange(self.part_g.number_of_nodes())
+        self.g2l[self.part_g.ndata[NID]] = F.arange(self.part_g.number_of_nodes())
         if self.get_id() % self.get_group_count() == 0: # master server
             for ndata_name in self.part_g.ndata.keys():
                 print(ndata_name)
@@ -79,8 +87,8 @@ class DistGraphStore:
 
         self.g = get_graph_from_shared_mem(graph_name)
         # TODO If we don't have HALO nodes, how do we set partition?
-        num_nodes = np.max(self.g.ndata[NID].asnumpy()) + 1
-        partition = mx.nd.zeros(shape=(num_nodes,), dtype=np.int64)
+        num_nodes = F.as_scalar(F.max(self.g.ndata[NID], 0)) + 1
+        partition = F.zeros(shape=(num_nodes,), dtype=F.int64, ctx=F.cpu())
         partition[self.g.ndata[NID]] = self.g.ndata['part_id']
         # TODO what is the node data name?
         self._client.set_partition_book(name='features', partition_book=partition)
