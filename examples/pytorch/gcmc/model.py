@@ -225,6 +225,7 @@ class SampleGCMCLayer(GCMCLayer):
                 self.ifc.to(device)
             self.dropout.to(device)
 
+
     def forward(self, ugraph, igraph, ufeat=None, ifeat=None):
         """Forward function
 
@@ -251,8 +252,8 @@ class SampleGCMCLayer(GCMCLayer):
         new_ifeat : torch.Tensor
             New movie features
         """
-        num_u = ugraph.number_of_nodes('user')
-        num_i = igraph.number_of_nodes('movie')
+        num_u = ugraph.dstnodes['user'].data['ci'].shape[0]
+        num_i = igraph.dstnodes['movie'].data['ci'].shape[0]
         ufuncs = {}
         ifuncs = {}
         for i, rating in enumerate(self.rating_vals):

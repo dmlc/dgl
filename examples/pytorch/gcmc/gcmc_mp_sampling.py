@@ -38,44 +38,59 @@ class GCMCSampler:
         dataset = self.dataset
         edge_ids = seeds
         # generate frontiners for user and item
+        possible_rating_values = dataset.possible_rating_values
         true_relation_ratings = self.train_truths[edge_ids]
         true_relation_labels = self.train_labels[edge_ids]
 
         head_id, tail_id = dataset.train_dec_graph.find_edges(edge_ids)
-        head_type, _, tail_type = dataset.train_dec_graph.canonical_etypes[0]
-        heads = {head_type : th.unique(head_id)}
-        tails = {tail_type : th.unique(tail_id)}
-        head_frontier = dgl.in_subgraph(dataset.train_enc_graph, heads)
-        tail_frontier = dgl.in_subgraph(dataset.train_enc_graph, tails)
-        head_frontier = dgl.to_block(head_frontier, heads)
-        tail_frontier = dgl.to_block(tail_frontier, tails)
+        utype, _, vtype = dataset.train_enc_graph.canonical_etypes[0]
+        subg = []
+        true_rel_ratings = []
+        true_rel_labels = []
+        for possible_rating_value in possible_rating_values:
+            idx_loc = (true_relation_ratings == possible_rating_value)
+            head = head_id[idx_loc]
+            tail = tail_id[idx_loc]
+            true_rel_ratings.append(true_relation_ratings[idx_loc])
+            true_rel_labels.append(true_relation_labels[idx_loc])
+            subg.append(dgl.bipartite((head, tail),
+                                        utype=utype,
+                                        etype=str(possible_rating_value),
+                                        vtype=vtype,
+                                        card=(dataset.train_enc_graph.number_of_nodes(utype),
+                                              dataset.train_enc_graph.number_of_nodes(vtype))))
+        
+        g = dgl.hetero_from_relations(subg)
+        g = dgl.compact_graphs(g)
+
+        seed_nodes = {}
+        for ntype in g.ntypes:
+            seed_nodes[ntype] = g.nodes[ntype].data[dgl.NID]
+
+        frontiner = dgl.in_subgraph(dataset.train_enc_graph, seed_nodes)
+        frontiner = dgl.to_block(frontiner, seed_nodes)
 
         # copy from parent
-        head_frontier.dstnodes['user'].data['ci'] = \
-            dataset.train_enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
-        head_frontier.srcnodes['movie'].data['cj'] = \
-            dataset.train_enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
-        tail_frontier.srcnodes['user'].data['cj'] = \
-            dataset.train_enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_frontier.dstnodes['movie'].data['ci'] = \
-            dataset.train_enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
-
-        self.train_user_ids[head_frontier.dstnodes['user'].data[dgl.NID]] = \
-            th.arange(head_frontier.dstnodes['user'].data[dgl.NID].shape[0])
-        self.train_movie_ids[tail_frontier.dstnodes['movie'].data[dgl.NID]] = \
-            th.arange(tail_frontier.dstnodes['movie'].data[dgl.NID].shape[0])
+        frontiner.dstnodes['user'].data['ci'] = \
+            dataset.train_enc_graph.nodes['user'].data['ci'][frontiner.dstnodes['user'].data[dgl.NID]]
+        frontiner.srcnodes['movie'].data['cj'] = \
+            dataset.train_enc_graph.nodes['movie'].data['cj'][frontiner.srcnodes['movie'].data[dgl.NID]]
+        frontiner.srcnodes['user'].data['cj'] = \
+            dataset.train_enc_graph.nodes['user'].data['cj'][frontiner.srcnodes['user'].data[dgl.NID]]
+        frontiner.dstnodes['movie'].data['ci'] = \
+            dataset.train_enc_graph.nodes['movie'].data['ci'][frontiner.dstnodes['movie'].data[dgl.NID]]
 
         # handle features
-        head_feat = tail_frontier.srcnodes['user'].data[dgl.NID].long() \
+        head_feat = frontiner.srcnodes['user'].data[dgl.NID].long() \
                     if dataset.user_feature is None else \
-                       dataset.user_feature[tail_frontier.srcnodes['user'].data[dgl.NID]]
-        tail_feat = head_frontier.srcnodes['movie'].data[dgl.NID].long()\
+                       dataset.user_feature[frontiner.srcnodes['user'].data[dgl.NID]]
+        tail_feat = frontiner.srcnodes['movie'].data[dgl.NID].long()\
                     if dataset.movie_feature is None else \
-                       dataset.movie_feature[head_frontier.srcnodes['movie'].data[dgl.NID]]
-        head_id = self.train_user_ids[head_id]
-        tail_id = self.train_movie_ids[tail_id]
+                       dataset.movie_feature[frontiner.srcnodes['movie'].data[dgl.NID]]
 
-        return (head_frontier, tail_frontier, head_feat, tail_feat, head_id, tail_id, true_relation_labels, true_relation_ratings)
+        true_rel_labels = th.cat(true_rel_labels, dim=0)
+        true_rel_ratings = th.cat(true_rel_ratings, dim=0)
+        return (g, frontiner, head_feat, tail_feat, true_rel_labels, true_rel_ratings)
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
@@ -103,17 +118,20 @@ class Net(nn.Module):
                                        num_basis_functions=args.gen_r_num_basis_func)
         self.decoder.to(dev_id)
 
-    def forward(self, head_enc, tail_enc, ufeat, ifeat, head_id, tail_id):
-        user_out, movie_out = self.encoder(
-            head_enc,
-            tail_enc,
-            ufeat,
-            ifeat)
+    def forward(self, compact_g, frontier, ufeat, ifeat, possible_rating_values):
+        user_out, movie_out = self.encoder(frontier, frontier, ufeat, ifeat)
 
-        user_out = user_out[head_id]
-        movie_out = movie_out[tail_id]
+        head_emb = []
+        tail_emb = []
+        for possible_rating_value in possible_rating_values:
+            head, tail = compact_g.all_edges(etype=str(possible_rating_value))
+            head_emb.append(user_out[head])
+            tail_emb.append(movie_out[tail])
 
-        pred_ratings = self.decoder(user_out, movie_out)
+        head_emb = th.cat(head_emb, dim=0)
+        tail_emb = th.cat(tail_emb, dim=0)
+
+        pred_ratings = self.decoder(head_emb, tail_emb)
         return pred_ratings
 
 def evaluate(args, dev_id, net, dataset, segment='valid'):
@@ -131,62 +149,77 @@ def evaluate(args, dev_id, net, dataset, segment='valid'):
     else:
         raise NotImplementedError
 
-    rating_values = rating_values.to(dev_id)
     num_edges = rating_values.shape[0]
     seed = th.arange(num_edges)
     count_rmse = 0
     count_num = 0
     real_pred_ratings = []
+    true_rel_ratings = []
     for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
         net.eval()
-        edge_ids = seed[sample_idx * args.minibatch_size: \
-                        (sample_idx + 1) * args.minibatch_size \
-                        if (sample_idx + 1) * args.minibatch_size < num_edges \
-                        else num_edges]
+        start = sample_idx * args.minibatch_size
+        end = (sample_idx + 1) * args.minibatch_size \
+              if (sample_idx + 1) * args.minibatch_size < num_edges else num_edges
+        edge_ids = seed[start:end]
 
+        sub_rating_values = rating_values[edge_ids]
         head_id, tail_id = dec_graph.find_edges(edge_ids)
-        head_type, _, tail_type = dec_graph.canonical_etypes[0]
-        heads = {head_type : th.unique(head_id)}
-        tails = {tail_type : th.unique(tail_id)}
+        utype, _, vtype = enc_graph.canonical_etypes[0]
+        
+        subg = []
+        sub_true_rel_ratings = []
+        for possible_rating_value in possible_rating_values:
+            idx_loc = (sub_rating_values == possible_rating_value)
+            head = head_id[idx_loc]
+            tail = tail_id[idx_loc]
+            sub_true_rel_ratings.append(sub_rating_values[idx_loc])
+            subg.append(dgl.bipartite((head, tail),
+                                        utype=utype,
+                                        etype=str(possible_rating_value),
+                                        vtype=vtype,
+                                        card=(enc_graph.number_of_nodes(utype),
+                                              enc_graph.number_of_nodes(vtype))))
 
-        head_frontier = dgl.in_subgraph(enc_graph, heads)
-        tail_frontier = dgl.in_subgraph(enc_graph, tails)
-        head_frontier = dgl.to_block(head_frontier, heads)
-        tail_frontier = dgl.to_block(tail_frontier, tails)
+        g = dgl.hetero_from_relations(subg)
+        g = dgl.compact_graphs(g)
 
-        head_frontier.dstnodes['user'].data['ci'] = \
-            enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
-        head_frontier.srcnodes['movie'].data['cj'] = \
-            enc_graph.nodes['movie'].data['cj'][head_frontier.nodes['movie'].data[dgl.NID]]
-        tail_frontier.srcnodes['user'].data['cj'] = \
-            enc_graph.nodes['user'].data['cj'][tail_frontier.nodes['user'].data[dgl.NID]]
-        tail_frontier.dstnodes['movie'].data['ci'] = \
-            enc_graph.nodes['movie'].data['ci'][tail_frontier.nodes['movie'].data[dgl.NID]]
+        seed_nodes = {}
+        for ntype in g.ntypes:
+            seed_nodes[ntype] = g.nodes[ntype].data[dgl.NID]
+        frontiner = dgl.in_subgraph(enc_graph, seed_nodes)
+        frontiner = dgl.to_block(frontiner, seed_nodes)
 
-        enc_graph.nodes['user'].data['ids'][head_frontier.dstnodes['user'].data[dgl.NID]] = \
-            th.arange(head_frontier.dstnodes['user'].data[dgl.NID].shape[0])
-        enc_graph.nodes['movie'].data['ids'][tail_frontier.dstnodes['movie'].data[dgl.NID]] = \
-            th.arange(tail_frontier.dstnodes['movie'].data[dgl.NID].shape[0])
+        # copy from parent
+        frontiner.dstnodes['user'].data['ci'] = \
+            enc_graph.nodes['user'].data['ci'][frontiner.dstnodes['user'].data[dgl.NID]]
+        frontiner.srcnodes['movie'].data['cj'] = \
+            enc_graph.nodes['movie'].data['cj'][frontiner.srcnodes['movie'].data[dgl.NID]]
+        frontiner.srcnodes['user'].data['cj'] = \
+            enc_graph.nodes['user'].data['cj'][frontiner.srcnodes['user'].data[dgl.NID]]
+        frontiner.dstnodes['movie'].data['ci'] = \
+            enc_graph.nodes['movie'].data['ci'][frontiner.dstnodes['movie'].data[dgl.NID]]
 
-        head_feat = tail_frontier.srcnodes['user'].data[dgl.NID].long() \
+        # handle features
+        head_feat = frontiner.srcnodes['user'].data[dgl.NID].long() \
                     if dataset.user_feature is None else \
-                       dataset.user_feature[tail_frontier.srcnodes['user'].data[dgl.NID]]
-        tail_feat = head_frontier.srcnodes['movie'].data[dgl.NID].long() \
+                       dataset.user_feature[frontiner.srcnodes['user'].data[dgl.NID]]
+        tail_feat = frontiner.srcnodes['movie'].data[dgl.NID].long()\
                     if dataset.movie_feature is None else \
-                        dataset.movie_feature[head_frontier.srcnodes['movie'].data[dgl.NID]]
+                       dataset.movie_feature[frontiner.srcnodes['movie'].data[dgl.NID]]
         head_feat = head_feat.to(dev_id)
         tail_feat = tail_feat.to(dev_id)
-        head_id = enc_graph.nodes['user'].data['ids'][head_id]
-        tail_id = enc_graph.nodes['movie'].data['ids'][tail_id]
+        sub_true_rel_ratings = th.cat(sub_true_rel_ratings, dim=0)
         with th.no_grad():
-            pred_ratings = net(head_frontier, tail_frontier,
-                               head_feat, tail_feat,
-                               head_id, tail_id)
+            pred_ratings = net(g, frontiner,
+                               head_feat, tail_feat, possible_rating_values)
         batch_pred_ratings = (th.softmax(pred_ratings, dim=1) *
                          nd_possible_rating_values.view(1, -1)).sum(dim=1)
         real_pred_ratings.append(batch_pred_ratings)
+        true_rel_ratings.append(sub_true_rel_ratings)
+
     real_pred_ratings = th.cat(real_pred_ratings, dim=0)
-    rmse = ((real_pred_ratings - rating_values) ** 2.).mean().item()
+    true_rel_ratings = th.cat(true_rel_ratings, dim=0).to(dev_id)
+    rmse = ((real_pred_ratings - true_rel_ratings) ** 2.).mean().item()
     rmse = np.sqrt(rmse)
     return rmse
 
@@ -319,7 +352,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
     ### declare the loss information
     best_valid_rmse = np.inf
     no_better_valid = 0
-    best_iter = -1
+    best_epoch = -1
     count_rmse = 0
     count_num = 0
     count_loss = 0
@@ -340,12 +373,12 @@ def run(proc_id, n_gpus, args, devices, dataset):
             t0 = time.time()
         net.train()
         for step, sample_data in enumerate(dataloader):           
-            head_frontier, tail_frontier, head_feat, tail_feat, \
-            head_id, tail_id, true_relation_labels, true_relation_ratings = sample_data
+            compact_g, frontier, head_feat, tail_feat, \
+                true_relation_labels, true_relation_ratings = sample_data
             head_feat = head_feat.to(dev_id)
             tail_feat = tail_feat.to(dev_id)
 
-            pred_ratings = net(head_frontier, tail_frontier, head_feat, tail_feat, head_id, tail_id)
+            pred_ratings = net(compact_g, frontier, head_feat, tail_feat, dataset.possible_rating_values)
             loss = rating_loss_net(pred_ratings, true_relation_labels.to(dev_id)).mean()
             count_loss += loss.item()
             optimizer.zero_grad()
@@ -386,7 +419,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
                 if valid_rmse < best_valid_rmse:
                     best_valid_rmse = valid_rmse
                     no_better_valid = 0
-                    best_iter = iter_idx
+                    best_epoch = epoch
                     test_rmse = evaluate(args=args, dev_id=dev_id, net=net, dataset=dataset, segment='test')
                     best_test_rmse = test_rmse
                     logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
@@ -408,7 +441,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         print(logging_str)
     if proc_id == 0:
         print('Best Iter Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
-              best_iter, best_valid_rmse, best_test_rmse))
+              best_epoch, best_valid_rmse, best_test_rmse))
 
 if __name__ == '__main__':
     args = config()
