@@ -10,20 +10,20 @@ from dgl.contrib import DistGraphStoreServer, DistGraphStore
 import backend as F
 import unittest
 
+server_namebook = {0: [0, '127.0.0.1', 30000, 1]}
+
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
     ig = create_graph_index(arr, multigraph=False, readonly=True)
     return dgl.DGLGraph(ig)
 
 def run_server(graph_name, server_id, num_clients):
-    server_namebook = {0: [0, '127.0.0.1', 30000, 1]}
     server_data = './server-' + str(server_id) + '.dgl'
     client_data = './client-' + str(server_id) + '.dgl'
     g = DistGraphStoreServer(server_namebook, server_id, graph_name, server_data, client_data, num_clients)
     g.start()
 
 def run_client(graph_name):
-    server_namebook = {0: [0, '127.0.0.1', 30000, 1]}
     g = DistGraphStore(server_namebook, graph_name)
 
 def test_create():
@@ -55,12 +55,12 @@ def test_create():
         p.start()
     cli_ps = []
     for cli_id in range(1):
-        p = Process(target=run_client, args=(graph_name))
+        p = Process(target=run_client, args=('test',))
         p.start()
         cli_ps.append(p)
 
-    for p in serv_ps:
-        p.join()
+    #for p in serv_ps:
+    #    p.join()
     for p in cli_ps:
         p.join()
 
