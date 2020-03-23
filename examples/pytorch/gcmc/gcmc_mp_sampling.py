@@ -356,14 +356,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
     count_rmse = 0
     count_num = 0
     count_loss = 0
-    dataset.valid_enc_graph.nodes['user'].data['ids'] = \
-        th.zeros((dataset.valid_enc_graph.number_of_nodes('user'),), dtype=th.int64)
-    dataset.valid_enc_graph.nodes['movie'].data['ids'] = \
-        th.zeros((dataset.valid_enc_graph.number_of_nodes('movie'),), dtype=th.int64)
-    dataset.test_enc_graph.nodes['user'].data['ids'] = \
-        th.zeros((dataset.test_enc_graph.number_of_nodes('user'),), dtype=th.int64)
-    dataset.test_enc_graph.nodes['movie'].data['ids'] = \
-        th.zeros((dataset.test_enc_graph.number_of_nodes('movie'),), dtype=th.int64)
     print("Start training ...")
     dur = []
     iter_idx = 1
