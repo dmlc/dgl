@@ -3,8 +3,10 @@ from .. import backend as F
 from ..base import ALL, NID, EID
 from ..data.utils import load_graphs
 from .graph_store import _move_data_to_shared_mem_array
-from .graph_store import _get_ndata_path, _get_edata_path, _get_graph_path
+from .graph_store import _get_ndata_path, _get_edata_path, _get_graph_path, dtype_dict
 from .dis_kvstore import KVServer, KVClient
+from ..graph_index import from_shared_mem_graph_index
+from .._ffi.ndarray import empty_shared_mem
 
 import socket
 import numpy as np
@@ -24,15 +26,24 @@ def copy_graph_to_shared_mem(g, graph_name):
                                                       _get_edata_path(graph_name, EID))
     return new_g
 
-dtype_dict = {'part_id': F.int64,
+field_dict = {'part_id': F.int64,
               'local_node': F.int32,
               NID: F.int64,
               EID: F.int64}
 
-def get_shared_mem_ndata(g, graph_name, ndata_name):
+def get_shared_mem_ndata(g, graph_name, name):
     shape = (g.number_of_nodes(),)
-    dtype = dtype_dict[ndata_name]
-    data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name), False, shape, dtype)
+    dtype = field_dict[name]
+    dtype = dtype_dict[dtype]
+    data = empty_shared_mem(_get_ndata_path(graph_name, name), False, shape, dtype)
+    dlpack = data.to_dlpack()
+    return F.zerocopy_from_dlpack(dlpack)
+
+def get_shared_mem_edata(g, graph_name, name):
+    shape = (g.number_of_edges(),)
+    dtype = field_dict[name]
+    dtype = dtype_dict[dtype]
+    data = empty_shared_mem(_get_edata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
 
@@ -58,10 +69,13 @@ class DistGraphStoreServer(KVServer):
         client_g.ndata['local_node'] = F.astype(client_g.ndata['part_id'] == server_id, F.int32)
         self.client_g = copy_graph_to_shared_mem(client_g, graph_name)
 
-        num_nodes = F.as_scalar(F.max(self.part_g.ndata[NID], 0)) + 1
+        # TODO something is wrong here. We shouldn't convert it to numpy. otherwise, it uses too much memory.
+        # however, for some reason F.max hangs.
+        parent_nid = F.asnumpy(self.part_g.ndata[NID])
+        num_nodes = np.max(parent_nid) + 1
         self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu())
         self.g2l[:] = -1
-        self.g2l[self.part_g.ndata[NID]] = F.arange(self.part_g.number_of_nodes())
+        self.g2l[self.part_g.ndata[NID]] = F.arange(0, self.part_g.number_of_nodes())
         if self.get_id() % self.get_group_count() == 0: # master server
             for ndata_name in self.part_g.ndata.keys():
                 print(ndata_name)
@@ -87,7 +101,11 @@ class DistGraphStore:
 
         self.g = get_graph_from_shared_mem(graph_name)
         # TODO If we don't have HALO nodes, how do we set partition?
-        num_nodes = F.as_scalar(F.max(self.g.ndata[NID], 0)) + 1
+        # TODO something is wrong here. We shouldn't convert it to numpy. otherwise, it uses too much memory.
+        # however, for some reason F.max hangs.
+        parent_nid = F.asnumpy(self.g.ndata[NID])
+        num_nodes = np.max(parent_nid) + 1
+
         partition = F.zeros(shape=(num_nodes,), dtype=F.int64, ctx=F.cpu())
         partition[self.g.ndata[NID]] = self.g.ndata['part_id']
         # TODO what is the node data name?
@@ -99,7 +117,7 @@ class DistGraphStore:
 
         self._client.barrier()
 
-        self.local_nids = np.nonzero(self.g.ndata['local_node'].asnumpy())[0]
+        self.local_nids = np.nonzero(F.asnumpy(self.g.ndata['local_node']))[0]
         self.local_gnid = self.g.ndata[NID][self.local_nids]
 
     def number_of_nodes(self):
