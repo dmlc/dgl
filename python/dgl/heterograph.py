@@ -1353,7 +1353,7 @@ class DGLHeteroGraph(object):
             dgl_warning("force_multi will be deprecated." \
                         "Please use return_array instead")
             if force_multi:
-                idx.tousertensor()
+                return idx.tousertensor()
             else:
                 return idx[0]
 
