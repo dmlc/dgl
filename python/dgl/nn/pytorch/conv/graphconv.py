@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import init
 
 from .... import function as fn
+from ....base import DGLError
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
@@ -77,12 +78,12 @@ class GraphConv(nn.Module):
         if weight:
             self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
         else:
-            self.weight = None
+            self.register_parameter('weight', None)
 
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
-            self.bias = None
+            self.register_parameter('bias', None)
 
         self.reset_parameters()
 
@@ -95,7 +96,7 @@ class GraphConv(nn.Module):
         if self.bias is not None:
             init.zeros_(self.bias)
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, weight=None):
         r"""Compute graph convolution.
 
         Notes
@@ -104,6 +105,7 @@ class GraphConv(nn.Module):
           dimensions, :math:`N` is the number of nodes.
         * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
           the same shape as the input.
+        * Weight shape: "math:`(\text{in_feats}, \text{out_feats})`.
 
         Parameters
         ----------
@@ -111,6 +113,8 @@ class GraphConv(nn.Module):
             The graph.
         feat : torch.Tensor
             The input feature
+        weight : torch.Tensor, optional
+            Optional external weight tensor.
 
         Returns
         -------
@@ -131,10 +135,18 @@ class GraphConv(nn.Module):
         if self._norm == 'both':
             feat = feat * norm
 
+        if weight is not None:
+            if self.weight is not None:
+                raise DGLError('External weight is provided while at the same time the'
+                               ' module has defined its own weight parameter. Please'
+                               ' create the module with flag weight=False.')
+        else:
+            weight = self.weight
+
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            if self.weight is not None:
-                feat = th.matmul(feat, self.weight)
+            if weight is not None:
+                feat = th.matmul(feat, weight)
             graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
@@ -145,8 +157,8 @@ class GraphConv(nn.Module):
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
             rst = graph.dstdata['h']
-            if self.weight is not None:
-                rst = th.matmul(rst, self.weight)
+            if weight is not None:
+                rst = th.matmul(rst, weight)
 
         if self._norm in ('right', 'both'):
             rst = rst * norm

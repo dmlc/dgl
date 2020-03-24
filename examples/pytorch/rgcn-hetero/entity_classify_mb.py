@@ -14,7 +14,7 @@ from functools import partial
 
 import dgl
 from dgl.data.rdf import AIFB, MUTAG, BGS, AM
-from model import EntityClassify
+from model import EntityClassify, RelGraphEmbed
 
 class HeteroNeighborSampler:
     """Neighbor sampler on heterogeneous graphs

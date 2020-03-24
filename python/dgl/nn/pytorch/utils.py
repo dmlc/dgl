@@ -218,31 +218,59 @@ class Sequential(nn.Sequential):
         return feats
 
 class WeightBasis(nn.Module):
+    r"""Basis decomposition module.
+
+    Basis decomposition is introduced in "`Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
+    and can be described as below:
+
+    .. math::
+        
+        W_o = \sum_{b=1}^B a_{ob} V_b
+
+    Each weight output :math:`W_o` is essentially a linear combination of basis
+    transformations :math:`V_b` with coefficients :math:`a_{ob}`.
+
+    If is useful as a form of regularization on a large parameter matrix. Thus,
+    the number of weight outputs is usually larger than the number of bases.
+
+    Parameters
+    ----------
+    size : int
+        Size of the basis parameter.
+    num_bases : int
+        Number of bases.
+    num_outputs : int
+        Number of outputs.
+    """
     def __init__(self,
-                 in_feat,
-                 out_feat,
+                 size,
                  num_bases,
-                 num_outputs=None):
+                 num_outputs):
         super(WeightBasis, self).__init__()
-        self.in_feat = in_feat
+        self.size = size
         self.out_feat = out_feat
         self.num_bases = num_bases
         self.num_outputs = num_outputs
 
-        self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
+        if num_outputs <= num_bases:
+            print('WARNING: The number of weight outputs should be larger than the number'
+                  ' of bases.')
+
+        self.weight = nn.Parameter(th.Tensor(self.num_bases, size))
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
-        if num_outputs is not None:
-            # linear combination coefficients
-            self.w_comp = nn.Parameter(th.Tensor(self.num_outputs, self.num_bases))
-            nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
+        # linear combination coefficients
+        self.w_comp = nn.Parameter(th.Tensor(self.num_outputs, self.num_bases))
+        nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
 
     def forward(self):
-        if self.num_outputs is not None:
-            # generate all weights from bases
-            weight = self.weight.view(self.num_bases,
-                                      self.in_feat * self.out_feat)
-            weight = th.matmul(self.w_comp, weight).view(
-                self.num_outputs, self.in_feat, self.out_feat)
-        else:
-            weight = self.weight
+        r"""Forward computation
+
+        Returns
+        -------
+        weight : torch.Tensor
+            Composed weight tensor of shape :math:`(\text{num_outputs}, \text{size})`
+        """
+        # generate all weights from bases
+        weight = th.matmul(self.w_comp, weight)
         return weight

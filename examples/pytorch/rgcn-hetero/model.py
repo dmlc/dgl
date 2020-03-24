@@ -56,10 +56,13 @@ class RelGraphConvLayer(nn.Module):
                 for rel in rel_names
             })
 
-        if weight:
-            self.basis = dglnn.WeightBasis(in_feat, out_feat, num_bases, len(self.rel_names))
-        else:
-            self.basis = None
+        self.use_weight = weight
+        self.use_basis = num_bases >= len(self.rel_names) and weight
+        if self.use_weight:
+            if self.use_basis:
+                self.basis = dglnn.WeightBasis(in_feat, out_feat, num_bases, len(self.rel_names))
+            else:
+                self.weight = nn.Parameter(th.Tensor(len(self.rel_names), in_feat * out_feat))
 
         # bias
         if bias:
@@ -90,13 +93,14 @@ class RelGraphConvLayer(nn.Module):
             New node features for each node type.
         """
         g = g.local_var()
-        if self.basis:
-            weights = self.basis()
-            assert weights.shape == (len(self.rel_names), self.in_feat, self.out_feat)
-            wdict = {self.rel_names[i] : w.squeeze(0) for i, w in enumerate(th.split(weights, 1, dim=0))}
-            for rel, mod in self.conv.mods.items():
-                mod.weight = wdict[rel]
-        hs = self.conv(g, inputs)
+        if self.use_weight:
+            weight = self.basis() if self.use_basis else self.weight
+            weight = weight.view(len(self.rel_names), self.in_feat, self.out_feat)
+            wdict = {self.rel_names[i] : {'weight' : w.squeeze(0)}
+                     for i, w in enumerate(th.split(weight, 1, dim=0))}
+        else:
+            wdict = {}
+        hs = self.conv(g, inputs, mod_kwargs=wdict)
         def _apply(ntype, h):
             if self.self_loop:
                 h = h + th.matmul(inputs[ntype], self.loop_weight)
