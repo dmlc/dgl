@@ -101,6 +101,7 @@ class RelGraphConvLayer(nn.Module):
         else:
             wdict = {}
         hs = self.conv(g, inputs, mod_kwargs=wdict)
+        print(hs.keys())
         def _apply(ntype, h):
             if self.self_loop:
                 h = h + th.matmul(inputs[ntype], self.loop_weight)
