@@ -108,7 +108,7 @@ class GATConv(nn.Module):
             feat_dst = self.fc(h_dst).view(-1, self._num_heads, self._out_feats)
         else:
             h_src = h_dst = self.feat_drop(feat)
-            feat_src, feat_dst = self.fc(h_src).view(
+            feat_src = feat_dst = self.fc(h_src).view(
                 -1, self._num_heads, self._out_feats)
         # NOTE: GAT paper uses "first concatenation then linear projection"
         # to compute attention scores, while ours is "first projection then
