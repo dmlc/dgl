@@ -165,10 +165,10 @@ g.edata.pop('w')
 ###############################################################################
 # Working with multigraphs
 # ~~~~~~~~~~~~~~~~~~~~~~~~
-# Many graph applications need parallel edges. To enable this, construct :class:`DGLGraph`
-# with ``multigraph=True``.
+# Many graph applications need parallel edges. By default class:`DGLGraph`
+# is already a multigraph
 
-g_multi = dgl.DGLGraph(multigraph=True)
+g_multi = dgl.DGLGraph()
 g_multi.add_nodes(10)
 g_multi.ndata['x'] = th.randn(10, 2)
 

@@ -81,8 +81,7 @@ class DGLBaseGraph(object):
 
     @property
     def is_multigraph(self):
-        """Deprecated (Will be deleted in the future).
-           True if the graph is a multigraph, False otherwise.
+        """True if the graph is a multigraph, False otherwise.
         """
         return self._graph.is_multigraph()
 
@@ -316,7 +315,7 @@ class DGLBaseGraph(object):
         """
         return self._graph.successors(v).tousertensor()
 
-    def edge_id(self, u, v, force_multi=False):
+    def edge_id(self, u, v, force_multi=None, return_array=False):
         """Return the edge ID, or an array of edge IDs, between source node
         `u` and destination node `v`.
 
@@ -328,14 +327,22 @@ class DGLBaseGraph(object):
             The destination node ID.
         force_multi : bool
             Deprecated (Will be deleted in the future).
-            If False, will return a single edge ID if the graph is a simple graph.
+            If False, will return a single edge ID.
+            If True, will always return an array.
+        return_array : bool
+            If False, will return a single edge ID.
             If True, will always return an array.
 
         Returns
         -------
         int or tensor
-            The edge ID if force_multi == True and the graph is a simple graph.
+            The edge ID if return_array is False.
             The edge ID array otherwise.
+
+        Notes
+        -----
+        If multiply edges exist between `u` and `v` and return_array is False,
+        the result is undefined.
 
         Examples
         --------
@@ -360,20 +367,28 @@ class DGLBaseGraph(object):
         connect from 0 and 1, while edge ID 1 and 3 both connect from 0 and 2.
 
         >>> G.add_edges([0, 0, 0, 0], [1, 2, 1, 2])
-        >>> G.edge_id(0, 1)
+        >>> G.edge_id(0, 1, return_array=True)
         tensor([0, 2])
 
         See Also
         --------
         edge_ids
         """
-        if force_multi is False:
-            dgl_warning("Hint of multigraph will be deprecated." \
-                        "DGL will treat all graphs as multigraph in the future.")
         idx = self._graph.edge_id(u, v)
-        return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
+        if force_multi is not None:
+            dgl_warning("force_multi will be deprecated." \
+                        "Please use return_array instead")
+            if force_multi:
+                idx.tousertensor()
+            else:
+                return idx[0]
 
-    def edge_ids(self, u, v, force_multi=False):
+        if return_array:
+            return idx.tousertensor()
+        else:
+            return idx[0]
+
+    def edge_ids(self, u, v, force_multi=None, return_uv=False):
         """Return all edge IDs between source node array `u` and destination
         node array `v`.
 
@@ -386,20 +401,24 @@ class DGLBaseGraph(object):
         force_multi : bool
             Deprecated (Will be deleted in the future).
             Whether to always treat the graph as a multigraph.
+        return_uv : bool
+            Whether return e or (eu, ev, e)
 
         Returns
         -------
         tensor, or (tensor, tensor, tensor)
-            If the graph is a simple graph and `force_multi` is False, return
-            a single edge ID array `e`.  `e[i]` is the edge ID between `u[i]`
-            and `v[i]`.
+            If 'return_uv` is False, return a single edge ID array `e`.  
+            `e[i]` is the edge ID between `u[i]` and `v[i]`.
             Otherwise, return three arrays `(eu, ev, e)`.  `e[i]` is the ID
             of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
             and `v[i]` are returned.
 
         Notes
         -----
-        If the graph is a simple graph, `force_multi` is False, and no edge
+        If the graph is a simple graph, `return_uv` is False, and no edge
+        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
+
+        If the graph is a multi graph, `return_uv` is False, and multi edges
         exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
 
         Examples
@@ -424,7 +443,7 @@ class DGLBaseGraph(object):
         Get all edges between (0, 1), (0, 2), (0, 3).  Note that there is no
         edge between 0 and 3:
 
-        >>> G.edge_ids([0, 0, 0], [1, 2, 3])
+        >>> G.edge_ids([0, 0, 0], [1, 2, 3], return_uv=True)
         (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([0, 1, 2]))
 
         See Also
@@ -434,11 +453,18 @@ class DGLBaseGraph(object):
         u = utils.toindex(u)
         v = utils.toindex(v)
         src, dst, eid = self._graph.edge_ids(u, v)
-        if force_multi or self.is_multigraph:
+        if force_multi is not None:
+            dgl_warning("force_multi will be deprecated, " \
+                        "Please use return_uv instead")
+            
+            if force_multi:
+                return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+            else:
+                return eid.tousertensor()
+        
+        if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
-            dgl_warning("Hint of multigraph will be deprecated." \
-                        "DGL will treat all graphs as multigraph in the future.")
             return eid.tousertensor()
 
     def find_edges(self, eid):

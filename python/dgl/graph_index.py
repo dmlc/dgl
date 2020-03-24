@@ -118,15 +118,13 @@ class GraphIndex(ObjectBase):
         self._cache.clear()
 
     def is_multigraph(self):
-        """Deprecated (Will be deleted in the future) Return whether the graph is a multigraph
+        """Return whether the graph is a multigraph
 
         Returns
         -------
         bool
             True if it is a multigraph, False otherwise.
         """
-        dgl_warning("Hint of multigraph will be deprecated." \
-                    "DGL will treat all graphs as multigraph in the future.")
         if self._multigraph is None:
             self._multigraph = bool(_CAPI_DGLGraphIsMultigraph(self))
         return self._multigraph
@@ -832,6 +830,7 @@ class GraphIndex(ObjectBase):
             The nx graph
         """
         src, dst, eid = self.edges()
+        # xiangsx: Always treat graph as multigraph
         ret = nx.MultiDiGraph()
         ret.add_nodes_from(range(self.number_of_nodes()))
         for u, v, e in zip(src, dst, eid):
@@ -1094,7 +1093,7 @@ def from_shared_mem_csr_matrix(shared_mem_name,
     if is_multigraph is not None:
         dgl_warning("Hint of multigraph will be deprecated." \
                     "DGL will treat all graphs as multigraph in the future.")
-    
+
     gidx = _CAPI_DGLGraphCSRCreateMMap(
         shared_mem_name,
         int(num_nodes), int(num_edges),
@@ -1179,7 +1178,7 @@ def from_scipy_sparse_matrix(adj, multigraph, readonly):
     if multigraph is not None:
         dgl_warning("Hint of multigraph will be deprecated." \
                     "DGL will treat all graphs as multigraph in the future.")
-  
+
     if adj.getformat() != 'csr' or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
