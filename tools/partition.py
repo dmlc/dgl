@@ -32,6 +32,7 @@ def main():
         client_parts = {0: g}
         g.ndata['part_id'] = F.zeros((g.number_of_nodes()), F.int64, F.cpu())
         g.ndata[dgl.NID] = F.arange(0, g.number_of_nodes())
+        g.edata[dgl.EID] = F.arange(0, g.number_of_edges())
     elif args.method == 'metis':
         node_parts = dgl.transform.metis_partition_assignment(g, num_parts)
         server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
