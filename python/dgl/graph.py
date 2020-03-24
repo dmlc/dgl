@@ -81,7 +81,8 @@ class DGLBaseGraph(object):
 
     @property
     def is_multigraph(self):
-        """True if the graph is a multigraph, False otherwise.
+        """Deprecated (Will be deleted in the future).
+           True if the graph is a multigraph, False otherwise.
         """
         return self._graph.is_multigraph()
 
@@ -326,6 +327,7 @@ class DGLBaseGraph(object):
         v : int
             The destination node ID.
         force_multi : bool
+            Deprecated (Will be deleted in the future).
             If False, will return a single edge ID if the graph is a simple graph.
             If True, will always return an array.
 
@@ -351,7 +353,7 @@ class DGLBaseGraph(object):
 
         For multigraphs:
 
-        >>> G = dgl.DGLGraph(multigraph=True)
+        >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
 
         Adding edges (0, 1), (0, 2), (0, 1), (0, 2), so edge ID 0 and 2 both
@@ -365,6 +367,9 @@ class DGLBaseGraph(object):
         --------
         edge_ids
         """
+        if force_multi is False:
+            dgl_warning("Hint of multigraph will be deprecated." \
+                        "DGL will treat all graphs as multigraph in the future.")
         idx = self._graph.edge_id(u, v)
         return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
 
@@ -379,6 +384,7 @@ class DGLBaseGraph(object):
         v : list, tensor
             The destination node ID array.
         force_multi : bool
+            Deprecated (Will be deleted in the future).
             Whether to always treat the graph as a multigraph.
 
         Returns
@@ -411,7 +417,7 @@ class DGLBaseGraph(object):
 
         For multigraphs
 
-        >>> G = dgl.DGLGraph(multigraph=True)
+        >>> G = dgl.DGLGraph()
         >>> G.add_nodes(4)
         >>> G.add_edges([0, 0, 0], [1, 1, 2])   # (0, 1), (0, 1), (0, 2)
 
@@ -431,6 +437,8 @@ class DGLBaseGraph(object):
         if force_multi or self.is_multigraph:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
+            dgl_warning("Hint of multigraph will be deprecated." \
+                        "DGL will treat all graphs as multigraph in the future.")
             return eid.tousertensor()
 
     def find_edges(self, eid):
@@ -814,8 +822,9 @@ class DGLGraph(DGLBaseGraph):
     edge_frame : FrameRef, optional
         Edge feature storage.
     multigraph : bool, optional
-        Whether the graph would be a multigraph. If none, the flag will be determined
-        by scanning the whole graph. (default: None)
+        Deprecated (Will be deleted in the future).
+        Whether the graph would be a multigraph. If none, the flag will be 
+        set to True. (default: None)
     readonly : bool, optional
         Whether the graph structure is read-only (default: False).
 
@@ -1814,6 +1823,7 @@ class DGLGraph(DGLBaseGraph):
             The graph's adjacency matrix
 
         multigraph : bool, optional
+            Deprecated (Will be deleted in the future).
             Whether the graph would be a multigraph. If the input scipy sparse matrix is CSR,
             this argument is ignored.
 

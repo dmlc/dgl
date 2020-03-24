@@ -310,7 +310,8 @@ class SharedMemoryStoreServer(object):
     graph_name : string
         Define the name of the graph, so the client can use the name to access the graph.
     multigraph : bool, optional
-        Whether the graph would be a multigraph (default: False)
+        Deprecated (Will be deleted in the future).
+        Whether the graph would be a multigraph (default: True)
     num_workers : int
         The number of workers that will connect to the server.
     port : int
@@ -318,6 +319,12 @@ class SharedMemoryStoreServer(object):
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
+        if multigraph is None:
+            multigraph = True
+        else:
+            dgl_warning("Hint of multigraph will be deprecated." \
+                        "DGL will treat all graphs as multigraph in the future.")
+
         if isinstance(graph_data, GraphIndex):
             graph_data = graph_data.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
             self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
@@ -479,7 +486,7 @@ class BaseGraphStore(DGLGraph):
     """
     def __init__(self,
                  graph_data=None,
-                 multigraph=False):
+                 multigraph=True):
         super(BaseGraphStore, self).__init__(graph_data, multigraph=multigraph, readonly=True)
 
     @property
@@ -1054,7 +1061,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
 
 
 def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
-                              multigraph=False, edge_dir='in', port=8000):
+                              multigraph=True, edge_dir='in', port=8000):
     """Create the graph store server.
 
     The server loads graph structure and node embeddings and edge embeddings.
@@ -1085,7 +1092,7 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     num_workers : int
         The number of workers that will connect to the server.
     multigraph : bool, optional
-        Whether the graph would be a multigraph (default: False)
+        Whether the graph would be a multigraph (default: True)
     edge_dir : string
         the edge direction for the graph structure. The supported option is
         "in" and "out".

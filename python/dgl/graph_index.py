@@ -43,7 +43,7 @@ class GraphIndex(ObjectBase):
     def __getstate__(self):
         src, dst, _ = self.edges()
         n_nodes = self.number_of_nodes()
-        # TODO(minjie): should try to avoid calling is_multigraph
+        # TODO(xiangsx): delete is_multigraph in the future
         multigraph = self.is_multigraph()
         readonly = self.is_readonly()
 
@@ -53,6 +53,7 @@ class GraphIndex(ObjectBase):
         """The pickle state of GraphIndex is defined as a triplet
         (number_of_nodes, multigraph, readonly, src_nodes, dst_nodes)
         """
+        # TODO(xiangsx): delete multigraph in the future
         num_nodes, multigraph, readonly, src, dst = state
 
         self._cache = {}
@@ -117,13 +118,15 @@ class GraphIndex(ObjectBase):
         self._cache.clear()
 
     def is_multigraph(self):
-        """Return whether the graph is a multigraph
+        """Deprecated (Will be deleted in the future) Return whether the graph is a multigraph
 
         Returns
         -------
         bool
             True if it is a multigraph, False otherwise.
         """
+        dgl_warning("Hint of multigraph will be deprecated." \
+                    "DGL will treat all graphs as multigraph in the future.")
         if self._multigraph is None:
             self._multigraph = bool(_CAPI_DGLGraphIsMultigraph(self))
         return self._multigraph
@@ -829,7 +832,7 @@ class GraphIndex(ObjectBase):
             The nx graph
         """
         src, dst, eid = self.edges()
-        ret = nx.MultiDiGraph() if self.is_multigraph() else nx.DiGraph()
+        ret = nx.MultiDiGraph()
         ret.add_nodes_from(range(self.number_of_nodes()))
         for u, v, e in zip(src, dst, eid):
             ret.add_edge(u, v, id=e)
@@ -1003,7 +1006,8 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
     dst : Tensor
         Dst end nodes of the edges.
     is_multigraph : bool or None
-        True if the graph is a multigraph. None means determined by data.
+        Deprecated (Will be deleted in the future).
+        True if the graph is a multigraph. None will be set to True by default.
     readonly : bool
         True if the returned graph is readonly.
 
@@ -1015,7 +1019,10 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
     src = utils.toindex(src)
     dst = utils.toindex(dst)
     if is_multigraph is None:
-        is_multigraph = BoolFlag.BOOL_UNKNOWN
+        is_multigraph = BoolFlag.BOOL_TRUE
+    else:
+        dgl_warning("Hint of multigraph will be deprecated." \
+                    "DGL will treat all graphs as multigraph in the future.")
     if readonly:
         gidx = _CAPI_DGLGraphCreate(
             src.todgltensor(),
@@ -1025,8 +1032,8 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
             readonly)
     else:
         if is_multigraph is BoolFlag.BOOL_UNKNOWN:
-            # TODO(minjie): better behavior in the future
-            is_multigraph = BoolFlag.BOOL_FALSE
+            # We will treat all graphs as multigraph by default
+            is_multigraph = BoolFlag.BOOL_TRUE
         gidx = _CAPI_DGLGraphCreateMutable(bool(is_multigraph))
         gidx.add_nodes(num_nodes)
         gidx.add_edges(src, dst)
@@ -1043,7 +1050,8 @@ def from_csr(indptr, indices, is_multigraph,
     indices : Tensor
         column index array in the CSR format
     is_multigraph : bool or None
-        True if the graph is a multigraph. None means determined by data.
+        Deprecated (Will be deleted in the future).
+        True if the graph is a multigraph. None will be set to True by default.
     direction : str
         the edge direction. Either "in" or "out".
     shared_mem_name : str
@@ -1052,7 +1060,10 @@ def from_csr(indptr, indices, is_multigraph,
     indptr = utils.toindex(indptr)
     indices = utils.toindex(indices)
     if is_multigraph is None:
-        is_multigraph = BoolFlag.BOOL_UNKNOWN
+        is_multigraph = BoolFlag.BOOL_TRUE
+    else:
+        dgl_warning("Hint of multigraph will be deprecated." \
+                    "DGL will treat all graphs as multigraph in the future.")
     gidx = _CAPI_DGLGraphCSRCreate(
         indptr.todgltensor(),
         indices.todgltensor(),
@@ -1076,7 +1087,14 @@ def from_shared_mem_csr_matrix(shared_mem_name,
         the number of edges
     edge_dir : string
         the edge direction. The supported option is "in" and "out".
+    is_multigraph : bool
+        Deprecated (Will be deleted in the future).
+        True if the graph is a multigraph.
     """
+    if is_multigraph is not None:
+        dgl_warning("Hint of multigraph will be deprecated." \
+                    "DGL will treat all graphs as multigraph in the future.")
+    
     gidx = _CAPI_DGLGraphCSRCreateMMap(
         shared_mem_name,
         int(num_nodes), int(num_edges),
@@ -1110,7 +1128,8 @@ def from_networkx(nx_graph, readonly):
             # the original graph is already directed and we do not want to do it.
             nx_graph = nx_graph.to_directed()
 
-    is_multigraph = isinstance(nx_graph, nx.MultiDiGraph)
+    # we will use multigraph by default
+    is_multigraph = True
     num_nodes = nx_graph.number_of_nodes()
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
@@ -1146,8 +1165,9 @@ def from_scipy_sparse_matrix(adj, multigraph, readonly):
     ----------
     adj : scipy sparse matrix
     multigraph : bool
-        Whether the graph would be a multigraph. If none, the flag will be determined
-        by the data.
+        Deprecated (Will be deleted in the future).
+        Whether the graph would be a multigraph. If none, the flag will be set
+        to True by default.
     readonly : bool
         True if the returned graph is readonly.
 
@@ -1156,13 +1176,17 @@ def from_scipy_sparse_matrix(adj, multigraph, readonly):
     GraphIndex
         The graph index.
     """
+    if multigraph is not None:
+        dgl_warning("Hint of multigraph will be deprecated." \
+                    "DGL will treat all graphs as multigraph in the future.")
+  
     if adj.getformat() != 'csr' or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
         return from_coo(num_nodes, adj_coo.row, adj_coo.col, multigraph, readonly)
     else:
-        # If the input matrix is csr, it's guaranteed to be a simple graph.
-        return from_csr(adj.indptr, adj.indices, False, "out")
+        # If the input matrix is csr, we still treat it as multigraph.
+        return from_csr(adj.indptr, adj.indices, None, "out")
 
 def from_edge_list(elist, is_multigraph, readonly):
     """Convert from an edge list.
@@ -1282,8 +1306,9 @@ def create_graph_index(graph_data, multigraph, readonly):
     graph_data : graph data
         Data to initialize graph. Same as networkx's semantics.
     multigraph : bool
-        Whether the graph would be a multigraph. If none, the flag will be determined
-        by the data.
+        Deprecated (Will be deleted in the future).
+        Whether the graph would be a multigraph. If none, the flag will be set
+        to True by default.
     readonly : bool
         Whether the graph structure is read-only.
     """
@@ -1295,7 +1320,10 @@ def create_graph_index(graph_data, multigraph, readonly):
         if readonly:
             raise Exception("can't create an empty immutable graph")
         if multigraph is None:
-            multigraph = False
+            multigraph = True
+        else:
+            dgl_warning("Hint of multigraph will be deprecated." \
+                        "DGL will treat all graphs as multigraph in the future.")
         return _CAPI_DGLGraphCreateMutable(multigraph)
     elif isinstance(graph_data, (list, tuple)):
         # edge list
