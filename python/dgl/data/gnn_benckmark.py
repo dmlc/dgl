@@ -1,8 +1,8 @@
 import scipy.sparse as sp
 import numpy as np
-from dgl import graph_index, DGLGraph, transform
 import os
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..graph import DGLGraph
 
 __all__=["AmazonCoBuy", "Coauthor", 'CoraFull']
 
