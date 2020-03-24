@@ -1086,14 +1086,14 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 
     return simple_graph
 
-def as_heterograph(graph, ntype='_U', etype='_E'):
+def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
 
     Node and edge features are preserved.
 
     Parameters
     ----------
-    graph : DGLGraph
+    g : DGLGraph
         The graph
     ntype : str, optional
         The node type name
@@ -1105,10 +1105,10 @@ def as_heterograph(graph, ntype='_U', etype='_E'):
     DGLHeteroGraph
         The heterograph.
     """
-    hgi = _CAPI_DGLAsHeteroGraph(graph._graph)
+    hgi = _CAPI_DGLAsHeteroGraph(g._graph)
     hg = DGLHeteroGraph(hgi, [ntype], [etype])
-    hg.ndata.update(graph.ndata)
-    hg.edata.update(graph.edata)
+    hg.ndata.update(g.ndata)
+    hg.edata.update(g.edata)
     return hg
 
 def as_immutable_graph(hg):
@@ -1118,7 +1118,7 @@ def as_immutable_graph(hg):
 
     Parameters
     ----------
-    graph : DGLHeteroGraph
+    g : DGLHeteroGraph
         The heterograph
 
     Returns
@@ -1127,9 +1127,9 @@ def as_immutable_graph(hg):
         The graph.
     """
     gidx = _CAPI_DGLAsImmutableGraph(hg._graph)
-    graph = DGLGraph(gidx)
-    graph.ndata.update(hg.ndata)
-    graph.edata.update(hg.edata)
-    return graph
+    g = DGLGraph(gidx)
+    g.ndata.update(hg.ndata)
+    g.edata.update(hg.edata)
+    return g
 
 _init_api("dgl.transform")
