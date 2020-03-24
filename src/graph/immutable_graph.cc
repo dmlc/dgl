@@ -7,6 +7,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/smart_ptr_serializer.h>
+#include <dgl/base_heterograph.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <string.h>
@@ -15,6 +16,8 @@
 #include <tuple>
 
 #include "../c_api_common.h"
+#include "heterograph.h"
+#include "unit_graph.h"
 
 using namespace dgl::runtime;
 
@@ -664,6 +667,30 @@ void ImmutableGraph::Save(dmlc::Stream *fs) const {
   fs->Write(kDGLSerialize_ImGraph);
   fs->Write(GetOutCSR());
 }
+
+HeteroGraphPtr ImmutableGraph::AsHeteroGraph() const {
+  aten::CSRMatrix in_csr, out_csr;
+  aten::COOMatrix coo;
+
+  if (in_csr_)
+    in_csr = GetInCSR()->ToCSRMatrix();
+  if (out_csr_)
+    out_csr = GetOutCSR()->ToCSRMatrix();
+  if (coo_)
+    coo = GetCOO()->ToCOOMatrix();
+
+  auto g = UnitGraph::CreateHomographFrom(
+      in_csr, out_csr, coo, !!in_csr_, !!out_csr_, !!coo_);
+  return HeteroGraphPtr(new HeteroGraph(g->meta_graph(), {g}));
+}
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsHeteroGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(ig) << "graph is not readonly";
+    *rv = HeteroGraphRef(ig->AsHeteroGraph());
+  });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {

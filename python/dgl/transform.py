@@ -37,7 +37,9 @@ __all__ = [
     'to_simple',
     'in_subgraph',
     'out_subgraph',
-    'remove_edges']
+    'remove_edges',
+    'as_immutable_graph',
+    'as_heterograph']
 
 
 def pairwise_squared_distance(x):
@@ -1083,5 +1085,51 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
             g.edges[canonical_etype].data[writeback_mapping] = edge_map
 
     return simple_graph
+
+def as_heterograph(graph, ntype='_U', etype='_E'):
+    """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
+
+    Node and edge features are preserved.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph
+    ntype : str, optional
+        The node type name
+    etype : str, optional
+        The edge type name
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The heterograph.
+    """
+    hgi = _CAPI_DGLAsHeteroGraph(graph._graph)
+    hg = DGLHeteroGraph(hgi, [ntype], [etype])
+    hg.ndata.update(graph.ndata)
+    hg.edata.update(graph.edata)
+    return hg
+
+def as_immutable_graph(hg):
+    """Convert a DGLHeteroGraph with one node and edge type into a DGLGraph.
+
+    Node and edge features are preserved.
+
+    Parameters
+    ----------
+    graph : DGLHeteroGraph
+        The heterograph
+
+    Returns
+    -------
+    DGLGraph
+        The graph.
+    """
+    gidx = _CAPI_DGLAsImmutableGraph(hg._graph)
+    graph = DGLGraph(gidx)
+    graph.ndata.update(hg.ndata)
+    graph.edata.update(hg.edata)
+    return graph
 
 _init_api("dgl.transform")
