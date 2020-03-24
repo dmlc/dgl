@@ -249,7 +249,6 @@ class WeightBasis(nn.Module):
                  num_outputs):
         super(WeightBasis, self).__init__()
         self.size = size
-        self.out_feat = out_feat
         self.num_bases = num_bases
         self.num_outputs = num_outputs
 
@@ -272,5 +271,5 @@ class WeightBasis(nn.Module):
             Composed weight tensor of shape :math:`(\text{num_outputs}, \text{size})`
         """
         # generate all weights from bases
-        weight = th.matmul(self.w_comp, weight)
+        weight = th.matmul(self.w_comp, self.weight)
         return weight

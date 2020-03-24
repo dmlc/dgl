@@ -57,12 +57,13 @@ class RelGraphConvLayer(nn.Module):
             })
 
         self.use_weight = weight
-        self.use_basis = num_bases >= len(self.rel_names) and weight
+        self.use_basis = num_bases < len(self.rel_names) and weight
         if self.use_weight:
             if self.use_basis:
-                self.basis = dglnn.WeightBasis(in_feat, out_feat, num_bases, len(self.rel_names))
+                self.basis = dglnn.WeightBasis(in_feat * out_feat, num_bases, len(self.rel_names))
             else:
                 self.weight = nn.Parameter(th.Tensor(len(self.rel_names), in_feat * out_feat))
+                nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
 
         # bias
         if bias:
