@@ -1,9 +1,5 @@
 import os
 os.environ['DGLBACKEND']='mxnet'
-if 'DMLC_ROLE' in os.environ and os.environ['DMLC_ROLE'] == 'worker':
-    os.environ['OMP_NUM_THREADS']='8'
-else:
-    os.environ['OMP_NUM_THREADS']='4'
 from multiprocessing import Process
 import argparse, time, math
 import numpy as np
@@ -26,7 +22,7 @@ def start_server(args):
 
 def main(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
-    g = DistGraphStore(args.ip_config, args.graph_name)
+    g = DistGraphStore(server_namebook, args.graph_name)
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(g.get_id())
@@ -58,14 +54,15 @@ if __name__ == '__main__':
                         help="select a model. Valid models: gcn_ns, gcn_cv, graphsage_cv")
     parser.add_argument('--server', action='store_true',
             help='whether this is a server.')
+    parser.add_argument('--graph-name', type=str, help='graph name')
     parser.add_argument('--id', type=int,
             help='the partition id')
     parser.add_argument('--n-features', type=int, help='the input feature size')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--server_data', type=str, help='The file with the server data')
+    parser.add_argument('--client_data', type=str, help='The file with data exposed to the client.')
     parser.add_argument('--num-client', type=int, help='The number of clients')
     parser.add_argument('--n-classes', type=int, help='the number of classes')
-    parser.add_argument('--graph-path', type=str, help='the directory that stores graph structure')
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
     parser.add_argument("--num-gpus", type=int, default=0,
