@@ -1440,7 +1440,7 @@ class DGLHeteroGraph(object):
         if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
-            return eid.tousertensor()    
+            return eid.tousertensor()
 
     def find_edges(self, eid, etype=None):
         """Given an edge ID array with the specified type, return the source

@@ -407,7 +407,7 @@ class DGLBaseGraph(object):
         Returns
         -------
         tensor, or (tensor, tensor, tensor)
-            If 'return_uv` is False, return a single edge ID array `e`.  
+            If 'return_uv` is False, return a single edge ID array `e`.
             `e[i]` is the edge ID between `u[i]` and `v[i]`.
             Otherwise, return three arrays `(eu, ev, e)`.  `e[i]` is the ID
             of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
@@ -456,12 +456,12 @@ class DGLBaseGraph(object):
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
-            
+
             if force_multi:
                 return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
             else:
                 return eid.tousertensor()
-        
+
         if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
@@ -849,7 +849,7 @@ class DGLGraph(DGLBaseGraph):
         Edge feature storage.
     multigraph : bool, optional
         Deprecated (Will be deleted in the future).
-        Whether the graph would be a multigraph. If none, the flag will be 
+        Whether the graph would be a multigraph. If none, the flag will be
         set to True. (default: None)
     readonly : bool, optional
         Whether the graph structure is read-only (default: False).
