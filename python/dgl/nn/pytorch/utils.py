@@ -5,7 +5,6 @@ import torch as th
 from torch import nn
 from ... import DGLGraph
 
-
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
 
@@ -236,19 +235,19 @@ class WeightBasis(nn.Module):
 
     Parameters
     ----------
-    size : int
-        Size of the basis parameter.
+    shape : tuple[int]
+        Shape of the basis parameter.
     num_bases : int
         Number of bases.
     num_outputs : int
         Number of outputs.
     """
     def __init__(self,
-                 size,
+                 shape,
                  num_bases,
                  num_outputs):
         super(WeightBasis, self).__init__()
-        self.size = size
+        self.shape = shape
         self.num_bases = num_bases
         self.num_outputs = num_outputs
 
@@ -256,7 +255,7 @@ class WeightBasis(nn.Module):
             print('WARNING: The number of weight outputs should be larger than the number'
                   ' of bases.')
 
-        self.weight = nn.Parameter(th.Tensor(self.num_bases, size))
+        self.weight = nn.Parameter(th.Tensor(self.num_bases, *shape))
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
         # linear combination coefficients
         self.w_comp = nn.Parameter(th.Tensor(self.num_outputs, self.num_bases))
@@ -268,8 +267,8 @@ class WeightBasis(nn.Module):
         Returns
         -------
         weight : torch.Tensor
-            Composed weight tensor of shape :math:`(\text{num_outputs}, \text{size})`
+            Composed weight tensor of shape ``(num_outputs,) + shape``
         """
         # generate all weights from bases
-        weight = th.matmul(self.w_comp, self.weight)
-        return weight
+        weight = th.matmul(self.w_comp, self.weight.view(self.num_bases, -1))
+        return weight.view(self.num_outputs, *self.shape)
