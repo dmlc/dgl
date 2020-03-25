@@ -1046,7 +1046,7 @@ def from_csr(indptr, indices, is_multigraph,
     if is_multigraph is not None:
         dgl_warning("multigraph is deprecated." \
                     "DGL treat all graphs as multigraph by default.")
-    
+
     gidx = _CAPI_DGLGraphCSRCreate(
         indptr.todgltensor(),
         indices.todgltensor(),
