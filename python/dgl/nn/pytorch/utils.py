@@ -224,7 +224,7 @@ class WeightBasis(nn.Module):
     and can be described as below:
 
     .. math::
-        
+
         W_o = \sum_{b=1}^B a_{ob} V_b
 
     Each weight output :math:`W_o` is essentially a linear combination of basis

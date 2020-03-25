@@ -1,6 +1,4 @@
 """Heterograph NN modules"""
-from collections import defaultdict
-
 import torch as th
 import torch.nn as nn
 
@@ -23,12 +21,12 @@ class HeteroGraphConv(nn.Module):
 
     >>> import dgl
     >>> g = dgl.heterograph({
-    ...     ('user', 'follows', 'user') : edges1, 
+    ...     ('user', 'follows', 'user') : edges1,
     ...     ('user', 'plays', 'game') : edges2,
     ...     ('store', 'sells', 'game')  : edges3})
 
     Create a ``HeteroGraphConv`` that applies different convolution modules to
-    different relations. Note that the modules for ``'follows'`` and ``'plays'`` 
+    different relations. Note that the modules for ``'follows'`` and ``'plays'``
     do not share weights.
 
     >>> import dgl.nn.pytorch as dglnn
@@ -97,7 +95,7 @@ class HeteroGraphConv(nn.Module):
                 #          aggregation is performed
                 stacked = torch.stack(tensors, dim=0)
                 return torch.sum(stacked, dim=0)
-    
+
     Attributes
     ----------
     mods : dict[str, nn.Module]
@@ -111,7 +109,7 @@ class HeteroGraphConv(nn.Module):
         else:
             self.agg_fn = aggregate
 
-    def forward(self, g, inputs, mod_args=dict(), mod_kwargs=dict()):
+    def forward(self, g, inputs, mod_args=None, mod_kwargs=None):
         """Forward computation
 
         Invoke the forward function with each module and aggregate their results.
@@ -122,9 +120,9 @@ class HeteroGraphConv(nn.Module):
             Graph data.
         inputs : dict[str, Tensor] or pair of dict[str, Tensor]
             Input node features.
-        mod_args : dict[str, tuple[any]]
+        mod_args : dict[str, tuple[any]], optional
             Extra positional arguments for the sub-modules.
-        mod_kwargs : dict[str, dict[str, any]]
+        mod_kwargs : dict[str, dict[str, any]], optional
             Extra key-word arguments for the sub-modules.
 
         Returns
@@ -132,7 +130,11 @@ class HeteroGraphConv(nn.Module):
         dict[str, Tensor]
             Output representations for every types of nodes.
         """
-        outputs = {ty : [] for ty in g.dsttypes}
+        if mod_args is None:
+            mod_args = {}
+        if mod_kwargs is None:
+            mod_kwargs = {}
+        outputs = {nty : [] for nty in g.dsttypes}
         if isinstance(inputs, tuple):
             src_inputs, dst_inputs = inputs
             for stype, etype, dtype in g.canonical_etypes:
@@ -161,9 +163,9 @@ class HeteroGraphConv(nn.Module):
                     **mod_kwargs.get(etype, {}))
                 outputs[dtype].append(dstdata)
         rsts = {}
-        for ty, alist in outputs.items():
+        for nty, alist in outputs.items():
             if len(alist) != 0:
-                rsts[ty] = self.agg_fn(alist, ty)
+                rsts[nty] = self.agg_fn(alist, nty)
         return rsts
 
 def get_aggregate_fn(agg):
@@ -196,13 +198,13 @@ def get_aggregate_fn(agg):
         raise DGLError('Invalid cross type aggregator. Must be one of '
                        '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg)
     if agg == 'stack':
-        def stack_agg(inputs, dsttype):
+        def stack_agg(inputs, dsttype):  # pylint: disable=unused-argument
             if len(inputs) == 0:
                 return None
             return th.stack(inputs, dim=1)
         return stack_agg
     else:
-        def aggfn(inputs, dsttype):
+        def aggfn(inputs, dsttype):  # pylint: disable=unused-argument
             if len(inputs) == 0:
                 return None
             stacked = th.stack(inputs, dim=0)
