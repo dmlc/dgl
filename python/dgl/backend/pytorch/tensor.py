@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from distutils.version import LooseVersion
 
+import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
 import builtins
 from torch.utils import dlpack
