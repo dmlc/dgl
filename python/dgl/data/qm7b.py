@@ -1,9 +1,9 @@
 from scipy import io
 import numpy as np
-from dgl import DGLGraph
 import os
 
 from .utils import get_download_dir, download
+from ..graph import DGLGraph
 
 class QM7b(object):
     """

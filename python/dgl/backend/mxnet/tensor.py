@@ -335,7 +335,10 @@ def sort_1d(input):
     return val, idx
 
 def arange(start, stop):
-    return nd.arange(start, stop, dtype=np.int64)
+    if start >= stop:
+        return nd.array([], dtype=np.int64)
+    else:
+        return nd.arange(start, stop, dtype=np.int64)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)

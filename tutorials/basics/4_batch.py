@@ -72,6 +72,7 @@ plt.show()
 # list of graph and label pairs.
 
 import dgl
+import torch
 
 def collate(samples):
     # The input `samples` is a list of pairs
@@ -99,57 +100,9 @@ def collate(samples):
 # be called readout or aggregation. Finally, the graph 
 # representations are fed into a classifier :math:`g` to predict the graph labels.
 #
-# Graph convolution
-# -----------------
-# The graph convolution operation is basically the same as that for graph convolutional network (GCN). To learn more, 
-# see the GCN `tutorial <https://docs.dgl.ai/tutorials/models/1_gnn/1_gcn.html>`_). The only difference is
-# that we replace :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)` 
-# by
-# :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\frac{1}{|\mathcal{N}(v)|}\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)`
-# 
-# The replacement of summation by average is to balance nodes with different
-# degrees. This gives a better performance for this experiment.
-#
-# The self edges added in the dataset initialization allows you to
-# include the original node feature :math:`h_{v}^{(l)}` when taking the average.
+# Graph convolution layer can be found in the ``dgl.nn.<backend>`` submodule.
 
-import dgl.function as fn
-import torch
-import torch.nn as nn
-
-
-# Sends a message of node feature h.
-msg = fn.copy_src(src='h', out='m')
-
-def reduce(nodes):
-    """Take an average over all neighbor node features hu and use it to
-    overwrite the original node feature."""
-    accum = torch.mean(nodes.mailbox['m'], 1)
-    return {'h': accum}
-
-class NodeApplyModule(nn.Module):
-    """Update the node feature hv with ReLU(Whv+b)."""
-    def __init__(self, in_feats, out_feats, activation):
-        super(NodeApplyModule, self).__init__()
-        self.linear = nn.Linear(in_feats, out_feats)
-        self.activation = activation
-
-    def forward(self, node):
-        h = self.linear(node.data['h'])
-        h = self.activation(h)
-        return {'h' : h}
-
-class GCN(nn.Module):
-    def __init__(self, in_feats, out_feats, activation):
-        super(GCN, self).__init__()
-        self.apply_mod = NodeApplyModule(in_feats, out_feats, activation)
-
-    def forward(self, g, feature):
-        # Initialize the node features with h.
-        g.ndata['h'] = feature
-        g.update_all(msg, reduce)
-        g.apply_nodes(func=self.apply_mod)
-        return g.ndata.pop('h')
+from dgl.nn.pytorch import GraphConv
 
 ###############################################################################
 # Readout and classification
@@ -166,25 +119,25 @@ class GCN(nn.Module):
 # graphs with variable size. You then feed the graph representations into a
 # classifier with one linear layer to obtain pre-softmax logits.
 
+import torch.nn as nn
 import torch.nn.functional as F
-
 
 class Classifier(nn.Module):
     def __init__(self, in_dim, hidden_dim, n_classes):
         super(Classifier, self).__init__()
-
-        self.layers = nn.ModuleList([
-            GCN(in_dim, hidden_dim, F.relu),
-            GCN(hidden_dim, hidden_dim, F.relu)])
+        self.conv1 = GraphConv(in_dim, hidden_dim)
+        self.conv2 = GraphConv(hidden_dim, hidden_dim)
         self.classify = nn.Linear(hidden_dim, n_classes)
 
     def forward(self, g):
-        # For undirected graphs, in_degree is the same as
-        # out_degree.
+        # Use node degree as the initial node feature. For undirected graphs, the in-degree
+        # is the same as the out_degree.
         h = g.in_degrees().view(-1, 1).float()
-        for conv in self.layers:
-            h = conv(g, h)
+        # Perform graph convolution and activation function.
+        h = F.relu(self.conv1(g, h))
+        h = F.relu(self.conv2(g, h))
         g.ndata['h'] = h
+        # Calculate graph representation by averaging all the node representations.
         hg = dgl.mean_nodes(g, 'h')
         return self.classify(hg)
 
