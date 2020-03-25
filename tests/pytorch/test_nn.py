@@ -4,6 +4,7 @@ import dgl
 import dgl.nn.pytorch as nn
 import dgl.function as fn
 import backend as F
+import pytest
 from copy import deepcopy
 
 import numpy as np
@@ -640,6 +641,110 @@ def test_cf_conv():
     h = cfconv(g, node_feats, edge_feats)
     # current we only do shape check
     assert h.shape[-1] == 3    
+
+def myagg(alist, dsttype):
+    rst = alist[0]
+    for i in range(1, len(alist)):
+        rst = rst + (i + 1) * alist[i]
+    return rst
+
+@pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
+def test_hetero_conv(agg):
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1), (0, 2), (2, 1), (1, 3)],
+        ('user', 'plays', 'game'): [(0, 0), (0, 2), (0, 3), (1, 0), (2, 2)],
+        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]})
+    conv = nn.HeteroGraphConv({
+        'follows': nn.GraphConv(2, 3),
+        'plays': nn.GraphConv(2, 4),
+        'sells': nn.GraphConv(3, 4)},
+        agg)
+    uf = F.randn((4, 2))
+    gf = F.randn((4, 4))
+    sf = F.randn((2, 3))
+    uf_dst = F.randn((4, 3))
+    gf_dst = F.randn((4, 4))
+
+    h = conv(g, {'user': uf})
+    assert set(h.keys()) == {'user', 'game'}
+    if agg != 'stack':
+        assert h['user'].shape == (4, 3)
+        assert h['game'].shape == (4, 4)
+    else:
+        assert h['user'].shape == (4, 1, 3)
+        assert h['game'].shape == (4, 1, 4)
+
+    h = conv(g, {'user': uf, 'store': sf})
+    assert set(h.keys()) == {'user', 'game'}
+    if agg != 'stack':
+        assert h['user'].shape == (4, 3)
+        assert h['game'].shape == (4, 4)
+    else:
+        assert h['user'].shape == (4, 1, 3)
+        assert h['game'].shape == (4, 2, 4)
+
+    h = conv(g, {'store': sf})
+    assert set(h.keys()) == {'game'}
+    if agg != 'stack':
+        assert h['game'].shape == (4, 4)
+    else:
+        assert h['game'].shape == (4, 1, 4)
+
+    # test with pair input
+    conv = nn.HeteroGraphConv({
+        'follows': nn.SAGEConv(2, 3, 'mean'),
+        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
+        'sells': nn.SAGEConv(3, 4, 'mean')},
+        agg)
+
+    h = conv(g, ({'user': uf}, {'user' : uf, 'game' : gf}))
+    assert set(h.keys()) == {'user', 'game'}
+    if agg != 'stack':
+        assert h['user'].shape == (4, 3)
+        assert h['game'].shape == (4, 4)
+    else:
+        assert h['user'].shape == (4, 1, 3)
+        assert h['game'].shape == (4, 1, 4)
+
+    # pair input requires both src and dst type features to be provided
+    h = conv(g, ({'user': uf}, {'game' : gf}))
+    assert set(h.keys()) == {'game'}
+    if agg != 'stack':
+        assert h['game'].shape == (4, 4)
+    else:
+        assert h['game'].shape == (4, 1, 4)
+
+    # test with mod args
+    class MyMod(th.nn.Module):
+        def __init__(self, s1, s2):
+            super(MyMod, self).__init__()
+            self.carg1 = 0
+            self.carg2 = 0
+            self.s1 = s1
+            self.s2 = s2
+        def forward(self, g, h, arg1=None, *, arg2=None):
+            if arg1 is not None:
+                self.carg1 += 1
+            if arg2 is not None:
+                self.carg2 += 1
+            return th.zeros((g.number_of_dst_nodes(), self.s2))
+    mod1 = MyMod(2, 3)
+    mod2 = MyMod(2, 4)
+    mod3 = MyMod(3, 4)
+    conv = nn.HeteroGraphConv({
+        'follows': mod1,
+        'plays': mod2,
+        'sells': mod3},
+        agg)
+    mod_args = {'follows' : (1,), 'plays' : (1,)}
+    mod_kwargs = {'sells' : {'arg2' : 'abc'}}
+    h = conv(g, {'user' : uf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
+    assert mod1.carg1 == 1
+    assert mod1.carg2 == 0
+    assert mod2.carg1 == 1
+    assert mod2.carg2 == 0
+    assert mod3.carg1 == 0
+    assert mod3.carg2 == 1
 
 if __name__ == '__main__':
     test_graph_conv()

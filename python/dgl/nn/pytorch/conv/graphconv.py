@@ -123,16 +123,11 @@ class GraphConv(nn.Module):
         """
         graph = graph.local_var()
 
-        if self._norm != 'none':
-            degs = graph.in_degrees().to(feat.device).float().clamp(min=1)
-            if self._norm == 'both':
-                norm = th.pow(degs, -0.5)
-            else:
-                norm = 1.0 / degs
+        if self._norm == 'both':
+            degs = graph.out_degrees().to(feat.device).float().clamp(min=1)
+            norm = th.pow(degs, -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)
             norm = th.reshape(norm, shp)
-
-        if self._norm == 'both':
             feat = feat * norm
 
         if weight is not None:
@@ -160,7 +155,14 @@ class GraphConv(nn.Module):
             if weight is not None:
                 rst = th.matmul(rst, weight)
 
-        if self._norm in ('right', 'both'):
+        if self._norm != 'none':
+            degs = graph.in_degrees().to(feat.device).float().clamp(min=1)
+            if self._norm == 'both':
+                norm = th.pow(degs, -0.5)
+            else:
+                norm = 1.0 / degs
+            shp = norm.shape + (1,) * (feat.dim() - 1)
+            norm = th.reshape(norm, shp)
             rst = rst * norm
 
         if self.bias is not None:
