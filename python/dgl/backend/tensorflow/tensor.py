@@ -6,9 +6,7 @@ from distutils.version import LooseVersion
 import tensorflow as tf
 from tensorflow.python.eager import context
 import builtins
-import tfdlpack
 import numpy as np
-from tfdlpack import to_dlpack, from_dlpack
 
 from ... import ndarray as nd
 from ... import kernel as K
@@ -356,11 +354,11 @@ def rand_shuffle(arr):
 
 
 def zerocopy_to_dlpack(input):
-    return tfdlpack.to_dlpack(input)
+    return tf.experimental.dlpack.to_dlpack(input)
 
 
 def zerocopy_from_dlpack(dlpack_tensor):
-    return tfdlpack.from_dlpack(dlpack_tensor)
+    return tf.experimental.dlpack.from_dlpack(dlpack_tensor)
 
 
 def zerocopy_to_numpy(input):
