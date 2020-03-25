@@ -519,3 +519,9 @@ def make_invmap(array, use_numpy=True):
     invmap = {x: i for i, x in enumerate(uniques)}
     remapped = np.asarray([invmap[x] for x in array])
     return uniques, invmap, remapped
+
+def expand_to_pairs(input_):
+    if isinstance(input_, tuple):
+        return input_
+    else:
+        return input_, input_

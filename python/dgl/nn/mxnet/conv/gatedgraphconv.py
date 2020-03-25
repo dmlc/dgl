@@ -75,6 +75,8 @@ class GatedGraphConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         """
+        assert graph.is_homograph, \
+            "Graph is not homogeneous; store edge types as features instead."
         graph = graph.local_var()
         zero_pad = nd.zeros((feat.shape[0], self._out_feats - feat.shape[1]), ctx=feat.context)
         feat = nd.concat(feat, zero_pad, dim=-1)

@@ -499,6 +499,27 @@ def test_nn_conv():
     # currently we only do shape check
     assert h.shape[-1] == 10
 
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
+    edge_func = th.nn.Linear(4, 5 * 10)
+    nnconv = nn.NNConv(5, 10, edge_func, 'mean')
+    feat = F.randn((100, 5))
+    efeat = F.randn((g.number_of_edges(), 4))
+    nnconv = nnconv.to(ctx)
+    h = nnconv(g, feat, efeat)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
+
+    g = dgl.bipartite(sp.sparse.random(50, 100, density=0.1))
+    edge_func = th.nn.Linear(4, 5 * 10)
+    nnconv = nn.NNConv((5, 2), 10, edge_func, 'mean')
+    feat = F.randn((50, 5))
+    feat_dst = F.randn((100, 2))
+    efeat = F.randn((g.number_of_edges(), 4))
+    nnconv = nnconv.to(ctx)
+    h = nnconv(g, (feat, feat_dst), efeat)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
+
 def test_gmm_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
@@ -507,6 +528,25 @@ def test_gmm_conv():
     pseudo = F.randn((g.number_of_edges(), 3))
     gmmconv = gmmconv.to(ctx)
     h = gmmconv(g, feat, pseudo)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    gmmconv = nn.GMMConv(5, 10, 3, 4, 'mean')
+    feat = F.randn((100, 5))
+    pseudo = F.randn((g.number_of_edges(), 3))
+    gmmconv = gmmconv.to(ctx)
+    h = gmmconv(g, feat, pseudo)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
+
+    g = dgl.bipartite(sp.sparse.random(100, 50, density=0.1), readonly=True)
+    gmmconv = nn.GMMConv((5, 2), 10, 3, 4, 'mean')
+    feat = F.randn((100, 5))
+    feat_dst = F.randn((50, 2))
+    pseudo = F.randn((g.number_of_edges(), 3))
+    gmmconv = gmmconv.to(ctx)
+    h = gmmconv(g, (feat, feat_dst), pseudo)
     # currently we only do shape check
     assert h.shape[-1] == 10
 
@@ -539,6 +579,25 @@ def test_dense_sage_conv():
     out_sage = sage(g, feat)
     out_dense_sage = dense_sage(adj, feat)
     assert F.allclose(out_sage, out_dense_sage)
+
+def test_edge_conv():
+    for g in [
+        dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)),
+        dgl.graph(nx.erdos_renyi_graph(20, 0.3)),
+        dgl.bipartite(sp.sparse.random(20, 10, 0.3))]:
+        ctx = F.ctx()
+
+        edge_conv = nn.EdgeConv(5, 2).to(ctx)
+        print(edge_conv)
+
+        # test #1: basic
+        h0 = F.randn((g.number_of_src_nodes(), 5))
+        if not g.is_homograph:
+            # bipartite
+            h1 = edge_conv(g, (h0, h0[:10]))
+        else:
+            h1 = edge_conv(g, h0)
+        assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_dense_cheb_conv():
     for k in range(1, 4):

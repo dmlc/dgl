@@ -4077,6 +4077,11 @@ class DGLHeteroGraph(object):
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
 
+    @property
+    def is_homograph(self):
+        """Return if the graph is homogeneous."""
+        return len(self.ntypes) == 1 and len(self.etypes) == 1
+
 ############################################################
 # Internal APIs
 ############################################################

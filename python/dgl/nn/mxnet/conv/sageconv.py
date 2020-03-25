@@ -1,12 +1,12 @@
 """MXNet Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
-from numbers import Integral
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
 
 from .... import function as fn
+from ....utils import expand_to_pairs
 
 class SAGEConv(nn.Block):
     r"""GraphSAGE layer from paper `Inductive Representation Learning on
@@ -57,14 +57,7 @@ class SAGEConv(nn.Block):
                  activation=None):
         super(SAGEConv, self).__init__()
 
-        if isinstance(in_feats, tuple):
-            self._in_src_feats = in_feats[0]
-            self._in_dst_feats = in_feats[1]
-        elif isinstance(in_feats, Integral):
-            self._in_src_feats = self._in_dst_feats = in_feats
-        else:
-            raise TypeError('in_feats must be either int or pair of ints')
-
+        self._in_src_feats, self._in_dst_feats = expand_to_pairs(in_feats)
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         with self.name_scope():
@@ -92,9 +85,11 @@ class SAGEConv(nn.Block):
         ----------
         graph : DGLGraph
             The graph.
-        feat : mxnet.NDArray
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+        feat : mxnet.NDArray or pair of mxnet.NDArray
+            If a single tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tensors are given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
         Returns
         -------

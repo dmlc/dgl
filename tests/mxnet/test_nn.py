@@ -264,17 +264,24 @@ def test_dense_sage_conv():
     assert F.allclose(out_sage, out_dense_sage)
 
 def test_edge_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
-    ctx = F.ctx()
+    for g in [
+        dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)),
+        dgl.graph(nx.erdos_renyi_graph(20, 0.3)),
+        dgl.bipartite(sp.sparse.random(20, 10, 0.3))]:
+        ctx = F.ctx()
 
-    edge_conv = nn.EdgeConv(5, 2)
-    edge_conv.initialize(ctx=ctx)
-    print(edge_conv)
+        edge_conv = nn.EdgeConv(5, 2)
+        edge_conv.initialize(ctx=ctx)
+        print(edge_conv)
 
-    # test #1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = edge_conv(g, h0)
-    assert h1.shape == (g.number_of_nodes(), 2)
+        # test #1: basic
+        h0 = F.randn((g.number_of_src_nodes(), 5))
+        if not g.is_homograph:
+            # bipartite
+            h1 = edge_conv(g, (h0, h0[:10]))
+        else:
+            h1 = edge_conv(g, h0)
+        assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_gin_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
@@ -290,32 +297,66 @@ def test_gin_conv():
     assert h1.shape == (g.number_of_nodes(), 5)
 
 def test_gmm_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     ctx = F.ctx()
 
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     gmm_conv = nn.GMMConv(5, 2, 5, 3, 'max')
     gmm_conv.initialize(ctx=ctx)
-    print(gmm_conv)
-
     # test #1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     pseudo = F.randn((g.number_of_edges(), 5))
     h1 = gmm_conv(g, h0, pseudo)
     assert h1.shape == (g.number_of_nodes(), 2)
 
+    g = dgl.graph(nx.erdos_renyi_graph(20, 0.3))
+    gmm_conv = nn.GMMConv(5, 2, 5, 3, 'max')
+    gmm_conv.initialize(ctx=ctx)
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    pseudo = F.randn((g.number_of_edges(), 5))
+    h1 = gmm_conv(g, h0, pseudo)
+    assert h1.shape == (g.number_of_nodes(), 2)
+
+    g = dgl.bipartite(sp.sparse.random(20, 10, 0.1))
+    gmm_conv = nn.GMMConv((5, 4), 2, 5, 3, 'max')
+    gmm_conv.initialize(ctx=ctx)
+    # test #1: basic
+    h0 = F.randn((g.number_of_src_nodes(), 5))
+    hd = F.randn((g.number_of_dst_nodes(), 4))
+    pseudo = F.randn((g.number_of_edges(), 5))
+    h1 = gmm_conv(g, (h0, hd), pseudo)
+    assert h1.shape == (g.number_of_dst_nodes(), 2)
+
 def test_nn_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     ctx = F.ctx()
 
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     nn_conv = nn.NNConv(5, 2, gluon.nn.Embedding(3, 5 * 2), 'max')
     nn_conv.initialize(ctx=ctx)
-    print(nn_conv)
-
     # test #1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
     h1 = nn_conv(g, h0, etypes)
     assert h1.shape == (g.number_of_nodes(), 2)
+
+    g = dgl.graph(nx.erdos_renyi_graph(20, 0.3))
+    nn_conv = nn.NNConv(5, 2, gluon.nn.Embedding(3, 5 * 2), 'max')
+    nn_conv.initialize(ctx=ctx)
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    h1 = nn_conv(g, h0, etypes)
+    assert h1.shape == (g.number_of_nodes(), 2)
+
+    g = dgl.bipartite(sp.sparse.random(20, 10, 0.3))
+    nn_conv = nn.NNConv((5, 4), 2, gluon.nn.Embedding(3, 5 * 2), 'max')
+    nn_conv.initialize(ctx=ctx)
+    # test #1: basic
+    h0 = F.randn((g.number_of_src_nodes(), 5))
+    hd = F.randn((g.number_of_dst_nodes(), 4))
+    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    h1 = nn_conv(g, (h0, hd), etypes)
+    assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_sg_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))

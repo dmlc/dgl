@@ -1,10 +1,10 @@
 """Torch Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-from numbers import Integral
 from torch import nn
 from torch.nn import functional as F
 
 from .... import function as fn
+from ....utils import expand_to_pairs
 
 
 class SAGEConv(nn.Module):
@@ -56,14 +56,7 @@ class SAGEConv(nn.Module):
                  activation=None):
         super(SAGEConv, self).__init__()
 
-        if isinstance(in_feats, tuple):
-            self._in_src_feats = in_feats[0]
-            self._in_dst_feats = in_feats[1]
-        elif isinstance(in_feats, Integral):
-            self._in_src_feats = self._in_dst_feats = in_feats
-        else:
-            raise TypeError('in_feats must be either int or pair of ints')
-
+        self._in_src_feats, self._in_dst_feats = expand_to_pairs(in_feats)
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         self.norm = norm
