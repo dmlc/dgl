@@ -6,6 +6,7 @@ from torch import nn
 from .... import function as fn
 from ..softmax import edge_softmax
 from ..utils import Identity
+from ....utils import expand_as_pair
 
 # pylint: enable=W0235
 class GATConv(nn.Module):
@@ -25,8 +26,13 @@ class GATConv(nn.Module):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int, or pair of ints
         Input feature size.
+
+        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
     out_feats : int
         Output feature size.
     num_heads : int
@@ -54,17 +60,25 @@ class GATConv(nn.Module):
                  activation=None):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
-        self._in_feats = in_feats
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
+        if isinstance(in_feats, tuple):
+            self.fc = nn.Linear(
+                self._in_src_feats, out_feats * num_heads, bias=False)
+        else:
+            self.fc_src = nn.Linear(
+                self._in_src_feats, out_feats * num_heads, bias=False)
+            self.fc_dst = nn.Linear(
+                self._in_dst_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.feat_drop = nn.Dropout(feat_drop)
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
         if residual:
-            if in_feats != out_feats:
-                self.res_fc = nn.Linear(in_feats, num_heads * out_feats, bias=False)
+            if self._in_dst_feats != out_feats:
+                self.res_fc = nn.Linear(
+                    self._in_dst_feats, num_heads * out_feats, bias=False)
             else:
                 self.res_fc = Identity()
         else:
@@ -104,8 +118,8 @@ class GATConv(nn.Module):
         if isinstance(feat, tuple):
             h_src = self.feat_drop(feat[0])
             h_dst = self.feat_drop(feat[1])
-            feat_src = self.fc(h_src).view(-1, self._num_heads, self._out_feats)
-            feat_dst = self.fc(h_dst).view(-1, self._num_heads, self._out_feats)
+            feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
+            feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
         else:
             h_src = h_dst = self.feat_drop(feat)
             feat_src = feat_dst = self.fc(h_src).view(
