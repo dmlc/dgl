@@ -157,48 +157,48 @@ pipeline {
     }
     stage("Test") {
       parallel {
-        stage("Tensorflow CPU") {
-          agent {
-            docker {
-              label "linux-cpu-node"
-              image "dgllib/${app}-ci-cpu:02192020"
-            }
-          }
-          stages {
-            stage("Unit test") {
-              steps {
-                unit_test_linux("tensorflow", "cpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
-        stage("Tensorflow GPU") {
-          agent {
-            docker {
-              label "linux-gpu-node"
-              image "dgllib/${app}-ci-gpu:02192020"
-              args "--runtime nvidia"
-            }
-          }
-          stages {
-            stage("Unit test") {
-              steps {
-                sh "nvidia-smi"
-                unit_test_linux("tensorflow", "gpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
+        //stage("Tensorflow CPU") {
+        //  agent {
+        //    docker {
+        //      label "linux-cpu-node"
+        //      image "dgllib/${app}-ci-cpu:02192020"
+        //    }
+        //  }
+        //  stages {
+        //    stage("Unit test") {
+        //      steps {
+        //        unit_test_linux("tensorflow", "cpu")
+        //      }
+        //    }
+        //  }
+        //  post {
+        //    always {
+        //      cleanWs disableDeferredWipeout: true, deleteDirs: true
+        //    }
+        //  }
+        // }
+        //stage("Tensorflow GPU") {
+        //  agent {
+        //    docker {
+        //      label "linux-gpu-node"
+        //      image "dgllib/${app}-ci-gpu:02192020"
+        //      args "--runtime nvidia"
+        //    }
+        //  }
+        //  stages {
+        //    stage("Unit test") {
+        //      steps {
+        //        sh "nvidia-smi"
+        //        unit_test_linux("tensorflow", "gpu")
+        //      }
+        //    }
+        //  }
+        //  post {
+        //    always {
+        //      cleanWs disableDeferredWipeout: true, deleteDirs: true
+        //    }
+        //  }
+        //}
         stage("Torch CPU") {
           agent {
             docker {
@@ -276,48 +276,48 @@ pipeline {
             }
           }
         }
-        stage("MXNet CPU") {
-          agent {
-            docker {
-              label "linux-cpu-node"
-              image "dgllib/${app}-ci-cpu:02192020"
-            }
-          }
-          stages {
-            stage("Unit test") {
-              steps {
-                unit_test_linux("mxnet", "cpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
-        stage("MXNet GPU") {
-          agent {
-            docker {
-              label "linux-gpu-node"
-              image "dgllib/${app}-ci-gpu:02192020"
-              args "--runtime nvidia"
-            }
-          }
-          stages {
-            stage("Unit test") {
-              steps {
-                sh "nvidia-smi"
-                unit_test_linux("mxnet", "gpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
+        //stage("MXNet CPU") {
+        //  agent {
+        //    docker {
+        //      label "linux-cpu-node"
+        //      image "dgllib/${app}-ci-cpu:02192020"
+        //    }
+        //  }
+        //  stages {
+        //    stage("Unit test") {
+        //      steps {
+        //        unit_test_linux("mxnet", "cpu")
+        //      }
+        //    }
+        //  }
+        //  post {
+        //    always {
+        //      cleanWs disableDeferredWipeout: true, deleteDirs: true
+        //    }
+        //  }
+        //}
+        //stage("MXNet GPU") {
+        //  agent {
+        //    docker {
+        //      label "linux-gpu-node"
+        //      image "dgllib/${app}-ci-gpu:02192020"
+        //      args "--runtime nvidia"
+        //    }
+        //  }
+        //  stages {
+        //    stage("Unit test") {
+        //      steps {
+        //        sh "nvidia-smi"
+        //        unit_test_linux("mxnet", "gpu")
+        //      }
+        //    }
+        //  }
+        //  post {
+        //    always {
+        //      cleanWs disableDeferredWipeout: true, deleteDirs: true
+        //    }
+        //  }
+        //}
       }
     }
   }

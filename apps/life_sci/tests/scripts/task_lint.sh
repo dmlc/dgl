@@ -3,4 +3,4 @@
 
 # pylint
 echo 'Checking code style of python codes...'
-python3 -m pylint --reports=y -v --rcfile=tests/lint/pylintrc python/dgl || exit 1
+python3 -m pylint --reports=y -v --rcfile=tests/lint/pylintrc python/dgllife || exit 1
