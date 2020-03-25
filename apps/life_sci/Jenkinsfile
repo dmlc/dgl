@@ -110,7 +110,7 @@ pipeline {
           agent {
             docker {
               label "linux-cpu-node"
-              image "dgllib/${app}-ci-cpu:02192020"
+              image "dgllib/dgllife-ci-cpu"
             }
           }
           steps {
