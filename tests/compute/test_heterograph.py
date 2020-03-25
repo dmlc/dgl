@@ -711,6 +711,7 @@ def test_flatten():
     assert fg.etypes == ['follows+knows']
     check_mapping(g, fg)
 
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_to_device():
     hg = create_test_heterograph()
     if F.is_cuda_available():
