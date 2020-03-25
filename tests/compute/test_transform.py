@@ -202,7 +202,8 @@ def create_large_graph_index(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
-    return from_scipy_sparse_matrix(spm, True)
+    # It's possible that we generate a multigraph.
+    return from_scipy_sparse_matrix(spm, True, True)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -540,6 +541,16 @@ def test_remove_edges():
     check(g2, 'AA', g, [2])
     check(g2, 'AB', g, [3])
     check(g2, 'BA', g, [1])
+
+    g3 = dgl.remove_edges(g, {'AA': F.tensor([]), 'AB': F.tensor([3]), 'BA': F.tensor([1])})
+    check(g3, 'AA', g, [])
+    check(g3, 'AB', g, [3])
+    check(g3, 'BA', g, [1])
+
+    g4 = dgl.remove_edges(g, {'AB': F.tensor([3, 1, 2, 0])})
+    check(g4, 'AA', g, [])
+    check(g4, 'AB', g, [3, 1, 2, 0])
+    check(g4, 'BA', g, [])
 
 if __name__ == '__main__':
     test_line_graph()
