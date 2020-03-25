@@ -5,12 +5,12 @@ dependencies:
   - pip:
     - tensorflow==2.2.0rc1
     - pytest
-  - nose
-  - numpy
-  - cython
-  - scipy
-  - networkx
-  - matplotlib
-  - nltk
-  - requests[security]
-  - tqdm
+    - nose
+    - numpy
+    - cython
+    - scipy
+    - networkx
+    - matplotlib
+    - nltk
+    - requests[security]
+    - tqdm

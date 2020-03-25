@@ -11,6 +11,7 @@ import numpy as np
 from ... import ndarray as nd
 from ... import kernel as K
 from ...function.base import TargetCode
+from ...container import _api_internal
 
 TF_VERSION = LooseVersion(tf.__version__)
 
@@ -379,7 +380,7 @@ def zerocopy_to_dgl_ndarray(input):
 
 
 def zerocopy_from_dgl_ndarray(input):
-    return zerocopy_from_dlpack(input.to_dlpack())
+    return zerocopy_from_dlpack(_api_internal._ForceAlign(input, 64).to_dlpack())
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,

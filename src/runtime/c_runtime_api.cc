@@ -406,3 +406,25 @@ DGL_REGISTER_GLOBAL("_GetDeviceAttr")
       DeviceAPIManager::Get(ctx)->GetAttr(ctx, kind, ret);
     }
   });
+
+
+inline bool is_aligned(const void* ptr, std::uintptr_t alignment) noexcept {
+  auto iptr = reinterpret_cast<std::uintptr_t>(ptr);
+  return iptr % alignment;
+}
+
+// copy if data is not aligned
+DGL_REGISTER_GLOBAL("_ForceAlign")
+.set_body([](DGLArgs args, DGLRetValue* ret) {
+  NDArray nd = args[0];
+  int32_t alignment = args[1];
+  if (is_aligned(nd->data, alignment)) {
+    *ret = nd;
+  } else {
+    std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
+    NDArray ret_ndarray =
+        NDArray::Empty(shape_vec, nd->dtype, nd->ctx);
+    ret_ndarray.CopyFrom(nd);
+    *ret = ret_ndarray;
+  }
+});
