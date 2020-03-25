@@ -41,6 +41,33 @@ Graph::Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes) {
   }
 }
 
+bool Graph::IsMultigraph() const {
+  if (num_edges_ <= 1) {
+    return false;
+  }
+
+  typedef std::pair<int64_t, int64_t> Pair;
+  std::vector<Pair> pairs;
+  pairs.reserve(num_edges_);
+  for (uint64_t eid = 0; eid < num_edges_; ++eid) {
+    pairs.emplace_back(all_edges_src_[eid], all_edges_dst_[eid]);
+  }
+  // sort according to src and dst ids
+  std::sort(pairs.begin(), pairs.end(),
+      [] (const Pair& t1, const Pair& t2) {
+        return std::get<0>(t1) < std::get<0>(t2)
+          || (std::get<0>(t1) == std::get<0>(t2) && std::get<1>(t1) < std::get<1>(t2));
+      });
+  for (uint64_t eid = 0; eid < num_edges_-1; ++eid) {
+    // As src and dst are all sorted, we only need to compare i and i+1
+    if (std::get<0>(pairs[eid]) == std::get<0>(pairs[eid+1]) &&
+        std::get<1>(pairs[eid]) == std::get<1>(pairs[eid+1]))
+        return true;
+  }
+
+  return false;
+}
+
 void Graph::AddVertices(uint64_t num_vertices) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
   adjlist_.resize(adjlist_.size() + num_vertices);

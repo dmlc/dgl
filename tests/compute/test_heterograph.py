@@ -1473,6 +1473,24 @@ def test_isolated_ntype():
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4
 
+def test_ismultigraph():
+    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5), (2, 5)], 'A', 'AB', 'B', card=(6, 6))
+    assert g1.is_multigraph == False
+    g2 = dgl.bipartite([(0, 1), (0, 1), (0, 2), (1, 5)], 'A', 'AC', 'C', card=(6, 6))
+    assert g2.is_multigraph == True
+    g3 = dgl.graph([(0, 1), (1, 2)], 'A', 'AA', card=6)
+    assert g3.is_multigraph == False
+    g4 = dgl.graph([(0, 1), (0, 1), (1, 2)], 'A', 'AA', card=6)
+    assert g4.is_multigraph == True
+    g = dgl.hetero_from_relations([g1, g3])
+    assert g.is_multigraph == False
+    g = dgl.hetero_from_relations([g1, g2])
+    assert g.is_multigraph == True
+    g = dgl.hetero_from_relations([g1, g4])
+    assert g.is_multigraph == True
+    g = dgl.hetero_from_relations([g2, g4])
+    assert g.is_multigraph == True
+
 def test_bipartite():
     g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B')
     assert g1.is_unibipartite

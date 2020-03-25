@@ -380,6 +380,17 @@ def test_find_edges():
     finally:
         assert fail
 
+def test_ismultigraph():
+    g = dgl.DGLGraph()
+    g.add_nodes(10)
+    assert g.is_multigraph == False
+    g.add_edges([0], [0])
+    assert g.is_multigraph == False
+    g.add_edges([1], [2])
+    assert g.is_multigraph == False
+    g.add_edges([0, 2], [0, 3])
+    assert g.is_multigraph == True
+
 if __name__ == '__main__':
     test_query()
     test_mutation()

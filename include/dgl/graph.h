@@ -25,6 +25,9 @@ typedef std::shared_ptr<Graph> MutableGraphPtr;
 /*! \brief Mutable graph based on adjacency list. */
 class Graph: public GraphInterface {
  public:
+  /*! \brief default constructor */
+  Graph() {}
+
   /*! \brief construct a graph from the coo format. */
   Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes);
 
@@ -98,10 +101,7 @@ class Graph: public GraphInterface {
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
-  bool IsMultigraph() const override {
-    LOG(FATAL) << "unsupported IsMultigraph in Graph on Adjlist";
-    return true;
-  }
+  bool IsMultigraph() const override;
 
   /*!
    * \return whether the graph is read-only
