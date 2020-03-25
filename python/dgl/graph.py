@@ -378,10 +378,7 @@ class DGLBaseGraph(object):
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated." \
                         "Please use return_array instead")
-            if force_multi:
-                return idx.tousertensor()
-            else:
-                return idx[0]
+            force_multi = return_array
 
         if return_array:
             return idx.tousertensor()
@@ -456,11 +453,7 @@ class DGLBaseGraph(object):
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
-
-            if force_multi:
-                return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
-            else:
-                return eid.tousertensor()
+            return_uv = force_multi
 
         if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()

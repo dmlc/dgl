@@ -14,8 +14,7 @@
 
 namespace dgl {
 
-Graph::Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes,
-    bool multigraph): is_multigraph_(multigraph) {
+Graph::Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes) {
   CHECK(aten::IsValidIdArray(src_ids));
   CHECK(aten::IsValidIdArray(dst_ids));
   this->AddVertices(num_nodes);
@@ -447,7 +446,7 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
     oldv2newv[vid_data[i]] = i;
   }
   Subgraph rst;
-  rst.graph = std::make_shared<Graph>(IsMultigraph());
+  rst.graph = std::make_shared<Graph>();
   rst.induced_vertices = vids;
   rst.graph->AddVertices(len);
   for (int64_t i = 0; i < len; ++i) {
@@ -486,7 +485,7 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
         nodes.push_back(dst_id);
     }
 
-    rst.graph = std::make_shared<Graph>(IsMultigraph());
+    rst.graph = std::make_shared<Graph>();
     rst.induced_edges = eids;
     rst.graph->AddVertices(nodes.size());
 
@@ -500,7 +499,7 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
         {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
     std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
   } else {
-    rst.graph = std::make_shared<Graph>(IsMultigraph());
+    rst.graph = std::make_shared<Graph>();
     rst.induced_edges = eids;
     rst.graph->AddVertices(NumVertices());
 

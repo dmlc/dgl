@@ -222,9 +222,9 @@ def test_query():
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
                 assert g.edge_id(src, dst, etype=etype) == i
-                assert F.asnumpy(g.edge_id(src, dst, etype=etype, force_multi=True)).tolist() == [i]
+                assert F.asnumpy(g.edge_id(src, dst, etype=etype, return_array=True)).tolist() == [i]
             assert F.asnumpy(g.edge_ids(srcs, dsts, etype=etype)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_ids(srcs, dsts, etype=etype, force_multi=True)
+            u, v, e = g.edge_ids(srcs, dsts, etype=etype, return_uv=True)
             assert F.asnumpy(u).tolist() == srcs
             assert F.asnumpy(v).tolist() == dsts
             assert F.asnumpy(e).tolist() == list(range(n_edges))
@@ -521,9 +521,9 @@ def test_view1():
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
                 assert g.edge_id(src, dst) == i
-                assert F.asnumpy(g.edge_id(src, dst, force_multi=True)).tolist() == [i]
+                assert F.asnumpy(g.edge_id(src, dst, return_array=True)).tolist() == [i]
             assert F.asnumpy(g.edge_ids(srcs, dsts)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_ids(srcs, dsts, force_multi=True)
+            u, v, e = g.edge_ids(srcs, dsts, return_uv=True)
             assert F.asnumpy(u).tolist() == srcs
             assert F.asnumpy(v).tolist() == dsts
             assert F.asnumpy(e).tolist() == list(range(n_edges))

@@ -35,7 +35,6 @@ class GraphIndex(ObjectBase):
     """
     def __new__(cls):
         obj = ObjectBase.__new__(cls)
-        obj._multigraph = None  # python-side cache of the flag
         obj._readonly = None  # python-side cache of the flag
         obj._cache = {}
         return obj
@@ -43,29 +42,22 @@ class GraphIndex(ObjectBase):
     def __getstate__(self):
         src, dst, _ = self.edges()
         n_nodes = self.number_of_nodes()
-        # TODO(xiangsx): delete is_multigraph in the future
-        multigraph = self.is_multigraph()
         readonly = self.is_readonly()
 
-        return n_nodes, multigraph, readonly, src, dst
+        return n_nodes, readonly, src, dst
 
     def __setstate__(self, state):
         """The pickle state of GraphIndex is defined as a triplet
-        (number_of_nodes, multigraph, readonly, src_nodes, dst_nodes)
+        (number_of_nodes, readonly, src_nodes, dst_nodes)
         """
-        # TODO(xiangsx): delete multigraph in the future
-        num_nodes, multigraph, readonly, src, dst = state
+        num_nodes, readonly, src, dst = state
 
         self._cache = {}
-        self._multigraph = multigraph
         self._readonly = readonly
-        if multigraph is None:
-            multigraph = BoolFlag.BOOL_UNKNOWN
         self.__init_handle_by_constructor__(
             _CAPI_DGLGraphCreate,
             src.todgltensor(),
             dst.todgltensor(),
-            int(multigraph),
             int(num_nodes),
             readonly)
 
@@ -119,15 +111,14 @@ class GraphIndex(ObjectBase):
 
     def is_multigraph(self):
         """Return whether the graph is a multigraph
+        The time cost will be O(E)
 
         Returns
         -------
         bool
             True if it is a multigraph, False otherwise.
         """
-        if self._multigraph is None:
-            self._multigraph = bool(_CAPI_DGLGraphIsMultigraph(self))
-        return self._multigraph
+        return bool(_CAPI_DGLGraphIsMultigraph(self))
 
     def is_readonly(self):
         """Indicate whether the graph index is read-only.
@@ -150,9 +141,9 @@ class GraphIndex(ObjectBase):
             New readonly state of current graph index.
         """
         # TODO(minjie): very ugly code, should fix this
-        n_nodes, multigraph, _, src, dst = self.__getstate__()
+        n_nodes, _, src, dst = self.__getstate__()
         self.clear_cache()
-        state = (n_nodes, multigraph, readonly_state, src, dst)
+        state = (n_nodes, readonly_state, src, dst)
         self.__setstate__(state)
 
     def number_of_nodes(self):
@@ -1017,23 +1008,17 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
     """
     src = utils.toindex(src)
     dst = utils.toindex(dst)
-    if is_multigraph is None:
-        is_multigraph = BoolFlag.BOOL_TRUE
-    else:
-        dgl_warning("Hint of multigraph will be deprecated." \
-                    "DGL will treat all graphs as multigraph in the future.")
+    if is_multigraph is not None:
+        dgl_warning("multigraph is deprecated." \
+                    "DGL treat all graphs as multigraph by default.")
     if readonly:
         gidx = _CAPI_DGLGraphCreate(
             src.todgltensor(),
             dst.todgltensor(),
-            int(is_multigraph),
             int(num_nodes),
             readonly)
     else:
-        if is_multigraph is BoolFlag.BOOL_UNKNOWN:
-            # We will treat all graphs as multigraph by default
-            is_multigraph = BoolFlag.BOOL_TRUE
-        gidx = _CAPI_DGLGraphCreateMutable(bool(is_multigraph))
+        gidx = _CAPI_DGLGraphCreateMutable()
         gidx.add_nodes(num_nodes)
         gidx.add_edges(src, dst)
     return gidx
@@ -1058,22 +1043,20 @@ def from_csr(indptr, indices, is_multigraph,
     """
     indptr = utils.toindex(indptr)
     indices = utils.toindex(indices)
-    if is_multigraph is None:
-        is_multigraph = BoolFlag.BOOL_TRUE
-    else:
-        dgl_warning("Hint of multigraph will be deprecated." \
-                    "DGL will treat all graphs as multigraph in the future.")
+    if is_multigraph is not None:
+        dgl_warning("multigraph is deprecated." \
+                    "DGL treat all graphs as multigraph by default.")
+    
     gidx = _CAPI_DGLGraphCSRCreate(
         indptr.todgltensor(),
         indices.todgltensor(),
         shared_mem_name,
-        int(is_multigraph),
         direction)
     return gidx
 
 def from_shared_mem_csr_matrix(shared_mem_name,
                                num_nodes, num_edges, edge_dir,
-                               is_multigraph):
+                               is_multigraph=None):
     """Load a graph from the shared memory in the CSR format.
 
     Parameters
@@ -1091,13 +1074,12 @@ def from_shared_mem_csr_matrix(shared_mem_name,
         True if the graph is a multigraph.
     """
     if is_multigraph is not None:
-        dgl_warning("Hint of multigraph will be deprecated." \
-                    "DGL will treat all graphs as multigraph in the future.")
+        dgl_warning("multigraph is deprecated." \
+                    "DGL treat all graphs as multigraph by default.")
 
     gidx = _CAPI_DGLGraphCSRCreateMMap(
         shared_mem_name,
         int(num_nodes), int(num_edges),
-        is_multigraph,
         edge_dir)
     return gidx
 
@@ -1128,7 +1110,7 @@ def from_networkx(nx_graph, readonly):
             nx_graph = nx_graph.to_directed()
 
     # we will use multigraph by default
-    is_multigraph = True
+    is_multigraph = None
     num_nodes = nx_graph.number_of_nodes()
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
@@ -1176,7 +1158,7 @@ def from_scipy_sparse_matrix(adj, multigraph, readonly):
         The graph index.
     """
     if multigraph is not None:
-        dgl_warning("Hint of multigraph will be deprecated." \
+        dgl_warning("multigraph will be deprecated." \
                     "DGL will treat all graphs as multigraph in the future.")
 
     if adj.getformat() != 'csr' or not readonly:
@@ -1318,12 +1300,10 @@ def create_graph_index(graph_data, multigraph, readonly):
     if graph_data is None:
         if readonly:
             raise Exception("can't create an empty immutable graph")
-        if multigraph is None:
-            multigraph = True
-        else:
-            dgl_warning("Hint of multigraph will be deprecated." \
+        if multigraph is not None:
+            dgl_warning("multigraph will be deprecated." \
                         "DGL will treat all graphs as multigraph in the future.")
-        return _CAPI_DGLGraphCreateMutable(multigraph)
+        return _CAPI_DGLGraphCreateMutable()
     elif isinstance(graph_data, (list, tuple)):
         # edge list
         return from_edge_list(graph_data, multigraph, readonly)

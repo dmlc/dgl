@@ -187,14 +187,12 @@ HeteroGraph::HeteroGraph(
 }
 
 bool HeteroGraph::IsMultigraph() const {
-  return const_cast<HeteroGraph*>(this)->is_multigraph_.Get([this] () {
-      for (const auto &hg : relation_graphs_) {
-        if (hg->IsMultigraph()) {
-          return true;
-        }
-      }
-      return false;
-    });
+  for (const auto &hg : relation_graphs_) {
+    if (hg->IsMultigraph()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 BoolArray HeteroGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {

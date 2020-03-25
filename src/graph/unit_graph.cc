@@ -69,16 +69,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
 
-  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
-      IdArray src, IdArray dst, bool is_multigraph)
-    : BaseHeteroGraph(metagraph),
-      is_multigraph_(is_multigraph) {
-    CHECK(aten::IsValidIdArray(src));
-    CHECK(aten::IsValidIdArray(dst));
-    CHECK_EQ(src->shape[0], dst->shape[0]) << "Input arrays should have the same length.";
-    adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
-  }
-
   COO(GraphPtr metagraph, const aten::COOMatrix& coo)
     : BaseHeteroGraph(metagraph), adj_(coo) {
     // Data index should not be inherited. Edges in COO format are always
@@ -142,7 +132,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
         adj_.num_rows, adj_.num_cols,
         aten::AsNumBits(adj_.row, bits),
         aten::AsNumBits(adj_.col, bits));
-    ret.is_multigraph_ = is_multigraph_;
     return ret;
   }
 
@@ -155,14 +144,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
         adj_.num_rows, adj_.num_cols,
         adj_.row.CopyTo(ctx),
         adj_.col.CopyTo(ctx));
-    ret.is_multigraph_ = is_multigraph_;
     return ret;
   }
 
   bool IsMultigraph() const override {
-    return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
-        return aten::COOHasDuplicate(adj_);
-      });
+    return aten::COOHasDuplicate(adj_);
   }
 
   bool IsReadonly() const override {
@@ -422,9 +408,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
-
-  /*! \brief multi-graph flag */
-  Lazy<bool> is_multigraph_;
 };
 
 //////////////////////////////////////////////////////////
@@ -445,17 +428,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
 
-    adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
-  }
-
-  CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
-      IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
-    : BaseHeteroGraph(metagraph), is_multigraph_(is_multigraph) {
-    CHECK(aten::IsValidIdArray(indptr));
-    CHECK(aten::IsValidIdArray(indices));
-    CHECK(aten::IsValidIdArray(edge_ids));
-    CHECK_EQ(indices->shape[0], edge_ids->shape[0])
-      << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
 
@@ -519,7 +491,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
           aten::AsNumBits(adj_.indptr, bits),
           aten::AsNumBits(adj_.indices, bits),
           aten::AsNumBits(adj_.data, bits));
-      ret.is_multigraph_ = is_multigraph_;
       return ret;
     }
   }
@@ -534,15 +505,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
           adj_.indptr.CopyTo(ctx),
           adj_.indices.CopyTo(ctx),
           adj_.data.CopyTo(ctx));
-      ret.is_multigraph_ = is_multigraph_;
       return ret;
     }
   }
 
   bool IsMultigraph() const override {
-    return const_cast<CSR*>(this)->is_multigraph_.Get([this] () {
-        return aten::CSRHasDuplicate(adj_);
-      });
+    return aten::CSRHasDuplicate(adj_);
   }
 
   bool IsReadonly() const override {
@@ -775,9 +743,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   /*! \brief internal adjacency matrix. Data array stores edge ids */
   aten::CSRMatrix adj_;
-
-  /*! \brief multi-graph flag */
-  Lazy<bool> is_multigraph_;
 };
 
 //////////////////////////////////////////////////////////

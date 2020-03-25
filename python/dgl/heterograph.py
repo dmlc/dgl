@@ -266,8 +266,6 @@ class DGLHeteroGraph(object):
             frame.set_initializer(init.zero_initializer)
             self._msg_frames.append(frame)
 
-        self._is_multigraph = None
-
     def __getstate__(self):
         return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
 
@@ -1075,10 +1073,7 @@ class DGLHeteroGraph(object):
         bool
             True if the graph is a multigraph, False otherwise.
         """
-        if self._is_multigraph is None:
-            return self._graph.is_multigraph()
-        else:
-            return self._is_multigraph
+        return self._graph.is_multigraph()
 
     @property
     def is_readonly(self):
@@ -1352,10 +1347,7 @@ class DGLHeteroGraph(object):
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated." \
                         "Please use return_array instead")
-            if force_multi:
-                return idx.tousertensor()
-            else:
-                return idx[0]
+            force_multi = return_array
 
         if return_array:
             return idx.tousertensor()
@@ -1377,8 +1369,7 @@ class DGLHeteroGraph(object):
             Whether to always treat the graph as a multigraph. See the
             "Returns" for their effects. (Default: False)
         return_uv : bool
-            Whether to always treat the graph as a multigraph. See the
-            "Returns" for their effects. (Default: False)
+            See the "Returns" for their effects. (Default: False)
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
@@ -1432,10 +1423,7 @@ class DGLHeteroGraph(object):
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
-            if force_multi:
-                return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
-            else:
-                return eid.tousertensor()
+            return_uv = force_multi
 
         if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
