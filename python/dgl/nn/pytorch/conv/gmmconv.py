@@ -6,7 +6,7 @@ from torch.nn import init
 
 from .... import function as fn
 from ..utils import Identity
-from ....utils import expand_to_pairs
+from ....utils import expand_as_pair
 
 
 class GMMConv(nn.Module):
@@ -46,7 +46,7 @@ class GMMConv(nn.Module):
                  residual=False,
                  bias=True):
         super(GMMConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = expand_to_pairs(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
@@ -111,7 +111,7 @@ class GMMConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_to_pairs(feat)
+            feat_src, feat_dst = expand_as_pair(feat)
             graph.srcdata['h'] = self.fc(feat_src).view(-1, self._n_kernels, self._out_feats)
             E = graph.number_of_edges()
             # compute gaussian weight

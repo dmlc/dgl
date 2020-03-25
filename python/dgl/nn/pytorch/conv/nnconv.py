@@ -6,7 +6,7 @@ from torch.nn import init
 
 from .... import function as fn
 from ..utils import Identity
-from ....utils import expand_to_pairs
+from ....utils import expand_as_pair
 
 
 class NNConv(nn.Module):
@@ -48,7 +48,7 @@ class NNConv(nn.Module):
                  residual=False,
                  bias=True):
         super(NNConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = expand_to_pairs(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self.edge_nn = edge_func
         if aggregator_type == 'sum':
@@ -103,7 +103,7 @@ class NNConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_to_pairs(feat)
+            feat_src, feat_dst = expand_as_pair(feat)
 
             # (n, d_in, 1)
             graph.srcdata['h'] = feat_src.unsqueeze(-1)

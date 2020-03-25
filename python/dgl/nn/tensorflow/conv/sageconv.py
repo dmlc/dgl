@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 from .... import function as fn
-from ....utils import expand_to_pairs
+from ....utils import expand_as_pair
 
 
 class SAGEConv(layers.Layer):
@@ -57,7 +57,7 @@ class SAGEConv(layers.Layer):
                  activation=None):
         super(SAGEConv, self).__init__()
 
-        self._in_src_feats, self._in_dst_feats = expand_to_pairs(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         self.norm = norm

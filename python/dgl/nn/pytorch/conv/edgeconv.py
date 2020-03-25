@@ -3,7 +3,7 @@
 from torch import nn
 
 from .... import function as fn
-from ....utils import expand_to_pairs
+from ....utils import expand_as_pair
 
 
 class EdgeConv(nn.Module):
@@ -67,7 +67,7 @@ class EdgeConv(nn.Module):
             New node features.
         """
         with g.local_scope():
-            h_src, h_dst = expand_to_pairs(h)
+            h_src, h_dst = expand_as_pair(h)
             g.srcdata['x'] = h_src
             g.dstdata['x'] = h_dst
             if not self.batch_norm:

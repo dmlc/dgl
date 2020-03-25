@@ -5,7 +5,7 @@ from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
-from ....utils import expand_to_pairs
+from ....utils import expand_as_pair
 
 
 class NNConv(nn.Block):
@@ -47,7 +47,7 @@ class NNConv(nn.Block):
                  residual=False,
                  bias=True):
         super(NNConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = expand_to_pairs(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         if aggregator_type == 'sum':
             self.reducer = fn.sum
@@ -100,7 +100,7 @@ class NNConv(nn.Block):
             is the output feature size.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_to_pairs(feat)
+            feat_src, feat_dst = expand_as_pair(feat)
 
             # (n, d_in, 1)
             graph.srcdata['h'] = feat_src.expand_dims(-1)
