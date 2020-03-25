@@ -71,6 +71,9 @@ class GraphConv(nn.Module):
                  bias=True,
                  activation=None):
         super(GraphConv, self).__init__()
+        if norm not in ('none', 'both', 'right'):
+            raise DGLError('Invalid norm value. Must be either "none", "both" or "right".'
+                           ' But got "{}".'.format(norm))
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm

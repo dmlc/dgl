@@ -20,7 +20,7 @@ def test_graph_conv():
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
 
-    conv = nn.GraphConv(5, 2, norm=False, bias=True)
+    conv = nn.GraphConv(5, 2, norm='none', bias=True)
     conv = conv.to(ctx)
     print(conv)
     # test#1: basic
@@ -515,7 +515,7 @@ def test_dense_graph_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
     adj = g.adjacency_matrix(ctx=ctx).to_dense()
-    conv = nn.GraphConv(5, 2, norm=False, bias=True)
+    conv = nn.GraphConv(5, 2, norm='none', bias=True)
     dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
     dense_conv.weight.data = conv.weight.data
     dense_conv.bias.data = conv.bias.data

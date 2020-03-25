@@ -4,6 +4,7 @@
 import torch as th
 from torch import nn
 from ... import DGLGraph
+from ...base import dgl_warning
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
@@ -252,8 +253,8 @@ class WeightBasis(nn.Module):
         self.num_outputs = num_outputs
 
         if num_outputs <= num_bases:
-            print('WARNING: The number of weight outputs should be larger than the number'
-                  ' of bases.')
+            dgl_warning('The number of weight outputs should be larger than the number'
+                        ' of bases.')
 
         self.weight = nn.Parameter(th.Tensor(self.num_bases, *shape))
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
