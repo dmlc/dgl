@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+#
+# setup.py
+#
+# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import math
 import numpy as np
 import scipy as sp
@@ -7,6 +26,8 @@ import os
 import sys
 import pickle
 import time
+
+from dgl.base import NID, EID
 
 def SoftRelationPartition(edges, n, threshold=0.05):
     """This partitions a list of edges to n partitions according to their
@@ -273,7 +294,7 @@ def ConstructGraph(edges, n_entities, args):
     else:
         src, etype_id, dst = edges
         coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[n_entities, n_entities])
-        g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+        g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
         g.edata['tid'] = F.tensor(etype_id, F.int64)
         if args.pickle_graph:
             with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
@@ -359,7 +380,7 @@ class TrainDataset(object):
                            return_false_neg=False)
 
 
-class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
+class ChunkNegEdgeSubgraph(dgl.DGLGraph):
     """Wrapper for negative graph
 
         Parameters
@@ -378,7 +399,11 @@ class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
     """
     def __init__(self, subg, num_chunks, chunk_size,
                  neg_sample_size, neg_head):
-        super(ChunkNegEdgeSubgraph, self).__init__(subg._parent, subg.sgi)
+        super(ChunkNegEdgeSubgraph, self).__init__(graph_data=subg.sgi.graph,
+                                                   readonly=True,
+                                                   parent=subg._parent)
+        self.ndata[NID] = subg.sgi.induced_nodes.tousertensor()
+        self.edata[EID] = subg.sgi.induced_edges.tousertensor()
         self.subg = subg
         self.num_chunks = num_chunks
         self.chunk_size = chunk_size
@@ -428,16 +453,19 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, neg_sample_size, is_chunked,
     # We use all nodes to create negative edges. Regardless of the sampling algorithm,
     # we can always view the subgraph with one chunk.
     if (neg_head and len(neg_g.head_nid) == num_nodes) \
-       or (not neg_head and len(neg_g.tail_nid) == num_nodes):
+            or (not neg_head and len(neg_g.tail_nid) == num_nodes):
         num_chunks = 1
         chunk_size = pos_g.number_of_edges()
     elif is_chunked:
-        if pos_g.number_of_edges() < chunk_size:
+        # This is probably for evaluation.
+        if pos_g.number_of_edges() < chunk_size \
+                and neg_g.number_of_edges() % neg_sample_size == 0:
+            num_chunks = 1
+            chunk_size = pos_g.number_of_edges()
+        # This is probably the last batch in the training. Let's ignore it.
+        elif pos_g.number_of_edges() % chunk_size > 0:
             return None
         else:
-            # This is probably the last batch. Let's ignore it.
-            if pos_g.number_of_edges() % chunk_size > 0:
-                return None
             num_chunks = int(pos_g.number_of_edges() / chunk_size)
         assert num_chunks * chunk_size == pos_g.number_of_edges()
     else:
@@ -553,7 +581,7 @@ class EvalDataset(object):
             dst = np.concatenate((dataset.train[2], dataset.valid[2], dataset.test[2]))
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
                                        shape=[dataset.n_entities, dataset.n_entities])
-            g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
+            g = dgl.DGLGraph(coo, readonly=True, multigraph=True, sort_csr=True)
             g.edata['tid'] = F.tensor(etype_id, F.int64)
             if args.pickle_graph:
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:

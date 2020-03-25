@@ -1139,12 +1139,15 @@ def from_networkx(nx_graph, readonly):
     dst = utils.toindex(dst)
     return from_coo(num_nodes, src, dst, is_multigraph, readonly)
 
-def from_scipy_sparse_matrix(adj, readonly):
+def from_scipy_sparse_matrix(adj, multigraph, readonly):
     """Convert from scipy sparse matrix.
 
     Parameters
     ----------
     adj : scipy sparse matrix
+    multigraph : bool
+        Whether the graph would be a multigraph. If none, the flag will be determined
+        by the data.
     readonly : bool
         True if the returned graph is readonly.
 
@@ -1156,8 +1159,9 @@ def from_scipy_sparse_matrix(adj, readonly):
     if adj.getformat() != 'csr' or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
-        return from_coo(num_nodes, adj_coo.row, adj_coo.col, False, readonly)
+        return from_coo(num_nodes, adj_coo.row, adj_coo.col, multigraph, readonly)
     else:
+        # If the input matrix is csr, it's guaranteed to be a simple graph.
         return from_csr(adj.indptr, adj.indices, False, "out")
 
 def from_edge_list(elist, is_multigraph, readonly):
@@ -1172,8 +1176,8 @@ def from_edge_list(elist, is_multigraph, readonly):
         src, dst = elist
     else:
         src, dst = zip(*elist)
-    src = np.array(src)
-    dst = np.array(dst)
+    src = np.asarray(src)
+    dst = np.asarray(dst)
     src_ids = utils.toindex(src)
     dst_ids = utils.toindex(dst)
     num_nodes = max(src.max(), dst.max()) + 1
@@ -1182,13 +1186,13 @@ def from_edge_list(elist, is_multigraph, readonly):
         raise DGLError('Invalid edge list. Nodes must start from 0.')
     return from_coo(num_nodes, src_ids, dst_ids, is_multigraph, readonly)
 
-def map_to_subgraph_nid(subgraph, parent_nids):
+def map_to_subgraph_nid(induced_nodes, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 
     Parameters
     ----------
-    subgraph: SubgraphIndex
-        the graph index of a subgraph
+    induced_nodes: utils.Index
+        Induced nodes of the subgraph.
 
     parent_nids: utils.Index
         Node Ids in the parent graph.
@@ -1198,7 +1202,7 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     utils.Index
         Node Ids in the subgraph.
     """
-    return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(induced_nodes.todgltensor(),
                                                  parent_nids.todgltensor()))
 
 def transform_ids(mapping, ids):
@@ -1298,7 +1302,7 @@ def create_graph_index(graph_data, multigraph, readonly):
         return from_edge_list(graph_data, multigraph, readonly)
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         # scipy format
-        return from_scipy_sparse_matrix(graph_data, readonly)
+        return from_scipy_sparse_matrix(graph_data, multigraph, readonly)
     else:
         # networkx - any format
         try:

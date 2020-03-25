@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+#
+# setup.py
+#
+# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import os
 import argparse
 import time
@@ -48,16 +67,15 @@ class ArgParser(argparse.ArgumentParser):
                           help='root path of all dataset')
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
-        self.add_argument('--format', type=str, default='1',
-                          help='the format of the dataset.')
-
+        self.add_argument('--format', type=str, default='built_in',
+                          help='the format of the dataset, it can be built_in,'\
+                                'raw_udd_{htr} and udd_{htr}')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
                           help='learning rate')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
-
         self.add_argument('--gpu', type=int, default=[-1], nargs='+',
                           help='a list of active gpu ids, e.g. 0')
         self.add_argument('--mix_cpu_gpu', action='store_true',
@@ -66,20 +84,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='double entitiy dim for complex number')
         self.add_argument('-dr', '--double_rel', action='store_true',
                           help='double relation dim for complex number')
-        self.add_argument('--seed', type=int, default=0,
-                          help='set random seed for reproducibility')
-
-        self.add_argument('--rel_part', action='store_true',
-                          help='enable relation partitioning')
-        self.add_argument('--soft_rel_part', action='store_true',
-                          help='enable soft relation partition')
-        self.add_argument('--nomp_thread_per_process', type=int, default=-1,
-                          help='num of omp threads used per process in multi-process training')
-        self.add_argument('--async_update', action='store_true',
-                          help='allow async_update on node embedding')
-        self.add_argument('--strict_rel_part', action='store_true',
-                          help='Strict relation partition')
-
+        self.add_argument('--num_thread', type=int, default=1,
+                          help='number of thread used')
         self.add_argument('--server_id', type=int, default=0,
                           help='Unique ID of each server')
         self.add_argument('--ip_config', type=str, default='ip_config.txt',
@@ -100,12 +106,14 @@ def get_server_data(args, machine_id):
    g2l, dataset = get_server_partition_dataset(
     args.data_path, 
     args.dataset, 
-    args.format, 
     machine_id)
 
    # Note that the dataset doesn't ccontain the triple
    print('n_entities: ' + str(dataset.n_entities))
    print('n_relations: ' + str(dataset.n_relations))
+
+   args.soft_rel_part = False
+   args.strict_rel_part = False
 
    model = load_model(None, args, dataset.n_entities, dataset.n_relations)
 

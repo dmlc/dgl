@@ -10,10 +10,10 @@ import pickle as pkl
 import networkx as nx
 import scipy.sparse as sp
 import os, sys
-from dgl import DGLGraph
 
-import dgl
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..graph import DGLGraph
+from ..graph import batch as graph_batch
 
 _urls = {
     'cora' : 'dataset/cora_raw.zip',
@@ -136,12 +136,12 @@ class CitationGraphDataset(object):
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
-    rowsum = np.array(features.sum(1))
+    rowsum = np.asarray(features.sum(1))
     r_inv = np.power(rowsum, -1).flatten()
     r_inv[np.isinf(r_inv)] = 0.
     r_mat_inv = sp.diags(r_inv)
     features = r_mat_inv.dot(features)
-    return np.array(features.todense())
+    return np.asarray(features.todense())
 
 def _parse_index_file(filename):
     """Parse index file."""
@@ -314,13 +314,13 @@ class CoraBinary(object):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(dgl.DGLGraph(elist))
+                        self.graphs.append(DGLGraph(elist))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(dgl.DGLGraph(elist))
+                self.graphs.append(DGLGraph(elist))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
             self.pmpds = _pickle_load(f)
         self.labels = []
@@ -329,12 +329,12 @@ class CoraBinary(object):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(cur) != 0:
-                        self.labels.append(np.array(cur))
+                        self.labels.append(np.asarray(cur))
                     cur = []
                 else:
                     cur.append(int(line.strip()))
             if len(cur) != 0:
-                self.labels.append(np.array(cur))
+                self.labels.append(np.asarray(cur))
         # sanity check
         assert len(self.graphs) == len(self.pmpds)
         assert len(self.graphs) == len(self.labels)
@@ -348,7 +348,7 @@ class CoraBinary(object):
     @staticmethod
     def collate_fn(batch):
         graphs, pmpds, labels = zip(*batch)
-        batched_graphs = dgl.batch(graphs)
+        batched_graphs = graph_batch(graphs)
         batched_pmpds = sp.block_diag(pmpds)
         batched_labels = np.concatenate(labels, axis=0)
         return batched_graphs, batched_pmpds, batched_labels
@@ -376,12 +376,12 @@ class CoraDataset(object):
         self.num_labels = labels.shape[1]
 
         # build graph
-        idx = np.array(idx_features_labels[:, 0], dtype=np.int32)
+        idx = np.asarray(idx_features_labels[:, 0], dtype=np.int32)
         idx_map = {j: i for i, j in enumerate(idx)}
         edges_unordered = np.genfromtxt("{}/cora/cora.cites".format(self.dir),
                                         dtype=np.int32)
-        edges = np.array(list(map(idx_map.get, edges_unordered.flatten())),
-                        dtype=np.int32).reshape(edges_unordered.shape)
+        edges = np.asarray(list(map(idx_map.get, edges_unordered.flatten())),
+                           dtype=np.int32).reshape(edges_unordered.shape)
         adj = sp.coo_matrix((np.ones(edges.shape[0]),
                              (edges[:, 0], edges[:, 1])),
                             shape=(labels.shape[0], labels.shape[0]),
@@ -392,7 +392,7 @@ class CoraDataset(object):
         self.graph = nx.from_scipy_sparse_matrix(adj, create_using=nx.DiGraph())
 
         features = _normalize(features)
-        self.features = np.array(features.todense())
+        self.features = np.asarray(features.todense())
         self.labels = np.where(labels)[1]
 
         self.train_mask = _sample_mask(range(140), labels.shape[0])
@@ -416,7 +416,7 @@ class CoraDataset(object):
 
 def _normalize(mx):
     """Row-normalize sparse matrix"""
-    rowsum = np.array(mx.sum(1))
+    rowsum = np.asarray(mx.sum(1))
     r_inv = np.power(rowsum, -1).flatten()
     r_inv[np.isinf(r_inv)] = 0.
     r_mat_inv = sp.diags(r_inv)
@@ -427,7 +427,7 @@ def _encode_onehot(labels):
     classes = list(sorted(set(labels)))
     classes_dict = {c: np.identity(len(classes))[i, :] for i, c in
                     enumerate(classes)}
-    labels_onehot = np.array(list(map(classes_dict.get, labels)),
-                             dtype=np.int32)
+    labels_onehot = np.asarray(list(map(classes_dict.get, labels)),
+                               dtype=np.int32)
     return labels_onehot
 

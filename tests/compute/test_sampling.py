@@ -152,24 +152,24 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
     
     if reverse:
         g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
-                'user', 'follow', card=card)
+                'user', 'follow', num_nodes=card)
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
-        g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user', card=card2)
+        g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user', num_nodes=card2)
         g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-        g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game', card=card2)
+        g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game', num_nodes=card2)
         g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-        g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user', card=card2)
+        g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user', num_nodes=card2)
 
         hg = dgl.hetero_from_relations([g, g1, g2, g3])
     else:
         g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
-                'user', 'follow', card=card)
+                'user', 'follow', num_nodes=card)
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
-        g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', card=card2)
+        g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', num_nodes=card2)
         g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-        g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', card=card2)
+        g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', num_nodes=card2)
         g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-        g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', card=card2)
+        g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', num_nodes=card2)
 
         hg = dgl.hetero_from_relations([g, g1, g2, g3])
     return g, hg

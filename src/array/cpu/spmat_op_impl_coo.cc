@@ -235,15 +235,12 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   const IdType* col_data = static_cast<IdType*>(coo.col->data);
   const IdType* data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
   NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
-  NDArray ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-  NDArray ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_indices;
+  NDArray ret_data;
 
   IdType* Bp = static_cast<IdType*>(ret_indptr->data);
-  IdType* Bi = static_cast<IdType*>(ret_indices->data);
-  IdType* Bx = static_cast<IdType*>(ret_data->data);
 
   std::fill(Bp, Bp + N, 0);
-
   for (int64_t i = 0; i < NNZ; ++i) {
     Bp[row_data[i]]++;
   }
@@ -256,18 +253,28 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   }
   Bp[N] = NNZ;
 
-  for (int64_t i = 0; i < NNZ; ++i) {
-    const IdType r = row_data[i];
-    Bi[Bp[r]] = col_data[i];
-    Bx[Bp[r]] = data? data[i] : i;
-    Bp[r]++;
-  }
+  if (coo.row_sorted == true) {
+    ret_indices = coo.col;
+    ret_data = coo.data;
+  } else {
+    ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+    IdType* Bi = static_cast<IdType*>(ret_indices->data);
+    IdType* Bx = static_cast<IdType*>(ret_data->data);
 
-  // correct the indptr
-  for (int64_t i = 0, last = 0; i <= N; ++i) {
-    IdType temp = Bp[i];
-    Bp[i] = last;
-    last = temp;
+    for (int64_t i = 0; i < NNZ; ++i) {
+      const IdType r = row_data[i];
+      Bi[Bp[r]] = col_data[i];
+      Bx[Bp[r]] = data? data[i] : i;
+      Bp[r]++;
+    }
+
+    // correct the indptr
+    for (int64_t i = 0, last = 0; i <= N; ++i) {
+      IdType temp = Bp[i];
+      Bp[i] = last;
+      last = temp;
+    }
   }
 
   return CSRMatrix(coo.num_rows, coo.num_cols,

@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+#
+# setup.py
+#
+# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 from models import KEModel
 
 import mxnet as mx
@@ -41,7 +60,7 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
         model.prepare_relation(mx.gpu(gpu_id))
 
     start = time.time()
-    for step in range(args.init_step, args.max_step):
+    for step in range(0, args.max_step):
         pos_g, neg_g = next(train_sampler)
         args.step = step
         with mx.autograd.record():
@@ -92,6 +111,6 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
             metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
 
     for k, v in metrics.items():
-        print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
+        print('{} average {}: {}'.format(mode, k, v))
     for i in range(len(test_samplers)):
         test_samplers[i] = test_samplers[i].reset()

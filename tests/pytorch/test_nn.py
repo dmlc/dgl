@@ -124,7 +124,7 @@ def test_set2set():
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = s2s(g, h0)
-    assert h1.shape[0] == 10 and h1.dim() == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
 
     # test#2: batched graph
     g1 = dgl.DGLGraph(nx.path_graph(11))
@@ -145,7 +145,7 @@ def test_glob_att_pool():
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = gap(g, h0)
-    assert h1.shape[0] == 10 and h1.dim() == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
@@ -170,13 +170,13 @@ def test_simple_pool():
     max_pool = max_pool.to(ctx)
     sort_pool = sort_pool.to(ctx)
     h1 = sum_pool(g, h0)
-    assert F.allclose(h1, F.sum(h0, 0))
+    assert F.allclose(F.squeeze(h1, 0), F.sum(h0, 0))
     h1 = avg_pool(g, h0)
-    assert F.allclose(h1, F.mean(h0, 0))
+    assert F.allclose(F.squeeze(h1, 0), F.mean(h0, 0))
     h1 = max_pool(g, h0)
-    assert F.allclose(h1, F.max(h0, 0))
+    assert F.allclose(F.squeeze(h1, 0), F.max(h0, 0))
     h1 = sort_pool(g, h0)
-    assert h1.shape[0] == 10 * 5 and h1.dim() == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
@@ -228,7 +228,7 @@ def test_set_trans():
     h1 = st_enc_1(g, h0)
     assert h1.shape == h0.shape
     h2 = st_dec(g, h1)
-    assert h2.shape[0] == 200 and h2.dim() == 1
+    assert h2.shape[0] == 1 and h2.shape[1] == 200 and h2.dim() == 2
 
     # test#2: batched graph
     g1 = dgl.DGLGraph(nx.path_graph(5))
@@ -290,23 +290,28 @@ def test_edge_softmax():
     print(score.grad[:10], grad_score[:10])
     
     # Test 2
-    def generate_rand_graph(n):
-      arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-      return dgl.DGLGraph(arr, readonly=True)
-    
-    g = generate_rand_graph(50)
-    a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
-    a2 = a1.clone().detach().requires_grad_()
-    g.edata['s'] = a1
-    g.group_apply_edges('dst', lambda edges: {'ss':F.softmax(edges.data['s'], 1)})
-    g.edata['ss'].sum().backward()
-    
-    builtin_sm = nn.edge_softmax(g, a2)
-    builtin_sm.sum().backward()
-    print(a1.grad - a2.grad)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 2
-    assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
+    def generate_rand_graph(n, m=None, ctor=dgl.DGLGraph):
+        if m is None:
+            m = n
+        arr = (sp.sparse.random(m, n, density=0.1, format='coo') != 0).astype(np.int64)
+        return ctor(arr, readonly=True)
+
+    for g in [generate_rand_graph(50),
+              generate_rand_graph(50, ctor=dgl.graph),
+              generate_rand_graph(100, 50, ctor=dgl.bipartite)]:
+        a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
+        a2 = a1.clone().detach().requires_grad_()
+        g.edata['s'] = a1
+        g.group_apply_edges('dst', lambda edges: {'ss':F.softmax(edges.data['s'], 1)})
+        g.edata['ss'].sum().backward()
+        
+        builtin_sm = nn.edge_softmax(g, a2)
+        builtin_sm.sum().backward()
+        print(a1.grad - a2.grad)
+        assert len(g.srcdata) == 0
+        assert len(g.dstdata) == 0
+        assert len(g.edata) == 2
+        assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
 
 def test_partial_edge_softmax():
     g = dgl.DGLGraph()
@@ -401,6 +406,22 @@ def test_sage_conv():
         sage = sage.to(ctx)
         h = sage(g, feat)
         assert h.shape[-1] == 10
+
+        g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
+        sage = nn.SAGEConv(5, 10, aggre_type)
+        feat = F.randn((100, 5))
+        sage = sage.to(ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 10
+
+        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+        dst_dim = 5 if aggre_type != 'gcn' else 10
+        sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
+        feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
+        sage = sage.to(ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 200
 
 def test_sgc_conv():
     ctx = F.ctx()

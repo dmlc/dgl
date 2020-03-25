@@ -124,11 +124,11 @@ directory, with three statistics logged in `generation_stats.txt` under `eval_re
 
 We also provide a jupyter notebook where you can visualize the generated molecules 
 
-![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg/DGMG_ZINC_canonical_vis.png)
+![](https://data.dgl.ai/model_zoo/drug_discovery/dgmg/DGMG_ZINC_canonical_vis.png)
 
 and compare their property distributions against the training molecule property distributions
 
-![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg/DGMG_ZINC_canonical_dist.png)
+![](https://data.dgl.ai/model_zoo/drug_discovery/dgmg/DGMG_ZINC_canonical_dist.png)
 
 You can download the notebook with `wget https://data.dgl.ai/dgllife/dgmg/eval_jupyter.ipynb`.
 
