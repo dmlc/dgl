@@ -32,13 +32,20 @@ local_path = args.dataset_path or os.path.join(get_download_dir(), data_filename
 if not os.path.exists(local_path):
     download('https://data.dgl.ai/dataset/modelnet40-sampled-2048.h5', local_path)
 
+def collate(samples):
+    # The input `samples` is a list of pairs
+    #  (graph, label).
+    graphs, data, labels = map(list, zip(*samples))
+    batched_graph = dgl.batch(graphs)
+    return batched_graph, torch.tensor(data), torch.tensor(labels)
+
 CustomDataLoader = partial(
         DataLoader,
         num_workers=num_workers,
         batch_size=batch_size,
         shuffle=True,
         drop_last=True,
-        collate_fn=lambda x: x)
+        collate_fn=collate)
 
 def train(net, opt, scheduler, train_loader, dev):
 
@@ -50,11 +57,7 @@ def train(net, opt, scheduler, train_loader, dev):
     count = 0
     with tqdm.tqdm(train_loader, ascii=True) as tq:
         # for data, label in tq:
-        for input in tq:
-            g = dgl.batch([d[0] for d in input])
-            data = torch.stack([torch.tensor(d[1]) for d in input])
-            label = torch.stack([torch.tensor(d[2]) for d in input])
-
+        for g, data, label in tq:
             num_examples = label.shape[0]
             data, label = data.to(dev), label.to(dev).squeeze().long()
             g.ndata['x'] = g.ndata['x'].to(dev)
@@ -74,9 +77,7 @@ def train(net, opt, scheduler, train_loader, dev):
             total_correct += correct
 
             tq.set_postfix({
-                'Loss': '%.5f' % loss,
                 'AvgLoss': '%.5f' % (total_loss / num_batches),
-                'Acc': '%.5f' % (correct / num_examples),
                 'AvgAcc': '%.5f' % (total_correct / count)})
     scheduler.step()
 
@@ -88,10 +89,11 @@ def evaluate(net, test_loader, dev):
 
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
-            for data, label in tq:
+            for g, data, label in tq:
                 num_examples = label.shape[0]
                 data, label = data.to(dev), label.to(dev).squeeze().long()
-                logits = net(data)
+                g.ndata['x'] = g.ndata['x'].to(dev)
+                logits = net(g, data)
                 _, preds = logits.max(1)
 
                 correct = (preds == label).sum().item()
@@ -113,7 +115,8 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+# opt = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+opt = optim.Adam(net.parameters(), lr=0.001, weight_decay=1e-4)
 
 scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, args.num_epochs, eta_min=0.001)
 
@@ -127,17 +130,15 @@ best_valid_acc = 0
 best_test_acc = 0
 
 for epoch in range(args.num_epochs):
-    '''
-    print('Epoch #%d Validating' % epoch)
-    valid_acc = evaluate(net, valid_loader, dev)
-    test_acc = evaluate(net, test_loader, dev)
-    if valid_acc > best_valid_acc:
-        best_valid_acc = valid_acc
-        best_test_acc = test_acc
-        if args.save_model_path:
-            torch.save(net.state_dict(), args.save_model_path)
-    print('Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)' % (
-        valid_acc, best_valid_acc, test_acc, best_test_acc))
-    '''
-
     train(net, opt, scheduler, train_loader, dev)
+    if (epoch + 1) % 5 == 0:
+        print('Epoch #%d Validating' % epoch)
+        valid_acc = evaluate(net, valid_loader, dev)
+        test_acc = evaluate(net, test_loader, dev)
+        if valid_acc > best_valid_acc:
+            best_valid_acc = valid_acc
+            best_test_acc = test_acc
+            if args.save_model_path:
+                torch.save(net.state_dict(), args.save_model_path)
+        print('Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)' % (
+            valid_acc, best_valid_acc, test_acc, best_test_acc))

@@ -91,6 +91,7 @@ class PointNetBasic(nn.Module):
         self.bn2.append(nn.BatchNorm1d(512))
         self.bn2.append(nn.BatchNorm1d(256))
 
+        self.dropout = nn.Dropout(0.3)
         self.mlp_out = nn.Linear(256, output_classes)
 
     def forward(self, g, x):
@@ -109,6 +110,7 @@ class PointNetBasic(nn.Module):
             h = bn(h)
             h = F.relu(h)
 
+        h = self.dropout(h)
         out = self.mlp_out(h)
         return out
 
