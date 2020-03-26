@@ -4,6 +4,7 @@ dependencies:
   - pip
   - pip:
     - tensorflow==2.2.0rc1
+    - tfdlpack-gpu
     - pytest
     - nose
     - numpy

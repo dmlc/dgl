@@ -382,6 +382,7 @@ def zerocopy_to_dgl_ndarray(input):
 
 def zerocopy_from_dgl_ndarray(input):
     return zerocopy_from_dlpack(_api_internal._ForceAlign(input, 64).to_dlpack())
+    # return zerocopy_from_dlpack(input.to_dlpack())
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
