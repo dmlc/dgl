@@ -119,3 +119,4 @@ def compute_loss(logits, y, eps=0.2):
     log_prob = F.log_softmax(logits, 1)
     loss = -(one_hot * log_prob).sum(1).mean()
     return loss
+
