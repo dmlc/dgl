@@ -232,7 +232,7 @@ def test_dense_graph_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.3), readonly=True)
     adj = g.adjacency_matrix(ctx=ctx).tostype('default')
-    conv = nn.GraphConv(5, 2, norm=False, bias=True)
+    conv = nn.GraphConv(5, 2, norm='none', bias=True)
     dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
     conv.initialize(ctx=ctx)
     dense_conv.initialize(ctx=ctx)
