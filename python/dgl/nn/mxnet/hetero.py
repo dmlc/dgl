@@ -172,6 +172,13 @@ class HeteroGraphConv(nn.Block):
                 rsts[nty] = self.agg_fn(alist, nty)
         return rsts
 
+    def __repr__(self):
+        summary = 'HeteroGraphConv({\n'
+        for name, mod in self.mods.items():
+            summary += '  {} : {},\n'.format(name, mod)
+        summary += '\n})'
+        return summary
+
 def get_aggregate_fn(agg):
     """Internal function to get the aggregation function for node data
     generated from different relations.

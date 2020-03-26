@@ -177,5 +177,5 @@ class GraphConv(gluon.Block):
         summary += 'in={:d}, out={:d}, normalization={}, activation={}'.format(
             self._in_feats, self._out_feats,
             self._norm, self._activation)
-        summary += '\n)'
+        summary += ')'
         return summary

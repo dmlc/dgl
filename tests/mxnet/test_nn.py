@@ -595,6 +595,7 @@ def test_hetero_conv(agg):
         'sells': nn.GraphConv(3, 4)},
         agg)
     conv.initialize(ctx=F.ctx())
+    print(conv)
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
