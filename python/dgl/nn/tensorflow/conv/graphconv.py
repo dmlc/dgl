@@ -107,7 +107,7 @@ class GraphConv(layers.Layer):
         graph = graph.local_var()
         if self._norm == 'both':
             degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32), clip_value_min=1,
-                                         clip_value_max=np.inf)
+                                    clip_value_max=np.inf)
             norm = tf.pow(degs, -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
             norm = tf.reshape(norm, shp)
@@ -130,7 +130,7 @@ class GraphConv(layers.Layer):
 
         if self._norm != 'none':
             degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32), clip_value_min=1,
-                                         clip_value_max=np.inf)
+                                    clip_value_max=np.inf)
             if self._norm == 'both':
                 norm = tf.pow(degs, -0.5)
             else:

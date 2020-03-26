@@ -65,7 +65,7 @@ class AGNNConv(nn.Block):
         graph.srcdata['h'] = feat
         graph.srcdata['norm_h'] = normalize(feat_src, p=2, axis=-1)
         if isinstance(feat, tuple):
-            graph.dstdata['norm_h'] = normalize(feat_dst, p=2, dim=-1)
+            graph.dstdata['norm_h'] = normalize(feat_dst, p=2, axis=-1)
         # compute cosine distance
         graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
         cos = graph.edata.pop('cos')

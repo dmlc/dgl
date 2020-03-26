@@ -72,7 +72,7 @@ class GINConv(layers.Layer):
         """
         graph = graph.local_var()
         feat_src, feat_dst = expand_as_pair(feat)
-        graph.srcdata['h'] = feat
+        graph.srcdata['h'] = feat_src
         graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
         rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
         if self.apply_func is not None:

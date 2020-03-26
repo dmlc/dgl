@@ -1,7 +1,6 @@
 """Torch Module for DenseSAGEConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
-from ....utils import expand_as_pair
 
 
 class DenseSAGEConv(nn.Module):
