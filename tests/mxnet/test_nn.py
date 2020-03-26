@@ -114,17 +114,27 @@ def test_tagconv():
     assert h1.shape[-1] == 2
 
 def test_gat_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     ctx = F.ctx()
 
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     gat = nn.GATConv(10, 20, 5) # n_heads = 5
     gat.initialize(ctx=ctx)
     print(gat)
 
     # test#1: basic
-    h0 = F.randn((20, 10))
-    h1 = gat(g, h0)
-    assert h1.shape == (20, 5, 20)
+    feat = F.randn((20, 10))
+    h = gat(g, feat)
+    assert h.shape == (20, 5, 20)
+
+    # test#2: bipartite
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    gat = nn.GATConv((5, 10), 2, 4)
+    gat.initialize(ctx=ctx)
+    feat = (F.randn((100, 5)), F.randn((200, 10)))
+    h = gat(g, feat)
+    assert h.shape == (200, 4, 2)
+
+
 
 def test_sage_conv():
     for aggre_type in ['mean', 'pool', 'gcn']:
@@ -188,9 +198,14 @@ def test_agnn_conv():
     print(agnn_conv)
 
     # test#1: basic
-    h0 = F.randn((20, 10))
-    h1 = agnn_conv(g, h0)
-    assert h1.shape == (20, 10)
+    feat = F.randn((20, 10))
+    h = agnn_conv(g, feat)
+    assert h.shape == (20, 10)
+
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    feat = (F.randn((100, 5)), F.randn((200, 5)))
+    h = agnn_conv(g, feat)
+    assert h.shape == (200, 5)
 
 def test_appnp_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
@@ -247,21 +262,29 @@ def test_dense_graph_conv():
 
 def test_dense_sage_conv():
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
-    sage = nn.SAGEConv(5, 2, 'gcn')
-    dense_sage = nn.DenseSAGEConv(5, 2)
-    sage.initialize(ctx=ctx)
-    dense_sage.initialize(ctx=ctx)
-    dense_sage.fc.weight.set_data(
-        sage.fc_neigh.weight.data())
-    dense_sage.fc.bias.set_data(
-        sage.fc_neigh.bias.data())
-    feat = F.randn((100, 5))
+    for g in [
+        dgl.graph(sp.sparse.random(100, 100, density=0.1)),
+        dgl.bipartite(sp.sparse.random(100, 200, density=0.1))]:
+        adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+        sage = nn.SAGEConv(5, 2, 'gcn')
+        dense_sage = nn.DenseSAGEConv(5, 2)
+        sage.initialize(ctx=ctx)
+        dense_sage.initialize(ctx=ctx)
+        dense_sage.fc.weight.set_data(
+            sage.fc_neigh.weight.data())
+        dense_sage.fc.bias.set_data(
+            sage.fc_neigh.bias.data())
+        if len(g.ntypes) == 2:
+            feat = (
+                F.randn((g.number_of_src_nodes(), 5)),
+                F.randn((g.number_of_dst_nodes(), 5))
+            )
+        else:
+            feat = F.randn((g.number_of_nodes(), 5))
 
-    out_sage = sage(g, feat)
-    out_dense_sage = dense_sage(adj, feat)
-    assert F.allclose(out_sage, out_dense_sage)
+        out_sage = sage(g, feat)
+        out_dense_sage = dense_sage(adj, feat)
+        assert F.allclose(out_sage, out_dense_sage)
 
 def test_edge_conv():
     for g in [
@@ -292,9 +315,16 @@ def test_gin_conv():
     print(gin_conv)
 
     # test #1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = gin_conv(g, h0)
-    assert h1.shape == (g.number_of_nodes(), 5)
+    feat = F.randn((g.number_of_nodes(), 5))
+    h = gin_conv(g, feat)
+    assert h.shape == (20, 5)
+
+    # test #2: bipartite
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    feat = (F.randn((100, 5)), F.randn((200, 5)))
+    h = gin_conv(g, feat)
+    return h.shape == (20, 5)
+
 
 def test_gmm_conv():
     ctx = F.ctx()

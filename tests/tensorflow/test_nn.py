@@ -305,7 +305,13 @@ def test_gat_conv():
     gat = nn.GATConv(5, 2, 4)
     feat = F.randn((100, 5))
     h = gat(g, feat)
-    assert h.shape[-1] == 2 and h.shape[-2] == 4
+    assert h.shape == (100, 4, 2)
+
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    gat = nn.GATConv((5, 10), 2, 4)
+    feat = (F.randn((100, 5)), F.randn((200, 10)))
+    h = gat(g, feat)
+    assert h.shape == (200, 4, 2)
 
 def test_sage_conv():
     for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:

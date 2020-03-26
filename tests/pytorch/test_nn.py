@@ -395,7 +395,14 @@ def test_gat_conv():
     feat = F.randn((100, 5))
     gat = gat.to(ctx)
     h = gat(g, feat)
-    assert h.shape[-1] == 2 and h.shape[-2] == 4
+    assert h.shape == (100, 4, 2)
+
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    gat = nn.GATConv((5, 10), 2, 4)
+    feat = (F.randn((100, 5)), F.randn((200, 10)))
+    gat = gat.to(ctx)
+    h = gat(g, feat)
+    assert h.shape == (200, 4, 2)
 
 def test_sage_conv():
     for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:
@@ -455,7 +462,7 @@ def test_appnp_conv():
 def test_gin_conv():
     for aggregator_type in ['mean', 'max', 'sum']:
         ctx = F.ctx()
-        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
         gin = nn.GINConv(
             th.nn.Linear(5, 12),
             aggregator_type
@@ -463,16 +470,33 @@ def test_gin_conv():
         feat = F.randn((100, 5))
         gin = gin.to(ctx)
         h = gin(g, feat)
-        assert h.shape[-1] == 12
+        assert h.shape == (100, 12)
+
+        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+        gin = nn.GINConv(
+            th.nn.Linear(5, 12),
+            aggregator_type
+        )
+        feat = (F.randn((100, 5)), F.randn((200, 5)))
+        gin = gin.to(ctx)
+        h = gin(g, feat)
+        assert h.shape == (200, 12)
 
 def test_agnn_conv():
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
     agnn = nn.AGNNConv(1)
     feat = F.randn((100, 5))
     agnn = agnn.to(ctx)
     h = agnn(g, feat)
-    assert h.shape[-1] == 5
+    assert h.shape == (100, 5)
+
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    agnn = nn.AGNNConv(1)
+    feat = (F.randn((100, 5)), F.randn((200, 5)))
+    agnn = agnn.to(ctx)
+    h = agnn(g, feat)
+    assert h.shape == (200, 5)
 
 def test_gated_graph_conv():
     ctx = F.ctx()
@@ -552,33 +576,43 @@ def test_gmm_conv():
 
 def test_dense_graph_conv():
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    adj = g.adjacency_matrix(ctx=ctx).to_dense()
-    conv = nn.GraphConv(5, 2, norm=False, bias=True)
-    dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
-    dense_conv.weight.data = conv.weight.data
-    dense_conv.bias.data = conv.bias.data
-    feat = F.randn((100, 5))
-    conv = conv.to(ctx)
-    dense_conv = dense_conv.to(ctx)
-    out_conv = conv(g, feat)
-    out_dense_conv = dense_conv(adj, feat)
-    assert F.allclose(out_conv, out_dense_conv)
+    for use_norm in [False]: # TODO(Zihao): fix this
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        adj = g.adjacency_matrix(ctx=ctx).to_dense()
+        conv = nn.GraphConv(5, 2, norm=use_norm, bias=True)
+        dense_conv = nn.DenseGraphConv(5, 2, norm=use_norm, bias=True)
+        dense_conv.weight.data = conv.weight.data
+        dense_conv.bias.data = conv.bias.data
+        feat = F.randn((100, 5))
+        conv = conv.to(ctx)
+        dense_conv = dense_conv.to(ctx)
+        out_conv = conv(g, feat)
+        out_dense_conv = dense_conv(adj, feat)
+        assert F.allclose(out_conv, out_dense_conv), use_norm
 
 def test_dense_sage_conv():
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    adj = g.adjacency_matrix(ctx=ctx).to_dense()
-    sage = nn.SAGEConv(5, 2, 'gcn')
-    dense_sage = nn.DenseSAGEConv(5, 2)
-    dense_sage.fc.weight.data = sage.fc_neigh.weight.data
-    dense_sage.fc.bias.data = sage.fc_neigh.bias.data
-    feat = F.randn((100, 5))
-    sage = sage.to(ctx)
-    dense_sage = dense_sage.to(ctx)
-    out_sage = sage(g, feat)
-    out_dense_sage = dense_sage(adj, feat)
-    assert F.allclose(out_sage, out_dense_sage)
+    for g in [
+        dgl.graph(sp.sparse.random(100, 100, density=0.1)),
+        dgl.bipartite(sp.sparse.random(100, 200, density=0.1))]:
+        adj = g.adjacency_matrix(ctx=ctx).to_dense()
+        sage = nn.SAGEConv(5, 2, 'gcn')
+        dense_sage = nn.DenseSAGEConv(5, 2)
+        dense_sage.fc.weight.data = sage.fc_neigh.weight.data
+        dense_sage.fc.bias.data = sage.fc_neigh.bias.data
+        
+        if len(g.ntypes) == 2:
+            feat = (
+                F.randn((g.number_of_src_nodes(), 5)),
+                F.randn((g.number_of_dst_nodes(), 5))
+            )
+        else:
+            feat = F.randn((g.number_of_nodes(), 5))
+        sage = sage.to(ctx)
+        dense_sage = dense_sage.to(ctx)
+        out_sage = sage(g, feat)
+        out_dense_sage = dense_sage(adj, feat)
+        assert F.allclose(out_sage, out_dense_sage), g
 
 def test_edge_conv():
     for g in [

@@ -78,7 +78,7 @@ class GINConv(nn.Block):
         feat_src, feat_dst = expand_as_pair(feat)
         graph.srcdata['h'] = feat_src
         graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
-        rst = (1 + self.eps.data(feat.context)) * feat_dst + graph.dstdata['neigh']
+        rst = (1 + self.eps.data(feat_dst.context)) * feat_dst + graph.dstdata['neigh']
         if self.apply_func is not None:
             rst = self.apply_func(rst)
         return rst
