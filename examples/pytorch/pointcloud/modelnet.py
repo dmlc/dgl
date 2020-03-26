@@ -1,4 +1,5 @@
 import numpy as np
+import dgl
 from torch.utils.data import Dataset
 
 class ModelNet(object):
@@ -52,4 +53,7 @@ class ModelNetDataset(Dataset):
         if self.mode == 'train':
             x = self.translate(x)
             np.random.shuffle(x)
-        return x, y
+        g = dgl.DGLGraph()
+        g.add_nodes(x.shape[0])
+        g.ndata['x'] = x
+        return g, x, y

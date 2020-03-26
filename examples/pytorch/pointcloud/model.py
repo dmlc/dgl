@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch import KNNGraph, EdgeConv
 
-class Model(nn.Module):
+class EdgeConvModel(nn.Module):
     def __init__(self, k, feature_dims, emb_dims, output_classes, input_dims=3,
                  dropout_prob=0.5):
-        super(Model, self).__init__()
+        super(EdgeConvModel, self).__init__()
 
         self.nng = KNNGraph(k)
         self.conv = nn.ModuleList()
@@ -63,6 +63,54 @@ class Model(nn.Module):
         h = self.proj_output(h)
         return h
 
+class PointNetBasic(nn.Module):
+    def __init__(self, output_classes, input_dims=3,
+                 dropout_prob=0.5):
+        super(PointNetBasic, self).__init__()
+        self.mlp = nn.ModuleList()
+        self.mlp.append(nn.Linear(3, 64))
+        self.mlp.append(nn.Linear(64, 64))
+        self.mlp.append(nn.Linear(64, 64))
+        self.mlp.append(nn.Linear(64, 128))
+        self.mlp.append(nn.Linear(128, 1024))
+
+        self.bn = nn.ModuleList()
+        self.bn.append(nn.BatchNorm1d(64))
+        self.bn.append(nn.BatchNorm1d(64))
+        self.bn.append(nn.BatchNorm1d(64))
+        self.bn.append(nn.BatchNorm1d(128))
+        self.bn.append(nn.BatchNorm1d(1024))
+
+        self.maxpool = nn.MaxPool1d(1024)
+
+        self.mlp2 = nn.ModuleList()
+        self.mlp2.append(nn.Linear(1024, 512))
+        self.mlp2.append(nn.Linear(512, 256))
+
+        self.bn2 = nn.ModuleList()
+        self.bn2.append(nn.BatchNorm1d(512))
+        self.bn2.append(nn.BatchNorm1d(256))
+
+        self.mlp_out = nn.Linear(256, output_classes)
+
+    def forward(self, g, x):
+        batch_size, n_points, x_dims = x.shape
+        h = g.ndata['x']
+        for mlp, bn in zip(self.mlp, self.bn):
+            h = mlp(h)
+            h = bn(h)
+            h = F.relu(h)
+
+        h = h.view(batch_size, n_points, -1).permute(0, 2, 1)
+        h = self.maxpool(h)
+        h = h.permute(0, 2, 1).view(batch_size, -1)
+        for mlp, bn in zip(self.mlp2, self.bn2):
+            h = mlp(h)
+            h = bn(h)
+            h = F.relu(h)
+
+        out = self.mlp_out(h)
+        return out
 
 def compute_loss(logits, y, eps=0.2):
     num_classes = logits.shape[1]

@@ -4,7 +4,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from modelnet import ModelNet
-from model import Model, compute_loss
+# from model import Model, compute_loss
+import dgl
+from model import PointNetBasic, EdgeConvModel, compute_loss
 from dgl.data.utils import download, get_download_dir
 
 from functools import partial
@@ -35,23 +37,29 @@ CustomDataLoader = partial(
         num_workers=num_workers,
         batch_size=batch_size,
         shuffle=True,
-        drop_last=True)
+        drop_last=True,
+        collate_fn=lambda x: x)
 
-def train(model, opt, scheduler, train_loader, dev):
-    scheduler.step()
+def train(net, opt, scheduler, train_loader, dev):
 
-    model.train()
+    net.train()
 
     total_loss = 0
     num_batches = 0
     total_correct = 0
     count = 0
     with tqdm.tqdm(train_loader, ascii=True) as tq:
-        for data, label in tq:
+        # for data, label in tq:
+        for input in tq:
+            g = dgl.batch([d[0] for d in input])
+            data = torch.stack([torch.tensor(d[1]) for d in input])
+            label = torch.stack([torch.tensor(d[2]) for d in input])
+
             num_examples = label.shape[0]
             data, label = data.to(dev), label.to(dev).squeeze().long()
+            g.ndata['x'] = g.ndata['x'].to(dev)
             opt.zero_grad()
-            logits = model(data)
+            logits = net(g, data)
             loss = compute_loss(logits, label)
             loss.backward()
             opt.step()
@@ -70,9 +78,10 @@ def train(model, opt, scheduler, train_loader, dev):
                 'AvgLoss': '%.5f' % (total_loss / num_batches),
                 'Acc': '%.5f' % (correct / num_examples),
                 'AvgAcc': '%.5f' % (total_correct / count)})
+    scheduler.step()
 
-def evaluate(model, test_loader, dev):
-    model.eval()
+def evaluate(net, test_loader, dev):
+    net.eval()
 
     total_correct = 0
     count = 0
@@ -82,7 +91,7 @@ def evaluate(model, test_loader, dev):
             for data, label in tq:
                 num_examples = label.shape[0]
                 data, label = data.to(dev), label.to(dev).squeeze().long()
-                logits = model(data)
+                logits = net(data)
                 _, preds = logits.max(1)
 
                 correct = (preds == label).sum().item()
@@ -98,12 +107,13 @@ def evaluate(model, test_loader, dev):
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = Model(20, [64, 64, 128, 256], [512, 512, 256], 40)
-model = model.to(dev)
+# net = EdgeConvModel(1, [64, 64, 128, 256], [512, 512, 256], 40)
+net = PointNetBasic(40)
+net = net.to(dev)
 if args.load_model_path:
-    model.load_state_dict(torch.load(args.load_model_path, map_location=dev))
+    net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+opt = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
 
 scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, args.num_epochs, eta_min=0.001)
 
@@ -117,15 +127,17 @@ best_valid_acc = 0
 best_test_acc = 0
 
 for epoch in range(args.num_epochs):
+    '''
     print('Epoch #%d Validating' % epoch)
-    valid_acc = evaluate(model, valid_loader, dev)
-    test_acc = evaluate(model, test_loader, dev)
+    valid_acc = evaluate(net, valid_loader, dev)
+    test_acc = evaluate(net, test_loader, dev)
     if valid_acc > best_valid_acc:
         best_valid_acc = valid_acc
         best_test_acc = test_acc
         if args.save_model_path:
-            torch.save(model.state_dict(), args.save_model_path)
+            torch.save(net.state_dict(), args.save_model_path)
     print('Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)' % (
         valid_acc, best_valid_acc, test_acc, best_test_acc))
+    '''
 
-    train(model, opt, scheduler, train_loader, dev)
+    train(net, opt, scheduler, train_loader, dev)
