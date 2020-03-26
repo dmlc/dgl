@@ -7,6 +7,7 @@ import dgl
 import dgl.nn.mxnet as nn
 import dgl.function as fn
 import backend as F
+from test_utils.graph_cases import get_cases
 from mxnet import autograd, gluon, nd
 
 def check_close(a, b):
@@ -73,6 +74,23 @@ def test_graph_conv():
     assert len(g.edata) == 0
     assert "h" in g.ndata
     check_close(g.ndata['h'], 2 * F.ones((3, 1)))
+
+@pytest.mark.parametrize('g', get_cases(['path', 'bipartite', 'small'], exclude=['zero-degree']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [False])
+def test_graph_conv2(g, norm, weight, bias):
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias)
+    conv.initialize(ctx=F.ctx())
+    ext_w = F.randn((5, 2)).as_in_context(F.ctx())
+    nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
+    ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).as_in_context(F.ctx())
+    if weight:
+        h = conv(g, h)
+    else:
+        h = conv(g, h, ext_w)
+    assert h.shape == (ndst, 2)
 
 def _S2AXWb(A, N, X, W, b):
     X1 = X * N
