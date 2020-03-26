@@ -659,6 +659,8 @@ def test_hetero_conv(agg):
         'plays': nn.GraphConv(2, 4),
         'sells': nn.GraphConv(3, 4)},
         agg)
+    if F.gpu_ctx():
+        conv = conv.to(F.ctx())
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
@@ -696,6 +698,8 @@ def test_hetero_conv(agg):
         'plays': nn.SAGEConv((2, 4), 4, 'mean'),
         'sells': nn.SAGEConv(3, 4, 'mean')},
         agg)
+    if F.gpu_ctx():
+        conv = conv.to(F.ctx())
 
     h = conv(g, ({'user': uf}, {'user' : uf, 'game' : gf}))
     assert set(h.keys()) == {'user', 'game'}
@@ -736,6 +740,8 @@ def test_hetero_conv(agg):
         'plays': mod2,
         'sells': mod3},
         agg)
+    if F.gpu_ctx():
+        conv = conv.to(F.ctx())
     mod_args = {'follows' : (1,), 'plays' : (1,)}
     mod_kwargs = {'sells' : {'arg2' : 'abc'}}
     h = conv(g, {'user' : uf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
