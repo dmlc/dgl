@@ -63,13 +63,13 @@ class GATConv(nn.Module):
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         if isinstance(in_feats, tuple):
-            self.fc = nn.Linear(
-                self._in_src_feats, out_feats * num_heads, bias=False)
-        else:
             self.fc_src = nn.Linear(
                 self._in_src_feats, out_feats * num_heads, bias=False)
             self.fc_dst = nn.Linear(
                 self._in_dst_feats, out_feats * num_heads, bias=False)
+        else:
+            self.fc = nn.Linear(
+                self._in_src_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.feat_drop = nn.Dropout(feat_drop)
@@ -89,7 +89,11 @@ class GATConv(nn.Module):
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
         gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.fc.weight, gain=gain)
+        if hasattr(self, 'fc'):
+            nn.init.xavier_normal_(self.fc.weight, gain=gain)
+        else: # bipartite graph neural networks
+            nn.init.xavier_normal_(self.fc_src.weight, gain=gain)
+            nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
         if isinstance(self.res_fc, nn.Linear):

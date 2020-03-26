@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
+from ....utils import expand_as_pair
 
 
 class GINConv(nn.Module):
@@ -72,10 +73,7 @@ class GINConv(nn.Module):
             as input dimensionality.
         """
         graph = graph.local_var()
-        if isinstance(feat, tuple):
-            feat_src, feat_dst = feat
-        else:
-            feat_src = feat_dst = feat
+        feat_src, feat_dst = expand_as_pair(feat)
         graph.srcdata['h'] = feat_src
         graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
         rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']

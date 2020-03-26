@@ -4,6 +4,7 @@ import math
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
+from ....utils import expand_as_pair
 
 
 class DenseGraphConv(nn.Block):
@@ -56,12 +57,17 @@ class DenseGraphConv(nn.Block):
         Parameters
         ----------
         adj : mxnet.NDArray
-            The adjacency matrix of the graph to apply Graph Convolution on,
-            should be of shape :math:`(N, N)`, where a row represents the destination
-            and a column represents the source.
-        feat : mxnet.NDArray
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+            The adjacency matrix of the graph to apply Graph Convolution on, when
+            applied to a unidirectional bipartite graph, ``adj`` should be of shape
+            should be of shape :math:`(N_{out}, N_{in})`; when applied to a homo
+            graph, ``adj`` should be of shape :math:`(N, N)`. In both cases,
+            a row represents a destination node while a column represents a source
+            node.
+        feat : mxnet.NDArray or a pair of mxnet.NDArray
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of torch.Tensor is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
 
         Returns
         -------
@@ -69,25 +75,31 @@ class DenseGraphConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        adj = adj.astype(feat.dtype).as_in_context(feat.context)
+        feat_src, feat_dst = expand_as_pair(feat)
+        adj = adj.astype(feat.dtype).as_in_context(feat_src.context)
+
         if self._norm:
-            in_degrees = adj.sum(axis=1)
-            norm = nd.power(in_degrees, -0.5)
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = norm.reshape(shp).as_in_context(feat.context)
-            feat = feat * norm
+            src_degrees = adj.sum(axis=0)
+            dst_degrees = adj.sum(axis=1)
+            norm_src = nd.power(src_degrees, -0.5)
+            norm_dst = nd.power(dst_degrees, -0.5)
+            shp_src = norm_src.shape + (1,) * (feat_src.ndim - 1)
+            shp_dst = norm_dst.shape + (1,) * (feat_dst.ndim - 1)
+            norm_src = norm_src.reshape(shp_src).as_in_context(feat_src.context)
+            norm_dst = norm_dst.reshape(shp_dst).as_in_context(feat_dst.context)
+            feat_src = feat_src * norm_src
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = nd.dot(feat, self.weight.data(feat.context))
-            rst = nd.dot(adj, feat)
+            feat_src = nd.dot(feat_src, self.weight.data(feat_src.context))
+            rst = nd.dot(adj, feat_src)
         else:
             # aggregate first then mult W
-            rst = nd.dot(adj, feat)
-            rst = nd.dot(rst, self.weight.data(feat.context))
+            rst = nd.dot(adj, feat_src)
+            rst = nd.dot(rst, self.weight.data(feat_src.context))
 
         if self._norm:
-            rst = rst * norm
+            rst = rst * norm_dst
 
         if self.bias is not None:
             rst = rst + self.bias.data(feat.context)

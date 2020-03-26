@@ -3,6 +3,7 @@
 import torch as th
 from torch import nn
 from torch.nn import init
+from ....utils import expand_as_pair
 
 
 class DenseGraphConv(nn.Module):
@@ -60,12 +61,17 @@ class DenseGraphConv(nn.Module):
         Parameters
         ----------
         adj : torch.Tensor
-            The adjacency matrix of the graph to apply Graph Convolution on,
-            should be of shape :math:`(N, N)`, where a row represents the destination
-            and a column represents the source.
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+            The adjacency matrix of the graph to apply Graph Convolution on, when
+            applied to a unidirectional bipartite graph, ``adj`` should be of shape
+            should be of shape :math:`(N_{out}, N_{in})`; when applied to a homo
+            graph, ``adj`` should be of shape :math:`(N, N)`. In both cases,
+            a row represents a destination node while a column represents a source
+            node.
+        feat : torch.Tensor or a pair of torch.Tensor
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of torch.Tensor is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
 
         Returns
         -------
@@ -73,25 +79,31 @@ class DenseGraphConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        adj = adj.float().to(feat.device)
+        feat_src, feat_dst = expand_as_pair(feat)
+        adj = adj.float().to(feat_src.device)
+
         if self._norm:
-            in_degrees = adj.sum(dim=1)
-            norm = th.pow(in_degrees, -0.5)
-            shp = norm.shape + (1,) * (feat.dim() - 1)
-            norm = th.reshape(norm, shp).to(feat.device)
-            feat = feat * norm
+            src_degrees = adj.sum(dim=0)
+            dst_degrees = adj.sum(dim=1)
+            norm_src = th.pow(src_degrees, -0.5)
+            norm_dst = th.pow(dst_degrees, -0.5)
+            shp_src = norm_src.shape + (1,) * (feat_src.dim() - 1)
+            shp_dst = norm_dst.shape + (1,) * (feat_dst.dim() - 1)
+            norm_src = th.reshape(norm_src, shp_src).to(feat_src.device)
+            norm_dst = th.reshape(norm_dst, shp_dst).to(feat_dst.device)
+            feat_src = feat_src * norm_src
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = th.matmul(feat, self.weight)
-            rst = adj @ feat
+            feat_src = th.matmul(feat_src, self.weight)
+            rst = adj @ feat_src
         else:
             # aggregate first then mult W
-            rst = adj @ feat
+            rst = adj @ feat_src
             rst = th.matmul(rst, self.weight)
 
         if self._norm:
-            rst = rst * norm
+            rst = rst * norm_dst
 
         if self.bias is not None:
             rst = rst + self.bias
