@@ -931,9 +931,12 @@ def remove_edges(g, edge_ids):
     for i, canonical_etype in enumerate(g.canonical_etypes):
         data = induced_eids_nd[i].data
         if len(data) == 0:
-            # Empty means that no edges are removed and edges are not shuffled.
+            # Empty means that either
+            # (1) no edges are removed and edges are not shuffled.
+            # (2) all edges are removed.
+            # The following statement deals with both cases.
             new_graph.edges[canonical_etype].data[EID] = F.arange(
-                0, g.number_of_edges(canonical_etype))
+                0, new_graph.number_of_edges(canonical_etype))
         else:
             new_graph.edges[canonical_etype].data[EID] = F.zerocopy_from_dgl_ndarray(data)
 

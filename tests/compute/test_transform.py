@@ -547,9 +547,9 @@ def test_remove_edges():
     check(g3, 'AB', g, [3])
     check(g3, 'BA', g, [1])
 
-    g4 = dgl.remove_edges(g, {'AB': F.tensor([3])})
+    g4 = dgl.remove_edges(g, {'AB': F.tensor([3, 1, 2, 0])})
     check(g4, 'AA', g, [])
-    check(g4, 'AB', g, [3])
+    check(g4, 'AB', g, [3, 1, 2, 0])
     check(g4, 'BA', g, [])
 
 if __name__ == '__main__':
