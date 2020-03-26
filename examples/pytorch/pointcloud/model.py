@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch import KNNGraph, EdgeConv
 
-class Model(nn.Module):
+class EdgeConvModel(nn.Module):
     def __init__(self, k, feature_dims, emb_dims, output_classes, input_dims=3,
                  dropout_prob=0.5):
-        super(Model, self).__init__()
+        super(EdgeConvModel, self).__init__()
 
         self.nng = KNNGraph(k)
         self.conv = nn.ModuleList()
@@ -63,6 +63,34 @@ class Model(nn.Module):
         h = self.proj_output(h)
         return h
 
+class PointNetBasic(nn.Module):
+    def __init__(self, k, feature_dims, emb_dims, output_classes, input_dims=3,
+                 dropout_prob=0.5):
+        super(PointNetBasic, self).__init__()
+        self.mlp = nn.ModuleList()
+        self.mlp.append(nn.Linear(3, 64))
+        self.mlp.append(nn.BatchNorm1d(64))
+        self.mlp.append(nn.Linear(64, 64))
+        self.mlp.append(nn.BatchNorm1d(64))
+        self.mlp.append(nn.Linear(64, 64))
+        self.mlp.append(nn.BatchNorm1d(64))
+        self.mlp.append(nn.Linear(64, 128))
+        self.mlp.append(nn.BatchNorm1d(128))
+        self.mlp.append(nn.Linear(128, 1024))
+        self.mlp.append(nn.BatchNorm1d(1024))
+
+        self.maxpool = nn.MaxPool2d(1024)
+
+        self.mlp2 = nn.ModuleList()
+        self.mlp2.append(nn.Linear(1024, 512))
+        self.mlp2.append(nn.Linear(512, 256))
+        self.mlp2.append(nn.Linear(256, output_classes))
+
+    def forward(self, g):
+        out = self.mlp(g.ndata['x'])
+        out = self.maxpool(out)
+        out = self.mlp2(out)
+        return out
 
 def compute_loss(logits, y, eps=0.2):
     num_classes = logits.shape[1]
@@ -71,3 +99,4 @@ def compute_loss(logits, y, eps=0.2):
     log_prob = F.log_softmax(logits, 1)
     loss = -(one_hot * log_prob).sum(1).mean()
     return loss
+
