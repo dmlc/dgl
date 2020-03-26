@@ -3,9 +3,11 @@ import dgl
 from torch.utils.data import Dataset
 
 class ModelNet(object):
-    def __init__(self, path, num_points):
+    def __init__(self, path, num_points, max_num_points=2048):
         import h5py
+        assert max_num_points >= num_points
         self.f = h5py.File(path)
+        self.max_num_points = max_num_points
         self.num_points = num_points
 
         self.n_train = self.f['train/data'].shape[0]
@@ -25,6 +27,7 @@ class ModelNet(object):
 class ModelNetDataset(Dataset):
     def __init__(self, modelnet, mode):
         super(ModelNetDataset, self).__init__()
+        self.max_num_points = modelnet.max_num_points
         self.num_points = modelnet.num_points
         self.mode = mode
 
@@ -48,11 +51,14 @@ class ModelNetDataset(Dataset):
         return self.data.shape[0]
 
     def __getitem__(self, i):
-        x = self.data[i][:self.num_points]
-        y = self.label[i]
         if self.mode == 'train':
+            inds = np.random.choice(self.max_num_points, self.num_points)
+            x = self.data[i][inds]
             x = self.translate(x)
             np.random.shuffle(x)
+        else:
+            x = self.data[i][:self.num_points]
+        y = self.label[i]
         g = dgl.DGLGraph()
         g.add_nodes(x.shape[0])
         g.ndata['x'] = x
