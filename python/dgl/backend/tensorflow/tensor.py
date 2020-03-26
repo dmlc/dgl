@@ -359,7 +359,8 @@ def zerocopy_to_dlpack(input):
 
 
 def zerocopy_from_dlpack(dlpack_tensor):
-    return tf.experimental.dlpack.from_dlpack(dlpack_tensor)
+    return tf.experimental.dlpack.from_dlpack(_api_internal._ForceAlign(nd.from_dlpack(dlpack_tensor), 64).to_dlpack())
+    # return tf.experimental.dlpack.from_dlpack(dlpack_tensor)
 
 
 def zerocopy_to_numpy(input):
