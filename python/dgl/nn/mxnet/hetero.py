@@ -1,7 +1,6 @@
 """Heterograph NN modules"""
 from mxnet import nd
 from mxnet.gluon import nn
-import numpy as np
 
 __all__ = ['HeteroGraphConv']
 
