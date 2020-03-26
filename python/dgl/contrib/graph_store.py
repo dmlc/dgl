@@ -359,7 +359,7 @@ class SharedMemoryStoreServer(object):
             # if the integers are larger than 2^31, xmlrpc can't handle them.
             # we convert them to strings to send them to clients.
             return str(self._graph.number_of_nodes()), str(self._graph.number_of_edges()), \
-                    None, edge_dir
+                    True, edge_dir
 
         # RPC command: initialize node embedding in the server.
         def init_ndata(init, ndata_name, shape, dtype):
