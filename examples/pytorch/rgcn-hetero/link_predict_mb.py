@@ -302,7 +302,7 @@ def evaluate(model, dataloader, bsize, neg_cnt):
                                                 neg_cnt)
         pos_scores = F.logsigmoid(pos_score).reshape(bsize, -1)
         t_neg_score = F.logsigmoid(t_neg_score).reshape(bsize, neg_cnt)
-        h_neg_score = F.logsigmoid(t_neg_score).reshape(bsize, neg_cnt)
+        h_neg_score = F.logsigmoid(h_neg_score).reshape(bsize, neg_cnt)
         neg_scores = th.cat([h_neg_score, t_neg_score], dim=1)
         rankings = th.sum(neg_scores >= pos_scores, dim=1) + 1
         rankings = rankings.cpu().detach().numpy()
