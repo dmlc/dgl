@@ -438,6 +438,12 @@ class BaseHeteroGraph : public runtime::Object {
     return nullptr;
   }
 
+  /*! \brief Cast this graph to immutable graph */
+  virtual GraphPtr AsImmutableGraph() const {
+    LOG(FATAL) << "AsImmutableGraph not supported.";
+    return nullptr;
+  }
+
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
 
