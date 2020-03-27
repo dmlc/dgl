@@ -4,9 +4,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from modelnet import ModelNet
-# from model import Model, compute_loss
-import dgl
-from model import PointNetBasic, EdgeConvModel, compute_loss
+from model import Model, compute_loss
 from dgl.data.utils import download, get_download_dir
 
 from functools import partial
@@ -32,37 +30,28 @@ local_path = args.dataset_path or os.path.join(get_download_dir(), data_filename
 if not os.path.exists(local_path):
     download('https://data.dgl.ai/dataset/modelnet40-sampled-2048.h5', local_path)
 
-def collate(samples):
-    # The input `samples` is a list of pairs
-    #  (graph, label).
-    graphs, data, labels = map(list, zip(*samples))
-    batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.tensor(data), torch.tensor(labels)
-
 CustomDataLoader = partial(
         DataLoader,
         num_workers=num_workers,
         batch_size=batch_size,
         shuffle=True,
-        drop_last=True,
-        collate_fn=collate)
+        drop_last=True)
 
-def train(net, opt, scheduler, train_loader, dev):
+def train(model, opt, scheduler, train_loader, dev):
+    scheduler.step()
 
-    net.train()
+    model.train()
 
     total_loss = 0
     num_batches = 0
     total_correct = 0
     count = 0
     with tqdm.tqdm(train_loader, ascii=True) as tq:
-        # for data, label in tq:
-        for g, data, label in tq:
+        for data, label in tq:
             num_examples = label.shape[0]
             data, label = data.to(dev), label.to(dev).squeeze().long()
-            g.ndata['x'] = g.ndata['x'].to(dev)
             opt.zero_grad()
-            logits = net(g, data)
+            logits = model(data)
             loss = compute_loss(logits, label)
             loss.backward()
             opt.step()
@@ -77,23 +66,23 @@ def train(net, opt, scheduler, train_loader, dev):
             total_correct += correct
 
             tq.set_postfix({
+                'Loss': '%.5f' % loss,
                 'AvgLoss': '%.5f' % (total_loss / num_batches),
+                'Acc': '%.5f' % (correct / num_examples),
                 'AvgAcc': '%.5f' % (total_correct / count)})
-    scheduler.step()
 
-def evaluate(net, test_loader, dev):
-    net.eval()
+def evaluate(model, test_loader, dev):
+    model.eval()
 
     total_correct = 0
     count = 0
 
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
-            for g, data, label in tq:
+            for data, label in tq:
                 num_examples = label.shape[0]
                 data, label = data.to(dev), label.to(dev).squeeze().long()
-                g.ndata['x'] = g.ndata['x'].to(dev)
-                logits = net(g, data)
+                logits = model(data)
                 _, preds = logits.max(1)
 
                 correct = (preds == label).sum().item()
@@ -109,14 +98,12 @@ def evaluate(net, test_loader, dev):
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# net = EdgeConvModel(1, [64, 64, 128, 256], [512, 512, 256], 40)
-net = PointNetBasic(40)
-net = net.to(dev)
+model = Model(20, [64, 64, 128, 256], [512, 512, 256], 40)
+model = model.to(dev)
 if args.load_model_path:
-    net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
+    model.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-# opt = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
-opt = optim.Adam(net.parameters(), lr=0.001, weight_decay=1e-4)
+opt = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
 
 scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, args.num_epochs, eta_min=0.001)
 
@@ -130,15 +117,15 @@ best_valid_acc = 0
 best_test_acc = 0
 
 for epoch in range(args.num_epochs):
-    train(net, opt, scheduler, train_loader, dev)
-    if (epoch + 1) % 5 == 0:
-        print('Epoch #%d Validating' % epoch)
-        valid_acc = evaluate(net, valid_loader, dev)
-        test_acc = evaluate(net, test_loader, dev)
-        if valid_acc > best_valid_acc:
-            best_valid_acc = valid_acc
-            best_test_acc = test_acc
-            if args.save_model_path:
-                torch.save(net.state_dict(), args.save_model_path)
-        print('Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)' % (
-            valid_acc, best_valid_acc, test_acc, best_test_acc))
+    print('Epoch #%d Validating' % epoch)
+    valid_acc = evaluate(model, valid_loader, dev)
+    test_acc = evaluate(model, test_loader, dev)
+    if valid_acc > best_valid_acc:
+        best_valid_acc = valid_acc
+        best_test_acc = test_acc
+        if args.save_model_path:
+            torch.save(model.state_dict(), args.save_model_path)
+    print('Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)' % (
+        valid_acc, best_valid_acc, test_acc, best_test_acc))
+
+    train(model, opt, scheduler, train_loader, dev)

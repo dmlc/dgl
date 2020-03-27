@@ -62,4 +62,4 @@ class ModelNetDataset(Dataset):
         g = dgl.DGLGraph()
         g.add_nodes(x.shape[0])
         g.ndata['x'] = x
-        return g, x, y
+        return g, y
