@@ -470,4 +470,10 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLOutSubgraph")
     *rv = HeteroGraphRef(ret);
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    *rv = GraphRef(hg->AsImmutableGraph());
+  });
+
 }  // namespace dgl

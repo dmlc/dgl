@@ -4,7 +4,7 @@
 import torch as th
 from torch import nn
 from ... import DGLGraph
-
+from ...base import dgl_warning
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
@@ -216,3 +216,60 @@ class Sequential(nn.Sequential):
             raise TypeError('The first argument of forward must be a DGLGraph'
                             ' or a list of DGLGraph s')
         return feats
+
+class WeightBasis(nn.Module):
+    r"""Basis decomposition module.
+
+    Basis decomposition is introduced in "`Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
+    and can be described as below:
+
+    .. math::
+
+        W_o = \sum_{b=1}^B a_{ob} V_b
+
+    Each weight output :math:`W_o` is essentially a linear combination of basis
+    transformations :math:`V_b` with coefficients :math:`a_{ob}`.
+
+    If is useful as a form of regularization on a large parameter matrix. Thus,
+    the number of weight outputs is usually larger than the number of bases.
+
+    Parameters
+    ----------
+    shape : tuple[int]
+        Shape of the basis parameter.
+    num_bases : int
+        Number of bases.
+    num_outputs : int
+        Number of outputs.
+    """
+    def __init__(self,
+                 shape,
+                 num_bases,
+                 num_outputs):
+        super(WeightBasis, self).__init__()
+        self.shape = shape
+        self.num_bases = num_bases
+        self.num_outputs = num_outputs
+
+        if num_outputs <= num_bases:
+            dgl_warning('The number of weight outputs should be larger than the number'
+                        ' of bases.')
+
+        self.weight = nn.Parameter(th.Tensor(self.num_bases, *shape))
+        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+        # linear combination coefficients
+        self.w_comp = nn.Parameter(th.Tensor(self.num_outputs, self.num_bases))
+        nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
+
+    def forward(self):
+        r"""Forward computation
+
+        Returns
+        -------
+        weight : torch.Tensor
+            Composed weight tensor of shape ``(num_outputs,) + shape``
+        """
+        # generate all weights from bases
+        weight = th.matmul(self.w_comp, self.weight.view(self.num_bases, -1))
+        return weight.view(self.num_outputs, *self.shape)
