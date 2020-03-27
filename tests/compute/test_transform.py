@@ -552,6 +552,32 @@ def test_remove_edges():
     check(g4, 'AB', g, [3, 1, 2, 0])
     check(g4, 'BA', g, [])
 
+def test_cast():
+    m = spsp.coo_matrix(([1, 1], ([0, 1], [1, 2])), (4, 4))
+    g = dgl.DGLGraph(m, readonly=True)
+    gsrc, gdst = g.edges(order='eid')
+    ndata = F.randn((4, 5))
+    edata = F.randn((2, 4))
+    g.ndata['x'] = ndata
+    g.edata['y'] = edata
+
+    hg = dgl.as_heterograph(g, 'A', 'AA')
+    assert hg.ntypes == ['A']
+    assert hg.etypes == ['AA']
+    assert hg.canonical_etypes == [('A', 'AA', 'A')]
+    assert hg.number_of_nodes() == 4
+    assert hg.number_of_edges() == 2
+    hgsrc, hgdst = hg.edges(order='eid')
+    assert F.array_equal(gsrc, hgsrc)
+    assert F.array_equal(gdst, hgdst)
+
+    g2 = dgl.as_immutable_graph(hg)
+    assert g2.number_of_nodes() == 4
+    assert g2.number_of_edges() == 2
+    g2src, g2dst = hg.edges(order='eid')
+    assert F.array_equal(g2src, gsrc)
+    assert F.array_equal(g2dst, gdst)
+
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
