@@ -18,7 +18,9 @@ def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer
         atom_feats, labels, masks = atom_feats.to(args['device']), \
                                     labels.to(args['device']), \
                                     masks.to(args['device'])
-        logits = model(bg, atom_feats)
+        edge_feats = bg.edata.pop(args['edge_data_field'])
+        edge_feats = edge_feats.to(args['device'])
+        logits = model(bg, atom_feats, edge_feats)
         # Mask non-existing labels
         loss = (loss_criterion(logits, labels) * (masks != 0).float()).mean()
         optimizer.zero_grad()
@@ -92,7 +94,7 @@ if __name__ == '__main__':
     from configure import get_exp_configure
 
     parser = argparse.ArgumentParser(description='Molecule Classification')
-    parser.add_argument('-m', '--model', type=str, choices=['GCN', 'GAT'],
+    parser.add_argument('-m', '--model', type=str, choices=['GCN', 'GAT', 'WeaveGNN'],
                         help='Model to use')
     parser.add_argument('-d', '--dataset', type=str, choices=['Tox21'],
                         help='Dataset to use')

@@ -5,6 +5,8 @@ from dgllife.utils.featurizers import CanonicalAtomFeaturizer, BaseAtomFeaturize
     atom_formal_charge, atom_num_radical_electrons, atom_hybridization_one_hot, \
     atom_total_num_H_one_hot
 
+from dgllife.utils.weave_featurizer import *
+
 from utils import chirality
 
 GCN_Tox21 = {
@@ -41,6 +43,28 @@ GAT_Tox21 = {
     'atom_featurizer': CanonicalAtomFeaturizer(),
     'metric_name': 'roc_auc_score'
 }
+
+WeaveGNN_Tox21 = {
+    'random_seed': 2,
+    'batch_size': 96,
+    'lr': 3e-3,
+    'num_epochs': 100,
+    'atom_data_field': 'h',
+    'edge_data_field': 'feat',
+    'frac_train': 0.8,
+    'frac_val': 0.1,
+    'frac_test': 0.1,
+    'node_in_feats': 27,
+    'edge_in_feats': 12,
+    'num_gnn_layers':2,
+    'weave_hidden_feats': 50,
+    'graph_feats': 128,
+    'patience': 10,
+    'atom_featurizer': AtomFeaturizer(),
+    'bond_featurizer': partial(edge_featurizer, max_distance=7),
+    'metric_name': 'roc_auc_score'
+}
+
 
 MPNN_Alchemy = {
     'random_seed': 0,
@@ -125,6 +149,7 @@ AttentiveFP_Aromaticity = {
 experiment_configures = {
     'GCN_Tox21': GCN_Tox21,
     'GAT_Tox21': GAT_Tox21,
+    'WeaveGNN_Tox21':WeaveGNN_Tox21,
     'MPNN_Alchemy': MPNN_Alchemy,
     'SchNet_Alchemy': SchNet_Alchemy,
     'MGCN_Alchemy': MGCN_Alchemy,
