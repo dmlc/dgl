@@ -601,7 +601,7 @@ class BaseAtomFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.life_sci import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
+    >>> from dgl.data.dgllife import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')
@@ -856,7 +856,7 @@ class BaseBondFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.life_sci import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
+    >>> from dgl.data.dgllife import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')

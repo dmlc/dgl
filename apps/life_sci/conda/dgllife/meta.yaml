@@ -4,7 +4,7 @@ package:
 
 source:
   git_rev: 0.2.0
-  git_url: https://github.com/dmlc/dgl/tree/master/apps/life_sci
+  git_url: https://github.com/dmlc/dgl/tree/master/apps/dgllife
 
 requirements:
   build:
@@ -25,6 +25,6 @@ test:
     - dgllife
 
 about:
-  home: https://github.com/dmlc/dgl/tree/master/apps/life_sci
+  home: https://github.com/dmlc/dgl/tree/master/apps/dgllife
   license_file:
-  license: 
+  license:
