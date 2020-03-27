@@ -27,3 +27,5 @@ item embeddings, which are learned as outputs of PinSAGE.
 ```
 python model.py data.pkl --num-epochs 300 --num-workers 2 --device cuda:0 data.pkl
 ```
+
+The HITS@10 is 0.00806, compared to 0.00642 with PCA with the same dimensionality.
