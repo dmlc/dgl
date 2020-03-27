@@ -378,7 +378,7 @@ class DGLBaseGraph(object):
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated." \
                         "Please use return_array instead")
-            force_multi = return_array
+            return_array = force_multi
 
         if return_array:
             return idx.tousertensor()
@@ -984,7 +984,10 @@ class DGLGraph(DGLBaseGraph):
             if sort_csr:
                 gidx.sort_csr()
         else:
-            gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+            if multigraph is not None:
+                dgl_warning("multigraph will be deprecated." \
+                            "DGL will treat all graphs as multigraph in the future.")
+            gidx = graph_index.create_graph_index(graph_data, readonly)
             if sort_csr:
                 gidx.sort_csr()
         super(DGLGraph, self).__init__(gidx)
@@ -1833,7 +1836,7 @@ class DGLGraph(DGLBaseGraph):
                         raise DGLError('Not all edges have attribute {}.'.format(attr))
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
-    def from_scipy_sparse_matrix(self, spmat, multigraph=False):
+    def from_scipy_sparse_matrix(self, spmat, multigraph=None):
         """ Convert from scipy sparse matrix.
 
         Parameters
@@ -1857,7 +1860,11 @@ class DGLGraph(DGLBaseGraph):
         >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
-        self._graph = graph_index.from_scipy_sparse_matrix(spmat, multigraph, self.is_readonly)
+        if multigraph is not None:
+            dgl_warning("multigraph will be deprecated." \
+                        "DGL will treat all graphs as multigraph in the future.")
+
+        self._graph = graph_index.from_scipy_sparse_matrix(spmat, self.is_readonly)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())

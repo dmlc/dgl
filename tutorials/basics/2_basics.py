@@ -165,8 +165,8 @@ g.edata.pop('w')
 ###############################################################################
 # Working with multigraphs
 # ~~~~~~~~~~~~~~~~~~~~~~~~
-# Many graph applications need parallel edges. By default class:`DGLGraph`
-# is already a multigraph
+# Many graph applications need parallel edges, 
+# which class:DGLGraph supports by default.
 
 g_multi = dgl.DGLGraph()
 g_multi.add_nodes(10)

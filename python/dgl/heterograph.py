@@ -1347,7 +1347,7 @@ class DGLHeteroGraph(object):
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated." \
                         "Please use return_array instead")
-            force_multi = return_array
+            return_array = force_multi
 
         if return_array:
             return idx.tousertensor()
@@ -2045,7 +2045,7 @@ class DGLHeteroGraph(object):
                 induced_etypes.append(self.etypes[i])
                 edge_frames.append(self._edge_frames[i])
 
-        metagraph = graph_index.from_edge_list(meta_edges, True, True)
+        metagraph = graph_index.from_edge_list(meta_edges, True)
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_type))
         hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
@@ -2119,7 +2119,7 @@ class DGLHeteroGraph(object):
         induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
         num_nodes_per_induced_type = [self.number_of_nodes(ntype) for ntype in induced_ntypes]
 
-        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)
+        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True)
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type))
         hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)

@@ -93,7 +93,7 @@ def create_large_graph_index(num_nodes):
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
 
-    return from_scipy_sparse_matrix(spm, True, True)
+    return from_scipy_sparse_matrix(spm, True)
 
 def test_node_subgraph_with_halo():
     gi = create_large_graph_index(1000)

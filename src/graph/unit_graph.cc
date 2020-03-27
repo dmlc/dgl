@@ -1267,20 +1267,20 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
   dgl::COOPtr coo_ptr = nullptr;
   if (in_csr_) {
     aten::CSRMatrix csc = GetCSCMatrix(0);
-    in_csr_ptr = dgl::CSRPtr(new dgl::CSR(csc.indptr, csc.indices, csc.data, true));
+    in_csr_ptr = dgl::CSRPtr(new dgl::CSR(csc.indptr, csc.indices, csc.data));
   }
   if (out_csr_) {
     aten::CSRMatrix csr = GetCSRMatrix(0);
-    out_csr_ptr = dgl::CSRPtr(new dgl::CSR(csr.indptr, csr.indices, csr.data, true));
+    out_csr_ptr = dgl::CSRPtr(new dgl::CSR(csr.indptr, csr.indices, csr.data));
   }
   if (coo_) {
     aten::COOMatrix coo = GetCOOMatrix(0);
     if (!COOHasData(coo)) {
-      coo_ptr = dgl::COOPtr(new dgl::COO(NumVertices(0), coo.row, coo.col, true));
+      coo_ptr = dgl::COOPtr(new dgl::COO(NumVertices(0), coo.row, coo.col));
     } else {
       IdArray new_src = Scatter(coo.row, coo.data);
       IdArray new_dst = Scatter(coo.col, coo.data);
-      coo_ptr = dgl::COOPtr(new dgl::COO(NumVertices(0), new_src, new_dst, true));
+      coo_ptr = dgl::COOPtr(new dgl::COO(NumVertices(0), new_src, new_dst));
     }
   }
   return GraphPtr(new dgl::ImmutableGraph(in_csr_ptr, out_csr_ptr, coo_ptr));

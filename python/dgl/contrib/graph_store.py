@@ -128,7 +128,7 @@ def _to_csr(graph_data, edge_dir, multigraph=None):
             csr = graph_data.tocsr()
             return csr.indptr, csr.indices
         else:
-            idx = create_graph_index(graph_data=graph_data, multigraph=multigraph, readonly=True)
+            idx = create_graph_index(graph_data=graph_data, readonly=True)
             transpose = (edge_dir != 'in')
             csr = idx.adjacency_matrix_scipy(transpose, 'csr')
             return csr.indptr, csr.indices
@@ -332,7 +332,7 @@ class SharedMemoryStoreServer(object):
         else:
             indptr, indices = _to_csr(graph_data, edge_dir)
             graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
-                                 None, edge_dir, _get_graph_path(graph_name))
+                                 edge_dir, _get_graph_path(graph_name))
             self._graph = DGLGraph(graph_idx, readonly=True)
 
         self._num_workers = num_workers
