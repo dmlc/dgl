@@ -71,7 +71,15 @@ def train(dataset, args):
         args.random_walk_restart_prob, args.num_random_walks, args.num_neighbors,
         args.num_layers)
     collator = sampler_module.PinSAGECollator(neighbor_sampler, g, item_ntype, textset)
-    dataloader = DataLoader(batch_sampler, collate_fn=collator, num_workers=args.num_workers)
+    dataloader = DataLoader(
+        batch_sampler,
+        collate_fn=collator.collate_train,
+        num_workers=args.num_workers)
+    dataloader_test = DataLoader(
+        torch.arange(g.number_of_nodes(item_ntype)),
+        batch_size=args.batch_size,
+        collate_fn=collator.collate_test,
+        num_workers=args.num_workers)
     dataloader_it = iter(dataloader)
 
     # Model
@@ -97,19 +105,17 @@ def train(dataset, args):
 
         # Evaluate
         model.eval()
-        item_batches = torch.arange(g.number_of_nodes(item_ntype)).split(args.batch_size)
-        h_item_batches = []
-        for item_batch in item_batches:
-            blocks = neighbor_sampler.sample_blocks(item_batch)
-            sampler_module.assign_features_to_blocks(blocks, g, textset, item_ntype)
+        with torch.no_grad():
+            item_batches = torch.arange(g.number_of_nodes(item_ntype)).split(args.batch_size)
+            h_item_batches = []
+            for blocks in dataloader_test:
+                for i in range(len(blocks)):
+                    blocks[i] = blocks[i].to(device)
 
-            for i in range(len(blocks)):
-                blocks[i] = blocks[i].to(device)
+                h_item_batches.append(model.get_repr(blocks))
+            h_item = torch.cat(h_item_batches, 0)
 
-            h_item_batches.append(model.get_repr(blocks))
-        h_item = torch.cat(h_item_batches, 0)
-
-        print(evaluation.evaluate_nn(dataset, h_item, args.k, args.batch_size))
+            print(evaluation.evaluate_nn(dataset, h_item, args.k, args.batch_size))
 
 if __name__ == '__main__':
     # Arguments

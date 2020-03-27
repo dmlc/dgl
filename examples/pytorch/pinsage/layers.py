@@ -166,18 +166,6 @@ class SAGENet(nn.Module):
             h = layer(block, (h, h_dst), block.edata['weights'])
         return h
 
-class FISMUserContext(nn.Module):
-    def __init__(self, user_ntype, item_ntype):
-        super().__init__()
-        self.user_ntype = user_ntype
-        self.item_ntype = item_ntype
-
-    def forward(self, item_user_graph, h_item):
-        with item_user_graph.local_scope():
-            item_user_graph.nodes[self.item_ntype].data['h'] = h_item
-            item_user_graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h'))
-            return item_user_graph.nodes[self.user_ntype].data['h']
-
 class ItemToItemScorer(nn.Module):
     def __init__(self, full_graph, ntype):
         super().__init__()
@@ -200,30 +188,4 @@ class ItemToItemScorer(nn.Module):
             item_item_graph.apply_edges(fn.u_dot_v('h', 'h', 's'))
             item_item_graph.apply_edges(self._add_bias)
             pair_score = item_item_graph.edata['s']
-        return pair_score
-
-class UserToItemScorer(nn.Module):
-    def __init__(self, g, user_ntype, item_ntype):
-        super().__init__()
-
-        self.user_ntype = user_ntype
-        self.item_ntype = item_ntype
-
-        n_users = g.number_of_nodes(user_ntype)
-        n_items = g.number_of_nodes(item_ntype)
-        self.bias_user = nn.Parameter(torch.zeros(n_users))
-        self.bias_item = nn.Parameter(torch.zeros(n_items))
-
-    def _add_bias(self, edges):
-        bias_src = self.bias_user[edges.src[dgl.NID]]
-        bias_dst = self.bias_item[edges.dst[dgl.NID]]
-        return {'s': edges.data['s'] + bias_src + bias_dst}
-
-    def forward(self, user_item_graph, h_user, h_item):
-        with user_item_graph.local_scope():
-            user_item_graph.nodes[self.item_ntype].data['h'] = h_item
-            user_item_graph.nodes[self.user_ntype].data['h'] = h_user
-            user_item_graph.apply_edges(fn.u_dot_v('h', 'h', 's'))
-            user_item_graph.apply_edges(self._add_bias)
-            pair_score = user_item_graph.edata['s']
         return pair_score

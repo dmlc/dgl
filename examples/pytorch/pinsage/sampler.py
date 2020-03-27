@@ -134,10 +134,16 @@ class PinSAGECollator(object):
         self.g = g
         self.textset = textset
 
-    def __call__(self, batches):
+    def collate_train(self, batches):
         heads, tails, neg_tails = batches[0]
         # Construct multilayer neighborhood via PinSAGE...
         pos_graph, neg_graph, blocks = self.sampler.sample_from_item_pairs(heads, tails, neg_tails)
         assign_features_to_blocks(blocks, self.g, self.textset, self.ntype)
 
         return pos_graph, neg_graph, blocks
+
+    def collate_test(self, samples):
+        batch = torch.LongTensor(samples)
+        blocks = self.sampler.sample_blocks(batch)
+        assign_features_to_blocks(blocks, self.g, self.textset, self.ntype)
+        return blocks
