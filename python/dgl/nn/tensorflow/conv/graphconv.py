@@ -50,7 +50,8 @@ class GraphConv(layers.Layer):
         If is `'none'`, no normalization is applied. Default is `'both'`,
         where the :math:`c_{ij}` in the paper is applied.
     weight : bool, optional
-        If True, apply a linear layer after message passing.
+        If True, apply a linear layer. Otherwise, aggregating the messages
+        without a weight matrix.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
