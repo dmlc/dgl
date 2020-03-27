@@ -106,3 +106,9 @@ AM:
 python3 entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --model_path "am.pt"
 python3 test_classify.py -d am --n-bases 40 --gpu 0 --model_path "am.pt"
 ```
+
+## Link prediction w/ minibatch training
+WN18:
+```
+python3 link_predict_mb.py --dataset wn18 --gpu 0 --test-neg-cnt 2000 --valid-neg-cnt 2000  --lr 0.005
+```

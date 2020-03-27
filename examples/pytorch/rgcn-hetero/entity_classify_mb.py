@@ -136,11 +136,18 @@ class RelGraphConvHetero(nn.Module):
                 funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
         else:
             funcs = {}
+            f_map = {}
+            for i, ntype in enumerate(g.ntypes):
+                if ntype not in xs:
+                    continue
+                f_map[ntype] = 'h%d' % i
+                g.srcnodes[ntype].data['h%d' % i] = g.srcnodes[ntype].data['x']
+
             for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
                 if srctype not in xs:
                     continue
-                g.srcnodes[srctype].data['h%d' % i] = g.srcnodes[srctype].data['x']
-                funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
+                fname = f_map[srctype]
+                funcs[(srctype, etype, dsttype)] = (fn.copy_u(fname, 'm'), fn.mean('m', 'h'))
         # message passing
         g.multi_update_all(funcs, 'sum')
 
@@ -178,7 +185,6 @@ class RelGraphEmbed(nn.Module):
             embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
             nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
             self.embeds[ntype] = embed
-
 
     def forward(self, block=None):
         """Forward computation
