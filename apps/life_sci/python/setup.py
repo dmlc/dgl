@@ -1,14 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import dgllife
-import sys
 
 from setuptools import find_packages
-
-if '--inplace' in sys.argv:
-    from distutils.core import setup
-else:
-    from setuptools import setup
+from setuptools import setup
 
 setup(
     name='dgllife',

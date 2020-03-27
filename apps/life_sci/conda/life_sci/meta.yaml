@@ -1,0 +1,30 @@
+package:
+  name: dgllife{{ environ.get('APP_PACKAGE_SUFFIX', '') }}
+  version: "0.2.0"
+
+source:
+  git_rev: 0.2.0
+  git_url: https://github.com/dmlc/dgl/tree/master/apps/life_sci
+
+requirements:
+  build:
+    - python {{ python }}
+    - setuptools
+    - cmake
+    - git
+    - cython
+  run:
+    - python
+    - requests >=2.22.0
+    - scikit-learn >=0.22.2
+    - pandas >=0.24.2
+    - tqdm
+
+test:
+  imports:
+    - dgllife
+
+about:
+  home: https://github.com/dmlc/dgl/tree/master/apps/life_sci
+  license_file:
+  license: 
