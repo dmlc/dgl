@@ -49,7 +49,7 @@ class EdgeSoftmax(th.autograd.Function):
         if not is_all(eids):
             g = g.edge_subgraph(eids.long())
 
-        n_nodes = g.number_of_nodes()
+        n_nodes = g.number_of_dst_nodes()
         n_edges = g.number_of_edges()
 
         # TODO(BarclayII): this is a temporary fix of memory leakage in PyTorch

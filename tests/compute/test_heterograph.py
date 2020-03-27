@@ -118,7 +118,7 @@ def test_create():
     try:
         g = dgl.graph(
             ([0, 0, 0, 1, 1, 2], [0, 1, 2, 0, 1, 2]),
-            card=2,
+            num_nodes=2,
             validate=True
         )
     except DGLError:
@@ -131,7 +131,7 @@ def test_create():
         try:
             g = dgl.bipartite(
                 ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3]),
-                card=card,
+                num_nodes=card,
                 validate=True
             )
         except DGLError:
@@ -711,6 +711,7 @@ def test_flatten():
     assert fg.etypes == ['follows+knows']
     check_mapping(g, fg)
 
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_to_device():
     hg = create_test_heterograph()
     if F.is_cuda_available():
@@ -720,14 +721,14 @@ def test_to_device():
 def test_convert_bound():
     def _test_bipartite_bound(data, card):
         try:
-            dgl.bipartite(data, card=card)
+            dgl.bipartite(data, num_nodes=card)
         except dgl.DGLError:
             return
         assert False, 'bipartite bound test with wrong uid failed'
 
     def _test_graph_bound(data, card):
         try:
-            dgl.graph(data, card=card)
+            dgl.graph(data, num_nodes=card)
         except dgl.DGLError:
             return
         assert False, 'graph bound test with wrong uid failed'
@@ -827,7 +828,7 @@ def test_convert():
         assert len(hg.etypes) == 2
 
     # hetero_to_homo test case 2
-    hg = dgl.bipartite([(0, 0), (1, 1)], card=(2, 3))
+    hg = dgl.bipartite([(0, 0), (1, 1)], num_nodes=(2, 3))
     g = dgl.to_homo(hg)
     assert g.number_of_nodes() == 5
 
@@ -1482,6 +1483,10 @@ def test_bipartite():
     assert g1.dsttypes == ['B']
     assert g1.number_of_nodes('A') == 2
     assert g1.number_of_nodes('B') == 6
+    assert g1.number_of_src_nodes('A') == 2
+    assert g1.number_of_src_nodes() == 2
+    assert g1.number_of_dst_nodes('B') == 6
+    assert g1.number_of_dst_nodes() == 6
     assert g1.number_of_edges() == 3
     g1.srcdata['h'] = F.randn((2, 5))
     assert F.array_equal(g1.srcnodes['A'].data['h'], g1.srcdata['h'])
@@ -1501,6 +1506,10 @@ def test_bipartite():
     assert g3.number_of_nodes('A') == 2
     assert g3.number_of_nodes('B') == 6
     assert g3.number_of_nodes('C') == 1
+    assert g3.number_of_src_nodes('A') == 2
+    assert g3.number_of_src_nodes() == 2
+    assert g3.number_of_dst_nodes('B') == 6
+    assert g3.number_of_dst_nodes('C') == 1
     g3.srcdata['h'] = F.randn((2, 5))
     assert F.array_equal(g3.srcnodes['A'].data['h'], g3.srcdata['h'])
     assert F.array_equal(g3.nodes['A'].data['h'], g3.srcdata['h'])
