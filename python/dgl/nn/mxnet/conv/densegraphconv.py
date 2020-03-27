@@ -4,7 +4,6 @@ import math
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
-from ....utils import expand_as_pair
 
 
 class DenseGraphConv(nn.Block):

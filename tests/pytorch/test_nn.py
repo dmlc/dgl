@@ -594,7 +594,7 @@ def test_gmm_conv():
 
 def test_dense_graph_conv():
     ctx = F.ctx()
-    for norm_type in ['none', 'both']:
+    for norm_type in ['none', 'right', 'both']:
         for g in [
             dgl.graph(nx.erdos_renyi_graph(100, 0.3)),
             dgl.bipartite(sp.sparse.random(100, 200, density=0.1))

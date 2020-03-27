@@ -3,7 +3,6 @@
 import torch as th
 from torch import nn
 from torch.nn import init
-from ....utils import expand_as_pair
 
 
 class DenseGraphConv(nn.Module):
@@ -103,7 +102,7 @@ class DenseGraphConv(nn.Module):
             if self._norm == 'both':
                 norm_dst = th.pow(dst_degrees, -0.5)
             else: # right
-                norm = 1.0 / dst_degrees
+                norm_dst = 1.0 / dst_degrees
             shp = norm_dst.shape + (1,) * (feat.dim() - 1)
             norm_dst = th.reshape(norm_dst, shp).to(feat.device)
             rst = rst * norm_dst

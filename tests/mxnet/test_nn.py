@@ -263,7 +263,7 @@ def test_dense_cheb_conv():
 
 def test_dense_graph_conv():
     ctx = F.ctx()
-    for norm_type in ['both', 'none']:
+    for norm_type in ['both', 'right', 'none']:
         for g in [
             dgl.graph(nx.erdos_renyi_graph(100, 0.3)),
             dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
