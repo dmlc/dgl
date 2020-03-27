@@ -680,7 +680,10 @@ HeteroGraphPtr ImmutableGraph::AsHeteroGraph() const {
     coo = GetCOO()->ToCOOMatrix();
 
   auto g = UnitGraph::CreateHomographFrom(
-      in_csr, out_csr, coo, !!in_csr_, !!out_csr_, !!coo_);
+      in_csr, out_csr, coo,
+      in_csr_ != nullptr,
+      out_csr_ != nullptr,
+      coo_ != nullptr);
   return HeteroGraphPtr(new HeteroGraph(g->meta_graph(), {g}));
 }
 
