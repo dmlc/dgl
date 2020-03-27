@@ -4,14 +4,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
-class FarthestPointSampler(nn.Module):
-    def __init__(self, npoints):
-        super(FarthestPointSampler, self).__init__()
-        self.npoints = npoints
 
-    def forward(self, g)
-
-class PointNet2(nn.Module):
+class PointNet(nn.Module):
     def __init__(self, output_classes, input_dims=3,
                  dropout_prob=0.5, use_transform=True):
         super(PointNet, self).__init__()
