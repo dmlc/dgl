@@ -244,21 +244,31 @@ def test_dense_cheb_conv():
 
 def test_dense_graph_conv():
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.3), readonly=True)
-    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
-    conv = nn.GraphConv(5, 2, norm=False, bias=True)
-    dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
-    conv.initialize(ctx=ctx)
-    dense_conv.initialize(ctx=ctx)
-    dense_conv.weight.set_data(
-        conv.weight.data())
-    dense_conv.bias.set_data(
-        conv.bias.data())
-    feat = F.randn((100, 5))
-
-    out_conv = conv(g, feat)
-    out_dense_conv = dense_conv(adj, feat)
-    assert F.allclose(out_conv, out_dense_conv)
+    for use_norm in [False, True]:
+        for g in [
+            dgl.graph(nx.erdos_renyi_graph(100, 0.3)),
+        ]:
+            # TODO(minjie): enable the following option after #1385
+            #dgl.bipartite(sp.sparse.random(100, 200, density=0.1))]:
+            adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+            conv = nn.GraphConv(5, 2, norm=False, bias=True)
+            dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
+            conv.initialize(ctx=ctx)
+            dense_conv.initialize(ctx=ctx)
+            dense_conv.weight.set_data(
+                conv.weight.data())
+            dense_conv.bias.set_data(
+                conv.bias.data())
+            if len(g.ntypes) == 2:
+                feat = (
+                    F.randn((g.number_of_src_nodes(), 5)),
+                    F.randn((g.number_of_dst_nodes(), 5))
+                )
+            else:
+                feat = F.randn((g.number_of_nodes(), 5))
+            out_conv = conv(g, feat)
+            out_dense_conv = dense_conv(adj, feat)
+            assert F.allclose(out_conv, out_dense_conv)
 
 def test_dense_sage_conv():
     ctx = F.ctx()

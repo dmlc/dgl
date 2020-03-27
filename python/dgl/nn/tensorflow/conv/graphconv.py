@@ -105,10 +105,10 @@ class GraphConv(layers.Layer):
             The output feature
         """
         graph = graph.local_var()
-        if self._norm == 'both':
-            degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32), clip_value_min=1,
-                                    clip_value_max=np.inf)
-            norm = tf.pow(degs, -0.5)
+        if self._norm:
+            in_degree = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32), clip_value_min=1,
+                                         clip_value_max=np.inf)
+            norm = tf.pow(in_degree, -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
             norm = tf.reshape(norm, shp)
             feat = feat * norm
@@ -116,27 +116,19 @@ class GraphConv(layers.Layer):
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
             feat = tf.matmul(feat, self.weight)
-            graph.srcdata['h'] = feat
+            graph.ndata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.dstdata['h']
+            rst = graph.ndata['h']
         else:
             # aggregate first then mult W
-            graph.srcdata['h'] = feat
+            graph.ndata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.dstdata['h']
+            rst = graph.ndata['h']
             rst = tf.matmul(rst, self.weight)
 
-        if self._norm != 'none':
-            degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32), clip_value_min=1,
-                                    clip_value_max=np.inf)
-            if self._norm == 'both':
-                norm = tf.pow(degs, -0.5)
-            else:
-                norm = 1.0 / degs
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = tf.reshape(norm, shp)
+        if self._norm:
             rst = rst * norm
 
         if self.bias is not None:

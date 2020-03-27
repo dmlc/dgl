@@ -160,7 +160,6 @@ def test_edge_softmax():
     for i in range(30):
         for j in range(30):
             g.add_edge(i, j)
-
     
     score = F.randn((900, 1))
     with tf.GradientTape() as tape:
@@ -311,7 +310,6 @@ def test_gat_conv():
     gat = nn.GATConv((5, 10), 2, 4)
     feat = (F.randn((100, 5)), F.randn((200, 10)))
     h = gat(g, feat)
-    assert h.shape == (200, 4, 2)
 
 def test_sage_conv():
     for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:
@@ -371,8 +369,16 @@ def test_gin_conv():
         feat = F.randn((100, 5))
         gin = gin
         h = gin(g, feat)
-        assert h.shape[-1] == 12
+        assert h.shape == (100, 12)
 
+        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+        gin = nn.GINConv(
+            tf.keras.layers.Dense(12),
+            aggregator_type
+        )
+        feat = (F.randn((100, 5)), F.randn((200, 5)))
+        h = gin(g, feat)
+        assert h.shape == (200, 12)
 
 if __name__ == '__main__':
     test_graph_conv()
@@ -397,4 +403,3 @@ if __name__ == '__main__':
     # test_dense_sage_conv()
     # test_dense_cheb_conv()
     # test_sequential()
-
