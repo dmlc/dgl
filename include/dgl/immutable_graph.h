@@ -15,6 +15,7 @@
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
 #include "lazy.h"
+#include "base_heterograph.h"
 
 namespace dgl {
 
@@ -951,8 +952,12 @@ class ImmutableGraph: public GraphInterface {
     GetOutCSR()->SortCSR();
   }
 
+  /*! \brief Cast this graph to a heterograph */
+  HeteroGraphPtr AsHeteroGraph() const;
+
  protected:
   friend class Serializer;
+  friend class UnitGraph;
 
   /* !\brief internal default constructor */
   ImmutableGraph() {}

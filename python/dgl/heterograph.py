@@ -528,7 +528,7 @@ class DGLHeteroGraph(object):
         -------
         int
         """
-        if self.is_unibipartite:
+        if self.is_unibipartite and ntype is not None:
             # Only check 'SRC/' and 'DST/' prefix when is_unibipartite graph is True.
             if ntype.startswith('SRC/'):
                 return self.get_ntype_id_from_src(ntype[4:])

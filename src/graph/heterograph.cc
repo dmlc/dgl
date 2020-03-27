@@ -356,4 +356,12 @@ void HeteroGraph::Save(dmlc::Stream* fs) const {
   fs->Write(num_verts_per_type_);
 }
 
+GraphPtr HeteroGraph::AsImmutableGraph() const {
+  CHECK(NumVertexTypes() == 1) << "graph has more than one node types";
+  CHECK(NumEdgeTypes() == 1) << "graph has more than one edge types";
+  auto unit_graph = CHECK_NOTNULL(
+      std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(0)));
+  return unit_graph->AsImmutableGraph();
+}
+
 }  // namespace dgl

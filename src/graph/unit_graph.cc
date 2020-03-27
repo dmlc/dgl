@@ -1140,6 +1140,30 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
+HeteroGraphPtr UnitGraph::CreateHomographFrom(
+    const aten::CSRMatrix &in_csr,
+    const aten::CSRMatrix &out_csr,
+    const aten::COOMatrix &coo,
+    bool has_in_csr,
+    bool has_out_csr,
+    bool has_coo,
+    SparseFormat restrict_format) {
+  auto mg = CreateUnitGraphMetaGraph1();
+
+  CSRPtr in_csr_ptr = nullptr;
+  CSRPtr out_csr_ptr = nullptr;
+  COOPtr coo_ptr = nullptr;
+
+  if (has_in_csr)
+    in_csr_ptr = CSRPtr(new CSR(mg, in_csr));
+  if (has_out_csr)
+    out_csr_ptr = CSRPtr(new CSR(mg, out_csr));
+  if (has_coo)
+    coo_ptr = COOPtr(new COO(mg, coo));
+
+  return HeteroGraphPtr(new UnitGraph(mg, in_csr_ptr, out_csr_ptr, coo_ptr, restrict_format));
+}
+
 UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
   if (!in_csr_) {
     if (out_csr_) {
@@ -1235,6 +1259,31 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return SparseFormat::kCSR;
   else
     return SparseFormat::kCOO;
+}
+
+GraphPtr UnitGraph::AsImmutableGraph() const {
+  CHECK(NumVertexTypes() == 1) << "not a homogeneous graph";
+  dgl::CSRPtr in_csr_ptr = nullptr, out_csr_ptr = nullptr;
+  dgl::COOPtr coo_ptr = nullptr;
+  if (in_csr_) {
+    aten::CSRMatrix csc = GetCSCMatrix(0);
+    in_csr_ptr = dgl::CSRPtr(new dgl::CSR(csc.indptr, csc.indices, csc.data, true));
+  }
+  if (out_csr_) {
+    aten::CSRMatrix csr = GetCSRMatrix(0);
+    out_csr_ptr = dgl::CSRPtr(new dgl::CSR(csr.indptr, csr.indices, csr.data, true));
+  }
+  if (coo_) {
+    aten::COOMatrix coo = GetCOOMatrix(0);
+    if (!COOHasData(coo)) {
+      coo_ptr = dgl::COOPtr(new dgl::COO(NumVertices(0), coo.row, coo.col, true));
+    } else {
+      IdArray new_src = Scatter(coo.row, coo.data);
+      IdArray new_dst = Scatter(coo.col, coo.data);
+      coo_ptr = dgl::COOPtr(new dgl::COO(NumVertices(0), new_src, new_dst, true));
+    }
+  }
+  return GraphPtr(new dgl::ImmutableGraph(in_csr_ptr, out_csr_ptr, coo_ptr));
 }
 
 constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
