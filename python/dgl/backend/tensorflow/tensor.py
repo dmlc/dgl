@@ -15,6 +15,8 @@ from ...container import _api_internal
 
 TF_VERSION = LooseVersion(tf.__version__)
 
+if TF_VERSION < LooseVersion("2.2.0"):
+    raise Exception("DGL requires tensorflow>=2.2.0")
 
 def data_type_dict():
     return {'float16': tf.float16,
