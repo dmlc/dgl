@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 from .... import function as fn
-from ....utils import expand_as_pair
+from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(layers.Layer):
@@ -101,7 +101,8 @@ class SAGEConv(layers.Layer):
             is size of output feature.
         """
         graph = graph.local_var()
-
+        
+        check_eq_shape(feat)
         if isinstance(feat, tuple):
             feat_src = self.feat_drop(feat[0])
             feat_dst = self.feat_drop(feat[1])

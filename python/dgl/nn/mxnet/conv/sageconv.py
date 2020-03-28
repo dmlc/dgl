@@ -6,7 +6,7 @@ from mxnet import nd
 from mxnet.gluon import nn
 
 from .... import function as fn
-from ....utils import expand_as_pair
+from ....utils import expand_as_pair, check_eq_shape
 
 class SAGEConv(nn.Block):
     r"""GraphSAGE layer from paper `Inductive Representation Learning on
@@ -99,6 +99,7 @@ class SAGEConv(nn.Block):
         """
         graph = graph.local_var()
 
+        check_eq_shape(feat)
         if isinstance(feat, tuple):
             feat_src = self.feat_drop(feat[0])
             feat_dst = self.feat_drop(feat[1])

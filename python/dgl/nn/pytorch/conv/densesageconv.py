@@ -1,6 +1,7 @@
 """Torch Module for DenseSAGEConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
+from ....utils import check_eq_shape
 
 
 class DenseSAGEConv(nn.Module):
@@ -75,6 +76,7 @@ class DenseSAGEConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+        check_eq_shape(feat)
         if isinstance(feat, tuple):
             feat_src = self.feat_drop(feat[0])
             feat_dst = self.feat_drop(feat[1])

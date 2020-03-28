@@ -4,6 +4,7 @@ import math
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
+from ....utils import check_eq_shape
 
 
 class DenseSAGEConv(nn.Block):
@@ -75,6 +76,7 @@ class DenseSAGEConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+        check_eq_shape(feat)
         if isinstance(feat, tuple):
             feat_src = self.feat_drop(feat[0])
             feat_dst = self.feat_drop(feat[1])

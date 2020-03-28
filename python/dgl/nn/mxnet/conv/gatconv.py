@@ -27,7 +27,7 @@ class GATConv(nn.Block):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int or pair of ints
         Input feature size.
 
         If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``

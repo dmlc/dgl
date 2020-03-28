@@ -57,7 +57,7 @@ class GINConv(nn.Block):
         ----------
         graph : DGLGraph
             The graph.
-        feat : mxnet.NDArray
+        feat : mxnet.NDArray or a pair of mxnet.NDArray
             If a mxnet.NDArray is given, the input feature of shape :math:`(N, D_{in})`
             where :math:`D_{in}` is size of input feature, :math:`N` is the number of
             nodes.
