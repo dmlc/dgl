@@ -19,7 +19,11 @@ Results
 
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-python3 train_full.py --dataset cora --gpu 0
+python3 train_full.py --dataset cora --gpu 0    # full graph
+python3 train_sampling.py --num-epochs 30       # neighbor sampling
+python3 train_sampling_multi_gpu.py --num-epochs 30    # neighbor sampling with multi GPU
+python3 train_cv.py --num-epochs 30             # control variate sampling
+python3 train_cv_multi_gpu.py --num-epochs 30   # control variate sampling with multi GPU
 ```
 
 * cora: ~0.8330 
