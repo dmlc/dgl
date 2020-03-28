@@ -99,7 +99,6 @@ class SAGEConv(nn.Block):
         """
         graph = graph.local_var()
 
-        check_eq_shape(feat)
         if isinstance(feat, tuple):
             feat_src = self.feat_drop(feat[0])
             feat_dst = self.feat_drop(feat[1])
@@ -113,6 +112,7 @@ class SAGEConv(nn.Block):
             graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
             h_neigh = graph.dstdata['neigh']
         elif self._aggre_type == 'gcn':
+            check_eq_shape(feat)
             graph.srcdata['h'] = feat_src
             graph.dstdata['h'] = feat_dst   # saame as above if homogeneous
             graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
