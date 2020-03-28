@@ -216,6 +216,7 @@ class HeteroGraphIndex(ObjectBase):
 
     def is_multigraph(self):
         """Return whether the graph is a multigraph
+        The time cost will be O(E)
 
         Returns
         -------
