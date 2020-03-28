@@ -101,7 +101,7 @@ class SAGEConv(layers.Layer):
             is size of output feature.
         """
         graph = graph.local_var()
-        
+
         if isinstance(feat, tuple):
             feat_src = self.feat_drop(feat[0])
             feat_dst = self.feat_drop(feat[1])
