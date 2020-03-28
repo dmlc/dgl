@@ -149,7 +149,7 @@ pipeline {
             }
           }
           steps {
-            sh "nvidia-smi"
+            // sh "nvidia-smi"
             build_dgl_linux("gpu")
           }
           post {
