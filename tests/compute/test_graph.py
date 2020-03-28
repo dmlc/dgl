@@ -5,6 +5,7 @@ import networkx as nx
 import dgl
 import backend as F
 from dgl import DGLError
+import pytest
 
 # graph generation: a random graph with 10 nodes
 #  and 20 edges.
@@ -201,6 +202,25 @@ def test_query():
         _test_csr_one(g)
         _test_csr_one(g)
 
+    def _test_edge_ids():
+        g = gen_by_mutation()
+        eids = g.edge_ids([4,0], [4,9])
+        assert eids.shape[0] == 2
+        eid = g.edge_id(4, 4)
+        assert isinstance(eid, int)
+        with pytest.raises(AssertionError):
+            eids = g.edge_ids([9,0], [4,9])
+
+        with pytest.raises(AssertionError):
+            eid = g.edge_id(4, 5)
+
+        g.add_edge(0, 4)
+        with pytest.raises(AssertionError):
+            eids = g.edge_ids([0,0], [4,9])
+
+        with pytest.raises(AssertionError):
+            eid = g.edge_id(0, 4)
+
     _test(gen_by_mutation())
     _test(gen_from_data(elist_input(), False, False))
     _test(gen_from_data(elist_input(), True, False))
@@ -212,6 +232,7 @@ def test_query():
 
     _test_csr(gen_from_data(scipy_csr_input(), False, False))
     _test_csr(gen_from_data(scipy_csr_input(), True, False))
+    _test_edge_ids()
 
 def test_mutation():
     g = dgl.DGLGraph()

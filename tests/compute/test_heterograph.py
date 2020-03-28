@@ -6,7 +6,7 @@ import scipy.sparse as ssp
 import itertools
 import backend as F
 import networkx as nx
-import unittest
+import unittest, pytest
 from dgl import DGLError
 
 def create_test_heterograph():
@@ -361,6 +361,31 @@ def test_hypersparse():
     assert g.out_degree(0, 'plays') == 1
     assert g.out_degree(N2, 'plays') == 0
     assert F.asnumpy(g.out_degrees([0, N2], 'plays')).tolist() == [1, 0]
+
+def test_edge_ids():
+    N1 = 1 << 50        # should crash if allocated a CSR
+    N2 = 1 << 48
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1)],
+        ('user', 'plays', 'game'): [(0, N2)]},
+        {'user': N1, 'game': N1})
+    with pytest.raises(AssertionError):
+        eids = g.edge_ids(0, 0, etype='follows')
+
+    with pytest.raises(AssertionError):
+        eid = g.edge_id(0, 0, etype='follows')
+
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1), (0, 1)],
+        ('user', 'plays', 'game'): [(0, N2)]},
+        {'user': N1, 'game': N1})
+
+    with pytest.raises(AssertionError):
+        eids = g2.edge_ids(0, 1, etype='follows')
+
+    with pytest.raises(AssertionError):
+        eid = g2.edge_id(0, 1, etype='follows')
 
 def test_adj():
     g = create_test_heterograph()

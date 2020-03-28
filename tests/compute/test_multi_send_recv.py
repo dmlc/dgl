@@ -78,7 +78,7 @@ def test_multi_recv():
     expected = F.copy_to(F.zeros((g.number_of_edges(),), dtype=F.int64), F.cpu())
     # two separate round of send and recv
     u = [4, 5, 6]
-    v = [9]
+    v = [9, 9, 9]
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected = F.asnumpy(expected)
@@ -89,7 +89,7 @@ def test_multi_recv():
     expected[eid] = 0
     assert np.array_equal(g._get_msg_index().tonumpy(), expected)
 
-    u = [0]
+    u = [0, 0, 0]
     v = [1, 2, 3]
     g.send((u, v))
     eid = g.edge_ids(u, v)
@@ -112,13 +112,13 @@ def test_multi_recv():
     expected[eid] = 1
     assert np.array_equal(g._get_msg_index().tonumpy(), expected)
     u = [4, 5, 6]
-    v = [9]
+    v = [9, 9, 9]
     g.recv(v)
     eid = g.edge_ids(u, v)
     eid = F.asnumpy(eid)
     expected[eid] = 0
     assert np.array_equal(g._get_msg_index().tonumpy(), expected)
-    u = [0]
+    u = [0, 0, 0]
     v = [1, 2, 3]
     g.recv(v)
     eid = g.edge_ids(u, v)

@@ -383,6 +383,9 @@ class DGLBaseGraph(object):
         if return_array:
             return idx.tousertensor()
         else:
+            assert len(idx) == 1, "For return_array=False, there should be one and " \
+                "only one edge between u and v, but get {} edges. " \
+                "Please use return_array=True instead".format(len(idx))
             return idx[0]
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False):
@@ -449,6 +452,8 @@ class DGLBaseGraph(object):
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
+        assert len(u) == len(v), "number of src nodes must equals number of dst nodes" \
+            "expect {} equals {}".format(len(u), len(v))
         src, dst, eid = self._graph.edge_ids(u, v)
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
@@ -458,6 +463,9 @@ class DGLBaseGraph(object):
         if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
+            assert len(eid) == len(u), "If return_uv=False, there should be one and " \
+                "only one edge between each u and v, expect {} edges but get {}. " \
+                "Please use return_uv=True instead".format(len(u), len(eid))
             return eid.tousertensor()
 
     def find_edges(self, eid):

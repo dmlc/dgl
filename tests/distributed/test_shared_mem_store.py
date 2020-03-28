@@ -257,9 +257,9 @@ def check_mem(gidx, cond_v, shared_v):
     cond_v.release()
 
     gidx1 = dgl.graph_index.from_shared_mem_csr_matrix("test_graph5", gidx.number_of_nodes(),
-                                                       gidx.number_of_edges(), "in", False)
+                                                       gidx.number_of_edges(), "in")
     gidx2 = dgl.graph_index.from_shared_mem_csr_matrix("test_graph6", gidx.number_of_nodes(),
-                                                       gidx.number_of_edges(), "out", False)
+                                                       gidx.number_of_edges(), "out")
     in_csr = gidx.adjacency_matrix_scipy(False, "csr")
     out_csr = gidx.adjacency_matrix_scipy(True, "csr")
 
