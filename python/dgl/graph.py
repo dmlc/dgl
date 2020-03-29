@@ -3992,7 +3992,6 @@ class DGLGraph(DGLBaseGraph):
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
 
-    @property
     def is_homograph(self):
         """Return if the graph is homogeneous."""
         return True

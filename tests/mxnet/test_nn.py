@@ -7,7 +7,7 @@ import dgl
 import dgl.nn.mxnet as nn
 import dgl.function as fn
 import backend as F
-from test_utils.graph_cases import get_cases
+from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from mxnet import autograd, gluon, nd
 
 def check_close(a, b):
@@ -154,32 +154,31 @@ def test_gat_conv():
     assert h.shape == (200, 4, 2)
 
 
+@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
+def test_sage_conv(aggre_type):
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    sage = nn.SAGEConv(5, 10, aggre_type)
+    feat = F.randn((100, 5))
+    sage.initialize(ctx=ctx)
+    h = sage(g, feat)
+    assert h.shape[-1] == 10
 
-def test_sage_conv():
-    for aggre_type in ['mean', 'pool', 'gcn']:
-        ctx = F.ctx()
-        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-        sage = nn.SAGEConv(5, 10, aggre_type)
-        feat = F.randn((100, 5))
-        sage.initialize(ctx=ctx)
-        h = sage(g, feat)
-        assert h.shape[-1] == 10
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
+    sage = nn.SAGEConv(5, 10, aggre_type)
+    feat = F.randn((100, 5))
+    sage.initialize(ctx=ctx)
+    h = sage(g, feat)
+    assert h.shape[-1] == 10
 
-        g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
-        sage = nn.SAGEConv(5, 10, aggre_type)
-        feat = F.randn((100, 5))
-        sage.initialize(ctx=ctx)
-        h = sage(g, feat)
-        assert h.shape[-1] == 10
-
-        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
-        dst_dim = 5 if aggre_type != 'gcn' else 10
-        sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
-        feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
-        sage.initialize(ctx=ctx)
-        h = sage(g, feat)
-        assert h.shape[-1] == 2
-        assert h.shape[0] == 200
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    dst_dim = 5 if aggre_type != 'gcn' else 10
+    sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
+    feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
+    sage.initialize(ctx=ctx)
+    h = sage(g, feat)
+    assert h.shape[-1] == 2
+    assert h.shape[0] == 200
 
 def test_gg_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
@@ -261,72 +260,64 @@ def test_dense_cheb_conv():
         out_dense_cheb = dense_cheb(adj, feat, 2.0)
         assert F.allclose(out_cheb, out_dense_cheb)
 
-def test_dense_graph_conv():
+@pytest.mark.parametrize('norm_type', ['both', 'right', 'none'])
+@pytest.mark.parametrize('g', [random_graph(100), random_bipartite(100, 200)])
+def test_dense_graph_conv(g, norm_type):
     ctx = F.ctx()
-    for norm_type in ['both', 'right', 'none']:
-        for g in [
-            dgl.graph(nx.erdos_renyi_graph(100, 0.3)),
-            dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
-        ]:
-            adj = g.adjacency_matrix(ctx=ctx).tostype('default')
-            conv = nn.GraphConv(5, 2, norm=norm_type, bias=True)
-            dense_conv = nn.DenseGraphConv(5, 2, norm=norm_type, bias=True)
-            conv.initialize(ctx=ctx)
-            dense_conv.initialize(ctx=ctx)
-            dense_conv.weight.set_data(
-                conv.weight.data())
-            dense_conv.bias.set_data(
-                conv.bias.data())
-            feat = F.randn((g.number_of_src_nodes(), 5))
-            out_conv = conv(g, feat)
-            out_dense_conv = dense_conv(adj, feat)
-            assert F.allclose(out_conv, out_dense_conv)
+    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    conv = nn.GraphConv(5, 2, norm=norm_type, bias=True)
+    dense_conv = nn.DenseGraphConv(5, 2, norm=norm_type, bias=True)
+    conv.initialize(ctx=ctx)
+    dense_conv.initialize(ctx=ctx)
+    dense_conv.weight.set_data(
+        conv.weight.data())
+    dense_conv.bias.set_data(
+        conv.bias.data())
+    feat = F.randn((g.number_of_src_nodes(), 5))
+    out_conv = conv(g, feat)
+    out_dense_conv = dense_conv(adj, feat)
+    assert F.allclose(out_conv, out_dense_conv)
 
-def test_dense_sage_conv():
+@pytest.mark.parametrize('g', [random_graph(100), random_bipartite(100, 200)])
+def test_dense_sage_conv(g):
     ctx = F.ctx()
-    for g in [
-        dgl.graph(sp.sparse.random(100, 100, density=0.1)),
-        dgl.bipartite(sp.sparse.random(100, 200, density=0.1))]:
-        adj = g.adjacency_matrix(ctx=ctx).tostype('default')
-        sage = nn.SAGEConv(5, 2, 'gcn')
-        dense_sage = nn.DenseSAGEConv(5, 2)
-        sage.initialize(ctx=ctx)
-        dense_sage.initialize(ctx=ctx)
-        dense_sage.fc.weight.set_data(
-            sage.fc_neigh.weight.data())
-        dense_sage.fc.bias.set_data(
-            sage.fc_neigh.bias.data())
-        if len(g.ntypes) == 2:
-            feat = (
-                F.randn((g.number_of_src_nodes(), 5)),
-                F.randn((g.number_of_dst_nodes(), 5))
-            )
-        else:
-            feat = F.randn((g.number_of_nodes(), 5))
+    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    sage = nn.SAGEConv(5, 2, 'gcn')
+    dense_sage = nn.DenseSAGEConv(5, 2)
+    sage.initialize(ctx=ctx)
+    dense_sage.initialize(ctx=ctx)
+    dense_sage.fc.weight.set_data(
+        sage.fc_neigh.weight.data())
+    dense_sage.fc.bias.set_data(
+        sage.fc_neigh.bias.data())
+    if len(g.ntypes) == 2:
+        feat = (
+            F.randn((g.number_of_src_nodes(), 5)),
+            F.randn((g.number_of_dst_nodes(), 5))
+        )
+    else:
+        feat = F.randn((g.number_of_nodes(), 5))
 
-        out_sage = sage(g, feat)
-        out_dense_sage = dense_sage(adj, feat)
-        assert F.allclose(out_sage, out_dense_sage)
+    out_sage = sage(g, feat)
+    out_dense_sage = dense_sage(adj, feat)
+    assert F.allclose(out_sage, out_dense_sage)
 
-def test_edge_conv():
-    for g in [
-        dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)),
-        dgl.graph(nx.erdos_renyi_graph(20, 0.3)),
-        dgl.bipartite(sp.sparse.random(20, 10, 0.3))]:
-        ctx = F.ctx()
+@pytest.mark.parametrize('g', [random_dglgraph(20), random_graph(20), random_bipartite(20, 10)])
+def test_edge_conv(g):
+    ctx = F.ctx()
 
-        edge_conv = nn.EdgeConv(5, 2)
-        edge_conv.initialize(ctx=ctx)
-        print(edge_conv)
+    edge_conv = nn.EdgeConv(5, 2)
+    edge_conv.initialize(ctx=ctx)
+    print(edge_conv)
 
-        # test #1: basic
-        h0 = F.randn((g.number_of_src_nodes(), 5))
-        if not g.is_homograph:
-            # bipartite
-            h1 = edge_conv(g, (h0, h0[:10]))
-        else:
-            h1 = edge_conv(g, h0)
-        assert h1.shape == (g.number_of_dst_nodes(), 2)
+    # test #1: basic
+    h0 = F.randn((g.number_of_src_nodes(), 5))
+    if not g.is_homograph():
+        # bipartite
+        h1 = edge_conv(g, (h0, h0[:10]))
+    else:
+        h1 = edge_conv(g, h0)
+    assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_gin_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
