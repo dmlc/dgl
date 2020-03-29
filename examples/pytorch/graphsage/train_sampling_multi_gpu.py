@@ -29,7 +29,7 @@ class NeighborSampler(object):
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
+            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
