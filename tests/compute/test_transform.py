@@ -202,8 +202,8 @@ def create_large_graph_index(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
-    # It's possible that we generate a multigraph.
-    return from_scipy_sparse_matrix(spm, True, True)
+
+    return from_scipy_sparse_matrix(spm, True)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
