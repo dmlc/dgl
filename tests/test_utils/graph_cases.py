@@ -1,6 +1,7 @@
 from collections import defaultdict
 import dgl
 import networkx as nx
+import scipy.sparse as ssp
 
 case_registry = defaultdict(list)
 
@@ -33,3 +34,12 @@ def bipartite1():
 @register_case(['bipartite', 'small', 'hetero'])
 def bipartite_full():
     return dgl.bipartite([(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2), (1, 3)])
+
+def random_dglgraph(size):
+    return dgl.DGLGraph(nx.erdos_renyi_graph(size, 0.3))
+
+def random_graph(size):
+    return dgl.graph(nx.erdos_renyi_graph(size, 0.3))
+
+def random_bipartite(size_src, size_dst):
+    return dgl.bipartite(ssp.random(size_src, size_dst, 0.1))
