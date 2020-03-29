@@ -241,7 +241,7 @@ def khop_graph(g, k):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    return DGLGraph(from_coo(n, row, col, True, True))
+    return DGLGraph(from_coo(n, row, col, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
     """Return the reverse of a graph
@@ -310,7 +310,7 @@ def reverse(g, share_ndata=False, share_edata=False):
             [2.],
             [3.]])
     """
-    g_reversed = DGLGraph(multigraph=g.is_multigraph)
+    g_reversed = DGLGraph()
     g_reversed.add_nodes(g.number_of_nodes())
     g_edges = g.all_edges(order='eid')
     g_reversed.add_edges(g_edges[1], g_edges[0])
@@ -356,6 +356,10 @@ def to_bidirected(g, readonly=True):
         The input graph.
     readonly : bool, default to be True
         Whether the returned bidirected graph is readonly or not.
+
+    Notes
+    -----
+    Please make sure g is a single graph, otherwise the return value is undefined.
 
     Returns
     -------
