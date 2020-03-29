@@ -63,11 +63,11 @@ class NeighborSampler(object):
         # connections only.
         pos_graph = dgl.graph(
             (heads, tails),
-            card=self.g.number_of_nodes(self.item_type),
+            num_nodes=self.g.number_of_nodes(self.item_type),
             ntype=self.item_type)
         neg_graph = dgl.graph(
             (heads, neg_tails),
-            card=self.g.number_of_nodes(self.item_type),
+            num_nodes=self.g.number_of_nodes(self.item_type),
             ntype=self.item_type)
         pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
         seeds = pos_graph.ndata[dgl.NID]
