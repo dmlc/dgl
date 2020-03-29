@@ -110,7 +110,7 @@ class GraphConv(gluon.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
-            The input feature
+            The input feature.
         weight : torch.Tensor, optional
             Optional external weight tensor.
 
