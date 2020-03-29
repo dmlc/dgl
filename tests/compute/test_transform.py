@@ -202,6 +202,7 @@ def create_large_graph_index(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
+
     return from_scipy_sparse_matrix(spm, True)
 
 def get_nodeflow(g, node_ids, num_layers):
@@ -326,8 +327,8 @@ def test_compact():
         ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
         {'user': 20, 'game': 10})
 
-    g3 = dgl.graph([(0, 1), (1, 2)], card=10, ntype='user')
-    g4 = dgl.graph([(1, 3), (3, 5)], card=10, ntype='user')
+    g3 = dgl.graph([(0, 1), (1, 2)], num_nodes=10, ntype='user')
+    g4 = dgl.graph([(1, 3), (3, 5)], num_nodes=10, ntype='user')
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes
@@ -540,6 +541,42 @@ def test_remove_edges():
     check(g2, 'AA', g, [2])
     check(g2, 'AB', g, [3])
     check(g2, 'BA', g, [1])
+
+    g3 = dgl.remove_edges(g, {'AA': F.tensor([]), 'AB': F.tensor([3]), 'BA': F.tensor([1])})
+    check(g3, 'AA', g, [])
+    check(g3, 'AB', g, [3])
+    check(g3, 'BA', g, [1])
+
+    g4 = dgl.remove_edges(g, {'AB': F.tensor([3, 1, 2, 0])})
+    check(g4, 'AA', g, [])
+    check(g4, 'AB', g, [3, 1, 2, 0])
+    check(g4, 'BA', g, [])
+
+def test_cast():
+    m = spsp.coo_matrix(([1, 1], ([0, 1], [1, 2])), (4, 4))
+    g = dgl.DGLGraph(m, readonly=True)
+    gsrc, gdst = g.edges(order='eid')
+    ndata = F.randn((4, 5))
+    edata = F.randn((2, 4))
+    g.ndata['x'] = ndata
+    g.edata['y'] = edata
+
+    hg = dgl.as_heterograph(g, 'A', 'AA')
+    assert hg.ntypes == ['A']
+    assert hg.etypes == ['AA']
+    assert hg.canonical_etypes == [('A', 'AA', 'A')]
+    assert hg.number_of_nodes() == 4
+    assert hg.number_of_edges() == 2
+    hgsrc, hgdst = hg.edges(order='eid')
+    assert F.array_equal(gsrc, hgsrc)
+    assert F.array_equal(gdst, hgdst)
+
+    g2 = dgl.as_immutable_graph(hg)
+    assert g2.number_of_nodes() == 4
+    assert g2.number_of_edges() == 2
+    g2src, g2dst = hg.edges(order='eid')
+    assert F.array_equal(g2src, gsrc)
+    assert F.array_equal(g2dst, gdst)
 
 if __name__ == '__main__':
     test_line_graph()

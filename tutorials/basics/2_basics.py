@@ -33,18 +33,50 @@ plt.show()
 
 
 ###############################################################################
-# The examples here show the same graph, except that :class:`DGLGraph` is always directional.
+# There are many ways to construct a :class:`DGLGraph`. Below are the allowed
+# data types ordered by our recommendataion.
 #
-# You can also create a graph by calling the DGL interface.
-# 
-# In the next example, you build a star graph. :class:`DGLGraph` nodes are a consecutive range of
-# integers between 0 and :func:`number_of_nodes() <DGLGraph.number_of_nodes>`
-# and can grow by calling :func:`add_nodes <DGLGraph.add_nodes>`.
+# * A pair of arrays ``(u, v)`` storing the source and destination nodes respectively.
+#   They can be numpy arrays or tensor objects from the backend framework.
+# * ``scipy`` sparse matrix representing the adjacency matrix of the graph to be
+#   constructed.
+# * ``networkx`` graph object.
+# * A list of edges in the form of integer pairs.
+#
+# The examples below construct the same star graph via different methods.
+#
+# :class:`DGLGraph` nodes are a consecutive range of integers between 0 and
+# :func:`number_of_nodes() <DGLGraph.number_of_nodes>`. 
 # :class:`DGLGraph` edges are in order of their additions. Note that
-# edges are accessed in much the same way as nodes, with one extra feature: *edge broadcasting*.
+# edges are accessed in much the same way as nodes, with one extra feature:
+# *edge broadcasting*.
 
-import dgl
 import torch as th
+import numpy as np
+import scipy.sparse as spp
+
+# Create a star graph from a pair of arrays (using ``numpy.array`` works too).
+u = th.tensor([0, 0, 0, 0, 0])
+v = th.tensor([1, 2, 3, 4, 5])
+star1 = dgl.DGLGraph((u, v))
+
+# Create the same graph in one go! Essentially, if one of the arrays is a scalar,
+# the value is automatically broadcasted to match the length of the other array
+# -- a feature called *edge broadcasting*.
+start2 = dgl.DGLGraph((0, v))
+
+# Create the same graph from a scipy sparse matrix (using ``scipy.sparse.csr_matrix`` works too).
+adj = spp.coo_matrix((np.ones(len(u)), (u.numpy(), v.numpy())))
+star3 = dgl.DGLGraph(adj)
+
+# Create the same graph from a list of integer pairs.
+elist = [(0, 1), (0, 2), (0, 3), (0, 4), (0, 5)]
+star4 = dgl.DGLGraph(elist)
+
+###############################################################################
+# You can also create a graph by progressively adding more nodes and edges.
+# Although it is not as efficient as the above constructors, it is suitable
+# for applications where the graph cannot be constructed in one shot.
 
 g = dgl.DGLGraph()
 g.add_nodes(10)
@@ -63,11 +95,9 @@ g.clear(); g.add_nodes(10)
 src = th.tensor(list(range(1, 10)));
 g.add_edges(src, 0)
 
-import networkx as nx
-import matplotlib.pyplot as plt
+# Visualize the graph.
 nx.draw(g.to_networkx(), with_labels=True)
 plt.show()
-
 
 ###############################################################################
 # Assigning a feature
@@ -89,19 +119,14 @@ import torch as th
 x = th.randn(10, 3)
 g.ndata['x'] = x
 
-
 ###############################################################################
-# :func:`ndata <DGLGraph.ndata>` is a syntax sugar to access the state of all nodes. 
-# States are stored
-# in a container ``data`` that hosts a user-defined dictionary.
+# :func:`ndata <DGLGraph.ndata>` is a syntax sugar to access the feature
+# data of all nodes. To get the features of some particular nodes, slice out
+# the corresponding rows.
 
-print(g.ndata['x'] == g.nodes[:].data['x'])
-
-# Access node set with integer, list, or integer tensor
-g.nodes[0].data['x'] = th.zeros(1, 3)
-g.nodes[[0, 1, 2]].data['x'] = th.zeros(3, 3)
-g.nodes[th.tensor([0, 1, 2])].data['x'] = th.zeros(3, 3)
-
+g.ndata['x'][0] = th.zeros(1, 3)
+g.ndata['x'][[0, 1, 2]] = th.zeros(3, 3)
+g.ndata['x'][th.tensor([0, 1, 2])] = th.randn((3, 3))
 
 ###############################################################################
 # Assigning edge features is similar to that of node features,
@@ -110,14 +135,15 @@ g.nodes[th.tensor([0, 1, 2])].data['x'] = th.zeros(3, 3)
 g.edata['w'] = th.randn(9, 2)
 
 # Access edge set with IDs in integer, list, or integer tensor
-g.edges[1].data['w'] = th.randn(1, 2)
-g.edges[[0, 1, 2]].data['w'] = th.zeros(3, 2)
-g.edges[th.tensor([0, 1, 2])].data['w'] = th.zeros(3, 2)
+g.edata['w'][1] = th.randn(1, 2)
+g.edata['w'][[0, 1, 2]] = th.zeros(3, 2)
+g.edata['w'][th.tensor([0, 1, 2])] = th.zeros(3, 2)
 
-# You can also access the edges by giving endpoints
-g.edges[1, 0].data['w'] = th.ones(1, 2)                 # edge 1 -> 0
-g.edges[[1, 2, 3], [0, 0, 0]].data['w'] = th.ones(3, 2) # edges [1, 2, 3] -> 0
-
+# You can get the edge ids by giving endpoints, which are useful for accessing the features.
+g.edata['w'][g.edge_id(1, 0)] = th.ones(1, 2)                   # edge 1 -> 0
+g.edata['w'][g.edge_ids([1, 2, 3], [0, 0, 0])] = th.ones(3, 2)  # edges [1, 2, 3] -> 0
+# Use edge broadcasting whenever applicable.
+g.edata['w'][g.edge_ids([1, 2, 3], 0)] = th.ones(3, 2)          # edges [1, 2, 3] -> 0
 
 ###############################################################################
 # After assignments, each node or edge field will be associated with a scheme
@@ -139,10 +165,10 @@ g.edata.pop('w')
 ###############################################################################
 # Working with multigraphs
 # ~~~~~~~~~~~~~~~~~~~~~~~~
-# Many graph applications need parallel edges. To enable this, construct :class:`DGLGraph`
-# with ``multigraph=True``.
+# Many graph applications need parallel edges,
+# which class:DGLGraph supports by default.
 
-g_multi = dgl.DGLGraph(multigraph=True)
+g_multi = dgl.DGLGraph()
 g_multi.add_nodes(10)
 g_multi.ndata['x'] = th.randn(10, 2)
 
@@ -158,7 +184,7 @@ print(g_multi.edges())
 # An edge in multigraph cannot be uniquely identified by using its incident nodes
 # :math:`u` and :math:`v`; query their edge IDs use ``edge_id`` interface.
 
-eid_10 = g_multi.edge_id(1, 0)
+eid_10 = g_multi.edge_id(1, 0, return_array=True)
 g_multi.edges[eid_10].data['w'] = th.ones(len(eid_10), 2)
 print(g_multi.edata['w'])
 
@@ -169,7 +195,6 @@ print(g_multi.edata['w'])
 #    * Nodes and edges can be added but not removed.
 #    * Updating a feature of different schemes raises the risk of error on individual nodes (or
 #      node subset).
-
 
 ###############################################################################
 # Next steps

@@ -194,6 +194,8 @@ class HeteroGraph : public BaseHeteroGraph {
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
+  GraphPtr AsImmutableGraph() const override;
+
   /*! \return Load HeteroGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
 
@@ -212,9 +214,6 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
-
-  /*! \brief True if the graph is a multigraph */
-  Lazy<bool> is_multigraph_;
 };
 
 }  // namespace dgl
