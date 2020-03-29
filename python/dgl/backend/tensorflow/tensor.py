@@ -15,8 +15,8 @@ from ...container import _api_internal
 
 TF_VERSION = LooseVersion(tf.__version__)
 
-if TF_VERSION < LooseVersion("2.2.0"):
-    raise Exception("DGL requires tensorflow>=2.2.0")
+# if TF_VERSION < LooseVersion("2.2.0"):
+#     raise Exception("DGL requires tensorflow>=2.2.0")
 
 def data_type_dict():
     return {'float16': tf.float16,
@@ -361,12 +361,11 @@ def zerocopy_to_dlpack(input):
 
 
 def zerocopy_from_dlpack(dlpack_tensor):
-    return tf.experimental.dlpack.from_dlpack(_api_internal._ForceAlign(nd.from_dlpack(dlpack_tensor), 64).to_dlpack())
+    return tf.experimental.dlpack.from_dlpack(nd.from_dlpack(dlpack_tensor).to_dlpack(64))
     # return tf.experimental.dlpack.from_dlpack(dlpack_tensor)
 
 
 def zerocopy_to_numpy(input):
-    # NOTE: not zerocopy
     return np.asarray(memoryview(input))
 
 
@@ -383,8 +382,7 @@ def zerocopy_to_dgl_ndarray(input):
 
 
 def zerocopy_from_dgl_ndarray(input):
-    return zerocopy_from_dlpack(_api_internal._ForceAlign(input, 64).to_dlpack())
-    # return zerocopy_from_dlpack(input.to_dlpack())
+    return zerocopy_from_dlpack(input.to_dlpack(64))
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,

@@ -350,10 +350,24 @@ int DGLArrayFromDLPack(DLManagedTensor* from,
   API_END();
 }
 
-int DGLArrayToDLPack(DGLArrayHandle from,
-                     DLManagedTensor** out) {
+inline bool is_aligned(const void* ptr, std::uintptr_t alignment) noexcept {
+  auto iptr = reinterpret_cast<std::uintptr_t>(ptr);
+  return !(iptr % alignment);
+}
+
+int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
+                     int alignment) {
   API_BEGIN();
-  *out = NDArray::Internal::ToDLPack(reinterpret_cast<NDArray::Container*>(from));
+  auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
+  DLTensor* nd = &(nd_container->dl_tensor);
+  if (alignment != 0 && !is_aligned(nd->data, alignment)) {
+    std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
+    NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, nd->ctx);
+    copy_ndarray.CopyFrom(nd);
+    *out = copy_ndarray.ToDLPack();
+  } else {
+    *out = NDArray::Internal::ToDLPack(nd_container);
+  }
   API_END();
 }
 
