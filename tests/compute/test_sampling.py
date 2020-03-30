@@ -271,7 +271,11 @@ def _test_sample_neighbors(hypersparse):
 
     # test different fanouts for different relations
     for i in range(10):
-        subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, [1, 2, 0, 2], replace=True)
+        subg = dgl.sampling.sample_neighbors(
+            hg,
+            {'user' : [0,1], 'game' : 0},
+            {'follow': 1, 'play': 2, 'liked-by': 0, 'flips': 2},
+            replace=True)
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
         assert subg['follow'].number_of_edges() == 2
