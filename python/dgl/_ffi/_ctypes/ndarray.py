@@ -79,10 +79,10 @@ class NDArrayBase(object):
         Args
         -------
         alignment: int, default to be 0
-        Indicates the alignment requirement when converting to dlpack. Will copy to a 
-        new tensor if the alignment requirement is not satisfied. 
+        Indicates the alignment requirement when converting to dlpack. Will copy to a
+        new tensor if the alignment requirement is not satisfied.
         0 means no alignment requirement.
-        
+
 
         Returns
         -------
