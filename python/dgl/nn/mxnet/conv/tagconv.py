@@ -76,6 +76,7 @@ class TAGConv(gluon.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+        assert graph.is_homograph(), 'Graph is not homogeneous'
         graph = graph.local_var()
 
         degs = graph.in_degrees().astype('float32')

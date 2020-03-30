@@ -749,7 +749,7 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def to_block(g, dst_nodes=None):
+def to_block(g, dst_nodes=None, include_dst_in_src=True):
     """Convert a graph into a bipartite-structured "block" for message passing.
 
     A block graph is uni-directional bipartite graph consisting of two sets of nodes
@@ -767,7 +767,7 @@ def to_block(g, dst_nodes=None):
 
     Moreover, the function also relabels node ids in each type to make the graph more compact.
     Specifically, the nodes of type ``vtype`` would contain the nodes that have at least one
-    inbound edge of any type, while ``utype`` would contain all the DST nodes of type ``utype``,
+    inbound edge of any type, while ``utype`` would contain all the DST nodes of type ``vtype``,
     as well as the nodes that have at least one outbound edge to any DST node.
 
     Since DST nodes are included in SRC nodes, a common requirement is to fetch
@@ -789,6 +789,8 @@ def to_block(g, dst_nodes=None):
         The graph.
     dst_nodes : Tensor or dict[str, Tensor], optional
         Optional DST nodes. If a tensor is given, the graph must have only one node type.
+    include_dst_in_src : bool, default True
+        If False, do not include DST nodes in SRC nodes.
 
     Returns
     -------
@@ -882,7 +884,8 @@ def to_block(g, dst_nodes=None):
         else:
             dst_nodes_nd.append(nd.null())
 
-    new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(g._graph, dst_nodes_nd)
+    new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
+        g._graph, dst_nodes_nd, include_dst_in_src)
     src_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in src_nodes_nd]
     dst_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd) for nodes_nd in dst_nodes_nd]
 
