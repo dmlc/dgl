@@ -69,6 +69,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         fanout_array = [None] * len(g.etypes)
         for etype, value in fanout.items():
             fanout_array[g.get_etype_id(etype)] = value
+    fanout_array = utils.toindex(fanout_array).todgltensor()
 
     if prob is None:
         prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
@@ -100,7 +101,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     ----------
     g : DGLHeteroGraph
         Full graph structure.
-    k : int
+    k : int or dict[etype, int]
         The K value.
     weight : str
         Feature name of the weights associated with each edge. Its shape should be
@@ -138,11 +139,16 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
-    if not isinstance(k, list):
-        k = [int(k)] * len(g.etypes)
-    if len(k) != len(g.etypes):
-        raise DGLError('K value must be specified for each edge type '
-                       'if a list is provided.')
+    if not isinstance(k, dict):
+        k_array = [int(k)] * len(g.etypes)
+    else:
+        if len(k) != len(g.etypes):
+            raise DGLError('K value must be specified for each edge type '
+                           'if a dict is provided.')
+        k_array = [None] * len(g.etypes)
+        for etype, value in k.items():
+            k_array[g.get_etype_id(etype)] = value
+    k_array = utils.toindex(k_array).todgltensor()
 
     weight_arrays = []
     for etype in g.canonical_etypes:
@@ -153,7 +159,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
                 weight, etype))
 
     subgidx = _CAPI_DGLSampleNeighborsTopk(
-        g._graph, nodes_all_types, k, edge_dir, weight_arrays, bool(ascending))
+        g._graph, nodes_all_types, k_array, edge_dir, weight_arrays, bool(ascending))
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
