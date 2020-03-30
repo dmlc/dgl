@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow.python.eager import context
 import builtins
 import numpy as np
+import os
 
 from ... import ndarray as nd
 from ... import kernel as K
@@ -15,8 +16,28 @@ from ...container import _api_internal
 
 TF_VERSION = LooseVersion(tf.__version__)
 
-# if TF_VERSION < LooseVersion("2.2.0"):
-#     raise Exception("DGL requires tensorflow>=2.2.0")
+use_tfdlpack = os.getenv("USE_TFDLPACK", False)
+
+if use_tfdlpack:
+    import tfdlpack
+
+    def zerocopy_to_dlpack(input):
+        return tfdlpack.to_dlpack(input)
+
+    def zerocopy_from_dlpack(input):
+        return tfdlpack.from_dlpack(input)
+
+else:
+    if TF_VERSION < LooseVersion("2.2.0"):
+        raise Exception("DGL requires tensorflow>=2.2.0")
+
+    def zerocopy_to_dlpack(input):
+        return tf.experimental.dlpack.to_dlpack(input)
+
+    def zerocopy_from_dlpack(dlpack_tensor):
+        return tf.experimental.dlpack.from_dlpack(nd.from_dlpack(dlpack_tensor).to_dlpack(64))
+        # return tf.experimental.dlpack.from_dlpack(dlpack_tensor)
+
 
 def data_type_dict():
     return {'float16': tf.float16,
@@ -356,15 +377,6 @@ def rand_shuffle(arr):
     return tf.random.shuffle(arr)
 
 
-def zerocopy_to_dlpack(input):
-    return tf.experimental.dlpack.to_dlpack(input)
-
-
-def zerocopy_from_dlpack(dlpack_tensor):
-    return tf.experimental.dlpack.from_dlpack(nd.from_dlpack(dlpack_tensor).to_dlpack(64))
-    # return tf.experimental.dlpack.from_dlpack(dlpack_tensor)
-
-
 def zerocopy_to_numpy(input):
     return np.asarray(memoryview(input))
 
@@ -382,7 +394,7 @@ def zerocopy_to_dgl_ndarray(input):
 
 
 def zerocopy_from_dgl_ndarray(input):
-    return zerocopy_from_dlpack(input.to_dlpack(64))
+    return zerocopy_from_dlpack(input.to_dlpack())
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
