@@ -12,7 +12,6 @@ import os
 from ... import ndarray as nd
 from ... import kernel as K
 from ...function.base import TargetCode
-from ...container import _api_internal
 
 TF_VERSION = LooseVersion(tf.__version__)
 
@@ -28,8 +27,8 @@ if use_tfdlpack:
         return tfdlpack.from_dlpack(input)
 
 else:
-    if TF_VERSION < LooseVersion("2.2.0"):
-        raise Exception("DGL requires tensorflow>=2.2.0")
+    # if TF_VERSION < LooseVersion("2.2.0"):
+    #     raise Exception("DGL requires tensorflow>=2.2.0")
 
     def zerocopy_to_dlpack(input):
         return tf.experimental.dlpack.to_dlpack(input)
