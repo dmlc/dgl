@@ -22,7 +22,6 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 export TF_FORCE_GPU_ALLOW_GROWTH=true
-export USE_TFDLPACK=true
 
 if [ $2 == "gpu" ] 
 then

@@ -9,8 +9,9 @@ def set_default_backend(backend_name):
     config_path = os.path.join(default_dir, 'config.json')
     with open(config_path, "w") as config_file: 
         json.dump({'backend': backend_name.lower()}, config_file)
-    print('Set default backend to "{}". You can change it in the '
-          '~/.dgl/config.json file or export the DGLBACKEND environment.'.format(backend_name))
+    print('Set the default backend to "{}". You can change it in the '
+          '~/.dgl/config.json file or export the DGLBACKEND environment variable.'.format(
+              backend_name))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
