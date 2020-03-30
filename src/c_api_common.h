@@ -13,6 +13,7 @@
 #include <dgl/graph_interface.h>
 #include <algorithm>
 #include <vector>
+#include <string>
 
 using dgl::runtime::operator<<;
 
