@@ -219,6 +219,13 @@ def check_apply_edges(create_node_flow):
         assert_array_equal(
             F.asnumpy(nf.blocks[i].data['f2']), F.asnumpy(expected_f_sum))
 
+        # test built-in
+        nf.apply_block(i, fn.u_add_v('f', 'f', 'f2'))
+        eids = nf.block_parent_eid(i)
+        srcs, dsts = g.find_edges(eids)
+        expected_f_sum = g.nodes[srcs].data["f"] + g.nodes[dsts].data["f"]
+        assert_array_equal(
+        F.asnumpy(nf.blocks[i].data['f2']), F.asnumpy(expected_f_sum))
 
 def check_apply_edges1(create_node_flow):
     num_layers = 2

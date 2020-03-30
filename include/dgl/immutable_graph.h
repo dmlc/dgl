@@ -15,6 +15,7 @@
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
 #include "lazy.h"
+#include "base_heterograph.h"
 
 namespace dgl {
 
@@ -32,27 +33,23 @@ typedef std::shared_ptr<ImmutableGraph> ImmutableGraphPtr;
 class CSR : public GraphInterface {
  public:
   // Create a csr graph that has the given number of verts and edges.
-  CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph);
+  CSR(int64_t num_vertices, int64_t num_edges);
   // Create a csr graph whose memory is stored in the shared memory
   //   that has the given number of verts and edges.
   CSR(const std::string &shared_mem_name,
-      int64_t num_vertices, int64_t num_edges, bool is_multigraph);
+      int64_t num_vertices, int64_t num_edges);
 
   // Create a csr graph that shares the given indptr and indices.
   CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
-  CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph);
 
   // Create a csr graph by data iterator
   template <typename IndptrIter, typename IndicesIter, typename EdgeIdIter>
   CSR(int64_t num_vertices, int64_t num_edges,
-      IndptrIter indptr_begin, IndicesIter indices_begin, EdgeIdIter edge_ids_begin,
-      bool is_multigraph);
+      IndptrIter indptr_begin, IndicesIter indices_begin, EdgeIdIter edge_ids_begin);
 
   // Create a csr graph whose memory is stored in the shared memory
   //   and the structure is given by the indptr and indcies.
   CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-      const std::string &shared_mem_name);
-  CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
       const std::string &shared_mem_name);
 
   void AddVertices(uint64_t num_vertices) override {
@@ -240,23 +237,26 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
-  void SortCSR() {
+  /*! \return Load CSR from stream */
+  bool Load(dmlc::Stream *fs);
+
+  /*! \return Save CSR to stream */
+  void Save(dmlc::Stream* fs) const;
+
+  void SortCSR() override {
     if (adj_.sorted)
       return;
-    aten::CSRSort(adj_);
-    adj_.sorted = true;
+    aten::CSRSort_(&adj_);
   }
 
  private:
-  /*! \brief prive default constructor */
-  CSR() {adj_.sorted = false;}
+  friend class Serializer;
 
+  /*! \brief private default constructor */
+  CSR() {adj_.sorted = false;}
   // The internal CSR adjacency matrix.
   // The data field stores edge ids.
   aten::CSRMatrix adj_;
-
-  // whether the graph is a multi-graph
-  Lazy<bool> is_multigraph_;
 
   // The name of the shared memory to store data.
   // If it's empty, data isn't stored in shared memory.
@@ -267,7 +267,6 @@ class COO : public GraphInterface {
  public:
   // Create a coo graph that shares the given src and dst
   COO(int64_t num_vertices, IdArray src, IdArray dst);
-  COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph);
 
   // TODO(da): add constructor for creating COO from shared memory
 
@@ -505,9 +504,6 @@ class COO : public GraphInterface {
   // The internal COO adjacency matrix.
   // The data field is empty
   aten::COOMatrix adj_;
-
-  /*! \brief whether the graph is a multi-graph */
-  Lazy<bool> is_multigraph_;
 };
 
 /*!
@@ -892,28 +888,15 @@ class ImmutableGraph: public GraphInterface {
 
   static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      bool multigraph, const std::string &edge_dir);
-
-  static ImmutableGraphPtr CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids,
       const std::string &edge_dir, const std::string &shared_mem_name);
 
   static ImmutableGraphPtr CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids,
-      bool multigraph, const std::string &edge_dir,
-      const std::string &shared_mem_name);
-
-  static ImmutableGraphPtr CreateFromCSR(
       const std::string &shared_mem_name, size_t num_vertices,
-      size_t num_edges, bool multigraph,
-      const std::string &edge_dir);
+      size_t num_edges, const std::string &edge_dir);
 
   /*! \brief Create an immutable graph from COO. */
   static ImmutableGraphPtr CreateFromCOO(
       int64_t num_vertices, IdArray src, IdArray dst);
-
-  static ImmutableGraphPtr CreateFromCOO(
-      int64_t num_vertices, IdArray src, IdArray dst, bool multigraph);
 
   /*!
    * \brief Convert the given graph to an immutable graph.
@@ -958,12 +941,24 @@ class ImmutableGraph: public GraphInterface {
    */
   ImmutableGraphPtr Reverse() const;
 
+  /*! \return Load ImmutableGraph from stream, using out csr */
+  bool Load(dmlc::Stream *fs);
+
+  /*! \return Save ImmutableGraph to stream, using out csr */
+  void Save(dmlc::Stream* fs) const;
+
   void SortCSR() {
     GetInCSR()->SortCSR();
     GetOutCSR()->SortCSR();
   }
 
+  /*! \brief Cast this graph to a heterograph */
+  HeteroGraphPtr AsHeteroGraph() const;
+
  protected:
+  friend class Serializer;
+  friend class UnitGraph;
+
   /* !\brief internal default constructor */
   ImmutableGraph() {}
 
@@ -1006,8 +1001,7 @@ class ImmutableGraph: public GraphInterface {
 
 template <typename IndptrIter, typename IndicesIter, typename EdgeIdIter>
 CSR::CSR(int64_t num_vertices, int64_t num_edges,
-    IndptrIter indptr_begin, IndicesIter indices_begin, EdgeIdIter edge_ids_begin,
-    bool is_multigraph): is_multigraph_(is_multigraph) {
+    IndptrIter indptr_begin, IndicesIter indices_begin, EdgeIdIter edge_ids_begin) {
   // TODO(minjie): this should be changed to a device-agnostic implementation
   //   in the future
   adj_.num_rows = num_vertices;
@@ -1027,5 +1021,10 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges,
 }
 
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::CSR, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::ImmutableGraph, true);
+}  // namespace dmlc
 
 #endif  // DGL_IMMUTABLE_GRAPH_H_

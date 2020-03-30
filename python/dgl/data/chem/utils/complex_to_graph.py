@@ -4,6 +4,7 @@ import numpy as np
 from ..utils import k_nearest_neighbors
 from .... import graph, bipartite, hetero_from_relations
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 __all__ = ['ACNN_graph_construction_and_featurization']
 
@@ -49,6 +50,7 @@ def get_atomic_numbers(mol, indices):
         atomic_numbers.append(atom.GetAtomicNum())
     return atomic_numbers
 
+@deprecated('Import it from dgllife.utils instead.')
 def ACNN_graph_construction_and_featurization(ligand_mol,
                                               protein_mol,
                                               ligand_coordinates,
@@ -72,11 +74,13 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     protein_coordinates : Float Tensor of shape (V2, 3)
         Atom coordinates in a protein.
     max_num_ligand_atoms : int or None
-        Maximum number of atoms in ligands for zero padding.
-        If None, no zero padding will be performed. Default to None.
+        Maximum number of atoms in ligands for zero padding, which should be no smaller than
+        ligand_mol.GetNumAtoms() if not None. If None, no zero padding will be performed.
+        Default to None.
     max_num_protein_atoms : int or None
-        Maximum number of atoms in proteins for zero padding.
-        If None, no zero padding will be performed. Default to None.
+        Maximum number of atoms in proteins for zero padding, which should be no smaller than
+        protein_mol.GetNumAtoms() if not None. If None, no zero padding will be performed.
+        Default to None.
     neighbor_cutoff : float
         Distance cutoff to define 'neighboring'. Default to 12.
     max_num_neighbors : int
@@ -86,6 +90,12 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     """
     assert ligand_coordinates is not None, 'Expect ligand_coordinates to be provided.'
     assert protein_coordinates is not None, 'Expect protein_coordinates to be provided.'
+    if max_num_ligand_atoms is not None:
+        assert max_num_ligand_atoms >= ligand_mol.GetNumAtoms(), \
+            'Expect max_num_ligand_atoms to be no smaller than ligand_mol.GetNumAtoms()'
+    if max_num_protein_atoms is not None:
+        assert max_num_protein_atoms >= protein_mol.GetNumAtoms(), \
+            'Expect max_num_protein_atoms to be no smaller than protein_mol.GetNumAtoms()'
 
     if strip_hydrogens:
         # Remove hydrogen atoms and their corresponding coordinates
@@ -114,7 +124,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     ligand_graph = graph((ligand_srcs, ligand_dsts),
                          'ligand_atom', 'ligand', num_ligand_atoms)
     ligand_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
-        np.array(ligand_dists).astype(np.float32)), (-1, 1))
+        np.asarray(ligand_dists, dtype=np.float32)), (-1, 1))
 
     # Construct graph for atoms in the protein
     protein_srcs, protein_dsts, protein_dists = k_nearest_neighbors(
@@ -122,7 +132,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     protein_graph = graph((protein_srcs, protein_dsts),
                           'protein_atom', 'protein', num_protein_atoms)
     protein_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
-        np.array(protein_dists).astype(np.float32)), (-1, 1))
+        np.asarray(protein_dists, dtype=np.float32)), (-1, 1))
 
     # Construct 4 graphs for complex representation, including the connection within
     # protein atoms, the connection within ligand atoms and the connection between
@@ -130,9 +140,9 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     complex_srcs, complex_dsts, complex_dists = k_nearest_neighbors(
         np.concatenate([ligand_coordinates, protein_coordinates]),
         neighbor_cutoff, max_num_neighbors)
-    complex_srcs = np.array(complex_srcs)
-    complex_dsts = np.array(complex_dsts)
-    complex_dists = np.array(complex_dists)
+    complex_srcs = np.asarray(complex_srcs)
+    complex_dsts = np.asarray(complex_dsts)
+    complex_dists = np.asarray(complex_dists)
     offset = num_ligand_atoms
 
     # ('ligand_atom', 'complex', 'ligand_atom')
@@ -196,11 +206,11 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     )
 
     # Get atomic numbers for all atoms left and set node features
-    ligand_atomic_numbers = np.array(get_atomic_numbers(ligand_mol, ligand_atom_indices_left))
+    ligand_atomic_numbers = np.asarray(get_atomic_numbers(ligand_mol, ligand_atom_indices_left))
     # zero padding
     ligand_atomic_numbers = np.concatenate([
         ligand_atomic_numbers, np.zeros(num_ligand_atoms - len(ligand_atom_indices_left))])
-    protein_atomic_numbers = np.array(get_atomic_numbers(protein_mol, protein_atom_indices_left))
+    protein_atomic_numbers = np.asarray(get_atomic_numbers(protein_mol, protein_atom_indices_left))
     # zero padding
     protein_atomic_numbers = np.concatenate([
         protein_atomic_numbers, np.zeros(num_protein_atoms - len(protein_atom_indices_left))])

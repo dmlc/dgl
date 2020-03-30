@@ -14,7 +14,7 @@ from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
 if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
-    raise Exception("DGL has to work with MXNet version >= 1.5")
+    raise RuntimeError("DGL requires mxnet >= 1.5")
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
@@ -190,7 +190,10 @@ def repeat(input, repeats, dim):
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
     if len(row_index) == 0:
-        return data[0:0]
+        if data.shape[0] == 0:
+            return data
+        else:
+            return data[0:0]
 
     if isinstance(row_index, nd.NDArray):
         return nd.take(data, row_index)
@@ -332,7 +335,10 @@ def sort_1d(input):
     return val, idx
 
 def arange(start, stop):
-    return nd.arange(start, stop, dtype=np.int64)
+    if start >= stop:
+        return nd.array([], dtype=np.int64)
+    else:
+        return nd.arange(start, stop, dtype=np.int64)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)
@@ -541,7 +547,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad in_shape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))[0]
+    reduce_idx = np.nonzero(np.asarray(grad_shape) - np.asarray(in_shape))[0]
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)

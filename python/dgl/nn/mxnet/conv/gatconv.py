@@ -7,6 +7,7 @@ from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
 from ..softmax import edge_softmax
+from ....utils import expand_as_pair
 
 #pylint: enable=W0235
 class GATConv(nn.Block):
@@ -26,8 +27,13 @@ class GATConv(nn.Block):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int or pair of ints
         Input feature size.
+
+        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
     out_feats : int
         Output feature size.
     num_heads : int
@@ -55,12 +61,21 @@ class GATConv(nn.Block):
                  activation=None):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._in_feats = in_feats
         self._out_feats = out_feats
         with self.name_scope():
-            self.fc = nn.Dense(out_feats * num_heads, use_bias=False,
-                               weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                               in_units=in_feats)
+            if isinstance(in_feats, tuple):
+                self.fc_src = nn.Dense(out_feats * num_heads, use_bias=False,
+                                       weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                       in_units=self._in_src_feats)
+                self.fc_dst = nn.Dense(out_feats * num_heads, use_bias=False,
+                                       weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                       in_units=self._in_dst_feats)
+            else:
+                self.fc = nn.Dense(out_feats * num_heads, use_bias=False,
+                                   weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                   in_units=in_feats)
             self.attn_l = self.params.get('attn_l',
                                           shape=(1, num_heads, out_feats),
                                           init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
@@ -90,8 +105,11 @@ class GATConv(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+            If a mxnet.NDArray is given, the input feature of shape :math:`(N, D_{in})`
+            where :math:`D_{in}` is size of input feature, :math:`N` is the number of
+            nodes.
+            If a pair of mxnet.NDArray is given, the pair must contain two tensors of
+            shape :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
         Returns
         -------
@@ -100,22 +118,42 @@ class GATConv(nn.Block):
             is the number of heads, and :math:`D_{out}` is size of output feature.
         """
         graph = graph.local_var()
-        h = self.feat_drop(feat)
-        feat = self.fc(h).reshape(-1, self._num_heads, self._out_feats)
-        el = (feat * self.attn_l.data(feat.context)).sum(axis=-1).expand_dims(-1)
-        er = (feat * self.attn_r.data(feat.context)).sum(axis=-1).expand_dims(-1)
-        graph.ndata.update({'ft': feat, 'el': el, 'er': er})
-        # compute edge attention
+        if isinstance(feat, tuple):
+            h_src = self.feat_drop(feat[0])
+            h_dst = self.feat_drop(feat[1])
+            feat_src = self.fc_src(h_src).reshape(
+                -1, self._num_heads, self._out_feats)
+            feat_dst = self.fc_dst(h_dst).reshape(
+                -1, self._num_heads, self._out_feats)
+        else:
+            h_src = h_dst = self.feat_drop(feat)
+            feat_src = feat_dst = self.fc(h_src).reshape(
+                -1, self._num_heads, self._out_feats)
+        # NOTE: GAT paper uses "first concatenation then linear projection"
+        # to compute attention scores, while ours is "first projection then
+        # addition", the two approaches are mathematically equivalent:
+        # We decompose the weight vector a mentioned in the paper into
+        # [a_l || a_r], then
+        # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
+        # Our implementation is much efficient because we do not need to
+        # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
+        # addition could be optimized with DGL's built-in function u_add_v,
+        # which further speeds up computation and saves memory footprint.
+        el = (feat_src * self.attn_l.data(feat_src.context)).sum(axis=-1).expand_dims(-1)
+        er = (feat_dst * self.attn_r.data(feat_src.context)).sum(axis=-1).expand_dims(-1)
+        graph.srcdata.update({'ft': feat_src, 'el': el})
+        graph.dstdata.update({'er': er})
+        # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
         graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
         e = self.leaky_relu(graph.edata.pop('e'))
         # compute softmax
         graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft'))
-        rst = graph.ndata['ft']
+        rst = graph.dstdata['ft']
         # residual
         if self.res_fc is not None:
-            resval = self.res_fc(h).reshape(h.shape[0], -1, self._out_feats)
+            resval = self.res_fc(h_dst).reshape(h_dst.shape[0], -1, self._out_feats)
             rst = rst + resval
         # activation
         if self.activation:

@@ -325,7 +325,7 @@ GraphPtr GraphOp::ToSimpleGraph(GraphPtr graph) {
     indptr[src+1] = indices.size();
   }
   CSRPtr csr(new CSR(graph->NumVertices(), indices.size(),
-        indptr.begin(), indices.begin(), RangeIter(0), false));
+        indptr.begin(), indices.begin(), RangeIter(0)));
   return std::make_shared<ImmutableGraph>(csr);
 }
 
@@ -397,7 +397,7 @@ GraphPtr GraphOp::ToBidirectedImmutableGraph(GraphPtr g) {
   IdArray srcs_array = aten::VecToIdArray(srcs);
   IdArray dsts_array = aten::VecToIdArray(dsts);
   return ImmutableGraph::CreateFromCOO(
-      g->NumVertices(), srcs_array, dsts_array, g->IsMultigraph());
+      g->NumVertices(), srcs_array, dsts_array);
 }
 
 HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hops) {
@@ -424,15 +424,17 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
   const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
   for (int64_t i = 0; i < num_edges; i++) {
-    edge_src.push_back(src_data[i]);
-    edge_dst.push_back(dst_data[i]);
-    edge_eid.push_back(eid_data[i]);
     // We check if the source node is in the original node.
     auto it1 = orig_nodes.find(src_data[i]);
-    inner_edges.push_back(it1 != orig_nodes.end());
+    if (it1 != orig_nodes.end() || num_hops > 0) {
+      edge_src.push_back(src_data[i]);
+      edge_dst.push_back(dst_data[i]);
+      edge_eid.push_back(eid_data[i]);
+      inner_edges.push_back(it1 != orig_nodes.end());
+    }
     // We need to expand only if the node hasn't been seen before.
     auto it = all_nodes.find(src_data[i]);
-    if (it == all_nodes.end()) {
+    if (it == all_nodes.end() && num_hops > 0) {
       all_nodes[src_data[i]] = false;
       outer_nodes[0].push_back(src_data[i]);
     }
@@ -643,7 +645,18 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
-    *rv = GraphOp::ToBidirectedImmutableGraph(g.sptr());
+    auto gptr = g.sptr();
+    auto immutable_g = std::dynamic_pointer_cast<ImmutableGraph>(gptr);
+    GraphPtr ret;
+    // For immutable graphs, we can try a faster version.
+    if (immutable_g) {
+      ret = GraphOp::ToBidirectedSimpleImmutableGraph(immutable_g);
+    }
+    // If the above option doesn't work, we call a general implementation.
+    if (!ret) {
+      ret = GraphOp::ToBidirectedImmutableGraph(gptr);
+    }
+    *rv = ret;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")

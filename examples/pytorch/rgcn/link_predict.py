@@ -186,8 +186,9 @@ def main(args):
             model.eval()
             print("start eval")
             embed = model(test_graph, test_node_id, test_rel, test_norm)
-            mrr = utils.calc_mrr(embed, model.w_relation, valid_data,
-                                 hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+            mrr = utils.calc_mrr(embed, model.w_relation, torch.LongTensor(train_data),
+                                 valid_data, test_data, hits=[1, 3, 10], eval_bz=args.eval_batch_size,
+                                 eval_p=args.eval_protocol)
             # save best model
             if mrr < best_mrr:
                 if epoch >= args.n_epochs:
@@ -212,8 +213,8 @@ def main(args):
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
     embed = model(test_graph, test_node_id, test_rel, test_norm)
-    utils.calc_mrr(embed, model.w_relation, test_data,
-                   hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+    utils.calc_mrr(embed, model.w_relation, torch.LongTensor(train_data), valid_data,
+                   test_data, hits=[1, 3, 10], eval_bz=args.eval_batch_size, eval_p=args.eval_protocol)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
@@ -235,6 +236,8 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--eval-batch-size", type=int, default=500,
             help="batch size when evaluating")
+    parser.add_argument("--eval-protocol", type=str, default="filtered",
+            help="type of evaluation protocol: 'raw' or 'filtered' mrr")
     parser.add_argument("--regularization", type=float, default=0.01,
             help="regularization weight")
     parser.add_argument("--grad-norm", type=float, default=1.0,

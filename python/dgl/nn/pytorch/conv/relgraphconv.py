@@ -72,7 +72,7 @@ class RelGraphConv(nn.Module):
         self.num_rels = num_rels
         self.regularizer = regularizer
         self.num_bases = num_bases
-        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases < 0:
+        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases <= 0:
             self.num_bases = self.num_rels
         self.bias = bias
         self.activation = activation
@@ -91,8 +91,11 @@ class RelGraphConv(nn.Module):
             # message func
             self.message_func = self.basis_message_func
         elif regularizer == "bdd":
-            if in_feat % num_bases != 0 or out_feat % num_bases != 0:
-                raise ValueError('Feature size must be a multiplier of num_bases.')
+            if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
+                raise ValueError(
+                    'Feature size must be a multiplier of num_bases (%d).'
+                    % self.num_bases
+                )
             # add block diagonal weights
             self.submat_in = in_feat // self.num_bases
             self.submat_out = out_feat // self.num_bases
@@ -169,22 +172,24 @@ class RelGraphConv(nn.Module):
         torch.Tensor
             New node features.
         """
-        g = g.local_var()
-        g.ndata['h'] = x
-        g.edata['type'] = etypes
-        if norm is not None:
-            g.edata['norm'] = norm
-        if self.self_loop:
-            loop_message = utils.matmul_maybe_select(x, self.loop_weight)
-        # message passing
-        g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
-        # apply bias and activation
-        node_repr = g.ndata['h']
-        if self.bias:
-            node_repr = node_repr + self.h_bias
-        if self.self_loop:
-            node_repr = node_repr + loop_message
-        if self.activation:
-            node_repr = self.activation(node_repr)
-        node_repr = self.dropout(node_repr)
-        return node_repr
+        assert g.is_homograph(), \
+            "not a homograph; convert it with to_homo and pass in the edge type as argument"
+        with g.local_scope():
+            g.ndata['h'] = x
+            g.edata['type'] = etypes
+            if norm is not None:
+                g.edata['norm'] = norm
+            if self.self_loop:
+                loop_message = utils.matmul_maybe_select(x, self.loop_weight)
+            # message passing
+            g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
+            # apply bias and activation
+            node_repr = g.ndata['h']
+            if self.bias:
+                node_repr = node_repr + self.h_bias
+            if self.self_loop:
+                node_repr = node_repr + loop_message
+            if self.activation:
+                node_repr = self.activation(node_repr)
+            node_repr = self.dropout(node_repr)
+            return node_repr

@@ -6,6 +6,7 @@ from torch import nn
 from .... import function as fn
 from ..softmax import edge_softmax
 from ..utils import Identity
+from ....utils import expand_as_pair
 
 # pylint: enable=W0235
 class GATConv(nn.Module):
@@ -25,8 +26,13 @@ class GATConv(nn.Module):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int, or pair of ints
         Input feature size.
+
+        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
     out_feats : int
         Output feature size.
     num_heads : int
@@ -54,17 +60,25 @@ class GATConv(nn.Module):
                  activation=None):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
-        self._in_feats = in_feats
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
+        if isinstance(in_feats, tuple):
+            self.fc_src = nn.Linear(
+                self._in_src_feats, out_feats * num_heads, bias=False)
+            self.fc_dst = nn.Linear(
+                self._in_dst_feats, out_feats * num_heads, bias=False)
+        else:
+            self.fc = nn.Linear(
+                self._in_src_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.feat_drop = nn.Dropout(feat_drop)
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
         if residual:
-            if in_feats != out_feats:
-                self.res_fc = nn.Linear(in_feats, num_heads * out_feats, bias=False)
+            if self._in_dst_feats != out_feats:
+                self.res_fc = nn.Linear(
+                    self._in_dst_feats, num_heads * out_feats, bias=False)
             else:
                 self.res_fc = Identity()
         else:
@@ -75,7 +89,11 @@ class GATConv(nn.Module):
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
         gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.fc.weight, gain=gain)
+        if hasattr(self, 'fc'):
+            nn.init.xavier_normal_(self.fc.weight, gain=gain)
+        else: # bipartite graph neural networks
+            nn.init.xavier_normal_(self.fc_src.weight, gain=gain)
+            nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
         if isinstance(self.res_fc, nn.Linear):
@@ -88,9 +106,11 @@ class GATConv(nn.Module):
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+        feat : torch.Tensor or pair of torch.Tensor
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of torch.Tensor is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
         Returns
         -------
@@ -99,12 +119,30 @@ class GATConv(nn.Module):
             is the number of heads, and :math:`D_{out}` is size of output feature.
         """
         graph = graph.local_var()
-        h = self.feat_drop(feat)
-        feat = self.fc(h).view(-1, self._num_heads, self._out_feats)
-        el = (feat * self.attn_l).sum(dim=-1).unsqueeze(-1)
-        er = (feat * self.attn_r).sum(dim=-1).unsqueeze(-1)
-        graph.ndata.update({'ft': feat, 'el': el, 'er': er})
-        # compute edge attention
+        if isinstance(feat, tuple):
+            h_src = self.feat_drop(feat[0])
+            h_dst = self.feat_drop(feat[1])
+            feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
+            feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
+        else:
+            h_src = h_dst = self.feat_drop(feat)
+            feat_src = feat_dst = self.fc(h_src).view(
+                -1, self._num_heads, self._out_feats)
+        # NOTE: GAT paper uses "first concatenation then linear projection"
+        # to compute attention scores, while ours is "first projection then
+        # addition", the two approaches are mathematically equivalent:
+        # We decompose the weight vector a mentioned in the paper into
+        # [a_l || a_r], then
+        # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
+        # Our implementation is much efficient because we do not need to
+        # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
+        # addition could be optimized with DGL's built-in function u_add_v,
+        # which further speeds up computation and saves memory footprint.
+        el = (feat_src * self.attn_l).sum(dim=-1).unsqueeze(-1)
+        er = (feat_dst * self.attn_r).sum(dim=-1).unsqueeze(-1)
+        graph.srcdata.update({'ft': feat_src, 'el': el})
+        graph.dstdata.update({'er': er})
+        # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
         graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
         e = self.leaky_relu(graph.edata.pop('e'))
         # compute softmax
@@ -112,10 +150,10 @@ class GATConv(nn.Module):
         # message passing
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft'))
-        rst = graph.ndata['ft']
+        rst = graph.dstdata['ft']
         # residual
         if self.res_fc is not None:
-            resval = self.res_fc(h).view(h.shape[0], -1, self._out_feats)
+            resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
             rst = rst + resval
         # activation
         if self.activation:

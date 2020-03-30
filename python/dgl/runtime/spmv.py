@@ -168,7 +168,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
         Number of ints needed to represent the graph
     """
     u, v, eid = edge_tuples
-    gidx = create_unitgraph_from_coo(2, num_src, num_dst, u, v)
+    gidx = create_unitgraph_from_coo(2, num_src, num_dst, u, v, 'any')
     forward, backward = gidx.get_csr_shuffle_order(0)
     eid = eid.tousertensor()
     nbits = gidx.bits_needed(0)

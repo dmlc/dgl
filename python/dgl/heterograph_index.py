@@ -25,27 +25,11 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        metagraph = self.metagraph
-        number_of_nodes = [self.number_of_nodes(i) for i in range(self.number_of_ntypes())]
-        edges = [self.edges(i, order='eid') for i in range(self.number_of_etypes())]
-        # multigraph and readonly are not used.
-        return metagraph, number_of_nodes, edges
+        return _CAPI_DGLHeteroPickle(self)
 
     def __setstate__(self, state):
-        metagraph, number_of_nodes, edges = state
-
         self._cache = {}
-        # loop over etypes and recover unit graphs
-        rel_graphs = []
-        for i, edges_per_type in enumerate(edges):
-            src_ntype, dst_ntype = metagraph.find_edge(i)
-            num_src = number_of_nodes[src_ntype]
-            num_dst = number_of_nodes[dst_ntype]
-            src_id, dst_id, _ = edges_per_type
-            rel_graphs.append(create_unitgraph_from_coo(
-                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id))
-        self.__init_handle_by_constructor__(
-            _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
+        self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
 
     @property
     def metagraph(self):
@@ -145,6 +129,16 @@ class HeteroGraphIndex(ObjectBase):
         _CAPI_DGLHeteroClear(self)
         self._cache.clear()
 
+    def dtype(self):
+        """Return the data type of this graph index.
+
+        Returns
+        -------
+        DGLDataType
+            The data type of the graph.
+        """
+        return _CAPI_DGLHeteroDataType(self)
+
     def ctx(self):
         """Return the context of this graph index.
 
@@ -222,6 +216,7 @@ class HeteroGraphIndex(ObjectBase):
 
     def is_multigraph(self):
         """Return whether the graph is a multigraph
+        The time cost will be O(E)
 
         Returns
         -------
@@ -957,7 +952,8 @@ class HeteroSubgraphIndex(ObjectBase):
 # Creators
 #################################################################
 
-def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
+def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
+                              restrict_format):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -972,15 +968,19 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
         Row index.
     col : utils.Index
         Col index.
+    restrict_format : "any", "coo", "csr" or "csc"
+        Restrict the storage format of the unit graph.
 
     Returns
     -------
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
-        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
+        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor(),
+        restrict_format)
 
-def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids):
+def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
+                              restrict_format):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -997,6 +997,8 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         CSR indices.
     edge_ids : utils.Index
         Edge shuffle id.
+    restrict_format : "any", "coo", "csr" or "csc"
+        Restrict the storage format of the unit graph.
 
     Returns
     -------
@@ -1004,9 +1006,10 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
-        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
+        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor(),
+        restrict_format)
 
-def create_heterograph_from_relations(metagraph, rel_graphs):
+def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
     """Create a heterograph from metagraph and graphs of every relation.
 
     Parameters
@@ -1015,12 +1018,18 @@ def create_heterograph_from_relations(metagraph, rel_graphs):
         Meta-graph.
     rel_graphs : list of HeteroGraphIndex
         Bipartite graph of each relation.
+    num_nodes_per_type : utils.Index, optional
+        Number of nodes per node type
 
     Returns
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+    if num_nodes_per_type is None:
+        return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+    else:
+        return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
+            metagraph, rel_graphs, num_nodes_per_type.todgltensor())
 
 def disjoint_union(metagraph, graphs):
     """Return a disjoint union of the input heterographs.
@@ -1061,8 +1070,57 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     return _CAPI_DGLHeteroDisjointPartitionBySizes(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
+#################################################################
+# Data structure used by C APIs
+#################################################################
+
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):
     """FlattenedHeteroGraph object class in C++ backend."""
+
+@register_object("graph.HeteroPickleStates")
+class HeteroPickleStates(ObjectBase):
+    """Pickle states object class in C++ backend."""
+    @property
+    def metagraph(self):
+        """Metagraph
+
+        Returns
+        -------
+        GraphIndex
+            Metagraph structure
+        """
+        return _CAPI_DGLHeteroPickleStatesGetMetagraph(self)
+
+    @property
+    def num_nodes_per_type(self):
+        """Number of nodes per edge type
+
+        Returns
+        -------
+        Tensor
+            Array of number of nodes for each type
+        """
+        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLHeteroPickleStatesGetNumVertices(self))
+
+    @property
+    def adjs(self):
+        """Adjacency matrices of all the relation graphs
+
+        Returns
+        -------
+        list of dgl.ndarray.SparseMatrix
+            Adjacency matrices
+        """
+        return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
+
+    def __getstate__(self):
+        return self.metagraph, self.num_nodes_per_type, self.adjs
+
+    def __setstate__(self, state):
+        metagraph, num_nodes_per_type, adjs = state
+        num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
+        self.__init_handle_by_constructor__(
+            _CAPI_DGLCreateHeteroPickleStates, metagraph, num_nodes_per_type, adjs)
 
 _init_api("dgl.heterograph_index")

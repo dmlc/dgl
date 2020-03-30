@@ -10,9 +10,10 @@ import networkx as nx
 
 import numpy as np
 import os
-import dgl
-import dgl.backend as F
-from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
+
+from .. import backend as F
+from ..graph import DGLGraph
+from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 __all__ = ['SSTBatch', 'SST']
 
@@ -78,7 +79,7 @@ class SST(object):
                 for line in pf.readlines():
                     sp = line.split(' ')
                     if sp[0].lower() in self.vocab:
-                        glove_emb[sp[0].lower()] = np.array([float(x) for x in sp[1:]])
+                        glove_emb[sp[0].lower()] = np.asarray([float(x) for x in sp[1:]])
         files = ['{}.txt'.format(self.mode)]
         corpus = BracketParseCorpusReader('{}/sst'.format(self.dir), files)
         sents = corpus.parsed_sents(files[0])
@@ -116,7 +117,7 @@ class SST(object):
         # add root
         g.add_node(0, x=SST.PAD_WORD, y=int(root.label()), mask=0)
         _rec_build(0, root)
-        ret = dgl.DGLGraph()
+        ret = DGLGraph()
         ret.from_networkx(g, node_attrs=['x', 'y', 'mask'])
         return ret
 
