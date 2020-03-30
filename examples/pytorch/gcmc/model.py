@@ -1,11 +1,98 @@
 """NN modules"""
 import torch as th
 import torch.nn as nn
+from torch.nn import init
 import dgl.function as fn
+import dgl.nn.pytorch as dglnn
 
 from utils import get_activation
 
-class GCMCLayer(nn.Module):
+class GCMCGraphConv(nn.Module):
+    """Apply graph convolution for GCMC model
+
+    Parameters
+    ----------
+    in_feats : int
+        Input feature size.
+    out_feats : int
+        Output feature size.
+    weight : bool, optional
+        If True, apply a linear layer. Otherwise, aggregating the messages
+        without a weight matrix or with an shared weight provided by caller.
+    device: str, optional
+        Which device to put data in. Useful in mix_cpu_gpu training and
+        multi-gpu training
+    """
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 weight=True,
+                 device=None):
+        super(GCMCGraphConv, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self.device=device 
+
+        if weight:
+            self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
+        else:
+            self.register_parameter('weight', None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
+        if self.weight is not None:
+            init.xavier_uniform_(self.weight)
+
+    def forward(self, graph, feat, weight=None, dropout=None):
+        """Compute graph convolution.
+
+        Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
+        and "cj".
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        feat : torch.Tensor
+            The input feature
+        weight : torch.Tensor, optional
+            Optional external weight tensor.
+        dropout : torch.nn.Dropout, optional
+            Optional external dropout layer.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
+        cj = graph.srcdata['cj']
+        ci = graph.dstdata['ci']
+        if self.device is not None:
+            cj = cj.to(self.device)
+            ci = ci.to(self.device)
+        graph = graph.local_var()
+        if weight is not None:
+            if self.weight is not None:
+                raise DGLError('External weight is provided while at the same time the'
+                               ' module has defined its own weight parameter. Please'
+                               ' create the module with flag weight=False.')
+        else:
+            weight = self.weight
+
+        if weight is not None:
+            feat = dot_or_identity(feat, weight, self.device)
+
+        feat = feat * dropout(cj)
+        graph.srcdata['h'] = feat
+        graph.update_all(fn.copy_src(src='h', out='m'),
+                         fn.sum(msg='m', out='h'))
+        rst = graph.dstdata['h']
+        rst = rst * ci
+
+        return rst
+
+class HeteroGCMCLayer(nn.Module):
     r"""GCMC layer
 
     .. math::
@@ -49,6 +136,9 @@ class GCMCLayer(nn.Module):
         If true, user node and movie node share the same set of parameters.
         Require ``user_in_units`` and ``move_in_units`` to be the same.
         (Default: False)
+    device: str, optional
+        Which device to put data in. Useful in mix_cpu_gpu training and
+        multi-gpu training
     """
     def __init__(self,
                  rating_vals,
@@ -60,8 +150,9 @@ class GCMCLayer(nn.Module):
                  agg='stack',  # or 'sum'
                  agg_act=None,
                  out_act=None,
-                 share_user_item_param=False):
-        super(GCMCLayer, self).__init__()
+                 share_user_item_param=False,
+                 device=None):
+        super(HeteroGCMCLayer, self).__init__()
         self.rating_vals = rating_vals
         self.agg = agg
         self.share_user_item_param = share_user_item_param
@@ -77,18 +168,52 @@ class GCMCLayer(nn.Module):
             msg_units = msg_units // len(rating_vals)
         self.dropout = nn.Dropout(dropout_rate)
         self.W_r = nn.ParameterDict()
+        subConv = {}
         for rating in rating_vals:
             # PyTorch parameter name can't contain "."
             rating = str(rating).replace('.', '_')
+            rev_rating = 'rev-%s' % rating
             if share_user_item_param and user_in_units == movie_in_units:
                 self.W_r[rating] = nn.Parameter(th.randn(user_in_units, msg_units))
                 self.W_r['rev-%s' % rating] = self.W_r[rating]
+                subConv[rating] = GCMCGraphConv(user_in_units,
+                                                msg_units,
+                                                weight=False,
+                                                device=device)
+                subConv[rev_rating] = GCMCGraphConv(user_in_units,
+                                                    msg_units,
+                                                    weight=False,
+                                                    device=device)
             else:
-                self.W_r[rating] = nn.Parameter(th.randn(user_in_units, msg_units))
-                self.W_r['rev-%s' % rating] = nn.Parameter(th.randn(movie_in_units, msg_units))
+                self.W_r = None
+                subConv[rating] = GCMCGraphConv(user_in_units,
+                                                  msg_units,
+                                                  weight=True,
+                                                  device=device)
+                subConv[rev_rating] = GCMCGraphConv(movie_in_units,
+                                                      msg_units,
+                                                      weight=True,
+                                                      device=device)
+        self.conv = dglnn.HeteroGraphConv(subConv, aggregate=agg)
         self.agg_act = get_activation(agg_act)
         self.out_act = get_activation(out_act)
+        self.device = device
         self.reset_parameters()
+
+    def partial_to(self):
+        """Put parameters into device except W_r
+        
+        Parameters
+        ----------
+        device : torch device
+            Which device the parameters are put in.
+        """
+        device = self.device
+        if device is not None:
+            self.ufc.cuda(device)
+            if self.share_user_item_param is False:
+                self.ifc.cuda(device)
+            self.dropout.cuda(device)
 
     def reset_parameters(self):
         for p in self.parameters():
@@ -97,9 +222,6 @@ class GCMCLayer(nn.Module):
 
     def forward(self, graph, ufeat=None, ifeat=None):
         """Forward function
-
-        Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
-        and "cj".
 
         Parameters
         ----------
@@ -118,164 +240,21 @@ class GCMCLayer(nn.Module):
         new_ifeat : torch.Tensor
             New movie features
         """
-        num_u = graph.number_of_nodes('user')
-        num_i = graph.number_of_nodes('movie')
-        funcs = {}
+        in_feats = {}
+        weights = {}
+        in_feats['user'] = ufeat
+        in_feats['movie'] = ifeat
         for i, rating in enumerate(self.rating_vals):
-            rating = str(rating)
-            # W_r * x
-            x_u = dot_or_identity(ufeat, self.W_r[rating.replace('.', '_')])
-            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating.replace('.', '_')])
-            # left norm and dropout
-            x_u = x_u * self.dropout(graph.nodes['user'].data['cj'])
-            x_i = x_i * self.dropout(graph.nodes['movie'].data['cj'])
-            graph.nodes['user'].data['h%d' % i] = x_u
-            graph.nodes['movie'].data['h%d' % i] = x_i
-            funcs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
-            funcs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
-        # message passing
-        graph.multi_update_all(funcs, self.agg)
-        ufeat = graph.nodes['user'].data.pop('h').view(num_u, -1)
-        ifeat = graph.nodes['movie'].data.pop('h').view(num_i, -1)
-        # right norm
-        ufeat = ufeat * graph.nodes['user'].data['ci']
-        ifeat = ifeat * graph.nodes['movie'].data['ci']
-        # fc and non-linear
-        ufeat = self.agg_act(ufeat)
-        ifeat = self.agg_act(ifeat)
-        ufeat = self.dropout(ufeat)
-        ifeat = self.dropout(ifeat)
-        ufeat = self.ufc(ufeat)
-        ifeat = self.ifc(ifeat)
-        return self.out_act(ufeat), self.out_act(ifeat)
+            rating = str(rating).replace('.', '_')
+            rev_rating = 'rev-%s' % rating
+            weights[rating] = (self.W_r[rating] if self.W_r is not None else None, self.dropout)
+            weights[rev_rating] = (self.W_r[rev_rating] if self.W_r is not None else None, self.dropout)
+        out_feats = self.conv(graph, in_feats, mod_args=weights)
+        ufeat = out_feats['user']
+        ifeat = out_feats['movie']
+        ufeat = ufeat.view(ufeat.shape[0], -1)
+        ifeat = ifeat.view(ifeat.shape[0], -1)
 
-class SampleGCMCLayer(GCMCLayer):
-    r"""Sample based GCMC layer
-
-    Implemented a sample based GCMC algorithm. It accepts two minibatch
-    graph: ugraph for generating user embeddings and igraph for generating
-    item embeddings.
-
-    Parameters
-    ----------
-    rating_vals : list of int or float
-        Possible rating values.
-    user_in_units : int
-        Size of user input feature
-    movie_in_units : int
-        Size of movie input feature
-    msg_units : int
-        Size of message :math:`W_rh_j`
-    out_units : int
-        Size of of final output user and movie features
-    dropout_rate : float, optional
-        Dropout rate (Default: 0.0)
-    agg : str, optional
-        Function to aggregate messages of different ratings.
-        Could be any of the supported cross type reducers:
-        "sum", "max", "min", "mean", "stack".
-        (Default: "stack")
-    agg_act : callable, str, optional
-        Activation function :math:`sigma_{agg}`. (Default: None)
-    out_act : callable, str, optional
-        Activation function :math:`sigma_{agg}`. (Default: None)
-    share_user_item_param : bool, optional
-        If true, user node and movie node share the same set of parameters.
-        Require ``user_in_units`` and ``move_in_units`` to be the same.
-        (Default: False)
-    """
-    def __init__(self,
-                 rating_vals,
-                 user_in_units,
-                 movie_in_units,
-                 msg_units,
-                 out_units,
-                 dropout_rate=0.0,
-                 agg='stack',  # or 'sum'
-                 agg_act=None,
-                 out_act=None,
-                 share_user_item_param=False,
-                 device=None):
-        super(SampleGCMCLayer, self).__init__(rating_vals,
-                                              user_in_units,
-                                              movie_in_units,
-                                              msg_units,
-                                              out_units,
-                                              dropout_rate,
-                                              agg,  # or 'sum'
-                                              agg_act,
-                                              out_act,
-                                              share_user_item_param)
-        # move part of mode params into GPU when required
-        self.device = device
-        self.share_user_item_param
-        
-    def partial_to(self, device):
-        """Put parameters into device except W_r
-        
-        Parameters
-        ----------
-        device : torch device
-            Which device the parameters are put in.
-        """
-        self.device = device
-        if device is not None:
-            self.ufc.to(device)
-            if self.share_user_item_param is False:
-                self.ifc.to(device)
-            self.dropout.to(device)
-
-
-    def forward(self, ugraph, igraph, ufeat=None, ifeat=None):
-        """Forward function
-
-        Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
-        and "cj".
-
-        Parameters
-        ----------
-        ugraph : DGLHeteroGraph
-            User-item rating graph. It should be a bipartite graph containing
-            edges only from item to user. Used in generating user embeddings.
-        igraph : DGLHeteroGraph
-            User-item rating graph. It should be a bipartite graph containing
-            edges only from user to item. Used in generating item embeddings.
-        ufeat : torch.Tensor, optional
-            User features. If None, using an identity matrix.
-        ifeat : torch.Tensor, optional
-            Movie features. If None, using an identity matrix.
-
-        Returns
-        -------
-        new_ufeat : torch.Tensor
-            New user features
-        new_ifeat : torch.Tensor
-            New movie features
-        """
-        num_u = ugraph.dstnodes['user'].data['ci'].shape[0]
-        num_i = igraph.dstnodes['movie'].data['ci'].shape[0]
-        ufuncs = {}
-        ifuncs = {}
-        for i, rating in enumerate(self.rating_vals):
-            rating = str(rating)
-            # W_r * x
-            x_u = dot_or_identity(ufeat, self.W_r[rating.replace('.', '_')], self.device)
-            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating.replace('.', '_')], self.device)
-            # left norm and dropout
-            x_u = x_u * self.dropout(igraph.srcnodes['user'].data['cj'].to(self.device))
-            x_i = x_i * self.dropout(ugraph.srcnodes['movie'].data['cj'].to(self.device))
-            igraph.srcnodes['user'].data['h%d' % i] = x_u
-            ugraph.srcnodes['movie'].data['h%d' % i] = x_i
-            ifuncs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
-            ufuncs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
-        # message passing
-        ugraph.multi_update_all(ufuncs, self.agg)
-        igraph.multi_update_all(ifuncs, self.agg)
-        ufeat = ugraph.dstnodes['user'].data.pop('h').view(num_u, -1)
-        ifeat = igraph.dstnodes['movie'].data.pop('h').view(num_i, -1)
-        # right norm
-        ufeat = ufeat * ugraph.dstnodes['user'].data['ci'].to(self.device)
-        ifeat = ifeat * igraph.dstnodes['movie'].data['ci'].to(self.device)
         # fc and non-linear
         ufeat = self.agg_act(ufeat)
         ifeat = self.agg_act(ifeat)

@@ -212,6 +212,7 @@ class MovieLens(object):
         def _npairs(graph):
             rst = 0
             for r in self.possible_rating_values:
+                r = str(r).replace('.', '_')
                 rst += graph.number_of_edges(str(r))
             return rst
 
@@ -253,9 +254,10 @@ class MovieLens(object):
             ridx = np.where(rating_values == rating)
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
-            bg = dgl.bipartite((rrow, rcol), 'user', str(rating), 'movie',
+            rating = str(rating).replace('.', '_')
+            bg = dgl.bipartite((rrow, rcol), 'user', rating, 'movie',
                                num_nodes=(self._num_user, self._num_movie))
-            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % str(rating), 'user',
+            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
                                num_nodes=(self._num_movie, self._num_user))
             rating_graphs.append(bg)
             rating_graphs.append(rev_bg)
@@ -275,7 +277,7 @@ class MovieLens(object):
             movie_ci = []
             movie_cj = []
             for r in self.possible_rating_values:
-                r = str(r)
+                r = str(r).replace('.', '_')
                 user_ci.append(graph['rev-%s' % r].in_degrees())
                 movie_ci.append(graph[r].in_degrees())
                 if self._symm:
