@@ -266,8 +266,6 @@ class DGLHeteroGraph(object):
             frame.set_initializer(init.zero_initializer)
             self._msg_frames.append(frame)
 
-        self._is_multigraph = None
-
     def __getstate__(self):
         return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
 
@@ -1075,10 +1073,7 @@ class DGLHeteroGraph(object):
         bool
             True if the graph is a multigraph, False otherwise.
         """
-        if self._is_multigraph is None:
-            return self._graph.is_multigraph()
-        else:
-            return self._is_multigraph
+        return self._graph.is_multigraph()
 
     @property
     def is_readonly(self):
@@ -1295,7 +1290,7 @@ class DGLHeteroGraph(object):
         """
         return self._graph.successors(self.get_etype_id(etype), v).tousertensor()
 
-    def edge_id(self, u, v, force_multi=False, etype=None):
+    def edge_id(self, u, v, force_multi=None, return_array=False, etype=None):
         """Return the edge ID, or an array of edge IDs, between source node
         `u` and destination node `v`, with the specified edge type
 
@@ -1306,7 +1301,11 @@ class DGLHeteroGraph(object):
         v : int
             The node ID of destination type.
         force_multi : bool, optional
-            If False, will return a single edge ID if the graph is a simple graph.
+            Deprecated (Will be deleted in the future).
+            If False, will return a single edge ID.
+            If True, will always return an array. (Default: False)
+        return_array : bool, optional
+            If False, will return a single edge ID.
             If True, will always return an array. (Default: False)
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
@@ -1315,8 +1314,13 @@ class DGLHeteroGraph(object):
         Returns
         -------
         int or tensor
-            The edge ID if ``force_multi == True`` and the graph is a simple graph.
+            The edge ID if ``return_array == False``.
             The edge ID array otherwise.
+
+        Notes
+        -----
+        If multiply edges exist between `u` and `v` and return_array is False,
+        the result is undefined.
 
         Examples
         --------
@@ -1332,7 +1336,7 @@ class DGLHeteroGraph(object):
 
         >>> plays_g.edge_id(1, 2, etype=('user', 'plays', 'game'))
         2
-        >>> g.edge_id(1, 2, force_multi=True, etype=('user', 'follows', 'user'))
+        >>> g.edge_id(1, 2, return_array=True, etype=('user', 'follows', 'user'))
         tensor([1, 2])
 
         See Also
@@ -1340,9 +1344,20 @@ class DGLHeteroGraph(object):
         edge_ids
         """
         idx = self._graph.edge_id(self.get_etype_id(etype), u, v)
-        return idx.tousertensor() if force_multi or self._graph.is_multigraph() else idx[0]
+        if force_multi is not None:
+            dgl_warning("force_multi will be deprecated." \
+                        "Please use return_array instead")
+            return_array = force_multi
 
-    def edge_ids(self, u, v, force_multi=False, etype=None):
+        if return_array:
+            return idx.tousertensor()
+        else:
+            assert len(idx) == 1, "For return_array=False, there should be one and " \
+                "only one edge between u and v, but get {} edges. " \
+                "Please use return_array=True instead".format(len(idx))
+            return idx[0]
+
+    def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return all edge IDs between source node array `u` and destination
         node array `v` with the specified edge type.
 
@@ -1353,8 +1368,11 @@ class DGLHeteroGraph(object):
         v : list, tensor
             The node ID array of destination type.
         force_multi : bool, optional
+            Deprecated (Will be deleted in the future).
             Whether to always treat the graph as a multigraph. See the
             "Returns" for their effects. (Default: False)
+        return_uv : bool
+            See the "Returns" for their effects. (Default: False)
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
@@ -1363,9 +1381,8 @@ class DGLHeteroGraph(object):
         -------
         tensor, or (tensor, tensor, tensor)
 
-            * If the graph is a simple graph and ``force_multi=False``, return
-            a single edge ID array ``e``.  ``e[i]`` is the edge ID between ``u[i]``
-            and ``v[i]``.
+            * If ``return_uv=False``, return a single edge ID array ``e``.
+            ``e[i]`` is the edge ID between ``u[i]`` and ``v[i]``.
 
             * Otherwise, return three arrays ``(eu, ev, e)``.  ``e[i]`` is the ID
             of an edge between ``eu[i]`` and ``ev[i]``.  All edges between ``u[i]``
@@ -1373,9 +1390,12 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-        If the graph is a simple graph, ``force_multi=False``, and no edge
+        If the graph is a simple graph, ``return_uv=False``, and no edge
         exists between some pairs of ``u[i]`` and ``v[i]``, the result is undefined
         and an empty tensor is returned.
+
+        If the graph is a multi graph, ``return_uv=False``, and multi edges
+        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
 
         Examples
         --------
@@ -1393,7 +1413,7 @@ class DGLHeteroGraph(object):
         tensor([], dtype=torch.int64)
         >>> plays_g.edge_ids([1], [2], etype=('user', 'plays', 'game'))
         tensor([2])
-        >>> g.edge_ids([1], [2], force_multi=True, etype=('user', 'follows', 'user'))
+        >>> g.edge_ids([1], [2], return_uv=True, etype=('user', 'follows', 'user'))
         (tensor([1, 1]), tensor([2, 2]), tensor([1, 2]))
 
         See Also
@@ -1403,9 +1423,17 @@ class DGLHeteroGraph(object):
         u = utils.toindex(u)
         v = utils.toindex(v)
         src, dst, eid = self._graph.edge_ids(self.get_etype_id(etype), u, v)
-        if force_multi or self._graph.is_multigraph():
+        if force_multi is not None:
+            dgl_warning("force_multi will be deprecated, " \
+                        "Please use return_uv instead")
+            return_uv = force_multi
+
+        if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
+            assert len(eid) == max(len(u), len(v)), "If return_uv=False, there should be one and " \
+                "only one edge between each u and v, expect {} edges but get {}. " \
+                "Please use return_uv=True instead".format(max(len(u), len(v)), len(eid))
             return eid.tousertensor()
 
     def find_edges(self, eid, etype=None):
@@ -2023,7 +2051,7 @@ class DGLHeteroGraph(object):
                 induced_etypes.append(self.etypes[i])
                 edge_frames.append(self._edge_frames[i])
 
-        metagraph = graph_index.from_edge_list(meta_edges, True, True)
+        metagraph = graph_index.from_edge_list(meta_edges, True)
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_type))
         hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
@@ -2097,7 +2125,7 @@ class DGLHeteroGraph(object):
         induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
         num_nodes_per_induced_type = [self.number_of_nodes(ntype) for ntype in induced_ntypes]
 
-        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)
+        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True)
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type))
         hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
@@ -3787,7 +3815,8 @@ class DGLHeteroGraph(object):
         src, dst = self.edges()
         src = F.asnumpy(src)
         dst = F.asnumpy(dst)
-        nx_graph = nx.MultiDiGraph() if self.is_multigraph else nx.DiGraph()
+        # xiangsx: Always treat graph as multigraph
+        nx_graph = nx.MultiDiGraph()
         nx_graph.add_nodes_from(range(self.number_of_nodes()))
         for eid, (u, v) in enumerate(zip(src, dst)):
             nx_graph.add_edge(u, v, id=eid)
@@ -4076,6 +4105,10 @@ class DGLHeteroGraph(object):
         yield
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
+
+    def is_homograph(self):
+        """Return if the graph is homogeneous."""
+        return len(self.ntypes) == 1 and len(self.etypes) == 1
 
 ############################################################
 # Internal APIs

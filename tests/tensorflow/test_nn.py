@@ -6,7 +6,7 @@ import dgl
 import dgl.nn.tensorflow as nn
 import dgl.function as fn
 import backend as F
-from test_utils.graph_cases import get_cases
+from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from copy import deepcopy
 
 import numpy as np
@@ -166,7 +166,6 @@ def test_edge_softmax():
     for i in range(30):
         for j in range(30):
             g.add_edge(i, j)
-
     
     score = F.randn((900, 1))
     with tf.GradientTape() as tape:
@@ -311,30 +310,35 @@ def test_gat_conv():
     gat = nn.GATConv(5, 2, 4)
     feat = F.randn((100, 5))
     h = gat(g, feat)
-    assert h.shape[-1] == 2 and h.shape[-2] == 4
+    assert h.shape == (100, 4, 2)
 
-def test_sage_conv():
-    for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:
-        ctx = F.ctx()
-        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-        sage = nn.SAGEConv(5, 10, aggre_type)
-        feat = F.randn((100, 5))
-        h = sage(g, feat)
-        assert h.shape[-1] == 10
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    gat = nn.GATConv((5, 10), 2, 4)
+    feat = (F.randn((100, 5)), F.randn((200, 10)))
+    h = gat(g, feat)
 
-        g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
-        sage = nn.SAGEConv(5, 10, aggre_type)
-        feat = F.randn((100, 5))
-        h = sage(g, feat)
-        assert h.shape[-1] == 10
+@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
+def test_sage_conv(aggre_type):
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    sage = nn.SAGEConv(5, 10, aggre_type)
+    feat = F.randn((100, 5))
+    h = sage(g, feat)
+    assert h.shape[-1] == 10
 
-        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
-        dst_dim = 5 if aggre_type != 'gcn' else 10
-        sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
-        feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
-        h = sage(g, feat)
-        assert h.shape[-1] == 2
-        assert h.shape[0] == 200
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
+    sage = nn.SAGEConv(5, 10, aggre_type)
+    feat = F.randn((100, 5))
+    h = sage(g, feat)
+    assert h.shape[-1] == 10
+
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    dst_dim = 5 if aggre_type != 'gcn' else 10
+    sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
+    feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
+    h = sage(g, feat)
+    assert h.shape[-1] == 2
+    assert h.shape[0] == 200
 
 def test_sgc_conv():
     ctx = F.ctx()
@@ -361,17 +365,26 @@ def test_appnp_conv():
     h = appnp(g, feat)
     assert h.shape[-1] == 5
 
-def test_gin_conv():
-    for aggregator_type in ['mean', 'max', 'sum']:
-        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-        gin = nn.GINConv(
-            tf.keras.layers.Dense(12),
-            aggregator_type
-        )
-        feat = F.randn((100, 5))
-        gin = gin
-        h = gin(g, feat)
-        assert h.shape[-1] == 12
+@pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
+def test_gin_conv(aggregator_type):
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    gin = nn.GINConv(
+        tf.keras.layers.Dense(12),
+        aggregator_type
+    )
+    feat = F.randn((100, 5))
+    gin = gin
+    h = gin(g, feat)
+    assert h.shape == (100, 12)
+
+    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+    gin = nn.GINConv(
+        tf.keras.layers.Dense(12),
+        aggregator_type
+    )
+    feat = (F.randn((100, 5)), F.randn((200, 5)))
+    h = gin(g, feat)
+    assert h.shape == (200, 12)
 
 def myagg(alist, dsttype):
     rst = alist[0]
@@ -477,7 +490,6 @@ def test_hetero_conv(agg):
     assert mod3.carg1 == 0
     assert mod3.carg2 == 1
 
-
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
@@ -501,4 +513,3 @@ if __name__ == '__main__':
     # test_dense_sage_conv()
     # test_dense_cheb_conv()
     # test_sequential()
-
