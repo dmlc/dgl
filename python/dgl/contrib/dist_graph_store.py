@@ -129,6 +129,9 @@ class DistGraphStore:
     def get_id(self):
         return self._client.get_id()
 
+    def is_local(self, nids):
+        return self.g.ndata['local_node'][nids]
+
     def get_ndata(self, name, nids=None):
         if nids is None:
             gnid = self.local_gnid

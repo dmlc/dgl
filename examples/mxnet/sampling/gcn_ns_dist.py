@@ -10,16 +10,28 @@ from dgl.data import register_data_args, load_data
 
 from gcn_ns_sc import GCNSampling, GCNInfer
 
-def copy_from_kvstore(nf, g, ctx, ndata_names):
+def copy_from_kvstore(nf, g, ctx):
     num_bytes = 0
+    num_local_bytes = 0
     start = time.time()
-    for i in range(nf.num_layers):
-        for name in ndata_names:
-            data = g.get_ndata(name, nf.layer_parent_nid(i))
-            data = data.as_in_context(ctx)
-            nf._node_frames[i][name] = data
-            num_bytes += np.prod(data.shape)
-    return num_bytes * 4, time.time() - start
+    data = g.get_ndata('features', nf.layer_parent_nid(0))
+    is_local = g.is_local(nf.layer_parent_nid(0)).asnumpy()
+    nf._node_frames[0]['features'] = data.as_in_context(ctx)
+    num_bytes += np.prod(data.shape)
+    if len(data.shape) == 1:
+        num_local_bytes += np.sum(is_local)
+    else:
+        num_local_bytes += np.sum(is_local) * data.shape[1]
+
+    data = g.get_ndata('labels', nf.layer_parent_nid(-1))
+    is_local = g.is_local(nf.layer_parent_nid(-1)).asnumpy()
+    nf._node_frames[-1]['labels'] = data.as_in_context(ctx)
+    num_bytes += np.prod(data.shape)
+    if len(data.shape) == 1:
+        num_local_bytes += np.sum(is_local)
+    else:
+        num_local_bytes += np.sum(is_local) * data.shape[1]
+    return num_bytes * 4, num_local_bytes * 4, time.time() - start
 
 def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
     in_feats = args.n_features
@@ -56,6 +68,7 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
         print('epoch', epoch)
         start = time.time()
         num_bytes = 0
+        num_local_bytes = 0
         copy_time = 0
         for_back_time = 0
         agg_grad_time = 0
@@ -67,8 +80,9 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
                                                        num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
-            nbytes, copy_time1 = copy_from_kvstore(nf, g, ctx, ['features', 'labels'])
+            nbytes, local_nbytes, copy_time1 = copy_from_kvstore(nf, g, ctx)
             num_bytes += nbytes
+            num_local_bytes += local_nbytes
             copy_time += copy_time1
             # forward
             start1 = time.time()
@@ -94,8 +108,9 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
 
         mx.nd.waitall()
         train_time = time.time() - start
-        print('Trainer {}: Train Time {:.4f}, Throughput: {:.4f}'.format(g.get_id(), train_time,
-            num_bytes / copy_time), flush=True)
+        print('Trainer {}: Train Time {:.4f}, Throughput: {:.4f} MB/s, local throughput: {:.4f} MB/s'.format(
+            g.get_id(), train_time, num_bytes / copy_time / 1024 / 1024, num_local_bytes / copy_time / 1024 / 1024),
+            flush=True)
         print('Trainer {}: copy {:.4f}, forward_backward: {:.4f}, gradient update:{:.4f}'.format(
             g.get_id(), copy_time, for_back_time, agg_grad_time))
 
@@ -108,7 +123,7 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
                                                        neighbor_type='in',
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=test_nid):
-            copy_from_kvstore(nf, g, ctx, ['features', 'labels'])
+            copy_from_kvstore(nf, g, ctx)
             pred = infer_model(nf)
             batch_nids = nf.layer_parent_nid(-1)
             batch_labels = nf.layers[-1].data['labels']
