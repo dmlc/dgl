@@ -50,11 +50,12 @@ class PrefetchingWrapper(object):
 
     _checked_start = False  # True once startup has been checkd by _check_start
 
-    def __init__(self, sampler_iter, num_prefetch):
+    def __init__(self, sampler_iter, num_prefetch, prepare):
         super(PrefetchingWrapper, self).__init__()
         self.sampler_iter = sampler_iter
         assert num_prefetch > 0, 'Unbounded Prefetcher is unsupported.'
         self.num_prefetch = num_prefetch
+        self.prepare = prepare
 
     def run(self):
         """Method representing the process activity."""
@@ -81,15 +82,20 @@ class PrefetchingWrapper(object):
                 self._dataq.put(None)
 
             try:
-                data = next(loader_iter)
-                error = None
+                data_list = []
+                error_list = []
+                for i in range(self.num_prefetch):
+                    data_list.append(next(loader_iter))
+                    error_list.append(None)
+                self.prepare(data_list)
             except Exception as e:  # pylint: disable=broad-except
                 tb = traceback.format_exc()
-                error = (e, tb)
-                data = None
+                error_list = [(e, tb)]
+                data_list = [None]
             finally:
-                self._errorq.put(error)
-                self._dataq.put(data)
+                for data, error in zip(data_list, error_list):
+                    self._errorq.put(error)
+                    self._dataq.put(data)
 
     def __next__(self):
         next_item = self._dataq.get()
@@ -150,7 +156,8 @@ class NodeFlowSampler(object):
             seed_nodes,
             shuffle,
             num_prefetch,
-            prefetching_wrapper_class):
+            prefetching_wrapper_class,
+            prepare=None):
         self._g = g
         if self.immutable_only and not g._graph.is_readonly():
             raise NotImplementedError("This loader only support read-only graphs.")
@@ -168,6 +175,7 @@ class NodeFlowSampler(object):
         if num_prefetch:
             self._prefetching_wrapper_class = prefetching_wrapper_class
         self._num_prefetch = num_prefetch
+        self.prepare = prepare
 
     def fetch(self, current_nodeflow_index):
         '''
@@ -192,7 +200,7 @@ class NodeFlowSampler(object):
     def __iter__(self):
         it = SamplerIter(self)
         if self._num_prefetch:
-            return self._prefetching_wrapper_class(it, self._num_prefetch)
+            return self._prefetching_wrapper_class(it, self._num_prefetch, self.prepare)
         else:
             return it
 
@@ -310,10 +318,11 @@ class NeighborSampler(NodeFlowSampler):
             shuffle=False,
             num_workers=1,
             prefetch=False,
-            add_self_loop=False):
+            add_self_loop=False,
+            prepare=None):
         super(NeighborSampler, self).__init__(
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
-                ThreadPrefetchingWrapper)
+                ThreadPrefetchingWrapper, prepare)
 
         assert g.is_readonly, "NeighborSampler doesn't support mutable graphs. " + \
                 "Please turn it into an immutable graph with DGLGraph.readonly"
