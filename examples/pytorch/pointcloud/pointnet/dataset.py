@@ -1,6 +1,7 @@
 import numpy as np
 import dgl
 from torch.utils.data import Dataset
+from scipy.sparse import csr_matrix
 
 class ModelNet(object):
     def __init__(self, path, num_points, max_num_points=2048):
@@ -23,6 +24,10 @@ class ModelNet(object):
 
     def test(self):
         return ModelNetDataset(self, 'test')
+
+def calc_dist(edges):
+    dist = ((edges.src['x'] - edges.dst['x']) ** 2).sum(1, keepdim=True)
+    return {'dist': dist}
 
 class ModelNetDataset(Dataset):
     def __init__(self, modelnet, mode):
@@ -59,7 +64,24 @@ class ModelNetDataset(Dataset):
         else:
             x = self.data[i][:self.num_points]
         y = self.label[i]
+        # complete graph
+        n_nodes = x.shape[0]
+        np_csr = np.ones((n_nodes, n_nodes)) - np.eye(n_nodes)
+        csr = csr_matrix(np_csr)
         g = dgl.DGLGraph()
-        g.add_nodes(x.shape[0])
+        # g.add_nodes(n_nodes)
+        g.from_scipy_sparse_matrix(csr)
         g.ndata['x'] = x
+        g.ndata['sampled'] = np.zeros((n_nodes, 1)).astype('long').copy()
+        '''
+        src = []
+        dst = []
+        for i in range(n_nodes - 1):
+            for j in range(i+1, n_nodes):
+                src.append(i)
+                dst.append(j)
+        g.add_edges(src, dst)
+        g.add_edges(dst, src)
+        g.apply_edges(calc_dist)
+        '''
         return g, y
