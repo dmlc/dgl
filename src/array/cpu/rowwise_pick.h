@@ -90,6 +90,9 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
     CHECK_LT(rid, mat.num_rows);
     const IdxType off = indptr[rid];
     const IdxType len = indptr[rid + 1] - off;
+    if (len == 0)
+      continue;
+
     if (len <= num_picks && !replace) {
       // nnz <= num_picks and w/o replacement, take all nnz
       for (int64_t j = 0; j < len; ++j) {

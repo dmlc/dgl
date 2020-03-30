@@ -452,6 +452,14 @@ def test_sample_neighbors_topk_outedge():
     _test_sample_neighbors_topk_outedge(False)
     _test_sample_neighbors_topk_outedge(True)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_with_0deg():
+    g = dgl.graph([], num_nodes=5)
+    dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=False)
+    dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=True)
+    dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=False)
+    dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=True)
+
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
@@ -460,3 +468,4 @@ if __name__ == '__main__':
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()
+    test_sample_neighbors_with_0deg()
