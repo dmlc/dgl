@@ -17,8 +17,11 @@ class DenseGraphConv(nn.Module):
         Input feature size.
     out_feats : int
         Output feature size.
-    norm : bool
-        If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
+    norm : str, optional
+        How to apply the normalizer. If is `'right'`, divide the aggregated messages
+        by each node's in-degrees, which is equivalent to averaging the received messages.
+        If is `'none'`, no normalization is applied. Default is `'both'`,
+        where the :math:`c_{ij}` in the paper is applied.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     activation : callable activation function/layer or None, optional
@@ -32,7 +35,7 @@ class DenseGraphConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 norm=True,
+                 norm='both',
                  bias=True,
                  activation=None):
         super(DenseGraphConv, self).__init__()
@@ -60,12 +63,14 @@ class DenseGraphConv(nn.Module):
         Parameters
         ----------
         adj : torch.Tensor
-            The adjacency matrix of the graph to apply Graph Convolution on,
-            should be of shape :math:`(N, N)`, where a row represents the destination
-            and a column represents the source.
+            The adjacency matrix of the graph to apply Graph Convolution on, when
+            applied to a unidirectional bipartite graph, ``adj`` should be of shape
+            should be of shape :math:`(N_{out}, N_{in})`; when applied to a homo
+            graph, ``adj`` should be of shape :math:`(N, N)`. In both cases,
+            a row represents a destination node while a column represents a source
+            node.
         feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+            The input feature.
 
         Returns
         -------
@@ -74,24 +79,33 @@ class DenseGraphConv(nn.Module):
             is size of output feature.
         """
         adj = adj.float().to(feat.device)
-        if self._norm:
-            in_degrees = adj.sum(dim=1)
-            norm = th.pow(in_degrees, -0.5)
-            shp = norm.shape + (1,) * (feat.dim() - 1)
-            norm = th.reshape(norm, shp).to(feat.device)
-            feat = feat * norm
+        src_degrees = adj.sum(dim=0).clamp(min=1)
+        dst_degrees = adj.sum(dim=1).clamp(min=1)
+        feat_src = feat
+
+        if self._norm == 'both':
+            norm_src = th.pow(src_degrees, -0.5)
+            shp = norm_src.shape + (1,) * (feat.dim() - 1)
+            norm_src = th.reshape(norm_src, shp).to(feat.device)
+            feat_src = feat_src * norm_src
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = th.matmul(feat, self.weight)
-            rst = adj @ feat
+            feat_src = th.matmul(feat_src, self.weight)
+            rst = adj @ feat_src
         else:
             # aggregate first then mult W
-            rst = adj @ feat
+            rst = adj @ feat_src
             rst = th.matmul(rst, self.weight)
 
-        if self._norm:
-            rst = rst * norm
+        if self._norm != 'none':
+            if self._norm == 'both':
+                norm_dst = th.pow(dst_degrees, -0.5)
+            else: # right
+                norm_dst = 1.0 / dst_degrees
+            shp = norm_dst.shape + (1,) * (feat.dim() - 1)
+            norm_dst = th.reshape(norm_dst, shp).to(feat.device)
+            rst = rst * norm_dst
 
         if self.bias is not None:
             rst = rst + self.bias
