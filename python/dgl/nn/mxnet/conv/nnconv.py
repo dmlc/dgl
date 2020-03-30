@@ -5,6 +5,7 @@ from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
+from ....utils import expand_as_pair
 
 
 class NNConv(nn.Block):
@@ -17,8 +18,13 @@ class NNConv(nn.Block):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int or pair of ints
         Input feature size.
+
+        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
     out_feats : int
         Output feature size.
     edge_func : callable activation function/layer
@@ -41,7 +47,7 @@ class NNConv(nn.Block):
                  residual=False,
                  bias=True):
         super(NNConv, self).__init__()
-        self._in_feats = in_feats
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         if aggregator_type == 'sum':
             self.reducer = fn.sum
@@ -56,9 +62,10 @@ class NNConv(nn.Block):
         with self.name_scope():
             self.edge_nn = edge_func
             if residual:
-                if in_feats != out_feats:
-                    self.res_fc = nn.Dense(out_feats, in_units=in_feats, use_bias=False,
-                                           weight_initializer=mx.init.Xavier())
+                if self._in_dst_feats != out_feats:
+                    self.res_fc = nn.Dense(
+                        out_feats, in_units=self._in_dst_feats,
+                        use_bias=False, weight_initializer=mx.init.Xavier())
                 else:
                     self.res_fc = Identity()
             else:
@@ -78,7 +85,7 @@ class NNConv(nn.Block):
         ----------
         graph : DGLGraph
             The graph.
-        feat : mxnet.NDArray
+        feat : mxnet.NDArray or pair of mxnet.NDArray
             The input feature of shape :math:`(N, D_{in})` where :math:`N`
             is the number of nodes of the graph and :math:`D_{in}` is the
             input feature size.
@@ -92,18 +99,20 @@ class NNConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         """
-        graph = graph.local_var()
-        # (n, d_in, 1)
-        graph.ndata['h'] = feat.expand_dims(-1)
-        # (n, d_in, d_out)
-        graph.edata['w'] = self.edge_nn(efeat).reshape(-1, self._in_feats, self._out_feats)
-        # (n, d_in, d_out)
-        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
-        rst = graph.ndata.pop('neigh').sum(axis=1) # (n, d_out)
-        # residual connection
-        if self.res_fc is not None:
-            rst = rst + self.res_fc(feat)
-        # bias
-        if self.bias is not None:
-            rst = rst + self.bias.data(feat.context)
-        return rst
+        with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
+
+            # (n, d_in, 1)
+            graph.srcdata['h'] = feat_src.expand_dims(-1)
+            # (n, d_in, d_out)
+            graph.edata['w'] = self.edge_nn(efeat).reshape(-1, self._in_src_feats, self._out_feats)
+            # (n, d_in, d_out)
+            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
+            rst = graph.dstdata.pop('neigh').sum(axis=1) # (n, d_out)
+            # residual connection
+            if self.res_fc is not None:
+                rst = rst + self.res_fc(feat_dst)
+            # bias
+            if self.bias is not None:
+                rst = rst + self.bias.data(feat_dst.context)
+            return rst
