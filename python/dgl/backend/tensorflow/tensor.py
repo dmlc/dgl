@@ -1,4 +1,4 @@
-
+"""Tensorflow backend implementation"""
 from __future__ import absolute_import
 
 from distutils.version import LooseVersion
@@ -6,16 +6,41 @@ from distutils.version import LooseVersion
 import tensorflow as tf
 from tensorflow.python.eager import context
 import builtins
-import tfdlpack
 import numpy as np
-from tfdlpack import to_dlpack, from_dlpack
+import os
 
 from ... import ndarray as nd
 from ... import kernel as K
 from ...function.base import TargetCode
 
-TF_VERSION = LooseVersion(tf.__version__)
+if os.getenv("USE_OFFICIAL_TFDLPACK", False):
+    if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
+        raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
 
+    def zerocopy_to_dlpack(input):
+        return tf.experimental.dlpack.to_dlpack(input)
+
+    def zerocopy_from_dlpack(dlpack_tensor):
+        # TODO(Jinjing): Tensorflow requires memory to be 64-bit aligned. We check the
+        #   alignment and make a copy if needed. The functionality is better in TF's main repo.
+        aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
+        return tf.experimental.dlpack.from_dlpack(aligned)
+else:
+    # Use our own DLPack solution
+    try:
+        import tfdlpack
+    except ImportError:
+        raise ImportError('Cannot find tfdlpack, which is required by the Tensorflow backend. '
+                          'Please follow https://github.com/VoVAllen/tf-dlpack for installation.')
+
+    if LooseVersion(tf.__version__) < LooseVersion("2.1.0"):
+        raise RuntimeError("DGL requires tensorflow>=2.1.0.")
+
+    def zerocopy_to_dlpack(input):
+        return tfdlpack.to_dlpack(input)
+
+    def zerocopy_from_dlpack(input):
+        return tfdlpack.from_dlpack(input)
 
 def data_type_dict():
     return {'float16': tf.float16,
@@ -27,10 +52,8 @@ def data_type_dict():
             'int32': tf.int32,
             'int64': tf.int64}
 
-
 def cpu():
     return "/cpu:0"
-
 
 def tensor(data, dtype=None):
     return tf.convert_to_tensor(data, dtype=dtype)
@@ -355,16 +378,7 @@ def rand_shuffle(arr):
     return tf.random.shuffle(arr)
 
 
-def zerocopy_to_dlpack(input):
-    return tfdlpack.to_dlpack(input)
-
-
-def zerocopy_from_dlpack(dlpack_tensor):
-    return tfdlpack.from_dlpack(dlpack_tensor)
-
-
 def zerocopy_to_numpy(input):
-    # NOTE: not zerocopy
     return np.asarray(memoryview(input))
 
 

@@ -14,7 +14,7 @@ from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
 if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
-    raise Exception("DGL has to work with MXNet version >= 1.5")
+    raise RuntimeError("DGL requires mxnet >= 1.5")
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
