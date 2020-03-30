@@ -116,6 +116,14 @@ a useful manual for in-depth developers.
    api/python/model_zoo
 
 .. toctree::
+   :maxdepth: 2
+   :caption: DGL Applications
+   :hidden:
+   :glob:
+
+   applications/DGL-KE
+
+.. toctree::
    :maxdepth: 1
    :caption: Developer Notes
    :hidden:
