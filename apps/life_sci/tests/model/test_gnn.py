@@ -81,7 +81,7 @@ def test_gat():
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
 
     # Test default setting
-    gnn = GAT(in_feats=1)
+    gnn = GAT(in_feats=1).to(device)
     assert gnn(g, node_feats).shape == torch.Size([3, 32])
     assert gnn(bg, batch_node_feats).shape == torch.Size([8, 32])
 
