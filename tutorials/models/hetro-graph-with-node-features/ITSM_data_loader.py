@@ -23,6 +23,8 @@ import os
 import requests
 import json
 from custom_http_client import CustomHTTPClient
+from amlnx_adapter.dgl.dgl_networkx_arango_adapter import DGL_Networkx_Arango_Adapter
+
 
 class ITSM_Dataloader:
 
@@ -39,6 +41,9 @@ class ITSM_Dataloader:
         self.sampling_frac = frac
         self.replication_factor = None
         self.cfg = None
+        self.batch_vert_dict = None
+        self.batch_edge_dict = None
+        
         if create_db:
             self.input_file = input_file
             self.delete_db()
@@ -124,6 +129,9 @@ class ITSM_Dataloader:
         with open(file_name, "w") as file_descriptor:
             cfg = yaml.dump(self.cfg, file_descriptor)
         return cfg
+    
+
+        
     def create_db(self):
 #        client = ArangoClient(hosts= 'http://localhost:8529')
 #
@@ -279,12 +287,31 @@ class ITSM_Dataloader:
         id_dict[vertex] += 1
 
 
-
+    def do_inserts(self):
+        for v in self.vertex_list:
+            batch_docs = self.batch_vert_dict[v]
+            self.db.collection(v).insert_many(batch_docs)
+            self.batch_vert_dict[v] = list()
+        edge_names = [*self.edge_dict]
+        
+        for ename in edge_names:
+            batch_edge_docs = self.batch_edge_dict[ename]
+            self.db.collection(ename).insert_many(batch_edge_docs)
+            self.batch_edge_dict[ename] = list()
+        
+        return
+        
+    def get_networkx_graph(self, load_from_db = True, graph_desc_file_loc = "graph_descriptor.yaml"):
+        dgnx = DGL_Networkx_Arango_Adapter(load_from_db = load_from_db, graph_desc_fp = graph_desc_file_loc)
+        l,g = dgnx.create_networkx_graph()
+        
+        return l, g
+    
     def load_data(self):
         t0 = time.time()
         df = pd.read_csv(self.input_file)
         df = df.sample(frac = self.sampling_frac)
-        num_rows = df.shape[0]
+        num_rows = df.shape[0] - 1
         print("A dataset with %d rows is being used for this run" % (num_rows) )
         df = df.reset_index()
 
@@ -294,13 +321,19 @@ class ITSM_Dataloader:
         edge_colls = {ename: self.emlg.edge_collection(ename) for ename in edge_names}
         row_vertex_map = {'incident': 'number', 'support_org': 'assignment_group',\
                           'customer': 'opened_by', 'vendor': 'vendor'}
+        batch_size = 500
+        self.batch_vert_dict = {v : list() for v in self.vertex_list}
+        self.batch_edge_dict = {ename: list() for ename in edge_names}
+        batch_count = 0
         for row_index, row in df.iterrows():
             try:
-                if row_index % 50 == 0:
+                if row_index % 500 == 0:
                     print("Processing row: " + str(row_index))
                 # insert the vertices
                 record_vertex_keys = dict()
+                
                 for v in self.vertex_list:
+
                     the_vertex = dict()
                     row_val = row[row_vertex_map[v]]
                     #if not row_val in node_val_ids[v]:
@@ -309,12 +342,14 @@ class ITSM_Dataloader:
                     node_val_ids[v][row_val] = the_vertex['_key']
 
                     self.load_vertex_attributes(row, the_vertex, v )
-
-                    vertex_colls[v].insert(the_vertex)
+                    self.batch_vert_dict[v].append(the_vertex)
                     record_vertex_keys[v] = node_val_ids[v][row_val]
+            
 
                 #insert the edges
+            
                 for ename in edge_names:
+
                     from_vertex = self.edge_dict[ename]['from']
                     to_vertex = self.edge_dict[ename]['to']
                     edge_key = record_vertex_keys[from_vertex] + "-" + \
@@ -322,13 +357,21 @@ class ITSM_Dataloader:
                     the_edge = {"_key" : edge_key,\
                                 "_from": from_vertex + "/" + record_vertex_keys[from_vertex],\
                                 "_to": to_vertex + "/" + record_vertex_keys[to_vertex]}
-                    edge_colls[ename].insert(the_edge)
-
-
+                    self.batch_edge_dict[ename].append(the_edge)
+                    
+                if row_index > 0 and (row_index % batch_size == 0):
+                    self.do_inserts()
+                    
+                
+                if num_rows % batch_size != 0:
+                    if row_index == num_rows:
+                        self.do_inserts()
+                    
+                    
 
             except Exception as e:
                 traceback.print_exc()
-                breakpoint()
+                
 
             #breakpoint()
 
@@ -395,81 +438,7 @@ class ITSM_Dataloader:
         return
 
 
-    def load_data_from_db(self):
-        query = 'WITH support_org, customer, vendor\
-        FOR doc in incident\
-    FOR s IN 1..1 OUTBOUND doc `incident-support_org`\
-    FOR c IN 1..1 OUTBOUND doc `incident-customer`\
-    FOR v IN 1..1 OUTBOUND doc `incident-vendor`\
-    RETURN { incident: doc, support_org: s, customer: c, vendor: v,\
-    reassigned: doc.reassigned}'
 
-        cursor = self.db.aql.execute(query)
-        sgdata = {ename : nx.DiGraph() for ename in self.edge_dict}
-        rsgdata = {ename : nx.DiGraph() for ename in self.edge_dict}
-        labels = []
-        for doc in cursor:
-            node_data = {v: dict() for v in self.vertex_list}
-            edge_data = {ename: list() for ename in self.edge_dict}
-            labels.append(doc['reassigned'])
-            for v in self.vertex_list:
-                a_vdata = doc[v]
-                a_vattrib = dict()
-                for k,val in a_vdata.items():
-                    if not k.startswith('_'):
-                        a_vattrib[k] = a_vdata[k]
-                node_info = node_data[v]
-                node_info['node_id'] = a_vdata['node_id']
-                node_info['attrib'] = a_vattrib
-            # done with vertices, set up edges now
-            for ename in self.edge_dict:
-                from_vertex = self.edge_dict[ename]['from']
-                to_vertex = self.edge_dict[ename]['to']
-                node_id_from = node_data[from_vertex]['node_id']
-                node_id_to = node_data[to_vertex]['node_id']
-
-                edge_data[ename].append((node_id_from, node_id_to))
-                # set the networkx graph for this doc
-                sg = sgdata[ename]
-                node_attr_from = node_data[from_vertex]['attrib']
-                node_attr_to = node_data[to_vertex]['attrib']
-                self.feature_data[from_vertex][node_id_from] = node_attr_from
-                self.feature_data[to_vertex][node_id_to] = node_attr_to
-                sg.add_node(node_id_from, bipartite = 0)
-                #import ipdb; ipdb.set_trace()
-                sg.add_node(node_id_to, bipartite = 1)
-                sg.nodes[node_id_to].update(node_attr_to)
-                sg.add_edge(node_id_from, node_id_to)
-                rsg = rsgdata[ename]
-                rsg.add_node(node_id_from, attr_dict = node_attr_from, bipartite = 1)
-                rsg.nodes[node_id_from].update(node_attr_from)
-                rsg.add_node(node_id_to, attr_dict = node_attr_to, bipartite = 0)
-                rsg.nodes[node_id_to].update(node_attr_to)
-                rsg.add_edge(node_id_to, node_id_from)
-         #construct the dgl hetero graph
-        dict_desc = dict()
-        for ename in self.edge_dict:
-            tokens = ename.split('-')
-            rename = tokens[1] + '-' + tokens[0]
-            fgk = ( tokens[0],  ename, tokens[1] )
-            rgk = (tokens[1], rename, tokens[0])
-            dict_desc[fgk] = sgdata[ename]
-            dict_desc[rgk] = rsgdata[ename]
-
-        g = dgl.heterograph(dict_desc)
-        print("Preparing Node feature data... ")
-        np_node_data = self.trim_node_data()
-        print("Setting node feature data...")
-
-        for v in self.vertex_list:
-            v_data = th.from_numpy(np_node_data[v].values)
-            g.nodes[v].data['f'] = v_data
-
-        print("Done setting feature data in dgl graph!")
-
-
-
-        return labels, g
 
 
 

@@ -1,10 +1,10 @@
 arangodb:
   DB_end_point: createDB
-  DB_service_host: arangoml.arangodb.cloud
+  DB_service_host: localhost
   DB_service_name: createDB
   DB_service_port: 8529
   arangodb_replication_factor: null
-  conn_protocol: https
-  dbName: MLk0sjyrxg83oi07yaibwfe
-  password: MLhhwpq4fbjo41906ef12xzk
-  username: MLrf2bzx1funbejaaie5baud
+  conn_protocol: http
+  dbName: MLbxzq0yqdandnip3ie6j3fr
+  password: MLpj3slfsjspss8scekyuq9
+  username: ML2qtoerkij6c6ld3yfhg0i

@@ -1,0 +1,36 @@
+arango_graph:
+  graph_name: 'ITSMg'
+edge_sep: '-'
+#data_dir: /home/admin2/networkx-connector/amlnx_adapter/amlnx_adapter/data
+edge_data:
+  incident-support_org: incident_support_org.json
+  incident-customer: incident_customer.json
+  incident-vendor: incident_vendor.json
+vertex_data:
+  incident: incident.json  
+  support_org: support_org.json
+  customer: customer.json
+  vendor: vendor.json
+exclude_attributes:
+  all: ['bipartite', '_key', '_rev', 'node_id', '_id']
+  incident: ['reassigned']
+arangodb:
+  DB_end_point: createDB
+  DB_service_host: arangoml.arangodb.cloud
+  DB_service_name: createDB
+  DB_service_port: 8529
+  arangodb_replication_factor: null
+  conn_protocol: https
+  dbName: MLk0sjyrxg83oi07yaibwfe
+  password: MLhhwpq4fbjo41906ef12xzk
+  username: MLrf2bzx1funbejaaie5baud
+queries:
+  load_data: >
+    WITH support_org, customer, vendor
+    FOR doc in incident
+    FOR s IN 1..1 OUTBOUND doc `incident-support_org`
+    FOR c IN 1..1 OUTBOUND doc `incident-customer`
+    FOR v IN 1..1 OUTBOUND doc `incident-vendor`
+    RETURN { incident: doc, support_org: s, customer: c, vendor: v, reassigned: doc.reassigned } 
+  
+ 
