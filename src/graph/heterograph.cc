@@ -187,14 +187,12 @@ HeteroGraph::HeteroGraph(
 }
 
 bool HeteroGraph::IsMultigraph() const {
-  return const_cast<HeteroGraph*>(this)->is_multigraph_.Get([this] () {
-      for (const auto &hg : relation_graphs_) {
-        if (hg->IsMultigraph()) {
-          return true;
-        }
-      }
-      return false;
-    });
+  for (const auto &hg : relation_graphs_) {
+    if (hg->IsMultigraph()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 BoolArray HeteroGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
@@ -356,6 +354,14 @@ void HeteroGraph::Save(dmlc::Stream* fs) const {
   fs->Write(meta_graph_ptr);
   fs->Write(relation_graphs_);
   fs->Write(num_verts_per_type_);
+}
+
+GraphPtr HeteroGraph::AsImmutableGraph() const {
+  CHECK(NumVertexTypes() == 1) << "graph has more than one node types";
+  CHECK(NumEdgeTypes() == 1) << "graph has more than one edge types";
+  auto unit_graph = CHECK_NOTNULL(
+      std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(0)));
+  return unit_graph->AsImmutableGraph();
 }
 
 }  // namespace dgl
