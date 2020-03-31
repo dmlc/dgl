@@ -25,7 +25,6 @@ import json
 from custom_http_client import CustomHTTPClient
 from amlnx_adapter.dgl.dgl_networkx_arango_adapter import DGL_Networkx_Arango_Adapter
 
-
 class ITSM_Dataloader:
 
     def __init__(self, input_file = "pp_recoded_incident_event_log.csv",\
