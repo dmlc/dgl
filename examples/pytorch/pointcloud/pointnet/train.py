@@ -21,7 +21,7 @@ parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=250)
-parser.add_argument('--num-workers', type=int, default=0)
+parser.add_argument('--num-workers', type=int, default=4)
 parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
@@ -60,10 +60,12 @@ def train(net, opt, scheduler, train_loader, dev):
             num_examples = label.shape[0]
             label = label.to(dev).squeeze().long()
             g.ndata['x'] = g.ndata['x'].to(dev)
+            '''
             tmp = FarthestPointSampler(512)
             res = tmp(g)
             tmp2 = EpsBallPoints(0.2, 64)
             res = tmp2(g)
+            '''
             opt.zero_grad()
             logits = net(g)
             loss = compute_loss(logits, label)
@@ -104,46 +106,37 @@ def evaluate(net, test_loader, dev):
                 count += num_examples
 
                 tq.set_postfix({
-                    'Acc': '%.5f' % (correct / num_examples),
                     'AvgAcc': '%.5f' % (total_correct / count)})
 
     return total_correct / count
 
 
-# dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dev = 'cpu'
+dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# net = EdgeConvModel(1, [64, 64, 128, 256], [512, 512, 256], 40)
 net = PointNet(40)
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-# opt = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
 opt = optim.Adam(net.parameters(), lr=0.001, weight_decay=1e-4)
 
-# scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, args.num_epochs, eta_min=0.001)
 scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.7)
 
 modelnet = ModelNet(local_path, 1024)
 
 train_loader = CustomDataLoader(modelnet.train())
-valid_loader = CustomDataLoader(modelnet.valid())
 test_loader = CustomDataLoader(modelnet.test())
 
-best_valid_acc = 0
 best_test_acc = 0
 
 for epoch in range(args.num_epochs):
     train(net, opt, scheduler, train_loader, dev)
     if (epoch + 1) % 5 == 0:
-        print('Epoch #%d Validating' % epoch)
-        valid_acc = evaluate(net, valid_loader, dev)
+        print('Epoch #%d Testing' % epoch)
         test_acc = evaluate(net, test_loader, dev)
-        if valid_acc > best_valid_acc:
-            best_valid_acc = valid_acc
+        if test_acc > best_test_acc:
             best_test_acc = test_acc
             if args.save_model_path:
                 torch.save(net.state_dict(), args.save_model_path)
-        print('Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)' % (
-            valid_acc, best_valid_acc, test_acc, best_test_acc))
+        print('Current test acc: %.5f (best: %.5f)' % (
+               test_acc, best_test_acc))

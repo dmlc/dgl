@@ -12,7 +12,8 @@ class ModelNet(object):
         self.num_points = num_points
 
         self.n_train = self.f['train/data'].shape[0]
-        self.n_valid = int(self.n_train / 5)
+        # self.n_valid = int(self.n_train / 5)
+        self.n_valid = 0
         self.n_train -= self.n_valid
         self.n_test = self.f['test/data'].shape[0]
 
@@ -66,14 +67,14 @@ class ModelNetDataset(Dataset):
         y = self.label[i]
         # complete graph
         n_nodes = x.shape[0]
-        np_csr = np.ones((n_nodes, n_nodes)) - np.eye(n_nodes)
-        csr = csr_matrix(np_csr)
+        # np_csr = np.ones((n_nodes, n_nodes)) - np.eye(n_nodes)
+        # csr = csr_matrix(np_csr)
         g = dgl.DGLGraph()
-        # g.add_nodes(n_nodes)
-        g.from_scipy_sparse_matrix(csr)
+        g.add_nodes(n_nodes)
+        # g.from_scipy_sparse_matrix(csr)
         g.ndata['x'] = x
-        g.ndata['sampled'] = np.zeros((n_nodes, 1)).astype('long').copy()
         '''
+        g.ndata['sampled'] = np.zeros((n_nodes, 1)).astype('long').copy()
         src = []
         dst = []
         for i in range(n_nodes - 1):
