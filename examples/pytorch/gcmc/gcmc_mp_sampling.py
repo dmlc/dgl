@@ -47,7 +47,7 @@ class GCMCSampler:
         dataset = self.dataset
         enc_graph = self.enc_graph
         dec_graph = self.dec_graph
-        edge_ids = seeds
+        edge_ids = th.stack(seeds)
         # generate frontiners for user and item
         possible_rating_values = dataset.possible_rating_values
         true_relation_ratings = self.truths[edge_ids]
@@ -241,7 +241,7 @@ def config():
     parser.add_argument('--train_decay_patience', type=int, default=5)
     parser.add_argument('--share_param', default=False, action='store_true')
     parser.add_argument('--mix_cpu_gpu', default=False, action='store_true')
-    parser.add_argument('--minibatch_size', type=int, default=10000)
+    parser.add_argument('--minibatch_size', type=int, default=20000)
     parser.add_argument('--num_workers_per_gpu', type=int, default=8)
 
     args = parser.parse_args()
@@ -414,7 +414,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
 
         print(logging_str)
     if proc_id == 0:
-        print('Best Iter Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
+        print('Best epoch Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
               best_epoch, best_valid_rmse, best_test_rmse))
 
 if __name__ == '__main__':

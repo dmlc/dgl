@@ -83,7 +83,7 @@ class GCMCGraphConv(nn.Module):
         if weight is not None:
             feat = dot_or_identity(feat, weight, self.device)
 
-        feat = feat * dropout(cj)
+        feat = feat * cj
         graph.srcdata['h'] = feat
         graph.update_all(fn.copy_src(src='h', out='m'),
                          fn.sum(msg='m', out='h'))
@@ -200,7 +200,7 @@ class HeteroGCMCLayer(nn.Module):
         self.device = device
         self.reset_parameters()
 
-    def partial_to(self):
+    def partial_to(self, device):
         """Put parameters into device except W_r
         
         Parameters
@@ -208,7 +208,7 @@ class HeteroGCMCLayer(nn.Module):
         device : torch device
             Which device the parameters are put in.
         """
-        device = self.device
+        assert device == self.device
         if device is not None:
             self.ufc.cuda(device)
             if self.share_user_item_param is False:
