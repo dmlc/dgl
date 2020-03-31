@@ -1,4 +1,5 @@
 """Readout for AttentiveFP"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl
 import torch
 import torch.nn as nn
@@ -6,6 +7,7 @@ import torch.nn.functional as F
 
 __all__ = ['AttentiveFPReadout']
 
+# pylint: disable=W0221
 class GlobalPool(nn.Module):
     """One-step readout in AttentiveFP
 

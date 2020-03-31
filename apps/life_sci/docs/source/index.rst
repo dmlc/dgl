@@ -1,4 +1,4 @@
-DGL-Life: A GNN Package for Chemistry and Molecular Applications
+DGL-LifeSci: A GNN Package for Chemistry and Molecular Applications
 ===========================================================================================
 
 Blahlah ...
