@@ -216,38 +216,7 @@ class ITSM_Dataloader:
                 self.emlg.create_vertex_collection(v)
         return
 
-    def trim_node_data(self):
-        np_node_data = {v : pd.DataFrame() for v in self.vertex_list}
-        t0 = time.time()
-        print("Creating Pandas data frames...")
-        for vertex in self.vertex_list:
 
-            for row, (node_id, node_data) in enumerate(self.feature_data[vertex].items()):
-                np_node_data[vertex] = np_node_data[vertex].append(node_data,\
-                            ignore_index = True)
-
-
-            print("Removing columns that are not needed...")
-            cols = np_node_data[vertex].columns.tolist()
-            if vertex == 'incident':
-                cols.remove('reassigned')
-                cols.remove('node_id')
-            else:
-                cols.remove('node_id')
-            np_node_data[vertex] = np_node_data[vertex][cols]
-            print("Converting to integer properties...")
-            np_node_data[vertex] = np_node_data[vertex].astype(int)
-            print("Done!")
-
-
-        t1 = time.time()
-        et = (t1 -t0)/60
-        et = round(et,2)
-
-        print ("Execution took :" + str(et) + " minutes!")
-
-
-        return np_node_data
 
     def id_sequence(self, vertex):
         id_dict = {v: 0 for v in self.vertex_list}

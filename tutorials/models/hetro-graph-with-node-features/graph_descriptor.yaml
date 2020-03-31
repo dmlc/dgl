@@ -1,7 +1,7 @@
 arango_graph:
   graph_name: 'ITSMg'
 edge_sep: '-'
-#data_dir: /home/admin2/networkx-connector/amlnx_adapter/amlnx_adapter/data
+data_dir: /home/admin2/networkx-connector/amlnx_adapter/amlnx_adapter/data
 edge_data:
   incident-support_org: incident_support_org.json
   incident-customer: incident_customer.json
