@@ -152,7 +152,7 @@ DGL should work on
 
 DGL requires Python 3.5 or later.
 
-Right now, DGL works on [PyTorch](https://pytorch.org) 1.1.0+, [MXNet](https://mxnet.apache.org) nightly build, and [TensorFlow](https://tensorflow.org) 2.0+.
+Right now, DGL works on [PyTorch](https://pytorch.org) 1.2.0+, [MXNet](https://mxnet.apache.org) 1.5.1+, and [TensorFlow](https://tensorflow.org) 2.1.0+.
 
 
 ### Using anaconda

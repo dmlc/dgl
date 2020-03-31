@@ -202,8 +202,8 @@ def create_large_graph_index(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
-    # It's possible that we generate a multigraph.
-    return from_scipy_sparse_matrix(spm, True, True)
+
+    return from_scipy_sparse_matrix(spm, True)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -428,13 +428,14 @@ def test_to_simple():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 def test_to_block():
-    def check(g, bg, ntype, etype, dst_nodes):
+    def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
         if dst_nodes is not None:
             assert F.array_equal(bg.dstnodes[ntype].data[dgl.NID], dst_nodes)
         n_dst_nodes = bg.number_of_nodes('DST/' + ntype)
-        assert F.array_equal(
-            bg.srcnodes[ntype].data[dgl.NID][:n_dst_nodes],
-            bg.dstnodes[ntype].data[dgl.NID])
+        if include_dst_in_src:
+            assert F.array_equal(
+                bg.srcnodes[ntype].data[dgl.NID][:n_dst_nodes],
+                bg.dstnodes[ntype].data[dgl.NID])
 
         g = g[etype]
         bg = bg[etype]
@@ -452,13 +453,13 @@ def test_to_block():
         assert F.array_equal(induced_src_bg, induced_src_ans)
         assert F.array_equal(induced_dst_bg, induced_dst_ans)
 
-    def checkall(g, bg, dst_nodes):
+    def checkall(g, bg, dst_nodes, include_dst_in_src=True):
         for etype in g.etypes:
             ntype = g.to_canonical_etype(etype)[2]
             if dst_nodes is not None and ntype in dst_nodes:
-                check(g, bg, ntype, etype, dst_nodes[ntype])
+                check(g, bg, ntype, etype, dst_nodes[ntype], include_dst_in_src)
             else:
-                check(g, bg, ntype, etype, None)
+                check(g, bg, ntype, etype, None, include_dst_in_src)
 
     g = dgl.heterograph({
         ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
@@ -468,6 +469,13 @@ def test_to_block():
 
     bg = dgl.to_block(g_a)
     check(g_a, bg, 'A', 'AA', None)
+    assert bg.number_of_src_nodes() == 5
+    assert bg.number_of_dst_nodes() == 4
+
+    bg = dgl.to_block(g_a, include_dst_in_src=False)
+    check(g_a, bg, 'A', 'AA', None, False)
+    assert bg.number_of_src_nodes() == 4
+    assert bg.number_of_dst_nodes() == 4
 
     dst_nodes = F.tensor([3, 4], dtype=F.int64)
     bg = dgl.to_block(g_a, dst_nodes)
@@ -551,6 +559,32 @@ def test_remove_edges():
     check(g4, 'AA', g, [])
     check(g4, 'AB', g, [3, 1, 2, 0])
     check(g4, 'BA', g, [])
+
+def test_cast():
+    m = spsp.coo_matrix(([1, 1], ([0, 1], [1, 2])), (4, 4))
+    g = dgl.DGLGraph(m, readonly=True)
+    gsrc, gdst = g.edges(order='eid')
+    ndata = F.randn((4, 5))
+    edata = F.randn((2, 4))
+    g.ndata['x'] = ndata
+    g.edata['y'] = edata
+
+    hg = dgl.as_heterograph(g, 'A', 'AA')
+    assert hg.ntypes == ['A']
+    assert hg.etypes == ['AA']
+    assert hg.canonical_etypes == [('A', 'AA', 'A')]
+    assert hg.number_of_nodes() == 4
+    assert hg.number_of_edges() == 2
+    hgsrc, hgdst = hg.edges(order='eid')
+    assert F.array_equal(gsrc, hgsrc)
+    assert F.array_equal(gdst, hgdst)
+
+    g2 = dgl.as_immutable_graph(hg)
+    assert g2.number_of_nodes() == 4
+    assert g2.number_of_edges() == 2
+    g2src, g2dst = hg.edges(order='eid')
+    assert F.array_equal(g2src, gsrc)
+    assert F.array_equal(g2dst, gdst)
 
 if __name__ == '__main__':
     test_line_graph()

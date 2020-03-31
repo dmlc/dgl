@@ -3,14 +3,21 @@
 Working with different backends
 ===============================
 
-DGL supports PyTorch, MXNet and Tensorflow backends. To change them, set the ``DGLBACKEND``
-environcment variable. The default backend is PyTorch.
+DGL supports PyTorch, MXNet and Tensorflow backends. 
+DGL will choose the backend on the following options (high priority to low priority)
+- `DGLBACKEND` environment
+   - You can use `DGLBACKEND=[BACKEND] python gcn.py ...` to specify the backend
+   - Or `export DGLBACKEND=[BACKEND]` to set the global environment variable 
+- `config.json` file under "~/.dgl"
+   - You can use `python -m dgl.backend.set_default_backend [BACKEND]` to set the default backend
+
+Currently BACKEND can be chosen from mxnet, pytorch, tensorflow.
 
 PyTorch backend
 ---------------
 
 Export ``DGLBACKEND`` as ``pytorch`` to specify PyTorch backend. The required PyTorch
-version is 0.4.1 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
+version is 1.1.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
 
 MXNet backend
 -------------
@@ -32,18 +39,10 @@ Tensorflow backend
 ------------------
 
 Export ``DGLBACKEND`` as ``tensorflow`` to specify Tensorflow backend. The required Tensorflow
-version is 2.0 or later. See `tensorflow.org <https://www.tensorflow.org/install>`_ for installation
-instructions. In addition, Tensorflow backend requires ``tfdlpack`` package installed as follows and set ``TF_FORCE_GPU_ALLOW_GROWTH`` to ``true`` to prevent Tensorflow take over the whole GPU memory:
+version is 2.2.0 or later. See `tensorflow.org <https://www.tensorflow.org/install>`_ for installation
+instructions. In addition, DGL will set ``TF_FORCE_GPU_ALLOW_GROWTH`` to ``true`` to prevent Tensorflow take over the whole GPU memory:
 
 .. code:: bash
 
-   pip install tfdlpack  # when using tensorflow cpu version
-
-
-or
-
-.. code:: bash
-
-   pip install tfdlpack-gpu  # when using tensorflow gpu version
-   export TF_FORCE_GPU_ALLOW_GROWTH=true # and add this to your .bashrc/.zshrc file if needed
+   pip install "tensorflow>=2.2.0rc1"  # when using tensorflow cpu version
 

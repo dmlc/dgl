@@ -390,7 +390,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         meta_edges_src.append(ntype_dict[stype])
         meta_edges_dst.append(ntype_dict[dtype])
         etypes.append(etype)
-    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True, True)
+    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
 
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
