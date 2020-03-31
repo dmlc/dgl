@@ -10,14 +10,8 @@ import pandas as pd
 from arango import ArangoClient
 import time
 import traceback
-#import simplejson
 import uuid
-import networkx as nx
-import dgl
-#import numpy as np
 from collections import OrderedDict
-
-import torch as th
 import yaml
 import os
 import requests
@@ -132,31 +126,7 @@ class ITSM_Dataloader:
 
         
     def create_db(self):
-#        client = ArangoClient(hosts= 'http://localhost:8529')
-#
-#        # Connect to "_system" database as root user.
-#        # This returns an API wrapper for "_system" database.
-#        sys_db = client.db('_system',\
-#                       username='root',
-#                       password='open sesame')
-#
-#        # Create a new arangopipe database if it does not exist.
-#        if not sys_db.has_database('ITSM_db'):
-#            sys_db.create_database('ITSM_db')
-#
-#        if not sys_db.has_user('ITSM_db_admin'):
-#            sys_db.create_user(username = 'ITSM_db_admin',\
-#                               password = 'open sesame')
-#
-#        sys_db.update_permission(username = 'ITSM_db_admin',\
-#                                 database = 'ITSM_db', permission = "rw")
-#
-#        # Connect to arangopipe database as administrative user.
-#         #This returns an API wrapper for "test" database.
-#        db = client.db('ITSM_db',\
-#                       username='ITSM_db_admin',\
-#                       password='open sesame')
-#        self.db = db
+
         
         self.cfg = self.get_conn_config()
         db_conn_protocol = self.cfg['arangodb']['conn_protocol']
