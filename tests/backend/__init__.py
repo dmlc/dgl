@@ -6,8 +6,7 @@ import importlib
 import sys
 import numpy as np
 
-mod_name = os.environ.get('DGLBACKEND', 'pytorch').lower()
-mod = importlib.import_module('.%s' % mod_name, __name__)
+mod = importlib.import_module('.%s' % backend_name, __name__)
 thismod = sys.modules[__name__]
 
 for api in backend_unittest.__dict__.keys():
@@ -16,7 +15,6 @@ for api in backend_unittest.__dict__.keys():
     elif callable(mod.__dict__[api]):
         # Tensor APIs used in unit tests MUST be supported across all backends
         globals()[api] = mod.__dict__[api]
-
 
 # Tensor creation with default dtype and context
 

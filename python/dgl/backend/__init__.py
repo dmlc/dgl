@@ -1,11 +1,15 @@
 from __future__ import absolute_import
 
-import sys, os
+import sys
+import os
+import json
 import importlib
 
 from . import backend
+from .set_default_backend import set_default_backend
 
 _enabled_apis = set()
+
 
 def _gen_missing_api(api, mod_name):
     def _missing_api(*args, **kwargs):
@@ -13,6 +17,7 @@ def _gen_missing_api(api, mod_name):
                           ' You can switch to other backends by setting'
                           ' the DGLBACKEND environment.' % (api, mod_name))
     return _missing_api
+
 
 def load_backend(mod_name):
     mod = importlib.import_module('.%s' % mod_name, __name__)
@@ -45,7 +50,29 @@ def load_backend(mod_name):
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
 
-load_backend(os.environ.get('DGLBACKEND', 'pytorch').lower())
+
+def get_preferred_backend():
+    config_path = os.path.join(os.path.expanduser('~'), '.dgl', 'config.json')
+    backend_name = None
+    if "DGLBACKEND" in os.environ:
+        backend_name = os.getenv('DGLBACKEND')
+    elif os.path.exists(config_path):
+        with open(config_path, "r") as config_file:
+            config_dict = json.load(config_file)
+            backend_name = config_dict.get('backend', '').lower()
+
+    if (backend_name in ['tensorflow', 'mxnet', 'pytorch']):
+        return backend_name 
+    else:
+        while not(backend_name in ['tensorflow', 'mxnet', 'pytorch']):
+            print("DGL does not detect a valid backend option. Which backend would you like to work with?")
+            backend_name = input("Backend choice (pytorch, mxnet or tensorflow): ").lower()
+        set_default_backend(backend_name)
+        return backend_name
+
+
+load_backend(get_preferred_backend())
+
 
 def is_enabled(api):
     """Return true if the api is enabled by the current backend.
