@@ -3,6 +3,7 @@
 from torch import nn
 
 from .... import function as fn
+from ....utils import expand_as_pair
 
 
 class EdgeConv(nn.Module):
@@ -53,16 +54,22 @@ class EdgeConv(nn.Module):
         ----------
         g : DGLGraph
             The graph.
-        h : Tensor
+        h : Tensor or pair of tensors
             :math:`(N, D)` where :math:`N` is the number of nodes and
             :math:`D` is the number of feature dimensions.
+
+            If a pair of tensors is given, the graph must be a uni-bipartite graph
+            with only one edge type, and the two tensors must have the same
+            dimensionality on all except the first axis.
         Returns
         -------
         torch.Tensor
             New node features.
         """
         with g.local_scope():
-            g.ndata['x'] = h
+            h_src, h_dst = expand_as_pair(h)
+            g.srcdata['x'] = h_src
+            g.dstdata['x'] = h_dst
             if not self.batch_norm:
                 g.update_all(self.message, fn.max('e', 'x'))
             else:
@@ -88,4 +95,4 @@ class EdgeConv(nn.Module):
                 #     images.
                 g.edata['e'] = self.bn(g.edata['e'])
                 g.update_all(fn.copy_e('e', 'e'), fn.max('e', 'x'))
-            return g.ndata['x']
+            return g.dstdata['x']

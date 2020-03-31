@@ -73,6 +73,7 @@ class TAGConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+        assert graph.is_homograph(), 'Graph is not homogeneous'
         graph = graph.local_var()
 
         norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)

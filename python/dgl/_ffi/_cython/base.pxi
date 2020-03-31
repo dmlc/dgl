@@ -112,7 +112,8 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
     int DGLArrayFromDLPack(DLManagedTensor* arr_from,
                            DLTensorHandle* out)
     int DGLArrayToDLPack(DLTensorHandle arr_from,
-                         DLManagedTensor** out)
+                         DLManagedTensor** out,
+                         int alignment)
     void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
 cdef extern from "dgl/runtime/c_object_api.h":
