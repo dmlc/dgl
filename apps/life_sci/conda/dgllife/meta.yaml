@@ -26,5 +26,5 @@ test:
 
 about:
   home: https://github.com/dmlc/dgl/tree/master/apps/dgllife
-  license_file:
-  license:
+  license_file: {{ environ.get('SRC_DIR') }}/LICENSE
+  license: Apache
