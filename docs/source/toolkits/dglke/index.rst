@@ -28,3 +28,7 @@ DGL-KE supports multiple training modes:
 * Multi-GPU GPU training
 * Distributed training
 
+.. toctree::
+   :hidden:
+
+   /get_started

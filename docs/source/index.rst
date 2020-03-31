@@ -117,11 +117,11 @@ a useful manual for in-depth developers.
 
 .. toctree::
    :maxdepth: 2
-   :caption: DGL Applications
+   :caption: DGL Toolkits
    :hidden:
    :glob:
 
-   applications/DGL-KE
+   toolkits/dglke/index
 
 .. toctree::
    :maxdepth: 1

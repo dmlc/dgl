@@ -2,7 +2,10 @@
 Distributed KGE training in EC2
 ===============================
 
-In this tutorial, we will introduce how to perform DGL-KE distributed training on AWS EC2. We will demonstrate that how to setup two EC2 instances to train our knowledge graph embeddings on **\ *FB15k*\ ** dataset jointly. Note that, the FB15k is just a small dataset as our toy demo. You can try much bigger dataset like **\ *Freebase*\ ** using the similar instructions.
+In this tutorial, we will introduce how to perform DGL-KE distributed training on AWS EC2
+and demonstrate how to setup two EC2 instances to train our knowledge graph embeddings on **\ *FB15k*\ **.
+Note that, the FB15k is just a small dataset as our toy demo. You can try much bigger datasets
+such as **\ *Freebase*\ ** using the similar instructions.
 
 **Prepare your machines**
 [Image: image.png]
