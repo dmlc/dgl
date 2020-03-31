@@ -4,13 +4,49 @@
 
 Deep learning on graphs has been an arising trend in the past few years. There are a lot of graphs in 
 life science such as molecular graphs and biological networks, making it an import area for applying 
-deep learning on graphs. `dgllife` is a DGL-based package for various applications in life science 
+deep learning on graphs. DGL-LifeSci is a DGL-based package for various applications in life science 
 with graph neural networks. 
 
 We provide various functionalities, including but not limited to methods for graph construction, 
 featurization, and evaluation, model architectures, training scripts and pre-trained models.
 
 **For a full list of work implemented in DGL-LifeSci, see [here](examples/README.md).**
+
+## Example Usage
+
+To apply graph neural networks to molecules with DGL, we need to first construct `DGLGraph` -- 
+the graph data structure in DGL and prepare initial node/edge features. Below gives an example of 
+constructing a bi-directed graph from a molecule and featurizing it with atom and bond features such 
+as atom type and bond type.
+
+```python
+from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer, CanonicalBondFeaturizer
+
+# Node featurizer
+node_featurizer = CanonicalAtomFeaturizer(atom_data_field='h')
+# Edge featurizer
+edge_featurizer = CanonicalBondFeaturizer(bond_data_field='h')
+# SMILES (a string representation for molecule) for Penicillin
+smiles = 'CC1(C(N2C(S1)C(C2=O)NC(=O)CC3=CC=CC=C3)C(=O)O)C'
+g = smiles_to_bigraph(smiles=smiles, 
+                      node_featurizer=node_featurizer,
+                      edge_featurizer=edge_featurizer)
+print(g)
+"""
+DGLGraph(num_nodes=23, num_edges=50,
+         ndata_schemes={'h': Scheme(shape=(74,), dtype=torch.float32)}
+         edata_schemes={'h': Scheme(shape=(12,), dtype=torch.float32)})
+"""
+```
+
+We implement various models that users can import directly. Below gives an example of defining a GCN-based model  
+for molecular property prediction.
+
+```python
+from dgllife.model import GCNPredictor
+
+model = GCNPredictor(in_feats=1)
+```
 
 ## Dependencies
 
@@ -30,53 +66,6 @@ To install the package,
 cd python
 python setup.py install
 ```
-
-## Organization
-
-```
-dgllife
-    data
-        csv_dataset.py
-        ...
-    model
-        gnn
-        model_zoo
-        readout
-        pretrain.py
-    utils
-        complex_to_graph.py
-        early_stop.py
-        eval.py
-        featurizers.py
-        mol_to_graph.py
-        rdkit_utils.py
-        splitters.py
-```
-
-### `data`
-
-The directory consists of interfaces for working with several datasets. Additionally, one can adapt any 
-`.csv` dataset to dgl with `MoleculeCSVDataset` in `csv_dataset.py`.
-
-### `model`
-
-- `gnn` implements several graph neural networks for message passing and updating node representations.
-- `readout` implements several methods for computing graph representations out of node representations. 
-In the context of molecules, they may be viewed as learned fingerprints.
-- `model_zoo` implements several models for property prediction, generative models and protein-ligand 
-binding affinity prediction. Many of them are based on modules in `gnn` and `readout`.
-- `pretrain.py` contains APIs for loading pre-trained models.
-
-### `utils`
-
-- `complex_to_graph.py` contains utils for graph construction and featurization of protein-ligand complexes.
-- `early_stop.py` contains utils for early stopping.
-- `eval.py` contains utils for evaluating models on property prediction.
-- `featurizers.py` contains utils for featurizing molecular graphs.
-- `mol_to_graph.py` contains several ways for graph construction of molecules.
-- `rdkit_utils.py` contains utils for RDKit, in particular loading RDKit molecule instances from different 
-formats, including `mol2`, `sdf`, `pdbqt`, and `pdb`.
-- `splitters.py` contains several ways for splitting the dataset.
 
 ## Example Usage
 

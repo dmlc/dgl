@@ -90,7 +90,7 @@ class AttentiveFPReadout(nn.Module):
         super(AttentiveFPReadout, self).__init__()
 
         self.readouts = nn.ModuleList()
-        for t in range(num_timesteps):
+        for _ in range(num_timesteps):
             self.readouts.append(GlobalPool(feat_size, dropout))
 
     def forward(self, g, node_feats, get_node_weight=False):

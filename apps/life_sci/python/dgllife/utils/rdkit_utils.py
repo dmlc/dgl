@@ -8,11 +8,6 @@ from multiprocessing import Pool
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
 __all__ = ['get_mol_3d_coordinates',
            'load_molecule',
            'multiprocess_load_molecules']

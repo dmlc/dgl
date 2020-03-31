@@ -1,8 +1,9 @@
 """Convert molecules into DGLGraphs."""
+# pylint: disable= no-member, arguments-differ, invalid-name
+from functools import partial
 import torch
 
 from dgl import DGLGraph
-from functools import partial
 from rdkit import Chem
 from rdkit.Chem import rdmolfiles, rdmolops
 from sklearn.neighbors import NearestNeighbors
@@ -16,6 +17,7 @@ __all__ = ['mol_to_graph',
            'mol_to_nearest_neighbor_graph',
            'smiles_to_nearest_neighbor_graph']
 
+# pylint: disable=I1101
 def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer, canonical_atom_order):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.
 
@@ -225,7 +227,8 @@ def mol_to_complete_graph(mol, add_self_loop=False,
     g : DGLGraph
         Complete DGLGraph for the molecule
     """
-    return mol_to_graph(mol, partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
+    return mol_to_graph(mol,
+                        partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
                         node_featurizer, edge_featurizer, canonical_atom_order)
 
 def smiles_to_complete_graph(smiles, add_self_loop=False,
@@ -321,6 +324,7 @@ def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors=None,
 
     return srcs, dsts, dists
 
+# pylint: disable=E1102
 def mol_to_nearest_neighbor_graph(mol,
                                   coordinates,
                                   neighbor_cutoff,
