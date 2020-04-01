@@ -1,4 +1,5 @@
 """Convert complexes into DGLHeteroGraphs"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl.backend as F
 import numpy as np
 
@@ -50,6 +51,7 @@ def get_atomic_numbers(mol, indices):
         atomic_numbers.append(atom.GetAtomicNum())
     return atomic_numbers
 
+# pylint: disable=C0326
 def ACNN_graph_construction_and_featurization(ligand_mol,
                                               protein_mol,
                                               ligand_coordinates,
@@ -216,7 +218,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     protein_atomic_numbers = np.concatenate([
         protein_atomic_numbers, np.zeros(num_protein_atoms - len(protein_atom_indices_left))])
 
-    g.nodes['ligand_atom'].data['atomic_number'] =  F.reshape(F.zerocopy_from_numpy(
+    g.nodes['ligand_atom'].data['atomic_number'] = F.reshape(F.zerocopy_from_numpy(
         ligand_atomic_numbers.astype(np.float32)), (-1, 1))
     g.nodes['protein_atom'].data['atomic_number'] = F.reshape(F.zerocopy_from_numpy(
         protein_atomic_numbers.astype(np.float32)), (-1, 1))

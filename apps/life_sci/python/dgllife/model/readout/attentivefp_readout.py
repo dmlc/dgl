@@ -1,4 +1,5 @@
 """Readout for AttentiveFP"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl
 import torch
 import torch.nn as nn
@@ -6,6 +7,7 @@ import torch.nn.functional as F
 
 __all__ = ['AttentiveFPReadout']
 
+# pylint: disable=W0221
 class GlobalPool(nn.Module):
     """One-step readout in AttentiveFP
 
@@ -88,7 +90,7 @@ class AttentiveFPReadout(nn.Module):
         super(AttentiveFPReadout, self).__init__()
 
         self.readouts = nn.ModuleList()
-        for t in range(num_timesteps):
+        for _ in range(num_timesteps):
             self.readouts.append(GlobalPool(feat_size, dropout))
 
     def forward(self, g, node_feats, get_node_weight=False):

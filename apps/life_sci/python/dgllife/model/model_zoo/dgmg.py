@@ -1,4 +1,4 @@
-# pylint: disable=C0103, W0622, R1710, W0104
+# pylint: disable=C0103, W0622, R1710, W0104, E1101, W0221, C0411
 """
 Learning Deep Generative Models of Graphs
 https://arxiv.org/pdf/1803.03324.pdf
