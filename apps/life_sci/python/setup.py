@@ -31,16 +31,17 @@ setup(
         'life-science',
         'drug-discovery'
     ],
-    zip_safe=False,
     maintainer='DGL Team',
     packages=[package for package in find_packages()
               if package.startswith('dgllife')],
     install_requires=[
-        'torch>=1.1'
         'scikit-learn>=0.22.2',
-        'pandas>=0.24.2',
+        'pandas',
         'requests>=2.22.0',
-        'tqdm'
+        'tqdm',
+        'numpy>=1.14.0',
+        'scipy>=1.1.0',
+        'networkx>=2.1',
     ],
     url='https://github.com/dmlc/dgl/tree/master/apps/life_sci',
     classifiers=[
