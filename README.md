@@ -131,7 +131,7 @@ Overall there are 30+ models implemented by using DGL:
 
 ### DGL for domain applications
 - [DGL-LifeSci](https://github.com/dmlc/dgl/tree/master/apps/life_sci), previously DGL-Chem
-- [DGL-KE](https://github.com/dmlc/dgl/tree/master/apps/kg)
+- [DGL-KE](https://github.com/awslabs/dgl-ke)
 - DGL-RecSys(coming soon)
 
 ### DGL for NLP/CV problems
