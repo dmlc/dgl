@@ -48,34 +48,19 @@ from dgllife.model import GCNPredictor
 model = GCNPredictor(in_feats=1)
 ```
 
-## Dependencies
-
-For the time being, we only support PyTorch.
-
-Depending on the features you want to use, you may need to manually install the following dependencies:
-
-- RDKit 2018.09.3
-    - We recommend installation with `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes,
-    see the [official documentation](https://www.rdkit.org/docs/Install.html).
-    
-## Installation
-
-To install the package, 
+For a full example of applying `GCNPredictor`, run the following command
 
 ```bash
-cd python
-python setup.py install
+python examples/property_prediction/classification.py -m GCN -d Tox21
 ```
 
-## Example Usage
+For more examples on molecular property prediction, generative models, protein-ligand binding affinity 
+prediction and reaction prediction, see `examples`.
 
-Currently we provide examples for molecular property prediction, generative models and protein-ligand binding 
-affinity prediction. See the examples folder for details.
-
-For some examples we also provide pre-trained models, which can be used off-shelf without training from scratch.
+We also provide pre-trained models for most examples, which can be used off-shelf without training from scratch. 
+Below gives an example of loading a pre-trained model for `GCNPredictor` on a molecular property prediction dataset.
 
 ```python
-"""Load a pre-trained model for property prediction."""
 from dgllife.data import Tox21
 from dgllife.model import load_pretrained
 from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
@@ -93,26 +78,48 @@ print(label_pred[:, mask != 0]) # Mask non-existing labels
 # 2.0957,  0.5919,  0.7715, 1.7273,  0.2070]])
 ```
 
-```python
-"""Load a pre-trained model for generating molecules."""
-from IPython.display import SVG
-from rdkit import Chem
-from rdkit.Chem import Draw
+Similarly, we can load a pre-trained model for generating molecules.
 
+```python
 from dgllife.model import load_pretrained
 
 model = load_pretrained('DGMG_ZINC_canonical')
 model.eval()
-mols = []
+smiles = []
 for i in range(4):
-    SMILES = model(rdkit_mol=True)
-    mols.append(Chem.MolFromSmiles(SMILES))
-# Generating 4 molecules takes less than a second.
+    smiles.append(model(rdkit_mol=True))
 
+print(smiles)
+# ['CC1CCC2C(CCC3C2C(NC2=CC(Cl)=CC=C2N)S3(=O)=O)O1',
+# 'O=C1SC2N=CN=C(NC(SC3=CC=CC=N3)C1=CC=CO)C=2C1=CCCC1', 
+# 'CC1C=CC(=CC=1)C(=O)NN=C(C)C1=CC=CC2=CC=CC=C21', 
+# 'CCN(CC1=CC=CC=C1F)CC1CCCN(C)C1']
+```
+
+If you are running the code block above in Jupyter notebook, you can also visualize the molecules generated with
+
+```python
+from IPython.display import SVG
+from rdkit import Chem
+from rdkit.Chem import Draw
+
+mols = [Chem.MolFromSmiles(s) for s in smiles]
 SVG(Draw.MolsToGridImage(mols, molsPerRow=4, subImgSize=(180, 150), useSVG=True))
 ```
 
 ![](https://data.dgl.ai/dgllife/dgmg/dgmg_model_zoo_example2.png)
+    
+## Installation
+
+DGL-LifeSci requires python 3.5+, DGL 0.4.3+ and PyTorch 1.2.0+.
+
+Additionally, we require `RDKit 2018.09.3` for cheminformatics. We recommend installing it with 
+`conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes, 
+see the [official documentation](https://www.rdkit.org/docs/Install.html).
+
+### Using anaconda
+
+### Using pip
 
 ## Speed Reference
 
