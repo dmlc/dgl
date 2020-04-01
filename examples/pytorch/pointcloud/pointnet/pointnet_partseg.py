@@ -147,15 +147,3 @@ class PartSegLoss(nn.Module):
         logits = logits.permute(0, 2, 1).contiguous().view(-1, num_classes)
         loss = F.nll_loss(logits, y)
         return loss
-
-'''
-def compute_loss(logits, y, eps=0.2):
-    num_classes = logits.shape[1]
-    logits = logits.permute(0, 2, 1).contiguous().view(-1, num_classes)
-    loss = F.
-    one_hot = torch.zeros_like(logits).scatter_(1, y.view(-1, 1), 1)
-    one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (num_classes - 1)
-    log_prob = F.log_softmax(logits, 1)
-    loss = -(one_hot * log_prob).sum(1).mean()
-    return loss
-'''

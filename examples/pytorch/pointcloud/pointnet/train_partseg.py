@@ -62,11 +62,11 @@ def train(net, opt, scheduler, train_loader, dev):
 
             _, preds = logits.max(1)
 
-            num_batches += 1
             count += num_examples * 2048
             loss = loss.item()
-            correct = (preds.view(-1) == g.ndata['y']).sum().item()
             total_loss += loss
+            num_batches += 1
+            correct = (preds.view(-1) == g.ndata['y']).sum().item()
             total_correct += correct
 
             tq.set_postfix({

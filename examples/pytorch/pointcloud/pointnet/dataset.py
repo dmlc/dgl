@@ -67,26 +67,10 @@ class ModelNetDataset(Dataset):
         else:
             x = self.data[i][:self.num_points]
         y = self.label[i]
-        # complete graph
         n_nodes = x.shape[0]
-        # np_csr = np.ones((n_nodes, n_nodes)) - np.eye(n_nodes)
-        # csr = csr_matrix(np_csr)
         g = dgl.DGLGraph()
         g.add_nodes(n_nodes)
-        # g.from_scipy_sparse_matrix(csr)
         g.ndata['x'] = x
-        '''
-        g.ndata['sampled'] = np.zeros((n_nodes, 1)).astype('long').copy()
-        src = []
-        dst = []
-        for i in range(n_nodes - 1):
-            for j in range(i+1, n_nodes):
-                src.append(i)
-                dst.append(j)
-        g.add_edges(src, dst)
-        g.add_edges(dst, src)
-        g.apply_edges(calc_dist)
-        '''
         return g, y
 
 class ShapeNet(object):
@@ -179,7 +163,7 @@ class ShapeNetDataset(Dataset):
         label_list = []
         category_list = []
         print('Loading data from split ' + self.mode)
-        for fn in tqdm.tqdm(self.file_list):
+        for fn in tqdm.tqdm(self.file_list, ascii=True):
             with open(fn) as f:
                 data = np.array([t.split('\n')[0].split(' ') for t in f.readlines()]).astype(np.float)
             data_list.append(data[:, 0:6])

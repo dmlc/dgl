@@ -3,11 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from dataset import ModelNet
-# from model import Model, compute_loss
 import dgl
-from pointnet_cls import PointNetCls, compute_loss
-from pointnet2 import FarthestPointSampler, EpsBallPoints
 from dgl.data.utils import download, get_download_dir
 
 from functools import partial
@@ -15,6 +11,10 @@ import tqdm
 import urllib
 import os
 import argparse
+
+from dataset import ModelNet
+from pointnet_cls import PointNetCls, compute_loss
+from pointnet2 import FarthestPointSampler, EpsBallPoints
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset-path', type=str, default='')
