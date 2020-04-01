@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from dataset import ModelNet
 # from model import Model, compute_loss
 import dgl
-from pointnet import PointNet, compute_loss
+from pointnet_cls import PointNetCls, compute_loss
 from pointnet2 import FarthestPointSampler, EpsBallPoints
 from dgl.data.utils import download, get_download_dir
 
@@ -113,7 +113,7 @@ def evaluate(net, test_loader, dev):
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-net = PointNet(40)
+net = PointNetCls(40)
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))

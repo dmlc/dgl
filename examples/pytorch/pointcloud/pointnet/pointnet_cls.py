@@ -4,10 +4,10 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
-class PointNet(nn.Module):
+class PointNetCls(nn.Module):
     def __init__(self, output_classes, input_dims=3,
                  dropout_prob=0.5, use_transform=True):
-        super(PointNet, self).__init__()
+        super(PointNetCls, self).__init__()
         self.input_dims = input_dims
         self.conv1 = nn.ModuleList()
         self.conv1.append(nn.Conv1d(input_dims, 64, 1))
