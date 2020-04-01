@@ -1,13 +1,28 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import dgllife
+import os
 
 from setuptools import find_packages
 from setuptools import setup
 
+CURRENT_DIR = os.path.dirname(__file__)
+
+def get_lib_path():
+    """Get library path, name and version"""
+     # We can not import `libinfo.py` in setup.py directly since __init__.py
+    # Will be invoked which introduces dependences
+    libinfo_py = os.path.join(CURRENT_DIR, './dgllife/__init__.py')
+    libinfo = {'__file__': libinfo_py}
+    exec(compile(open(libinfo_py, "rb").read(), libinfo_py, 'exec'), libinfo, libinfo)
+    version = libinfo['__version__']
+
+    return version
+
+VERSION = get_lib_path()
+
 setup(
     name='dgllife',
-    version=dgllife.__version__,
+    version=VERSION,
     description='DGL-based package for Life Science',
     keywords=[
         'pytorch',
