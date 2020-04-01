@@ -41,7 +41,7 @@ def main():
     curr_dir = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
     proj_root = os.path.abspath(os.path.join(curr_dir, ".."))
     # python path
-    update(os.path.join(proj_root, "python/dgllife/__init__.py"),
+    update(os.path.join(proj_root, "python/dgllife/libinfo.py"),
            r"(?<=__version__ = \")[.0-9a-z]+", __version__)
     # conda
     update(os.path.join(proj_root, "conda/dgllife/meta.yaml"),
