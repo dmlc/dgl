@@ -111,6 +111,22 @@ class ShapeNet(object):
         self.synset_dict = {}
         for syn in synset:
             self.synset_dict[syn[1]] = syn[0]
+        self.seg_classes = {'Earphone': [16, 17, 18],
+                            'Motorbike': [30, 31, 32, 33, 34, 35],
+                            'Rocket': [41, 42, 43],
+                            'Car': [8, 9, 10, 11],
+                            'Laptop': [28, 29],
+                            'Cap': [6, 7],
+                            'Skateboard': [44, 45, 46],
+                            'Mug': [36, 37],
+                            'Guitar': [19, 20, 21],
+                            'Bag': [4, 5],
+                            'Lamp': [24, 25, 26, 27],
+                            'Table': [47, 48, 49],
+                            'Airplane': [0, 1, 2, 3],
+                            'Pistol': [38, 39, 40],
+                            'Chair': [12, 13, 14, 15],
+                            'Knife': [22, 23]}
 
         train_split_json = 'shuffled_train_file_list.json'
         val_split_json = 'shuffled_val_file_list.json'
@@ -161,14 +177,17 @@ class ShapeNetDataset(Dataset):
 
         data_list = []
         label_list = []
+        category_list = []
         print('Loading data from split ' + self.mode)
         for fn in tqdm.tqdm(self.file_list):
             with open(fn) as f:
                 data = np.array([t.split('\n')[0].split(' ') for t in f.readlines()]).astype(np.float)
             data_list.append(data[:, 0:6])
             label_list.append(data[:, 6].astype(np.int))
+            category_list.append(shapenet.synset_dict[fn.split('/')[-2]])
         self.data = data_list
         self.label = label_list
+        self.category = category_list
 
     def translate(self, x, scale=(2/3, 3/2), shift=(-0.2, 0.2), size=3):
         xyz1 = np.random.uniform(low=scale[0], high=scale[1], size=[size])
@@ -183,6 +202,7 @@ class ShapeNetDataset(Dataset):
         inds = np.random.choice(self.data[i].shape[0], self.num_points, replace=True)
         x = self.data[i][inds,:self.dim]
         y = self.label[i][inds]
+        cat = self.category[i]
         if self.mode == 'train':
             x = self.translate(x, size=self.dim)
         n_nodes = x.shape[0]
@@ -191,4 +211,4 @@ class ShapeNetDataset(Dataset):
         # g.from_scipy_sparse_matrix(csr)
         g.ndata['x'] = x.astype(np.float)
         g.ndata['y'] = y.astype(np.int)
-        return g
+        return g, cat
