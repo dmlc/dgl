@@ -117,7 +117,7 @@ Additionally, we require `RDKit 2018.09.3` for cheminformatics. We recommend ins
 `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes, 
 see the [official documentation](https://www.rdkit.org/docs/Install.html).
 
-We provide installation of `DGL-LifeSci` with conda and pip. Once you have installed the package, 
+We provide installation of `DGL-LifeSci` with pip. Once you have installed the package, 
 verify the success of installation with 
 
 ```python
@@ -126,8 +126,6 @@ import dgllife
 print(dgllife.__version__)
 # 0.2.0
 ```
-
-### Using anaconda
 
 ### Using pip
 
