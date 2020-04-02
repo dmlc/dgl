@@ -363,15 +363,15 @@ class WLNReactionDataset(object):
         Returns
         -------
         str
-            Reaction
+            Reaction.
         str
             Graph edits for the reaction
         rdkit.Chem.rdchem.Mol
-            RDKit molecule instance
+            RDKit molecule instance for reactants
         DGLGraph
-            DGLGraph for the ith molecular graph
+            DGLGraph for the ith molecular graph of reactants
         DGLGraph
-            Complete DGLGraph, which will be needed for predicting
+            Complete DGLGraph for reactants, which will be needed for predicting
             scores between each pair of atoms
         float32 tensor of shape (V^2, 10)
             Features for each pair of atoms.
@@ -477,7 +477,6 @@ class USPTO(WLNReactionDataset):
         -------
         str
 
-            * 'full' for the complete dataset
             * 'train' for the training set
             * 'val' for the validation set
             * 'test' for the test set

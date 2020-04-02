@@ -1,47 +1,61 @@
 .. _apidata:
 
-dgllife.data
-============
+Datasets
+========
 
-TBD by Murphy
+.. contents:: Contents
+    :local:
 
-dgllife.data.alchemy
---------------------
+Molecular Property Prediction
+-----------------------------
 
-.. automodule:: dgllife.data.alchemy
-    :members:
+Tox21
+`````
 
+.. autoclass:: dgllife.data.Tox21
+    :members: task_pos_weights, __getitem__, __len__
+    :show-inheritance:
 
-dgllife.data.csv_dataset
-------------------------
+Alchemy for Quantum Chemistry
+`````````````````````````````
 
-.. automodule:: dgllife.data.csv_dataset
-    :members:
+.. autoclass:: dgllife.data.TencentAlchemyDataset
+    :members: set_mean_and_std, __getitem__, __len__
 
+Pubmed Aromaticity
+``````````````````
 
-dgllife.data.pdbbind
----------------------
+.. autoclass:: dgllife.data.PubChemBioAssayAromaticity
+    :members: __getitem__, __len__
+    :show-inheritance:
 
-.. automodule:: dgllife.data.pdbbind
-    :members:
+Adapting to New Datasets with CSV
+`````````````````````````````````
 
+.. autoclass:: dgllife.data.MoleculeCSVDataset
+    :members: __getitem__, __len__
 
-dgllife.data.pubchem_aromaticity
----------------------------------
+Reaction Prediction
+-------------------
 
-.. automodule:: dgllife.data.pubchem_aromaticity
-    :members:
+USPTO
+`````
 
+.. autoclass:: dgllife.data.USPTO
+    :members: __getitem__, __len__
+    :show-inheritance:
 
-dgllife.data.tox21
----------------------------------
+Adapting to New Datasets for Weisfeiler-Lehman Networks
+```````````````````````````````````````````````````````
 
-.. automodule:: dgllife.data.tox21
-    :members:
+.. autoclass:: dgllife.data.WLNReactionDataset
+    :members: __getitem__, __len__
 
+Protein-Ligand Binding Affinity Prediction
+------------------------------------------
 
-dgllife.data.uspto
----------------------------------
+PDBBind
+```````
 
-.. automodule:: dgllife.data.uspto
-    :members:
+.. autoclass:: dgllife.data.PDBBind
+    :members: __getitem__, __len__

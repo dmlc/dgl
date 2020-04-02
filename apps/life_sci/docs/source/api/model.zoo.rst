@@ -1,61 +1,77 @@
 .. _apimodelzoo:
 
-dgllife.model.model_zoo
-=============================
+Model Zoo
+=========
 
-TBD by Murphy
+This section introduces complete models for various downstream tasks.
 
-dgllife.model.model_zoo.attentivefp_predictor
------------------------------------------------
-.. automodule:: dgllife.model.model_zoo.attentivefp_predictor
-    :members:
+.. contents:: Contents
+    :local:
 
-dgllife.model.model_zoo.gat_predictor
--------------------------------------------
-.. automodule:: dgllife.model.model_zoo.gat_predictor
-    :members:
+Building Blocks
+---------------
 
-dgllife.model.model_zoo.gcn_predictor
--------------------------------------------
-.. automodule:: dgllife.model.model_zoo.gcn_predictor
-    :members:
-
-dgllife.model.model_zoo.mgcn_predictor
--------------------------------------------
-.. automodule:: dgllife.model.model_zoo.mgcn_predictor
-    :members:
-
-dgllife.model.model_zoo.mlp_predictor
--------------------------------------------
+MLP Predictor
+`````````````
 .. automodule:: dgllife.model.model_zoo.mlp_predictor
     :members:
 
-dgllife.model.model_zoo.mpnn_predictor
--------------------------------------------
+Molecular Property Prediction
+-----------------------------
+
+AttentiveFP Predictor
+`````````````````````
+.. automodule:: dgllife.model.model_zoo.attentivefp_predictor
+    :members:
+
+GAT Predictor
+`````````````
+.. automodule:: dgllife.model.model_zoo.gat_predictor
+    :members:
+
+GCN Predictor
+`````````````
+.. automodule:: dgllife.model.model_zoo.gcn_predictor
+    :members:
+
+MGCN Predictor
+``````````````
+.. automodule:: dgllife.model.model_zoo.mgcn_predictor
+    :members:
+
+MPNN Predictor
+``````````````
 .. automodule:: dgllife.model.model_zoo.mpnn_predictor
     :members:
 
-dgllife.model.model_zoo.schnet_predictor
--------------------------------------------
+SchNet Predictor
+````````````````
 .. automodule:: dgllife.model.model_zoo.schnet_predictor
     :members:
 
-dgllife.model.model_zoo.wln_reaction_center
--------------------------------------------
-.. automodule:: dgllife.model.model_zoo.wln_reaction_center
-    :members:
+Generative Models
+-----------------
 
-dgllife.model.model_zoo.acnn
--------------------------------------------
-.. automodule:: dgllife.model.model_zoo.acnn
-    :members:
-
-dgllife.model.model_zoo.dgmg
--------------------------------------------
+DGMG
+````
 .. automodule:: dgllife.model.model_zoo.dgmg
     :members:
 
-dgllife.model.model_zoo.jtnn
--------------------------------------------
+JTNN
+````
 .. autoclass:: dgllife.model.model_zoo.jtnn.DGLJTNNVAE
+    :members:
+
+Reaction Prediction
+
+WLN for Reaction Center Prediction
+``````````````````````````````````
+.. automodule:: dgllife.model.model_zoo.wln_reaction_center
+    :members:
+
+Protein-Ligand Binding Affinity Prediction
+
+ACNN
+````
+.. automodule:: dgllife.model.model_zoo.acnn
     :members:
