@@ -203,7 +203,7 @@ def init_history(g, model, dev_id):
             g.ndata['hist_delta_%d' % layer] = g.ndata[hist_col].clone().zero_()
             g.update_all(fn.copy_u(hist_col, 'm'), fn.sum('m', agg_hist_col))
 
-        g.ndata['deg'] = g.in_degrees().float()
+        g.ndata['deg'] = g.in_degrees().float().clamp(min=1)    # avoid 0 in denominator
 
 def update_history(g, blocks):
     with th.no_grad():
