@@ -25,7 +25,7 @@ interacted.  The distance between two items are measured by Euclidean distance o
 item embeddings, which are learned as outputs of PinSAGE.
 
 ```
-python model.py data.pkl --num-epochs 300 --num-workers 2 --device cuda:0 data.pkl
+python model.py data.pkl --num-epochs 300 --num-workers 2 --device cuda:0 data.pkl --hidden-dims 64
 ```
 
-The HITS@10 is 0.00806, compared to 0.00642 with PCA with the same dimensionality.
+The HITS@10 is 0.01241, compared to 0.01220 with SLIM with the same dimensionality.
