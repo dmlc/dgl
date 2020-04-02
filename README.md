@@ -24,16 +24,21 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 
 **A data scientist** may want to apply a pre-trained model to your data right away. For this you can use DGL's [Application packages, formally *Model Zoo*](https://github.com/dmlc/dgl/tree/master/apps). Application packages are developed for domain applications, as is the case for [DGL-LifeScience](https://github.com/dmlc/dgl/tree/master/apps/life_sci). We will soon add model zoo for knowledge graph embedding learning and recommender systems. Here's how you will use a pretrained model:
 ```python
-from dgl.data.chem import Tox21, smiles_to_bigraph, CanonicalAtomFeaturizer
-from dgl import model_zoo
+from dgllife.data import Tox21
+from dgllife.model import load_pretrained
+from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
 
 dataset = Tox21(smiles_to_bigraph, CanonicalAtomFeaturizer())
-model = model_zoo.chem.load_pretrained('GCN_Tox21') # Pretrained model loaded
+model = load_pretrained('GCN_Tox21') # Pretrained model loaded
 model.eval()
 
 smiles, g, label, mask = dataset[0]
 feats = g.ndata.pop('h')
 label_pred = model(g, feats)
+print(smiles)                   # CCOc1ccc2nc(S(N)(=O)=O)sc2c1
+print(label_pred[:, mask != 0]) # Mask non-existing labels
+# tensor([[ 1.4190, -0.1820,  1.2974,  1.4416,  0.6914,  
+# 2.0957,  0.5919,  0.7715, 1.7273,  0.2070]])
 ```
 
 **Further reading**: DGL is released as a managed service on AWS SageMaker, see the medium posts for an easy trip to DGL on SageMaker([part1](https://medium.com/@julsimon/a-primer-on-graph-neural-networks-with-amazon-neptune-and-the-deep-graph-library-5ce64984a276) and [part2](https://medium.com/@julsimon/deep-graph-library-part-2-training-on-amazon-sagemaker-54d318dfc814)).
