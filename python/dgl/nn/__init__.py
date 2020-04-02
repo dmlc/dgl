@@ -10,9 +10,10 @@ def _load_backend(mod_name):
     for api, obj in mod.__dict__.items():
         setattr(thismod, api, obj)
 
-load_all = os.getenv("DGL_LOADALL", False)
 
-if bool(load_all):
+LOAD_ALL = os.getenv("DGL_LOADALL", "False")
+
+if bool(LOAD_ALL):
     from .mxnet import *
     from .pytorch import *
     from .tensorflow import *
