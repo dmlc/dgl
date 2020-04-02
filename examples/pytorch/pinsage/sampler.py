@@ -48,7 +48,7 @@ class NeighborSampler(object):
         for sampler in self.samplers:
             frontier = sampler(seeds)
             if heads is not None:
-                eids = frontier.edge_ids(torch.cat([heads, heads]), torch.cat([tails, neg_tails]), force_multi=True)[2]
+                eids = frontier.edge_ids(torch.cat([heads, heads]), torch.cat([tails, neg_tails]), return_uv=True)[2]
                 if len(eids) > 0:
                     old_frontier = frontier
                     frontier = dgl.remove_edges(old_frontier, eids)
