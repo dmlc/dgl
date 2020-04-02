@@ -24,7 +24,6 @@ class GCMCSampler:
     """
     def __init__(self, dataset, segment='train'):
         self.dataset = dataset
-        self.sample_idx = 0
         if segment == 'train':
             self.truths = dataset.train_truths
             self.labels = dataset.train_labels
@@ -48,7 +47,7 @@ class GCMCSampler:
         enc_graph = self.enc_graph
         dec_graph = self.dec_graph
         edge_ids = th.stack(seeds)
-        # generate frontiners for user and item
+        # generate frontiers for user and item
         possible_rating_values = dataset.possible_rating_values
         true_relation_ratings = self.truths[edge_ids]
         true_relation_labels = None if self.labels is None else self.labels[edge_ids]
@@ -79,30 +78,30 @@ class GCMCSampler:
         for ntype in g.ntypes:
             seed_nodes[ntype] = g.nodes[ntype].data[dgl.NID]
 
-        frontiner = dgl.in_subgraph(enc_graph, seed_nodes)
-        frontiner = dgl.to_block(frontiner, seed_nodes)
+        frontier = dgl.in_subgraph(enc_graph, seed_nodes)
+        frontier = dgl.to_block(frontier, seed_nodes)
 
         # copy from parent
-        frontiner.dstnodes['user'].data['ci'] = \
-            enc_graph.nodes['user'].data['ci'][frontiner.dstnodes['user'].data[dgl.NID]]
-        frontiner.srcnodes['movie'].data['cj'] = \
-            enc_graph.nodes['movie'].data['cj'][frontiner.srcnodes['movie'].data[dgl.NID]]
-        frontiner.srcnodes['user'].data['cj'] = \
-            enc_graph.nodes['user'].data['cj'][frontiner.srcnodes['user'].data[dgl.NID]]
-        frontiner.dstnodes['movie'].data['ci'] = \
-            enc_graph.nodes['movie'].data['ci'][frontiner.dstnodes['movie'].data[dgl.NID]]
+        frontier.dstnodes['user'].data['ci'] = \
+            enc_graph.nodes['user'].data['ci'][frontier.dstnodes['user'].data[dgl.NID]]
+        frontier.srcnodes['movie'].data['cj'] = \
+            enc_graph.nodes['movie'].data['cj'][frontier.srcnodes['movie'].data[dgl.NID]]
+        frontier.srcnodes['user'].data['cj'] = \
+            enc_graph.nodes['user'].data['cj'][frontier.srcnodes['user'].data[dgl.NID]]
+        frontier.dstnodes['movie'].data['ci'] = \
+            enc_graph.nodes['movie'].data['ci'][frontier.dstnodes['movie'].data[dgl.NID]]
 
         # handle features
-        head_feat = frontiner.srcnodes['user'].data[dgl.NID].long() \
+        head_feat = frontier.srcnodes['user'].data[dgl.NID].long() \
                     if dataset.user_feature is None else \
-                       dataset.user_feature[frontiner.srcnodes['user'].data[dgl.NID]]
-        tail_feat = frontiner.srcnodes['movie'].data[dgl.NID].long()\
+                       dataset.user_feature[frontier.srcnodes['user'].data[dgl.NID]]
+        tail_feat = frontier.srcnodes['movie'].data[dgl.NID].long()\
                     if dataset.movie_feature is None else \
-                       dataset.movie_feature[frontiner.srcnodes['movie'].data[dgl.NID]]
+                       dataset.movie_feature[frontier.srcnodes['movie'].data[dgl.NID]]
 
         true_rel_labels = None if self.labels is None else th.cat(true_rel_labels, dim=0)
         true_rel_ratings = th.cat(true_rel_ratings, dim=0)
-        return (g, frontiner, head_feat, tail_feat, true_rel_labels, true_rel_ratings)
+        return (g, frontier, head_feat, tail_feat, true_rel_labels, true_rel_ratings)
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
