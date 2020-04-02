@@ -1,10 +1,10 @@
 package:
   name: dgllife{{ environ.get('APP_PACKAGE_SUFFIX', '') }}
-  version: "0.2.0"
+  version: "0.2.1"
 
 source:
-  git_rev: 0.2.0
-  git_url: https://github.com/dmlc/dgl/tree/master/apps/dgllife
+  url: https://files.pythonhosted.org/packages/7d/ca/543802eca0e8d263a73309379f79a054b3bb7e7377ead0b69d2451728465/dgllife-0.2.1.tar.gz
+  sha256: 11a1622ba587f7ff67f42ad8bc88d238faaa459ab554cf59e1b69a10079d41c0
 
 requirements:
   build:
@@ -19,12 +19,9 @@ requirements:
     - scikit-learn
     - pandas
     - tqdm
-
-test:
-  imports:
-    - dgllife
+    - numpy
+    - scipy
+    - networkx
 
 about:
-  home: https://github.com/dmlc/dgl/tree/master/apps/dgllife
-  license_file: {{ environ.get('SRC_DIR') }}/LICENSE
   license: Apache

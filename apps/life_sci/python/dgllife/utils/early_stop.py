@@ -22,7 +22,40 @@ class EarlyStopping(object):
         The early stopping will happen if we do not observe performance
         improvement for ``patience`` consecutive epochs.
     filename : str or None
-        Filename for storing the model checkpoint
+        Filename for storing the model checkpoint. If not specified,
+        we will automatically generate a file starting with ``early_stop``
+        based on the current time.
+
+    Examples
+    --------
+    Below gives a demo for a fake training process.
+
+    >>> import torch
+    >>> import torch.nn as nn
+    >>> from torch.nn import MSELoss
+    >>> from torch.optim import Adam
+    >>> from dgllife.utils import EarlyStopping
+
+    >>> model = nn.Linear(1, 1)
+    >>> criterion = MSELoss()
+    >>> # For MSE, the lower, the better
+    >>> stopper = EarlyStopping(mode='lower', filename='test.pth')
+    >>> optimizer = Adam(params=model.parameters(), lr=1e-3)
+
+    >>> for epoch in range(1000):
+    >>>     x = torch.randn(1, 1) # Fake input
+    >>>     y = torch.randn(1, 1) # Fake label
+    >>>     pred = model(x)
+    >>>     loss = criterion(y, pred)
+    >>>     optimizer.zero_grad()
+    >>>     loss.backward()
+    >>>     optimizer.step()
+    >>>     early_stop = stopper.step(loss.detach().data, model)
+    >>>     if early_stop:
+    >>>         break
+
+    >>> # Load the final parameters saved by the model
+    >>> stopper.load_checkpoint(model)
     """
     def __init__(self, mode='higher', patience=10, filename=None):
         if filename is None:
