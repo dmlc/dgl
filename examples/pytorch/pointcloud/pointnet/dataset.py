@@ -163,7 +163,7 @@ class ShapeNetDataset(Dataset):
         label_list = []
         category_list = []
         print('Loading data from split ' + self.mode)
-        for fn in tqdm.tqdm(self.file_list[0:100], ascii=True):
+        for fn in tqdm.tqdm(self.file_list, ascii=True):
             with open(fn) as f:
                 data = np.array([t.split('\n')[0].split(' ') for t in f.readlines()]).astype(np.float)
             data_list.append(data[:, 0:6])
