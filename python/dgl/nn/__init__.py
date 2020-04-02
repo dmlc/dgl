@@ -13,7 +13,7 @@ def _load_backend(mod_name):
 
 LOAD_ALL = os.getenv("DGL_LOADALL", "False")
 
-if bool(LOAD_ALL):
+if LOAD_ALL.lower() != "false":
     from .mxnet import *
     from .pytorch import *
     from .tensorflow import *
