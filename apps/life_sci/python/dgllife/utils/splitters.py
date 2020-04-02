@@ -3,10 +3,8 @@
 We mostly adapt them from deepchem
 (https://github.com/deepchem/deepchem/blob/master/deepchem/splits/splitters.py).
 """
-import dgl.backend as F
-import numpy as np
-
-from dgl.data.utils import split_dataset, Subset
+# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable=E0611
 from collections import defaultdict
 from functools import partial
 from itertools import accumulate, chain
@@ -14,6 +12,10 @@ from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.rdmolops import FastFindRings
 from rdkit.Chem.Scaffolds import MurckoScaffold
+
+import dgl.backend as F
+import numpy as np
+from dgl.data.utils import split_dataset, Subset
 
 __all__ = ['ConsecutiveSplitter',
            'RandomSplitter',
@@ -304,6 +306,7 @@ class RandomSplitter(object):
 
         return base_k_fold_split(partial(indices_split, indices=indices), dataset, k, log)
 
+# pylint: disable=I1101
 class MolecularWeightSplitter(object):
     """Sort molecules based on their weights and then split them."""
 
@@ -335,7 +338,7 @@ class MolecularWeightSplitter(object):
         for i, mol in enumerate(molecules):
             count_and_log('Computing molecular weight for compound',
                           i, len(molecules), log_every_n)
-            mws.append(Chem.rdMolDescriptors.CalcExactMolWt(mol))
+            mws.append(rdMolDescriptors.CalcExactMolWt(mol))
 
         return np.argsort(mws)
 
@@ -427,6 +430,7 @@ class MolecularWeightSplitter(object):
         return base_k_fold_split(partial(indices_split, indices=sorted_indices), dataset, k,
                                  log=(log_every_n is not None))
 
+# pylint: disable=W0702
 class ScaffoldSplitter(object):
     """Group molecules based on their Bemis-Murcko scaffolds and then split the groups.
 

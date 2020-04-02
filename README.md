@@ -131,7 +131,7 @@ Overall there are 30+ models implemented by using DGL:
 
 ### DGL for domain applications
 - [DGL-LifeSci](https://github.com/dmlc/dgl/tree/master/apps/life_sci), previously DGL-Chem
-- [DGL-KE](https://github.com/dmlc/dgl/tree/master/apps/kg)
+- [DGL-KE](https://github.com/awslabs/dgl-ke)
 - DGL-RecSys(coming soon)
 
 ### DGL for NLP/CV problems
@@ -152,7 +152,7 @@ DGL should work on
 
 DGL requires Python 3.5 or later.
 
-Right now, DGL works on [PyTorch](https://pytorch.org) 1.1.0+, [MXNet](https://mxnet.apache.org) nightly build, and [TensorFlow](https://tensorflow.org) 2.0+.
+Right now, DGL works on [PyTorch](https://pytorch.org) 1.2.0+, [MXNet](https://mxnet.apache.org) 1.5.1+, and [TensorFlow](https://tensorflow.org) 2.1.0+.
 
 
 ### Using anaconda

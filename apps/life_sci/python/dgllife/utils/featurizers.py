@@ -1,9 +1,10 @@
 """Node and edge featurization for molecular graphs."""
-import dgl.backend as F
+# pylint: disable= no-member, arguments-differ, invalid-name
 import itertools
+from collections import defaultdict
+import dgl.backend as F
 import numpy as np
 
-from collections import defaultdict
 from rdkit import Chem
 
 __all__ = ['one_hot_encoding',
@@ -302,6 +303,7 @@ def atom_implicit_valence(atom):
     """
     return [atom.GetImplicitValence()]
 
+# pylint: disable=I1101
 def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the hybridization of an atom.
 
@@ -601,7 +603,7 @@ class BaseAtomFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.life_sci import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
+    >>> from dgl.data.dgllife import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')
@@ -856,17 +858,17 @@ class BaseBondFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.life_sci import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
+    >>> from dgl.data.dgllife import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')
-    >>> bond_featurizer = BaseBondFeaturizer({'bond_type': bond_type_one_hot, 'in_ring': bond_is_in_ring})
+    >>> bond_featurizer = BaseBondFeaturizer({'type': bond_type_one_hot, 'ring': bond_is_in_ring})
     >>> bond_featurizer(mol)
-    {'bond_type': tensor([[1., 0., 0., 0.],
-                          [1., 0., 0., 0.],
-                          [1., 0., 0., 0.],
-                          [1., 0., 0., 0.]]),
-     'in_ring': tensor([[0.], [0.], [0.], [0.]])}
+    {'type': tensor([[1., 0., 0., 0.],
+                     [1., 0., 0., 0.],
+                     [1., 0., 0., 0.],
+                     [1., 0., 0., 0.]]),
+     'ring': tensor([[0.], [0.], [0.], [0.]])}
     """
     def __init__(self, featurizer_funcs, feat_sizes=None):
         self.featurizer_funcs = featurizer_funcs

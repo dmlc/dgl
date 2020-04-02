@@ -1,4 +1,5 @@
 """Utilities for using pretrained models."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import os
 import torch
 import torch.nn.functional as F
@@ -58,6 +59,7 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
 
     return model
 
+# pylint: disable=I1101
 def load_pretrained(model_name, log=True):
     """Load a pretrained model
 

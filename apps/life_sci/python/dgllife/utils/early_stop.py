@@ -1,9 +1,11 @@
 """Early stopping"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import datetime
 import torch
 
 __all__ = ['EarlyStopping']
 
+# pylint: disable=C0103
 class EarlyStopping(object):
     """Early stop tracker
 
@@ -56,7 +58,7 @@ class EarlyStopping(object):
         bool
             Whether the new score is higher than the previous best score.
         """
-        return (score > prev_best_score)
+        return score > prev_best_score
 
     def _check_lower(self, score, prev_best_score):
         """Check if the new score is lower than the previous best score.
@@ -73,7 +75,7 @@ class EarlyStopping(object):
         bool
             Whether the new score is lower than the previous best score.
         """
-        return (score < prev_best_score)
+        return score < prev_best_score
 
     def step(self, score, model):
         """Update based on a new score.

@@ -1,6 +1,7 @@
 """WLN"""
-import dgl.function as fn
+# pylint: disable= no-member, arguments-differ, invalid-name
 import math
+import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,7 +11,7 @@ from torch.nn import Parameter
 __all__ = ['WLN']
 
 class WLNLinear(nn.Module):
-    """Linear layer for WLN
+    r"""Linear layer for WLN
 
     Let stddev be
 
@@ -50,12 +51,12 @@ class WLNLinear(nn.Module):
             bound = 1 / math.sqrt(fan_in)
             nn.init.uniform_(self.bias, -bound, bound)
 
-    def forward(self, input):
+    def forward(self, feats):
         """Applies the layer.
 
         Parameters
         ----------
-        input : float32 tensor of shape (N, *, in_feats)
+        feats : float32 tensor of shape (N, *, in_feats)
             N for the number of samples, * for any additional dimensions.
 
         Returns
@@ -63,7 +64,7 @@ class WLNLinear(nn.Module):
         float32 tensor of shape (N, *, out_feats)
             Result of the layer.
         """
-        return F.linear(input, self.weight, self.bias)
+        return F.linear(feats, self.weight, self.bias)
 
     def extra_repr(self):
         """Return a description of the layer."""
@@ -133,7 +134,7 @@ class WLN(nn.Module):
             Updated node representations.
         """
         node_feats = self.project_node_in_feats(node_feats)
-        for l in range(self.n_layers):
+        for _ in range(self.n_layers):
             g = g.local_var()
             g.ndata['hv'] = node_feats
             g.apply_edges(fn.copy_src('hv', 'he_src'))
