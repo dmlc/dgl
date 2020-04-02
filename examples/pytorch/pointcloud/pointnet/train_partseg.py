@@ -22,7 +22,7 @@ parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=250)
-parser.add_argument('--num-workers', type=int, default=0)
+parser.add_argument('--num-workers', type=int, default=4)
 parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
@@ -128,16 +128,16 @@ def evaluate(net, test_loader, dev):
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # dev = "cpu"
 
-net = PointNetPartSeg(50, 6, 2048)
+net = PointNetPartSeg(50, 3, 2048)
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
 opt = optim.Adam(net.parameters(), lr=0.001, weight_decay=1e-4)
-scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.7)
+scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.5)
 L = PartSegLoss()
 
-shapenet = ShapeNet(2048)
+shapenet = ShapeNet(2048, normal_channel=False)
 
 train_loader = CustomDataLoader(shapenet.trainval())
 test_loader = CustomDataLoader(shapenet.test())

@@ -141,9 +141,10 @@ class PartSegLoss(nn.Module):
     def __init__(self, eps=0.2):
         super(PartSegLoss, self).__init__()
         self.eps = eps
+        self.loss = nn.CrossEntropyLoss()
     
     def forward(self, logits, y):
         num_classes = logits.shape[1]
         logits = logits.permute(0, 2, 1).contiguous().view(-1, num_classes)
-        loss = F.nll_loss(logits, y)
+        loss = self.loss(logits, y)
         return loss
