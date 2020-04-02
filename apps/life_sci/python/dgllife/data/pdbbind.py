@@ -31,7 +31,7 @@ class PDBBind(object):
 
         * [1] MoleculeNet: a benchmark for molecular machine learning
         * [2] The PDBbind database: collection of binding affinities for protein-ligand complexes
-        with known three-dimensional structures
+          with known three-dimensional structures
         * [3] The PDBbind database: methodologies and updates
         * [4] PDB-wide collection of binding data: current status of the PDBbind database
 
@@ -57,9 +57,10 @@ class PDBBind(object):
         Whether we need to extract molecular conformation from proteins and ligands.
         Default to True.
     construct_graph_and_featurize : callable
-        Construct a DGLHeteroGraph for the use of GNNs. Mapping self.ligand_mols[i],
-        self.protein_mols[i], self.ligand_coordinates[i] and self.protein_coordinates[i]
-        to a DGLHeteroGraph. Default to :func:`ACNN_graph_construction_and_featurization`.
+        Construct a DGLHeteroGraph for the use of GNNs. Mapping ``self.ligand_mols[i]``,
+        ``self.protein_mols[i]``, ``self.ligand_coordinates[i]`` and
+        ``self.protein_coordinates[i]`` to a DGLHeteroGraph.
+        Default to :func:`dgllife.utils.ACNN_graph_construction_and_featurization`.
     zero_padding : bool
         Whether to perform zero padding. While DGL does not necessarily require zero padding,
         pooling operations for variable length inputs can introduce stochastic behaviour, which

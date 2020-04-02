@@ -1,26 +1,33 @@
-DGL-LifeSci: A GNN Package for Chemistry and Molecular Applications
+DGL-LifeSci: Bringing Graph Neural Networks to Chemistry and Biology
 ===========================================================================================
 
-Blahlah ...
+DGL-LifeSci is a python package for applying graph neural networks to various tasks in chemistry
+and biology, on top of PyTorch and DGL. It provides:
+
+* Various utilities for data processing, training and evaluation.
+* Efficient and flexible model implementations.
+* Pre-trained models for use without training from scratch.
+
+We cover various applications in our
+`examples <https://github.com/dmlc/dgl/tree/master/apps/life_sci/examples>`_, including:
+
+* `Molecular property prediction <https://github.com/dmlc/dgl/tree/master/apps/life_sci/examples/property_prediction>`_
+* `Generative models <https://github.com/dmlc/dgl/tree/master/apps/life_sci/examples/generative_models>`_
+* `Protein-ligand binding affinity prediction <https://github.com/dmlc/dgl/tree/master/apps/life_sci/examples/binding_affinity_prediction>`_
+* `Reaction prediction <https://github.com/dmlc/dgl/tree/master/apps/life_sci/examples/reaction_prediction>`_
 
 Get Started
 ------------
 
-You could borrow some from the README page.
-
-API Reference
----------------
-
-The highest level breakdown. What are the APIs for?
-
+Follow the :doc:`instructions<install/index>` to install DGL.
 
 .. toctree::
-    :maxdepth: 1
-    :caption: Get Started
-    :hidden:
-    :glob:
+   :maxdepth: 1
+   :caption: Installation
+   :hidden:
+   :glob:
 
-    get_started
+   install/index
 
 .. toctree::
     :maxdepth: 2
@@ -28,12 +35,20 @@ The highest level breakdown. What are the APIs for?
     :hidden:
     :glob:
 
+    api/utils.mols
+    api/utils.splitters
+    api/utils.pipeline
+    api/utils.complexes
     api/data
-    api/model
+    api/model.pretrain
     api/model.gnn
-    api/model.zoo
     api/model.readout
-    api/utils
+    api/model.zoo
+
+Free software
+-------------
+DGL-LifeSci is free software; you can redistribute it and/or modify it under the terms
+of the Apache License 2.0. We welcome contributions. Join us on `GitHub <https://github.com/dmlc/dgl/tree/master/apps/life_sci>`_.
 
 Index
 -----

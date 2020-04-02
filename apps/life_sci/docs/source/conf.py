@@ -157,7 +157,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'dgllife', 'DGL-LifeSci Documentation',
-     author, 'dgllife', 'Application library for XXXXXXXXXXXXXXXX.',
+     author, 'dgllife', 'Application library for life science.',
      'Miscellaneous'),
 ]
 
