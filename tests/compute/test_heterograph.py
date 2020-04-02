@@ -944,10 +944,13 @@ def test_subgraph():
     for fmt in ['csr', 'csc', 'coo']:
         g = dgl.graph([(0, 1), (1, 2)], restrict_format=fmt)
         sg = g.subgraph({g.ntypes[0]: [1, 0]})
-        assert F.array_equal(sg.ndata[dgl.NID], F.tensor([1, 0], F.int64))
+        nids = F.asnumpy(sg.ndata[dgl.NID])
+        assert np.array_equal(nids, np.array([1, 0]))
         src, dst = sg.all_edges(order='eid')
-        assert F.array_equal(src, F.tensor([1], F.int64))
-        assert F.array_equal(dst, F.tensor([0], F.int64))
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        assert np.array_equal(src, np.array([1]))
+        assert np.array_equal(dst, np.array([0]))
 
 def test_apply():
     def node_udf(nodes):
