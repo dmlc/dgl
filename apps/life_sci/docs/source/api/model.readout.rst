@@ -1,25 +1,28 @@
 .. _apimodelreadout:
 
-dgllife.model.readout
-========================
+Readout for Computing Graph Representations
+===========================================
 
-TBD by Murphy
+After updating node/edge representations with graph neural networks (GNNs), a common operation is to compute
+graph representations out of updated node/edge representations. For example, we need to compute molecular
+representations out of atom/bond representations in molecular property prediction. We call the various modules
+for computing graph-level representations **readout** as in Neural Message Passing for Quantum Chemistry and this
+section lists the readout modules implemented in DGL-LifeSci.
 
-dgllife.model.readout.attentivefp_readout
-------------------------------------------
+.. contents:: Contents
+    :local:
+
+AttentiveFP Readout
+-------------------
 .. automodule:: dgllife.model.readout.attentivefp_readout
     :members:
 
-
-
-dgllife.model.readout.mlp_readout
-------------------------------------------
+MLP Readout
+-----------
 .. automodule:: dgllife.model.readout.mlp_readout
     :members:
 
-
-
-dgllife.model.readout.weighted_sum_and_max
---------------------------------------------
+Weighted Sum and Max Readout
+----------------------------
 .. automodule:: dgllife.model.readout.weighted_sum_and_max
     :members:

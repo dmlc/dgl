@@ -1,5 +1,7 @@
 # DGL-LifeSci
 
+[Documentation](https://lifesci.dgl.ai/index.html) | [Discussion Forum](https://discuss.dgl.ai)
+
 ## Introduction
 
 Deep learning on graphs has been an arising trend in the past few years. There are a lot of graphs in 
