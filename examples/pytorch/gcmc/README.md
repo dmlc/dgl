@@ -152,7 +152,7 @@ python gcmc_mp_sampling.py --data_name=ml-100k \
 ```
 Result: RMSE=0.9397
 Speed: 1.202s/epoch (Run with only 30 epoches) 
-Speed: 1.729s/epoch (mix_cpu_gpu)
+Speed: 1.245/epoch (mix_cpu_gpu)
 
 ml-100k, with feature
 ```bash
