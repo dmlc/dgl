@@ -23,7 +23,7 @@ parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=250)
 parser.add_argument('--num-workers', type=int, default=4)
-parser.add_argument('--batch-size', type=int, default=32)
+parser.add_argument('--batch-size', type=int, default=16)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -43,6 +43,8 @@ CustomDataLoader = partial(
 
 def train(net, opt, scheduler, train_loader, dev):
 
+    category_list = sorted(list(shapenet.seg_classes.keys()))
+    eye_mat = np.eye(16)
     net.train()
 
     total_loss = 0
@@ -50,12 +52,15 @@ def train(net, opt, scheduler, train_loader, dev):
     total_correct = 0
     count = 0
     with tqdm.tqdm(train_loader, ascii=True) as tq:
-        for g, _ in tq:
+        for g, cat in tq:
             num_examples = g.batch_size
             g.ndata['x'] = g.ndata['x'].to(dev, dtype=torch.float)
             g.ndata['y'] = g.ndata['y'].to(dev, dtype=torch.long)
             opt.zero_grad()
-            logits = net(g)
+            cat_ind = [category_list.index(c) for c in cat]
+            cat_tensor = torch.tensor(eye_mat[cat_ind]).to(dev, dtype=torch.float).repeat(1, 2048)
+            cat_tensor = cat_tensor.view(g.batch_size, -1, 16).permute(0,2,1)
+            logits = net(g, cat_tensor)
             loss = L(logits, g.ndata['y'])
             loss.backward()
             opt.step()
@@ -96,6 +101,9 @@ def mIoU(preds, label, cat, cat_miou, seg_classes):
     return cat_miou
 
 def evaluate(net, test_loader, dev):
+
+    category_list = sorted(list(shapenet.seg_classes.keys()))
+    eye_mat = np.eye(16)
     net.eval()
 
     cat_miou = {}
@@ -106,16 +114,19 @@ def evaluate(net, test_loader, dev):
 
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
-            for g, category in tq:
+            for g, cat in tq:
                 num_examples = g.batch_size
                 g.ndata['x'] = g.ndata['x'].to(dev, dtype=torch.float)
                 g.ndata['y'] = g.ndata['y'].to(dev, dtype=torch.long)
-                logits = net(g)
+                cat_ind = [category_list.index(c) for c in cat]
+                cat_tensor = torch.tensor(eye_mat[cat_ind]).to(dev, dtype=torch.float).repeat(1, 2048)
+                cat_tensor = cat_tensor.view(g.batch_size, -1, 16).permute(0,2,1)
+                logits = net(g, cat_tensor)
                 _, preds = logits.max(1)
 
                 cat_miou = mIoU(preds.cpu().numpy(),
                                 g.ndata['y'].view(num_examples, -1).cpu().numpy(),
-                                category, cat_miou, shapenet.seg_classes)
+                                cat, cat_miou, shapenet.seg_classes)
                 for _, v in cat_miou.items():
                     if v[1] > 0:
                         miou += v[0] / v[1]
