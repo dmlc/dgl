@@ -13,12 +13,24 @@
 #include <dgl/graph_interface.h>
 #include <algorithm>
 #include <vector>
+#include <string>
 
 using dgl::runtime::operator<<;
 
 /*! \brief Output the string representation of device context.*/
-inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
-  return os << ctx.device_type << ":" << ctx.device_id;
+inline std::ostream& operator<<(std::ostream& os, const DLContext& ctx) {
+  std::string device_name;
+  switch (ctx.device_type) {
+    case kDLCPU:
+      device_name = "CPU";
+      break;
+    case kDLGPU:
+      device_name = "GPU";
+      break;
+    default:
+      device_name = "Unknown device";
+  }
+  return os << device_name << ":" << ctx.device_id;
 }
 
 namespace dgl {

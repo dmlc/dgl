@@ -61,22 +61,14 @@ def test_Meter():
     meter = Meter(label_mean, label_std)
     meter.update(label, pred)
     true_scores = [0.22125875529784111, 0.5937311018897714]
-    assert meter.rmse() == true_scores
-    assert meter.rmse('mean') == np.mean(true_scores)
-    assert meter.rmse('sum') == np.sum(true_scores)
-    assert meter.compute_metric('rmse') == true_scores
-    assert meter.compute_metric('rmse', 'mean') == np.mean(true_scores)
-    assert meter.compute_metric('rmse', 'sum') == np.sum(true_scores)
+    assert torch.allclose(torch.tensor(meter.rmse()), torch.tensor(true_scores))
+    assert torch.allclose(torch.tensor(meter.compute_metric('rmse')), torch.tensor(true_scores))
 
     meter = Meter(label_mean, label_std)
     meter.update(label, pred, mask)
     true_scores = [0.1337071188699867, 0.5019903799993205]
-    assert meter.rmse() == true_scores
-    assert meter.rmse('mean') == np.mean(true_scores)
-    assert meter.rmse('sum') == np.sum(true_scores)
-    assert meter.compute_metric('rmse') == true_scores
-    assert meter.compute_metric('rmse', 'mean') == np.mean(true_scores)
-    assert meter.compute_metric('rmse', 'sum') == np.sum(true_scores)
+    assert torch.allclose(torch.tensor(meter.rmse()), torch.tensor(true_scores))
+    assert torch.allclose(torch.tensor(meter.compute_metric('rmse')), torch.tensor(true_scores))
 
     # roc auc score
     meter = Meter()

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from distutils.version import LooseVersion
 
+import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
 import builtins
 from torch.utils import dlpack
@@ -9,8 +10,11 @@ from torch.utils import dlpack
 from ... import ndarray as nd
 from ... import kernel as K
 from ...function.base import TargetCode
+from ...base import dgl_warning
 
-TH_VERSION = LooseVersion(th.__version__)
+if LooseVersion(th.__version__) < LooseVersion("1.2.0"):
+    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.2.0 "
+                "for the best experience.")
 
 def data_type_dict():
     return {'float16' : th.float16,

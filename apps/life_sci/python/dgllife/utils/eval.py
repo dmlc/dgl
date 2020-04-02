@@ -1,4 +1,5 @@
 """Evaluation of model performance."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -8,6 +9,7 @@ from sklearn.metrics import roc_auc_score
 
 __all__ = ['Meter']
 
+# pylint: disable=E1101
 class Meter(object):
     """Track and summarize model performance on a dataset for (multi-label) prediction.
 
@@ -252,12 +254,12 @@ class Meter(object):
         """
         if metric_name == 'r2':
             return self.pearson_r2(reduction)
-
-        if metric_name == 'mae':
+        elif metric_name == 'mae':
             return self.mae(reduction)
-
-        if metric_name == 'rmse':
+        elif metric_name == 'rmse':
             return self.rmse(reduction)
-
-        if metric_name == 'roc_auc_score':
+        elif metric_name == 'roc_auc_score':
             return self.roc_auc_score(reduction)
+        else:
+            raise ValueError('Expect metric_name to be "r2" or "mae" or "rmse" '
+                             'or "roc_auc_score", got {}'.format(metric_name))

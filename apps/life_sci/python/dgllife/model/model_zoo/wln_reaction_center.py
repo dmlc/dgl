@@ -1,4 +1,5 @@
 """Weisfeiler-Lehman Network (WLN) for Reaction Center Prediction."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl.function as fn
 import torch
 import torch.nn as nn
@@ -7,6 +8,7 @@ from ..gnn.wln import WLNLinear, WLN
 
 __all__ = ['WLNReactionCenter']
 
+# pylint: disable=W0221, E1101
 class WLNContext(nn.Module):
     """Attention-based context computation for each node.
 

@@ -1,5 +1,6 @@
 """Utils for RDKit, mostly adapted from DeepChem
 (https://github.com/deepchem/deepchem/blob/master/deepchem)."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import warnings
 
 from functools import partial
@@ -7,16 +8,12 @@ from multiprocessing import Pool
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
-__all__ = ['get_mol_3D_coordinates',
+__all__ = ['get_mol_3d_coordinates',
            'load_molecule',
            'multiprocess_load_molecules']
 
-def get_mol_3D_coordinates(mol):
+# pylint: disable=W0702
+def get_mol_3d_coordinates(mol):
     """Get 3D coordinates of the molecule.
 
     Parameters
@@ -42,6 +39,7 @@ def get_mol_3D_coordinates(mol):
         warnings.warn('Unable to get conformation of the molecule.')
         return None
 
+# pylint: disable=E1101
 def load_molecule(molecule_file, sanitize=False, calc_charges=False,
                   remove_hs=False, use_conformation=True):
     """Load a molecule from a file.
@@ -80,8 +78,8 @@ def load_molecule(molecule_file, sanitize=False, calc_charges=False,
         supplier = Chem.SDMolSupplier(molecule_file, sanitize=False, removeHs=False)
         mol = supplier[0]
     elif molecule_file.endswith('.pdbqt'):
-        with open(molecule_file) as f:
-            pdbqt_data = f.readlines()
+        with open(molecule_file) as file:
+            pdbqt_data = file.readlines()
         pdb_block = ''
         for line in pdbqt_data:
             pdb_block += '{}\n'.format(line[:66])
@@ -109,7 +107,7 @@ def load_molecule(molecule_file, sanitize=False, calc_charges=False,
         return None, None
 
     if use_conformation:
-        coordinates = get_mol_3D_coordinates(mol)
+        coordinates = get_mol_3d_coordinates(mol)
     else:
         coordinates = None
 
@@ -151,7 +149,7 @@ def multiprocess_load_molecules(files, sanitize=False, calc_charges=False,
     """
     if num_processes == 1:
         mols_loaded = []
-        for i, f in enumerate(files):
+        for f in files:
             mols_loaded.append(load_molecule(
                 f, sanitize=sanitize, calc_charges=calc_charges,
                 remove_hs=remove_hs, use_conformation=use_conformation))

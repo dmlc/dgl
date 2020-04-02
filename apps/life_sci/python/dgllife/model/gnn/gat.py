@@ -1,4 +1,5 @@
 """Graph Attention Networks"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -6,6 +7,7 @@ from dgl.nn.pytorch import GATConv
 
 __all__ = ['GAT']
 
+# pylint: disable=W0221
 class GATLayer(nn.Module):
     r"""Single GAT layer from `Graph Attention Networks <https://arxiv.org/abs/1710.10903>`__
 
