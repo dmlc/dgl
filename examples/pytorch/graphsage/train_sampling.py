@@ -127,13 +127,13 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
+def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     """
-    Evaluate the model on the validation set specified by ``val_mask``.
+    Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
-    val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
+    val_nid : the node Ids for validation.
     batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
@@ -141,7 +141,7 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     with th.no_grad():
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred[val_mask], labels[val_mask])
+    return compute_acc(pred[val_nid], labels[val_nid])
 
 def load_subtensor(g, labels, seeds, input_nodes, device):
     """
@@ -157,8 +157,6 @@ def run(args, device, data):
     train_mask, val_mask, in_feats, labels, n_classes, g = data
     train_nid = th.LongTensor(np.nonzero(train_mask)[0])
     val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    train_mask = th.BoolTensor(train_mask)
-    val_mask = th.BoolTensor(val_mask)
 
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
@@ -220,7 +218,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, device)
+            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
