@@ -125,8 +125,8 @@ class GATLayer(nn.Module):
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
         gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.fc, gain=gain)
-        nn.init.xavier_normal_(self.attn_fc, gain=gain)
+        nn.init.xavier_normal_(self.fc.weight, gain=gain)
+        nn.init.xavier_normal_(self.attn_fc.weight, gain=gain)
 
     def edge_attention(self, edges):
         # edge UDF for equation (2)
