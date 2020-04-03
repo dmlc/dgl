@@ -187,6 +187,7 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
+        step_time = []
         for step, blocks in enumerate(dataloader):
             tic_step = time.time()
 
@@ -205,12 +206,14 @@ def run(args, device, data):
             loss.backward()
             optimizer.step()
 
-            iter_tput.append(len(seeds) / (time.time() - tic_step))
+            step_t = time.time() - tic_step
+            step_time.append(step_t)
+            iter_tput.append(len(seeds) / (step_t))
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
-                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
+                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
