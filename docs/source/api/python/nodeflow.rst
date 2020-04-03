@@ -1,7 +1,7 @@
 .. _apinodeflow:
 
-NodeFlow -- Graph sampled from a large graph
-============================================
+dgl.nodeflow
+==============
 
 .. currentmodule:: dgl
 .. autoclass:: NodeFlow

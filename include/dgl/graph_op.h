@@ -139,6 +139,15 @@ class GraphOp {
    * \return a new immutable bidirected graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
+  /*!
+   * \brief Same as BidirectedMutableGraph except that the returned graph is immutable
+   * and call gk_csr_MakeSymmetric in GKlib. This is more efficient than ToBidirectedImmutableGraph.
+   * It return a null pointer if the conversion fails.
+   *
+   * \param graph The input graph.
+   * \return a new immutable bidirected graph.
+   */
+  static GraphPtr ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig);
 
   /*!
    * \brief Get a induced subgraph with HALO nodes.
@@ -149,6 +158,15 @@ class GraphOp {
    * \return the induced subgraph with HALO nodes.
    */
   static HaloSubgraph GetSubgraphWithHalo(GraphPtr graph, IdArray nodes, int num_hops);
+
+  /*!
+   * \brief Partition a graph with Metis.
+   * The partitioning algorithm assigns each vertex to a partition.
+   * \param graph The input graph
+   * \param k The number of partitions.
+   * \return The partition assignments of all vertices.
+   */
+  static IdArray MetisPartition(GraphPtr graph, int32_t k);
 };
 
 }  // namespace dgl

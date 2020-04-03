@@ -6,6 +6,7 @@ from torch.nn import functional as F
 
 from .... import function as fn
 from ..softmax import edge_softmax
+from ....utils import expand_as_pair
 
 
 class AGNNConv(nn.Module):
@@ -47,6 +48,9 @@ class AGNNConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
+            If a pair of torch.Tensor is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, *)` and :math:`(N_{out}, *})`, the the :math:`*` in the later
+            tensor must equal the previous one.
 
         Returns
         -------
@@ -55,12 +59,16 @@ class AGNNConv(nn.Module):
             should be the same as input shape.
         """
         graph = graph.local_var()
-        graph.ndata['h'] = feat
-        graph.ndata['norm_h'] = F.normalize(feat, p=2, dim=-1)
+
+        feat_src, feat_dst = expand_as_pair(feat)
+        graph.srcdata['h'] = feat_src
+        graph.srcdata['norm_h'] = F.normalize(feat_src, p=2, dim=-1)
+        if isinstance(feat, tuple):
+            graph.dstdata['norm_h'] = F.normalize(feat_dst, p=2, dim=-1)
         # compute cosine distance
         graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
         cos = graph.edata.pop('cos')
         e = self.beta * cos
         graph.edata['p'] = edge_softmax(graph, e)
         graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
-        return graph.ndata.pop('h')
+        return graph.dstdata.pop('h')

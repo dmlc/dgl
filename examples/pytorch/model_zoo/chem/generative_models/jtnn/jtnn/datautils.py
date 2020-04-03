@@ -1,8 +1,9 @@
-import torch
-from torch.utils.data import Dataset
 import dgl
-from dgl.data.utils import download, extract_archive, get_download_dir
 import os
+import torch
+
+from torch.utils.data import Dataset
+from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 from .mol_tree import Vocab, DGLMolTree
 from .chemutils import mol2dgl_dec, mol2dgl_enc
@@ -15,8 +16,6 @@ BOND_FDIM_DEC = 5
 MAX_NB = 10
 
 PAPER = os.getenv('PAPER', False)
-
-_url = 'https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip'
 
 def _unpack_field(examples, field):
     return [e[field] for e in examples]
@@ -33,7 +32,7 @@ class JTNNDataset(Dataset):
     def __init__(self, data, vocab, training=True):
         self.dir = get_download_dir()
         self.zip_file_path='{}/jtnn.zip'.format(self.dir)
-        download(_url, path=self.zip_file_path)
+        download(_get_dgl_url('dgllife/jtnn.zip'), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/jtnn'.format(self.dir))
         print('Loading data...')
         if data in ['train', 'test']:

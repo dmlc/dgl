@@ -13,25 +13,24 @@
 #include <dgl/graph_interface.h>
 #include <algorithm>
 #include <vector>
+#include <string>
 
-/*! \brief Check whether two data types are the same.*/
-inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
-  return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
-}
+using dgl::runtime::operator<<;
 
 /*! \brief Output the string representation of device context.*/
-inline std::ostream& operator << (std::ostream& os, const DLDataType& ty) {
-  return os << "code=" << ty.code << ",bits=" << ty.bits << "lanes=" << ty.lanes;
-}
-
-/*! \brief Check whether two device contexts are the same.*/
-inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
-  return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
-}
-
-/*! \brief Output the string representation of device context.*/
-inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
-  return os << ctx.device_type << ":" << ctx.device_id;
+inline std::ostream& operator<<(std::ostream& os, const DLContext& ctx) {
+  std::string device_name;
+  switch (ctx.device_type) {
+    case kDLCPU:
+      device_name = "CPU";
+      break;
+    case kDLGPU:
+      device_name = "GPU";
+      break;
+    default:
+      device_name = "Unknown device";
+  }
+  return os << device_name << ":" << ctx.device_id;
 }
 
 namespace dgl {

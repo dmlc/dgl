@@ -67,7 +67,7 @@ def load_data(args):
     test_dataset = PPIDataset('test')
     PPIDataType = namedtuple('PPIDataset', ['train_mask', 'test_mask',
                                             'val_mask', 'features', 'labels', 'num_labels', 'graph'])
-    G = dgl.BatchedDGLGraph(
+    G = dgl.batch(
         [train_dataset.graph, val_dataset.graph, test_dataset.graph], edge_attrs=None, node_attrs=None)
     G = G.to_networkx()
     # hack to dodge the potential bugs of to_networkx

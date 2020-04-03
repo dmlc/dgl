@@ -1,10 +1,10 @@
 from scipy import io
 import numpy as np
-from dgl import DGLGraph
 import os
 import datetime
 
 from .utils import get_download_dir, download, extract_archive
+from ..graph import DGLGraph
 
 
 class BitcoinOTC(object):

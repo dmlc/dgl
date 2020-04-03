@@ -63,7 +63,7 @@ class Index(object):
             self._slice_data = slice(data.start, data.stop)
         else:
             try:
-                data = np.array(data).astype(np.int64)
+                data = np.asarray(data, dtype=np.int64)
             except Exception:  # pylint: disable=broad-except
                 raise DGLError('Error index data: %s' % str(data))
             if data.ndim == 0:  # scalar array
@@ -517,5 +517,25 @@ def make_invmap(array, use_numpy=True):
     else:
         uniques = list(set(array))
     invmap = {x: i for i, x in enumerate(uniques)}
-    remapped = np.array([invmap[x] for x in array])
+    remapped = np.asarray([invmap[x] for x in array])
     return uniques, invmap, remapped
+
+def expand_as_pair(input_):
+    """Return a pair of same element if the input is not a pair.
+    """
+    if isinstance(input_, tuple):
+        return input_
+    else:
+        return input_, input_
+
+def check_eq_shape(input_):
+    """If input_ is a pair of features, check if the feature shape of source
+    nodes is equal to the feature shape of destination nodes.
+    """
+    srcdata, dstdata = expand_as_pair(input_)
+    src_feat_shape = tuple(F.shape(srcdata))[1:]
+    dst_feat_shape = tuple(F.shape(dstdata))[1:]
+    if src_feat_shape != dst_feat_shape:
+        raise DGLError("The feature shape of source nodes: {} \
+            should be equal to the feature shape of destination \
+            nodes: {}.".format(src_feat_shape, dst_feat_shape))

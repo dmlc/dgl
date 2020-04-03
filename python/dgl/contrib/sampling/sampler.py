@@ -12,7 +12,8 @@ from ..._ffi.ndarray import empty
 from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
-from ... import subgraph
+from ...graph import DGLGraph
+from ...base import NID, EID
 
 try:
     import Queue as queue
@@ -224,7 +225,7 @@ class NeighborSampler(NodeFlowSampler):
     layer :math:`i+1` are in layer :math:`i`. All the edges are from nodes
     in layer :math:`i` to layer :math:`i+1`.
 
-    .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NodeFlow.png
+    .. image:: https://data.dgl.ai/tutorial/sampling/NodeFlow.png
     
     As an analogy to mini-batch training, the ``batch_size`` here is equal to the number
     of the initial seed nodes (number of nodes in the last layer).
@@ -240,14 +241,8 @@ class NeighborSampler(NodeFlowSampler):
         The DGLGraph where we sample NodeFlows.
     batch_size : int
         The batch size (i.e, the number of nodes in the last layer)
-    expand_factor : int, float, str
+    expand_factor : int
         The number of neighbors sampled from the neighbor list of a vertex.
-        The value of this parameter can be:
-
-        * int: indicates the number of neighbors sampled from a neighbor list.
-        * float: indicates the ratio of the sampled neighbors in a neighbor list.
-        * str: indicates some common ways of calculating the number of sampled neighbors,
-          e.g., ``sqrt(deg)``.
 
         Note that no matter how large the expand_factor, the max number of sampled neighbors
         is the neighborhood size.
@@ -437,13 +432,17 @@ class LayerSampler(NodeFlowSampler):
         nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
 
-class EdgeSubgraph(subgraph.DGLSubGraph):
+class EdgeSubgraph(DGLGraph):
     ''' The subgraph sampled from an edge sampler.
 
     A user can access the head nodes and tail nodes of the subgraph directly.
     '''
     def __init__(self, parent, sgi, neg):
-        super(EdgeSubgraph, self).__init__(parent, sgi)
+        super(EdgeSubgraph, self).__init__(graph_data=sgi.graph,
+                                           readonly=True,
+                                           parent=parent)
+        self.ndata[NID] = sgi.induced_nodes.tousertensor()
+        self.edata[EID] = sgi.induced_edges.tousertensor()
         self.sgi = sgi
         self.neg = neg
         self.head = None
@@ -741,7 +740,9 @@ class EdgeSampler(object):
 
         if self._negative_mode == "":
             # If no negative subgraphs.
-            return [subgraph.DGLSubGraph(self.g, subg) for subg in subgs]
+            return [self.g._create_subgraph(subg,
+                                            subg.induced_nodes,
+                                            subg.induced_edges) for subg in subgs]
         else:
             rets = []
             assert len(subgs) % 2 == 0

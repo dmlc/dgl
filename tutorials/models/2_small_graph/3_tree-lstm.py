@@ -91,12 +91,13 @@ def plot_tree(g):
 plot_tree(graph.to_networkx())
 
 #################################################################################
-# You can read more about the definition of :func:`~dgl.batched_graph.batch`, or
+# You can read more about the definition of :func:`~dgl.batch`, or
 # skip ahead to the next step:
 # .. note::
 #
-#    **Definition**: A :class:`~dgl.batched_graph.BatchedDGLGraph` is a
-#    :class:`~dgl.DGLGraph` that unions a list of :class:`~dgl.DGLGraph`\ s. 
+#    **Definition**: :func:`~dgl.batch` unions a list of :math:`B`
+#      :class:`~dgl.DGLGraph`\ s and returns a :class:`~dgl.DGLGraph` of batch 
+#      size :math:`B`. 
 #    
 #    - The union includes all the nodes,
 #      edges, and their features. The order of nodes, edges, and features are
@@ -108,22 +109,15 @@ plot_tree(graph.to_networkx())
 #          :math:`j + \sum_{k=1}^{i-1} V_k` in the batched graph. 
 #    
 #        - Therefore, performing feature transformation and message passing on
-#          ``BatchedDGLGraph`` is equivalent to doing those
+#          the batched graph is equivalent to doing those
 #          on all ``DGLGraph`` constituents in parallel. 
 #
 #    - Duplicate references to the same graph are
 #      treated as deep copies; the nodes, edges, and features are duplicated,
 #      and mutation on one reference does not affect the other. 
-#    - Currently, ``BatchedDGLGraph`` is immutable in
-#      graph structure. You can't add
-#      nodes and edges to it. You need to support mutable batched graphs in
-#      (far) future. 
-#    - The ``BatchedDGLGraph`` keeps track of the meta
+#    - The batched graph keeps track of the meta
 #      information of the constituents so it can be
 #      :func:`~dgl.batched_graph.unbatch`\ ed to list of ``DGLGraph``\ s.
-#
-# For more details about the :class:`~dgl.batched_graph.BatchedDGLGraph`
-# module in DGL, you can click the class name.
 #
 # Step 2: Tree-LSTM cell with message-passing APIs
 # ------------------------------------------------
