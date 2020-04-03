@@ -4,16 +4,17 @@
  * \brief Call Metis partitioning
  */
 
-#include <metis.h>
-#include <dgl/graph_op.h>
 #include <dgl/packed_func_ext.h>
 #include "../c_api_common.h"
+
+#if !defined(_WIN32)
+
+#include <metis.h>
+#include <dgl/graph_op.h>
 
 using namespace dgl::runtime;
 
 namespace dgl {
-
-#if !defined(_WIN32)
 
 IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
   // The index type of Metis needs to be compatible with DGL index type.
@@ -71,7 +72,13 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
     *rv = GraphOp::MetisPartition(g.sptr(), k);
   });
 
-#else
+}   // namespace dgl
+
+#else   // defined(_WIN32)
+
+using namespace dgl::runtime;
+
+namespace dgl {
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -81,6 +88,6 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
     *rv = aten::NullArray();
   });
 
-#endif  // !defined(_WIN32)
 
 }  // namespace dgl
+#endif  // !defined(_WIN32)

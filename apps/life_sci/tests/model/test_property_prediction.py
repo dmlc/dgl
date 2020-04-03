@@ -1,5 +1,6 @@
 import dgl
 import torch
+import torch.nn.functional as F
 
 from dgl import DGLGraph
 
@@ -65,7 +66,7 @@ def test_gcn_predictor():
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
 
     # Test default setting
-    gcn_predictor = GCNPredictor(in_feats=1)
+    gcn_predictor = GCNPredictor(in_feats=1).to(device)
     gcn_predictor.eval()
     assert gcn_predictor(g, node_feats).shape == torch.Size([1, 1])
     gcn_predictor.train()
@@ -213,7 +214,7 @@ def test_mpnn_predictor():
 
     # Test default setting
     mpnn_predictor = MPNNPredictor(node_in_feats=1,
-                                   edge_in_feats=2)
+                                   edge_in_feats=2).to(device)
     assert mpnn_predictor(g, node_feats, edge_feats).shape == torch.Size([1, 1])
     assert mpnn_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
            torch.Size([2, 1])
@@ -226,7 +227,7 @@ def test_mpnn_predictor():
                                    n_tasks=2,
                                    num_step_message_passing=2,
                                    num_step_set2set=2,
-                                   num_layer_set2set=2)
+                                   num_layer_set2set=2).to(device)
     assert mpnn_predictor(g, node_feats, edge_feats).shape == torch.Size([1, 2])
     assert mpnn_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
            torch.Size([2, 2])

@@ -1,4 +1,5 @@
 """Utilities for using pretrained models."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import os
 import torch
 import torch.nn.functional as F
@@ -58,6 +59,7 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
 
     return model
 
+# pylint: disable=I1101
 def load_pretrained(model_name, log=True):
     """Load a pretrained model
 
@@ -66,15 +68,20 @@ def load_pretrained(model_name, log=True):
     model_name : str
         Currently supported options include
 
-        * ``'GCN_Tox21'``
-        * ``'GAT_Tox21'``
-        * ``'AttentiveFP_Aromaticity'``
-        * ``'DGMG_ChEMBL_canonical'``
-        * ``'DGMG_ChEMBL_random'``
-        * ``'DGMG_ZINC_canonical'``
-        * ``'DGMG_ZINC_random'``
-        * ``'JTNN_ZINC'``
-        * ``'wln_center_uspto'``
+        * ``'GCN_Tox21'``: A GCN-based model for molecular property prediction on Tox21
+        * ``'GAT_Tox21'``: A GAT-based model for molecular property prediction on Tox21
+        * ``'AttentiveFP_Aromaticity'``: An AttentiveFP model for predicting number of
+          aromatic atoms on a subset of Pubmed
+        * ``'DGMG_ChEMBL_canonical'``: A DGMG model trained on ChEMBL with a canonical
+          atom order
+        * ``'DGMG_ChEMBL_random'``: A DGMG model trained on ChEMBL for molecule generation
+          with a random atom order
+        * ``'DGMG_ZINC_canonical'``: A DGMG model trained on ZINC for molecule generation
+          with a canonical atom order
+        * ``'DGMG_ZINC_random'``: A DGMG model pre-trained on ZINC for molecule generation
+          with a random atom order
+        * ``'JTNN_ZINC'``: A JTNN model pre-trained on ZINC for molecule generation
+        * ``'wln_center_uspto'``: A WLN model pre-trained on USPTO for reaction prediction
 
     log : bool
         Whether to print progress for model loading
