@@ -80,12 +80,10 @@ def train(net, opt, scheduler, train_loader, dev):
     scheduler.step()
 
 def mIoU(preds, label, cat, cat_miou, seg_classes):
-    n_cat = len(seg_classes)
     for i in range(preds.shape[0]):
         shape_iou = 0
         n = len(seg_classes[cat[i]])
         for cls in seg_classes[cat[i]]:
-            gt_ind = label[i,:] == cls
             pred_set = set(np.where(preds[i,:] == cls)[0])
             label_set = set(np.where(label[i,:] == cls)[0])
             union = len(pred_set.union(label_set))
@@ -100,7 +98,7 @@ def mIoU(preds, label, cat, cat_miou, seg_classes):
 
     return cat_miou
 
-def evaluate(net, test_loader, dev):
+def evaluate(net, test_loader, dev, per_cat_verbose=False):
 
     category_list = sorted(list(shapenet.seg_classes.keys()))
     eye_mat = np.eye(16)
@@ -111,6 +109,8 @@ def evaluate(net, test_loader, dev):
         cat_miou[k] = [0, 0]
     miou = 0
     count = 0
+    per_cat_miou = 0
+    per_cat_count = 0
 
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
@@ -129,11 +129,21 @@ def evaluate(net, test_loader, dev):
                                 cat, cat_miou, shapenet.seg_classes)
                 for _, v in cat_miou.items():
                     if v[1] > 0:
-                        miou += v[0] / v[1]
-                        count += 1
+                        miou += v[0]
+                        count += v[1]
+                        per_cat_miou += v[0] / v[1]
+                        per_cat_count += 1
                 tq.set_postfix({
-                    'mIoU': '%.5f' % (miou / count)})
-    return miou / count
+                    'mIoU': '%.5f' % (miou / count),
+                    'per Category mIoU': '%.5f' % (miou / count)})
+    if per_cat_verbose:
+        print("Per-Category mIoU:")
+        for k, v in cat_miou.items():
+            if v[1] > 0:
+                print("%s mIoU=%.5f" % (k, v[0] / v[1]))
+            else:
+                print("%s mIoU=%.5f" % (k, 1))
+    return miou / count, per_cat_miou / per_cat_count
 
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -153,16 +163,18 @@ shapenet = ShapeNet(2048, normal_channel=False)
 train_loader = CustomDataLoader(shapenet.trainval())
 test_loader = CustomDataLoader(shapenet.test())
 
-best_test_acc = 0
+best_test_miou = 0
+best_test_per_cat_miou = 0
 
 for epoch in range(args.num_epochs):
     train(net, opt, scheduler, train_loader, dev)
     if (epoch + 1) % 5 == 0:
         print('Epoch #%d Testing' % epoch)
-        test_acc = evaluate(net, test_loader, dev)
-        if test_acc > best_test_acc:
-            best_test_acc = test_acc
+        test_miou, test_per_cat_miou = evaluate(net, test_loader, dev, (epoch + 1) % 5 ==0)
+        if test_miou > best_test_miou:
+            best_test_miou = test_miou
+            best_test_per_cat_miou = test_per_cat_miou
             if args.save_model_path:
                 torch.save(net.state_dict(), args.save_model_path)
-        print('Current test acc: %.5f (best: %.5f)' % (
-               test_acc, best_test_acc))
+        print('Current test mIoU: %.5f (best: %.5f), per-Category mIoU: %.5f (best: %.5f)' % (
+               test_miou, best_test_miou, test_per_cat_miou, best_test_per_cat_miou))
