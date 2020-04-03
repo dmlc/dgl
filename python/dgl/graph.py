@@ -4009,6 +4009,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
 
     The nodes and edges are re-indexed with a new id in the batched graph with the
     rule below:
+
     ======  ==========  ========================  ===  ==========================
     item    Graph 1     Graph 2                   ...  Graph k
     ======  ==========  ========================  ===  ==========================
@@ -4040,6 +4041,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     --------
     Create two :class:`~dgl.DGLGraph` objects.
     **Instantiation:**
+
     >>> import dgl
     >>> import torch as th
     >>> g1 = dgl.DGLGraph()
@@ -4052,13 +4054,17 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     >>> g2.add_edges([0, 2], [1, 1])                   # Add edges 0 -> 1, 2 -> 1
     >>> g2.ndata['hv'] = th.tensor([[2.], [3.], [4.]]) # Initialize node features
     >>> g2.edata['he'] = th.tensor([[1.], [2.]])       # Initialize edge features
+
     Merge two :class:`~dgl.DGLGraph` objects into one :class:`DGLGraph` object.
     When merging a list of graphs, we can choose to include only a subset of the attributes.
+
     >>> bg = dgl.batch([g1, g2], edge_attrs=None)
     >>> bg.edata
     {}
+
     Below one can see that the nodes are re-indexed. The edges are re-indexed in
     the same way.
+
     >>> bg.nodes()
     tensor([0, 1, 2, 3, 4])
     >>> bg.ndata['hv']
@@ -4067,14 +4073,17 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
             [2.],
             [3.],
             [4.]])
+
     **Property:**
     We can still get a brief summary of the graphs that constitute the batched graph.
+
     >>> bg.batch_size
     2
     >>> bg.batch_num_nodes
     [2, 3]
     >>> bg.batch_num_edges
     [1, 2]
+
     **Readout:**
     Another common demand for graph neural networks is graph readout, which is a
     function that takes in the node attributes and/or edge attributes for a graph
@@ -4082,20 +4091,25 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     DGL also supports performing readout for a batch of graphs at once.
     Below we take the built-in readout function :func:`sum_nodes` as an example, which
     sums over a particular kind of node attribute for each graph.
+
     >>> dgl.sum_nodes(bg, 'hv') # Sum the node attribute 'hv' for each graph.
     tensor([[1.],               # 0 + 1
             [9.]])              # 2 + 3 + 4
+
     **Message passing:**
     For message passing and related operations, batched :class:`DGLGraph` acts exactly
     the same as a single :class:`~dgl.DGLGraph` with batch size 1.
     **Update Attributes:**
     Updating the attributes of the batched graph has no effect on the original graphs.
+
     >>> bg.edata['he'] = th.zeros(3, 2)
     >>> g2.edata['he']
     tensor([[1.],
             [2.]])}
+
     Instead, we can decompose the batched graph back into a list of graphs and use them
     to replace the original graphs.
+
     >>> g1, g2 = dgl.unbatch(bg)    # returns a list of DGLGraph objects
     >>> g2.edata['he']
     tensor([[0., 0.],
