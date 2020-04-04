@@ -36,7 +36,6 @@ struct GraphIndexMetadata {
   bool has_in_csr;
   bool has_out_csr;
   bool has_coo;
-  bool multigraph;
 };
 
 /*
@@ -51,7 +50,6 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
   meta.has_in_csr = gidx->HasInCSR();
   meta.has_out_csr = gidx->HasOutCSR();
   meta.has_coo = false;
-  meta.multigraph = gidx->IsMultigraph();
 
   NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DLDataType{kDLInt, 8, 1},
                                           DLContext{kDLCPU, 0}, true);
@@ -522,12 +520,10 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(const std::string &name) {
   GraphIndexMetadata meta = DeserializeMetadata(GetSharedMemName(name, "meta"));
   CSRPtr in_csr, out_csr;
   if (meta.has_in_csr) {
-    in_csr = CSRPtr(new CSR(GetSharedMemName(name, "in"), meta.num_nodes,
-                            meta.num_edges, meta.multigraph));
+    in_csr = CSRPtr(new CSR(GetSharedMemName(name, "in"), meta.num_nodes, meta.num_edges));
   }
   if (meta.has_out_csr) {
-    out_csr = CSRPtr(new CSR(GetSharedMemName(name, "out"), meta.num_nodes,
-                             meta.num_edges, meta.multigraph));
+    out_csr = CSRPtr(new CSR(GetSharedMemName(name, "out"), meta.num_nodes, meta.num_edges));
   }
   return ImmutableGraphPtr(new ImmutableGraph(in_csr, out_csr, name));
 }

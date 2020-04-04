@@ -886,10 +886,6 @@ class ImmutableGraph: public GraphInterface {
   static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir);
 
-  static ImmutableGraphPtr CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids,
-      const std::string &edge_dir);
-
   static ImmutableGraphPtr CreateFromCSR(const std::string &shared_mem_name);
 
   /*! \brief Create an immutable graph from COO. */
