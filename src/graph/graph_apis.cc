@@ -44,7 +44,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray indptr = args[0];
     const IdArray indices = args[1];
-    const std::string edge_dir = args[3];
+    const std::string edge_dir = args[2];
 
     IdArray edge_ids = IdArray::Empty({indices->shape[0]},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
