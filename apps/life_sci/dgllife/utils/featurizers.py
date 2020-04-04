@@ -375,6 +375,9 @@ def atom_partial_charge(atom):
     For using this function, you must have called ``AllChem.ComputeGasteigerCharges(mol)``
     to compute Gasteiger charges.
 
+    Occasionally, we can get nan or infinity Gasteiger charges, in which case we will set
+    the result to be 0.
+
     Parameters
     ----------
     atom : rdkit.Chem.rdchem.Atom
