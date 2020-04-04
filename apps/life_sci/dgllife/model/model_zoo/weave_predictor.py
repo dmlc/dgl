@@ -94,6 +94,3 @@ class WeavePredictor(nn.Module):
         g_feats = self.readout(g, node_feats)
 
         return self.predict(g_feats)
-
-if __name__ == '__main__':
-    model = WeavePredictor(node_in_feats=27, edge_in_feats=12)
