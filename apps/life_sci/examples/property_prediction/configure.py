@@ -63,6 +63,7 @@ Weave_Tox21 = {
     'num_gnn_layers': 2,
     'gnn_hidden_feats': 50,
     'graph_feats': 128,
+    'patience': 10,
     'smiles_to_graph': partial(smiles_to_complete_graph, add_self_loop=True, ),
     'node_featurizer': WeaveAtomFeaturizer(),
     'edge_featurizer': WeaveEdgeFeaturizer(),
