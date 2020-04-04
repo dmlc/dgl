@@ -385,7 +385,10 @@ def atom_partial_charge(atom):
     list
         List containing one float only.
     """
-    return [float(atom.GetProp('_GasteigerCharge'))]
+    gasteiger_charge = atom.GetProp('_GasteigerCharge')
+    if gasteiger_charge == '-nan':
+        gasteiger_charge = 0
+    return [float(gasteiger_charge)]
 
 def atom_num_radical_electrons_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the number of radical electrons of an atom.
