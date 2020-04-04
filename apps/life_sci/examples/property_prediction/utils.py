@@ -5,6 +5,16 @@ import torch
 
 from dgllife.utils.featurizers import one_hot_encoding
 from dgllife.utils.splitters import RandomSplitter
+from dgllife.utils.weave_featurizer import *
+
+
+def smiles_to_bigraph(smiles, add_self_loop=False,
+                      node_featurizer=None,
+                      edge_featurizer=None,
+                      canonical_atom_order=True):
+    mol = Chem.MolFromSmiles(smiles)
+    return construct_graph_and_featurize(mol)
+
 
 def set_random_seed(seed=0):
     """Set random seed.
@@ -18,6 +28,7 @@ def set_random_seed(seed=0):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
+
 
 def load_dataset_for_classification(args):
     """Load dataset for classification tasks.
@@ -47,6 +58,7 @@ def load_dataset_for_classification(args):
             frac_test=args['frac_test'], random_state=args['random_seed'])
 
     return dataset, train_set, val_set, test_set
+
 
 def load_dataset_for_regression(args):
     """Load dataset for regression tasks.
@@ -82,6 +94,7 @@ def load_dataset_for_regression(args):
 
     return train_set, val_set, test_set
 
+
 def collate_molgraphs(data):
     """Batching a list of datapoints for dataloader.
 
@@ -97,7 +110,7 @@ def collate_molgraphs(data):
     smiles : list
         List of smiles
     bg : DGLGraph
-        Batched DGLGraph
+        The batched DGLGraph.
     labels : Tensor of dtype float32 and shape (B, T)
         Batched datapoint labels. B is len(data) and
         T is the number of total tasks.
@@ -124,6 +137,7 @@ def collate_molgraphs(data):
     else:
         masks = torch.stack(masks, dim=0)
     return smiles, bg, labels, masks
+
 
 def load_model(args):
     if args['model'] == 'GCN':
@@ -183,6 +197,7 @@ def load_model(args):
                               n_tasks=args['n_tasks'])
 
     return model
+
 
 def chirality(atom):
     try:

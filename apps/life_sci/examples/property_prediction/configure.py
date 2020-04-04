@@ -11,6 +11,8 @@ from dgllife.utils import CanonicalAtomFeaturizer, BaseAtomFeaturizer, WeaveAtom
 # edge featurization
 from dgllife.utils.featurizers import BaseBondFeaturizer, WeaveEdgeFeaturizer
 
+from dgllife.utils.weave_featurizer import *
+
 from utils import chirality
 
 GCN_Tox21 = {
@@ -69,6 +71,28 @@ Weave_Tox21 = {
     'edge_featurizer': WeaveEdgeFeaturizer(),
     'metric_name': 'roc_auc_score'
 }
+
+WeaveGNN_Tox21 = {
+    'random_seed': 2,
+    'batch_size': 96,
+    'lr': 3e-3,
+    'num_epochs': 100,
+    'atom_data_field': 'h',
+    'edge_data_field': 'feat',
+    'frac_train': 0.8,
+    'frac_val': 0.1,
+    'frac_test': 0.1,
+    'node_in_feats': 27,
+    'edge_in_feats': 12,
+    'num_gnn_layers':2,
+    'weave_hidden_feats': 50,
+    'graph_feats': 128,
+    'patience': 10,
+    'atom_featurizer': AtomFeaturizer(),
+    'bond_featurizer': partial(edge_featurizer, max_distance=7),
+    'metric_name': 'roc_auc_score'
+}
+
 
 MPNN_Alchemy = {
     'random_seed': 0,
