@@ -63,7 +63,8 @@ class WeavePredictor(nn.Module):
                             activation=gnn_activation)
         self.node_to_graph = nn.Sequential(
             nn.Linear(gnn_hidden_feats, graph_feats),
-            readout_activation
+            readout_activation,
+            nn.BatchNorm1d(graph_feats)
         )
         self.readout = WeaveGather(node_in_feats=graph_feats,
                                    gaussian_expand=gaussian_expand,
