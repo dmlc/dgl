@@ -26,10 +26,10 @@ typedef std::shared_ptr<Graph> MutableGraphPtr;
 class Graph: public GraphInterface {
  public:
   /*! \brief default constructor */
-  explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
+  Graph() {}
 
   /*! \brief construct a graph from the coo format. */
-  Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes, bool multigraph = false);
+  Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes);
 
   /*! \brief default copy constructor */
   Graph(const Graph& other) = default;
@@ -44,7 +44,6 @@ class Graph: public GraphInterface {
     all_edges_src_ = other.all_edges_src_;
     all_edges_dst_ = other.all_edges_dst_;
     read_only_ = other.read_only_;
-    is_multigraph_ = other.is_multigraph_;
     num_edges_ = other.num_edges_;
     other.Clear();
   }
@@ -102,9 +101,7 @@ class Graph: public GraphInterface {
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
-  bool IsMultigraph() const override {
-    return is_multigraph_;
-  }
+  bool IsMultigraph() const override;
 
   /*!
    * \return whether the graph is read-only
@@ -350,14 +347,14 @@ class Graph: public GraphInterface {
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
   /*! \brief Create an empty graph */
-  static MutableGraphPtr Create(bool multigraph = false) {
-    return std::make_shared<Graph>(multigraph);
+  static MutableGraphPtr Create() {
+    return std::make_shared<Graph>();
   }
 
   /*! \brief Create from coo */
   static MutableGraphPtr CreateFromCOO(
-      int64_t num_nodes, IdArray src_ids, IdArray dst_ids, bool multigraph = false) {
-    return std::make_shared<Graph>(src_ids, dst_ids, num_nodes, multigraph);
+      int64_t num_nodes, IdArray src_ids, IdArray dst_ids) {
+    return std::make_shared<Graph>(src_ids, dst_ids, num_nodes);
   }
 
  protected:
@@ -383,12 +380,7 @@ class Graph: public GraphInterface {
 
   /*! \brief read only flag */
   bool read_only_ = false;
-  /*!
-   * \brief Whether if this is a multigraph.
-   *
-   * When a multiedge is added, this flag switches to true.
-   */
-  bool is_multigraph_ = false;
+
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
 };

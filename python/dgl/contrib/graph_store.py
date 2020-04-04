@@ -290,7 +290,8 @@ class SharedMemoryStoreServer(object):
     graph_name : string
         Define the name of the graph, so the client can use the name to access the graph.
     multigraph : bool, optional
-        Whether the graph would be a multigraph (default: False)
+        Deprecated (Will be deleted in the future).
+        Whether the graph would be a multigraph (default: True)
     num_workers : int
         The number of workers that will connect to the server.
     port : int
@@ -298,14 +299,18 @@ class SharedMemoryStoreServer(object):
     """
     def __init__(self, graph_data, graph_name, multigraph, num_workers, port):
         self.server = None
+        if multigraph is not None:
+            dgl_warning("multigraph will be deprecated." \
+                        "DGL will treat all graphs as multigraph in the future.")
+
         if isinstance(graph_data, GraphIndex):
             graph_data = graph_data.copyto_shared_mem(_get_graph_path(graph_name))
         elif isinstance(graph_data, DGLGraph):
             graph_data = graph_data._graph.copyto_shared_mem(_get_graph_path(graph_name))
         else:
-            graph_data = create_graph_index(graph_data, multigraph, True)
+            graph_data = create_graph_index(graph_data, readonly=True)
             graph_data = graph_data.copyto_shared_mem(_get_graph_path(graph_name))
-        self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
+        self._graph = DGLGraph(graph_data, readonly=True)
 
         self._num_workers = num_workers
         self._graph_name = graph_name
@@ -329,8 +334,7 @@ class SharedMemoryStoreServer(object):
             assert graph_name == self._graph_name
             # if the integers are larger than 2^31, xmlrpc can't handle them.
             # we convert them to strings to send them to clients.
-            return str(self._graph.number_of_nodes()), str(self._graph.number_of_edges()), \
-                    self._graph.is_multigraph
+            return str(self._graph.number_of_nodes()), str(self._graph.number_of_edges())
 
         # RPC command: initialize node embedding in the server.
         def init_ndata(init, ndata_name, shape, dtype):
@@ -455,7 +459,7 @@ class BaseGraphStore(DGLGraph):
     """
     def __init__(self,
                  graph_data=None,
-                 multigraph=False):
+                 multigraph=None):
         super(BaseGraphStore, self).__init__(graph_data, multigraph=multigraph, readonly=True)
 
     @property
@@ -531,11 +535,10 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         self._worker_id, self._num_workers = self.proxy.register(graph_name)
         if self._worker_id < 0:
             raise Exception('fail to get graph ' + graph_name + ' from the graph store')
-        num_nodes, num_edges, multigraph = self.proxy.get_graph_info(graph_name)
+        num_nodes, num_edges = self.proxy.get_graph_info(graph_name)
         num_nodes, num_edges = int(num_nodes), int(num_edges)
 
         graph_idx = from_shared_mem_graph_index(_get_graph_path(graph_name))
-        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
         self._init_manager = InitializerManager()
 
         # map all ndata and edata from the server.
@@ -1029,7 +1032,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
 
 
 def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
-                              multigraph=False, port=8000):
+                              multigraph=None, port=8000):
     """Create the graph store server.
 
     The server loads graph structure and node embeddings and edge embeddings.
@@ -1060,7 +1063,8 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     num_workers : int
         The number of workers that will connect to the server.
     multigraph : bool, optional
-        Whether the graph would be a multigraph (default: False)
+        Deprecated (Will be deleted in the future).
+        Whether the graph would be a multigraph (default: True)
     port : int
         The port that the server listens to.
 
@@ -1069,7 +1073,10 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     SharedMemoryStoreServer
         The graph store server
     """
-    return SharedMemoryStoreServer(graph_data, graph_name, multigraph,
+    if multigraph is not None:
+        dgl_warning("multigraph is deprecated." \
+                    "DGL treat all graphs as multigraph by default.")
+    return SharedMemoryStoreServer(graph_data, graph_name, None,
                                    num_workers, port)
 
 def create_graph_from_store(graph_name, store_type, port=8000):

@@ -277,7 +277,7 @@ def check_mem(gidx, cond_v, shared_v):
 
 def test_copy_shared_mem():
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
-    gidx = dgl.graph_index.create_graph_index(csr, False, True)
+    gidx = dgl.graph_index.create_graph_index(csr, True)
 
     cond_v = Condition()
     shared_v = Value('i', 0)

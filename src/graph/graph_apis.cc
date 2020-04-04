@@ -23,8 +23,7 @@ namespace dgl {
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    bool multigraph = args[0];
-    *rv = GraphRef(Graph::Create(multigraph));
+    *rv = GraphRef(Graph::Create());
   });
 
 
@@ -32,18 +31,12 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray src_ids = args[0];
     const IdArray dst_ids = args[1];
-    const int multigraph = args[2];
-    const int64_t num_nodes = args[3];
-    const bool readonly = args[4];
+    const int64_t num_nodes = args[2];
+    const bool readonly = args[3];
     if (readonly) {
-      if (multigraph == kBoolUnknown) {
-        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids));
-      } else {
-        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids, multigraph));
-      }
+      *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids));
     } else {
-      CHECK_NE(multigraph, kBoolUnknown);
-      *rv = GraphRef(Graph::CreateFromCOO(num_nodes, src_ids, dst_ids, multigraph));
+      *rv = GraphRef(Graph::CreateFromCOO(num_nodes, src_ids, dst_ids));
     }
   });
 
@@ -51,7 +44,6 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray indptr = args[0];
     const IdArray indices = args[1];
-    const int multigraph = args[2];
     const std::string edge_dir = args[3];
 
     IdArray edge_ids = IdArray::Empty({indices->shape[0]},
@@ -59,12 +51,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
-    if (multigraph == kBoolUnknown) {
-      *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, edge_dir));
-    } else {
-      *rv = GraphRef(ImmutableGraph::CreateFromCSR(
-          indptr, indices, edge_ids, multigraph, edge_dir));
-    }
+    *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, edge_dir));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")

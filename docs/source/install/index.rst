@@ -12,10 +12,9 @@ DGL works with the following operating systems:
 * Windows 10
 
 DGL requires Python version 3.5 or later. Python 3.4 or earlier is not
-tested. Python 2 support is coming.
+tested.
 
-DGL supports multiple tensor libraries as backends, e.g., PyTorch, MXNet. For requirements on backends and how to select one, see
-`Working with different backends`_.
+DGL supports multiple tensor libraries as backends, e.g., PyTorch, MXNet. For requirements on backends and how to select one, see :ref:`backends`.
 
 Starting at version 0.3, DGL is separated into CPU and CUDA builds.  The builds share the
 same Python package name. If you install DGL with a CUDA 9 build after you install the
@@ -46,7 +45,7 @@ For CPU builds, run the following command to install with ``pip``.
 .. code:: bash
 
    pip install dgl
-   
+
 For CUDA builds, run one of the following commands and specify the CUDA version.
 
 .. code:: bash
@@ -54,7 +53,7 @@ For CUDA builds, run one of the following commands and specify the CUDA version.
    pip install dgl           # For CPU Build
    pip install dgl-cu90      # For CUDA 9.0 Build
    pip install dgl-cu92      # For CUDA 9.2 Build
-   pip install dgl-cu100     # For CUDA 10.0 Build   
+   pip install dgl-cu100     # For CUDA 10.0 Build
    pip install dgl-cu101     # For CUDA 10.1 Build
 
 For the most current nightly build from master branch, run one of the following commands.

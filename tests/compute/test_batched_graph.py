@@ -130,8 +130,8 @@ def test_batch_send_then_recv():
     bg.recv([1, 9]) # assuming recv takes in unique nodes
 
     t1, t2 = dgl.unbatch(bg)
-    assert t1.ndata['h'][1] == 7
-    assert t2.ndata['h'][4] == 2
+    assert F.asnumpy(t1.ndata['h'][1]) == 7
+    assert F.asnumpy(t2.ndata['h'][4]) == 2
 
 def test_batch_send_and_recv():
     t1 = tree1()
@@ -146,8 +146,8 @@ def test_batch_send_and_recv():
     bg.send_and_recv((u, v))
 
     t1, t2 = dgl.unbatch(bg)
-    assert t1.ndata['h'][1] == 7
-    assert t2.ndata['h'][4] == 2
+    assert F.asnumpy(t1.ndata['h'][1]) == 7
+    assert F.asnumpy(t2.ndata['h'][4]) == 2
 
 def test_batch_propagate():
     t1 = tree1()
@@ -173,8 +173,8 @@ def test_batch_propagate():
     bg.prop_edges(order)
     t1, t2 = dgl.unbatch(bg)
 
-    assert t1.ndata['h'][0] == 9
-    assert t2.ndata['h'][1] == 5
+    assert F.asnumpy(t1.ndata['h'][0]) == 9
+    assert F.asnumpy(t2.ndata['h'][1]) == 5
 
 def test_batched_edge_ordering():
     g1 = dgl.DGLGraph()

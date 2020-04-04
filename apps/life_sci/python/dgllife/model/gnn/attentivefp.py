@@ -1,4 +1,5 @@
 """AttentiveFP"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl.function as fn
 import torch
 import torch.nn as nn
@@ -8,6 +9,7 @@ from dgl.nn.pytorch import edge_softmax
 
 __all__ = ['AttentiveFPGNN']
 
+# pylint: disable=W0221, C0103, E1101
 class AttentiveGRU1(nn.Module):
     """Update node features with attention and GRU.
 
@@ -298,7 +300,7 @@ class AttentiveFPGNN(nn.Module):
 
         self.init_context = GetContext(node_feat_size, edge_feat_size, graph_feat_size, dropout)
         self.gnn_layers = nn.ModuleList()
-        for i in range(num_layers - 1):
+        for _ in range(num_layers - 1):
             self.gnn_layers.append(GNNLayer(graph_feat_size, graph_feat_size, dropout))
 
     def forward(self, g, node_feats, edge_feats):

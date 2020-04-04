@@ -37,7 +37,9 @@ __all__ = [
     'to_simple',
     'in_subgraph',
     'out_subgraph',
-    'remove_edges']
+    'remove_edges',
+    'as_immutable_graph',
+    'as_heterograph']
 
 
 def pairwise_squared_distance(x):
@@ -239,7 +241,7 @@ def khop_graph(g, k):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    return DGLGraph(from_coo(n, row, col, True, True))
+    return DGLGraph(from_coo(n, row, col, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
     """Return the reverse of a graph
@@ -308,7 +310,7 @@ def reverse(g, share_ndata=False, share_edata=False):
             [2.],
             [3.]])
     """
-    g_reversed = DGLGraph(multigraph=g.is_multigraph)
+    g_reversed = DGLGraph()
     g_reversed.add_nodes(g.number_of_nodes())
     g_edges = g.all_edges(order='eid')
     g_reversed.add_edges(g_edges[1], g_edges[0])
@@ -354,6 +356,10 @@ def to_bidirected(g, readonly=True):
         The input graph.
     readonly : bool, default to be True
         Whether the returned bidirected graph is readonly or not.
+
+    Notes
+    -----
+    Please make sure g is a single graph, otherwise the return value is undefined.
 
     Returns
     -------
@@ -743,7 +749,7 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def to_block(g, dst_nodes=None):
+def to_block(g, dst_nodes=None, include_dst_in_src=True):
     """Convert a graph into a bipartite-structured "block" for message passing.
 
     A block graph is uni-directional bipartite graph consisting of two sets of nodes
@@ -761,7 +767,7 @@ def to_block(g, dst_nodes=None):
 
     Moreover, the function also relabels node ids in each type to make the graph more compact.
     Specifically, the nodes of type ``vtype`` would contain the nodes that have at least one
-    inbound edge of any type, while ``utype`` would contain all the DST nodes of type ``utype``,
+    inbound edge of any type, while ``utype`` would contain all the DST nodes of type ``vtype``,
     as well as the nodes that have at least one outbound edge to any DST node.
 
     Since DST nodes are included in SRC nodes, a common requirement is to fetch
@@ -783,6 +789,8 @@ def to_block(g, dst_nodes=None):
         The graph.
     dst_nodes : Tensor or dict[str, Tensor], optional
         Optional DST nodes. If a tensor is given, the graph must have only one node type.
+    include_dst_in_src : bool, default True
+        If False, do not include DST nodes in SRC nodes.
 
     Returns
     -------
@@ -876,7 +884,8 @@ def to_block(g, dst_nodes=None):
         else:
             dst_nodes_nd.append(nd.null())
 
-    new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(g._graph, dst_nodes_nd)
+    new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
+        g._graph, dst_nodes_nd, include_dst_in_src)
     src_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in src_nodes_nd]
     dst_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd) for nodes_nd in dst_nodes_nd]
 
@@ -922,15 +931,23 @@ def remove_edges(g, edge_ids):
                 "Graph has more than one edge type; specify a dict for edge_id instead.")
         edge_ids = {g.canonical_etypes[0]: edge_ids}
 
-    edge_ids_nd = [None] * len(g.etypes)
+    edge_ids_nd = [nd.null()] * len(g.etypes)
     for key, value in edge_ids.items():
         edge_ids_nd[g.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
     new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(g._graph, edge_ids_nd)
 
     new_graph = DGLHeteroGraph(new_graph_index, g.ntypes, g.etypes)
     for i, canonical_etype in enumerate(g.canonical_etypes):
-        new_graph.edges[canonical_etype].data[EID] = F.zerocopy_from_dgl_ndarray(
-            induced_eids_nd[i].data)
+        data = induced_eids_nd[i].data
+        if len(data) == 0:
+            # Empty means that either
+            # (1) no edges are removed and edges are not shuffled.
+            # (2) all edges are removed.
+            # The following statement deals with both cases.
+            new_graph.edges[canonical_etype].data[EID] = F.arange(
+                0, new_graph.number_of_edges(canonical_etype))
+        else:
+            new_graph.edges[canonical_etype].data[EID] = F.zerocopy_from_dgl_ndarray(data)
 
     return new_graph
 
@@ -1075,5 +1092,51 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
             g.edges[canonical_etype].data[writeback_mapping] = edge_map
 
     return simple_graph
+
+def as_heterograph(g, ntype='_U', etype='_E'):
+    """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
+
+    Node and edge features are preserved.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph
+    ntype : str, optional
+        The node type name
+    etype : str, optional
+        The edge type name
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The heterograph.
+    """
+    hgi = _CAPI_DGLAsHeteroGraph(g._graph)
+    hg = DGLHeteroGraph(hgi, [ntype], [etype])
+    hg.ndata.update(g.ndata)
+    hg.edata.update(g.edata)
+    return hg
+
+def as_immutable_graph(hg):
+    """Convert a DGLHeteroGraph with one node and edge type into a DGLGraph.
+
+    Node and edge features are preserved.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The heterograph
+
+    Returns
+    -------
+    DGLGraph
+        The graph.
+    """
+    gidx = _CAPI_DGLAsImmutableGraph(hg._graph)
+    g = DGLGraph(gidx)
+    g.ndata.update(hg.ndata)
+    g.edata.update(hg.edata)
+    return g
 
 _init_api("dgl.transform")
