@@ -386,7 +386,7 @@ def atom_partial_charge(atom):
         List containing one float only.
     """
     gasteiger_charge = atom.GetProp('_GasteigerCharge')
-    if gasteiger_charge == '-nan':
+    if gasteiger_charge == '-nan' or gasteiger_charge == 'nan':
         gasteiger_charge = 0
     return [float(gasteiger_charge)]
 
