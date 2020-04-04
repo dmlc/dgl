@@ -1,0 +1,5 @@
+*.csv
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+# Compiled python modules.
+**/*.pyc
