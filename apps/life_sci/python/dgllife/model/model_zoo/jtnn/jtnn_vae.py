@@ -1,4 +1,4 @@
-# pylint: disable=C0111, C0103, E1101, W0611, W0612, C0200
+# pylint: disable=C0111, C0103, E1101, W0611, W0612, C0200, W0221, E1102
 import copy
 import rdkit.Chem as Chem
 import torch

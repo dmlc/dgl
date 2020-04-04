@@ -1,9 +1,11 @@
 """Readout for SchNet"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl
 import torch.nn as nn
 
 __all__ = ['MLPNodeReadout']
 
+# pylint: disable=W0221
 class MLPNodeReadout(nn.Module):
     """MLP-based Readout.
 

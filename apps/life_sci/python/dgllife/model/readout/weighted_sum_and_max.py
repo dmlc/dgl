@@ -1,4 +1,5 @@
 """Apply weighted sum and max pooling to the node representations and concatenate the results."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl
 import torch
 import torch.nn as nn
@@ -7,6 +8,7 @@ from dgl.nn.pytorch import WeightAndSum
 
 __all__ = ['WeightedSumAndMax']
 
+# pylint: disable=W0221
 class WeightedSumAndMax(nn.Module):
     r"""Apply weighted sum and max pooling to the node
     representations and concatenate the results.

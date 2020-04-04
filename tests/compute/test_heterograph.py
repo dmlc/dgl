@@ -940,6 +940,18 @@ def test_subgraph():
     sg5 = g.edge_type_subgraph(['follows', 'plays', 'wishes'])
     _check_typed_subgraph1(g, sg5)
 
+    # Test for restricted format
+    for fmt in ['csr', 'csc', 'coo']:
+        g = dgl.graph([(0, 1), (1, 2)], restrict_format=fmt)
+        sg = g.subgraph({g.ntypes[0]: [1, 0]})
+        nids = F.asnumpy(sg.ndata[dgl.NID])
+        assert np.array_equal(nids, np.array([1, 0]))
+        src, dst = sg.all_edges(order='eid')
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        assert np.array_equal(src, np.array([1]))
+        assert np.array_equal(dst, np.array([0]))
+
 def test_apply():
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
