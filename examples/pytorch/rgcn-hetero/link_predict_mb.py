@@ -61,6 +61,17 @@ class LinkPredict(nn.Module):
                 dropout=self.dropout))
         self.layers.to(self.device)
 
+    def fowrard_all(self, blocks):
+        emb = self.embed_layer()
+        h = {}
+        for k, e in emb.items():
+            h[k] = e[blocks[0].srcnodes[k].data[dgl.NID]].to(self.device)
+
+        for layer, block in zip(self.layers, blocks):
+            h = layer(block, h)
+
+        return h
+
     def forward(self, p_blocks, n_blocks, p_g, n_g):
         emb = self.embed_layer()
         p_h = {}
@@ -119,17 +130,26 @@ class LinkPredict(nn.Module):
         score = th.sum(h_emb * r * t_emb, dim=-1)
         return score
 
-    def calc_neg_tail_score(self, heads, tails, rids, num_chunks, chunk_size, neg_sample_size):
+    def calc_neg_tail_score(self, heads, tails, rids, num_chunks, chunk_size, neg_sample_size, device=None):
         hidden_dim = heads.shape[1]
         r = self.w_relation[rids]
+
+        if device is not None:
+            r = r.to(device)
+            heads = heads.to(device)
+            tails = tails.to(device)
         tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
         tails = th.transpose(tails, 1, 2)
         tmp = (heads * r).reshape(num_chunks, chunk_size, hidden_dim)
         return th.bmm(tmp, tails)
 
-    def calc_neg_head_score(self, heads, tails, rids, num_chunks, chunk_size, neg_sample_size):
+    def calc_neg_head_score(self, heads, tails, rids, num_chunks, chunk_size, neg_sample_size, device=None):
         hidden_dim = tails.shape[1]
         r = self.w_relation[rids]
+        if device is not None:
+            r = r.to(device)
+            heads = heads.to(device)
+            tails = tails.to(device)
         heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
         heads = th.transpose(heads, 1, 2)
         tmp = (tails * r).reshape(num_chunks, chunk_size, hidden_dim)
@@ -277,6 +297,61 @@ class RGCNLinkRankSampler:
         
         return (bsize, p_g, n_g, p_blocks, n_blocks)
 
+def fullgraph_eval(eval_g, model, blocks, pos_pairs, neg_pairs):
+    model.eval()
+    t0 = time.time()
+    p_h = model.fowrard_all(blocks)
+
+    test_head_ids, test_etypes, test_tail_ids = pos_pairs
+    test_neg_head_ids, test_neg_etypes, test_neg_tail_ids = neg_pairs
+    
+    phead_emb = p_h['node'][test_head_ids]
+    ptail_emb = p_h['node'][test_tail_ids]
+    nhead_emb = p_h['node'][test_neg_head_ids]
+    ntail_emb = p_h['node'][test_neg_tail_ids]
+    pos_score = model.calc_pos_score(phead_emb, ptail_emb, test_etypes)
+    pos_score = F.logsigmoid(pos_score).reshape(phead_emb.shape[0], -1).cpu()
+    t_neg_score = model.calc_neg_tail_score(phead_emb,
+                                             ntail_emb,
+                                             test_etypes,
+                                             1, 
+                                             phead_emb.shape[0],
+                                             ntail_emb.shape[0],
+                                             device=th.device('cpu'))
+    t_neg_score = F.logsigmoid(t_neg_score).reshape(phead_emb.shape[0], ntail_emb.shape[0])
+    h_neg_score = model.calc_neg_tail_score(ptail_emb,
+                                             nhead_emb,
+                                             test_etypes,
+                                             1,
+                                             ptail_emb.shape[0],
+                                             nhead_emb.shape[0],
+                                             device=th.device('cpu'))
+    h_neg_score = F.logsigmoid(h_neg_score).reshape(phead_emb.shape[0], ntail_emb.shape[0])
+    neg_score = th.cat([h_neg_score, t_neg_score], dim=1)
+
+    rankings = th.sum(neg_score >= pos_score, dim=1) + 1
+    rankings = rankings.detach().numpy().tolist()
+
+    mrr = 0
+    mr = 0
+    hit1 = 0
+    hit3 = 0
+    hit10 = 0
+    for ranking in rankings:
+        mrr += 1.0 / ranking
+        mr += float(ranking)
+        hit1 += 1.0 if ranking <= 1 else 0.0
+        hit3 +=  1.0 if ranking <= 3 else 0.0
+        hit10 += 1.0 if ranking <= 10 else 0.0
+
+    print("MRR {}\nMR {}\nHITS@1 {}\nHITS@3 {}\nHITS@10 {}".format(mrr/len(rankings),
+                                                                   mr/len(rankings),
+                                                                   hit1/len(rankings),
+                                                                   hit3/len(rankings),
+                                                                   hit10/len(rankings)))
+    t1 = time.time()
+    print("Full eval {} exmpales takes {} seconds".format(pos_score.shape[0], t1 - t0))
+
 def evaluate(model, dataloader, bsize, neg_cnt):
     logs = []
     model.eval()
@@ -349,7 +424,7 @@ def main(args):
     tail_ids = th.from_numpy(train_dst)
     etypes = th.from_numpy(train_rel)
     num_train_edges = train_data.shape[0]
-    pos_seed = th.arange((num_train_edges//batch_size) * batch_size)
+    pos_seed = th.arange(num_train_edges//batch_size) * batch_size)
 
     # train dataloader
     sampler = RGCNLinkRankSampler(train_g,
@@ -402,7 +477,6 @@ def main(args):
                                   drop_last=False,
                                   num_workers=args.num_workers)
 
-    # test dataloader
     test_src, test_rel, test_dst = test_data.transpose()
     test_head_ids = th.from_numpy(test_src)
     test_tail_ids = th.from_numpy(test_dst)
@@ -410,28 +484,46 @@ def main(args):
     test_neg_head_ids = th.cat([valid_neg_head_ids, test_head_ids])
     test_neg_tail_ids = th.cat([valid_neg_tail_ids, test_tail_ids])
     test_neg_etypes = th.cat([valid_neg_etypes, test_etypes])
-    num_test_edges = test_data.shape[0] + num_valid_edges
-    test_seed = th.arange(test_etypes.shape[0])
+    # test dataloader
+    if args.test_neg_cnt == -1:
+        # full neg test
+        cur = {}
+        test_blocks = []
+        for ntype in test_g.ntypes:
+            cur[ntype] = th.arange(test_g.number_of_nodes(ntype))
 
-    test_sampler = RGCNLinkRankSampler(valid_g,
-                                        num_test_edges,
-                                        test_etypes,
-                                        test_neg_etypes,
-                                        num_rels,
-                                        test_head_ids,
-                                        test_tail_ids,
-                                        [None] * args.n_layers,
-                                        nhead_ids=test_neg_head_ids,
-                                        ntail_ids=test_neg_tail_ids,
-                                        num_neg=args.test_neg_cnt,
-                                        is_train=False)
-    test_dataloader = DataLoader(dataset=test_seed,
-                                  batch_size=valid_batch_size,
-                                  collate_fn=test_sampler.sample_blocks,
-                                  shuffle=False,
-                                  pin_memory=True,
-                                  drop_last=False,
-                                  num_workers=args.num_workers)
+        for i in range(args.n_layers):
+            frontier = dgl.in_subgraph(test_g, cur)
+
+            block = dgl.to_block(frontier, cur)
+            test_blocks.insert(0, block)
+            cur = {}
+            for ntype in block.srctypes:
+                cur[ntype] = block.srcnodes[ntype].data[dgl.NID]
+            test_blocks.insert(0, block)
+    else:
+        num_test_edges = test_data.shape[0] + num_valid_edges
+        test_seed = th.arange(test_etypes.shape[0])
+
+        test_sampler = RGCNLinkRankSampler(test_g,
+                                            num_test_edges,
+                                            test_etypes,
+                                            test_neg_etypes,
+                                            num_rels,
+                                            test_head_ids,
+                                            test_tail_ids,
+                                            [None] * args.n_layers,
+                                            nhead_ids=test_neg_head_ids,
+                                            ntail_ids=test_neg_tail_ids,
+                                            num_neg=args.test_neg_cnt,
+                                            is_train=False)
+        test_dataloader = DataLoader(dataset=test_seed,
+                                    batch_size=valid_batch_size,
+                                    collate_fn=test_sampler.sample_blocks,
+                                    shuffle=False,
+                                    pin_memory=True,
+                                    drop_last=False,
+                                    num_workers=args.num_workers)
 
     # build input layer
     model = LinkPredict(test_g,
@@ -484,7 +576,13 @@ def main(args):
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
-    evaluate(model, test_dataloader, args.valid_batch_size, args.test_neg_cnt)
+
+    if args.test_neg_cnt == -1:
+        fullgraph_eval(test_g, model, test_blocks,
+                      (test_head_ids, test_etypes, test_etypes),
+                      (test_neg_head_ids, test_neg_etypes, test_neg_tail_ids))
+    else:
+        evaluate(model, test_dataloader, args.valid_batch_size, args.test_neg_cnt)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
