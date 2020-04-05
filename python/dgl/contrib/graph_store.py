@@ -539,6 +539,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         num_nodes, num_edges = int(num_nodes), int(num_edges)
 
         graph_idx = from_shared_mem_graph_index(_get_graph_path(graph_name))
+        super(SharedMemoryDGLGraph, self).__init__(graph_idx)
         self._init_manager = InitializerManager()
 
         # map all ndata and edata from the server.
