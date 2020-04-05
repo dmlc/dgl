@@ -16,7 +16,7 @@ import line_profiler
 import dgl
 import dgl.function as fn
 from dgl.contrib.data import load_data
-from entity_classify_mb import RelGraphConvHetero, RelGraphEmbed
+from model import RelGraphConvLayer, RelGraphEmbed
 from utils import build_graph_from_triplets, thread_wrapped_func
 
 class LinkPredict(nn.Module):
@@ -49,14 +49,14 @@ class LinkPredict(nn.Module):
 
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConvHetero(
-            self.h_dim, self.h_dim, self.rel_names, "basis",
+        self.layers.append(RelGraphConvLayer(
+            self.h_dim, self.h_dim, self.rel_names,
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout, use_weight=False))
+            dropout=self.dropout, weight=False))
         # h2h
         for i in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConvHetero(
-                self.h_dim, self.h_dim, self.rel_names, "basis",
+            self.layers.append(RelGraphConvLayer(
+                self.h_dim, self.h_dim, self.rel_names,
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
                 dropout=self.dropout))
         self.layers.to(self.device)
@@ -424,7 +424,7 @@ def main(args):
     tail_ids = th.from_numpy(train_dst)
     etypes = th.from_numpy(train_rel)
     num_train_edges = train_data.shape[0]
-    pos_seed = th.arange(num_train_edges//batch_size) * batch_size)
+    pos_seed = th.arange((num_train_edges//batch_size) * batch_size)
 
     # train dataloader
     sampler = RGCNLinkRankSampler(train_g,
