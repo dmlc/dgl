@@ -315,7 +315,7 @@ class DGLBaseGraph(object):
         """
         return self._graph.successors(v).tousertensor()
 
-    def edge_id(self, u, v, force_multi=False):
+    def edge_id(self, u, v, force_multi=None, return_array=False):
         """Return the edge ID, or an array of edge IDs, between source node
         `u` and destination node `v`.
 
@@ -326,14 +326,23 @@ class DGLBaseGraph(object):
         v : int
             The destination node ID.
         force_multi : bool
-            If False, will return a single edge ID if the graph is a simple graph.
+            Deprecated (Will be deleted in the future).
+            If False, will return a single edge ID.
+            If True, will always return an array.
+        return_array : bool
+            If False, will return a single edge ID.
             If True, will always return an array.
 
         Returns
         -------
         int or tensor
-            The edge ID if force_multi == True and the graph is a simple graph.
+            The edge ID if return_array is False.
             The edge ID array otherwise.
+
+        Notes
+        -----
+        If multiply edges exist between `u` and `v` and return_array is False,
+        the result is undefined.
 
         Examples
         --------
@@ -351,14 +360,14 @@ class DGLBaseGraph(object):
 
         For multigraphs:
 
-        >>> G = dgl.DGLGraph(multigraph=True)
+        >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
 
         Adding edges (0, 1), (0, 2), (0, 1), (0, 2), so edge ID 0 and 2 both
         connect from 0 and 1, while edge ID 1 and 3 both connect from 0 and 2.
 
         >>> G.add_edges([0, 0, 0, 0], [1, 2, 1, 2])
-        >>> G.edge_id(0, 1)
+        >>> G.edge_id(0, 1, return_array=True)
         tensor([0, 2])
 
         See Also
@@ -366,9 +375,20 @@ class DGLBaseGraph(object):
         edge_ids
         """
         idx = self._graph.edge_id(u, v)
-        return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
+        if force_multi is not None:
+            dgl_warning("force_multi will be deprecated." \
+                        "Please use return_array instead")
+            return_array = force_multi
 
-    def edge_ids(self, u, v, force_multi=False):
+        if return_array:
+            return idx.tousertensor()
+        else:
+            assert len(idx) == 1, "For return_array=False, there should be one and " \
+                "only one edge between u and v, but get {} edges. " \
+                "Please use return_array=True instead".format(len(idx))
+            return idx[0]
+
+    def edge_ids(self, u, v, force_multi=None, return_uv=False):
         """Return all edge IDs between source node array `u` and destination
         node array `v`.
 
@@ -379,21 +399,26 @@ class DGLBaseGraph(object):
         v : list, tensor
             The destination node ID array.
         force_multi : bool
+            Deprecated (Will be deleted in the future).
             Whether to always treat the graph as a multigraph.
+        return_uv : bool
+            Whether return e or (eu, ev, e)
 
         Returns
         -------
         tensor, or (tensor, tensor, tensor)
-            If the graph is a simple graph and `force_multi` is False, return
-            a single edge ID array `e`.  `e[i]` is the edge ID between `u[i]`
-            and `v[i]`.
+            If 'return_uv` is False, return a single edge ID array `e`.
+            `e[i]` is the edge ID between `u[i]` and `v[i]`.
             Otherwise, return three arrays `(eu, ev, e)`.  `e[i]` is the ID
             of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
             and `v[i]` are returned.
 
         Notes
         -----
-        If the graph is a simple graph, `force_multi` is False, and no edge
+        If the graph is a simple graph, `return_uv` is False, and no edge
+        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
+
+        If the graph is a multi graph, `return_uv` is False, and multi edges
         exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
 
         Examples
@@ -411,14 +436,14 @@ class DGLBaseGraph(object):
 
         For multigraphs
 
-        >>> G = dgl.DGLGraph(multigraph=True)
+        >>> G = dgl.DGLGraph()
         >>> G.add_nodes(4)
         >>> G.add_edges([0, 0, 0], [1, 1, 2])   # (0, 1), (0, 1), (0, 2)
 
         Get all edges between (0, 1), (0, 2), (0, 3).  Note that there is no
         edge between 0 and 3:
 
-        >>> G.edge_ids([0, 0, 0], [1, 2, 3])
+        >>> G.edge_ids([0, 0, 0], [1, 2, 3], return_uv=True)
         (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([0, 1, 2]))
 
         See Also
@@ -428,9 +453,17 @@ class DGLBaseGraph(object):
         u = utils.toindex(u)
         v = utils.toindex(v)
         src, dst, eid = self._graph.edge_ids(u, v)
-        if force_multi or self.is_multigraph:
+        if force_multi is not None:
+            dgl_warning("force_multi will be deprecated, " \
+                        "Please use return_uv instead")
+            return_uv = force_multi
+
+        if return_uv:
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
+            assert len(eid) == max(len(u), len(v)), "If return_uv=False, there should be one and " \
+                "only one edge between each u and v, expect {} edges but get {}. " \
+                "Please use return_uv=True instead".format(max(len(u), len(v)), len(eid))
             return eid.tousertensor()
 
     def find_edges(self, eid):
@@ -814,8 +847,9 @@ class DGLGraph(DGLBaseGraph):
     edge_frame : FrameRef, optional
         Edge feature storage.
     multigraph : bool, optional
-        Whether the graph would be a multigraph. If none, the flag will be determined
-        by scanning the whole graph. (default: None)
+        Deprecated (Will be deleted in the future).
+        Whether the graph would be a multigraph. If none, the flag will be
+        set to True. (default: None)
     readonly : bool, optional
         Whether the graph structure is read-only (default: False).
 
@@ -956,7 +990,10 @@ class DGLGraph(DGLBaseGraph):
             if sort_csr:
                 gidx.sort_csr()
         else:
-            gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+            if multigraph is not None:
+                dgl_warning("multigraph will be deprecated." \
+                            "DGL will treat all graphs as multigraph in the future.")
+            gidx = graph_index.create_graph_index(graph_data, readonly)
             if sort_csr:
                 gidx.sort_csr()
         super(DGLGraph, self).__init__(gidx)
@@ -1805,7 +1842,7 @@ class DGLGraph(DGLBaseGraph):
                         raise DGLError('Not all edges have attribute {}.'.format(attr))
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
-    def from_scipy_sparse_matrix(self, spmat, multigraph=False):
+    def from_scipy_sparse_matrix(self, spmat, multigraph=None):
         """ Convert from scipy sparse matrix.
 
         Parameters
@@ -1814,6 +1851,7 @@ class DGLGraph(DGLBaseGraph):
             The graph's adjacency matrix
 
         multigraph : bool, optional
+            Deprecated (Will be deleted in the future).
             Whether the graph would be a multigraph. If the input scipy sparse matrix is CSR,
             this argument is ignored.
 
@@ -1828,7 +1866,11 @@ class DGLGraph(DGLBaseGraph):
         >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
-        self._graph = graph_index.from_scipy_sparse_matrix(spmat, multigraph, self.is_readonly)
+        if multigraph is not None:
+            dgl_warning("multigraph will be deprecated." \
+                        "DGL will treat all graphs as multigraph in the future.")
+
+        self._graph = graph_index.from_scipy_sparse_matrix(spmat, self.is_readonly)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
@@ -3950,6 +3992,10 @@ class DGLGraph(DGLBaseGraph):
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
 
+    def is_homograph(self):
+        """Return if the graph is homogeneous."""
+        return True
+
 ############################################################
 # Batch/Unbatch APIs
 ############################################################
@@ -3963,6 +4009,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
 
     The nodes and edges are re-indexed with a new id in the batched graph with the
     rule below:
+
     ======  ==========  ========================  ===  ==========================
     item    Graph 1     Graph 2                   ...  Graph k
     ======  ==========  ========================  ===  ==========================
@@ -3994,6 +4041,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     --------
     Create two :class:`~dgl.DGLGraph` objects.
     **Instantiation:**
+
     >>> import dgl
     >>> import torch as th
     >>> g1 = dgl.DGLGraph()
@@ -4006,13 +4054,17 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     >>> g2.add_edges([0, 2], [1, 1])                   # Add edges 0 -> 1, 2 -> 1
     >>> g2.ndata['hv'] = th.tensor([[2.], [3.], [4.]]) # Initialize node features
     >>> g2.edata['he'] = th.tensor([[1.], [2.]])       # Initialize edge features
+
     Merge two :class:`~dgl.DGLGraph` objects into one :class:`DGLGraph` object.
     When merging a list of graphs, we can choose to include only a subset of the attributes.
+
     >>> bg = dgl.batch([g1, g2], edge_attrs=None)
     >>> bg.edata
     {}
+
     Below one can see that the nodes are re-indexed. The edges are re-indexed in
     the same way.
+
     >>> bg.nodes()
     tensor([0, 1, 2, 3, 4])
     >>> bg.ndata['hv']
@@ -4021,14 +4073,17 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
             [2.],
             [3.],
             [4.]])
+
     **Property:**
     We can still get a brief summary of the graphs that constitute the batched graph.
+
     >>> bg.batch_size
     2
     >>> bg.batch_num_nodes
     [2, 3]
     >>> bg.batch_num_edges
     [1, 2]
+
     **Readout:**
     Another common demand for graph neural networks is graph readout, which is a
     function that takes in the node attributes and/or edge attributes for a graph
@@ -4036,20 +4091,26 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     DGL also supports performing readout for a batch of graphs at once.
     Below we take the built-in readout function :func:`sum_nodes` as an example, which
     sums over a particular kind of node attribute for each graph.
+
     >>> dgl.sum_nodes(bg, 'hv') # Sum the node attribute 'hv' for each graph.
     tensor([[1.],               # 0 + 1
             [9.]])              # 2 + 3 + 4
+
     **Message passing:**
     For message passing and related operations, batched :class:`DGLGraph` acts exactly
     the same as a single :class:`~dgl.DGLGraph` with batch size 1.
+
     **Update Attributes:**
     Updating the attributes of the batched graph has no effect on the original graphs.
+
     >>> bg.edata['he'] = th.zeros(3, 2)
     >>> g2.edata['he']
     tensor([[1.],
             [2.]])}
+
     Instead, we can decompose the batched graph back into a list of graphs and use them
     to replace the original graphs.
+
     >>> g1, g2 = dgl.unbatch(bg)    # returns a list of DGLGraph objects
     >>> g2.edata['he']
     tensor([[0., 0.],

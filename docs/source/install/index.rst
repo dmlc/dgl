@@ -12,7 +12,7 @@ DGL works with the following operating systems:
 * Windows 10
 
 DGL requires Python version 3.5 or later. Python 3.4 or earlier is not
-tested. Python 2 support is coming.
+tested.
 
 DGL supports multiple tensor libraries as backends, e.g., PyTorch, MXNet. For requirements on backends and how to select one, see :ref:`backends`.
 

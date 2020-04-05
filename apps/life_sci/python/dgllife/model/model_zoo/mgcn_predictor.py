@@ -1,4 +1,5 @@
 """MGCN"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 
 from ..gnn import MGCNGNN
@@ -6,6 +7,7 @@ from ..readout import MLPNodeReadout
 
 __all__ = ['MGCNPredictor']
 
+# pylint: disable=W0221
 class MGCNPredictor(nn.Module):
     """MGCN for for regression and classification on graphs.
 

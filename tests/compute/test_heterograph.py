@@ -6,7 +6,7 @@ import scipy.sparse as ssp
 import itertools
 import backend as F
 import networkx as nx
-import unittest
+import unittest, pytest
 from dgl import DGLError
 
 def create_test_heterograph():
@@ -222,9 +222,9 @@ def test_query():
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
                 assert g.edge_id(src, dst, etype=etype) == i
-                assert F.asnumpy(g.edge_id(src, dst, etype=etype, force_multi=True)).tolist() == [i]
+                assert F.asnumpy(g.edge_id(src, dst, etype=etype, return_array=True)).tolist() == [i]
             assert F.asnumpy(g.edge_ids(srcs, dsts, etype=etype)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_ids(srcs, dsts, etype=etype, force_multi=True)
+            u, v, e = g.edge_ids(srcs, dsts, etype=etype, return_uv=True)
             assert F.asnumpy(u).tolist() == srcs
             assert F.asnumpy(v).tolist() == dsts
             assert F.asnumpy(e).tolist() == list(range(n_edges))
@@ -361,6 +361,31 @@ def test_hypersparse():
     assert g.out_degree(0, 'plays') == 1
     assert g.out_degree(N2, 'plays') == 0
     assert F.asnumpy(g.out_degrees([0, N2], 'plays')).tolist() == [1, 0]
+
+def test_edge_ids():
+    N1 = 1 << 50        # should crash if allocated a CSR
+    N2 = 1 << 48
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1)],
+        ('user', 'plays', 'game'): [(0, N2)]},
+        {'user': N1, 'game': N1})
+    with pytest.raises(AssertionError):
+        eids = g.edge_ids(0, 0, etype='follows')
+
+    with pytest.raises(AssertionError):
+        eid = g.edge_id(0, 0, etype='follows')
+
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1), (0, 1)],
+        ('user', 'plays', 'game'): [(0, N2)]},
+        {'user': N1, 'game': N1})
+
+    with pytest.raises(AssertionError):
+        eids = g2.edge_ids(0, 1, etype='follows')
+
+    with pytest.raises(AssertionError):
+        eid = g2.edge_id(0, 1, etype='follows')
 
 def test_adj():
     g = create_test_heterograph()
@@ -521,9 +546,9 @@ def test_view1():
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
                 assert g.edge_id(src, dst) == i
-                assert F.asnumpy(g.edge_id(src, dst, force_multi=True)).tolist() == [i]
+                assert F.asnumpy(g.edge_id(src, dst, return_array=True)).tolist() == [i]
             assert F.asnumpy(g.edge_ids(srcs, dsts)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_ids(srcs, dsts, force_multi=True)
+            u, v, e = g.edge_ids(srcs, dsts, return_uv=True)
             assert F.asnumpy(u).tolist() == srcs
             assert F.asnumpy(v).tolist() == dsts
             assert F.asnumpy(e).tolist() == list(range(n_edges))
@@ -914,6 +939,18 @@ def test_subgraph():
     _check_typed_subgraph2(g, sg4)
     sg5 = g.edge_type_subgraph(['follows', 'plays', 'wishes'])
     _check_typed_subgraph1(g, sg5)
+
+    # Test for restricted format
+    for fmt in ['csr', 'csc', 'coo']:
+        g = dgl.graph([(0, 1), (1, 2)], restrict_format=fmt)
+        sg = g.subgraph({g.ntypes[0]: [1, 0]})
+        nids = F.asnumpy(sg.ndata[dgl.NID])
+        assert np.array_equal(nids, np.array([1, 0]))
+        src, dst = sg.all_edges(order='eid')
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        assert np.array_equal(src, np.array([1]))
+        assert np.array_equal(dst, np.array([0]))
 
 def test_apply():
     def node_udf(nodes):
@@ -1473,6 +1510,24 @@ def test_isolated_ntype():
     assert g.number_of_nodes('A') == 3
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4
+
+def test_ismultigraph():
+    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5), (2, 5)], 'A', 'AB', 'B', num_nodes=(6, 6))
+    assert g1.is_multigraph == False
+    g2 = dgl.bipartite([(0, 1), (0, 1), (0, 2), (1, 5)], 'A', 'AC', 'C', num_nodes=(6, 6))
+    assert g2.is_multigraph == True
+    g3 = dgl.graph([(0, 1), (1, 2)], 'A', 'AA', num_nodes=6)
+    assert g3.is_multigraph == False
+    g4 = dgl.graph([(0, 1), (0, 1), (1, 2)], 'A', 'AA', num_nodes=6)
+    assert g4.is_multigraph == True
+    g = dgl.hetero_from_relations([g1, g3])
+    assert g.is_multigraph == False
+    g = dgl.hetero_from_relations([g1, g2])
+    assert g.is_multigraph == True
+    g = dgl.hetero_from_relations([g1, g4])
+    assert g.is_multigraph == True
+    g = dgl.hetero_from_relations([g2, g4])
+    assert g.is_multigraph == True
 
 def test_bipartite():
     g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B')

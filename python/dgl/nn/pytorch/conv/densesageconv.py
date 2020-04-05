@@ -1,6 +1,7 @@
 """Torch Module for DenseSAGEConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
+from ....utils import check_eq_shape
 
 
 class DenseSAGEConv(nn.Module):
@@ -57,12 +58,17 @@ class DenseSAGEConv(nn.Module):
         Parameters
         ----------
         adj : torch.Tensor
-            The adjacency matrix of the graph to apply Graph Convolution on,
-            should be of shape :math:`(N, N)`, where a row represents the destination
-            and a column represents the source.
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+            The adjacency matrix of the graph to apply SAGE Convolution on, when
+            applied to a unidirectional bipartite graph, ``adj`` should be of shape
+            should be of shape :math:`(N_{out}, N_{in})`; when applied to a homo
+            graph, ``adj`` should be of shape :math:`(N, N)`. In both cases,
+            a row represents a destination node while a column represents a source
+            node.
+        feat : torch.Tensor or a pair of torch.Tensor
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of torch.Tensor is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
 
         Returns
         -------
@@ -70,10 +76,15 @@ class DenseSAGEConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        adj = adj.float().to(feat.device)
-        feat = self.feat_drop(feat)
+        check_eq_shape(feat)
+        if isinstance(feat, tuple):
+            feat_src = self.feat_drop(feat[0])
+            feat_dst = self.feat_drop(feat[1])
+        else:
+            feat_src = feat_dst = self.feat_drop(feat)
+        adj = adj.float().to(feat_src.device)
         in_degrees = adj.sum(dim=1, keepdim=True)
-        h_neigh = (adj @ feat + feat) / (in_degrees + 1)
+        h_neigh = (adj @ feat_src + feat_dst) / (in_degrees + 1)
         rst = self.fc(h_neigh)
         # activation
         if self.activation is not None:
