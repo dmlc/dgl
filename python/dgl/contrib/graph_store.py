@@ -13,7 +13,7 @@ from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
-from ..graph_index import GraphIndex, create_graph_index, from_csr, from_shared_mem_csr_matrix
+from ..graph_index import GraphIndex, create_graph_index, from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
@@ -21,9 +21,6 @@ from ..init import zero_initializer
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name
-
-def _get_edata_path(graph_name, edata_name):
-    return "/" + graph_name + "_edge_" + edata_name
 
 def _get_edata_path(graph_name, edata_name):
     return "/" + graph_name + "_edge_" + edata_name
@@ -117,21 +114,6 @@ class EdgeDataView(MutableMapping):
     def __repr__(self):
         data = self._graph.get_e_repr(self._edges)
         return repr({key : data[key] for key in self._graph._edge_frame})
-
-def _to_csr(graph_data, edge_dir, multigraph=None):
-    try:
-        indptr = graph_data.indptr
-        indices = graph_data.indices
-        return indptr, indices
-    except:
-        if isinstance(graph_data, scipy.sparse.spmatrix):
-            csr = graph_data.tocsr()
-            return csr.indptr, csr.indices
-        else:
-            idx = create_graph_index(graph_data=graph_data, readonly=True)
-            transpose = (edge_dir != 'in')
-            csr = idx.adjacency_matrix_scipy(transpose, 'csr')
-            return csr.indptr, csr.indices
 
 class Barrier(object):
     """ A barrier in the KVStore server used for one synchronization.
@@ -305,8 +287,6 @@ class SharedMemoryStoreServer(object):
     ----------
     graph_data : graph data
         Data to initialize graph.
-    edge_dir : string
-        the edge direction for the graph structure ("in" or "out")
     graph_name : string
         Define the name of the graph, so the client can use the name to access the graph.
     multigraph : bool, optional
@@ -317,27 +297,23 @@ class SharedMemoryStoreServer(object):
     port : int
         The port that the server listens to.
     """
-    def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
+    def __init__(self, graph_data, graph_name, multigraph, num_workers, port):
         self.server = None
         if multigraph is not None:
             dgl_warning("multigraph will be deprecated." \
                         "DGL will treat all graphs as multigraph in the future.")
 
         if isinstance(graph_data, GraphIndex):
-            graph_data = graph_data.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
-            self._graph = DGLGraph(graph_data, readonly=True)
+            graph_data = graph_data.copyto_shared_mem(_get_graph_path(graph_name))
         elif isinstance(graph_data, DGLGraph):
-            graph_data = graph_data._graph.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
-            self._graph = DGLGraph(graph_data, readonly=True)
+            graph_data = graph_data._graph.copyto_shared_mem(_get_graph_path(graph_name))
         else:
-            indptr, indices = _to_csr(graph_data, edge_dir)
-            graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
-                                 edge_dir, _get_graph_path(graph_name))
-            self._graph = DGLGraph(graph_idx, readonly=True)
+            graph_data = create_graph_index(graph_data, readonly=True)
+            graph_data = graph_data.copyto_shared_mem(_get_graph_path(graph_name))
+        self._graph = DGLGraph(graph_data, readonly=True)
 
         self._num_workers = num_workers
         self._graph_name = graph_name
-        self._edge_dir = edge_dir
         self._registered_nworkers = 0
 
         self._barrier = BarrierManager(num_workers)
@@ -358,8 +334,7 @@ class SharedMemoryStoreServer(object):
             assert graph_name == self._graph_name
             # if the integers are larger than 2^31, xmlrpc can't handle them.
             # we convert them to strings to send them to clients.
-            return str(self._graph.number_of_nodes()), str(self._graph.number_of_edges()), \
-                    True, edge_dir
+            return str(self._graph.number_of_nodes()), str(self._graph.number_of_edges())
 
         # RPC command: initialize node embedding in the server.
         def init_ndata(init, ndata_name, shape, dtype):
@@ -560,11 +535,10 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         self._worker_id, self._num_workers = self.proxy.register(graph_name)
         if self._worker_id < 0:
             raise Exception('fail to get graph ' + graph_name + ' from the graph store')
-        num_nodes, num_edges, _, edge_dir = self.proxy.get_graph_info(graph_name)
+        num_nodes, num_edges = self.proxy.get_graph_info(graph_name)
         num_nodes, num_edges = int(num_nodes), int(num_edges)
 
-        graph_idx = from_shared_mem_csr_matrix(_get_graph_path(graph_name),
-                num_nodes, num_edges, edge_dir)
+        graph_idx = from_shared_mem_graph_index(_get_graph_path(graph_name))
         super(SharedMemoryDGLGraph, self).__init__(graph_idx)
         self._init_manager = InitializerManager()
 
@@ -1059,7 +1033,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
 
 
 def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
-                              multigraph=None, edge_dir='in', port=8000):
+                              multigraph=None, port=8000):
     """Create the graph store server.
 
     The server loads graph structure and node embeddings and edge embeddings.
@@ -1092,9 +1066,6 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     multigraph : bool, optional
         Deprecated (Will be deleted in the future).
         Whether the graph would be a multigraph (default: True)
-    edge_dir : string
-        the edge direction for the graph structure. The supported option is
-        "in" and "out".
     port : int
         The port that the server listens to.
 
@@ -1106,7 +1077,7 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     if multigraph is not None:
         dgl_warning("multigraph is deprecated." \
                     "DGL treat all graphs as multigraph by default.")
-    return SharedMemoryStoreServer(graph_data, edge_dir, graph_name, None,
+    return SharedMemoryStoreServer(graph_data, graph_name, None,
                                    num_workers, port)
 
 def create_graph_from_store(graph_name, store_type, port=8000):
