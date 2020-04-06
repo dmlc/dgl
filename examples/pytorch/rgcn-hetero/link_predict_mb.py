@@ -303,54 +303,55 @@ def fullgraph_eval(eval_g, model, blocks, pos_pairs, neg_pairs):
     p_h = model.fowrard_all(blocks)
 
     test_head_ids, test_etypes, test_tail_ids = pos_pairs
-    test_neg_head_ids, test_neg_etypes, test_neg_tail_ids = neg_pairs
+    test_neg_head_ids, _, test_neg_tail_ids = neg_pairs
     
     phead_emb = p_h['node'][test_head_ids]
     ptail_emb = p_h['node'][test_tail_ids]
     nhead_emb = p_h['node'][test_neg_head_ids]
     ntail_emb = p_h['node'][test_neg_tail_ids]
-    pos_score = model.calc_pos_score(phead_emb, ptail_emb, test_etypes)
-    pos_score = F.logsigmoid(pos_score).reshape(phead_emb.shape[0], -1).cpu()
-    t_neg_score = model.calc_neg_tail_score(phead_emb,
-                                             ntail_emb,
-                                             test_etypes,
-                                             1, 
-                                             phead_emb.shape[0],
-                                             ntail_emb.shape[0],
-                                             device=th.device('cpu'))
-    t_neg_score = F.logsigmoid(t_neg_score).reshape(phead_emb.shape[0], ntail_emb.shape[0])
-    h_neg_score = model.calc_neg_tail_score(ptail_emb,
-                                             nhead_emb,
-                                             test_etypes,
-                                             1,
-                                             ptail_emb.shape[0],
-                                             nhead_emb.shape[0],
-                                             device=th.device('cpu'))
-    h_neg_score = F.logsigmoid(h_neg_score).reshape(phead_emb.shape[0], ntail_emb.shape[0])
-    neg_score = th.cat([h_neg_score, t_neg_score], dim=1)
-
-    rankings = th.sum(neg_score >= pos_score, dim=1) + 1
-    rankings = rankings.detach().numpy().tolist()
-
+    pos_scores = model.calc_pos_score(phead_emb, ptail_emb, test_etypes)
+    pos_scores = F.logsigmoid(pos_scores).reshape(phead_emb.shape[0], -1).cpu()
+    
     mrr = 0
     mr = 0
     hit1 = 0
     hit3 = 0
     hit10 = 0
-    for ranking in rankings:
+    num_samples = test_head_ids.shape[0]
+    for idx in range(num_samples):
+        head_pos = eval_g.has_edges_between(th.full(test_neg_tail_ids.shape, test_head_ids[idx]).long(),
+                                           test_neg_tail_ids,
+                                           etype=str(test_etypes[idx].numpy().item()))
+        tail_pos = eval_g.has_edges_between(test_neg_head_ids,
+                                           th.full(test_neg_head_ids.shape, test_tail_ids[idx]).long(),
+                                           etype=str(test_etypes[idx].numpy().item()))
+    
+        t_neg_score = model.calc_pos_score(phead_emb[idx], ntail_emb, test_etypes[idx])
+        h_neg_score = model.calc_pos_score(nhead_emb, ptail_emb[idx], test_etypes[idx])
+    
+        t_neg_score = F.logsigmoid(t_neg_score).cpu()
+        h_neg_score = F.logsigmoid(h_neg_score).cpu()
+        t_neg_score[head_pos == 1] += pos_scores[idx]
+        h_neg_score[tail_pos == 1] += pos_scores[idx]
+    
+        neg_score = th.cat([h_neg_score, t_neg_score], dim=0)
+        print(neg_score > pos_scores[idx])
+        print(neg_score)
+        print(pos_scores[idx])
+        ranking = th.sum(neg_score > pos_scores[idx], dim=0) + 1
         mrr += 1.0 / ranking
         mr += float(ranking)
         hit1 += 1.0 if ranking <= 1 else 0.0
         hit3 +=  1.0 if ranking <= 3 else 0.0
         hit10 += 1.0 if ranking <= 10 else 0.0
 
-    print("MRR {}\nMR {}\nHITS@1 {}\nHITS@3 {}\nHITS@10 {}".format(mrr/len(rankings),
-                                                                   mr/len(rankings),
-                                                                   hit1/len(rankings),
-                                                                   hit3/len(rankings),
-                                                                   hit10/len(rankings)))
+    print("MRR {}\nMR {}\nHITS@1 {}\nHITS@3 {}\nHITS@10 {}".format(mrr/num_samples,
+                                                                   mr/num_samples,
+                                                                   hit1/num_samples,
+                                                                   hit3/num_samples,
+                                                                   hit10/num_samples))
     t1 = time.time()
-    print("Full eval {} exmpales takes {} seconds".format(pos_score.shape[0], t1 - t0))
+    print("Full eval {} exmpales takes {} seconds".format(pos_scores.shape[0], t1 - t0))
 
 def evaluate(model, dataloader, bsize, neg_cnt):
     logs = []
@@ -573,13 +574,16 @@ def main(args):
             print("Epoch {} takes {} seconds".format(epoch, dur))
         gc.collect()
         evaluate(model, valid_dataloader, args.valid_batch_size, args.valid_neg_cnt)
+        fullgraph_eval(test_g, model, test_blocks,
+                      (test_head_ids, test_etypes, test_tail_ids),
+                      (test_neg_head_ids, test_neg_etypes, test_neg_tail_ids))
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
     if args.test_neg_cnt == -1:
         fullgraph_eval(test_g, model, test_blocks,
-                      (test_head_ids, test_etypes, test_etypes),
+                      (test_head_ids, test_etypes, test_tail_ids),
                       (test_neg_head_ids, test_neg_etypes, test_neg_tail_ids))
     else:
         evaluate(model, test_dataloader, args.valid_batch_size, args.test_neg_cnt)
@@ -594,7 +598,7 @@ if __name__ == '__main__':
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
-    parser.add_argument("--n-bases", type=int, default=100,
+    parser.add_argument("--n-bases", type=int, default=10,
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of propagation rounds")
@@ -604,15 +608,15 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--model_path", type=str, default=None,
             help='path for save the model')
-    parser.add_argument("--use-self-loop", default=False, action='store_true',
+    parser.add_argument("--use-self-loop", default=True, action='store_true',
             help="include self feature as a special relation")
     parser.add_argument("--batch-size", type=int, default=1024,
             help="Mini-batch size.")
     parser.add_argument("--chunk-size", type=int, default=32,
             help="Negative sample chunk size. In each chunk, positive pairs will share negative edges")
-    parser.add_argument("--valid-batch-size", type=int, default=16,
+    parser.add_argument("--valid-batch-size", type=int, default=8,
             help="Mini-batch size for validation and test.")
-    parser.add_argument("--fanout", type=int, default=4,
+    parser.add_argument("--fanout", type=int, default=10,
             help="Fan-out of neighbor sampling.")
     parser.add_argument("--regularization-coef", type=float, default=0.001,
             help="Regularization Coeffiency.")
