@@ -999,9 +999,27 @@ HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const
   // We prefer to generate a subgraph from out-csr.
   SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   HeteroSubgraph sg = GetFormat(fmt)->VertexSubgraph(vids);
-  CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr, nullptr));
+
+  CSRPtr subcsr = nullptr;
+  CSRPtr subcsc = nullptr;
+  COOPtr subcoo = nullptr;
+  switch (fmt) {
+    case SparseFormat::kCSR:
+      subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
+      break;
+    case SparseFormat::kCSC:
+      subcsc = std::dynamic_pointer_cast<CSR>(sg.graph);
+      break;
+    case SparseFormat::kCOO:
+      subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
+      break;
+    default:
+      LOG(FATAL) << "[BUG] unsupported format " << static_cast<int>(fmt);
+      return ret;
+  }
+
+  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), subcsc, subcsr, subcoo));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
@@ -1011,9 +1029,27 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
     const std::vector<IdArray>& eids, bool preserve_nodes) const {
   SparseFormat fmt = SelectFormat(SparseFormat::kCOO);
   auto sg = GetFormat(fmt)->EdgeSubgraph(eids, preserve_nodes);
-  COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, nullptr, subcoo));
+
+  CSRPtr subcsr = nullptr;
+  CSRPtr subcsc = nullptr;
+  COOPtr subcoo = nullptr;
+  switch (fmt) {
+    case SparseFormat::kCSR:
+      subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
+      break;
+    case SparseFormat::kCSC:
+      subcsc = std::dynamic_pointer_cast<CSR>(sg.graph);
+      break;
+    case SparseFormat::kCOO:
+      subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
+      break;
+    default:
+      LOG(FATAL) << "[BUG] unsupported format " << static_cast<int>(fmt);
+      return ret;
+  }
+
+  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), subcsc, subcsr, subcoo));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
