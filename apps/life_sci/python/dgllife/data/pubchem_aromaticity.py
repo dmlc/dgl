@@ -12,7 +12,7 @@ class PubChemBioAssayAromaticity(MoleculeCSVDataset):
     """Subset of PubChem BioAssay Dataset for aromaticity prediction.
 
     The dataset was constructed in `Pushing the Boundaries of Molecular Representation for Drug
-    Discovery with the Graph Attention Mechanism.
+    Discovery with the Graph Attention Mechanism
     <https://www.ncbi.nlm.nih.gov/pubmed/31408336>`__ and is accompanied by the task of predicting
     the number of aromatic atoms in molecules.
 

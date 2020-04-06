@@ -42,7 +42,8 @@ def base_k_fold_split(split_method, dataset, k, log):
     Returns
     -------
     all_folds : list of 2-tuples
-        Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+        Each element of the list represents a fold and is a 2-tuple (train_set, val_set),
+        which are all :class:`Subset` instances.
     """
     assert k >= 2, 'Expect the number of folds to be no smaller than 2, got {:d}'.format(k)
     all_folds = []
@@ -208,7 +209,8 @@ class ConsecutiveSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test that also have ``len(dataset)`` and
+            ``dataset[i]`` behaviors
         """
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test], shuffle=False)
 
@@ -229,7 +231,8 @@ class ConsecutiveSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         return base_k_fold_split(ConsecutiveSplitter.train_val_test_split, dataset, k, log)
 
@@ -269,7 +272,8 @@ class RandomSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test.
+            Subsets for training, validation and test, which also have ``len(dataset)``
+            and ``dataset[i]`` behaviors.
         """
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test],
                              shuffle=True, random_state=random_state)
@@ -298,7 +302,8 @@ class RandomSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         # Permute the dataset only once so that each datapoint
         # will appear once in exactly one fold.
@@ -381,7 +386,8 @@ class MolecularWeightSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test, which also have ``len(dataset)``
+            and ``dataset[i]`` behaviors
         """
         # Perform sanity check first as molecule instance initialization and descriptor
         # computation can take a long time.
@@ -422,7 +428,8 @@ class MolecularWeightSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         molecules = prepare_mols(dataset, mols, sanitize, log_every_n)
         sorted_indices = MolecularWeightSplitter.molecular_weight_indices(molecules, log_every_n)
@@ -543,7 +550,8 @@ class ScaffoldSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test, which also have ``len(dataset)`` and
+            ``dataset[i]`` behaviors
         """
         # Perform sanity check first as molecule related computation can take a long time.
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
@@ -609,7 +617,8 @@ class ScaffoldSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         assert k >= 2, 'Expect the number of folds to be no smaller than 2, got {:d}'.format(k)
 
@@ -677,7 +686,8 @@ class SingleTaskStratifiedSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test, which also have ``len(dataset)``
+            and ``dataset[i]`` behaviors
         """
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
 
@@ -735,7 +745,8 @@ class SingleTaskStratifiedSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         if not isinstance(labels, np.ndarray):
             labels = F.asnumpy(labels)

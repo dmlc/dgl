@@ -8,7 +8,7 @@ List of affected files:
 import os
 import re
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 print(__version__)
 
 # Implementations

@@ -886,13 +886,7 @@ class ImmutableGraph: public GraphInterface {
   static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir);
 
-  static ImmutableGraphPtr CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids,
-      const std::string &edge_dir, const std::string &shared_mem_name);
-
-  static ImmutableGraphPtr CreateFromCSR(
-      const std::string &shared_mem_name, size_t num_vertices,
-      size_t num_edges, const std::string &edge_dir);
+  static ImmutableGraphPtr CreateFromCSR(const std::string &shared_mem_name);
 
   /*! \brief Create an immutable graph from COO. */
   static ImmutableGraphPtr CreateFromCOO(
@@ -918,12 +912,10 @@ class ImmutableGraph: public GraphInterface {
 
   /*!
    * \brief Copy data to shared memory.
-   * \param edge_dir the graph of the specific edge direction to be copied.
    * \param name The name of the shared memory.
    * \return The graph in the shared memory
    */
-  static ImmutableGraphPtr CopyToSharedMem(
-      ImmutableGraphPtr g, const std::string &edge_dir, const std::string &name);
+  static ImmutableGraphPtr CopyToSharedMem(ImmutableGraphPtr g, const std::string &name);
 
   /*!
    * \brief Convert the graph to use the given number of bits for storage.
@@ -950,6 +942,14 @@ class ImmutableGraph: public GraphInterface {
   void SortCSR() {
     GetInCSR()->SortCSR();
     GetOutCSR()->SortCSR();
+  }
+
+  bool HasInCSR() const {
+    return in_csr_ != NULL;
+  }
+
+  bool HasOutCSR() const {
+    return out_csr_ != NULL;
   }
 
   /*! \brief Cast this graph to a heterograph */
@@ -995,6 +995,8 @@ class ImmutableGraph: public GraphInterface {
   // The name of shared memory for this graph.
   // If it's empty, the graph isn't stored in shared memory.
   std::string shared_mem_name_;
+  // We serialize the metadata of the graph index here for shared memory.
+  NDArray serialized_shared_meta_;
 };
 
 // inline implementations
