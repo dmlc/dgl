@@ -17,7 +17,7 @@
     // uninstalling the project. See asv.conf.json documentation.
     //
     "install_command": [
-        "/bin/bash {build_dir}/tests/regression/install_dgl_asv.sh"
+        "/bin/bash {build_dir}/tests/regression/install_dgl_asv.sh; python -m pip install numpy"
     ],
     "build_command": [
         "/bin/bash {build_dir}/tests/regression/build_dgl_asv.sh"
