@@ -51,9 +51,9 @@ class PointNetPartSeg(nn.Module):
             self.transform2 = TransformNet(128)
             self.trans_bn2 = nn.BatchNorm1d(128)
 
-    def forward(self, g, cat_vec):
-        batch_size = g.batch_size
-        h = g.ndata['x'].view(batch_size, -1, self.input_dims).permute(0, 2, 1)
+    def forward(self, x, cat_vec=None):
+        batch_size = x.shape[0]
+        h = x.permute(0, 2, 1)
         num_points = h.shape[2]
         if self.use_transform:
             trans = self.transform1(h)
@@ -87,7 +87,8 @@ class PointNetPartSeg(nn.Module):
         h = self.bn_max(h)
         h = self.maxpool(h).view(batch_size, -1, 1).repeat(1, 1, num_points)
         mid_feat.append(h)
-        mid_feat.append(cat_vec)
+        if cat_vec is not None:
+            mid_feat.append(cat_vec)
         h = torch.cat(mid_feat, 1)
         for conv, bn in zip(self.conv3, self.bn3):
             h = conv(h)

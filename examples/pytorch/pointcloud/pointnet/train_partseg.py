@@ -38,8 +38,7 @@ CustomDataLoader = partial(
         num_workers=num_workers,
         batch_size=batch_size,
         shuffle=True,
-        drop_last=True,
-        collate_fn=collate)
+        drop_last=True)
 
 def train(net, opt, scheduler, train_loader, dev):
 
@@ -52,16 +51,16 @@ def train(net, opt, scheduler, train_loader, dev):
     total_correct = 0
     count = 0
     with tqdm.tqdm(train_loader, ascii=True) as tq:
-        for g, cat in tq:
-            num_examples = g.batch_size
-            g.ndata['x'] = g.ndata['x'].to(dev, dtype=torch.float)
-            g.ndata['y'] = g.ndata['y'].to(dev, dtype=torch.long)
+        for data, label, cat in tq:
+            num_examples = data.shape[0]
+            data = data.to(dev, dtype=torch.float)
+            label = label.to(dev, dtype=torch.long).view(-1)
             opt.zero_grad()
             cat_ind = [category_list.index(c) for c in cat]
             cat_tensor = torch.tensor(eye_mat[cat_ind]).to(dev, dtype=torch.float).repeat(1, 2048)
-            cat_tensor = cat_tensor.view(g.batch_size, -1, 16).permute(0,2,1)
-            logits = net(g, cat_tensor)
-            loss = L(logits, g.ndata['y'])
+            cat_tensor = cat_tensor.view(num_examples, -1, 16).permute(0,2,1)
+            logits = net(data, cat_tensor)
+            loss = L(logits, label)
             loss.backward()
             opt.step()
 
@@ -71,7 +70,7 @@ def train(net, opt, scheduler, train_loader, dev):
             loss = loss.item()
             total_loss += loss
             num_batches += 1
-            correct = (preds.view(-1) == g.ndata['y']).sum().item()
+            correct = (preds.view(-1) == label).sum().item()
             total_correct += correct
 
             tq.set_postfix({
@@ -114,18 +113,18 @@ def evaluate(net, test_loader, dev, per_cat_verbose=False):
 
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
-            for g, cat in tq:
-                num_examples = g.batch_size
-                g.ndata['x'] = g.ndata['x'].to(dev, dtype=torch.float)
-                g.ndata['y'] = g.ndata['y'].to(dev, dtype=torch.long)
+            for data, label, cat in tq:
+                num_examples = data.shape[0]
+                data = data.to(dev, dtype=torch.float)
+                label = label.to(dev, dtype=torch.long)
                 cat_ind = [category_list.index(c) for c in cat]
                 cat_tensor = torch.tensor(eye_mat[cat_ind]).to(dev, dtype=torch.float).repeat(1, 2048)
-                cat_tensor = cat_tensor.view(g.batch_size, -1, 16).permute(0,2,1)
-                logits = net(g, cat_tensor)
+                cat_tensor = cat_tensor.view(num_examples, -1, 16).permute(0,2,1)
+                logits = net(data, cat_tensor)
                 _, preds = logits.max(1)
 
                 cat_miou = mIoU(preds.cpu().numpy(),
-                                g.ndata['y'].view(num_examples, -1).cpu().numpy(),
+                                label.view(num_examples, -1).cpu().numpy(),
                                 cat, cat_miou, shapenet.seg_classes)
                 for _, v in cat_miou.items():
                     if v[1] > 0:

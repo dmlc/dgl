@@ -48,9 +48,9 @@ class PointNetCls(nn.Module):
             self.transform2 = TransformNet(64)
             self.trans_bn2 = nn.BatchNorm1d(64)
 
-    def forward(self, g):
-        batch_size = g.batch_size
-        h = g.ndata['x'].view(batch_size, -1, self.input_dims).permute(0, 2, 1)
+    def forward(self, x):
+        batch_size = x.shape[0]
+        h = x.permute(0, 2, 1)
         if self.use_transform:
             trans = self.transform1(h)
             h = h.transpose(2, 1)

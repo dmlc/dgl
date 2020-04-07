@@ -67,11 +67,7 @@ class ModelNetDataset(Dataset):
         else:
             x = self.data[i][:self.num_points]
         y = self.label[i]
-        n_nodes = x.shape[0]
-        g = dgl.DGLGraph()
-        g.add_nodes(n_nodes)
-        g.ndata['x'] = x
-        return g, y
+        return x, y
 
 class ShapeNet(object):
     def __init__(self, num_points=2048, normal_channel=True):
@@ -163,7 +159,7 @@ class ShapeNetDataset(Dataset):
         label_list = []
         category_list = []
         print('Loading data from split ' + self.mode)
-        for fn in tqdm.tqdm(self.file_list, ascii=True):
+        for fn in tqdm.tqdm(self.file_list[:100], ascii=True):
             with open(fn) as f:
                 data = np.array([t.split('\n')[0].split(' ') for t in f.readlines()]).astype(np.float)
             data_list.append(data[:, 0:6])
@@ -189,10 +185,6 @@ class ShapeNetDataset(Dataset):
         cat = self.category[i]
         if self.mode == 'train':
             x = self.translate(x, size=self.dim)
-        n_nodes = x.shape[0]
-        g = dgl.DGLGraph()
-        g.add_nodes(n_nodes)
-        # g.from_scipy_sparse_matrix(csr)
-        g.ndata['x'] = x.astype(np.float)
-        g.ndata['y'] = y.astype(np.int)
-        return g, cat
+        x = x.astype(np.float)
+        y = y.astype(np.int)
+        return x, y, cat

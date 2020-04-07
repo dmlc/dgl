@@ -33,18 +33,12 @@ local_path = args.dataset_path or os.path.join(get_download_dir(), data_filename
 if not os.path.exists(local_path):
     download('https://data.dgl.ai/dataset/modelnet40-sampled-2048.h5', local_path)
 
-def collate(samples):
-    graphs, labels = map(list, zip(*samples))
-    batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.tensor(labels)
-
 CustomDataLoader = partial(
         DataLoader,
         num_workers=num_workers,
         batch_size=batch_size,
         shuffle=True,
-        drop_last=True,
-        collate_fn=collate)
+        drop_last=True)
 
 def train(net, opt, scheduler, train_loader, dev):
 
@@ -56,18 +50,11 @@ def train(net, opt, scheduler, train_loader, dev):
     count = 0
     with tqdm.tqdm(train_loader, ascii=True) as tq:
         # for data, label in tq:
-        for g, label in tq:
+        for data, label in tq:
             num_examples = label.shape[0]
-            label = label.to(dev).squeeze().long()
-            g.ndata['x'] = g.ndata['x'].to(dev)
-            '''
-            tmp = FarthestPointSampler(512)
-            res = tmp(g)
-            tmp2 = EpsBallPoints(0.2, 64)
-            res = tmp2(g)
-            '''
+            data, label = data.to(dev), label.to(dev).squeeze().long()
             opt.zero_grad()
-            logits = net(g)
+            logits = net(data)
             loss = compute_loss(logits, label)
             loss.backward()
             opt.step()
@@ -94,11 +81,10 @@ def evaluate(net, test_loader, dev):
 
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
-            for g, label in tq:
+            for data, label in tq:
                 num_examples = label.shape[0]
-                label = label.to(dev).squeeze().long()
-                g.ndata['x'] = g.ndata['x'].to(dev)
-                logits = net(g)
+                data, label = data.to(dev), label.to(dev).squeeze().long()
+                logits = net(data)
                 _, preds = logits.max(1)
 
                 correct = (preds == label).sum().item()

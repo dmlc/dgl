@@ -17,7 +17,7 @@ class FarthestPointSampler(nn.Module):
         super(FarthestPointSampler, self).__init__()
         self.npoints = npoints
 
-    def forward(self, g):
+    def forward(self, x):
         bs = g.batch_size
         coord = g.ndata['x'].view(bs, -1, 3)
         device = coord.device
