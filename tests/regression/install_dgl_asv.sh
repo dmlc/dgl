@@ -1,3 +1,8 @@
+#!/bin/bash
+
+set -e
+
+. /opt/conda/etc/profile.d/conda.sh
 
 pushd python
 for backend in pytorch mxnet tensorflow
