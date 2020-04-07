@@ -91,22 +91,22 @@ class ShapeNet(object):
         self.synset_dict = {}
         for syn in synset:
             self.synset_dict[syn[1]] = syn[0]
-        self.seg_classes = {'Earphone': [16, 17, 18],
-                            'Motorbike': [30, 31, 32, 33, 34, 35],
-                            'Rocket': [41, 42, 43],
-                            'Car': [8, 9, 10, 11],
-                            'Laptop': [28, 29],
-                            'Cap': [6, 7],
-                            'Skateboard': [44, 45, 46],
-                            'Mug': [36, 37],
-                            'Guitar': [19, 20, 21],
+        self.seg_classes = {'Airplane': [0, 1, 2, 3],
                             'Bag': [4, 5],
-                            'Lamp': [24, 25, 26, 27],
-                            'Table': [47, 48, 49],
-                            'Airplane': [0, 1, 2, 3],
-                            'Pistol': [38, 39, 40],
+                            'Cap': [6, 7],
+                            'Car': [8, 9, 10, 11],
                             'Chair': [12, 13, 14, 15],
-                            'Knife': [22, 23]}
+                            'Earphone': [16, 17, 18],
+                            'Guitar': [19, 20, 21],
+                            'Knife': [22, 23],
+                            'Lamp': [24, 25, 26, 27],
+                            'Laptop': [28, 29],
+                            'Motorbike': [30, 31, 32, 33, 34, 35],
+                            'Mug': [36, 37],
+                            'Pistol': [38, 39, 40],
+                            'Rocket': [41, 42, 43],
+                            'Skateboard': [44, 45, 46],
+                            'Table': [47, 48, 49]}
 
         train_split_json = 'shuffled_train_file_list.json'
         val_split_json = 'shuffled_val_file_list.json'
