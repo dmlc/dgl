@@ -25,7 +25,7 @@ conda activate base
 pip install --upgrade pip
 pip install asv numpy
 
-source /root/regression/dgl/tests/scripts/build_dgl.sh gpu
+export DGL_LIBRARY_PATH="~/dgl/build"
 
 conda activate base
 asv machine --yes

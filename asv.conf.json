@@ -12,15 +12,15 @@
     // The Python project's subdirectory in your repo.  If missing or
     // the empty string, the project is assumed to be located at the root
     // of the repository.
-    // "repo_subdir": "",
+    "repo_subdir": "python",
     // Customizable commands for building, installing, and
     // uninstalling the project. See asv.conf.json documentation.
     //
     "install_command": [
-        "in-dir={env_dir} python -m pip install numpy"
+        "bash ./tests/regression/install_dgl_asv.sh"
     ],
     "build_command": [
-        "python -c \"print('skip')\""
+        "bash ./tests/regression/build_dgl_asv.sh"
     ],
     "uninstall_command": [
         "return-code=any python -mpip uninstall -y dgl"
