@@ -4099,6 +4099,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     **Message passing:**
     For message passing and related operations, batched :class:`DGLGraph` acts exactly
     the same as a single :class:`~dgl.DGLGraph` with batch size 1.
+
     **Update Attributes:**
     Updating the attributes of the batched graph has no effect on the original graphs.
 

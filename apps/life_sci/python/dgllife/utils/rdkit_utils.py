@@ -1,5 +1,6 @@
 """Utils for RDKit, mostly adapted from DeepChem
 (https://github.com/deepchem/deepchem/blob/master/deepchem)."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import warnings
 
 from functools import partial
@@ -7,17 +8,15 @@ from multiprocessing import Pool
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
-__all__ = ['get_mol_3D_coordinates',
+__all__ = ['get_mol_3d_coordinates',
            'load_molecule',
            'multiprocess_load_molecules']
 
-def get_mol_3D_coordinates(mol):
+# pylint: disable=W0702
+def get_mol_3d_coordinates(mol):
     """Get 3D coordinates of the molecule.
+
+    This function requires that molecular conformation has been initialized.
 
     Parameters
     ----------
@@ -29,6 +28,27 @@ def get_mol_3D_coordinates(mol):
     numpy.ndarray of shape (N, 3) or None
         The 3D coordinates of atoms in the molecule. N for the number of atoms in
         the molecule. For failures in getting the conformations, None will be returned.
+
+    Examples
+    --------
+    An error will occur in the example below since the molecule object does not
+    carry conformation information.
+
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import get_mol_3d_coordinates
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+
+    Below we give a working example based on molecule conformation initialized from calculation.
+
+    >>> from rdkit.Chem import AllChem
+    >>> AllChem.EmbedMolecule(mol)
+    >>> AllChem.MMFFOptimizeMolecule(mol)
+    >>> coords = get_mol_3d_coordinates(mol)
+    >>> print(coords)
+    array([[ 1.20967478, -0.25802181,  0.        ],
+           [-0.05021255,  0.57068079,  0.        ],
+           [-1.15946223, -0.31265898,  0.        ]])
     """
     try:
         conf = mol.GetConformer()
@@ -42,15 +62,16 @@ def get_mol_3D_coordinates(mol):
         warnings.warn('Unable to get conformation of the molecule.')
         return None
 
+# pylint: disable=E1101
 def load_molecule(molecule_file, sanitize=False, calc_charges=False,
                   remove_hs=False, use_conformation=True):
-    """Load a molecule from a file.
+    """Load a molecule from a file of format ``.mol2`` or ``.sdf`` or ``.pdbqt`` or ``.pdb``.
 
     Parameters
     ----------
     molecule_file : str
-        Path to file for storing a molecule, which can be of format '.mol2', '.sdf',
-        '.pdbqt', or '.pdb'.
+        Path to file for storing a molecule, which can be of format ``.mol2`` or ``.sdf``
+        or ``.pdbqt`` or ``.pdb``.
     sanitize : bool
         Whether sanitization is performed in initializing RDKit molecule instances. See
         https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
@@ -80,8 +101,8 @@ def load_molecule(molecule_file, sanitize=False, calc_charges=False,
         supplier = Chem.SDMolSupplier(molecule_file, sanitize=False, removeHs=False)
         mol = supplier[0]
     elif molecule_file.endswith('.pdbqt'):
-        with open(molecule_file) as f:
-            pdbqt_data = f.readlines()
+        with open(molecule_file) as file:
+            pdbqt_data = file.readlines()
         pdb_block = ''
         for line in pdbqt_data:
             pdb_block += '{}\n'.format(line[:66])
@@ -109,7 +130,7 @@ def load_molecule(molecule_file, sanitize=False, calc_charges=False,
         return None, None
 
     if use_conformation:
-        coordinates = get_mol_3D_coordinates(mol)
+        coordinates = get_mol_3d_coordinates(mol)
     else:
         coordinates = None
 
@@ -117,13 +138,14 @@ def load_molecule(molecule_file, sanitize=False, calc_charges=False,
 
 def multiprocess_load_molecules(files, sanitize=False, calc_charges=False,
                                 remove_hs=False, use_conformation=True, num_processes=2):
-    """Load molecules from files with multiprocessing.
+    """Load molecules from files with multiprocessing, which can be of format ``.mol2`` or
+    ``.sdf`` or ``.pdbqt`` or ``.pdb``.
 
     Parameters
     ----------
     files : list of str
-        Each element is a path to a file storing a molecule, which can be of format '.mol2',
-        '.sdf', '.pdbqt', or '.pdb'.
+        Each element is a path to a file storing a molecule, which can be of format ``.mol2``,
+        ``.sdf``, ``.pdbqt``, or ``.pdb``.
     sanitize : bool
         Whether sanitization is performed in initializing RDKit molecule instances. See
         https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
@@ -151,7 +173,7 @@ def multiprocess_load_molecules(files, sanitize=False, calc_charges=False,
     """
     if num_processes == 1:
         mols_loaded = []
-        for i, f in enumerate(files):
+        for f in files:
             mols_loaded.append(load_molecule(
                 f, sanitize=sanitize, calc_charges=calc_charges,
                 remove_hs=remove_hs, use_conformation=use_conformation))
