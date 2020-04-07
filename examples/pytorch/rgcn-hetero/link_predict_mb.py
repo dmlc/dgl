@@ -61,14 +61,14 @@ class LinkPredict(nn.Module):
                 dropout=self.dropout))
         self.layers.to(self.device)
 
-    def fowrard_all(self, blocks):
+    def forward_all(self, blocks):
         emb = self.embed_layer()
         h = {}
         for k, e in emb.items():
             h[k] = e[blocks[0].srcnodes[k].data[dgl.NID]].to(self.device)
 
         for layer, block in zip(self.layers, blocks):
-            h = layer(block, h)
+            h = layer(block, h, emb)
 
         return h
 
@@ -81,9 +81,9 @@ class LinkPredict(nn.Module):
             n_h[k] = e[n_blocks[0].srcnodes[k].data[dgl.NID]].to(self.device)
 
         for layer, block in zip(self.layers, p_blocks):
-            p_h = layer(block, p_h)
+            p_h = layer(block, p_h, emb)
         for layer, block in zip(self.layers, n_blocks):
-            n_h = layer(block, n_h)
+            n_h = layer(block, n_h, emb)
 
         for ntype, emb in p_h.items():
             p_g.nodes[ntype].data['h'] = emb
@@ -300,18 +300,18 @@ class RGCNLinkRankSampler:
 def fullgraph_eval(eval_g, model, blocks, pos_pairs, neg_pairs):
     model.eval()
     t0 = time.time()
-    p_h = model.fowrard_all(blocks)
+    p_h = model.forward_all(blocks)
 
     test_head_ids, test_etypes, test_tail_ids = pos_pairs
     test_neg_head_ids, _, test_neg_tail_ids = neg_pairs
-    
+
     phead_emb = p_h['node'][test_head_ids]
     ptail_emb = p_h['node'][test_tail_ids]
     nhead_emb = p_h['node'][test_neg_head_ids]
     ntail_emb = p_h['node'][test_neg_tail_ids]
     pos_scores = model.calc_pos_score(phead_emb, ptail_emb, test_etypes)
     pos_scores = F.logsigmoid(pos_scores).reshape(phead_emb.shape[0], -1).cpu()
-    
+
     mrr = 0
     mr = 0
     hit1 = 0
@@ -325,21 +325,18 @@ def fullgraph_eval(eval_g, model, blocks, pos_pairs, neg_pairs):
         tail_pos = eval_g.has_edges_between(test_neg_head_ids,
                                            th.full(test_neg_head_ids.shape, test_tail_ids[idx]).long(),
                                            etype=str(test_etypes[idx].numpy().item()))
-    
+
         t_neg_score = model.calc_pos_score(phead_emb[idx], ntail_emb, test_etypes[idx])
         h_neg_score = model.calc_pos_score(nhead_emb, ptail_emb[idx], test_etypes[idx])
-    
+
         t_neg_score = F.logsigmoid(t_neg_score).cpu()
         h_neg_score = F.logsigmoid(h_neg_score).cpu()
         t_neg_score[head_pos == 1] += pos_scores[idx]
         h_neg_score[tail_pos == 1] += pos_scores[idx]
-    
+
         neg_score = th.cat([h_neg_score, t_neg_score], dim=0)
-        print(neg_score > pos_scores[idx])
-        print(neg_score)
-        print(pos_scores[idx])
         ranking = th.sum(neg_score > pos_scores[idx], dim=0) + 1
-        mrr += 1.0 / ranking
+        mrr += 1.0 / float(ranking)
         mr += float(ranking)
         hit1 += 1.0 if ranking <= 1 else 0.0
         hit3 +=  1.0 if ranking <= 3 else 0.0
@@ -497,7 +494,6 @@ def main(args):
             frontier = dgl.in_subgraph(test_g, cur)
 
             block = dgl.to_block(frontier, cur)
-            test_blocks.insert(0, block)
             cur = {}
             for ntype in block.srctypes:
                 cur[ntype] = block.srcnodes[ntype].data[dgl.NID]
@@ -574,13 +570,11 @@ def main(args):
             print("Epoch {} takes {} seconds".format(epoch, dur))
         gc.collect()
         evaluate(model, valid_dataloader, args.valid_batch_size, args.valid_neg_cnt)
-        fullgraph_eval(test_g, model, test_blocks,
-                      (test_head_ids, test_etypes, test_tail_ids),
-                      (test_neg_head_ids, test_neg_etypes, test_neg_tail_ids))
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
+    gc.collect()
     if args.test_neg_cnt == -1:
         fullgraph_eval(test_g, model, test_blocks,
                       (test_head_ids, test_etypes, test_tail_ids),
@@ -608,7 +602,7 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--model_path", type=str, default=None,
             help='path for save the model')
-    parser.add_argument("--use-self-loop", default=True, action='store_true',
+    parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
     parser.add_argument("--batch-size", type=int, default=1024,
             help="Mini-batch size.")

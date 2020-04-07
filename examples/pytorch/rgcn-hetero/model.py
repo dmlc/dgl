@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import dgl.nn.pytorch as dglnn
+from dgl import NID
 
 class RelGraphConvLayer(nn.Module):
     r"""Relational graph convolution layer.
@@ -78,7 +79,7 @@ class RelGraphConvLayer(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, g, inputs):
+    def forward(self, g, inputs, emb):
         """Forward computation
 
         Parameters
@@ -103,7 +104,8 @@ class RelGraphConvLayer(nn.Module):
         hs = self.conv(g, inputs, mod_kwargs=wdict)
         def _apply(ntype, h):
             if self.self_loop:
-                h = h + th.matmul(inputs[ntype], self.loop_weight)
+                self_emb = emb[ntype][g.dstnodes[ntype].data[NID]].to(h.device)
+                h = h + th.matmul(self_emb, self.loop_weight)
             if self.bias:
                 h = h + self.h_bias
             if self.activation:
@@ -191,7 +193,7 @@ class EntityClassify(nn.Module):
             self.num_bases, activation=None,
             self_loop=self.use_self_loop))
 
-    def forward(self, h=None, blocks=None):
+    def forward(self, h=None, blocks=None, node_embed=None):
         if blocks is None:
             # full graph training
             blocks = [self.g] * len(self.layers)
@@ -199,5 +201,5 @@ class EntityClassify(nn.Module):
             # full graph training
             h = self.embed_layer()
         for layer, block in zip(self.layers, blocks):
-            h = layer(block, h)
+            h = layer(block, h, node_embed)
         return h

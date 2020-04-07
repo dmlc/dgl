@@ -66,7 +66,7 @@ def evaluate(model, seeds, blocks, node_embed, labels, category, use_cuda):
     if use_cuda:
         emb = {k : e.cuda() for k, e in emb.items()}
         lbl = lbl.cuda()
-    logits = model(emb, blocks)[category]
+    logits = model(emb, blocks, node_embed)[category]
     loss = F.cross_entropy(logits, lbl)
     acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
     return loss, acc
@@ -158,7 +158,7 @@ def main(args):
             if use_cuda:
                 emb = {k : e.cuda() for k, e in emb.items()}
                 lbl = lbl.cuda()
-            logits = model(emb, blocks)[category]
+            logits = model(emb, blocks, node_embed)[category]
             loss = F.cross_entropy(logits, lbl)
             loss.backward()
             optimizer.step()
