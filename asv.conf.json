@@ -17,10 +17,10 @@
     // uninstalling the project. See asv.conf.json documentation.
     //
     "install_command": [
-        "bash ./tests/regression/install_dgl_asv.sh"
+        "/bin/bash ./tests/regression/install_dgl_asv.sh"
     ],
     "build_command": [
-        "bash ./tests/regression/build_dgl_asv.sh"
+        "/bin/bash ./tests/regression/build_dgl_asv.sh"
     ],
     "uninstall_command": [
         "return-code=any python -mpip uninstall -y dgl"
