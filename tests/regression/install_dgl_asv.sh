@@ -2,6 +2,8 @@
 
 set -e
 
+python -m pip install numpy
+
 . /opt/conda/etc/profile.d/conda.sh
 
 pushd python
