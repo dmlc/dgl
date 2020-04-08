@@ -24,7 +24,7 @@ class SAGEBenchmark:
         if key_name in self.std_log:
             return
         run_path = base_path / "examples/{}/graphsage/train_sampling.py".format(backend)
-        bashCommand = "/opt/conda/envs/{}-ci/bin/python {} --num-workers=4 --num-epochs=16 --gpu={}".format(
+        bashCommand = "/opt/conda/envs/{}-ci/bin/python {} --num-workers=2 --num-epochs=16 --gpu={}".format(
             backend, run_path.expanduser(), gpu)
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE,env=dict(os.environ, DGLBACKEND=backend))
         output, error = process.communicate()
