@@ -107,7 +107,7 @@
     "benchmark_dir": "tests/regression",
     // The directory (relative to the current directory) to cache the Python
     // environments in.  If not provided, defaults to "env"
-    // "env_dir": "env",
+    "env_dir": ".asv/env",
     // The directory (relative to the current directory) that raw benchmark
     // results are stored in.  If not provided, defaults to "results".
     "results_dir": "asv/results",
