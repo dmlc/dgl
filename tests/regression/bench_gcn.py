@@ -34,7 +34,7 @@ class GCNBenchmark:
 
     def track_gcn_time(self, backend, dataset, gpu_id):
         key_name = "{}_{}_{}".format(backend, dataset, gpu_id)
-        lines = self.std_log[keyname].split("\\n")
+        lines = self.std_log[key_name].split("\\n")
 
         time_list = []
         for line in lines:
@@ -47,8 +47,8 @@ class GCNBenchmark:
 
     def track_gcn_accuracy(self, backend, dataset, gpu_id):
         key_name = "{}_{}_{}".format(backend, dataset, gpu_id)
-        lines = self.std_log[keyname].split("\\n")
-        
+        lines = self.std_log[key_name].split("\\n")
+
         test_acc = -1
         for line in lines:
             if 'Test accuracy' in line:
