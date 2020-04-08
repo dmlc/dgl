@@ -32,7 +32,7 @@ class SAGEBenchmark:
         self.std_log[key_name] = str(output)
 
 
-    def track_sage_time(self, backend):
+    def track_sage_time(self, backend, gpu):
         key_name = key_name = "{}_{}".format(backend, gpu)
         lines = self.std_log[key_name].split("\\n")
         time_list = []
@@ -42,7 +42,7 @@ class SAGEBenchmark:
                 time_list.append(float(time_str))
         return np.array(time_list).mean()
 
-    def track_sage_accuracy(self, backend):
+    def track_sage_accuracy(self, backend, gpu):
         key_name = key_name = "{}_{}".format(backend, gpu)
         lines = self.std_log[key_name].split("\\n")
         test_acc = 0.
