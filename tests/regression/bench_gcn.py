@@ -29,7 +29,7 @@ class GCNBenchmark:
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE,env=dict(os.environ, DGLBACKEND=backend))
         output, error = process.communicate()
         print(str(error))
-        self.std_log[key_name] = output
+        self.std_log[key_name] = str(output)
 
 
     def track_gcn_time(self, backend, dataset, gpu_id):
