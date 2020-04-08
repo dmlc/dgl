@@ -305,7 +305,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=dev_id)
-    th.cuda.set_device(dev_id)
+    if n_gpus > 0:
+        th.cuda.set_device(dev_id)
 
     nd_possible_rating_values = \
         th.FloatTensor(dataset.possible_rating_values)
@@ -437,8 +438,13 @@ if __name__ == '__main__':
     args.dst_in_units = dataset.movie_feature_shape[1]
     args.rating_vals = dataset.possible_rating_values
 
-    if n_gpus == 1:
+    # cpu
+    if devices[0] == -1:
+        run(0, 0, args, ['cpu'], dataset)
+    # gpu
+    elif n_gpus == 1:
         run(0, n_gpus, args, devices, dataset)
+    # multi gpu
     else:
         prepare_mp(dataset.train_enc_graph)
         prepare_mp(dataset.train_dec_graph)
