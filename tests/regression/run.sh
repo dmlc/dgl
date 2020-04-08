@@ -16,8 +16,8 @@ mkdir regression
 cd regression
 # git config core.filemode false
 git clone --recursive https://github.com/$REPO/dgl.git 
-git checkout $BRANCH
 cd dgl
+git checkout $BRANCH
 mkdir asv
 cp -r ~/asv_data/* asv/
 
