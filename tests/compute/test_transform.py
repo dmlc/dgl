@@ -130,20 +130,26 @@ def test_bidirected_graph():
 def test_khop_graph():
     N = 20
     feat = F.randn((N, 5))
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
-    for k in range(4):
-        g_k = dgl.khop_graph(g, k)
-        # use original graph to do message passing for k times.
-        g.ndata['h'] = feat
-        for _ in range(k):
-            g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-        h_0 = g.ndata.pop('h')
-        # use k-hop graph to do message passing for one time.
-        g_k.ndata['h'] = feat
-        g_k.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-        h_1 = g_k.ndata.pop('h')
-        assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
+    def _test(g):
+        for k in range(4):
+            g_k = dgl.khop_graph(g, k)
+            # use original graph to do message passing for k times.
+            g.ndata['h'] = feat
+            for _ in range(k):
+                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            h_0 = g.ndata.pop('h')
+            # use k-hop graph to do message passing for one time.
+            g_k.ndata['h'] = feat
+            g_k.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            h_1 = g_k.ndata.pop('h')
+            assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
+
+    # Test for random undirected graphs
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+    _test(g)
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3, directed=True))
+    _test(g)
 
 def test_khop_adj():
     N = 20

@@ -234,7 +234,7 @@ def khop_graph(g, k):
              edata_schemes={})
     """
     n = g.number_of_nodes()
-    adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
+    adj_k = g.adjacency_matrix_scipy(transpose=True, return_edge_ids=False) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)
