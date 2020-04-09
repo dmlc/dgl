@@ -583,7 +583,7 @@ class KVClient(object):
         self._server_namebook = server_namebook
         self._server_count = len(server_namebook)
         self._group_count = server_namebook[0][3]
-        self._machine_count = self._server_count / self._group_count;
+        self._machine_count = int(self._server_count / self._group_count)
         # client ID will be assign by server after connecting to server
         self._client_id = -1
         # Get local machine id via server_namebook
