@@ -561,7 +561,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
         kv_msg.data = args[args_count++];
       }
     }
-    send_kv_message(sender, kv_msg, recv_id)
+    send_kv_message(sender, kv_msg, recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
