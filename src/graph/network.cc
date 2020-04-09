@@ -634,7 +634,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<int64_t> local_ids;
     std::vector<int64_t> local_ids_orginal;
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
-    std::vector<int> local_data_shape;
+    std::vector<int64_t> local_data_shape;
     int row_size = 1;
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
@@ -656,7 +656,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     // Send remote ID to remote machine
-    msg_count = 0;
+    int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
       if (remote_ids[i].size() != 0) {
         KVStoreMsg kv_msg;
@@ -680,7 +680,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     }
     // Recv remote msg
     for (int i = 0; i < msg_count; ++i) {
-      kv_msg = recv_kv_message(receiver);
+      KVStoreMsg *kv_msg = recv_kv_message(receiver);
       int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
       int64_t* id_data = static_cast<int64_t*>(kv_msg->id->data);
       char* data_char = static_cast<char*>(kv_msg->data->data);
