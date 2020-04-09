@@ -18,6 +18,8 @@ The folder contains training module and inferencing module (beam decoder) for Tr
     python3 translation_train.py [--gpus id1,id2,...] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--universal]
     ```
 
+By specifying multiple gpu ids separated by comma, we will employ multi-gpu training with multiprocessing.
+
 - For evaluating BLEU score on test set(by enabling `--print` to see translated text):
 
     ```
@@ -35,11 +37,7 @@ Available datasets: `copy`, `sort`, `wmt14`, `multi30k`(default).
 
 ### Universal Transformer
 
-- work in progress 
-
-## Notes
-
-- Currently we do not support Multi-GPU training(this will be fixed soon), you should only specify only one gpu\_id when running the training script.
+- work in progress
 
 ## Reference
 
