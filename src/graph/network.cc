@@ -636,12 +636,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
     std::vector<int64_t> local_data_shape;
     int row_size = 1;
+    std::cout << "111111\n";
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
       if (i != 0) {
         row_size *= local_data->shape[i];
       }
     }
+    std::cout << "222222\n";
     row_size *= sizeof(float);
     // Get local id and remote id
     for (size_t i = 0; i < ID_size; ++i) {
@@ -655,6 +657,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         remote_ids[part_id].push_back(id);
       }
     }
+    std::cout << "333333\n";
     // Send remote ID to remote machine
     int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
@@ -671,6 +674,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         msg_count++;
       }
     }
+    std::cout << "444444\n";
     // Get local data
     char *return_data = new char[ID_size*row_size];
     for (size_t i = 0; i < local_ids.size(); ++i) {
@@ -678,6 +682,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
              local_data_char + local_ids[i] * row_size,
              row_size);
     }
+    std::cout << "555555\n";
     // Recv remote msg
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
@@ -690,6 +695,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                row_size);
       }
     }
+    std::cout << "666666\n";
     // Final NDArray
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
@@ -698,6 +704,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                           DLContext{kDLCPU, 0},
                           return_data);
     *rv = res_tensor;
+    std::cout << "777777\n";
   });
 
 }  // namespace network
