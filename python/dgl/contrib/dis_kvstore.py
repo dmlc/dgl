@@ -5,6 +5,7 @@ from ..network import _network_wait, _add_receiver_addr
 from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
 from ..network import _clear_kv_msg
+from ..network import _pull_message
 from ..network import KVMsgType, KVStoreMsg
 
 from .. import backend as F
@@ -582,6 +583,7 @@ class KVClient(object):
         self._server_namebook = server_namebook
         self._server_count = len(server_namebook)
         self._group_count = server_namebook[0][3]
+        self._machine_count = self._server_count / self._group_count;
         # client ID will be assign by server after connecting to server
         self._client_id = -1
         # Get local machine id via server_namebook
@@ -900,6 +902,35 @@ class KVClient(object):
         data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
 
         return data_tensor[back_sorted_id] # return data with original index order
+
+
+    def fast_pull(self, name, id_tensor):
+        """Pull message from KVServer by using c_api.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        id_tensor : tensor (mx.ndarray or torch.tensor)
+            a vector storing the ID list
+
+        Returns
+        -------
+        tensor
+            a data tensor with the same row size of id_tensor.
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
+
+        return _pull_message(name, id_tensor,
+            self._machine_count,
+            self._machine_id,
+            self._client_id,
+            self._data_store[name+'-part-'], 
+            self._data_store[name+'-g2l-'], 
+            self._data_store[name+'-data-'],
+            self._sender,
+            self._receiver)
 
         
     def barrier(self):

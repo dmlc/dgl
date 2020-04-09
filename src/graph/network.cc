@@ -452,6 +452,96 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
 ////////////////////////// Distributed KVStore Components ////////////////////////////////
 
 
+static void send_kv_message(sender, kv_msg, recv_id) {
+  int64_t kv_size = 0;
+  char* kv_data = kv_msg.Serialize(&kv_size);
+  // Send kv_data
+  Message send_kv_msg;
+  send_kv_msg.data = kv_data;
+  send_kv_msg.size = kv_size;
+  send_kv_msg.deallocator = DefaultMessageDeleter;
+  CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
+  if (kv_msg.msg_type != kFinalMsg &&
+      kv_msg.msg_type != kBarrierMsg &&
+      kv_msg.msg_type != kIPIDMsg) {
+    // Send ArrayMeta
+    ArrayMeta meta(kv_msg.msg_type);
+    meta.AddArray(kv_msg.id);
+    if (kv_msg.msg_type != kPullMsg) {
+      meta.AddArray(kv_msg.data);
+    }
+    int64_t meta_size = 0;
+    char* meta_data = meta.Serialize(&meta_size);
+    Message send_meta_msg;
+    send_meta_msg.data = meta_data;
+    send_meta_msg.size = meta_size;
+    send_meta_msg.deallocator = DefaultMessageDeleter;
+    CHECK_EQ(sender->Send(send_meta_msg, recv_id), ADD_SUCCESS);
+    // Send ID NDArray
+    Message send_id_msg;
+    send_id_msg.data = static_cast<char*>(kv_msg.id->data);
+    send_id_msg.size = kv_msg.id.GetSize();
+    NDArray id = kv_msg.id;
+    send_id_msg.deallocator = [id](Message*) {};
+    CHECK_EQ(sender->Send(send_id_msg, recv_id), ADD_SUCCESS);
+    // Send data NDArray
+    if (kv_msg.msg_type != kPullMsg) {
+      Message send_data_msg;
+      send_data_msg.data = static_cast<char*>(kv_msg.data->data);
+      send_data_msg.size = kv_msg.data.GetSize();
+      NDArray data = kv_msg.data;
+      send_data_msg.deallocator = [data](Message*) {};
+      CHECK_EQ(sender->Send(send_data_msg, recv_id), ADD_SUCCESS);
+    }
+  }
+}
+
+static KVStoreMsg* recv_kv_message(receiver) {
+  KVStoreMsg *kv_msg = new KVStoreMsg();
+  // Recv kv_Msg
+  Message recv_kv_msg;
+  int send_id;
+  CHECK_EQ(receiver->Recv(&recv_kv_msg, &send_id), REMOVE_SUCCESS);
+  kv_msg->Deserialize(recv_kv_msg.data, recv_kv_msg.size);
+  recv_kv_msg.deallocator(&recv_kv_msg);
+  if (kv_msg->msg_type == kFinalMsg ||
+      kv_msg->msg_type == kBarrierMsg ||
+      kv_msg->msg_type == kIPIDMsg) {
+    *rv = kv_msg;
+    return;
+  }
+  // Recv ArrayMeta
+  Message recv_meta_msg;
+  CHECK_EQ(receiver->RecvFrom(&recv_meta_msg, send_id), REMOVE_SUCCESS);
+  ArrayMeta meta(recv_meta_msg.data, recv_meta_msg.size);
+  recv_meta_msg.deallocator(&recv_meta_msg);
+  // Recv ID NDArray
+  Message recv_id_msg;
+  CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
+  CHECK_EQ(meta.data_shape_[0], 1);
+  kv_msg->id = CreateNDArrayFromRaw(
+    {meta.data_shape_[1]},
+    DLDataType{kDLInt, 64, 1},
+    DLContext{kDLCPU, 0},
+    recv_id_msg.data);
+  // Recv Data NDArray
+  if (kv_msg->msg_type != kPullMsg) {
+    Message recv_data_msg;
+    CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
+    CHECK_GE(meta.data_shape_[2], 1);
+    std::vector<int64_t> vec_shape;
+    for (int i = 3; i < meta.data_shape_.size(); ++i) {
+      vec_shape.push_back(meta.data_shape_[i]);
+    }
+    kv_msg->data = CreateNDArrayFromRaw(
+      vec_shape,
+      DLDataType{kDLFloat, 32, 1},
+      DLContext{kDLCPU, 0},
+      recv_data_msg.data);
+  }
+  return kv_msg;  
+}
+
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     int args_count = 0;
@@ -471,97 +561,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
         kv_msg.data = args[args_count++];
       }
     }
-    int64_t kv_size = 0;
-    char* kv_data = kv_msg.Serialize(&kv_size);
-    // Send kv_data
-    Message send_kv_msg;
-    send_kv_msg.data = kv_data;
-    send_kv_msg.size = kv_size;
-    send_kv_msg.deallocator = DefaultMessageDeleter;
-    CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
-
-    if (kv_msg.msg_type != kFinalMsg &&
-        kv_msg.msg_type != kBarrierMsg &&
-        kv_msg.msg_type != kIPIDMsg) {
-      // Send ArrayMeta
-      ArrayMeta meta(kv_msg.msg_type);
-      meta.AddArray(kv_msg.id);
-      if (kv_msg.msg_type != kPullMsg) {
-        meta.AddArray(kv_msg.data);
-      }
-      int64_t meta_size = 0;
-      char* meta_data = meta.Serialize(&meta_size);
-      Message send_meta_msg;
-      send_meta_msg.data = meta_data;
-      send_meta_msg.size = meta_size;
-      send_meta_msg.deallocator = DefaultMessageDeleter;
-      CHECK_EQ(sender->Send(send_meta_msg, recv_id), ADD_SUCCESS);
-      // Send ID NDArray
-      Message send_id_msg;
-      send_id_msg.data = static_cast<char*>(kv_msg.id->data);
-      send_id_msg.size = kv_msg.id.GetSize();
-      NDArray id = kv_msg.id;
-      send_id_msg.deallocator = [id](Message*) {};
-      CHECK_EQ(sender->Send(send_id_msg, recv_id), ADD_SUCCESS);
-      // Send data NDArray
-      if (kv_msg.msg_type != kPullMsg) {
-        Message send_data_msg;
-        send_data_msg.data = static_cast<char*>(kv_msg.data->data);
-        send_data_msg.size = kv_msg.data.GetSize();
-        NDArray data = kv_msg.data;
-        send_data_msg.deallocator = [data](Message*) {};
-        CHECK_EQ(sender->Send(send_data_msg, recv_id), ADD_SUCCESS);
-      }
-    }
+    send_kv_message(sender, kv_msg, recv_id)
   });
 
 DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
-    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
-    KVStoreMsg *kv_msg = new KVStoreMsg();
-    // Recv kv_Msg
-    Message recv_kv_msg;
-    int send_id;
-    CHECK_EQ(receiver->Recv(&recv_kv_msg, &send_id), REMOVE_SUCCESS);
-    kv_msg->Deserialize(recv_kv_msg.data, recv_kv_msg.size);
-    recv_kv_msg.deallocator(&recv_kv_msg);
-    if (kv_msg->msg_type == kFinalMsg ||
-        kv_msg->msg_type == kBarrierMsg ||
-        kv_msg->msg_type == kIPIDMsg) {
-      *rv = kv_msg;
-      return;
-    }
-    // Recv ArrayMeta
-    Message recv_meta_msg;
-    CHECK_EQ(receiver->RecvFrom(&recv_meta_msg, send_id), REMOVE_SUCCESS);
-    ArrayMeta meta(recv_meta_msg.data, recv_meta_msg.size);
-    recv_meta_msg.deallocator(&recv_meta_msg);
-    // Recv ID NDArray
-    Message recv_id_msg;
-    CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
-    CHECK_EQ(meta.data_shape_[0], 1);
-    kv_msg->id = CreateNDArrayFromRaw(
-      {meta.data_shape_[1]},
-      DLDataType{kDLInt, 64, 1},
-      DLContext{kDLCPU, 0},
-      recv_id_msg.data);
-    // Recv Data NDArray
-    if (kv_msg->msg_type != kPullMsg) {
-      Message recv_data_msg;
-      CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
-      CHECK_GE(meta.data_shape_[2], 1);
-      std::vector<int64_t> vec_shape;
-      for (int i = 3; i < meta.data_shape_.size(); ++i) {
-        vec_shape.push_back(meta.data_shape_[i]);
-      }
-      kv_msg->data = CreateNDArrayFromRaw(
-        vec_shape,
-        DLDataType{kDLFloat, 32, 1},
-        DLContext{kDLCPU, 0},
-        recv_data_msg.data);
-    }
-    *rv = kv_msg;
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);    
+    *rv = recv_kv_message(receiver);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgType")
@@ -605,6 +612,68 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
     network::KVStoreMsg* msg = static_cast<KVStoreMsg*>(chandle);
     delete msg;
   });
+
+
+/*
+DGL_REGISTER_GLOBAL("network._CAPI_PullMessage")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string name = args[0];
+    int local_machine_id = args[1];
+    int machine_count = args[2];
+    int client_id = args[3];
+    int row_size = args[4];
+    NDArray ID = args[5];
+    NDArray pb = args[6];
+    NDArray g2l = args[7];
+    NDArray local_data = args[8];
+    CommunicatorHandle chandle_sender = args[9];
+    CommunicatorHandle chandle_receiver = args[10];
+    network::Sender* sender = static_cast<network::Sender*>(chandle_sender);
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle_receiver);
+    size_t ID_size = ID.GetSize() / sizeof(int64_t);
+    int64_t* ID_data = static_cast<int64_t*>(ID->data);
+    int64_t* pb_data = static_cast<int64_t*>(pb->data);
+    int64_t* g2l_data = static_cast<int64_t*>(g2l->data);
+    std::vector<int64_t> local_ids;
+    std::vector<std::vector<int64_t> > remote_ids(machine_count-1);
+    // Get local id and remote id
+    for (size_t i = 0; i < ID_size; ++i) {
+      int64_t id = ID_data[i];
+      int64_t part_id = pb_data[id];
+      if (part_id == local_machine_id) {
+        int local_id = g2l_data[id];
+        local_ids.push_back(local_id);
+      } else {
+        remote_ids[part_id].push_back(id);
+      }
+    }
+    // Send remote it to remote machine
+    for (int i = 0; i < remote_ids.size(); ++i) {
+      if (remote_ids[i].size() != 0) {
+        KVStoreMsg kv_msg;
+        kv_msg.msg_type = MessageType::kPullMsg;
+        kv_msg.rank = client_id;
+        kv_msg.name = name;
+        kv_msg.id = CreateNDArrayFromRaw({remote_ids[i].size()},
+                                         DLDataType{kDLInt, 64, 1},
+                                         DLContext{kDLCPU, 0},
+                                         remote_ids[i].data());
+        int64_t kv_size = 0;
+        char* kv_data = kv_msg.Serialize(&kv_size);
+        // Send kv_data
+        Message send_kv_msg;
+        send_kv_msg.data = kv_data;
+        send_kv_msg.size = kv_size;
+        send_kv_msg.deallocator = DefaultMessageDeleter;
+        CHECK_EQ(sender->Send(send_kv_msg, i), ADD_SUCCESS);
+      }
+    }
+    // Get local data
+
+    // wait remote msg
+
+  });
+*/
 
 }  // namespace network
 }  // namespace dgl

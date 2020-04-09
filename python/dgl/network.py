@@ -327,3 +327,46 @@ def _clear_kv_msg(msg):
     F.sync()
     if msg.c_ptr is not None:
         _CAPI_DeleteKVMsg(msg.c_ptr)
+
+
+def _pull_message(name, ID, 
+                  machine_count, machine_id, client_id, 
+                  partition_book, g2l, local_data, 
+                  sender, receiver):
+    """ Pull message
+
+    Parameters
+    ----------
+    name : str
+        data name string
+    ID : tensor
+        tensor of ID
+    machine_count : int
+        count of total machine
+    machine_id : int
+        current machine id
+    client_id : int
+        current client ID
+    partition_book : tensor
+        tensor of partition book
+    g2l : tensor
+        tensor of global2local
+    local_data : tensor
+        tensor of local shared data
+    sender : ctypes.c_void_p
+        C Sender handle
+    receiver : ctypes.c_void_p
+        C Receiver handle
+
+    Return
+    ------
+    tensor
+        target tensor
+    """
+    row_size = F.shape(local_data)[1]
+    _CAPI_PullMessage(name, machine_id, machine_count, client_id, row_size,
+        F.zerocopy_to_dgl_ndarray(ID),
+        F.zerocopy_to_dgl_ndarray(partition_book),
+        F.zerocopy_to_dgl_ndarray(g2l),
+        F.zerocopy_to_dgl_ndarray(local_data),
+        sender, receiver)
