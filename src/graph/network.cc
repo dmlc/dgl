@@ -692,6 +692,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     //end = clock();
     //std::cout << "new time = " << double(end-start) << std::endl;
     //start = clock(); 
+#pragma omp parallel for
     for (size_t i = 0; i < local_ids.size(); ++i) {
       memcpy(return_data + local_ids_orginal[i] * row_size,
              local_data_char + local_ids[i] * row_size,
@@ -701,7 +702,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     //std::cout << "Get local data time = " << double(end-start) << std::endl;
     // Recv remote msg
     //start = clock(); 
-#pragma omp parallel for
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
       int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
