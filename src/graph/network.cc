@@ -642,7 +642,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
     std::vector<int64_t> local_data_shape;
     end = clock();
-    cout<<"init time = "<< double(end-start) << std::endl;
+    std::cout << "init time = " << double(end-start) << std::endl;
     start = clock(); 
     int row_size = 1;
     for (int i = 0; i < local_data->ndim; ++i) {
@@ -666,7 +666,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     end = clock();
-    cout<<"Get ID time = "<< double(end-start) << std::endl;
+    std::cout << "Get ID time = " << double(end-start) << std::endl;
     // Send remote ID to remote machine
     int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
@@ -692,7 +692,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
              row_size);
     }
     end = clock();
-    cout<<"Get local data time = "<< double(end-start) << std::endl;
+    std::cout << "Get local data time = " << double(end-start) << std::endl;
     // Recv remote msg
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
