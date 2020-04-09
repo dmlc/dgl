@@ -6,7 +6,7 @@ import mxnet as mx
 from mxnet import gluon
 
 from .... import function as fn
-
+from ....base import DGLError
 
 class GraphConv(gluon.Block):
     r"""Apply graph convolution over an input signal.
@@ -43,8 +43,14 @@ class GraphConv(gluon.Block):
         Number of input features.
     out_feats : int
         Number of output features.
-    norm : bool, optional
-        If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
+    norm : str, optional
+        How to apply the normalizer. If is `'right'`, divide the aggregated messages
+        by each node's in-degrees, which is equivalent to averaging the received messages.
+        If is `'none'`, no normalization is applied. Default is `'both'`,
+        where the :math:`c_{ij}` in the paper is applied.
+    weight : bool, optional
+        If True, apply a linear layer. Otherwise, aggregating the messages
+        without a weight matrix.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
@@ -61,17 +67,25 @@ class GraphConv(gluon.Block):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 norm=True,
+                 norm='both',
+                 weight=True,
                  bias=True,
                  activation=None):
         super(GraphConv, self).__init__()
+        if norm not in ('none', 'both', 'right'):
+            raise DGLError('Invalid norm value. Must be either "none", "both" or "right".'
+                           ' But got "{}".'.format(norm))
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
 
         with self.name_scope():
-            self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                                          init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+            if weight:
+                self.weight = self.params.get('weight', shape=(in_feats, out_feats),
+                                              init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+            else:
+                self.weight = None
+
             if bias:
                 self.bias = self.params.get('bias', shape=(out_feats,),
                                             init=mx.init.Zero())
@@ -80,22 +94,25 @@ class GraphConv(gluon.Block):
 
         self._activation = activation
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, weight=None):
         r"""Compute graph convolution.
 
         Notes
         -----
-            * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
-              dimensions, :math:`N` is the number of nodes.
-            * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
-              the same shape as the input.
+        * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
+          dimensions, :math:`N` is the number of nodes.
+        * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
+          the same shape as the input.
+        * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
 
         Parameters
         ----------
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
-            The input feature
+            The input feature.
+        weight : torch.Tensor, optional
+            Optional external weight tensor.
 
         Returns
         -------
@@ -103,29 +120,49 @@ class GraphConv(gluon.Block):
             The output feature
         """
         graph = graph.local_var()
-        if self._norm:
-            degs = graph.in_degrees().astype('float32')
-            norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
+
+        if self._norm == 'both':
+            degs = graph.out_degrees().as_in_context(feat.context).astype('float32')
+            degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
+            norm = mx.nd.power(degs, -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = norm.reshape(shp).as_in_context(feat.context)
+            norm = norm.reshape(shp)
             feat = feat * norm
+
+        if weight is not None:
+            if self.weight is not None:
+                raise DGLError('External weight is provided while at the same time the'
+                               ' module has defined its own weight parameter. Please'
+                               ' create the module with flag weight=False.')
+        else:
+            weight = self.weight.data(feat.context)
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = mx.nd.dot(feat, self.weight.data(feat.context))
-            graph.ndata['h'] = feat
+            if weight is not None:
+                feat = mx.nd.dot(feat, weight)
+            graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.ndata.pop('h')
+            rst = graph.dstdata.pop('h')
         else:
             # aggregate first then mult W
-            graph.ndata['h'] = feat
+            graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.ndata.pop('h')
-            rst = mx.nd.dot(rst, self.weight.data(feat.context))
+            rst = graph.dstdata.pop('h')
+            if weight is not None:
+                rst = mx.nd.dot(rst, weight)
 
-        if self._norm:
+        if self._norm != 'none':
+            degs = graph.in_degrees().as_in_context(feat.context).astype('float32')
+            degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
+            if self._norm == 'both':
+                norm = mx.nd.power(degs, -0.5)
+            else:
+                norm = 1.0 / degs
+            shp = norm.shape + (1,) * (feat.ndim - 1)
+            norm = norm.reshape(shp)
             rst = rst * norm
 
         if self.bias is not None:
@@ -141,5 +178,5 @@ class GraphConv(gluon.Block):
         summary += 'in={:d}, out={:d}, normalization={}, activation={}'.format(
             self._in_feats, self._out_feats,
             self._norm, self._activation)
-        summary += '\n)'
+        summary += ')'
         return summary

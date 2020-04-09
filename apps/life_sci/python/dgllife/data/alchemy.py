@@ -259,30 +259,32 @@ class TencentAlchemyDataset(object):
             SMILES for the ith datapoint
         DGLGraph
             DGLGraph for the ith datapoint
-        Tensor of dtype float32
-            Labels of the datapoint for all tasks
+        Tensor of dtype float32 and shape (T)
+            Labels of the datapoint for all tasks.
         """
         return self.smiles[item], self.graphs[item], self.labels[item]
 
     def __len__(self):
-        """Length of the dataset
+        """Size for the dataset.
 
         Returns
         -------
         int
-            Length of Dataset
+            Size for the dataset.
         """
         return len(self.graphs)
 
     def set_mean_and_std(self, mean=None, std=None):
         """Set mean and std or compute from labels for future normalization.
 
+        The mean and std can be fetched later with ``self.mean`` and ``self.std``.
+
         Parameters
         ----------
-        mean : int or float
-            Default to be None.
-        std : int or float
-            Default to be None.
+        mean : float32 tensor of shape (T)
+            Mean of labels for all tasks.
+        std : float32 tensor of shape (T)
+            Std of labels for all tasks.
         """
         labels = np.array([i.numpy() for i in self.labels])
         if mean is None:

@@ -1,6 +1,9 @@
 import dgl
 import backend as F
+import unittest
 
+
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_to_device():
     g = dgl.DGLGraph()
     g.add_nodes(5, {'h' : F.ones((5, 2))})

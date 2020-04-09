@@ -10,10 +10,9 @@ __all__ = ['MoleculeCSVDataset']
 class MoleculeCSVDataset(object):
     """MoleculeCSVDataset
 
-    This is a general class for loading molecular data from pandas.DataFrame.
+    This is a general class for loading molecular data from :class:`pandas.DataFrame`.
 
-    In data pre-processing, we set non-existing labels to be 0,
-    and returning mask with 1 where label exists.
+    In data pre-processing, we construct a binary mask indicating the existence of labels.
 
     All molecules are converted into DGLGraphs. After the first-time construction, the
     DGLGraphs can be saved for reloading so that we do not need to reconstruct them every time.
@@ -22,8 +21,7 @@ class MoleculeCSVDataset(object):
     ----------
     df: pandas.DataFrame
         Dataframe including smiles and labels. Can be loaded by pandas.read_csv(file_path).
-        One column includes smiles and other columns for labels.
-        Column names other than smiles column would be considered as task names.
+        One column includes smiles and some other columns include labels.
     smiles_to_graph: callable, str -> DGLGraph
         A function turning a SMILES into a DGLGraph.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
@@ -33,7 +31,7 @@ class MoleculeCSVDataset(object):
         Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph.
     smiles_column: str
-        Column name that including smiles.
+        Column name that including smiles in ``df``.
     cache_file_path: str
         Path to store the preprocessed DGLGraphs. For example, this can be ``'dglgraph.bin'``.
     task_names : list of str or None
@@ -118,19 +116,19 @@ class MoleculeCSVDataset(object):
             SMILES for the ith datapoint
         DGLGraph
             DGLGraph for the ith datapoint
-        Tensor of dtype float32
+        Tensor of dtype float32 and shape (T)
             Labels of the datapoint for all tasks
-        Tensor of dtype float32
+        Tensor of dtype float32 and shape (T)
             Binary masks indicating the existence of labels for all tasks
         """
         return self.smiles[item], self.graphs[item], self.labels[item], self.mask[item]
 
     def __len__(self):
-        """Length of the dataset
+        """Size for the dataset
 
         Returns
         -------
         int
-            Length of Dataset
+            Size for the dataset
         """
         return len(self.smiles)

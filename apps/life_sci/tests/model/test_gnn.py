@@ -81,7 +81,7 @@ def test_gat():
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
 
     # Test default setting
-    gnn = GAT(in_feats=1)
+    gnn = GAT(in_feats=1).to(device)
     assert gnn(g, node_feats).shape == torch.Size([3, 32])
     assert gnn(bg, batch_node_feats).shape == torch.Size([8, 32])
 
@@ -196,7 +196,7 @@ def test_mpnn_gnn():
 
     # Test default setting
     gnn = MPNNGNN(node_in_feats=1,
-                  edge_in_feats=2)
+                  edge_in_feats=2).to(device)
     assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 64])
     assert gnn(bg, batch_node_feats, batch_edge_feats).shape == torch.Size([8, 64])
 
@@ -223,7 +223,7 @@ def test_wln():
 
     # Test default setting
     gnn = WLN(node_in_feats=1,
-              edge_in_feats=2)
+              edge_in_feats=2).to(device)
     assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 300])
     assert gnn(bg, batch_node_feats, batch_edge_feats).shape == torch.Size([8, 300])
 
@@ -231,7 +231,7 @@ def test_wln():
     gnn = WLN(node_in_feats=1,
               edge_in_feats=2,
               node_out_feats=3,
-              n_layers=1)
+              n_layers=1).to(device)
     assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 3])
     assert gnn(bg, batch_node_feats, batch_edge_feats).shape == torch.Size([8, 3])
 
