@@ -614,7 +614,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
 
 DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::cout << "00000000\n";
     std::string name = args[0];
     int local_machine_id = args[1];
     int machine_count = args[2];
@@ -625,7 +624,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     NDArray local_data = args[7];
     CommunicatorHandle chandle_sender = args[8];
     CommunicatorHandle chandle_receiver = args[9];
-    std::cout << "111111\n";
     network::Sender* sender = static_cast<network::Sender*>(chandle_sender);
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle_receiver);
     size_t ID_size = ID.GetSize() / sizeof(int64_t);
@@ -638,14 +636,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
     std::vector<int64_t> local_data_shape;
     int row_size = 1;
-    std::cout << "222222\n";
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
       if (i != 0) {
         row_size *= local_data->shape[i];
       }
     }
-    std::cout << "222222\n";
     row_size *= sizeof(float);
     // Get local id and remote id
     for (size_t i = 0; i < ID_size; ++i) {
@@ -659,7 +655,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         remote_ids[part_id].push_back(id);
       }
     }
-    std::cout << "333333\n";
     // Send remote ID to remote machine
     int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
@@ -676,8 +671,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         msg_count++;
       }
     }
-    std::cout << "444444\n";
     // Get local data
+    std::cout << "ID_size: " << ID_size << std::endl;
+    std::cout << "row_size: " << row_size << std::endl;
     char *return_data = new char[ID_size*row_size];
     for (size_t i = 0; i < local_ids.size(); ++i) {
       memcpy(return_data + local_ids_orginal[i] * row_size,
