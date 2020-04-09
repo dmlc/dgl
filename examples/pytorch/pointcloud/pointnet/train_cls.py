@@ -1,4 +1,5 @@
 import torch
+torch.backends.cudnn.enabled = False
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
