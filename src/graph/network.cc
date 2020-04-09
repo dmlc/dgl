@@ -681,7 +681,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
              local_data_char + local_ids[i] * row_size,
              row_size);
     }
-    std::cout << "555555\n";
     // Recv remote msg
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
@@ -694,7 +693,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                row_size);
       }
     }
-    std::cout << "666666\n";
     // Final NDArray
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
@@ -703,7 +701,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                           DLContext{kDLCPU, 0},
                           return_data);
     *rv = res_tensor;
-    std::cout << "777777\n";
   });
 
 }  // namespace network
