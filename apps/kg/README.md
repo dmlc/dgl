@@ -1,6 +1,6 @@
 # DGL - Knowledge Graph Embedding
 
-**Note: DGL-KE is moved to [here](https://github.com/awslabs/dgl-ke). DGL-KE in this folder is deprecated. **
+**Note: DGL-KE is moved to [here](https://github.com/awslabs/dgl-ke). DGL-KE in this folder is deprecated.**
 
 
 ## Introduction
