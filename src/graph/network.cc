@@ -668,6 +668,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     end = clock();
     std::cout << "Get ID time = " << double(end-start) << std::endl;
     // Send remote ID to remote machine
+    start = clock(); 
     int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
       if (remote_ids[i].size() != 0) {
@@ -683,9 +684,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         msg_count++;
       }
     }
+    end = clock();
+    std::cout << "Send msg time = " << double(end-start) << std::endl;
     // Get local data
     start = clock(); 
     char *return_data = new char[ID_size*row_size];
+    end = clock();
+    std::cout << "new time = " << double(end-start) << std::endl;
+    start = clock(); 
     for (size_t i = 0; i < local_ids.size(); ++i) {
       memcpy(return_data + local_ids_orginal[i] * row_size,
              local_data_char + local_ids[i] * row_size,
@@ -694,6 +700,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     end = clock();
     std::cout << "Get local data time = " << double(end-start) << std::endl;
     // Recv remote msg
+    start = clock(); 
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
       int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
@@ -705,13 +712,18 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                row_size);
       }
     }
+    end = clock();
+    std::cout << "Recv time = " << double(end-start) << std::endl;
     // Final NDArray
+    start = clock(); 
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
                           DLDataType{kDLFloat, 32, 1},
                           DLContext{kDLCPU, 0},
                           return_data);
+    end = clock();
+    std::cout << "return time = " << double(end-start) << std::endl;
     *rv = res_tensor;
   });
 
