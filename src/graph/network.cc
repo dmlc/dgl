@@ -18,6 +18,8 @@
 #include "./network/msg_queue.h"
 #include "./network/common.h"
 
+#include <time.h>
+
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
 
@@ -614,6 +616,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
 
 DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
+    clock_t start,end;
+    start = clock(); 
     std::string name = args[0];
     int local_machine_id = args[1];
     int machine_count = args[2];
@@ -637,6 +641,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
     std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
     std::vector<int64_t> local_data_shape;
+    end = clock();
+    cout<<"init time = "<< double(end-start) << std::endl;
+    start = clock(); 
     int row_size = 1;
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
@@ -658,6 +665,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         remote_ids_original[part_id].push_back(i);
       }
     }
+    end = clock();
+    cout<<"Get ID time = "<< double(end-start) << std::endl;
     // Send remote ID to remote machine
     int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
@@ -675,12 +684,15 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     // Get local data
+    start = clock(); 
     char *return_data = new char[ID_size*row_size];
     for (size_t i = 0; i < local_ids.size(); ++i) {
       memcpy(return_data + local_ids_orginal[i] * row_size,
              local_data_char + local_ids[i] * row_size,
              row_size);
     }
+    end = clock();
+    cout<<"Get local data time = "<< double(end-start) << std::endl;
     // Recv remote msg
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
