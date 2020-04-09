@@ -614,6 +614,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
 
 DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::cout << "00000000\n";
     std::string name = args[0];
     int local_machine_id = args[1];
     int machine_count = args[2];
