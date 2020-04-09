@@ -625,6 +625,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     NDArray local_data = args[7];
     CommunicatorHandle chandle_sender = args[8];
     CommunicatorHandle chandle_receiver = args[9];
+    std::cout << "111111\n";
     network::Sender* sender = static_cast<network::Sender*>(chandle_sender);
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle_receiver);
     size_t ID_size = ID.GetSize() / sizeof(int64_t);
@@ -637,7 +638,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
     std::vector<int64_t> local_data_shape;
     int row_size = 1;
-    std::cout << "111111\n";
+    std::cout << "222222\n";
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
       if (i != 0) {
