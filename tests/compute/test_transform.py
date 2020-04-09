@@ -148,6 +148,7 @@ def test_khop_graph():
     # Test for random undirected graphs
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
     _test(g)
+    # Test for random directed graphs
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3, directed=True))
     _test(g)
 
