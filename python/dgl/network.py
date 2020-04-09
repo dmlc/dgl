@@ -329,10 +329,10 @@ def _clear_kv_msg(msg):
         _CAPI_DeleteKVMsg(msg.c_ptr)
 
 
-def _pull_message(name, ID, 
-                  machine_count, machine_id, client_id, 
-                  partition_book, g2l, local_data, 
-                  sender, receiver):
+def _fast_pull(name, ID, 
+               machine_count, machine_id, client_id, 
+               partition_book, g2l, local_data, 
+               sender, receiver):
     """ Pull message
 
     Parameters
@@ -363,10 +363,11 @@ def _pull_message(name, ID,
     tensor
         target tensor
     """
-    row_size = F.shape(local_data)[1]
-    _CAPI_PullMessage(name, machine_id, machine_count, client_id, row_size,
-        F.zerocopy_to_dgl_ndarray(ID),
-        F.zerocopy_to_dgl_ndarray(partition_book),
-        F.zerocopy_to_dgl_ndarray(g2l),
-        F.zerocopy_to_dgl_ndarray(local_data),
-        sender, receiver)
+    res_tensor = _CAPI_FastPull(name, machine_id, machine_count, client_id,
+                    F.zerocopy_to_dgl_ndarray(ID),
+                    F.zerocopy_to_dgl_ndarray(partition_book),
+                    F.zerocopy_to_dgl_ndarray(g2l),
+                    F.zerocopy_to_dgl_ndarray(local_data),
+                    sender, receiver)
+    
+    return F.zerocopy_from_dgl_ndarray(res_tensor)

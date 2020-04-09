@@ -922,7 +922,7 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
-        return _pull_message(name, id_tensor,
+        return _fast_pull(name, id_tensor,
             self._machine_count,
             self._machine_id,
             self._client_id,

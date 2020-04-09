@@ -612,41 +612,51 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
     delete msg;
   });
 
-
-/*
-DGL_REGISTER_GLOBAL("network._CAPI_PullMessage")
+DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string name = args[0];
     int local_machine_id = args[1];
     int machine_count = args[2];
     int client_id = args[3];
-    int row_size = args[4];
-    NDArray ID = args[5];
-    NDArray pb = args[6];
-    NDArray g2l = args[7];
-    NDArray local_data = args[8];
-    CommunicatorHandle chandle_sender = args[9];
-    CommunicatorHandle chandle_receiver = args[10];
+    NDArray ID = args[4];
+    NDArray pb = args[5];
+    NDArray g2l = args[6];
+    NDArray local_data = args[7];
+    CommunicatorHandle chandle_sender = args[8];
+    CommunicatorHandle chandle_receiver = args[9];
     network::Sender* sender = static_cast<network::Sender*>(chandle_sender);
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle_receiver);
     size_t ID_size = ID.GetSize() / sizeof(int64_t);
     int64_t* ID_data = static_cast<int64_t*>(ID->data);
     int64_t* pb_data = static_cast<int64_t*>(pb->data);
     int64_t* g2l_data = static_cast<int64_t*>(g2l->data);
+    char* local_data_char = static_cast<char*>(local_data->data);
     std::vector<int64_t> local_ids;
-    std::vector<std::vector<int64_t> > remote_ids(machine_count-1);
+    std::vector<int64_t> local_ids_orginal;
+    std::vector<std::vector<int64_t> > remote_ids(machine_count);
+    std::vector<int> local_data_shape;
+    int row_size = 1;
+    for (int i = 0; i < local_data->ndim; ++i) {
+      local_data_shape.push_back(local_data->shape[i]);
+      if (i != 0) {
+        row_size *= local_data->shape[i];
+      }
+    }
+    row_size *= sizeof(float);
     // Get local id and remote id
     for (size_t i = 0; i < ID_size; ++i) {
       int64_t id = ID_data[i];
       int64_t part_id = pb_data[id];
       if (part_id == local_machine_id) {
-        int local_id = g2l_data[id];
+        int64_t local_id = g2l_data[id];
         local_ids.push_back(local_id);
+        local_ids_orginal.push_back(id);
       } else {
         remote_ids[part_id].push_back(id);
       }
     }
-    // Send remote it to remote machine
+    // Send remote ID to remote machine
+    msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
       if (remote_ids[i].size() != 0) {
         KVStoreMsg kv_msg;
@@ -657,22 +667,38 @@ DGL_REGISTER_GLOBAL("network._CAPI_PullMessage")
                                          DLDataType{kDLInt, 64, 1},
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data());
-        int64_t kv_size = 0;
-        char* kv_data = kv_msg.Serialize(&kv_size);
-        // Send kv_data
-        Message send_kv_msg;
-        send_kv_msg.data = kv_data;
-        send_kv_msg.size = kv_size;
-        send_kv_msg.deallocator = DefaultMessageDeleter;
-        CHECK_EQ(sender->Send(send_kv_msg, i), ADD_SUCCESS);
+        send_kv_message(sender, kv_msg, i);
+        msg_count++;
       }
     }
     // Get local data
-
-    // wait remote msg
-
+    char *return_data = new char[ID_size*row_size];
+    for (size_t i = 0; i < local_ids.size(); ++i) {
+      memcpy(return_data + local_ids_orginal[i] * row_size,
+             local_data_char + local_ids[i] * row_size,
+             row_size);
+    }
+    // Recv remote msg
+    for (int i = 0; i < msg_count; ++i) {
+      kv_msg = recv_kv_message(receiver);
+      int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
+      int64_t* id_data = static_cast<int64_t*>(kv_msg->id->data);
+      char* data_char = static_cast<char*>(kv_msg->data->data);
+      for (size_t n = 0; n < id_size; ++n) {
+        memcpy(return_data + id_data[n] * row_size,
+               data_char + n * row_size,
+               row_size);
+      }
+    }
+    // Final NDArray
+    local_data_shape[0] = ID_size;
+    NDArray res_tensor = CreateNDArrayFromRaw(
+                          local_data_shape,
+                          DLDataType{kDLFloat, 32, 1},
+                          DLContext{kDLCPU, 0},
+                          return_data);
+    *rv = res_tensor;
   });
-*/
 
 }  // namespace network
 }  // namespace dgl
