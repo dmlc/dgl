@@ -617,13 +617,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::string name = args[0];
     int local_machine_id = args[1];
     int machine_count = args[2];
-    int client_id = args[3];
-    NDArray ID = args[4];
-    NDArray pb = args[5];
-    NDArray g2l = args[6];
-    NDArray local_data = args[7];
-    CommunicatorHandle chandle_sender = args[8];
-    CommunicatorHandle chandle_receiver = args[9];
+    int group_count = args[3];
+    int client_id = args[4];
+    NDArray ID = args[5];
+    NDArray pb = args[6];
+    NDArray g2l = args[7];
+    NDArray local_data = args[8];
+    CommunicatorHandle chandle_sender = args[9];
+    CommunicatorHandle chandle_receiver = args[10];
     network::Sender* sender = static_cast<network::Sender*>(chandle_sender);
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle_receiver);
     size_t ID_size = ID.GetSize() / sizeof(int64_t);
@@ -634,6 +635,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<int64_t> local_ids;
     std::vector<int64_t> local_ids_orginal;
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
+    std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
     std::vector<int64_t> local_data_shape;
     int row_size = 1;
     for (int i = 0; i < local_data->ndim; ++i) {
@@ -650,9 +652,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       if (part_id == local_machine_id) {
         int64_t local_id = g2l_data[id];
         local_ids.push_back(local_id);
-        local_ids_orginal.push_back(id);
+        local_ids_orginal.push_back(i);
       } else {
         remote_ids[part_id].push_back(id);
+        remote_ids_original[part_id].push_back(i);
       }
     }
     // Send remote ID to remote machine
@@ -672,8 +675,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     // Get local data
-    std::cout << "ID_size: " << ID_size << std::endl;
-    std::cout << "row_size: " << row_size << std::endl;
     char *return_data = new char[ID_size*row_size];
     for (size_t i = 0; i < local_ids.size(); ++i) {
       memcpy(return_data + local_ids_orginal[i] * row_size,
@@ -685,10 +686,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
       int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
-      int64_t* id_data = static_cast<int64_t*>(kv_msg->id->data);
+      int part_id = kv_msg->rank / group_count;
       char* data_char = static_cast<char*>(kv_msg->data->data);
       for (size_t n = 0; n < id_size; ++n) {
-        memcpy(return_data + id_data[n] * row_size,
+        memcpy(return_data + remote_ids_original[part_id][n] * row_size,
                data_char + n * row_size,
                row_size);
       }

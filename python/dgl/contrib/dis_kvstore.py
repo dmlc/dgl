@@ -924,6 +924,7 @@ class KVClient(object):
 
         return _fast_pull(name, id_tensor,
             self._machine_count,
+            self._group_count,
             self._machine_id,
             self._client_id,
             self._data_store[name+'-part-'], 
