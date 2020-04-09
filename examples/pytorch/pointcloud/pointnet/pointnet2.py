@@ -3,6 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
+import dgl
+import dgl.function as fn
+from dgl.nn.pytorch import GraphConv
+
+'''
+Part of the code are adapted from
+https://github.com/yanx27/Pointnet_Pointnet2_pytorch
+'''
 
 def square_distance(src, dst):
     B, N, _ = src.shape
@@ -12,127 +20,196 @@ def square_distance(src, dst):
     dist += torch.sum(dst ** 2, -1).view(B, 1, M)
     return dist
 
+def index_points(points, idx):
+    device = points.device
+    B = points.shape[0]
+    view_shape = list(idx.shape)
+    view_shape[1:] = [1] * (len(view_shape) - 1)
+    repeat_shape = list(idx.shape)
+    repeat_shape[0] = 1
+    batch_indices = torch.arange(B, dtype=torch.long).to(device).view(view_shape).repeat(repeat_shape)
+    new_points = points[batch_indices, idx, :]
+    return new_points
+
 class FarthestPointSampler(nn.Module):
     def __init__(self, npoints):
         super(FarthestPointSampler, self).__init__()
         self.npoints = npoints
 
-    def forward(self, x):
-        bs = g.batch_size
-        coord = g.ndata['x'].view(bs, -1, 3)
-        device = coord.device
-        B, N, C =coord.shape
+    def forward(self, pos):
+        device = pos.device
+        B, N, C = pos.shape
         centroids = torch.zeros(B, self.npoints, dtype=torch.long).to(device)
         distance = torch.ones(B, N).to(device) * 1e10
         farthest = torch.randint(0, N, (B,), dtype=torch.long).to(device)
         batch_indices = torch.arange(B, dtype=torch.long).to(device)
         for i in range(self.npoints):
             centroids[:, i] = farthest
-            centroid = coord[batch_indices, farthest, :].view(B, 1, 3)
-            dist = torch.sum((coord - centroid) ** 2, -1)
+            centroid = pos[batch_indices, farthest, :].view(B, 1, 3)
+            dist = torch.sum((pos - centroid) ** 2, -1)
             mask = dist < distance
             distance[mask] = dist[mask]
             farthest = torch.max(distance, -1)[1]
-        for i in range(B):
-            centroids[i,:] += i*N
-        g.ndata['sampled'][centroids.view(-1)] = 1
-        return
+        return centroids
 
-class EpsBallPoints(nn.Module):
-    def __init__(self, radius, nsample):
-        super(EpsBallPoints, self).__init__()
+class FixedRadiusNearNeighbors(nn.Module):
+    def __init__(self, radius, n_neighbor):
+        super(FixedRadiusNearNeighbors, self).__init__()
         self.radius = radius
-        self.nsample = nsample
+        self.n_neighbor = n_neighbor
 
-    def forward(self, g):
-        bs = g.batch_size
-        coord = g.ndata['x'].view(bs, -1, 3)
-        samples = g.ndata['x'][g.ndata['sampled'][:,0] == 1].view(bs, -1, 3)
-        device = coord.device
-        B, N, C = coord.shape
-        _, S, _ = samples.shape
+    def forward(self, pos, centroids):
+        device = pos.device
+        B, N, _ = pos.shape
+        center_pos = index_points(pos, centroids)
+        _, S, _ = center_pos.shape
         group_idx = torch.arange(N, dtype=torch.long).to(device).view(1, 1, N).repeat([B, S, 1])
-        sqrdists = square_distance(samples, coord)
-        import pdb; pdb.set_trace()
+        sqrdists = square_distance(center_pos, pos)
         group_idx[sqrdists > self.radius ** 2] = N
-        group_idx = group_idx.sort(dim=-1)[0][:, :, :self.nsample]
-        group_first = group_idx[:, :, 0].view(B, S, 1).repeat([1, 1, self.nsample])
+        group_idx = group_idx.sort(dim=-1)[0][:, :, :self.n_neighbor]
+        group_first = group_idx[:, :, 0].view(B, S, 1).repeat([1, 1, self.n_neighbor])
         mask = group_idx == N
         group_idx[mask] = group_first[mask]
         return group_idx
 
-class SAMLP(nn.Module):
-    def __init__(self, sizes, maxpool=False):
-        super(SAMLP, self).__init__()
-        self.mlp = nn.ModuleList()
+class FixedRadiusNNGraph(nn.Module):
+    def __init__(self, radius, n_neighbor):
+        super(FixedRadiusNNGraph, self).__init__()
+        self.radius = radius
+        self.n_neighbor = n_neighbor
+        self.frnn = FixedRadiusNearNeighbors(radius, n_neighbor)
+
+    def forward(self, pos, centroids, feat=None):
+        dev = pos.device
+        group_idx = self.frnn(pos, centroids)
+        B, N, _ = pos.shape
+        glist = []
+        for i in range(B):
+            center = torch.zeros((N)).to(dev)
+            center[centroids[i]] = 1
+            g = dgl.DGLGraph()
+            if feat is not None:
+                g.add_nodes(N, {'pos': pos[i], 'feat': feat[i], 'center': center})
+            else:
+                g.add_nodes(N, {'pos': pos[i], 'center': center})
+            src = group_idx[0].contiguous().view(-1)
+            dst = centroids[0].view(-1, 1).repeat(1, self.n_neighbor).view(-1)
+            g.add_edges(src, dst)
+            sub_nodes = sorted(list(set(centroids[i].tolist() + src.tolist() + dst.tolist())))
+            subg = g.subgraph(sub_nodes)
+            subg.copy_from_parent()
+            glist.append(subg)
+        bg = dgl.batch(glist)
+        return bg
+
+class GroupMessage(nn.Module):
+    def __init__(self, n_neighbor):
+        super(GroupMessage, self).__init__()
+        self.n_neighbor = n_neighbor
+
+    def forward(self, edges):
+        pos = edges.src['pos'] - edges.dst['pos']
+        if 'feat' in edges.src:
+            res = torch.cat([pos, edges.src['feat']], 1)
+        else:
+            res = pos
+        return {'agg_feat': res}
+
+class PointNetConv(nn.Module):
+    def __init__(self, sizes, batch_size):
+        super(PointNetConv, self).__init__()
+        self.batch_size = batch_size
+        self.conv = nn.ModuleList()
         self.bn = nn.ModuleList()
         for i in range(1, len(sizes)):
-            self.mlp.append(nn.Conv1d(sizes[i-1], sizes[i], 1))
-            self.bn.append(nn.BatchNorm1d(sizes[i]))
-        if maxpool:
-            self.maxpool = nn.MaxPool1d(sizes[-1])
-        else:
-            self.maxpool = None
-    
-    def forward(self, g):
-        batch_size = g.batch_size
-        h = g.ndata['x'].view(batch_size, -1, self.input_dims).permute(0, 2, 1)
-        for mlp, bn in zip(self.mlp, self.bn):
-            h = mlp(h)
+            self.conv.append(nn.Conv2d(sizes[i-1], sizes[i], 1))
+            self.bn.append(nn.BatchNorm2d(sizes[i]))
+
+    def forward(self, nodes):
+        shape = nodes.mailbox['agg_feat'].shape
+        h = nodes.mailbox['agg_feat'].view(self.batch_size, -1, shape[1], shape[2]).permute(0, 3, 1, 2)
+        for conv, bn in zip(self.conv, self.bn):
+            h = conv(h)
             h = bn(h)
             h = F.relu(h)
-        if self.maxpool:
-            h = self.maxpool(h)
-        h = h.view(g.number_of_nodes, -1)
-        g.ndata['x'] = torch.cat(g.ndata['x'], h)
+        h = torch.max(h, 3)[0]
+        feat_dim = h.shape[1]
+        h = h.permute(0, 2, 1).reshape(-1, feat_dim)
+        return {'new_feat': h}
+    
+    def group_all(self, pos, feat):
+        if feat is not None:
+            h = torch.cat([pos, feat], 2)
+        else:
+            h = pos
+        shape = h.shape
+        h = h.permute(0, 2, 1).view(shape[0], shape[2], shape[1], 1)
+        for conv, bn in zip(self.conv, self.bn):
+            h = conv(h)
+            h = bn(h)
+            h = F.relu(h)
+        h = torch.max(h[:, :, :, 0], 2)[0]
+        return h
 
 class SAModule(nn.Module):
-    def __init__(self, npoints, radius, mlp_sizes):
+    def __init__(self, npoints, radius, mlp_sizes, batch_size, n_neighbor=64,
+                 group_all=False):
         super(SAModule, self).__init__()
-        self.fps = FarthestPointSampler(npoints)
-        self.epsball = EpsBallPoints(radius, 64)
-        self.mlp = SAMLP(mlp_sizes)
+        self.group_all = group_all
+        if not group_all:
+            self.fps = FarthestPointSampler(npoints)
+            self.frnn_graph = FixedRadiusNNGraph(radius, n_neighbor)
+        self.message = GroupMessage(n_neighbor)
+        self.conv = PointNetConv(mlp_sizes, batch_size)
+        self.batch_size = batch_size
     
-    def forward(self, g):
-        self.fps(g)
-        self.epsball(g)
-        self.mlp(g)
+    def forward(self, pos, feat):
+        if self.group_all:
+            return self.conv.group_all(pos, feat)
 
-class PointNet2(nn.Module):
-    def __init__(self, output_classes, input_dims=3,
-                 dropout_prob=0.5, use_transform=True):
-        super(PointNet2, self).__init__()
+        centroids = self.fps(pos)
+        g = self.frnn_graph(pos, centroids, feat)
+        g.update_all(self.message, self.conv)
+        mask = g.ndata['center'] == 1
+        pos_dim = g.ndata['pos'].shape[-1]
+        feat_dim = g.ndata['new_feat'].shape[-1]
+        pos_res = g.ndata['pos'][mask].view(self.batch_size, -1, pos_dim)
+        feat_res = g.ndata['new_feat'][mask].view(self.batch_size, -1, feat_dim)
+        return pos_res, feat_res
+
+class PointNet2Cls(nn.Module):
+    def __init__(self, output_classes, batch_size, input_dims=3, dropout_prob=0.4):
+        super(PointNet2Cls, self).__init__()
         self.input_dims = input_dims
 
-        self.sa_module1 = SAModule(512, 0.2, [3, 64, 64, 128])
-        self.sa_module2 = SAModule(128, 0.4, [128 + 3, 128, 128, 256])
-        self.sa_module3 = SAMLP([256 + 3, 256, 512, 1024], maxpool=True)
+        self.sa_module1 = SAModule(512, 0.2, [3, 64, 64, 128], batch_size)
+        self.sa_module2 = SAModule(128, 0.4, [128 + 3, 128, 128, 256], batch_size)
+        self.sa_module3 = SAModule(None, None, [256 + 3, 256, 512, 1024], batch_size,
+                                   group_all=True)
 
-        self.mlp3 = nn.ModuleList()
-        self.mlp3.append(nn.Linear(1024, 512))
-        self.mlp3.append(nn.Linear(512, 256))
+        self.mlp1 = nn.Linear(1024, 512)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.drop1 = nn.Dropout(dropout_prob)
 
-        self.bn3 = nn.ModuleList()
-        self.bn3.append(nn.BatchNorm1d(512))
-        self.bn3.append(nn.BatchNorm1d(256))
+        self.mlp2 = nn.Linear(512, 256)
+        self.bn2 = nn.BatchNorm1d(256)
+        self.drop2 = nn.Dropout(dropout_prob)
 
-        self.dropout = nn.Dropout(0.3)
         self.mlp_out = nn.Linear(256, output_classes)
 
-        self.use_transform = use_transform
-        if use_transform:
-            self.transform1 = TransformNet(3)
-            self.trans_bn1 = nn.BatchNorm1d(3)
-            self.transform2 = TransformNet(64)
-            self.trans_bn2 = nn.BatchNorm1d(64)
+    def forward(self, x):
+        pos, feat = self.sa_module1(x, None)
+        pos, feat = self.sa_module2(pos, feat)
+        h = self.sa_module3(pos, feat)
 
-    def forward(self, g):
-        batch_size = g.batch_size
-        h = g.ndata['x'].view(batch_size, -1, self.input_dims).permute(0, 2, 1)
-        self.sa_module1(g)
-        self.sa_module2(g)
-        self.sa_module3(g)
+        h = self.mlp1(h)
+        h = self.bn1(h)
+        h = F.relu(h)
+        h = self.drop1(h)
+        h = self.mlp2(h)
+        h = self.bn2(h)
+        h = F.relu(h)
+        h = self.drop2(h)
 
-        h = self.dropout(h)
         out = self.mlp_out(h)
         return out
