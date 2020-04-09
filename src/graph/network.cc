@@ -452,7 +452,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
 ////////////////////////// Distributed KVStore Components ////////////////////////////////
 
 
-static void send_kv_message(network::Sender* sender, const KVStoreMsg &kv_msg, int recv_id) {
+static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int recv_id) {
   int64_t kv_size = 0;
   char* kv_data = kv_msg.Serialize(&kv_size);
   // Send kv_data
@@ -507,8 +507,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   if (kv_msg->msg_type == kFinalMsg ||
       kv_msg->msg_type == kBarrierMsg ||
       kv_msg->msg_type == kIPIDMsg) {
-    *rv = kv_msg;
-    return;
+    return kv_msg;
   }
   // Recv ArrayMeta
   Message recv_meta_msg;
