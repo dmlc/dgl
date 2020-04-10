@@ -220,6 +220,18 @@ def khop_graph(g, k):
     Examples
     --------
 
+    Below gives an easy example:
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(3)
+    >>> g.add_edges([0, 1], [1, 2])
+    >>> g_2 = dgl.transform.khop_graph(g, 2)
+    >>> print(g_2.edges())
+    (tensor([0]), tensor([2]))
+
+    A more complicated example:
+
     >>> import dgl
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(5)
@@ -234,7 +246,7 @@ def khop_graph(g, k):
              edata_schemes={})
     """
     n = g.number_of_nodes()
-    adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
+    adj_k = g.adjacency_matrix_scipy(transpose=True, return_edge_ids=False) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)

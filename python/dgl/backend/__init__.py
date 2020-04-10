@@ -20,6 +20,7 @@ def _gen_missing_api(api, mod_name):
 
 
 def load_backend(mod_name):
+    print('Using backend: %s' % mod_name, file=sys.stderr)
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api in backend.__dict__.keys():
@@ -62,13 +63,12 @@ def get_preferred_backend():
             backend_name = config_dict.get('backend', '').lower()
 
     if (backend_name in ['tensorflow', 'mxnet', 'pytorch']):
-        return backend_name 
-    else:
-        while not(backend_name in ['tensorflow', 'mxnet', 'pytorch']):
-            print("DGL does not detect a valid backend option. Which backend would you like to work with?")
-            backend_name = input("Backend choice (pytorch, mxnet or tensorflow): ").lower()
-        set_default_backend(backend_name)
         return backend_name
+    else:
+        print("DGL backend not selected or invalid.  "
+              "Assuming PyTorch for now.", file=sys.stderr)
+        set_default_backend('pytorch')
+        return 'pytorch'
 
 
 load_backend(get_preferred_backend())
