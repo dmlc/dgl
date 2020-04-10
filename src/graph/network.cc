@@ -18,8 +18,6 @@
 #include "./network/msg_queue.h"
 #include "./network/common.h"
 
-#include <time.h>
-
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
 
@@ -466,9 +464,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
 ////////////////////////// Distributed KVStore Components ////////////////////////////////
 
 
-static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int recv_id, bool auto_free) {
+static void send_kv_message(network::Sender* sender, 
+                            KVStoreMsg* kv_msg, 
+                            int recv_id, 
+                            bool auto_free) {
   int64_t kv_size = 0;
-  char* kv_data = kv_msg.Serialize(&kv_size);
+  char* kv_data = kv_msg->Serialize(&kv_size);
   // Send kv_data
   Message send_kv_msg;
   send_kv_msg.data = kv_data;
@@ -477,14 +478,14 @@ static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int rec
     send_kv_msg.deallocator = DefaultMessageDeleter;
   }
   CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
-  if (kv_msg.msg_type != kFinalMsg &&
-      kv_msg.msg_type != kBarrierMsg &&
-      kv_msg.msg_type != kIPIDMsg) {
+  if (kv_msg->msg_type != kFinalMsg &&
+      kv_msg->msg_type != kBarrierMsg &&
+      kv_msg->msg_type != kIPIDMsg) {
     // Send ArrayMeta
-    ArrayMeta meta(kv_msg.msg_type);
-    meta.AddArray(kv_msg.id);
-    if (kv_msg.msg_type != kPullMsg) {
-      meta.AddArray(kv_msg.data);
+    ArrayMeta meta(kv_msg->msg_type);
+    meta.AddArray(kv_msg->id);
+    if (kv_msg->msg_type != kPullMsg) {
+      meta.AddArray(kv_msg->data);
     }
     int64_t meta_size = 0;
     char* meta_data = meta.Serialize(&meta_size);
@@ -497,17 +498,17 @@ static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int rec
     CHECK_EQ(sender->Send(send_meta_msg, recv_id), ADD_SUCCESS);
     // Send ID NDArray
     Message send_id_msg;
-    send_id_msg.data = static_cast<char*>(kv_msg.id->data);
-    send_id_msg.size = kv_msg.id.GetSize();
-    NDArray id = kv_msg.id;
+    send_id_msg.data = static_cast<char*>(kv_msg->id->data);
+    send_id_msg.size = kv_msg->id.GetSize();
+    NDArray id = kv_msg->id;
     send_id_msg.deallocator = [id](Message*) {};
     CHECK_EQ(sender->Send(send_id_msg, recv_id), ADD_SUCCESS);
     // Send data NDArray
-    if (kv_msg.msg_type != kPullMsg) {
+    if (kv_msg->msg_type != kPullMsg) {
       Message send_data_msg;
-      send_data_msg.data = static_cast<char*>(kv_msg.data->data);
-      send_data_msg.size = kv_msg.data.GetSize();
-      NDArray data = kv_msg.data;
+      send_data_msg.data = static_cast<char*>(kv_msg->data->data);
+      send_data_msg.size = kv_msg->data.GetSize();
+      NDArray data = kv_msg->data;
       if (auto_free) {
         send_data_msg.deallocator = [data](Message*) {};
       }
@@ -560,7 +561,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
       recv_data_msg.data,
       AUTO_FREE);
   }
-  return kv_msg;  
+  return kv_msg;
 }
 
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
@@ -588,7 +589,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
 DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
-    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);    
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     *rv = recv_kv_message(receiver);
   });
 
