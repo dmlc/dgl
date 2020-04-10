@@ -17,16 +17,21 @@ class TreeLSTMCell(nn.Module):
         self.W_iou = nn.Linear(x_size, 3 * h_size, bias=False)
         self.U_iou = nn.Linear(2 * h_size, 3 * h_size, bias=False)
         self.b_iou = nn.Parameter(th.zeros(1, 3 * h_size))
-        self.U_f = nn.Linear(2 * h_size, 2 * h_size)
+
+        self.W_f = nn.Linear(x_size, h_size, bias=False)
+        self.U_f = nn.Linear(2 * h_size, 2 * h_size, bias=False)
+        self.b_f = nn.Parameter(th.zeros(1, h_size))
 
     def message_func(self, edges):
         return {'h': edges.src['h'], 'c': edges.src['c']}
 
     def reduce_func(self, nodes):
         h_cat = nodes.mailbox['h'].view(nodes.mailbox['h'].size(0), -1)
-        f = th.sigmoid(self.U_f(h_cat)).view(*nodes.mailbox['h'].size())
+        iou = nodes.data['iou'] + self.U_iou(h_cat)
+        f = nodes.data['f'].unsqueeze(dim=1) + self.U_f(h_cat).view(*nodes.mailbox['h'].size()) + self.b_f
+        f = th.sigmoid(f)
         c = th.sum(f * nodes.mailbox['c'], 1)
-        return {'iou': self.U_iou(h_cat), 'c': c}
+        return {'iou': iou, 'c': c}
 
     def apply_node_func(self, nodes):
         iou = nodes.data['iou'] + self.b_iou
@@ -42,16 +47,21 @@ class ChildSumTreeLSTMCell(nn.Module):
         self.W_iou = nn.Linear(x_size, 3 * h_size, bias=False)
         self.U_iou = nn.Linear(h_size, 3 * h_size, bias=False)
         self.b_iou = nn.Parameter(th.zeros(1, 3 * h_size))
-        self.U_f = nn.Linear(h_size, h_size)
+
+        self.W_f = nn.Linear(x_size, h_size, bias=False)
+        self.U_f = nn.Linear(h_size, h_size, bias=False)
+        self.b_f = nn.Parameter(th.zeros(1, h_size))
 
     def message_func(self, edges):
         return {'h': edges.src['h'], 'c': edges.src['c']}
 
     def reduce_func(self, nodes):
         h_tild = th.sum(nodes.mailbox['h'], 1)
-        f = th.sigmoid(self.U_f(nodes.mailbox['h']))
+        iou = nodes.data['iou'] + self.U_iou(h_tild)
+        f = nodes.data['f'].unsqueeze(dim=1) + self.U_f(nodes.mailbox['h']) + self.b_f
+        f = th.sigmoid(f)
         c = th.sum(f * nodes.mailbox['c'], 1)
-        return {'iou': self.U_iou(h_tild), 'c': c}
+        return {'iou': iou, 'c': c}
 
     def apply_node_func(self, nodes):
         iou = nodes.data['iou'] + self.b_iou
@@ -104,6 +114,7 @@ class TreeLSTM(nn.Module):
         # feed embedding
         embeds = self.embedding(batch.wordid * batch.mask)
         g.ndata['iou'] = self.cell.W_iou(self.dropout(embeds)) * batch.mask.float().unsqueeze(-1)
+        g.ndata['f'] = self.cell.W_f(self.dropout(embeds)) * batch.mask.float().unsqueeze(-1)
         g.ndata['h'] = h
         g.ndata['c'] = c
         # propagate
