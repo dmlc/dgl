@@ -51,7 +51,7 @@ By default, we store the model per 10000 iterations in `center_results`.
 **Speedup**: For an epoch of training, our implementation takes about 5095s for the first epoch  while the authors' 
 implementation takes about 11657s, which is roughly a speedup by 2.3x.
 
-For model evaluation, we can choose whether to exclude reactants not contributing atoms to the product 
+For model evaluation, we can choose whether to exclude reactants not contributing heavy atoms to the product 
 (e.g. reagents and solvents) in top-k atom pair selection, which will make the task easier. 
 For the easier evaluation, do
 
@@ -93,6 +93,12 @@ python find_reaction_center.py --train-path X --val-path Y --test-path Z
 ```
 
 where `X`, `Y`, `Z` are paths to the new training/validation/test set as described above.
+
+## Candidate Ranking
+
+For candidate ranking, we assume that a model has been trained for reaction center prediction first. 
+By default, we exclude reactants not contributing heavy atoms to the product in selecting candidate bonds 
+for a consistent setting as in the paper.
 
 ## References
 

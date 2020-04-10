@@ -6,7 +6,10 @@ import random
 import torch
 
 from collections import defaultdict
+from dgllife.data import USPTOCenter, WLNCenterDataset
+from dgllife.model import load_pretrained, WLNReactionCenter
 from rdkit import Chem
+from torch.utils.data import DataLoader
 
 def mkdir_p(path):
     """Create a folder for the given path.
@@ -40,10 +43,6 @@ def setup(args, seed=0):
     args
         Updated configuration
     """
-    assert args['max_k'] >= max(args['top_ks']), \
-        'Expect max_k to be no smaller than the possible options ' \
-        'of top_ks, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks']))
-
     if torch.cuda.is_available():
         args['device'] = 'cuda:0'
     else:
@@ -137,7 +136,7 @@ def reaction_center_prediction(device, model, mol_graphs, complete_graphs):
 
     return model(mol_graphs, complete_graphs, node_feats, edge_feats, node_pair_feats)
 
-def rough_eval(complete_graphs, preds, labels, num_correct):
+def reaction_center_rough_eval(complete_graphs, preds, labels, num_correct):
     batch_size = complete_graphs.batch_size
     start = 0
     for i in range(batch_size):
@@ -150,7 +149,7 @@ def rough_eval(complete_graphs, preds, labels, num_correct):
             num_correct[k].append(is_correct)
         start = end
 
-def rough_eval_on_a_loader(args, model, data_loader):
+def reaction_center_rough_eval_on_a_loader(args, model, data_loader):
     """A rough evaluation of model performance in the middle of training.
 
     For final evaluation, we will eliminate some possibilities based on prior knowledge.
@@ -177,7 +176,8 @@ def rough_eval_on_a_loader(args, model, data_loader):
         with torch.no_grad():
             pred, biased_pred = reaction_center_prediction(
                 args['device'], model, batch_mol_graphs, batch_complete_graphs)
-        rough_eval(batch_complete_graphs, biased_pred, batch_atom_pair_labels, num_correct)
+        reaction_center_rough_eval(
+            batch_complete_graphs, biased_pred, batch_atom_pair_labels, num_correct)
 
     msg = '|'
     for k, correct_count in num_correct.items():
@@ -185,7 +185,84 @@ def rough_eval_on_a_loader(args, model, data_loader):
 
     return msg
 
-def eval(complete_graphs, preds, reactions, graph_edits, num_correct, max_k, easy):
+bond_change_to_id = {0.0: 0, 1:1, 2:2, 3:3, 1.5:4}
+id_to_bond_change = {v: k for k, v in bond_change_to_id.items()}
+num_change_types = len(bond_change_to_id)
+
+def get_candidate_bonds(reaction, preds, num_nodes, max_k, easy, include_scores=False):
+    """Get candidate bonds for a reaction.
+
+    Parameters
+    ----------
+    reaction : str
+        Reaction
+    preds : float32 tensor of shape (E * 5)
+        E for the number of edges in a complete graph and 5 for the number of possible
+        bond changes.
+    num_nodes : int
+        Number of nodes in the graph.
+    max_k : int
+        Maximum number of atom pairs to be selected.
+    easy : bool
+        If True, reactants not contributing atoms to the product will be excluded in
+        top-k atom pair selection, which will make the task easier.
+    include_scores : bool
+        Whether to include the scores for the atom pairs selected. Default to False.
+
+    Returns
+    -------
+    list of 3-tuples or 4-tuples
+        The first three elements in a tuple separately specify the first atom,
+        the second atom and the type for bond change. If include_scores is True,
+        the score for the prediction will be included as a fourth element.
+    """
+    # Decide which atom-pairs will be considered.
+    reaction_atoms = []
+    reaction_bonds = defaultdict(bool)
+    reactants, _, product = reaction.split('>')
+    product_mol = Chem.MolFromSmiles(product)
+    product_atoms = set([atom.GetAtomMapNum() for atom in product_mol.GetAtoms()])
+
+    for reactant in reactants.split('.'):
+        reactant_mol = Chem.MolFromSmiles(reactant)
+        reactant_atoms = [atom.GetAtomMapNum() for atom in reactant_mol.GetAtoms()]
+        if (len(set(reactant_atoms) & product_atoms) > 0) or (not easy):
+            reaction_atoms.extend(reactant_atoms)
+            for bond in reactant_mol.GetBonds():
+                end_atoms = sorted([bond.GetBeginAtom().GetAtomMapNum(),
+                                    bond.GetEndAtom().GetAtomMapNum()])
+                bond = tuple(end_atoms + [bond.GetBondTypeAsDouble()])
+                reaction_bonds[bond] = True
+
+    candidate_bonds = []
+    topk_values, topk_indices = torch.topk(preds, max_k)
+    for j in range(max_k):
+        preds_j = topk_indices[j].cpu().item()
+        # A bond change can be either losing the bond or forming a
+        # single, double, triple or aromatic bond
+        change_id = preds_j % num_change_types
+        change_type = id_to_bond_change[change_id]
+        pair_id = preds_j // num_change_types
+        atom1 = pair_id // num_nodes + 1
+        atom2 = pair_id % num_nodes + 1
+        # Avoid duplicates and an atom cannot form a bond with itself
+        if atom1 >= atom2:
+            continue
+        if atom1 not in reaction_atoms:
+            continue
+        if atom2 not in reaction_atoms:
+            continue
+        candidate = (int(atom1), int(atom2), float(change_type))
+        if reaction_bonds[candidate]:
+            continue
+        if include_scores:
+            candidate += (topk_values[j].cpu().item(),)
+        candidate_bonds.append(candidate)
+
+    return candidate_bonds
+
+def reaction_center_eval(complete_graphs, preds, reactions,
+                         graph_edits, num_correct, max_k, easy):
     """Evaluate top-k accuracies for reaction center prediction.
 
     Parameters
@@ -211,57 +288,13 @@ def eval(complete_graphs, preds, reactions, graph_edits, num_correct, max_k, eas
     """
     # 0 for losing the bond
     # 1, 2, 3, 1.5 separately for forming a single, double, triple or aromatic bond.
-    bond_change_to_id = {0.0: 0, 1:1, 2:2, 3:3, 1.5:4}
-    id_to_bond_change = {v: k for k, v in bond_change_to_id.items()}
-    num_change_types = len(bond_change_to_id)
-
     batch_size = complete_graphs.batch_size
     start = 0
     for i in range(batch_size):
-        # Decide which atom-pairs will be considered.
-        reaction_i = reactions[i]
-        reaction_atoms_i = []
-        reaction_bonds_i = defaultdict(bool)
-        reactants_i, _, product_i = reaction_i.split('>')
-        product_mol_i = Chem.MolFromSmiles(product_i)
-        product_atoms_i = set([atom.GetAtomMapNum() for atom in product_mol_i.GetAtoms()])
-
-        for reactant in reactants_i.split('.'):
-            reactant_mol = Chem.MolFromSmiles(reactant)
-            reactant_atoms = [atom.GetAtomMapNum() for atom in reactant_mol.GetAtoms()]
-            if (len(set(reactant_atoms) & product_atoms_i) > 0) or (not easy):
-                reaction_atoms_i.extend(reactant_atoms)
-                for bond in reactant_mol.GetBonds():
-                    end_atoms = sorted([bond.GetBeginAtom().GetAtomMapNum(),
-                                        bond.GetEndAtom().GetAtomMapNum()])
-                    bond = tuple(end_atoms + [bond.GetBondTypeAsDouble()])
-                    reaction_bonds_i[bond] = True
-
-        num_nodes = complete_graphs.batch_num_nodes[i]
         end = start + complete_graphs.batch_num_edges[i]
-        preds_i = preds[start:end, :].flatten()
-        candidate_bonds = []
-        topk_values, topk_indices = torch.topk(preds_i, max_k)
-        for j in range(max_k):
-            preds_i_j = topk_indices[j].cpu().item()
-            # A bond change can be either losing the bond or forming a
-            # single, double, triple or aromatic bond
-            change_id = preds_i_j % num_change_types
-            change_type = id_to_bond_change[change_id]
-            pair_id = preds_i_j // num_change_types
-            atom1 = pair_id // num_nodes + 1
-            atom2 = pair_id % num_nodes + 1
-            # Avoid duplicates and an atom cannot form a bond with itself
-            if atom1 >= atom2:
-                continue
-            if atom1 not in reaction_atoms_i:
-                continue
-            if atom2 not in reaction_atoms_i:
-                continue
-            candidate = (int(atom1), int(atom2), float(change_type))
-            if reaction_bonds_i[candidate]:
-                continue
-            candidate_bonds.append(candidate)
+        candidate_bonds = get_candidate_bonds(
+            reactions[i], preds[start:end, :].flatten(),
+            complete_graphs.batch_num_nodes[i], max_k, easy)
 
         gold_bonds = []
         gold_edits = graph_edits[i]
@@ -301,7 +334,7 @@ def reaction_center_final_eval(args, model, data_loader, easy):
         with torch.no_grad():
             pred, biased_pred = reaction_center_prediction(
                 args['device'], model, batch_mol_graphs, batch_complete_graphs)
-        eval(batch_complete_graphs, biased_pred, batch_reactions,
+        reaction_center_eval(batch_complete_graphs, biased_pred, batch_reactions,
              batch_graph_edits, num_correct, args['max_k'], easy)
 
     msg = '|'
@@ -309,3 +342,104 @@ def reaction_center_final_eval(args, model, data_loader, easy):
         msg += ' acc@{:d} {:.4f} |'.format(k, correct_count / len(data_loader.dataset))
 
     return msg
+
+def prepare_reaction_center(args, reaction_center_config):
+    """Use a trained model for reaction center prediction to prepare candidate bonds.
+
+    Parameters
+    ----------
+    args : dict
+        Configuration for the experiment.
+    reaction_center_config : dict
+        Configuration for the experiment on reaction center prediction.
+
+    Returns
+    -------
+    path_to_candidate_bonds : dict
+        Mapping 'train', 'val', 'test' to the corresponding files for candidate bonds.
+    """
+    path_to_candidate_bonds = {
+        'train': args['result_path'] + '/train_candidate_bonds.txt',
+        'val': args['result_path'] + '/val_candidate_bonds.txt',
+        'test': args['result_path'] + '/test_candidate_bonds.txt'
+    }
+
+    if os.path.isfile(path_to_candidate_bonds['train']) and \
+        os.path.isfile(path_to_candidate_bonds['val']) and \
+        os.path.isfile(path_to_candidate_bonds['test']):
+        return path_to_candidate_bonds
+
+    if args['center_model_path'] is None:
+        reaction_center_model = load_pretrained('wln_center_uspto').to(args['device'])
+    else:
+        reaction_center_model = WLNReactionCenter(
+            node_in_feats=reaction_center_config['node_in_feats'],
+            edge_in_feats=reaction_center_config['edge_in_feats'],
+            node_pair_in_feats=reaction_center_config['node_pair_in_feats'],
+            node_out_feats=reaction_center_config['node_out_feats'],
+            n_layers=reaction_center_config['n_layers'],
+            n_tasks=reaction_center_config['n_tasks'])
+        reaction_center_model.load_state_dict(
+            torch.load(args['center_model_path'])['model_state_dict'])
+        reaction_center_model = reaction_center_model.to(args['device'])
+
+    if args['train_path'] is None:
+        train_set = USPTOCenter('train')
+    else:
+        train_set = WLNCenterDataset(raw_file_path=args['train_path'],
+                                     mol_graph_path='train.bin')
+    if args['val_path'] is None:
+        val_set = USPTOCenter('val')
+    else:
+        val_set = WLNCenterDataset(raw_file_path=args['val_path'],
+                                   mol_graph_path='val.bin')
+    if args['test_path'] is None:
+        test_set = USPTOCenter('test')
+    else:
+        test_set = WLNCenterDataset(raw_file_path=args['test_path'],
+                                    mol_graph_path='test.bin')
+
+    train_loader = DataLoader(train_set, batch_size=reaction_center_config['batch_size'],
+                              collate_fn=collate, shuffle=False)
+    val_loader = DataLoader(val_set, batch_size=reaction_center_config['batch_size'],
+                            collate_fn=collate, shuffle=False)
+    test_loader = DataLoader(test_set, batch_size=reaction_center_config['batch_size'],
+                             collate_fn=collate, shuffle=False)
+
+    reaction_center_model.eval()
+    for dataset, data_loader in {
+        'train': train_loader, 'val': val_loader, 'test': test_loader
+    }.items():
+        set_candidate_bonds = []
+        for batch_id, batch_data in enumerate(data_loader):
+            batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
+            batch_complete_graphs, batch_atom_pair_labels = batch_data
+            with torch.no_grad():
+                pred, biased_pred = reaction_center_prediction(
+                    args['device'], reaction_center_model,
+                    batch_mol_graphs, batch_complete_graphs)
+            batch_size = len(batch_reactions)
+            start = 0
+            for i in range(batch_size):
+                end = start + batch_complete_graphs.batch_num_edges[i]
+                # Note that we use the easy mode by default, which is also the
+                # setting in the paper.
+                candidate_bonds = get_candidate_bonds(
+                    batch_reactions[i], biased_pred[start:end, :].flatten(),
+                    batch_complete_graphs.batch_num_nodes[i],
+                    reaction_center_config['max_k'], easy=True, include_scores=True)
+                set_candidate_bonds.append(candidate_bonds)
+                start = end
+        with open(path_to_candidate_bonds[dataset], 'w') as f:
+            for reaction_candidate_bonds in set_candidate_bonds:
+                candidate_string = ''
+                for candidate in reaction_candidate_bonds:
+                    # A 4-tuple consisting of the atom mapping number of atom 1,
+                    # atom 2, the bond change type and the score
+                    candidate_string += '{}-{}-{:.1f}-{:.3f};'.format(
+                        candidate[0], candidate[1], candidate[2], candidate[3])
+                candidate_string += '\n'
+                f.write(candidate_string)
+        del data_loader
+
+    return path_to_candidate_bonds

@@ -2,7 +2,7 @@ import numpy as np
 import time
 import torch
 
-from dgllife.data import USPTO, WLNReactionDataset
+from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import WLNReactionCenter, load_pretrained
 from torch.nn import BCEWithLogitsLoss
 from torch.nn.utils import clip_grad_norm_
@@ -11,25 +11,24 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
 from utils import setup, collate, reaction_center_prediction, \
-    rough_eval_on_a_loader, reaction_center_final_eval
+    reaction_center_rough_eval_on_a_loader, reaction_center_final_eval
 
 def main(args):
-    setup(args)
     if args['train_path'] is None:
-        train_set = USPTO('train')
+        train_set = USPTOCenter('train')
     else:
-        train_set = WLNReactionDataset(raw_file_path=args['train_path'],
-                                       mol_graph_path='train.bin')
+        train_set = WLNCenterDataset(raw_file_path=args['train_path'],
+                                     mol_graph_path='train.bin')
     if args['val_path'] is None:
-        val_set = USPTO('val')
+        val_set = USPTOCenter('val')
     else:
-        val_set = WLNReactionDataset(raw_file_path=args['val_path'],
-                                     mol_graph_path='val.bin')
+        val_set = WLNCenterDataset(raw_file_path=args['val_path'],
+                                   mol_graph_path='val.bin')
     if args['test_path'] is None:
-        test_set = USPTO('test')
+        test_set = USPTOCenter('test')
     else:
-        test_set = WLNReactionDataset(raw_file_path=args['test_path'],
-                                      mol_graph_path='test.bin')
+        test_set = WLNCenterDataset(raw_file_path=args['test_path'],
+                                    mol_graph_path='test.bin')
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
@@ -87,11 +86,12 @@ def main(args):
                 print(progress)
 
             if total_iter % args['decay_every'] == 0:
-                torch.save(model.state_dict(), args['result_path'] + '/model.pkl')
+                torch.save({'model_state_dict': model.state_dict()},
+                           args['result_path'] + '/model.pkl')
 
         dur.append(time.time() - t0)
         print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
-              rough_eval_on_a_loader(args, model, val_loader))
+              reaction_center_rough_eval_on_a_loader(args, model, val_loader))
 
     del train_loader
     del val_loader
@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(description='Reaction Center Identification')
     parser.add_argument('--result-path', type=str, default='center_results',
-                        help='Path to training results')
+                        help='Path to save modeling results')
     parser.add_argument('--train-path', type=str, default=None,
                         help='Path to a new training set. '
                              'If None, we will use the default training set in USPTO.')
@@ -124,10 +124,14 @@ if __name__ == '__main__':
                         help='If true, we will directly evaluate a '
                              'pretrained model on the test set.')
     parser.add_argument('--easy', action='store_true', default=False,
-                        help='Whether to exclude reactants not contributing atoms to the '
+                        help='Whether to exclude reactants not contributing heavy atoms to the '
                              'product in top-k atom pair selection, which will make the '
                              'task easier.')
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)
 
+    assert args['max_k'] >= max(args['top_ks']), \
+        'Expect max_k to be no smaller than the possible options ' \
+        'of top_ks, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks']))
+    setup(args)
     main(args)

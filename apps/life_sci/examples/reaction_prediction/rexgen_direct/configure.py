@@ -17,3 +17,11 @@ reaction_center_config = {
     'top_ks': [6, 8, 10],
     'max_k': 80
 }
+
+# Configuration for candidate ranking
+candidate_ranking_config = {
+    'batch_size': 4,
+    'hidden_size': 500,
+    'n_layers': 3,
+    'max_norm': 50.0
+}

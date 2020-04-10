@@ -7,17 +7,21 @@ from collections import defaultdict
 from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_archive, \
     save_graphs, load_graphs
 from functools import partial
+from itertools import combinations
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
 from tqdm import tqdm
 
 from ..utils.featurizers import BaseAtomFeaturizer, ConcatFeaturizer, atom_type_one_hot, \
     atom_degree_one_hot, atom_explicit_valence_one_hot, atom_implicit_valence_one_hot, \
-    atom_is_aromatic, BaseBondFeaturizer, bond_type_one_hot, bond_is_conjugated, bond_is_in_ring
+    atom_is_aromatic, atom_formal_charge_one_hot, BaseBondFeaturizer, bond_type_one_hot, \
+    bond_is_conjugated, bond_is_in_ring
 from ..utils.mol_to_graph import mol_to_bigraph, mol_to_complete_graph
 
-__all__ = ['WLNReactionDataset',
-           'USPTO']
+__all__ = ['WLNCenterDataset',
+           'USPTOCenter',
+           'WLNRankDataset',
+           'USPTORank']
 
 # Disable RDKit warnings
 RDLogger.DisableLog('rdApp.*')
@@ -29,19 +33,45 @@ atom_types = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 
               'Cr', 'Pt', 'Hg', 'Pb', 'W', 'Ru', 'Nb', 'Re', 'Te', 'Rh', 'Tc', 'Ba', 'Bi',
               'Hf', 'Mo', 'U', 'Sm', 'Os', 'Ir', 'Ce', 'Gd', 'Ga', 'Cs']
 
-default_node_featurizer = BaseAtomFeaturizer({
+default_node_featurizer_center = BaseAtomFeaturizer({
     'hv': ConcatFeaturizer(
-        [partial(atom_type_one_hot, allowable_set=atom_types, encode_unknown=True),
-         partial(atom_degree_one_hot, allowable_set=list(range(6))),
-         atom_explicit_valence_one_hot,
-         partial(atom_implicit_valence_one_hot, allowable_set=list(range(6))),
+        [partial(atom_type_one_hot,
+                 allowable_set=atom_types, encode_unknown=True),
+         partial(atom_degree_one_hot,
+                 allowable_set=list(range(5)), encode_unknown=True),
+         partial(atom_explicit_valence_one_hot,
+                 allowable_set=list(range(1, 6)), encode_unknown=True),
+         partial(atom_implicit_valence_one_hot,
+                 allowable_set=list(range(5)), encode_unknown=True),
          atom_is_aromatic]
     )
 })
 
-default_edge_featurizer = BaseBondFeaturizer({
+default_node_featurizer_rank = BaseAtomFeaturizer({
+    'hv': ConcatFeaturizer(
+        [partial(atom_type_one_hot,
+                 allowable_set=atom_types, encode_unknown=True),
+         partial(atom_formal_charge_one_hot,
+                 allowable_set=[-3, -2, -1, 0, 1, 2], encode_unknown=True),
+         partial(atom_degree_one_hot,
+                 allowable_set=list(range(5)), encode_unknown=True),
+         partial(atom_explicit_valence_one_hot,
+                 allowable_set=list(range(1, 6)), encode_unknown=True),
+         partial(atom_implicit_valence_one_hot,
+                 allowable_set=list(range(5)), encode_unknown=True),
+         atom_is_aromatic]
+    )
+})
+
+default_edge_featurizer_center = BaseBondFeaturizer({
     'he': ConcatFeaturizer([
         bond_type_one_hot, bond_is_conjugated, bond_is_in_ring]
+    )
+})
+
+default_edge_featurizer_rank = BaseBondFeaturizer({
+    'he': ConcatFeaturizer([
+        bond_type_one_hot, bond_is_in_ring]
     )
 })
 
@@ -215,8 +245,8 @@ def process_file(path):
                 ';'.join(['{}-{}-{}'.format(x[0], x[1], x[2]) for x in bond_changes])))
     print('Finished processing {}'.format(path))
 
-class WLNReactionDataset(object):
-    """Dataset for reaction prediction with WLN
+class WLNCenterDataset(object):
+    """Dataset for reaction center prediction with WLN
 
     Parameters
     ----------
@@ -246,16 +276,20 @@ class WLNReactionDataset(object):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
+    log_every : int
+        Print a progress update every time ``log_every`` reactions are pre-processed.
+        Default to 10000.
     """
     def __init__(self,
                  raw_file_path,
                  mol_graph_path,
                  mol_to_graph=mol_to_bigraph,
-                 node_featurizer=default_node_featurizer,
-                 edge_featurizer=default_edge_featurizer,
+                 node_featurizer=default_node_featurizer_center,
+                 edge_featurizer=default_edge_featurizer_center,
                  atom_pair_featurizer=default_atom_pair_featurizer,
-                 load=True):
-        super(WLNReactionDataset, self).__init__()
+                 load=True,
+                 log_every=10000):
+        super(WLNCenterDataset, self).__init__()
 
         self._atom_pair_featurizer = atom_pair_featurizer
         self.atom_pair_features = []
@@ -269,13 +303,15 @@ class WLNReactionDataset(object):
             process_file(raw_file_path)
 
         full_mols, full_reactions, full_graph_edits = \
-            self.load_reaction_data(path_to_reaction_file)
+            self.load_reaction_data(path_to_reaction_file, log_every)
         if load and os.path.isfile(mol_graph_path):
+            print('Loading previously saved graphs...')
             self.reactant_mol_graphs, _ = load_graphs(mol_graph_path)
         else:
+            print('Constructing graphs from scratch...')
             self.reactant_mol_graphs = []
             for i in range(len(full_mols)):
-                if i % 10000 == 0:
+                if i % log_every == 0:
                     print('Processing reaction {:d}/{:d}'.format(i + 1, len(full_mols)))
                 mol = full_mols[i]
                 reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
@@ -291,13 +327,15 @@ class WLNReactionDataset(object):
         self.atom_pair_features.extend([None for _ in range(len(self.mols))])
         self.atom_pair_labels.extend([None for _ in range(len(self.mols))])
 
-    def load_reaction_data(self, file_path):
+    def load_reaction_data(self, file_path, log_every):
         """Load reaction data from the raw file.
 
         Parameters
         ----------
         file_path : str
             Path to read the file.
+        log_every : int
+            Print a progress update every time ``log_every`` reactions are pre-processed.
 
         Returns
         -------
@@ -313,7 +351,7 @@ class WLNReactionDataset(object):
         all_graph_edits = []
         with open(file_path, 'r') as f:
             for i, line in enumerate(f):
-                if i % 10000 == 0:
+                if i % log_every == 0:
                     print('Processing line {:d}'.format(i))
                 # Each line represents a reaction and the corresponding graph edits
                 #
@@ -363,15 +401,15 @@ class WLNReactionDataset(object):
         Returns
         -------
         str
-            Reaction.
+            Reaction
         str
             Graph edits for the reaction
         rdkit.Chem.rdchem.Mol
-            RDKit molecule instance for reactants
+            RDKit molecule instance
         DGLGraph
-            DGLGraph for the ith molecular graph of reactants
+            DGLGraph for the ith molecular graph
         DGLGraph
-            Complete DGLGraph for reactants, which will be needed for predicting
+            Complete DGLGraph, which will be needed for predicting
             scores between each pair of atoms
         float32 tensor of shape (V^2, 10)
             Features for each pair of atoms.
@@ -399,8 +437,8 @@ class WLNReactionDataset(object):
                self.atom_pair_features[item], \
                self.atom_pair_labels[item]
 
-class USPTO(WLNReactionDataset):
-    """USPTO dataset for reaction prediction.
+class USPTOCenter(WLNCenterDataset):
+    """USPTO dataset for reaction center prediction.
 
     The dataset contains reactions from patents granted by United States Patent
     and Trademark Office (USPTO), collected by Lowe [1]. Jin et al. removes duplicates
@@ -443,13 +481,13 @@ class USPTO(WLNReactionDataset):
     def __init__(self,
                  subset,
                  mol_to_graph=mol_to_bigraph,
-                 node_featurizer=default_node_featurizer,
-                 edge_featurizer=default_edge_featurizer,
+                 node_featurizer=default_node_featurizer_center,
+                 edge_featurizer=default_edge_featurizer_center,
                  atom_pair_featurizer=default_atom_pair_featurizer,
                  load=True):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
-        print('Preparing {} subset of USPTO'.format(subset))
+        print('Preparing {} subset of USPTO for reaction center prediction.'.format(subset))
         self._subset = subset
         if subset == 'val':
             subset = 'valid'
@@ -460,7 +498,7 @@ class USPTO(WLNReactionDataset):
         download(_get_dgl_url(self._url), path=data_path)
         extract_archive(data_path, extracted_data_path)
 
-        super(USPTO, self).__init__(
+        super(USPTOCenter, self).__init__(
             raw_file_path=extracted_data_path + '/{}.txt'.format(subset),
             mol_graph_path=extracted_data_path + '/{}_mol_graphs.bin'.format(subset),
             mol_to_graph=mol_to_graph,
@@ -471,12 +509,554 @@ class USPTO(WLNReactionDataset):
 
     @property
     def subset(self):
-        """Get the subset used for USPTO
+        """Get the subset used for USPTOCenter
 
         Returns
         -------
         str
 
+            * 'full' for the complete dataset
+            * 'train' for the training set
+            * 'val' for the validation set
+            * 'test' for the test set
+        """
+        return self._subset
+
+class WLNRankDataset(object):
+    """Dataset for ranking candidate products with WLN
+
+    Parameters
+    ----------
+    raw_file_path : str
+        Path to the raw reaction file, where each line is the SMILES for a reaction and
+        the corresponding graph edits.
+    candidate_bond_path : str
+        Path to the candidate bond changes for product enumeration, where each line is
+        candidate bond changes for a reaction by a WLN for reaction center prediction.
+    size_cutoff : int
+        By calling ``.ignore_large(True)``, we can optionally ignore reactions whose reactants
+        contain more than ``size_cutoff`` atoms. Default to 100.
+    max_num_changes_per_reaction : int
+        Maximum number of bond changes per reaction. Default to 5.
+    train_mode : bool
+        Whether the dataset is to be used for training. Default to True.
+    log_every : int
+        Print a progress update every time ``log_every`` reactions are pre-processed.
+        Default to 10000.
+    """
+    def __init__(self,
+                 raw_file_path,
+                 candidate_bond_path,
+                 size_cutoff=100,
+                 max_num_changes_per_reaction=5,
+                 train_mode=True,
+                 log_every=10000):
+        super(WLNRankDataset, self).__init__()
+
+        self.ignore_large_samples = False
+        self.size_cutoff = size_cutoff
+        self.train_mode = train_mode
+
+        self.reactant_mols, self.product_mols, self.reactions, self.graph_edits, \
+        self.real_bond_changes, self.ids_for_small_samples = \
+            self.load_reaction_data(raw_file_path, log_every)
+        self.candidate_bond_changes = self.load_candidate_bond_changes(
+            candidate_bond_path, log_every)
+        self.pre_process(max_num_changes_per_reaction)
+
+    def load_reaction_data(self, file_path, log_every):
+        """Load reaction data from the raw file.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to read the file.
+        log_every : int
+            Print a progress update every time ``log_every`` reactions are pre-processed.
+
+        Returns
+        -------
+        all_reactant_mols : list of rdkit.Chem.rdchem.Mol
+            RDKit molecule instances for reactants.
+        all_product_mols : list of rdkit.Chem.rdchem.Mol
+            RDKit molecule instances for products if the dataset is for training and
+            None otherwise.
+        all_reactions : list of str
+            Reactions
+        all_graph_edits : list of str
+            Graph edits in the reactions.
+        all_real_bond_changes : list of list
+            ``all_real_bond_changes[i]`` gives a list of tuples, which are ground
+            truth bond changes for a reaction.
+        ids_for_small_samples : list of int
+            Indices for reactions whose reactants do not contain too many atoms
+        """
+        all_reactant_mols = []
+        if self.train_mode:
+            all_product_mols = []
+        else:
+            all_product_mols = None
+        all_reactions = []
+        all_graph_edits = []
+        all_real_bond_changes = []
+        ids_for_small_samples = []
+        curr_id = 0
+        with open(file_path, 'r') as f:
+            for i, line in enumerate(f):
+                if i % log_every == 0:
+                    print('Processing line {:d}'.format(i))
+                # Each line represents a reaction and the corresponding graph edits
+                #
+                # reaction example:
+                # [CH3:14][OH:15].[NH2:12][NH2:13].[OH2:11].[n:1]1[n:2][cH:3][c:4]
+                # ([C:7]([O:9][CH3:8])=[O:10])[cH:5][cH:6]1>>[n:1]1[n:2][cH:3][c:4]
+                # ([C:7](=[O:9])[NH:12][NH2:13])[cH:5][cH:6]1
+                # The reactants are on the left-hand-side of the reaction and the product
+                # is on the right-hand-side of the reaction. The numbers represent atom mapping.
+                #
+                # graph_edits example:
+                # 23-33-1.0;23-25-0.0
+                # For a triplet a-b-c, a and b are the atoms that form or loss the bond.
+                # c specifies the particular change, 0.0 for losing a bond, 1.0, 2.0, 3.0 and
+                # 1.5 separately for forming a single, double, triple or aromatic bond.
+                reaction, graph_edits = line.strip("\r\n ").split()
+                reactants, _, product = reaction.split('>')
+                reactants_mol = Chem.MolFromSmiles(reactants)
+                if reactants_mol is None:
+                    continue
+                if self.train_mode:
+                    product_mol = Chem.MolFromSmiles(product)
+                    if product_mol is None:
+                        continue
+                    all_product_mols.append(product_mol)
+                if reactants_mol.GetNumAtoms() <= self.size_cutoff:
+                    ids_for_small_samples.append(curr_id)
+
+                # Reorder atoms according to the order specified in the atom map
+                atom_map_order = [-1 for _ in range(reactants_mol.GetNumAtoms())]
+                for i in range(reactants_mol.GetNumAtoms()):
+                    atom = reactants_mol.GetAtomWithIdx(i)
+                    atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = i
+                reactants_mol = rdmolops.RenumberAtoms(reactants_mol, atom_map_order)
+                all_reactant_mols.append(reactants_mol)
+                all_reactions.append(reaction)
+                all_graph_edits.append(graph_edits)
+
+                reaction_real_bond_changes = []
+                for changed_bond in graph_edits.split(';'):
+                    atom1, atom2, change_type = changed_bond.split('-')
+                    atom1, atom2 = int(atom1) - 1, int(atom2) - 1
+                    reaction_real_bond_changes.append(
+                        (min(atom1, atom2), max(atom1, atom2), float(change_type)))
+                all_real_bond_changes.append(reaction_real_bond_changes)
+
+                curr_id += 1
+
+        return all_reactant_mols, all_product_mols, all_reactions, all_graph_edits, \
+               all_real_bond_changes, ids_for_small_samples
+
+    def load_candidate_bond_changes(self, file_path, log_every):
+        """Load candidate bond changes predicted by a WLN for reaction center prediction.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to a file of candidate bond changes for each reaction.
+        log_every : int
+            Print a progress update every time ``log_every`` reactions are pre-processed.
+
+        Returns
+        -------
+        all_candidate_bond_changes : list of list
+            ``all_candidate_bond_changes[i]`` gives a list of tuples, which are candidate
+            bond changes for a reaction.
+        """
+        all_candidate_bond_changes = []
+        with open(file_path, 'r') as f:
+            for i, line in enumerate(f):
+                if i % log_every == 0:
+                    print('Processing line {:d}'.format(i))
+                reaction_candidate_bond_changes = []
+                elements = line.strip().split(';')[:-1]
+                for candidate in elements:
+                    atom1, atom2, change_type, score = candidate.split('-')
+                    atom1, atom2 = int(atom1) - 1, int(atom2) - 1
+                    reaction_candidate_bond_changes.append((
+                        min(atom1, atom2), max(atom1, atom2), float(change_type), float(score)))
+                all_candidate_bond_changes.append(reaction_candidate_bond_changes)
+
+        return all_candidate_bond_changes
+
+    def bookkeep_reactant(self, mol, candidate_pairs):
+        """Bookkeep reaction-related information of reactants.
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for reactants.
+        candidate_pairs : list of 2-tuples
+            Pairs of atoms that ranked high by a model for reaction center prediction.
+            By assumption, the two atoms are different and the first atom has a smaller
+            index than the second.
+
+        Returns
+        -------
+        info : dict
+            Reaction-related information of reactants
+        """
+        num_atoms = mol.GetNumAtoms()
+        info = {
+            # free valence of atoms
+            'free_val': [0 for _ in range(num_atoms)],
+            # Whether it is a carbon atom
+            'is_c': [False for _ in range(num_atoms)],
+            # Whether it is a carbon atom connected to a nitrogen atom in pyridine
+            'is_c2_of_pyridine': [False for _ in range(num_atoms)],
+            # Whether it is a phosphorous atom
+            'is_p': [False for _ in range(num_atoms)],
+            # Whether it is a sulfur atom
+            'is_s': [False for _ in range(num_atoms)],
+            # Whether it is an oxygen atom
+            'is_o': [False for _ in range(num_atoms)],
+            # Whether it is a nitrogen atom
+            'is_n': [False for _ in range(num_atoms)],
+            'pair_to_bond_val': dict(),
+            'ring_bonds': set()
+        }
+
+        # bookkeep atoms
+        for j, atom in enumerate(mol.GetAtoms()):
+            info['free_val'][j] += atom.GetTotalNumHs() + abs(atom.GetFormalCharge())
+            # An aromatic carbon atom next to an aromatic nitrogen atom can get a
+            # carbonyl b/c of bookkeeping of hydroxypyridines
+            if atom.GetSymbol() == 'C':
+                info['is_c'][j] = True
+                if atom.GetIsAromatic():
+                    for nbr in atom.GetNeighbors():
+                        if nbr.GetSymbol() == 'N' and nbr.GetDegree() == 2:
+                            info['is_c2_of_pyridine'][j] = True
+                            break
+            # A nitrogen atom should be allowed to become positively charged
+            elif atom.GetSymbol() == 'N':
+                info['free_val'][j] += 1 - atom.GetFormalCharge()
+                info['is_n'][j] = True
+            # Phosphorous atoms can form a phosphonium
+            elif atom.GetSymbol() == 'P':
+                info['free_val'][j] += 1 - atom.GetFormalCharge()
+                info['is_p'][j] = True
+            elif atom.GetSymbol() == 'O':
+                info['is_o'][j] = True
+            elif atom.GetSymbol() == 'S':
+                info['is_s'][j] = True
+
+        # bookkeep bonds
+        for bond in mol.GetBonds():
+            atom1, atom2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            atom1, atom2 = min(atom1, atom2), max(atom1, atom2)
+            type_val = bond.GetBondTypeAsDouble()
+            info['pair_to_bond_val'][(atom1, atom2)] = type_val
+            if (atom1, atom2) in candidate_pairs:
+                info['free_val'][atom1] += type_val
+                info['free_val'][atom2] += type_val
+            if bond.IsInRing():
+                info['ring_bonds'].add((atom1, atom2))
+
+        return info
+
+    def bookkeep_product(self, mol):
+        """Bookkeep reaction-related information of atoms/bonds in products
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for products.
+
+        Returns
+        -------
+        info : dict
+            Reaction-related information of atoms/bonds in products
+        """
+        info = {
+            'atoms': set()
+        }
+        for bond in mol.GetBonds():
+            atom1, atom2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            atom1, atom2 = min(atom1, atom2), max(atom1, atom2)
+            info['atoms'].add(atom1)
+            info['atoms'].add(atom2)
+
+        return info
+
+    def is_connected_change_combo(self, combo_ids, cand_change_adj):
+        """Check whether the combo of bond changes yields a connected component.
+
+        Parameters
+        ----------
+        combo_ids : tuple of int
+            Ids for bond changes in the combination.
+        cand_change_adj : bool ndarray of shape (N, N)
+            Adjacency matrix for candidate bond changes. Two candidate bond
+            changes are considered adjacent if they share a common atom.
+            * N for the number of candidate bond changes.
+
+        Returns
+        -------
+        bool
+            Whether the combo of bond changes yields a connected component
+        """
+        if len(combo_ids) == 1:
+            return True
+        multi_hop_adj = np.linalg.matrix_power(
+            cand_change_adj[combo_ids, :][:, combo_ids], len(combo_ids) - 1)
+        # The combo is connected if the distance between
+        # any pair of bond changes is within len(combo) - 1
+
+        return np.all(multi_hop_adj)
+
+    def is_valid_combo(self, combo_changes, reactant_info):
+        """Whether the combo of bond changes is chemically valid.
+
+        Parameters
+        ----------
+        combo_changes : list of 4-tuples
+            Each tuple consists of atom1, atom2, type of bond change (in the form of related
+            valence) and score for the change.
+        reactant_info : dict
+            Reaction-related information of reactants
+
+        Returns
+        -------
+        bool
+            Whether the combo of bond changes is chemically valid.
+        """
+        num_atoms = len(reactant_info['free_val'])
+        force_even_parity = np.zeros((num_atoms,), dtype=bool)
+        force_odd_parity = np.zeros((num_atoms,), dtype=bool)
+        pair_seen = defaultdict(bool)
+        free_val_tmp = reactant_info['free_val'].copy()
+        for (atom1, atom2, change_type, score) in combo_changes:
+            if pair_seen[(atom1, atom2)]:
+                # A pair of atoms cannot have two types of changes. Even if we
+                # randomly pick one, that will be reduced to a combo of less changed
+                return False
+            pair_seen[(atom1, atom2)] = True
+
+            # Special valence rules
+            atom1_type_val = atom2_type_val = change_type
+            if change_type == 2:
+                # to form a double bond
+                if reactant_info['is_o'][atom1]:
+                    if reactant_info['is_c2_of_pyridine'][atom2]:
+                        atom2_type_val = 1.
+                    elif reactant_info['is_p'][atom2]:
+                        # don't count information of =o toward valence
+                        # but require odd valence parity
+                        atom2_type_val = 0.
+                        force_odd_parity[atom2] = True
+                    elif reactant_info['is_s'][atom2]:
+                        atom2_type_val = 0.
+                        force_even_parity[atom2] = True
+                elif reactant_info['is_o'][atom2]:
+                    if reactant_info['is_c2_of_pyridine'][atom1]:
+                        atom1_type_val = 1.
+                    elif reactant_info['is_p'][atom1]:
+                        atom1_type_val = 0.
+                        force_odd_parity[atom1] = True
+                    elif reactant_info['is_s'][atom1]:
+                        atom1_type_val = 0.
+                        force_even_parity[atom1] = True
+                elif reactant_info['is_n'][atom1] and reactant_info['is_p'][atom2]:
+                    atom2_type_val = 0.
+                    force_odd_parity[atom2] = True
+                elif reactant_info['is_n'][atom2] and reactant_info['is_p'][atom1]:
+                    atom1_type_val = 0.
+                    force_odd_parity[atom1] = True
+                elif reactant_info['is_p'][atom1] and reactant_info['is_c'][atom2]:
+                    atom1_type_val = 0.
+                    force_odd_parity[atom1] = True
+                elif reactant_info['is_p'][atom2] and reactant_info['is_c'][atom1]:
+                    atom2_type_val = 0.
+                    force_odd_parity[atom2] = True
+
+            reactant_pair_val = reactant_info['pair_to_bond_val'].get((atom1, atom2), None)
+            if reactant_pair_val is not None:
+                free_val_tmp[atom1] += reactant_pair_val - atom1_type_val
+                free_val_tmp[atom2] += reactant_pair_val - atom2_type_val
+            else:
+                free_val_tmp[atom1] -= atom1_type_val
+                free_val_tmp[atom2] -= atom2_type_val
+
+        # False if 1) too many connections 2) sulfur valence not even
+        # 3) phosphorous valence not odd
+        if any(free_val_tmp < 0) or \
+            any(aval % 2 != 0 for aval in free_val_tmp[force_even_parity]) or \
+            any(aval % 2 != 1 for aval in free_val_tmp[force_odd_parity]):
+            return False
+        return True
+
+    def pre_process(self, max_num_changes_per_reaction):
+        """Pre-process for the experiments.
+
+        Parameters
+        ----------
+        max_num_changes_per_reaction : int
+            Maximum number of bond changes per reaction.
+        """
+        all_valid_candidate_combos = []
+        for i in range(len(self.reactant_mols)):
+            candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
+                               in self.candidate_bond_changes[i]]
+            reactant_mol = self.reactant_mols[i]
+            reactant_info = self.bookkeep_reactant(reactant_mol, candidate_pairs)
+            product_mol = self.product_mols[i]
+            if self.train_mode:
+                product_info = self.bookkeep_product(product_mol)
+
+            # Filter out candidate new bonds already in reactants
+            candidate_bond_changes = []
+            for (atom1, atom2, change_type, score) in self.candidate_bond_changes[i]:
+                if ((atom1, atom2) not in reactant_info['pair_to_bond_val']) or \
+                    (reactant_info['pair_to_bond_val'][(atom1, atom2)] != change_type):
+                    candidate_bond_changes.append((atom1, atom2, change_type, score))
+
+            # Check if two bond changes have atom in common
+            cand_change_adj = np.eye(len(candidate_bond_changes), dtype=bool)
+            for id1, candidate1 in enumerate(candidate_bond_changes):
+                atom1_1, atom1_2, _, _ = candidate1
+                for id2, candidate2 in enumerate(candidate_bond_changes):
+                    atom2_1, atom2_2, _, _ = candidate2
+                    if atom1_1 == atom2_1 or atom1_1 == atom2_2 or \
+                        atom1_2 == atom2_1 or atom1_2 == atom2_2:
+                        cand_change_adj[id1, id2] = cand_change_adj[id2, id1] = True
+
+            # Enumerate combinations of k candidate bond changes and record
+            # those that are connected and chemically valid
+            valid_candidate_combos = []
+            cand_change_ids = range(len(candidate_bond_changes))
+            for k in range(1, max_num_changes_per_reaction + 1):
+                for combo_ids in combinations(cand_change_ids, k):
+                    # Check if the changed bonds form a connected component
+                    if not self.is_connected_change_combo(combo_ids, cand_change_adj):
+                        continue
+                    combo_changes = [candidate_bond_changes[i] for i in combo_ids]
+                    # Check if the combo is chemically valid
+                    if self.is_valid_combo(combo_changes, reactant_info):
+                        valid_candidate_combos.append(combo_changes)
+
+            if self.train_mode:
+                return NotImplementedError
+
+            all_valid_candidate_combos.append(valid_candidate_combos)
+
+    def ignore_large(self, ignore=True):
+        """Whether to ignore reactions where reactants contain too many atoms.
+
+        Parameters
+        ----------
+        ignore : bool
+            If ``ignore``, reactions where reactants contain too many atoms will be ignored.
+        """
+        self.ignore_large_samples = ignore
+
+    def __len__(self):
+        """Get the size for the dataset.
+
+        Returns
+        -------
+        int
+            Number of reactions in the dataset.
+        """
+        if self.ignore_large_samples:
+            return len(self.ids_for_small_samples)
+        else:
+            return len(self.reactant_mols)
+
+    def __getitem__(self, item):
+        """Get the i-th datapoint.
+
+        Parameters
+        ----------
+        item : int
+            Index for the datapoint.
+        """
+        if self.ignore_large_samples:
+            item = self.ids_for_small_samples[item]
+        return NotImplementedError
+
+class USPTORank(WLNRankDataset):
+    """USPTO dataset for ranking candidate products.
+
+    The dataset contains reactions from patents granted by United States Patent
+    and Trademark Office (USPTO), collected by Lowe [1]. Jin et al. removes duplicates
+    and erroneous reactions, obtaining a set of 480K reactions. They divide it
+    into 400K, 40K, and 40K for training, validation and test.
+
+    References:
+
+        * [1] Patent reaction extraction
+        * [2] Predicting Organic Reaction Outcomes with Weisfeiler-Lehman Network
+
+    Parameters
+    ----------
+    subset : str
+        Whether to use the training/validation/test set as in Jin et al.
+
+        * 'train' for the training set
+        * 'val' for the validation set
+        * 'test' for the test set
+    candidate_bond_path : str
+        Path to the candidate bond changes for product enumeration, where each line is
+        candidate bond changes for a reaction by a WLN for reaction center prediction.
+    size_cutoff : int
+        By calling ``.ignore_large(True)``, we can optionally ignore reactions whose reactants
+        contain more than ``size_cutoff`` atoms. Default to 100.
+    max_num_changes_per_reaction : int
+        Maximum number of bond changes per reaction. Default to 5.
+    log_every : int
+        Print a progress update every time ``log_every`` reactions are pre-processed.
+        Default to 10000.
+    """
+    def __init__(self,
+                 subset,
+                 candidate_bond_path,
+                 size_cutoff=100,
+                 max_num_changes_per_reaction=5,
+                 log_every=10000):
+        assert subset in ['train', 'val', 'test'], \
+            'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
+        print('Preparing {} subset of USPTO for product candidate ranking.'.format(subset))
+        self._subset = subset
+        if subset == 'val':
+            subset = 'valid'
+
+        self._url = 'dataset/uspto.zip'
+        data_path = get_download_dir() + '/uspto.zip'
+        extracted_data_path = get_download_dir() + '/uspto'
+        download(_get_dgl_url(self._url), path=data_path)
+        extract_archive(data_path, extracted_data_path)
+
+        if self.subset == 'train':
+            train_mode = True
+        else:
+            train_mode = False
+
+        super(USPTORank, self).__init__(
+            raw_file_path=extracted_data_path + '/{}.txt.proc'.format(subset),
+            candidate_bond_path=candidate_bond_path,
+            size_cutoff=size_cutoff,
+            max_num_changes_per_reaction=max_num_changes_per_reaction,
+            train_mode=train_mode,
+            log_every=log_every)
+
+    @property
+    def subset(self):
+        """Get the subset used for USPTOCenter
+
+        Returns
+        -------
+        str
+
+            * 'full' for the complete dataset
             * 'train' for the training set
             * 'val' for the validation set
             * 'test' for the test set

@@ -64,10 +64,22 @@ def test_wln_reaction():
     remove_file('test.txt.proc')
 
     # Test configured dataset
-    dataset = WLNReactionDataset('test.txt', 'test_graphs.bin')
+    dataset = WLNCenterDataset('test.txt', 'test_graphs.bin')
+
+    with open('test_candidate_bond_changes.txt', 'w') as f:
+        for reac in reactions:
+            # simulate fake candidate bond changes
+            candidate_string = ''
+            for i in range(2):
+                candidate_string += '{}-{}-{:.1f}-{:.3f};'.format(i+1, i+2, 0.0, 0.234)
+            candidate_string += '\n'
+            f.write(candidate_string)
+
+    dataset = WLNRankDataset('test.txt.proc', 'test_candidate_bond_changes.txt')
     remove_file('test.txt')
     remove_file('test.txt.proc')
     remove_file('test_graphs.bin')
+    remove_file('test_candidate_bond_changes.txt')
 
 if __name__ == '__main__':
     test_pubchem_aromaticity()
