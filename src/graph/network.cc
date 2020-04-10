@@ -23,6 +23,8 @@
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
 
+const bool AUTO_FREE = true;
+
 namespace dgl {
 namespace network {
 
@@ -388,7 +390,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_0.data,
-        true);
+        AUTO_FREE);
       // edge_mapping
       Message array_1;
       CHECK_EQ(receiver->RecvFrom(&array_1, send_id), REMOVE_SUCCESS);
@@ -398,7 +400,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_1.data,
-        true);
+        AUTO_FREE);
       // layer_offset
       Message array_2;
       CHECK_EQ(receiver->RecvFrom(&array_2, send_id), REMOVE_SUCCESS);
@@ -408,7 +410,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_2.data,
-        true);
+        AUTO_FREE);
       // flow_offset
       Message array_3;
       CHECK_EQ(receiver->RecvFrom(&array_3, send_id), REMOVE_SUCCESS);
@@ -418,7 +420,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_3.data,
-        true);
+        AUTO_FREE);
       // CSR indptr
       Message array_4;
       CHECK_EQ(receiver->RecvFrom(&array_4, send_id), REMOVE_SUCCESS);
@@ -428,7 +430,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_4.data,
-        true);
+        AUTO_FREE);
       // CSR indice
       Message array_5;
       CHECK_EQ(receiver->RecvFrom(&array_5, send_id), REMOVE_SUCCESS);
@@ -438,7 +440,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_5.data,
-        true);
+        AUTO_FREE);
       // CSR edge_ids
       Message array_6;
       CHECK_EQ(receiver->RecvFrom(&array_6, send_id), REMOVE_SUCCESS);
@@ -448,7 +450,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_6.data,
-        true);
+        AUTO_FREE);
       // Create CSR
       CSRPtr csr(new CSR(indptr, indice, edge_ids));
       nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr));
@@ -541,7 +543,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     DLDataType{kDLInt, 64, 1},
     DLContext{kDLCPU, 0},
     recv_id_msg.data,
-    true);
+    AUTO_FREE);
   // Recv Data NDArray
   if (kv_msg->msg_type != kPullMsg) {
     Message recv_data_msg;
@@ -556,7 +558,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
       DLDataType{kDLFloat, 32, 1},
       DLContext{kDLCPU, 0},
       recv_data_msg.data,
-      true);
+      AUTO_FREE);
   }
   return kv_msg;  
 }
@@ -580,7 +582,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
         kv_msg.data = args[args_count++];
       }
     }
-    send_kv_message(sender, kv_msg, recv_id, true);
+    send_kv_message(sender, kv_msg, recv_id, AUTO_FREE);
   });
 
 DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
@@ -689,8 +691,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                                          DLDataType{kDLInt, 64, 1},
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
-                                         false);
-        send_kv_message(sender, kv_msg, i, false);
+                                         !AUTO_FREE);
+        send_kv_message(sender, kv_msg, i, !AUTO_FREE);
         msg_count++;
       }
     }
@@ -721,7 +723,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                           local_data_shape,
                           DLDataType{kDLFloat, 32, 1},
                           DLContext{kDLCPU, 0},
-                          return_data);
+                          return_data,
+                          AUTO_FREE);
     *rv = res_tensor;
   });
 
