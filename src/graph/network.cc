@@ -464,9 +464,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
 ////////////////////////// Distributed KVStore Components ////////////////////////////////
 
 
-static void send_kv_message(network::Sender* sender, 
-                            KVStoreMsg* kv_msg, 
-                            int recv_id, 
+static void send_kv_message(network::Sender* sender,
+                            KVStoreMsg* kv_msg,
+                            int recv_id,
                             bool auto_free) {
   int64_t kv_size = 0;
   char* kv_data = kv_msg->Serialize(&kv_size);
