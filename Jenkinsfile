@@ -122,7 +122,7 @@ pipeline {
             docker {
               label "linux-auto-cpu-node"
               image "dgllib/dgl-ci-cpu:conda" 
-              args "-u ubuntu" 
+              args "--privileged" 
             }
           }
           steps {
@@ -139,7 +139,7 @@ pipeline {
             docker {
               label "linux-auto-cpu-node"
               image "dgllib/dgl-ci-gpu:conda"
-              args "--group-add sudo" 
+              args "--privileged " 
             }
           }
           steps {
