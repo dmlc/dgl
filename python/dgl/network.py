@@ -329,7 +329,7 @@ def _clear_kv_msg(msg):
         _CAPI_DeleteKVMsg(msg.c_ptr)
 
 
-def _fast_pull(name, ID,
+def _fast_pull(name, id_tensor,
                machine_count, group_count, machine_id, client_id,
                partition_book, g2l, local_data,
                sender, receiver):
@@ -339,7 +339,7 @@ def _fast_pull(name, ID,
     ----------
     name : str
         data name string
-    ID : tensor
+    id_tensor : tensor
         tensor of ID
     machine_count : int
         count of total machine
@@ -366,7 +366,7 @@ def _fast_pull(name, ID,
         target tensor
     """
     res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
-                                F.zerocopy_to_dgl_ndarray(ID),
+                                F.zerocopy_to_dgl_ndarray(id_tensor),
                                 F.zerocopy_to_dgl_ndarray(partition_book),
                                 F.zerocopy_to_dgl_ndarray(g2l),
                                 F.zerocopy_to_dgl_ndarray(local_data),
