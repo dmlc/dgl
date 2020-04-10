@@ -106,7 +106,7 @@ class GraphConv(layers.Layer):
           dimensions, :math:`N` is the number of nodes.
         * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
           the same shape as the input.
-        * Weight shape: "math:`(\text{in_feats}, \text{out_feats})`.
+        * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
 
         Parameters
         ----------

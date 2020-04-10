@@ -16,12 +16,12 @@ class GCNBenchmark:
     param_names = ['backend', 'dataset', 'gpu_id']
     timeout = 120
 
-    # def setup_cache(self):
-    #     self.tmp_dir = Path(tempfile.mkdtemp())
+    def __init__(self):
+        self.std_log = {}
 
     def setup(self, backend, dataset, gpu_id):
-        log_filename = Path("gcn_{}_{}_{}.log".format(backend, dataset, gpu_id))
-        if log_filename.exists():
+        key_name = "{}_{}_{}".format(backend, dataset, gpu_id)
+        if key_name in self.std_log:
             return
         gcn_path = base_path / "examples/{}/gcn/train.py".format(backend)
         bashCommand = "/opt/conda/envs/{}-ci/bin/python {} --dataset {} --gpu {} --n-epochs 50".format(
@@ -29,12 +29,13 @@ class GCNBenchmark:
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE,env=dict(os.environ, DGLBACKEND=backend))
         output, error = process.communicate()
         print(str(error))
-        log_filename.write_text(str(output))
+        self.std_log[key_name] = str(output)
 
 
     def track_gcn_time(self, backend, dataset, gpu_id):
-        log_filename = Path("{}_{}_{}.log".format(backend, dataset, gpu_id))
-        lines = log_filename.read_text().split("\\n")
+        key_name = "{}_{}_{}".format(backend, dataset, gpu_id)
+        lines = self.std_log[key_name].split("\\n")
+
         time_list = []
         for line in lines:
             # print(line)
@@ -45,8 +46,9 @@ class GCNBenchmark:
         return np.array(time_list)[-10:].mean()
 
     def track_gcn_accuracy(self, backend, dataset, gpu_id):
-        log_filename = Path("{}_{}_{}.log".format(backend, dataset, gpu_id))
-        lines = log_filename.read_text().split("\\n")
+        key_name = "{}_{}_{}".format(backend, dataset, gpu_id)
+        lines = self.std_log[key_name].split("\\n")
+
         test_acc = -1
         for line in lines:
             if 'Test accuracy' in line:
