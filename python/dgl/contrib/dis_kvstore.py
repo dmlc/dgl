@@ -922,7 +922,7 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
-        return _fast_pull(name, id_tensor,
+        res_tensor = _fast_pull(name, id_tensor,
             self._machine_count,
             self._group_count,
             self._machine_id,
@@ -932,6 +932,8 @@ class KVClient(object):
             self._data_store[name+'-data-'],
             self._sender,
             self._receiver)
+
+        return res_tensor
 
         
     def barrier(self):

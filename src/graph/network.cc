@@ -36,7 +36,8 @@ static void NaiveDeleter(DLManagedTensor* managed_tensor) {
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
                              DLDataType dtype,
                              DLContext ctx,
-                             void* raw) {
+                             void* raw,
+                             bool auto_free = true) {
   DLTensor tensor;
   tensor.ctx = ctx;
   tensor.ndim = static_cast<int>(shape.size());
@@ -55,7 +56,9 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   tensor.data = raw;
   DLManagedTensor *managed_tensor = new DLManagedTensor();
   managed_tensor->dl_tensor = tensor;
-  managed_tensor->deleter = NaiveDeleter;
+  if (auto_free) {
+    managed_tensor->deleter = NaiveDeleter;
+  }
   return NDArray::FromDLPack(managed_tensor);
 }
 
@@ -454,14 +457,16 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
 ////////////////////////// Distributed KVStore Components ////////////////////////////////
 
 
-static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int recv_id) {
+static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int recv_id, bool auto_free=true) {
   int64_t kv_size = 0;
   char* kv_data = kv_msg.Serialize(&kv_size);
   // Send kv_data
   Message send_kv_msg;
   send_kv_msg.data = kv_data;
   send_kv_msg.size = kv_size;
-  send_kv_msg.deallocator = DefaultMessageDeleter;
+  if (auto_free) {
+    send_kv_msg.deallocator = DefaultMessageDeleter;
+  }
   CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
   if (kv_msg.msg_type != kFinalMsg &&
       kv_msg.msg_type != kBarrierMsg &&
@@ -477,7 +482,9 @@ static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int rec
     Message send_meta_msg;
     send_meta_msg.data = meta_data;
     send_meta_msg.size = meta_size;
-    send_meta_msg.deallocator = DefaultMessageDeleter;
+    if (auto_free) {
+      send_meta_msg.deallocator = DefaultMessageDeleter;
+    }
     CHECK_EQ(sender->Send(send_meta_msg, recv_id), ADD_SUCCESS);
     // Send ID NDArray
     Message send_id_msg;
@@ -492,7 +499,9 @@ static void send_kv_message(network::Sender* sender, KVStoreMsg &kv_msg, int rec
       send_data_msg.data = static_cast<char*>(kv_msg.data->data);
       send_data_msg.size = kv_msg.data.GetSize();
       NDArray data = kv_msg.data;
-      send_data_msg.deallocator = [data](Message*) {};
+      if (auto_free) {
+        send_data_msg.deallocator = [data](Message*) {};
+      }
       CHECK_EQ(sender->Send(send_data_msg, recv_id), ADD_SUCCESS);
     }
   }
@@ -616,7 +625,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
 
 DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::cout << "000\n";
     std::string name = args[0];
     int local_machine_id = args[1];
     int machine_count = args[2];
@@ -641,7 +649,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
     std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
     int row_size = 1;
-    std::cout << "111\n";
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
       if (i != 0) {
@@ -649,7 +656,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     row_size *= sizeof(float);
-    std::cout << "222\n";
     // Get local id and remote id
     for (int64_t i = 0; i < ID_size; ++i) {
       int64_t id = ID_data[i];
@@ -663,7 +669,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         remote_ids_original[part_id].push_back(i);
       }
     }
-    std::cout << "333\n";
     int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
       if (remote_ids[i].size() != 0) {
@@ -674,12 +679,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.id = CreateNDArrayFromRaw({remote_ids[i].size()},
                                          DLDataType{kDLInt, 64, 1},
                                          DLContext{kDLCPU, 0},
-                                         remote_ids[i].data());
-        send_kv_message(sender, kv_msg, i);
+                                         remote_ids[i].data(),
+                                         false);
+        send_kv_message(sender, kv_msg, i, false);
         msg_count++;
       }
     }
-    std::cout << "444\n";
     char *return_data = new char[ID_size*row_size];
     // Copy local data
 #pragma omp parallel for
@@ -688,7 +693,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
              local_data_char + local_ids[i] * row_size,
              row_size);
     }
-    std::cout << "555\n";
     // Recv remote message
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
@@ -700,8 +704,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                data_char + n * row_size,
                row_size);
       }
+      delete kv_msg;
     }
-    std::cout << "666\n";
     // Get final tensor
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
@@ -710,7 +714,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                           DLContext{kDLCPU, 0},
                           return_data);
     *rv = res_tensor;
-    std::cout << "777\n";
   });
 
 }  // namespace network
