@@ -366,10 +366,10 @@ def _fast_pull(name, ID,
         target tensor
     """
     res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
-                    F.zerocopy_to_dgl_ndarray(ID),
-                    F.zerocopy_to_dgl_ndarray(partition_book),
-                    F.zerocopy_to_dgl_ndarray(g2l),
-                    F.zerocopy_to_dgl_ndarray(local_data),
-                    sender, receiver)
+                                F.zerocopy_to_dgl_ndarray(ID),
+                                F.zerocopy_to_dgl_ndarray(partition_book),
+                                F.zerocopy_to_dgl_ndarray(g2l),
+                                F.zerocopy_to_dgl_ndarray(local_data),
+                                sender, receiver)
 
     return F.zerocopy_from_dgl_ndarray(res_tensor)
