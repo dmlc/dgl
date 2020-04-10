@@ -583,7 +583,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
         kv_msg.data = args[args_count++];
       }
     }
-    send_kv_message(sender, kv_msg, recv_id, AUTO_FREE);
+    send_kv_message(sender, &kv_msg, recv_id, AUTO_FREE);
   });
 
 DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
@@ -693,7 +693,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
                                          !AUTO_FREE);
-        send_kv_message(sender, kv_msg, i, !AUTO_FREE);
+        send_kv_message(sender, &kv_msg, i, !AUTO_FREE);
         msg_count++;
       }
     }
