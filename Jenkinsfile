@@ -102,7 +102,7 @@ pipeline {
         docker {
           label "linux-auto-cpu-node"
           image "dgllib/dgl-ci-lint"
-          args "--group-add 777" 
+          // args "--group-add 777" 
         }
       }
       steps {
