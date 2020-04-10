@@ -688,7 +688,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.msg_type = MessageType::kPullMsg;
         kv_msg.rank = client_id;
         kv_msg.name = name;
-        kv_msg.id = CreateNDArrayFromRaw({remote_ids[i].size()},
+        kv_msg.id = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
                                          DLDataType{kDLInt, 64, 1},
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
@@ -700,7 +700,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     char *return_data = new char[ID_size*row_size];
     // Copy local data
 #pragma omp parallel for
-    for (size_t i = 0; i < local_ids.size(); ++i) {
+    for (int64_t i = 0; i < local_ids.size(); ++i) {
       memcpy(return_data + local_ids_orginal[i] * row_size,
              local_data_char + local_ids[i] * row_size,
              row_size);
