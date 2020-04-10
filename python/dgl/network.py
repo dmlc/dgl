@@ -329,9 +329,9 @@ def _clear_kv_msg(msg):
         _CAPI_DeleteKVMsg(msg.c_ptr)
 
 
-def _fast_pull(name, ID, 
-               machine_count, group_count, machine_id, client_id, 
-               partition_book, g2l, local_data, 
+def _fast_pull(name, ID,
+               machine_count, group_count, machine_id, client_id,
+               partition_book, g2l, local_data,
                sender, receiver):
     """ Pull message
 
