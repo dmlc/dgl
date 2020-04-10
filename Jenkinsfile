@@ -101,7 +101,8 @@ pipeline {
       agent { 
         docker {
           label "linux-auto-cpu-node"
-          image "dgllib/dgl-ci-lint" 
+          image "dgllib/dgl-ci-lint"
+          args "-u ubuntu" 
         }
       }
       steps {
