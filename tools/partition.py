@@ -4,11 +4,14 @@ import signal
 import dgl
 from dgl import backend as F
 from dgl.data.utils import load_graphs, save_graphs
+import pickle
 
 def main():
     parser = argparse.ArgumentParser(description='Partition a graph')
     parser.add_argument('--data', required=True, type=str,
                         help='The file path of the input graph in the DGL format.')
+    parser.add_argument('--graph-name', required=True, type=str,
+                        help='The graph name')
     parser.add_argument('-k', '--num-parts', required=True, type=int,
                         help='The number of partitions')
     parser.add_argument('--num-hops', type=int, default=1,
@@ -23,6 +26,7 @@ def main():
     num_hops = args.num_hops
     method = args.method
     output = args.output
+    graph_name = args.graph_name
 
     glist, _ = load_graphs(data_path)
     g = glist[0]
@@ -64,8 +68,10 @@ def main():
             tot_num_inner_edges += num_inner_edges
             serv_part.copy_from_parent()
 
-        save_graphs(output + '/server-' + str(part_id) + '.dgl', [serv_part])
-        save_graphs(output + '/client-' + str(part_id) + '.dgl', [part])
+        save_graphs('{}/{}-server-{}.dgl'.format(output, graph_name, part_id), [serv_part])
+        save_graphs('{}/{}-client-{}.dgl'.format(output, graph_name, part_id), [part])
+    meta = np.array([g.number_of_nodes(), g.number_of_edges()])
+    pickle.dump(meta, open('{}/{}-meta.pkl'.format(output, graph_name), 'wb'))
     num_cuts = g.number_of_edges() - tot_num_inner_edges
     if num_parts == 1:
         num_cuts = 0
