@@ -536,6 +536,9 @@ class WLNRankDataset(object):
         candidate bond changes for a reaction by a WLN for reaction center prediction.
     mol_graph_path : str
         Path to save/load DGLGraphs for molecules.
+    mol_to_graph: callable, str -> DGLGraph
+        A function turning RDKit molecule instances into DGLGraphs.
+        Default to :func:`dgllife.utils.mol_to_bigraph`.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. By default, we consider descriptors including atom type,
@@ -565,6 +568,7 @@ class WLNRankDataset(object):
                  raw_file_path,
                  candidate_bond_path,
                  mol_graph_path,
+                 mol_to_graph=mol_to_bigraph,
                  node_featurizer=default_node_featurizer_rank,
                  size_cutoff=100,
                  max_num_changes_per_reaction=5,
@@ -587,6 +591,27 @@ class WLNRankDataset(object):
         self.valid_candidate_combos = self.pre_process(
             num_candidate_bond_changes, max_num_changes_per_reaction,
             max_num_change_combos_per_reaction)
+
+        self.reactant_mol_graphs = []
+        if load and os.path.isfile(mol_graph_path):
+            print('Loading previously saved graphs...')
+            reactant_mol_graphs_, _ = load_graphs(mol_graph_path)
+            for graph in reactant_mol_graphs_:
+                # Re-use graphs saved for reaction center prediction
+                nkeys = list(graph.ndata.keys())
+                for key in nkeys:
+                    graph.ndata.pop(key)
+                ekeys = list(graph.edata.keys())
+                for key in ekeys:
+                    graph.edata.pop(key)
+                self.reactant_mol_graphs.append(graph)
+        else:
+            print('Constructing graphs from scratch...')
+            for i in range(len(self.reactant_mols)):
+                if i % log_every == 0:
+                    print('Processing reaction {:d}/{:d}'.format(i + 1, len(self.reactant_mols)))
+                mol = self.reactant_mols[i]
+                graph =
 
     def load_reaction_data(self, file_path, log_every):
         """Load reaction data from the raw file.
