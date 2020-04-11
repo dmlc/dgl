@@ -26,65 +26,27 @@ from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate
 def start_server(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
     serv = DistGraphStoreServer(server_namebook, args.id, args.graph_name,
-                                args.server_data, args.client_data, args.num_client)
+                                args.data_path, args.num_client)
     serv.start()
 
-def copy_from_kvstore(nfs, g, stats):
-    num_bytes = 0
-    num_local_bytes = 0
-    first_layer_nid = []
-    last_layer_nid = []
-    first_layer_offs = [0]
-    last_layer_offs = [0]
-    for nf in nfs:
-        first_layer_nid.append(nf.layer_parent_nid(0))
-        last_layer_nid.append(nf.layer_parent_nid(-1))
-        first_layer_offs.append(first_layer_offs[-1] + len(nf.layer_parent_nid(0)))
-        last_layer_offs.append(last_layer_offs[-1] + len(nf.layer_parent_nid(-1)))
-    first_layer_nid = torch.cat(first_layer_nid, dim=0)
-    last_layer_nid = torch.cat(last_layer_nid, dim=0)
-
-    # TODO we need to gracefully handle the case that the nodes don't exist.
-    start = time.time()
-    first_layer_data = g.get_ndata('features', first_layer_nid)
-    last_layer_data = g.get_ndata('labels', last_layer_nid)
-    stats[2] = time.time() - start
-    first_layer_local = g.is_local(first_layer_nid).numpy()
-    last_layer_local = g.is_local(last_layer_nid).numpy()
-    num_bytes += np.prod(first_layer_data.shape)
-    num_bytes += np.prod(last_layer_data.shape)
-    if len(first_layer_data.shape) == 1:
-        num_local_bytes += np.sum(first_layer_local)
-    else:
-        num_local_bytes += np.sum(first_layer_local) * first_layer_data.shape[1]
-    if len(last_layer_data.shape) == 1:
-        num_local_bytes += np.sum(last_layer_local)
-    else:
-        num_local_bytes += np.sum(last_layer_local) * last_layer_data.shape[1]
-
-    for idx, nf in enumerate(nfs):
-        start = first_layer_offs[idx]
-        end = first_layer_offs[idx + 1]
-        nfs[idx]._node_frames[0]['features'] = first_layer_data[start:end]
-        start = last_layer_offs[idx]
-        end = last_layer_offs[idx + 1]
-        nfs[idx]._node_frames[-1]['labels'] = last_layer_data[start:end]
-
-    stats[0] = num_bytes * 4
-    stats[1] = num_local_bytes * 4
-
-def load_subtensor(g, labels, seeds, input_nodes, device):
+def load_subtensor(g, blocks, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    
-    batch_inputs = g.get_ndata('features', input_nodes)
-    batch_labels = g.get_ndata('labels', seeds).long()
+    # The nodes for input lies at the LHS side of the first block.
+    # The nodes for output lies at the RHS side of the last block.
+    input_nodes = blocks[0].srcdata[dgl.NID]
+    input_nodes = g.g.ndata[dgl.NID][input_nodes]
+    # TODO we should get global node id directly from the sampler.
+    seeds = blocks[-1].dstdata[dgl.NID]
+    seeds = g.g.ndata[dgl.NID][seeds]
+    batch_inputs = g.ndata['features'][input_nodes]
+    batch_labels = g.ndata['labels'][seeds].long()
     return batch_inputs, batch_labels
 
 def run(args, device, data):
     # Unpack data
-    train_nid, val_nid, in_feats, labels, n_classes, g = data
+    train_nid, val_nid, in_feats, n_classes, g = data
     # Create sampler
     sampler = NeighborSampler(g.g, [int(fanout) for fanout in args.fan_out.split(',')])
 
@@ -125,24 +87,19 @@ def run(args, device, data):
             tic_step = time.time()
             sample_time += tic_step - start
 
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
-            seeds = blocks[-1].dstdata[dgl.NID]
-
             # Load the input features as well as output labels
             start = time.time()
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(g, blocks, device)
             copy_time += time.time() - start
 
-            num_seeds += len(seeds)
+            num_seeds += len(blocks[-1].dstdata[dgl.NID])
             num_inputs += len(blocks[0].srcdata[dgl.NID])
             # Compute loss and prediction
             start = time.time()
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
-            optimizer.zero_grad()
             forward_end = time.time()
+            optimizer.zero_grad()
             loss.backward()
             compute_end = time.time()
             forward_time += forward_end - start
@@ -153,7 +110,7 @@ def run(args, device, data):
 
             step_t = time.time() - tic_step
             step_time.append(step_t)
-            iter_tput.append(len(seeds) / (step_t))
+            iter_tput.append(num_seeds / (step_t))
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
@@ -171,7 +128,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_nid, args.batch_size, device)
+            eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
@@ -187,21 +144,20 @@ def main(args):
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     th.manual_seed(g.get_id())
-    train_mask = g.get_ndata('train_mask').numpy()
-    val_mask = g.get_ndata('val_mask').numpy()
-    test_mask = g.get_ndata('test_mask').numpy()
+    train_mask = g.ndata['train_mask'][g.local_nids].numpy()
+    val_mask = g.ndata['val_mask'][g.local_nids].numpy()
+    test_mask = g.ndata['test_mask'][g.local_nids].numpy()
     print('part {}, train: {}, val: {}, test: {}'.format(g.get_id(),
         np.sum(train_mask), np.sum(val_mask), np.sum(test_mask)), flush=True)
 
-    train_nid = th.tensor(g.get_local_nids()[train_mask == 1], dtype=th.int64)
-    val_nid = th.tensor(g.get_local_nids()[val_mask == 1], dtype=th.int64)
-    test_nid = th.tensor(g.get_local_nids()[test_mask == 1], dtype=th.int64)
-    labels = g.get_ndata('labels').long()
+    train_nid = g.local_nids[train_mask == 1].long()
+    val_nid = g.local_nids[val_mask == 1].long()
+    test_nid = g.local_nids[test_mask == 1].long()
     
     device = th.device('cpu')
 
     # Pack data
-    data = train_nid, val_nid, args.n_features, labels, args.n_classes, g
+    data = train_nid, val_nid, args.n_features, args.n_classes, g
     if args.model == "gcn_ns":
         run(args, device, data)
     else:
@@ -219,8 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--n-features', type=int, help='the input feature size')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
-    parser.add_argument('--server_data', type=str, help='The file with the server data')
-    parser.add_argument('--client_data', type=str, help='The file with data exposed to the client.')
+    parser.add_argument('--data_path', type=str, help='The folder with all data')
     parser.add_argument('--num-client', type=int, help='The number of clients')
     parser.add_argument('--n-classes', type=int, help='the number of classes')
     parser.add_argument('--gpu', type=int, default=0,
