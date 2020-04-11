@@ -110,7 +110,6 @@ def run(args, device, data):
     for epoch in range(args.num_epochs):
         tic = time.time()
 
-        step_time = []
         sample_time = 0
         copy_time = 0
         forward_time = 0
@@ -121,6 +120,7 @@ def run(args, device, data):
         start = time.time()
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
+        step_time = []
         for step, blocks in enumerate(dataloader):
             tic_step = time.time()
             sample_time += tic_step - start
@@ -135,20 +135,19 @@ def run(args, device, data):
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
             copy_time += time.time() - start
 
-            seeds = blocks[-1].dstdata[dgl.NID]
             num_seeds += len(seeds)
             num_inputs += len(blocks[0].srcdata[dgl.NID])
             # Compute loss and prediction
             start = time.time()
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
+            optimizer.zero_grad()
             forward_end = time.time()
             loss.backward()
             compute_end = time.time()
             forward_time += forward_end - start
             backward_time += compute_end - forward_end
 
-            optimizer.zero_grad()
             optimizer.step()
             update_time += time.time() - compute_end
 
