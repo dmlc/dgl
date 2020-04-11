@@ -23,5 +23,6 @@ candidate_ranking_config = {
     'batch_size': 4,
     'hidden_size': 500,
     'n_layers': 3,
-    'max_norm': 50.0
+    'max_norm': 50.0,
+    'num_epochs': 25
 }

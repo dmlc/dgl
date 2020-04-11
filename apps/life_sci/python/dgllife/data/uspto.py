@@ -1,6 +1,7 @@
 """USPTO for reaction prediction"""
 import numpy as np
 import os
+import random
 import torch
 
 from collections import defaultdict
@@ -533,24 +534,45 @@ class WLNRankDataset(object):
     candidate_bond_path : str
         Path to the candidate bond changes for product enumeration, where each line is
         candidate bond changes for a reaction by a WLN for reaction center prediction.
+    mol_graph_path : str
+        Path to save/load DGLGraphs for molecules.
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
+        ndata for a DGLGraph. By default, we consider descriptors including atom type,
+        atom formal charge, atom degree, atom explicit valence, atom implicit valence,
+        aromaticity.
     size_cutoff : int
         By calling ``.ignore_large(True)``, we can optionally ignore reactions whose reactants
         contain more than ``size_cutoff`` atoms. Default to 100.
     max_num_changes_per_reaction : int
         Maximum number of bond changes per reaction. Default to 5.
+    num_candidate_bond_changes : int
+        Number of candidate bond changes to consider for each ground truth reaction.
+        Default to 16.
+    max_num_change_combos_per_reaction : int
+        Number of bond change combos to consider for each reaction. Default to 150.
     train_mode : bool
         Whether the dataset is to be used for training. Default to True.
     log_every : int
         Print a progress update every time ``log_every`` reactions are pre-processed.
         Default to 10000.
+    load : bool
+        Whether to load the previously pre-processed dataset or pre-process from scratch.
+        ``load`` should be False when we want to try different graph construction and
+        featurization methods and need to preprocess from scratch. Default to True.
     """
     def __init__(self,
                  raw_file_path,
                  candidate_bond_path,
+                 mol_graph_path,
+                 node_featurizer=default_node_featurizer_rank,
                  size_cutoff=100,
                  max_num_changes_per_reaction=5,
+                 num_candidate_bond_changes=16,
+                 max_num_change_combos_per_reaction=150,
                  train_mode=True,
-                 log_every=10000):
+                 log_every=10000,
+                 load=True):
         super(WLNRankDataset, self).__init__()
 
         self.ignore_large_samples = False
@@ -562,7 +584,9 @@ class WLNRankDataset(object):
             self.load_reaction_data(raw_file_path, log_every)
         self.candidate_bond_changes = self.load_candidate_bond_changes(
             candidate_bond_path, log_every)
-        self.pre_process(max_num_changes_per_reaction)
+        self.valid_candidate_combos = self.pre_process(
+            num_candidate_bond_changes, max_num_changes_per_reaction,
+            max_num_change_combos_per_reaction)
 
     def load_reaction_data(self, file_path, log_every):
         """Load reaction data from the raw file.
@@ -628,6 +652,11 @@ class WLNRankDataset(object):
                     product_mol = Chem.MolFromSmiles(product)
                     if product_mol is None:
                         continue
+                    atom_map_order = [-1 for _ in range(product_mol.GetNumAtoms())]
+                    for i in range(product_mol.GetNumAtoms()):
+                        atom = product_mol.GetAtomWithIdx(i)
+                        atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = i
+                    product_mol = rdmolops.RenumberAtoms(product_mol, atom_map_order)
                     all_product_mols.append(product_mol)
                 if reactants_mol.GetNumAtoms() <= self.size_cutoff:
                     ids_for_small_samples.append(curr_id)
@@ -779,11 +808,8 @@ class WLNRankDataset(object):
         info = {
             'atoms': set()
         }
-        for bond in mol.GetBonds():
-            atom1, atom2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-            atom1, atom2 = min(atom1, atom2), max(atom1, atom2)
-            info['atoms'].add(atom1)
-            info['atoms'].add(atom2)
+        for atom in mol.GetAtoms():
+            info['atoms'].add(atom.GetAtomMapNum() - 1)
 
         return info
 
@@ -894,13 +920,108 @@ class WLNRankDataset(object):
             return False
         return True
 
-    def pre_process(self, max_num_changes_per_reaction):
+    def edit_mol(self, reactant_mols, edits, product_info):
+        """Simulate reaction via graph editing
+
+        Parameters
+        ----------
+        reactant_mols : rdkit.Chem.rdchem.Mol
+            RDKit molecule instances for reactants.
+        edits : list of 4-tuples
+            Bond changes for getting the product out of the reactants in a reaction.
+            Each 4-tuple is of form (atom1, atom2, change_type, score), where atom1
+            and atom2 are the end atoms to form or lose a bond, change_type is the
+            type of bond change and score represents the confidence for the bond change
+            by a model.
+        product_info : dict
+            proeduct_info['atoms'] gives a set of atom ids in the ground truth product molecule.
+
+        Returns
+        -------
+        str
+            SMILES for the main products
+        """
+        bond_change_to_type = {1: Chem.rdchem.BondType.SINGLE, 2: Chem.rdchem.BondType.DOUBLE,
+                             3: Chem.rdchem.BondType.TRIPLE, 1.5: Chem.rdchem.BondType.AROMATIC}
+
+        new_mol = Chem.RWMol(reactant_mols)
+        [atom.SetNumExplicitHs(0) for atom in new_mol.GetAtoms()]
+
+        for atom1, atom2, change_type, score in edits:
+            bond = new_mol.GetBondBetweenAtoms(atom1, atom2)
+            if bond is not None:
+                new_mol.RemoveBond(atom1, atom2)
+            if change_type > 0:
+                new_mol.AddBond(atom1, atom2, bond_change_to_type[change_type])
+
+        pred_mol = new_mol.GetMol()
+        pred_smiles = Chem.MolToSmiles(pred_mol)
+        pred_list = pred_smiles.split('.')
+        pred_mols = []
+        for pred_smiles in pred_list:
+            mol = Chem.MolFromSmiles(pred_smiles)
+            if mol is None:
+                continue
+            atom_set = set([atom.GetAtomMapNum() - 1 for atom in mol.GetAtoms()])
+            if len(atom_set & product_info['atoms']) == 0:
+                continue
+            for atom in mol.GetAtoms():
+                atom.SetAtomMapNum(0)
+            pred_mols.append(mol)
+
+        return '.'.join(sorted([Chem.MolToSmiles(mol) for mol in pred_mols]))
+
+    def get_product_smiles(self, reactant_mols, edits, product_info):
+        """Get the product smiles of the reaction
+
+        Parameters
+        ----------
+        reactant_mols : rdkit.Chem.rdchem.Mol
+            RDKit molecule instances for reactants.
+        edits : list of 4-tuples
+            Bond changes for getting the product out of the reactants in a reaction.
+            Each 4-tuple is of form (atom1, atom2, change_type, score), where atom1
+            and atom2 are the end atoms to form or lose a bond, change_type is the
+            type of bond change and score represents the confidence for the bond change
+            by a model.
+        product_info : dict
+            proeduct_info['atoms'] gives a set of atom ids in the ground truth product molecule.
+
+        Returns
+        -------
+        str
+            SMILES for the main products
+        """
+        smiles = self.edit_mol(reactant_mols, edits, product_info)
+        if len(smiles) != 0:
+            return smiles
+        try:
+            Chem.Kekulize(reactant_mols)
+        except Exception as e:
+            return smiles
+        return self.edit_mol(reactant_mols, edits, product_info)
+
+    def pre_process(self, num_candidate_bond_changes, max_num_changes_per_reaction,
+                    max_num_change_combos_per_reaction):
         """Pre-process for the experiments.
 
         Parameters
         ----------
+        num_candidate_bond_changes : int
+            Number of candidate bond changes to consider for each ground truth reaction.
         max_num_changes_per_reaction : int
             Maximum number of bond changes per reaction.
+        max_num_change_combos_per_reaction : int
+            Number of bond change combos to consider for each reaction.
+
+        Returns
+        -------
+        valid_candidate_combos : list of list
+            valid_candidate_combos[i] gives combos of bond changes for the i-th reaction.
+            valid_candidate_combos[i][j] gives the j-th combo for the i-th reaction, which
+            is of form ``atom1, atom2, change_type, score``, where ``atom1`` and ``atom2`` are
+            end atoms for the bond to form/break, ``change_type`` is the type for the bond change
+            and ``score`` is the confidence in the bond change by a model.
         """
         all_valid_candidate_combos = []
         for i in range(len(self.reactant_mols)):
@@ -918,6 +1039,7 @@ class WLNRankDataset(object):
                 if ((atom1, atom2) not in reactant_info['pair_to_bond_val']) or \
                     (reactant_info['pair_to_bond_val'][(atom1, atom2)] != change_type):
                     candidate_bond_changes.append((atom1, atom2, change_type, score))
+            candidate_bond_changes = candidate_bond_changes[:num_candidate_bond_changes]
 
             # Check if two bond changes have atom in common
             cand_change_adj = np.eye(len(candidate_bond_changes), dtype=bool)
@@ -944,9 +1066,50 @@ class WLNRankDataset(object):
                         valid_candidate_combos.append(combo_changes)
 
             if self.train_mode:
-                return NotImplementedError
+                random.shuffle(valid_candidate_combos)
+                # Index for the combo of candidate bond changes
+                # that is equivalent to the gold combo
+                real_combo_id = -1
+                for i, combo_changes in enumerate(valid_candidate_combos):
+                    if set([(atom1, atom2, change_type) for
+                            (atom1, atom2, change_type, score) in combo_changes]) == \
+                        set(self.real_bond_changes[i]):
+                        real_combo_id = i
+                        break
 
+                # If we fail to find the real combo, make it the first entry
+                if real_combo_id == -1:
+                    valid_candidate_combos = \
+                        [[(atom1, atom2, change_type, 0.0)
+                          for (atom1, atom2, change_type) in self.real_bond_changes[i]]] + \
+                        valid_candidate_combos
+                else:
+                    valid_candidate_combos[0], valid_candidate_combos[real_combo_id] = \
+                        valid_candidate_combos[real_combo_id], valid_candidate_combos[0]
+
+                product_smiles = self.get_product_smiles(
+                    reactant_mol, valid_candidate_combos[0], product_info)
+                if len(product_smiles) > 0:
+                    # Remove combos yielding duplicate products
+                    product_smiles = set([product_smiles])
+                    new_candidate_combos = [valid_candidate_combos[0]]
+
+                    for combo in valid_candidate_combos[1:]:
+                        smiles = self.get_product_smiles(reactant_mol, combo, product_info)
+                        if smiles in product_smiles or len(smiles) == 0:
+                            continue
+                        product_smiles.append(smiles)
+                        new_candidate_combos.append(combo)
+                else:
+                    print('\nwarning! could not recover true smiles from gbonds: {}'.format(
+                        Chem.MolToSmiles(product_mol)))
+                    print('reactant smiles: {} graph edits: {}'.format(
+                        Chem.MolToSmiles(reactant_mol), self.real_bond_changes[i]))
+
+            valid_candidate_combos = valid_candidate_combos[:max_num_change_combos_per_reaction]
             all_valid_candidate_combos.append(valid_candidate_combos)
+
+        return all_valid_candidate_combos
 
     def ignore_large(self, ignore=True):
         """Whether to ignore reactions where reactants contain too many atoms.
@@ -1015,13 +1178,18 @@ class USPTORank(WLNRankDataset):
     log_every : int
         Print a progress update every time ``log_every`` reactions are pre-processed.
         Default to 10000.
+    load : bool
+        Whether to load the previously pre-processed dataset or pre-process from scratch.
+        ``load`` should be False when we want to try different graph construction and
+        featurization methods and need to preprocess from scratch. Default to True.
     """
     def __init__(self,
                  subset,
                  candidate_bond_path,
                  size_cutoff=100,
                  max_num_changes_per_reaction=5,
-                 log_every=10000):
+                 log_every=10000,
+                 load=True):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         print('Preparing {} subset of USPTO for product candidate ranking.'.format(subset))
@@ -1043,10 +1211,12 @@ class USPTORank(WLNRankDataset):
         super(USPTORank, self).__init__(
             raw_file_path=extracted_data_path + '/{}.txt.proc'.format(subset),
             candidate_bond_path=candidate_bond_path,
+            mol_graph_path=extracted_data_path + '/{}_mol_graphs.bin'.format(subset),
             size_cutoff=size_cutoff,
             max_num_changes_per_reaction=max_num_changes_per_reaction,
             train_mode=train_mode,
-            log_every=log_every)
+            log_every=log_every,
+            load=load)
 
     @property
     def subset(self):
