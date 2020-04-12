@@ -61,11 +61,12 @@ class NeighborSampler(object):
             # For each seed node, sample ``fanout`` neighbors.
             frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
             # Remove all edges between heads and tails, as well as heads and neg_tails.
-            _, _, edge_ids = frontier.edge_ids(
-                th.cat([heads, tails, neg_heads, neg_tails]),
-                th.cat([tails, heads, neg_tails, neg_heads]),
-                return_uv=True)
-            frontier = dgl.remove_edges(frontier, edge_ids)
+            # Currently this is slow and I'm still optimizing edge_ids operation.
+            #_, _, edge_ids = frontier.edge_ids(
+            #    th.cat([heads, tails, neg_heads, neg_tails]),
+            #    th.cat([tails, heads, neg_tails, neg_heads]),
+            #    return_uv=True)
+            #frontier = dgl.remove_edges(frontier, edge_ids)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
