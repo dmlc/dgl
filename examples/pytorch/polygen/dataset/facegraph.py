@@ -6,31 +6,47 @@ import time
 from collections import *
 
 Graph = namedtuple('Graph',
-                   ['g', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
+                   ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
 class GraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
-    def __init__(self, n=50):
+    def __init__(self, n=50, m=50):
         '''
         args:
-            n: maximum number of vertexes
+            n: maximum length of input sequence.
+            m: maximum length of output sequence.
         '''
         print('start creating graph pool...')
         tic = time.time()
-        self.n = n
-        g_pool = [dgl.DGLGraph() for _ in range(n)]
+        self.n, self.m = n, m
+        g_pool = [[dgl.DGLGraph() for _ in range(m)] for _ in range(n)]
         num_edges = {
-            'dd': np.zeros((n, n)).astype(int)
+            'ee': np.zeros((n, n)).astype(int),
+            'ed': np.zeros((n, m)).astype(int),
+            'dd': np.zeros((m, m)).astype(int)
         }
-        for i in range(n):
-            n_vertex = i + 1
+        for i, j in itertools.product(range(n), range(m)):
+            src_length = i + 1
+            tgt_length = j + 1
 
-            dec_nodes = th.arange(n_vertex, dtype=th.long)
+            g_pool[i][j].add_nodes(src_length + tgt_length)
+            enc_nodes = th.arange(src_length, dtype=th.long)
+            dec_nodes = th.arange(tgt_length, dtype=th.long) + src_length
 
+            # enc -> enc
+            us = enc_nodes.unsqueeze(-1).repeat(1, src_length).view(-1)
+            vs = enc_nodes.repeat(src_length)
+            g_pool[i][j].add_edges(us, vs)
+            num_edges['ee'][i][j] = len(us)
+            # enc -> dec
+            us = enc_nodes.unsqueeze(-1).repeat(1, tgt_length).view(-1)
+            vs = dec_nodes.repeat(src_length)
+            g_pool[i][j].add_edges(us, vs)
+            num_edges['ed'][i][j] = len(us)
             # dec -> dec
-            indices = th.triu(th.ones(n_vertex, n_vertex)) == 1
-            us = dec_nodes.unsqueeze(-1).repeat(1, n_vertex)[indices]
-            vs = dec_nodes.unsqueeze(0).repeat(n_vertex, 1)[indices]
+            indices = th.triu(th.ones(tgt_length, tgt_length)) == 1
+            us = dec_nodes.unsqueeze(-1).repeat(1, tgt_length)[indices]
+            vs = dec_nodes.unsqueeze(0).repeat(tgt_length, 1)[indices]
             g_pool[i][j].add_edges(us, vs)
             num_edges['dd'][i][j] = len(us)
 
@@ -99,20 +115,23 @@ class GraphPool:
                      n_edges=n_edges,
                      n_tokens=n_tokens)
 
-    def __call__(self, tgt_buf, device='cpu'):
+    def __call__(self, src_buf, tgt_buf, device='cpu'):
         '''
         Return a batched graph for the training phase of Transformer.
         args:
+            src_buf: a set of input sequence arrays.
             tgt_buf: a set of output sequence arrays.
             device: 'cpu' or 'cuda:*'
         '''
         g_list = []
+        src_lens = [len(_) for _ in src_buf]
         tgt_lens = [len(_) - 1 for _ in tgt_buf]
-        num_edges = {'dd': []}
-        for tgt_len in tgt_lens:
-            i = tgt_len - 1
-            g_list.append(self.g_pool[i])
-            num_edges['dd'].append(int(self.num_edges['dd'][i]))
+        num_edges = {'ee': [], 'ed': [], 'dd': []}
+        for src_len, tgt_len in zip(src_lens, tgt_lens):
+            i, j = src_len - 1, tgt_len - 1
+            g_list.append(self.g_pool[i][j])
+            for key in ['ee', 'ed', 'dd']:
+                num_edges[key].append(int(self.num_edges[key][i][j]))
 
         g = dgl.batch(g_list)
         src, tgt, tgt_y = [], [], []
@@ -120,24 +139,35 @@ class GraphPool:
         enc_ids, dec_ids = [], []
         e2e_eids, d2d_eids, e2d_eids = [], [], []
         n_nodes, n_edges, n_tokens = 0, 0, 0
-        for tgt_sample, n, n_dd in zip(tgt_buf, tgt_lens, num_edges['dd']):
+        for src_sample, tgt_sample, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
+            src.append(th.tensor(src_sample, dtype=th.long, device=device))
             tgt.append(th.tensor(tgt_sample[:-1], dtype=th.long, device=device))
             tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
+            src_pos.append(th.arange(n, dtype=th.long, device=device))
             tgt_pos.append(th.arange(m, dtype=th.long, device=device))
-            dec_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
+            enc_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
             n_nodes += n
-            n_tokens += n
+            dec_ids.append(th.arange(n_nodes, n_nodes + m, dtype=th.long, device=device))
+            n_nodes += m
+            e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
+            n_edges += n_ee
+            e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
+            n_edges += n_ed
+            d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
+            n_edges += n_dd
+            n_tokens += m
 
 
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
 
         return Graph(g=g,
+                     src=(th.cat(src), th.cat(src_pos)),
                      tgt=(th.cat(tgt), th.cat(tgt_pos)),
                      tgt_y=th.cat(tgt_y),
-                     nids = {'dec': th.cat(dec_ids)},
-                     eids = {'dd': th.cat(d2d_eids)},
-                     nid_arr = {'dec': dec_ids},
+                     nids = {'enc': th.cat(enc_ids), 'dec': th.cat(dec_ids)},
+                     eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
+                     nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
                      n_edges=n_edges,
                      n_tokens=n_tokens)
