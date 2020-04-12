@@ -39,8 +39,8 @@ class NeighborSampler(object):
         n_edges = len(seed_edges)
         seed_edges = th.LongTensor(np.asarray(seed_edges))
         heads, tails = self.g.find_edges(seed_edges)
-        neg_tails = self.neg_sampler(self.num_negs * n_edges).view(n_edges, self.num_negs)
-        neg_heads = heads.view(-1, 1).expand_as(neg_tails)
+        neg_tails = self.neg_sampler(self.num_negs * n_edges)
+        neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
 
         # Maintain the correspondence between heads, tails and negative tails as two
         # graphs.
@@ -60,6 +60,12 @@ class NeighborSampler(object):
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
             frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
+            # Remove all edges between heads and tails, as well as heads and neg_tails.
+            _, _, edge_ids = frontier.edge_ids(
+                th.cat([heads, tails, neg_heads, neg_tails]),
+                th.cat([tails, heads, neg_tails, neg_heads]),
+                return_uv=True)
+            frontier = dgl.remove_edges(frontier, edge_ids)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -153,7 +159,7 @@ class CrossEntropyLoss(nn.Module):
 
         score = th.cat([pos_score, neg_score])
         label = th.cat([th.ones_like(pos_score), th.zeros_like(neg_score)]).long()
-        loss = F.cross_entropy(score, label)
+        loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
 
 def prepare_mp(g):
@@ -168,22 +174,25 @@ def prepare_mp(g):
     g.out_degree(0)
     g.find_edges([0])
 
-def compute_acc(pred, train_nids, train_labels, val_nids, val_labels):
+def compute_acc(pred, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
     """
     pred = pred.cpu().numpy()
     train_nids = train_nids.cpu().numpy()
-    train_labels = train_labels.cpu().numpy()
+    train_labels = labels[train_nids].cpu().numpy()
     val_nids = val_nids.cpu().numpy()
-    val_labels = val_labels.cpu().numpy()
+    val_labels = labels[val_nids].cpu().numpy()
+    test_nids = test_nids.cpu().numpy()
+    test_labels = labels[test_nids].cpu().numpy()
 
-    lr = lm.LogisticRegression(multi_class='multinomial')
-    lr.fit(pred[train_nids], train_labels)
-    return lr.score(pred[val_nids], val_labels)
+    pred = (pred - pred.mean(0, keepdims=True)) / pred.std(0, keepdims=True)
 
-def evaluate(model, g, inputs, train_nids, train_labels, val_nids, val_labels,
-             batch_size, device):
+    lr = lm.LogisticRegression(multi_class='multinomial', max_iter=10000)
+    lr.fit(pred[train_nids], labels[train_nids])
+    return lr.score(pred[val_nids], labels[val_nids]), lr.score(pred[test_nids], labels[test_nids])
+
+def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -197,37 +206,30 @@ def evaluate(model, g, inputs, train_nids, train_labels, val_nids, val_labels,
     with th.no_grad():
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred, train_nids, train_labels, val_nids, val_labels)
+    return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
-def load_subtensor(g, labels, seeds, input_nodes, device):
+def load_subtensor(g, seeds, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
     batch_inputs = g.ndata['features'][input_nodes].to(device)
-    batch_labels = labels[seeds].to(device)
-    return batch_inputs, batch_labels
+    return batch_inputs
 
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    train_mask, val_mask, test_mask, in_feats, labels, n_classes, full_g = data
+    train_mask, val_mask, test_mask, in_feats, labels, n_classes, g = data
 
     train_nid = th.LongTensor(np.nonzero(train_mask)[0])
     val_nid = th.LongTensor(np.nonzero(val_mask)[0])
     test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
-    # Split training edges and validation edges
-    eids = th.randperm(g.number_of_edges())
-    n_train_edges = int(len(eids) * 0.95)
-    train_eids, val_eids = eids[:n_train_edges], eids[n_train_edges:]
-    g = full_g.edge_subgraph(train_eids, preserve_nodes=True)
-
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
-        dataset=train_eids.numpy(),
+        dataset=np.arange(g.number_of_edges()),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
@@ -244,6 +246,8 @@ def run(args, device, data):
     # Training loop
     avg = 0
     iter_tput = []
+    best_eval_acc = 0
+    best_test_acc = 0
     for epoch in range(args.num_epochs):
         tic = time.time()
 
@@ -258,7 +262,7 @@ def run(args, device, data):
             seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
-            batch_inputs = load_subtensor(g, labels, seeds, input_nodes, device)
+            batch_inputs = load_subtensor(g, seeds, input_nodes, device)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -269,18 +273,17 @@ def run(args, device, data):
 
             iter_tput.append(len(seeds) / (time.time() - tic_step))
             if step % args.log_every == 0:
-                acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
-                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
+                    epoch, step, loss.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
 
-        toc = time.time()
-        print('Epoch Time(s): {:.4f}'.format(toc - tic))
-        if epoch >= 5:
-            avg += toc - tic
-        if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, device)
-            print('Eval Acc {:.4f}'.format(eval_acc))
+            if step % args.eval_every == 0:
+                eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
+                print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
+                if eval_acc > best_eval_acc:
+                    best_eval_acc = eval_acc
+                    best_test_acc = test_acc
+                print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
@@ -291,6 +294,7 @@ if __name__ == '__main__':
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
+    argparser.add_argument('--num-negs', type=int, default=1)
     argparser.add_argument('--fan-out', type=str, default='10,25')
     argparser.add_argument('--batch-size', type=int, default=1000)
     argparser.add_argument('--log-every', type=int, default=20)
