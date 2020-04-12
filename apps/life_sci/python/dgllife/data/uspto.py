@@ -664,11 +664,6 @@ class WLNRankDataset(object):
                     product_mol = Chem.MolFromSmiles(product)
                     if product_mol is None:
                         continue
-                    atom_map_order = [-1 for _ in range(product_mol.GetNumAtoms())]
-                    for j in range(product_mol.GetNumAtoms()):
-                        atom = product_mol.GetAtomWithIdx(j)
-                        atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = j
-                    product_mol = rdmolops.RenumberAtoms(product_mol, atom_map_order)
                     all_product_mols.append(product_mol)
                 if reactants_mol.GetNumAtoms() <= self.size_cutoff:
                     ids_for_small_samples.append(curr_id)
@@ -925,6 +920,7 @@ class WLNRankDataset(object):
                 free_val_tmp[atom1] -= atom1_type_val
                 free_val_tmp[atom2] -= atom2_type_val
 
+        free_val_tmp = np.array(free_val_tmp)
         # False if 1) too many connections 2) sulfur valence not even
         # 3) phosphorous valence not odd
         if any(free_val_tmp < 0) or \
@@ -1108,7 +1104,7 @@ class WLNRankDataset(object):
                 for j, combo_changes in enumerate(valid_candidate_combos):
                     if set([(atom1, atom2, change_type) for
                             (atom1, atom2, change_type, score) in combo_changes]) == \
-                        set(self.real_bond_changes[j]):
+                        set(self.real_bond_changes[i]):
                         real_combo_id = j
                         break
 
@@ -1133,7 +1129,7 @@ class WLNRankDataset(object):
                         smiles = self.get_product_smiles(reactant_mol, combo, product_info)
                         if smiles in product_smiles or len(smiles) == 0:
                             continue
-                        product_smiles.append(smiles)
+                        product_smiles.add(smiles)
                         new_candidate_combos.append(combo)
                 else:
                     print('\nwarning! could not recover true smiles from gbonds: {}'.format(

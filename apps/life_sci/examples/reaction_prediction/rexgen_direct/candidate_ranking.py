@@ -1,10 +1,15 @@
-from dgllife.data import USPTORank
+from dgllife.data import USPTORank, WLNRankDataset
 
 from configure import reaction_center_config, candidate_ranking_config
 from utils import setup, prepare_reaction_center
 
 def main(args, path_to_candidate_bonds):
-    train_set = USPTORank(subset='train', candidate_bond_path=path_to_candidate_bonds['train'])
+    if args['train_path'] is None:
+        train_set = USPTORank(subset='train', candidate_bond_path=path_to_candidate_bonds['train'])
+    else:
+        train_set = WLNRankDataset(raw_file_path=args['train_path'],
+                                   candidate_bond_path=path_to_candidate_bonds['train'],
+                                   mol_graph_path='train_rank_graphs.bin')
     train_set.ignore_large()
 
 if __name__ == '__main__':

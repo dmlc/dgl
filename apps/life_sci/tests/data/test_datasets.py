@@ -65,6 +65,7 @@ def test_wln_reaction():
 
     # Test configured dataset
     dataset = WLNCenterDataset('test.txt', 'test_graphs.bin')
+    remove_file('test_graphs.bin')
 
     with open('test_candidate_bond_changes.txt', 'w') as f:
         for reac in reactions:
@@ -75,7 +76,7 @@ def test_wln_reaction():
             candidate_string += '\n'
             f.write(candidate_string)
 
-    dataset = WLNRankDataset('test.txt.proc', 'test_candidate_bond_changes.txt')
+    dataset = WLNRankDataset('test.txt.proc', 'test_candidate_bond_changes.txt', 'test_graphs.bin')
     remove_file('test.txt')
     remove_file('test.txt.proc')
     remove_file('test_graphs.bin')
