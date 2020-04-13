@@ -320,8 +320,9 @@ class KVServer(object):
 
         """
         # Get connected with all client nodes
+        print("111")
         _receiver_wait(self._receiver, self._ip, self._port, self._client_count)
-
+        print("222")
         # recv client address information
         addr_list = []
         for i in range(self._client_count):
@@ -675,11 +676,14 @@ class KVClient(object):
 
         """
         # Get connected with all server nodes
+        print("aaa")
         for ID, addr in self._server_namebook.items():
             server_ip = addr[1]
             server_port = addr[2]
             _add_receiver_addr(self._sender, server_ip, server_port, ID)
+        print("bbb")
         _sender_connect(self._sender)
+        print("ccc")
 
         # Send client address to server nodes
         self._addr = self._get_local_usable_addr()
