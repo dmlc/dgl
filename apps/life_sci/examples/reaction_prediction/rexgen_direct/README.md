@@ -64,8 +64,8 @@ A summary of the model performance is as follows:
 | Item            | Top 6 accuracy | Top 8 accuracy | Top 10 accuracy |
 | --------------- | -------------- | -------------- | --------------- |
 | Paper           | 89.8           | 92.0           | 93.3            |
-| Hard evaluation | 86.5           | 89.6           | 91.2            |
-| Easy evaluation | 88.9           | 92.0           | 93.5            |
+| Hard evaluation | 88.8           | 91.6           | 92.9            |
+| Easy evaluation | 91.0           | 93.7           | 94.9            |
 
 ### Pre-trained Model
 
