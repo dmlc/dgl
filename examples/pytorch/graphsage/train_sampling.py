@@ -182,9 +182,16 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
+        sample_time = 0
+        copy_time = 0
+        forward_time = 0
+        backward_time = 0
+        update_time = 0
         step_time = []
+        start = time.time()
         for step, blocks in enumerate(dataloader):
             tic_step = time.time()
+            sample_time += tic_step - start
 
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
@@ -192,14 +199,24 @@ def run(args, device, data):
             seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
+            start = time.time()
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
+            copy_time += time.time() - start
 
             # Compute loss and prediction
+            start = time.time()
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
+            forward_end = time.time()
+
             optimizer.zero_grad()
             loss.backward()
+            compute_end = time.time()
+            forward_time += forward_end - start
+            backward_time += compute_end - forward_end
+
             optimizer.step()
+            update_time += time.time() - compute_end
 
             step_t = time.time() - tic_step
             step_time.append(step_t)
@@ -209,9 +226,11 @@ def run(args, device, data):
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
+            start = time.time()
 
         toc = time.time()
-        print('Epoch Time(s): {:.4f}'.format(toc - tic))
+        print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}'.format(
+            toc - tic, sample_time, copy_time, forward_time, backward_time, update_time))
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
