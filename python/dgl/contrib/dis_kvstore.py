@@ -829,7 +829,9 @@ class KVClient(object):
 
         if local_id is not None: # local push
             if self._udf_push is not None:
+                print("udf push!")
                 self._udf_push(name+'-data-', local_id, local_data, self._data_store)
+                print("udf finihs!")
             else:
                 self._default_push_handler(name+'-data-', local_id, local_data, self._data_store)
     
