@@ -240,28 +240,6 @@ class KVServer(object):
         self._has_data.add(name+'-data-')
 
 
-    def set_push_handler(self, push_handler):
-        """Set user-defined push-handler
-
-        Parameters
-        ----------
-        push_handler : function
-            user-defined push_handler
-        """
-        self._udf_push = push_handler
-
-
-    def set_pull_handler(self, pull_handler):
-        """Set user-defined pull-handler
-
-        Parameters
-        ----------
-        pull_handler : function
-            user-defined pull_handler
-        """
-        self._udf_pull = pull_handler
-
-
     def get_id(self):
         """Get current server id
 
@@ -792,28 +770,6 @@ class KVClient(object):
         return self._machine_id
 
 
-    def set_push_handler(self, push_handler):
-        """Set user-defined push-handler
-
-        Parameters
-        ----------
-        push_handler : function
-            user-defined push_handler
-        """
-        self._udf_push = push_handler
-
-
-    def set_pull_handler(self, pull_handler):
-        """Set user-defined pull-handler
-
-        Parameters
-        ----------
-        pull_handler : function
-            user-defined pull_handler
-        """
-        self._udf_pull = pull_handler
-
-
     def push(self, name, id_tensor, data_tensor):
         """Push data to KVServer.
 
@@ -952,7 +908,7 @@ class KVClient(object):
 
             msg_list = []
             if local_id is not None: # local pull
-                local_data = self._default_pull_handler(name+'-data-', local_id, self._data_store)
+                local_data = self._udf_pull(name+'-data-', local_id, self._data_store)
                 s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
                 local_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK, 
