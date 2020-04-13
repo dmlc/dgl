@@ -271,7 +271,11 @@ def _test_sample_neighbors(hypersparse):
 
     # test different fanouts for different relations
     for i in range(10):
-        subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, [1, 2, 0, 2], replace=True)
+        subg = dgl.sampling.sample_neighbors(
+            hg,
+            {'user' : [0,1], 'game' : 0},
+            {'follow': 1, 'play': 2, 'liked-by': 0, 'flips': 2},
+            replace=True)
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
         assert subg['follow'].number_of_edges() == 2
@@ -382,7 +386,8 @@ def _test_sample_neighbors_topk(hypersparse):
     _test3()
 
     # test different k for different relations
-    subg = dgl.sampling.select_topk(hg, [1, 2, 0, 2], 'weight', {'user' : [0,1], 'game' : 0})
+    subg = dgl.sampling.select_topk(
+        hg, {'follow': 1, 'play': 2, 'liked-by': 0, 'flips': 2}, 'weight', {'user' : [0,1], 'game' : 0})
     assert len(subg.ntypes) == 3
     assert len(subg.etypes) == 4
     assert subg['follow'].number_of_edges() == 2
@@ -452,6 +457,18 @@ def test_sample_neighbors_topk_outedge():
     _test_sample_neighbors_topk_outedge(False)
     _test_sample_neighbors_topk_outedge(True)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_with_0deg():
+    g = dgl.graph([], num_nodes=5)
+    sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=False)
+    assert sg.number_of_edges() == 0
+    sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=True)
+    assert sg.number_of_edges() == 0
+    sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=False)
+    assert sg.number_of_edges() == 0
+    sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=True)
+    assert sg.number_of_edges() == 0
+
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
@@ -460,3 +477,4 @@ if __name__ == '__main__':
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()
+    test_sample_neighbors_with_0deg()

@@ -1,4 +1,5 @@
 """MPNN"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 
 from dgl.nn.pytorch import Set2Set
@@ -7,6 +8,7 @@ from ..gnn import MPNNGNN
 
 __all__ = ['MPNNPredictor']
 
+# pylint: disable=W0221
 class MPNNPredictor(nn.Module):
     """MPNN for regression and classification on graphs.
 

@@ -27,6 +27,55 @@ inline std::string GetSharedMemName(const std::string &name, const std::string &
   return name + "_" + edge_dir;
 }
 
+/*
+ * The metadata of a graph index that are needed for shared-memory graph.
+ */
+struct GraphIndexMetadata {
+  int64_t num_nodes;
+  int64_t num_edges;
+  bool has_in_csr;
+  bool has_out_csr;
+  bool has_coo;
+};
+
+/*
+ * Serialize the metadata of a graph index and place it in a shared-memory tensor.
+ * In this way, another process can reconstruct a GraphIndex from a shared-memory tensor.
+ */
+NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
+#ifndef _WIN32
+  GraphIndexMetadata meta;
+  meta.num_nodes = gidx->NumVertices();
+  meta.num_edges = gidx->NumEdges();
+  meta.has_in_csr = gidx->HasInCSR();
+  meta.has_out_csr = gidx->HasOutCSR();
+  meta.has_coo = false;
+
+  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DLDataType{kDLInt, 8, 1},
+                                          DLContext{kDLCPU, 0}, true);
+  memcpy(meta_arr->data, &meta, sizeof(meta));
+  return meta_arr;
+#else
+  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
+  return NDArray();
+#endif  // _WIN32
+}
+
+/*
+ * Deserialize the metadata of a graph index.
+ */
+GraphIndexMetadata DeserializeMetadata(const std::string &name) {
+  GraphIndexMetadata meta;
+#ifndef _WIN32
+  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DLDataType{kDLInt, 8, 1},
+                                          DLContext{kDLCPU, 0}, false);
+  memcpy(&meta, meta_arr->data, sizeof(meta));
+#else
+  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
+#endif  // _WIN32
+  return meta;
+}
+
 std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
   const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges, bool is_create) {
 #ifndef _WIN32
@@ -467,34 +516,16 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
   }
 }
 
-ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
-    IdArray indptr, IdArray indices, IdArray edge_ids,
-    const std::string &edge_dir,
-    const std::string &shared_mem_name) {
-  CSRPtr csr(new CSR(indptr, indices, edge_ids,
-                     GetSharedMemName(shared_mem_name, edge_dir)));
-  if (edge_dir == "in") {
-    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
-  } else if (edge_dir == "out") {
-    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
-  } else {
-    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphPtr();
+ImmutableGraphPtr ImmutableGraph::CreateFromCSR(const std::string &name) {
+  GraphIndexMetadata meta = DeserializeMetadata(GetSharedMemName(name, "meta"));
+  CSRPtr in_csr, out_csr;
+  if (meta.has_in_csr) {
+    in_csr = CSRPtr(new CSR(GetSharedMemName(name, "in"), meta.num_nodes, meta.num_edges));
   }
-}
-
-ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
-    const std::string &shared_mem_name, size_t num_vertices,
-    size_t num_edges, const std::string &edge_dir) {
-  CSRPtr csr(new CSR(GetSharedMemName(shared_mem_name, edge_dir), num_vertices, num_edges));
-  if (edge_dir == "in") {
-    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
-  } else if (edge_dir == "out") {
-    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
-  } else {
-    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphPtr();
+  if (meta.has_out_csr) {
+    out_csr = CSRPtr(new CSR(GetSharedMemName(name, "out"), meta.num_nodes, meta.num_edges));
   }
+  return ImmutableGraphPtr(new ImmutableGraph(in_csr, out_csr, name));
 }
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCOO(
@@ -527,15 +558,17 @@ ImmutableGraphPtr ImmutableGraph::CopyTo(ImmutableGraphPtr g, const DLContext& c
   return ImmutableGraphPtr(new ImmutableGraph(new_incsr, new_outcsr));
 }
 
-ImmutableGraphPtr ImmutableGraph::CopyToSharedMem(ImmutableGraphPtr g,
-    const std::string &edge_dir, const std::string &name) {
+ImmutableGraphPtr ImmutableGraph::CopyToSharedMem(ImmutableGraphPtr g, const std::string &name) {
   CSRPtr new_incsr, new_outcsr;
-  std::string shared_mem_name = GetSharedMemName(name, edge_dir);
-  if (edge_dir == std::string("in"))
-    new_incsr = CSRPtr(new CSR(g->GetInCSR()->CopyToSharedMem(shared_mem_name)));
-  else if (edge_dir == std::string("out"))
-    new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->CopyToSharedMem(shared_mem_name)));
-  return ImmutableGraphPtr(new ImmutableGraph(new_incsr, new_outcsr, name));
+  std::string shared_mem_name = GetSharedMemName(name, "in");
+  new_incsr = CSRPtr(new CSR(g->GetInCSR()->CopyToSharedMem(shared_mem_name)));
+
+  shared_mem_name = GetSharedMemName(name, "out");
+  new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->CopyToSharedMem(shared_mem_name)));
+
+  auto new_g = ImmutableGraphPtr(new ImmutableGraph(new_incsr, new_outcsr, name));
+  new_g->serialized_shared_meta_ = SerializeMetadata(new_g, GetSharedMemName(name, "meta"));
+  return new_g;
 }
 
 ImmutableGraphPtr ImmutableGraph::AsNumBits(ImmutableGraphPtr g, uint8_t bits) {
@@ -622,10 +655,9 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyToSharedMem")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
-    std::string edge_dir = args[1];
-    std::string name = args[2];
+    std::string name = args[1];
     ImmutableGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
-    *rv = ImmutableGraph::CopyToSharedMem(ig, edge_dir, name);
+    *rv = ImmutableGraph::CopyToSharedMem(ig, name);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")

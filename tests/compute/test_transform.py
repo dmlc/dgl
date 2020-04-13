@@ -130,20 +130,27 @@ def test_bidirected_graph():
 def test_khop_graph():
     N = 20
     feat = F.randn((N, 5))
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
-    for k in range(4):
-        g_k = dgl.khop_graph(g, k)
-        # use original graph to do message passing for k times.
-        g.ndata['h'] = feat
-        for _ in range(k):
-            g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-        h_0 = g.ndata.pop('h')
-        # use k-hop graph to do message passing for one time.
-        g_k.ndata['h'] = feat
-        g_k.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-        h_1 = g_k.ndata.pop('h')
-        assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
+    def _test(g):
+        for k in range(4):
+            g_k = dgl.khop_graph(g, k)
+            # use original graph to do message passing for k times.
+            g.ndata['h'] = feat
+            for _ in range(k):
+                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            h_0 = g.ndata.pop('h')
+            # use k-hop graph to do message passing for one time.
+            g_k.ndata['h'] = feat
+            g_k.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            h_1 = g_k.ndata.pop('h')
+            assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
+
+    # Test for random undirected graphs
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+    _test(g)
+    # Test for random directed graphs
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3, directed=True))
+    _test(g)
 
 def test_khop_adj():
     N = 20
@@ -428,13 +435,14 @@ def test_to_simple():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 def test_to_block():
-    def check(g, bg, ntype, etype, dst_nodes):
+    def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
         if dst_nodes is not None:
             assert F.array_equal(bg.dstnodes[ntype].data[dgl.NID], dst_nodes)
         n_dst_nodes = bg.number_of_nodes('DST/' + ntype)
-        assert F.array_equal(
-            bg.srcnodes[ntype].data[dgl.NID][:n_dst_nodes],
-            bg.dstnodes[ntype].data[dgl.NID])
+        if include_dst_in_src:
+            assert F.array_equal(
+                bg.srcnodes[ntype].data[dgl.NID][:n_dst_nodes],
+                bg.dstnodes[ntype].data[dgl.NID])
 
         g = g[etype]
         bg = bg[etype]
@@ -452,13 +460,13 @@ def test_to_block():
         assert F.array_equal(induced_src_bg, induced_src_ans)
         assert F.array_equal(induced_dst_bg, induced_dst_ans)
 
-    def checkall(g, bg, dst_nodes):
+    def checkall(g, bg, dst_nodes, include_dst_in_src=True):
         for etype in g.etypes:
             ntype = g.to_canonical_etype(etype)[2]
             if dst_nodes is not None and ntype in dst_nodes:
-                check(g, bg, ntype, etype, dst_nodes[ntype])
+                check(g, bg, ntype, etype, dst_nodes[ntype], include_dst_in_src)
             else:
-                check(g, bg, ntype, etype, None)
+                check(g, bg, ntype, etype, None, include_dst_in_src)
 
     g = dgl.heterograph({
         ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
@@ -468,6 +476,13 @@ def test_to_block():
 
     bg = dgl.to_block(g_a)
     check(g_a, bg, 'A', 'AA', None)
+    assert bg.number_of_src_nodes() == 5
+    assert bg.number_of_dst_nodes() == 4
+
+    bg = dgl.to_block(g_a, include_dst_in_src=False)
+    check(g_a, bg, 'A', 'AA', None, False)
+    assert bg.number_of_src_nodes() == 4
+    assert bg.number_of_dst_nodes() == 4
 
     dst_nodes = F.tensor([3, 4], dtype=F.int64)
     bg = dgl.to_block(g_a, dst_nodes)

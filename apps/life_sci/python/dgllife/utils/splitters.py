@@ -3,10 +3,8 @@
 We mostly adapt them from deepchem
 (https://github.com/deepchem/deepchem/blob/master/deepchem/splits/splitters.py).
 """
-import dgl.backend as F
-import numpy as np
-
-from dgl.data.utils import split_dataset, Subset
+# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable=E0611
 from collections import defaultdict
 from functools import partial
 from itertools import accumulate, chain
@@ -14,6 +12,10 @@ from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.rdmolops import FastFindRings
 from rdkit.Chem.Scaffolds import MurckoScaffold
+
+import dgl.backend as F
+import numpy as np
+from dgl.data.utils import split_dataset, Subset
 
 __all__ = ['ConsecutiveSplitter',
            'RandomSplitter',
@@ -40,7 +42,8 @@ def base_k_fold_split(split_method, dataset, k, log):
     Returns
     -------
     all_folds : list of 2-tuples
-        Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+        Each element of the list represents a fold and is a 2-tuple (train_set, val_set),
+        which are all :class:`Subset` instances.
     """
     assert k >= 2, 'Expect the number of folds to be no smaller than 2, got {:d}'.format(k)
     all_folds = []
@@ -206,7 +209,8 @@ class ConsecutiveSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test that also have ``len(dataset)`` and
+            ``dataset[i]`` behaviors
         """
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test], shuffle=False)
 
@@ -227,7 +231,8 @@ class ConsecutiveSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         return base_k_fold_split(ConsecutiveSplitter.train_val_test_split, dataset, k, log)
 
@@ -267,7 +272,8 @@ class RandomSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test.
+            Subsets for training, validation and test, which also have ``len(dataset)``
+            and ``dataset[i]`` behaviors.
         """
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test],
                              shuffle=True, random_state=random_state)
@@ -296,7 +302,8 @@ class RandomSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         # Permute the dataset only once so that each datapoint
         # will appear once in exactly one fold.
@@ -304,6 +311,7 @@ class RandomSplitter(object):
 
         return base_k_fold_split(partial(indices_split, indices=indices), dataset, k, log)
 
+# pylint: disable=I1101
 class MolecularWeightSplitter(object):
     """Sort molecules based on their weights and then split them."""
 
@@ -335,7 +343,7 @@ class MolecularWeightSplitter(object):
         for i, mol in enumerate(molecules):
             count_and_log('Computing molecular weight for compound',
                           i, len(molecules), log_every_n)
-            mws.append(Chem.rdMolDescriptors.CalcExactMolWt(mol))
+            mws.append(rdMolDescriptors.CalcExactMolWt(mol))
 
         return np.argsort(mws)
 
@@ -378,7 +386,8 @@ class MolecularWeightSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test, which also have ``len(dataset)``
+            and ``dataset[i]`` behaviors
         """
         # Perform sanity check first as molecule instance initialization and descriptor
         # computation can take a long time.
@@ -419,7 +428,8 @@ class MolecularWeightSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         molecules = prepare_mols(dataset, mols, sanitize, log_every_n)
         sorted_indices = MolecularWeightSplitter.molecular_weight_indices(molecules, log_every_n)
@@ -427,6 +437,7 @@ class MolecularWeightSplitter(object):
         return base_k_fold_split(partial(indices_split, indices=sorted_indices), dataset, k,
                                  log=(log_every_n is not None))
 
+# pylint: disable=W0702
 class ScaffoldSplitter(object):
     """Group molecules based on their Bemis-Murcko scaffolds and then split the groups.
 
@@ -539,7 +550,8 @@ class ScaffoldSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test, which also have ``len(dataset)`` and
+            ``dataset[i]`` behaviors
         """
         # Perform sanity check first as molecule related computation can take a long time.
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
@@ -605,7 +617,8 @@ class ScaffoldSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         assert k >= 2, 'Expect the number of folds to be no smaller than 2, got {:d}'.format(k)
 
@@ -673,7 +686,8 @@ class SingleTaskStratifiedSplitter(object):
         Returns
         -------
         list of length 3
-            Subsets for training, validation and test, which are all :class:`Subset` instances.
+            Subsets for training, validation and test, which also have ``len(dataset)``
+            and ``dataset[i]`` behaviors
         """
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
 
@@ -731,7 +745,8 @@ class SingleTaskStratifiedSplitter(object):
         Returns
         -------
         list of 2-tuples
-            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+            Each element of the list represents a fold and is a 2-tuple ``(train_set, val_set)``.
+            ``train_set`` and ``val_set`` also have ``len(dataset)`` and ``dataset[i]`` behaviors.
         """
         if not isinstance(labels, np.ndarray):
             labels = F.asnumpy(labels)
