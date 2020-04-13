@@ -25,6 +25,9 @@ cmake $CMAKE_VARS ..
 make -j4
 popd
 
+# Fix permission issue due to different user between host and docker
+sudo chmod -R 777 ./
+
 pushd python
 for backend in pytorch mxnet tensorflow
 do 
