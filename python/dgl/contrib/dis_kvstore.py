@@ -394,9 +394,9 @@ class KVServer(object):
                 else:
                     local_id = msg.id
                 if self._udf_push is not None:
-                    self._udf_pull(msg.name+'-data-', local_id, self._data_store)
+                    res_tensor = self._udf_pull(msg.name+'-data-', local_id, self._data_store)
                 else:
-                    self._default_pull_handler(msg.name+'-data-', local_id, self._data_store)
+                    res_tensor = self._default_pull_handler(msg.name+'-data-', local_id, self._data_store)
                 back_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK,
                     rank=self._server_id,
