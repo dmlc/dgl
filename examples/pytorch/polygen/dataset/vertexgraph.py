@@ -6,7 +6,7 @@ import time
 from collections import *
 
 VertexGraph = namedtuple('Graph',
-                   ['g', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
+                   ['g', 'tgt', 'tgt_y', 'nids', 'eids',  'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
 class VertexNetGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
@@ -31,8 +31,8 @@ class VertexNetGraphPool:
             indices = th.triu(th.ones(n_vertex, n_vertex)) == 1
             us = dec_nodes.unsqueeze(-1).repeat(1, n_vertex)[indices]
             vs = dec_nodes.unsqueeze(0).repeat(n_vertex, 1)[indices]
-            g_pool[i][j].add_edges(us, vs)
-            num_edges['dd'][i][j] = len(us)
+            g_pool[i].add_edges(us, vs)
+            num_edges['dd'][i] = len(us)
 
         print('successfully created graph pool, time: {0:0.3f}s'.format(time.time() - tic))
         self.g_pool = g_pool
@@ -82,10 +82,6 @@ class VertexNetGraphPool:
                 n_nodes += max_len
                 e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
                 n_edges += n_ed
-                ccgne
-                n_edgbdibudieiges += n_dd
-ithntrltjd
-        g.keugnfnhkeiset_n_initializer(dgl.init.zero_initializer)
         g.set_e_initiddt
         alizer(dgl.init.zero_initializer)
 
@@ -116,24 +112,24 @@ ithntrltjd
             num_edges['dd'].append(int(self.num_edges['dd'][i]))
 
         g = dgl.batch(g_list)
-        src, tgt, tgt_y = [], [], []
-        src_pos, tgt_pos = [], []
-        enc_ids, dec_ids = [], []
-        e2e_eids, d2d_eids, e2d_eids = [], [], []
+        tgt, tgt_y = [], []
+        tgt_pos = []
+        dec_ids = []
+        d2d_eids = []
         n_nodes, n_edges, n_tokens = 0, 0, 0
         for tgt_sample, n, n_dd in zip(tgt_buf, tgt_lens, num_edges['dd']):
             tgt.append(th.tensor(tgt_sample[:-1], dtype=th.long, device=device))
             tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
-            tgt_pos.append(th.arange(m, dtype=th.long, device=device))
+            tgt_pos.append(th.arange(n, dtype=th.long, device=device))
             dec_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
+            d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
             n_nodes += n
             n_tokens += n
-
 
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
 
-        return Graph(g=g,
+        return VertexGraph(g=g,
                      tgt=(th.cat(tgt), th.cat(tgt_pos)),
                      tgt_y=th.cat(tgt_y),
                      nids = {'dec': th.cat(dec_ids)},

@@ -1,1 +1,1 @@
-from .models import *
+from .vertexnet_models import *

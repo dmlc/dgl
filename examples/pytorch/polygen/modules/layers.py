@@ -10,12 +10,10 @@ class Generator(nn.Module):
     def __init__(self, dim_model, vocab_size):
         super(Generator, self).__init__()
         self.proj = nn.Linear(dim_model, vocab_size)
-
-    def forward(self, x, vert_embed):
-        transformer_out = self.proj(x)
-        # product with all the vert_embed then softmax
-        return th.softmax(
-            self.proj(x)*vert_embed, dim=-1
+    
+    def forward(self, x):
+        return th.log_softmax(
+            self.proj(x), dim=-1
         )
 
 class FaceNetGenerator(nn.Module):
@@ -27,13 +25,12 @@ class FaceNetGenerator(nn.Module):
         super(Generator, self).__init__()
         self.proj = nn.Linear(dim_model, vocab_size)
 
-    def forward(self, x):
-        return th.log_softmax(
-            self.proj(x), dim=-1
+    def forward(self, x, vert_embed):
+        transformer_out = self.proj(x)
+        # product with all the vert_embed then softmax
+        return th.softmax(
+            self.proj(x)*vert_embed, dim=-1
         )
-
-
-
 
 class SubLayerWrapper(nn.Module):
     '''

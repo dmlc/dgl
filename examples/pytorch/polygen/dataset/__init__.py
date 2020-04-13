@@ -1,4 +1,4 @@
-from .graph import *
+from .vertexgraph import *
 from .fields import *
 from .utils import prepare_dataset
 from .preprocess_mesh import preprocess as preprocess_mesh_obj
@@ -15,8 +15,9 @@ class ShapeNetVertextDataset(object):
     Dataset class for ShapeNet Vertex.
     '''
     COORD_BIN = 64
-    INIT_INDEX = COORD_BIN + 1
+    INIT_BIN = COORD_BIN + 1
     EOS_BIN = COORD_BIN + 2
+    PAD_BIN = COORD_BIN + 3
     MAX_LENGTH = 800 * 3
     
     def __init__(self, dataset_list_file ='table_chair.txt'):
@@ -24,10 +25,15 @@ class ShapeNetVertextDataset(object):
         dataset_list_path = os.path.join(dataset_list_dir, dataset_list_file)
         with open(dataset_list_path, 'r') as f:
             self.dataset_list = f.readlines()
-        self.vocab = np.range(COORD_BIN+2)
-        self.tgt_field = Field(np.range(COORD_BIN+2),
-                               preprocessing=lambda seq: [self.INIT_INDEX] + seq + [self.EOS_INDEX],
-                               postprocessing=strip_func)
+        self.pad_id = self.PAD_BIN
+        # We don't need field since we handle them in preprocess
+        # self.tgt_field = Field(np.range(COORD_BIN+2),
+        #                       preprocessing=lambda seq: [self.INIT_INDEX] + seq + [self.EOS_INDEX],
+        #                       postprocessing=strip_func)
+    
+    @property
+    def vocab_size(self):
+        return self.COORD_BIN+3 
 
     def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
                  device='cpu', dev_rank=0, ndev=1):
@@ -58,19 +64,25 @@ class ShapeNetVertextDataset(object):
         for idx in order:
             obj_file = dataset_list[idx]
             verts, faces = preprocess_mesh_obj(obj_file)
-            tgt_buf.append(verts)
-            if len(src_buf) == batch_size:
+            # Flattern verts, order Y(up), X(front), Z(right)
+            reordered_verts = np.zeros_like(verts)
+            reordered_verts[:,0] = verts[:,1]
+            reordered_verts[:,1] = verts[:,0]
+            reordered_verts[:,2] = verts[:,2]
+            flattern_verts = [INIT_BIN] + reordered_verts.reshape().astype(np.int64).to_list() + [EOS_BIN]
+            tgt_buf.append(flattern_verts)
+            if len(tgt_buf) == batch_size:
                 if mode == 'test':
                     yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
                 else:
                     yield graph_pool(tgt_buf, device=device)
-                src_buf, tgt_buf = [], []
+                tgt_buf = []
 
-        if len(src_buf) != 0:
+        if len(tgt_buf) != 0:
             if mode == 'test':
-                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
+                yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
             else:
-                yield graph_pool(src_buf, tgt_buf, device=device)
+                yield graph_pool(tgt_buf, device=device)
 
     def get_sequence(self, batch):
         "return a list of sequence from a list of index arrays"
@@ -228,6 +240,8 @@ def get_dataset(dataset):
             valid='valid',
             test='test',
         )
+    elif dataset == 'vertex':
+        return ShapeNetVertextDataset()
     elif dataset == 'multi30k':
         return TranslationDataset(
             'data/multi30k',

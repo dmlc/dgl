@@ -157,7 +157,6 @@ class FaceGraphPool:
             n_edges += n_dd
             n_tokens += m
 
-
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
 

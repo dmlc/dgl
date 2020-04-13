@@ -181,11 +181,14 @@ def make_vertex_model(N=6, dim_model=512, dim_ff=2048, h=8, dropout=0.1, univers
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)
-    coord_embed = PositionalEncoding(dim_model, dropout)
-    pos_embed = PositionalEncoding(dim_model, dropout)
+    # coord only have x, y, z
+    coord_embed = PositionalEncoding(dim_model, dropout, max_len=3)
+    pos_embed = PositionalEncoding(dim_model, dropout, max_len=800*3)
 
     decoder = Decoder(DecoderLayer(dim_model, c(attn), c(attn), c(ff), dropout), N)
-    value_embed = Embeddings(np.range(64+2), dim_model)
+    # Do we need to consider INIT_BIN?
+    tgt_vocab = 64 + 3
+    value_embed = Embeddings(tgt_vocab, dim_model)
     generator = Generator(dim_model, tgt_vocab)
     model = Transformer(
         decoder, coord_embed, pos_embed, value_embed, generator, h, dim_model // h)

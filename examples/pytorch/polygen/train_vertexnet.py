@@ -11,18 +11,14 @@ from functools import partial
 import torch.distributed as dist
 
 def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True):
-    universal = isinstance(model, UTransformer)
     with loss_compute:
         for i, g in enumerate(data_iter):
             with T.set_grad_enabled(is_train):
-                if universal:
-                    output, loss_act = model(g)
-                    if is_train: loss_act.backward(retain_graph=True)
-                else:
-                    output = model(g)
+                output = model(g)
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
                 loss = loss_compute(output, tgt_y, n_tokens)
+            print (i, loss)
 
     if universal:
         for step in range(1, model.MAX_DEPTH + 1):
@@ -52,12 +48,12 @@ def main(dev_id, args):
     # Set current device
     th.cuda.set_device(device)
     # Prepare dataset
-    dataset = get_dataset(args.dataset)
+    dataset = get_dataset('vertex')
     V = dataset.vocab_size
     criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
     dim_model = 512
     # Build graph pool
-    graph_pool = VertexGraphPool()
+    graph_pool = VertexNetGraphPool()
     # Create model
     model = make_vertex_model(N=args.N, dim_model=dim_model,
                        universal=args.universal)
@@ -87,30 +83,11 @@ def main(dev_id, args):
     # Train & evaluate
     for epoch in range(100):
         start = time.time()
-        train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
+        train_iter = dataset(graph_pool, batch_size=args.batch,
                              device=device, dev_rank=dev_rank, ndev=ndev)
         model.train(True)
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
                   loss_compute(opt=model_opt), is_train=True)
-        if dev_rank == 0:
-            model.att_weight_map = None
-            model.eval()
-            valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch,
-                                 device=device, dev_rank=dev_rank, ndev=1)
-            run_epoch(epoch, valid_iter, dev_rank, 1, model,
-                      loss_compute(opt=None), is_train=False)
-            end = time.time()
-            print("epoch time: {}".format(end - start))
-
-            # Visualize attention
-            if args.viz:
-                src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
-                tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
-                draw_atts(model.att_weight_map, src_seq, tgt_seq, exp_setting, 'epoch_{}'.format(epoch))
-            args_filter = ['batch', 'gpus', 'viz', 'master_ip', 'master_port', 'grad_accum', 'ngpu']
-            exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
-            with open('checkpoints/{}-{}.pkl'.format(exp_setting, epoch), 'wb') as f:
-                torch.save(model.state_dict(), f)
 
 if __name__ == '__main__':
     if not os.path.exists('checkpoints'):
@@ -119,7 +96,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
-    argparser.add_argument('--dataset', default='multi30k', help='dataset')
+    argparser.add_argument('--dataset', default='vertex', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
     argparser.add_argument('--viz', action='store_true',
                            help='visualize attention')
