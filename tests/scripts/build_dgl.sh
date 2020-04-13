@@ -39,4 +39,4 @@ done
 popd
 
 # Fix permission issue due to different user between host and docker
-sudo chmod -R 777 ./
+# sudo chmod -R 777 ./
