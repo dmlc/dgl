@@ -5,7 +5,7 @@ import itertools
 import time
 from collections import *
 
-Graph = namedtuple('Graph',
+VertexGraph = namedtuple('Graph',
                    ['g', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
 class VertexNetGraphPool:
