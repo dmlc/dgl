@@ -5,12 +5,12 @@ import itertools
 import time
 from collections import *
 
-Graph = namedtuple('Graph',
+FaceGraph = namedtuple('Graph',
                    ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
-class GraphPool:
+class FaceGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
-    def __init__(self, n=50, m=50):
+    def __init__(self, n=2400, m=7200):
         '''
         args:
             n: maximum length of input sequence.
