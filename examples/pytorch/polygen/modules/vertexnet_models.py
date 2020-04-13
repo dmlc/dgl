@@ -78,7 +78,7 @@ class Transformer(nn.Module):
         coord_embed = self.coord_embed(graph.tgt[1]%3)
         pos_embed = self.pos_embed(graph.tgt[1]//3) 
         value_embed = self.value_embed(graph.tgt[0]) 
-        g.nodes[nids['dec']].data['x'] = self.pos_enc.dropout(coord_embed + pos_embed + value_embed)
+        g.nodes[nids['dec']].data['x'] = self.pos_embed.dropout(coord_embed + pos_embed + value_embed)
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')

@@ -15,9 +15,9 @@ class ShapeNetVertextDataset(object):
     Dataset class for ShapeNet Vertex.
     '''
     COORD_BIN = 64
-    INIT_BIN = COORD_BIN + 1
-    EOS_BIN = COORD_BIN + 2
-    PAD_BIN = COORD_BIN + 3
+    INIT_BIN = COORD_BIN
+    EOS_BIN = COORD_BIN + 1
+    PAD_BIN = COORD_BIN + 2
     MAX_LENGTH = 800 * 3
     
     def __init__(self, dataset_list_file ='table_chair.txt'):
@@ -62,19 +62,24 @@ class ShapeNetVertextDataset(object):
         tgt_buf = []
 
         for idx in order:
-            obj_file = dataset_list[idx]
+            obj_file = dataset_list[idx].strip()
             verts, faces = preprocess_mesh_obj(obj_file)
             # Flattern verts, order Y(up), X(front), Z(right)
             reordered_verts = np.zeros_like(verts)
             reordered_verts[:,0] = verts[:,1]
             reordered_verts[:,1] = verts[:,0]
             reordered_verts[:,2] = verts[:,2]
-            flattern_verts = [INIT_BIN] + reordered_verts.reshape().astype(np.int64).to_list() + [EOS_BIN]
+            flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
+            # exp
+            if len(flattern_verts) > 300:
+                flattern_verts = flattern_verts[:299] + [self.EOS_BIN]
             tgt_buf.append(flattern_verts)
             if len(tgt_buf) == batch_size:
                 if mode == 'test':
                     yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
                 else:
+                    for k, v in enumerate(tgt_buf):
+                        print (k, len(v))
                     yield graph_pool(tgt_buf, device=device)
                 tgt_buf = []
 

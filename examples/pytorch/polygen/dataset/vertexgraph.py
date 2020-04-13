@@ -10,7 +10,7 @@ VertexGraph = namedtuple('Graph',
 
 class VertexNetGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
-    def __init__(self, n=2400):
+    def __init__(self, n=300):
         '''
         args:
             n: maximum number of vertexes
@@ -20,11 +20,12 @@ class VertexNetGraphPool:
         self.n = n
         g_pool = [dgl.DGLGraph() for _ in range(n)]
         num_edges = {
-            'dd': np.zeros((n, n)).astype(int)
+            'dd': np.zeros(n).astype(int)
         }
         for i in range(n):
             n_vertex = i + 1
 
+            g_pool[i].add_nodes(n_vertex)
             dec_nodes = th.arange(n_vertex, dtype=th.long)
 
             # dec -> dec

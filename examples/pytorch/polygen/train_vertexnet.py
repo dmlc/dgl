@@ -18,8 +18,6 @@ def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=Tr
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
                 loss = loss_compute(output, tgt_y, n_tokens)
-            print (i, loss)
-
     if universal:
         for step in range(1, model.MAX_DEPTH + 1):
             print("nodes entering step {}: {:.2f}%".format(step, (1.0 * model.stat[step] / model.stat[0])))
