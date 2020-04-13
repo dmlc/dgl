@@ -716,7 +716,7 @@ class WLNRankDataset(object):
                 reaction_candidate_bond_changes = []
                 elements = line.strip().split(';')[:-1]
                 for candidate in elements:
-                    atom1, atom2, change_type, score = candidate.split('-')
+                    atom1, atom2, change_type, score = candidate.split(' ')
                     atom1, atom2 = int(atom1) - 1, int(atom2) - 1
                     reaction_candidate_bond_changes.append((
                         min(atom1, atom2), max(atom1, atom2), float(change_type), float(score)))

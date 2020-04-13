@@ -436,7 +436,7 @@ def prepare_reaction_center(args, reaction_center_config):
                 for candidate in reaction_candidate_bonds:
                     # A 4-tuple consisting of the atom mapping number of atom 1,
                     # atom 2, the bond change type and the score
-                    candidate_string += '{}-{}-{:.1f}-{:.3f};'.format(
+                    candidate_string += '{} {} {:.1f} {:.3f};'.format(
                         candidate[0], candidate[1], candidate[2], candidate[3])
                 candidate_string += '\n'
                 f.write(candidate_string)
