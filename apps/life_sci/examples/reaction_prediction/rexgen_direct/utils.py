@@ -256,7 +256,7 @@ def get_candidate_bonds(reaction, preds, num_nodes, max_k, easy, include_scores=
         if reaction_bonds[candidate]:
             continue
         if include_scores:
-            candidate += (topk_values[j].cpu().item(),)
+            candidate += (float(topk_values[j].cpu().item()),)
         candidate_bonds.append(candidate)
 
     return candidate_bonds
