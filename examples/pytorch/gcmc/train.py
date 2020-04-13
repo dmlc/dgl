@@ -1,4 +1,7 @@
-"""Training script"""
+"""Training GCMC model on the MovieLens data set.
+
+The script loads the full graph to the training device.
+"""
 import os, time
 import argparse
 import logging
@@ -8,7 +11,7 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 from data import MovieLens
-from model import GCMCLayer, BiDecoder
+from model import BiDecoder, GCMCLayer
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
 class Net(nn.Module):
@@ -23,10 +26,11 @@ class Net(nn.Module):
                                  args.gcn_dropout,
                                  args.gcn_agg_accum,
                                  agg_act=self._act,
-                                 share_user_item_param=args.share_param)
-        self.decoder = BiDecoder(args.rating_vals,
-                                 in_units=args.gcn_out_units,
-                                 num_basis_functions=args.gen_r_num_basis_func)
+                                 share_user_item_param=args.share_param,
+                                 device=args.device)
+        self.decoder = BiDecoder(in_units=args.gcn_out_units,
+                                 num_classes=len(args.rating_vals),
+                                 num_basis=args.gen_r_num_basis_func)
 
     def forward(self, enc_graph, dec_graph, ufeat, ifeat):
         user_out, movie_out = self.encoder(
