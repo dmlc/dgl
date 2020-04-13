@@ -322,6 +322,8 @@ class KVServer(object):
         # Get connected with all client nodes
         _receiver_wait(self._receiver, self._ip, self._port, self._client_count)
 
+        print("11111111")
+
         # recv client address information
         addr_list = []
         for i in range(self._client_count):
