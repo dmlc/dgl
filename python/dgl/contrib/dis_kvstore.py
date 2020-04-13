@@ -148,9 +148,9 @@ class KVServer(object):
         # record for total message count
         self._msg_count = 0
         # user-defined push handler
-        self._push_handler = self._default_push_handler
+        self._udf_push = None
         # user-defined pull handler
-        self._pull_handler = self._default_pull_handler
+        self._udf_pull = None
 
 
     def __del__(self):
@@ -248,7 +248,7 @@ class KVServer(object):
         push_handler : function
             user-defined push_handler
         """
-        self._push_handler = push_handler
+        self._udf_push = push_handler
 
 
     def set_pull_handler(self, pull_handler):
@@ -259,7 +259,7 @@ class KVServer(object):
         pull_handler : function
             user-defined pull_handler
         """
-        self._pull_handler = pull_handler
+        self._udf_pull = pull_handler
 
 
     def get_id(self):
@@ -405,14 +405,20 @@ class KVServer(object):
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
-                self._push_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
+                if self._udf_push is not None:
+                    self._udf_push(msg.name+'-data-', local_id, msg.data, self._data_store)
+                else:
+                    self._default_push_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
             # Pull message
             elif msg.type == KVMsgType.PULL:
                 if (msg.name+'-g2l-' in self._has_data) == True:
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
-                res_tensor = self._pull_handler(msg.name+'-data-', local_id, self._data_store)
+                if self._udf_pull is not None:
+                    res_tensor = self._udf_pull(msg.name+'-data-', local_id, self._data_store)
+                else:
+                    res_tensor = self._default_pull_handler(msg.name+'-data-', local_id, self._data_store)
                 back_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK,
                     rank=self._server_id,
@@ -622,10 +628,9 @@ class KVClient(object):
         # Gargage_collection
         self._garbage_msg = []
         # User-defined pull handler
-        self._pull_handler = self._default_pull_handler
-        self._use_default_pull_handler = True
+        self._udf_pull = None
         # User-defined push handler
-        self._push_handler = self._default_push_handler
+        self._udf_push = None
         # Used load-balance
         random.seed(time.time())
 
@@ -795,7 +800,7 @@ class KVClient(object):
         push_handler : function
             user-defined push_handler
         """
-        self._push_handler = push_handler
+        self._udf_push = push_handler
 
 
     def set_pull_handler(self, pull_handler):
@@ -806,8 +811,7 @@ class KVClient(object):
         pull_handler : function
             user-defined pull_handler
         """
-        self._pull_handler = pull_handler
-        self._use_default_pull_handler = False
+        self._udf_pull = pull_handler
 
 
     def push(self, name, id_tensor, data_tensor):
@@ -868,7 +872,10 @@ class KVClient(object):
             start += count[idx]
 
         if local_id is not None: # local push
-            self._push_handler(name+'-data-', local_id, local_data, self._data_store)
+            if self._udf_push is not None:
+                self._udf_push(name+'-data-', local_id, local_data, self._data_store)
+            else:
+                self._default_push_handler(name+'-data-', local_id, local_data, self._data_store)
     
 
     def pull(self, name, id_tensor):
@@ -889,7 +896,7 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
-        if self._use_default_pull_handler == True:
+        if self._udf_pull is None:
             return _fast_pull(name, id_tensor,
                         self._machine_count,
                         self._group_count,
@@ -945,7 +952,7 @@ class KVClient(object):
 
             msg_list = []
             if local_id is not None: # local pull
-                local_data = self._pull_handler(name+'-data-', local_id, self._data_store)
+                local_data = self._default_pull_handler(name+'-data-', local_id, self._data_store)
                 s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
                 local_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK, 
