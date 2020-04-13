@@ -175,7 +175,6 @@ pipeline {
             docker { 
               label "linux-auto-cpu-node"
               image "dgllib/dgl-ci-cpu:conda"
-              args "--cpus=9"
             }
           }
           steps {
@@ -203,7 +202,6 @@ pipeline {
             docker {
               label "linux-auto-cpu-node"
               image "dgllib/dgl-ci-cpu:conda"               
-              args "--cpus=9"
             }
           }
           stages {
@@ -323,7 +321,6 @@ pipeline {
             docker {
               label "linux-auto-cpu-node"
               image "dgllib/dgl-ci-cpu:conda"               
-              args "--cpus=9"
             }
           }
           stages {
