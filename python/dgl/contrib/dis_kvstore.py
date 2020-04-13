@@ -5,6 +5,7 @@ from ..network import _network_wait, _add_receiver_addr
 from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
 from ..network import _clear_kv_msg
+from ..network import _fast_pull
 from ..network import KVMsgType, KVStoreMsg
 
 from .. import backend as F
@@ -146,6 +147,10 @@ class KVServer(object):
         self._open_file_list = []
         # record for total message count
         self._msg_count = 0
+        # user-defined push handler
+        self._udf_push = None
+        # user-defined pull handler
+        self._udf_pull = None
 
 
     def __del__(self):
@@ -378,14 +383,19 @@ class KVServer(object):
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
-                self._push_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
+                if self._udf_push is not None:
+                    self._udf_push(msg.name+'-data-', local_id, msg.data, self._data_store)
+                else:
+                    self._default_push_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
             # Pull message
             elif msg.type == KVMsgType.PULL:
                 if (msg.name+'-g2l-' in self._has_data) == True:
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
-                    local_id = msg.id
-                res_tensor = self._pull_handler(msg.name+'-data-', local_id, self._data_store)
+                if self._udf_push is not None:
+                    self._udf_pull(msg.name+'-data-', local_id, msg.data, self._data_store)
+                else:
+                    self._default_pull_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
                 back_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK,
                     rank=self._server_id,
@@ -500,7 +510,7 @@ class KVServer(object):
         return data_shape
 
 
-    def _push_handler(self, name, ID, data, target):
+    def _default_push_handler(self, name, ID, data, target):
         """Default handler for PUSH message. 
 
         On default, _push_handler perform update operation for the tensor.
@@ -519,7 +529,7 @@ class KVServer(object):
         target[name][ID] = data
 
 
-    def _pull_handler(self, name, ID, target):
+    def _default_pull_handler(self, name, ID, target):
         """Default handler for PULL operation.
 
         On default, _pull_handler perform get operation for the tensor.
@@ -593,6 +603,10 @@ class KVClient(object):
         self._open_file_list = []
         # Gargage_collection
         self._garbage_msg = []
+        # User-defined pull handler
+        self._udf_pull = None
+        # User-defined push handler
+        self._udf_push = None
         # Used load-balance
         random.seed(time.time())
 
@@ -812,7 +826,10 @@ class KVClient(object):
             start += count[idx]
 
         if local_id is not None: # local push
-            self._push_handler(name+'-data-', local_id, local_data, self._data_store)
+            if self._udf_push is not None:
+                self._udf_push(name+'-data-', local_id, local_data, self._data_store)
+            else:
+                self._default_push_handler(name+'-data-', local_id, local_data, self._data_store)
     
 
     def pull(self, name, id_tensor):
@@ -833,73 +850,85 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
-        for msg in self._garbage_msg:
-            _clear_kv_msg(msg)
-        self._garbage_msg = []
+        if self._udf_pull is None:
+            return _fast_pull(name, id_tensor,
+                        self._machine_count,
+                        self._group_count,
+                        self._machine_id,
+                        self._client_id,
+                        self._data_store[name+'-part-'], 
+                        self._data_store[name+'-g2l-'], 
+                        self._data_store[name+'-data-'],
+                        self._sender,
+                        self._receiver)
+        else:
+            for msg in self._garbage_msg:
+                _clear_kv_msg(msg)
+            self._garbage_msg = []
 
-        # partition data
-        machine_id = self._data_store[name+'-part-'][id_tensor]
-        # sort index by machine id
-        sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
-        back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
-        id_tensor = id_tensor[sorted_id]
-        machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
-        # pull data from server by order
-        start = 0
-        pull_count = 0
-        local_id = None
-        for idx in range(len(machine)):
-            end = start + count[idx]
-            if start == end: # No data for target machine
-                continue
-            partial_id = id_tensor[start:end]
-            if machine[idx] == self._machine_id: # local pull
-                # Note that DO NOT pull local data right now because we can overlap
-                # communication-local_pull here
-                if (name+'-g2l-' in self._has_data) == True:
-                    local_id = self._data_store[name+'-g2l-'][partial_id]
-                else:
-                    local_id = partial_id
-            else: # pull data from remote server
-                msg = KVStoreMsg(
-                    type=KVMsgType.PULL, 
-                    rank=self._client_id, 
+            # partition data
+            machine_id = self._data_store[name+'-part-'][id_tensor]
+            # sort index by machine id
+            sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
+            back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
+            id_tensor = id_tensor[sorted_id]
+            machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
+            # pull data from server by order
+            start = 0
+            pull_count = 0
+            local_id = None
+            for idx in range(len(machine)):
+                end = start + count[idx]
+                if start == end: # No data for target machine
+                    continue
+                partial_id = id_tensor[start:end]
+                if machine[idx] == self._machine_id: # local pull
+                    # Note that DO NOT pull local data right now because we can overlap
+                    # communication-local_pull here
+                    if (name+'-g2l-' in self._has_data) == True:
+                        local_id = self._data_store[name+'-g2l-'][partial_id]
+                    else:
+                        local_id = partial_id
+                else: # pull data from remote server
+                    msg = KVStoreMsg(
+                        type=KVMsgType.PULL, 
+                        rank=self._client_id, 
+                        name=name, 
+                        id=partial_id,
+                        data=None,
+                        c_ptr=None)
+                    # randomly select a server node in target machine for load-balance
+                    s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
+                    _send_kv_msg(self._sender, msg, s_id)
+                    pull_count += 1
+
+                start += count[idx]           
+
+            msg_list = []
+            if local_id is not None: # local pull
+                local_data = self._udf_pull(name+'-data-', local_id, self._data_store)
+                s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
+                local_msg = KVStoreMsg(
+                    type=KVMsgType.PULL_BACK, 
+                    rank=s_id,
                     name=name, 
-                    id=partial_id,
-                    data=None,
+                    id=None,
+                    data=local_data,
                     c_ptr=None)
-                # randomly select a server node in target machine for load-balance
-                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
-                _send_kv_msg(self._sender, msg, s_id)
-                pull_count += 1
+                msg_list.append(local_msg)
+                self._garbage_msg.append(local_msg)
 
-            start += count[idx]           
+            # wait message from server nodes
+            for idx in range(pull_count):
+                remote_msg = _recv_kv_msg(self._receiver)
+                msg_list.append(remote_msg)
+                self._garbage_msg.append(remote_msg)
 
-        msg_list = []
-        if local_id is not None: # local pull
-            local_data = self._pull_handler(name+'-data-', local_id, self._data_store)
-            s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
-            local_msg = KVStoreMsg(
-                type=KVMsgType.PULL_BACK, 
-                rank=s_id,
-                name=name, 
-                id=None,
-                data=local_data,
-                c_ptr=None)
-            msg_list.append(local_msg)
-            self._garbage_msg.append(local_msg)
+            # sort msg by server id and merge tensor together
+            msg_list.sort(key=self._takeId)
+            data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
 
-        # wait message from server nodes
-        for idx in range(pull_count):
-            remote_msg = _recv_kv_msg(self._receiver)
-            msg_list.append(remote_msg)
-            self._garbage_msg.append(remote_msg)
-
-        # sort msg by server id and merge tensor together
-        msg_list.sort(key=self._takeId)
-        data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
-
-        return data_tensor[back_sorted_id] # return data with original index order
+            return data_tensor[back_sorted_id] # return data with original index order
 
         
     def barrier(self):
@@ -1082,7 +1111,7 @@ class KVClient(object):
         return elem.rank
 
 
-    def _push_handler(self, name, ID, data, target):
+    def _default_push_handler(self, name, ID, data, target):
         """Default handler for PUSH message. 
 
         On default, _push_handler perform update operation for the tensor.
@@ -1101,7 +1130,7 @@ class KVClient(object):
         target[name][ID] = data
 
 
-    def _pull_handler(self, name, ID, target):
+    def _default_pull_handler(self, name, ID, target):
         """Default handler for PULL operation.
 
         On default, _pull_handler perform get operation for the tensor.
