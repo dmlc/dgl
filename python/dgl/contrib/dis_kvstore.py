@@ -320,29 +320,28 @@ class KVServer(object):
 
         """
         # Get connected with all client nodes
-        print("1111")
         _receiver_wait(self._receiver, self._ip, self._port, self._client_count)
-        print("2222")
+
         # recv client address information
         addr_list = []
         for i in range(self._client_count):
             msg = _recv_kv_msg(self._receiver)
             assert msg.type == KVMsgType.IP_ID
             addr_list.append(msg.name)
-        print("3333")
+
         # Assign client ID to each client node
         addr_list.sort()
         for ID in range(len(addr_list)):
             self._client_namebook[ID] = addr_list[ID]
-        print("4444")
+
         _network_wait()
-        print("5555")
+
         for ID, addr in self._client_namebook.items():
             client_ip, client_port = addr.split(':')
             _add_receiver_addr(self._sender, client_ip, int(client_port), ID)
-        print("6666")
+
         _sender_connect(self._sender)
-        print("7777")
+
         if self._server_id == 0:
             for client_id in range(len(self._client_namebook)):
                 msg = KVStoreMsg(
@@ -353,7 +352,7 @@ class KVServer(object):
                     data=None,
                     c_ptr=None)
                 _send_kv_msg(self._sender, msg, client_id)
-        print("8888")
+
         # Send shared-tensor information to each client node
         if self._server_id == 0:
             shared_tensor = ''
