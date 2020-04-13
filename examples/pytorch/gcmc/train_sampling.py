@@ -1,4 +1,9 @@
-"""Training script"""
+"""Training GCMC model on the MovieLens data set by mini-batch sampling.
+
+The script loads the full graph in CPU and samples subgraphs for computing
+gradients on the training device. The script also supports multi-GPU for
+further acceleration.
+"""
 import os, time
 import argparse
 import logging
@@ -15,13 +20,12 @@ from torch.nn.parallel import DistributedDataParallel
 from _thread import start_new_thread
 from functools import wraps
 from data import MovieLens
-from model import HeteroGCMCLayer, SampleBiDecoder
+from model import GCMCLayer, DenseBiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 import dgl
 
 class GCMCSampler:
-    """ GCMCSampler
-    """
+    """Neighbor sampler in GCMC mini-batch training."""
     def __init__(self, dataset, segment='train'):
         self.dataset = dataset
         if segment == 'train':
@@ -43,6 +47,15 @@ class GCMCSampler:
             assert False, "Unknow dataset {}".format(segment)
 
     def sample_blocks(self, seeds):
+        """Sample subgraphs from the entire graph.
+
+        The input ``seeds`` represents the edges to compute prediction for. The sampling
+        algorithm works as follows:
+        
+          1. Get the head and tail nodes of the provided seed edges.
+          2. For each head and tail node, extract the entire in-coming neighborhood.
+          3. Copy the node features/embeddings from the full graph to the sampled subgraphs.
+        """
         dataset = self.dataset
         enc_graph = self.enc_graph
         dec_graph = self.dec_graph
@@ -52,6 +65,7 @@ class GCMCSampler:
         true_relation_ratings = self.truths[edge_ids]
         true_relation_labels = None if self.labels is None else self.labels[edge_ids]
 
+        # 1. Get the head and tail nodes from both the decoder and encoder graphs.
         head_id, tail_id = dec_graph.find_edges(edge_ids)
         utype, _, vtype = enc_graph.canonical_etypes[0]
         subg = []
@@ -70,18 +84,19 @@ class GCMCSampler:
                                         vtype=vtype,
                                         num_nodes=(enc_graph.number_of_nodes(utype),
                                                    enc_graph.number_of_nodes(vtype))))
-        
+        # Convert the encoder subgraph to a more compact one by removing nodes that covered
+        # by the seed edges.
         g = dgl.hetero_from_relations(subg)
         g = dgl.compact_graphs(g)
 
+        # 2. For each head and tail node, extract the entire in-coming neighborhood.
         seed_nodes = {}
         for ntype in g.ntypes:
             seed_nodes[ntype] = g.nodes[ntype].data[dgl.NID]
-
         frontier = dgl.in_subgraph(enc_graph, seed_nodes)
         frontier = dgl.to_block(frontier, seed_nodes)
 
-        # copy from parent
+        # 3. Copy the node features/embeddings from the full graph to the sampled subgraphs.
         frontier.dstnodes['user'].data['ci'] = \
             enc_graph.nodes['user'].data['ci'][frontier.dstnodes['user'].data[dgl.NID]]
         frontier.srcnodes['movie'].data['cj'] = \
@@ -107,16 +122,16 @@ class Net(nn.Module):
     def __init__(self, args, dev_id):
         super(Net, self).__init__()
         self._act = get_activation(args.model_activation)
-        self.encoder = HeteroGCMCLayer(args.rating_vals,
-                                       args.src_in_units,
-                                       args.dst_in_units,
-                                       args.gcn_agg_units,
-                                       args.gcn_out_units,
-                                       args.gcn_dropout,
-                                       args.gcn_agg_accum,
-                                       agg_act=self._act,
-                                       share_user_item_param=args.share_param,
-                                       device=dev_id)
+        self.encoder = GCMCLayer(args.rating_vals,
+                                 args.src_in_units,
+                                 args.dst_in_units,
+                                 args.gcn_agg_units,
+                                 args.gcn_out_units,
+                                 args.gcn_dropout,
+                                 args.gcn_agg_accum,
+                                 agg_act=self._act,
+                                 share_user_item_param=args.share_param,
+                                 device=dev_id)
         if args.mix_cpu_gpu and args.use_one_hot_fea:
             # if use_one_hot_fea, user and movie feature is None
             # W can be extremely large, with mix_cpu_gpu W should be stored in CPU
@@ -124,9 +139,9 @@ class Net(nn.Module):
         else:
             self.encoder.to(dev_id)
 
-        self.decoder = SampleBiDecoder(args.rating_vals,
-                                       in_units=args.gcn_out_units,
-                                       num_basis_functions=args.gen_r_num_basis_func)
+        self.decoder = DenseBiDecoder(in_units=args.gcn_out_units,
+                                      num_classes=len(args.rating_vals),
+                                      num_basis=args.gen_r_num_basis_func)
         self.decoder.to(dev_id)
 
     def forward(self, compact_g, frontier, ufeat, ifeat, possible_rating_values):
@@ -229,7 +244,7 @@ def config():
     parser.add_argument('--gcn_agg_accum', type=str, default="sum")
     parser.add_argument('--gcn_out_units', type=int, default=75)
     parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
-    parser.add_argument('--train_max_epoch', type=int, default=70)
+    parser.add_argument('--train_max_epoch', type=int, default=1000)
     parser.add_argument('--train_log_interval', type=int, default=1)
     parser.add_argument('--train_valid_interval', type=int, default=1)
     parser.add_argument('--train_optimizer', type=str, default="adam")
@@ -237,7 +252,8 @@ def config():
     parser.add_argument('--train_lr', type=float, default=0.01)
     parser.add_argument('--train_min_lr', type=float, default=0.0001)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.5)
-    parser.add_argument('--train_decay_patience', type=int, default=5)
+    parser.add_argument('--train_decay_patience', type=int, default=25)
+    parser.add_argument('--train_early_stopping_patience', type=int, default=50)
     parser.add_argument('--share_param', default=False, action='store_true')
     parser.add_argument('--mix_cpu_gpu', default=False, action='store_true')
     parser.add_argument('--minibatch_size', type=int, default=20000)
@@ -399,6 +415,10 @@ def run(proc_id, n_gpus, args, devices, dataset):
                     logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
                 else:
                     no_better_valid += 1
+                    if no_better_valid > args.train_early_stopping_patience\
+                        and learning_rate <= args.train_min_lr:
+                        logging.info("Early stopping threshold reached. Stop training.")
+                        break
                     if no_better_valid > args.train_decay_patience:
                         new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
                         if new_lr < learning_rate:

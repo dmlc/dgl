@@ -5,8 +5,6 @@ import re
 import pandas as pd
 import scipy.sparse as sp
 import torch as th
-from torchtext import data
-from torchtext.vocab import GloVe
 
 import dgl
 from dgl.data.utils import download, extract_archive, get_download_dir
@@ -504,6 +502,8 @@ class MovieLens(object):
             Generate movie features by concatenating embedding and the year
 
         """
+        import torchtext
+
         if self._name == 'ml-100k':
             GENRES = GENRES_ML_100K
         elif self._name == 'ml-1m':
@@ -513,8 +513,8 @@ class MovieLens(object):
         else:
             raise NotImplementedError
 
-        TEXT = data.Field(tokenize='spacy')
-        embedding = GloVe(name='840B', dim=300)
+        TEXT = torchtext.data.Field(tokenize='spacy')
+        embedding = torchtext.vocab.GloVe(name='840B', dim=300)
 
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)
         release_years = np.zeros(shape=(self.movie_info.shape[0], 1), dtype=np.float32)

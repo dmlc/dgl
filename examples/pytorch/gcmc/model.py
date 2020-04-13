@@ -8,7 +8,7 @@ import dgl.nn.pytorch as dglnn
 from utils import get_activation
 
 class GCMCGraphConv(nn.Module):
-    """Apply graph convolution for GCMC model
+    """Graph convolution module used in the GCMC model.
 
     Parameters
     ----------
@@ -27,11 +27,13 @@ class GCMCGraphConv(nn.Module):
                  in_feats,
                  out_feats,
                  weight=True,
-                 device=None):
+                 device=None,
+                 dropout_rate=0.0):
         super(GCMCGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self.device=device 
+        self.device = device 
+        self.dropout = nn.Dropout(dropout_rate)
 
         if weight:
             self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
@@ -44,7 +46,7 @@ class GCMCGraphConv(nn.Module):
         if self.weight is not None:
             init.xavier_uniform_(self.weight)
 
-    def forward(self, graph, feat, weight=None, dropout=None):
+    def forward(self, graph, feat, weight=None):
         """Compute graph convolution.
 
         Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
@@ -66,33 +68,33 @@ class GCMCGraphConv(nn.Module):
         torch.Tensor
             The output feature
         """
-        cj = graph.srcdata['cj']
-        ci = graph.dstdata['ci']
-        if self.device is not None:
-            cj = cj.to(self.device)
-            ci = ci.to(self.device)
-        graph = graph.local_var()
-        if weight is not None:
-            if self.weight is not None:
-                raise DGLError('External weight is provided while at the same time the'
-                               ' module has defined its own weight parameter. Please'
-                               ' create the module with flag weight=False.')
-        else:
-            weight = self.weight
+        with graph.local_scope():
+            cj = graph.srcdata['cj']
+            ci = graph.dstdata['ci']
+            if self.device is not None:
+                cj = cj.to(self.device)
+                ci = ci.to(self.device)
+            if weight is not None:
+                if self.weight is not None:
+                    raise DGLError('External weight is provided while at the same time the'
+                                   ' module has defined its own weight parameter. Please'
+                                   ' create the module with flag weight=False.')
+            else:
+                weight = self.weight
 
-        if weight is not None:
-            feat = dot_or_identity(feat, weight, self.device)
+            if weight is not None:
+                feat = dot_or_identity(feat, weight, self.device)
 
-        feat = feat * cj
-        graph.srcdata['h'] = feat
-        graph.update_all(fn.copy_src(src='h', out='m'),
-                         fn.sum(msg='m', out='h'))
-        rst = graph.dstdata['h']
-        rst = rst * ci
+            feat = feat * self.dropout(cj)
+            graph.srcdata['h'] = feat
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.dstdata['h']
+            rst = rst * ci
 
         return rst
 
-class HeteroGCMCLayer(nn.Module):
+class GCMCLayer(nn.Module):
     r"""GCMC layer
 
     .. math::
@@ -152,7 +154,7 @@ class HeteroGCMCLayer(nn.Module):
                  out_act=None,
                  share_user_item_param=False,
                  device=None):
-        super(HeteroGCMCLayer, self).__init__()
+        super(GCMCLayer, self).__init__()
         self.rating_vals = rating_vals
         self.agg = agg
         self.share_user_item_param = share_user_item_param
@@ -179,21 +181,25 @@ class HeteroGCMCLayer(nn.Module):
                 subConv[rating] = GCMCGraphConv(user_in_units,
                                                 msg_units,
                                                 weight=False,
-                                                device=device)
+                                                device=device,
+                                                dropout_rate=dropout_rate)
                 subConv[rev_rating] = GCMCGraphConv(user_in_units,
                                                     msg_units,
                                                     weight=False,
-                                                    device=device)
+                                                    device=device,
+                                                    dropout_rate=dropout_rate)
             else:
                 self.W_r = None
                 subConv[rating] = GCMCGraphConv(user_in_units,
-                                                  msg_units,
-                                                  weight=True,
-                                                  device=device)
+                                                msg_units,
+                                                weight=True,
+                                                device=device,
+                                                dropout_rate=dropout_rate)
                 subConv[rev_rating] = GCMCGraphConv(movie_in_units,
-                                                      msg_units,
-                                                      weight=True,
-                                                      device=device)
+                                                    msg_units,
+                                                    weight=True,
+                                                    device=device,
+                                                    dropout_rate=dropout_rate)
         self.conv = dglnn.HeteroGraphConv(subConv, aggregate=agg)
         self.agg_act = get_activation(agg_act)
         self.out_act = get_activation(out_act)
@@ -240,16 +246,14 @@ class HeteroGCMCLayer(nn.Module):
         new_ifeat : torch.Tensor
             New movie features
         """
-        in_feats = {}
-        weights = {}
-        in_feats['user'] = ufeat
-        in_feats['movie'] = ifeat
+        in_feats = {'user' : ufeat, 'movie' : ifeat}
+        mod_args = {}
         for i, rating in enumerate(self.rating_vals):
             rating = str(rating).replace('.', '_')
             rev_rating = 'rev-%s' % rating
-            weights[rating] = (self.W_r[rating] if self.W_r is not None else None, self.dropout)
-            weights[rev_rating] = (self.W_r[rev_rating] if self.W_r is not None else None, self.dropout)
-        out_feats = self.conv(graph, in_feats, mod_args=weights)
+            mod_args[rating] = (self.W_r[rating] if self.W_r is not None else None,)
+            mod_args[rev_rating] = (self.W_r[rev_rating] if self.W_r is not None else None,)
+        out_feats = self.conv(graph, in_feats, mod_args=mod_args)
         ufeat = out_feats['user']
         ifeat = out_feats['movie']
         ufeat = ufeat.view(ufeat.shape[0], -1)
@@ -265,7 +269,10 @@ class HeteroGCMCLayer(nn.Module):
         return self.out_act(ufeat), self.out_act(ifeat)
 
 class BiDecoder(nn.Module):
-    r"""Bilinear decoder.
+    r"""Bi-linear decoder.
+
+    Given a bipartite graph G, for each edge (i, j) ~ G, compute the likelihood
+    of it being class r by:
 
     .. math::
         p(M_{ij}=r) = \text{softmax}(u_i^TQ_rv_j)
@@ -278,28 +285,27 @@ class BiDecoder(nn.Module):
 
     Parameters
     ----------
-    rating_vals : list of int or float
-        Possible rating values.
     in_units : int
         Size of input user and movie features
-    num_basis_functions : int, optional
+    num_classes : int
+        Number of classes.
+    num_basis : int, optional
         Number of basis. (Default: 2)
     dropout_rate : float, optional
         Dropout raite (Default: 0.0)
     """
     def __init__(self,
-                 rating_vals,
                  in_units,
-                 num_basis_functions=2,
+                 num_classes,
+                 num_basis=2,
                  dropout_rate=0.0):
         super(BiDecoder, self).__init__()
-        self.rating_vals = rating_vals
-        self._num_basis_functions = num_basis_functions
+        self._num_basis = num_basis
         self.dropout = nn.Dropout(dropout_rate)
         self.Ps = nn.ParameterList()
-        for i in range(num_basis_functions):
+        for i in range(num_basis):
             self.Ps.append(nn.Parameter(th.randn(in_units, in_units)))
-        self.rate_out = nn.Linear(self._num_basis_functions, len(rating_vals), bias=False)
+        self.combine_basis = nn.Linear(self._num_basis, num_classes, bias=False)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -324,70 +330,73 @@ class BiDecoder(nn.Module):
         th.Tensor
             Predicting scores for each user-movie edge.
         """
-        graph = graph.local_var()
-        ufeat = self.dropout(ufeat)
-        ifeat = self.dropout(ifeat)
-        graph.nodes['movie'].data['h'] = ifeat
-        basis_out = []
-        for i in range(self._num_basis_functions):
-            graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
-            graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
-            basis_out.append(graph.edata['sr'].unsqueeze(1))
-        out = th.cat(basis_out, dim=1)
-        out = self.rate_out(out)
+        with graph.local_scope():
+            ufeat = self.dropout(ufeat)
+            ifeat = self.dropout(ifeat)
+            graph.nodes['movie'].data['h'] = ifeat
+            basis_out = []
+            for i in range(self._num_basis):
+                graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
+                graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
+                basis_out.append(graph.edata['sr'].unsqueeze(1))
+            out = th.cat(basis_out, dim=1)
+            out = self.combine_basis(out)
         return out
 
-class SampleBiDecoder(BiDecoder):
-    r"""Sample based Bilinear decoder.
+class DenseBiDecoder(BiDecoder):
+    r"""Dense bi-linear decoder.
 
-    Implemented a sample based GCMC algorithm. It accepts user embeddings and
-    item embeddings and output a score for each possible label.
+    Dense implementation of the bi-linear decoder used in GCMC. Suitable when
+    the graph can be efficiently represented by a pair of arrays (one for source
+    nodes; one for destination nodes).
 
     Parameters
     ----------
-    rating_vals : list of int or float
-        Possible rating values.
     in_units : int
         Size of input user and movie features
-    num_basis_functions : int, optional
+    num_classes : int
+        Number of classes.
+    num_basis : int, optional
         Number of basis. (Default: 2)
     dropout_rate : float, optional
         Dropout raite (Default: 0.0)
     """
     def __init__(self,
-                 rating_vals,
                  in_units,
-                 num_basis_functions=2,
+                 num_classes,
+                 num_basis=2,
                  dropout_rate=0.0):
-        super(SampleBiDecoder, self).__init__(rating_vals,
-                                              in_units,
-                                              num_basis_functions,
-                                              dropout_rate)
+        super(DenseBiDecoder, self).__init__(in_units,
+                                             num_classes,
+                                             num_basis,
+                                             dropout_rate)
 
     def forward(self, ufeat, ifeat):
         """Forward function.
 
+        Compute logits for each pair ``(ufeat[i], ifeat[i])``.
+
         Parameters
         ----------
         ufeat : th.Tensor
-            User embeddings. Shape: (Batsh_Size, D)
+            User embeddings. Shape: (B, D)
         ifeat : th.Tensor
-            Movie embeddings. Shape: (Batsh_Size, D)
+            Movie embeddings. Shape: (B, D)
 
         Returns
         -------
         th.Tensor
-            Predicting scores for each user-movie edge.
+            Predicting scores for each user-movie edge. Shape: (B, num_classes)
         """
         ufeat = self.dropout(ufeat)
         ifeat = self.dropout(ifeat)
         basis_out = []
-        for i in range(self._num_basis_functions):
+        for i in range(self._num_basis):
             ufeat_i = ufeat @ self.Ps[i]
             out = th.einsum('ab,ab->a', ufeat_i, ifeat)
             basis_out.append(out.unsqueeze(1))
         out = th.cat(basis_out, dim=1)
-        out = self.rate_out(out)
+        out = self.combine_basis(out)
         return out
 
 def dot_or_identity(A, B, device=None):
