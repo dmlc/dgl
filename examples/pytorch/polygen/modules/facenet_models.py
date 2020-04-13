@@ -241,7 +241,7 @@ def make_face_model(N=6, dim_model=512, dim_ff=2048, h=8, dropout=0.1, universal
     encoder = Encoder(EncoderLayer(dim_model, c(attn), c(ff), dropout), N)
     decoder = Decoder(DecoderLayer(dim_model, c(attn), c(attn), c(ff), dropout), N)
     vertex_embed = Embeddings(np.range(MAX_VERT_NUM), dim_model)
-    generator = Generator(dim_model, tgt_vocab)
+    generator = Face_Generator(dim_model, tgt_vocab)
     model = Transformer(
         encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, dim_model // h)
     # xavier init
