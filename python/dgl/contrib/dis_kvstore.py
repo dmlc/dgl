@@ -392,6 +392,7 @@ class KVServer(object):
                 if (msg.name+'-g2l-' in self._has_data) == True:
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
+                    local_id = msg.id
                 if self._udf_push is not None:
                     self._udf_pull(msg.name+'-data-', local_id, msg.data, self._data_store)
                 else:
