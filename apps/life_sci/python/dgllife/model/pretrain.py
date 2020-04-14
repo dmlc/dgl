@@ -112,7 +112,7 @@ def load_pretrained(model_name, log=True):
 
     elif model_name == 'Weave_Tox21':
         model = WeavePredictor(node_in_feats=27,
-                               edge_in_feats=12,
+                               edge_in_feats=7,
                                num_gnn_layers=2,
                                gnn_hidden_feats=50,
                                graph_feats=128,
