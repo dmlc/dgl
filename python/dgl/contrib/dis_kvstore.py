@@ -395,7 +395,7 @@ class KVServer(object):
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
-                if self._udf_push is not None:
+                if self._udf_pull is not None:
                     res_tensor = self._udf_pull(msg.name+'-data-', local_id, self._data_store)
                 else:
                     res_tensor = self._default_pull_handler(msg.name+'-data-', local_id, self._data_store)
