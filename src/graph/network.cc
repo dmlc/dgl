@@ -5,6 +5,8 @@
  */
 #include "./network.h"
 
+#include <stdlib.h>
+
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/packed_func_ext.h>
@@ -712,7 +714,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
                                          !AUTO_FREE);
-        send_kv_message(sender, &kv_msg, i, !AUTO_FREE);
+        int lower = machine[idx]*self._group_count;
+        int higher = (machine[idx]+1)*self._group_count-1;
+        int s_id = (rand() % (higher-lower+1))+lower;
+        send_kv_message(sender, &kv_msg, s_id, !AUTO_FREE);
         msg_count++;
       }
     }
