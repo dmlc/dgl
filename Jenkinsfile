@@ -69,14 +69,6 @@ def unit_test_win64(backend, dev) {
   }
 }
 
-def kg_test_linux(backend, dev) {
-  init_git()
-  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 20, unit: 'MINUTES') {
-    sh "bash tests/scripts/task_kg_test.sh ${backend} ${dev}"
-  }
-}
-
 def example_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
@@ -149,7 +141,7 @@ pipeline {
             }
           }
           steps {
-            sh "nvidia-smi"
+            // sh "nvidia-smi"
             build_dgl_linux("gpu")
           }
           post {
@@ -359,61 +351,6 @@ pipeline {
               steps {
                 sh "nvidia-smi"
                 unit_test_linux("mxnet", "gpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
-      }
-    }
-    stage("App") {
-      parallel {
-        stage("Knowledge Graph CPU") {
-          agent { 
-            docker {
-              label "linux-cpu-node"
-              image "dgllib/dgl-ci-cpu:conda" 
-            }
-          }
-          stages {
-            stage("Torch test") {
-              steps {
-                kg_test_linux("pytorch", "cpu")
-              }
-            }
-            stage("MXNet test") {
-              steps {
-                kg_test_linux("mxnet", "cpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
-        stage("Knowledge Graph GPU") {
-          agent {
-            docker {
-              label "linux-gpu-node"
-              image "dgllib/dgl-ci-gpu:conda"
-              args "--runtime nvidia"
-            }
-          }
-          stages {
-            stage("Torch test") {
-              steps {
-                kg_test_linux("pytorch", "gpu")
-              }
-            }
-            stage("MXNet test") {
-              steps {
-                kg_test_linux("mxnet", "gpu")
               }
             }
           }

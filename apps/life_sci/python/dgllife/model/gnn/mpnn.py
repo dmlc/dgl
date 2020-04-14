@@ -1,4 +1,5 @@
 """MPNN"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -6,6 +7,7 @@ from dgl.nn.pytorch import NNConv
 
 __all__ = ['MPNNGNN']
 
+# pylint: disable=W0221
 class MPNNGNN(nn.Module):
     """MPNN.
 
@@ -69,7 +71,7 @@ class MPNNGNN(nn.Module):
         node_feats = self.project_node_feats(node_feats) # (V, node_out_feats)
         hidden_feats = node_feats.unsqueeze(0)           # (1, V, node_out_feats)
 
-        for i in range(self.num_step_message_passing):
+        for _ in range(self.num_step_message_passing):
             node_feats = F.relu(self.gnn_layer(g, node_feats, edge_feats))
             node_feats, hidden_feats = self.gru(node_feats.unsqueeze(0), hidden_feats)
             node_feats = node_feats.squeeze(0)

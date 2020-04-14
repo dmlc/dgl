@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import init
 
 from .... import function as fn
+from ....base import DGLError
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
@@ -42,8 +43,14 @@ class GraphConv(nn.Module):
         Input feature size.
     out_feats : int
         Output feature size.
-    norm : bool, optional
-        If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
+    norm : str, optional
+        How to apply the normalizer. If is `'right'`, divide the aggregated messages
+        by each node's in-degrees, which is equivalent to averaging the received messages.
+        If is `'none'`, no normalization is applied. Default is `'both'`,
+        where the :math:`c_{ij}` in the paper is applied.
+    weight : bool, optional
+        If True, apply a linear layer. Otherwise, aggregating the messages
+        without a weight matrix.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
@@ -60,30 +67,40 @@ class GraphConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 norm=True,
+                 norm='both',
+                 weight=True,
                  bias=True,
                  activation=None):
         super(GraphConv, self).__init__()
+        if norm not in ('none', 'both', 'right'):
+            raise DGLError('Invalid norm value. Must be either "none", "both" or "right".'
+                           ' But got "{}".'.format(norm))
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
 
-        self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
+        if weight:
+            self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
+        else:
+            self.register_parameter('weight', None)
+
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
+
         self.reset_parameters()
 
         self._activation = activation
 
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
-        init.xavier_uniform_(self.weight)
+        if self.weight is not None:
+            init.xavier_uniform_(self.weight)
         if self.bias is not None:
             init.zeros_(self.bias)
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, weight=None):
         r"""Compute graph convolution.
 
         Notes
@@ -92,6 +109,7 @@ class GraphConv(nn.Module):
           dimensions, :math:`N` is the number of nodes.
         * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
           the same shape as the input.
+        * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
 
         Parameters
         ----------
@@ -99,6 +117,8 @@ class GraphConv(nn.Module):
             The graph.
         feat : torch.Tensor
             The input feature
+        weight : torch.Tensor, optional
+            Optional external weight tensor.
 
         Returns
         -------
@@ -106,28 +126,47 @@ class GraphConv(nn.Module):
             The output feature
         """
         graph = graph.local_var()
-        if self._norm:
-            norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+
+        if self._norm == 'both':
+            degs = graph.out_degrees().to(feat.device).float().clamp(min=1)
+            norm = th.pow(degs, -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)
-            norm = th.reshape(norm, shp).to(feat.device)
+            norm = th.reshape(norm, shp)
             feat = feat * norm
+
+        if weight is not None:
+            if self.weight is not None:
+                raise DGLError('External weight is provided while at the same time the'
+                               ' module has defined its own weight parameter. Please'
+                               ' create the module with flag weight=False.')
+        else:
+            weight = self.weight
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = th.matmul(feat, self.weight)
-            graph.ndata['h'] = feat
+            if weight is not None:
+                feat = th.matmul(feat, weight)
+            graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.ndata['h']
+            rst = graph.dstdata['h']
         else:
             # aggregate first then mult W
-            graph.ndata['h'] = feat
+            graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
-            rst = graph.ndata['h']
-            rst = th.matmul(rst, self.weight)
+            rst = graph.dstdata['h']
+            if weight is not None:
+                rst = th.matmul(rst, weight)
 
-        if self._norm:
+        if self._norm != 'none':
+            degs = graph.in_degrees().to(feat.device).float().clamp(min=1)
+            if self._norm == 'both':
+                norm = th.pow(degs, -0.5)
+            else:
+                norm = 1.0 / degs
+            shp = norm.shape + (1,) * (feat.dim() - 1)
+            norm = th.reshape(norm, shp)
             rst = rst * norm
 
         if self.bias is not None:

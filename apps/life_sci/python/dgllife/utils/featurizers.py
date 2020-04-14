@@ -1,6 +1,8 @@
 """Node and edge featurization for molecular graphs."""
-import dgl.backend as F
+# pylint: disable= no-member, arguments-differ, invalid-name
 import itertools
+from collections import defaultdict
+import dgl.backend as F
 import numpy as np
 import os.path as osp
 import torch
@@ -69,6 +71,16 @@ def one_hot_encoding(x, allowable_set, encode_unknown=False):
         List of boolean values where at most one value is True.
         The list is of length ``len(allowable_set)`` if ``encode_unknown=False``
         and ``len(allowable_set) + 1`` otherwise.
+
+    Examples
+    --------
+    >>> from dgllife.utils import one_hot_encoding
+    >>> one_hot_encoding('C', ['C', 'O'])
+    [True, False]
+    >>> one_hot_encoding('S', ['C', 'O'])
+    [False, False]
+    >>> one_hot_encoding('S', ['C', 'O'], encode_unknown=True)
+    [False, False, True]
     """
     if encode_unknown and (allowable_set[-1] is not None):
         allowable_set.append(None)
@@ -103,6 +115,12 @@ def atom_type_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atomic_number
+    atomic_number_one_hot
     """
     if allowable_set is None:
         allowable_set = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
@@ -128,6 +146,12 @@ def atomic_number_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atomic_number
+    atom_type_one_hot
     """
     if allowable_set is None:
         allowable_set = list(range(1, 101))
@@ -145,6 +169,11 @@ def atomic_number(atom):
     -------
     list
        List containing one int only.
+
+    See Also
+    --------
+    atomic_number_one_hot
+    atom_type_one_hot
     """
     return [atom.GetAtomicNum()]
 
@@ -171,6 +200,9 @@ def atom_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
 
     See Also
     --------
+    one_hot_encoding
+    atom_degree
+    atom_total_degree
     atom_total_degree_one_hot
     """
     if allowable_set is None:
@@ -195,7 +227,9 @@ def atom_degree(atom):
 
     See Also
     --------
+    atom_degree_one_hot
     atom_total_degree
+    atom_total_degree_one_hot
     """
     return [atom.GetDegree()]
 
@@ -214,7 +248,10 @@ def atom_total_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
 
     See Also
     --------
+    one_hot_encoding
+    atom_degree
     atom_degree_one_hot
+    atom_total_degree
     """
     if allowable_set is None:
         allowable_set = list(range(6))
@@ -223,14 +260,16 @@ def atom_total_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
 def atom_total_degree(atom):
     """The degree of an atom including Hs.
 
-    See Also
-    --------
-    atom_degree
-
     Returns
     -------
     list
         List containing one int only.
+
+    See Also
+    --------
+    atom_total_degree_one_hot
+    atom_degree
+    atom_degree_one_hot
     """
     return [atom.GetTotalDegree()]
 
@@ -251,6 +290,11 @@ def atom_explicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atom_explicit_valence
     """
     if allowable_set is None:
         allowable_set = list(range(1, 7))
@@ -268,6 +312,10 @@ def atom_explicit_valence(atom):
     -------
     list
         List containing one int only.
+
+    See Also
+    --------
+    atom_explicit_valence_one_hot
     """
     return [atom.GetExplicitValence()]
 
@@ -288,6 +336,10 @@ def atom_implicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    atom_implicit_valence
     """
     if allowable_set is None:
         allowable_set = list(range(7))
@@ -305,9 +357,14 @@ def atom_implicit_valence(atom):
     ------
     list
         List containing one int only.
+
+    See Also
+    --------
+    atom_implicit_valence_one_hot
     """
     return [atom.GetImplicitValence()]
 
+# pylint: disable=I1101
 def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the hybridization of an atom.
 
@@ -327,6 +384,10 @@ def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
     """
     if allowable_set is None:
         allowable_set = [Chem.rdchem.HybridizationType.SP,
@@ -353,6 +414,11 @@ def atom_total_num_H_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atom_total_num_H
     """
     if allowable_set is None:
         allowable_set = list(range(5))
@@ -370,6 +436,10 @@ def atom_total_num_H(atom):
     -------
     list
         List containing one int only.
+
+    See Also
+    --------
+    atom_total_num_H_one_hot
     """
     return [atom.GetTotalNumHs()]
 
@@ -390,6 +460,11 @@ def atom_formal_charge_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atom_formal_charge
     """
     if allowable_set is None:
         allowable_set = list(range(-2, 3))
@@ -407,6 +482,10 @@ def atom_formal_charge(atom):
     -------
     list
         List containing one int only.
+
+    See Also
+    --------
+    atom_formal_charge_one_hot
     """
     return [atom.GetFormalCharge()]
 
@@ -451,6 +530,11 @@ def atom_num_radical_electrons_one_hot(atom, allowable_set=None, encode_unknown=
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atom_num_radical_electrons
     """
     if allowable_set is None:
         allowable_set = list(range(5))
@@ -468,6 +552,10 @@ def atom_num_radical_electrons(atom):
     -------
     list
         List containing one int only.
+
+    See Also
+    --------
+    atom_num_radical_electrons_one_hot
     """
     return [atom.GetNumRadicalElectrons()]
 
@@ -488,6 +576,11 @@ def atom_is_aromatic_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atom_is_aromatic
     """
     if allowable_set is None:
         allowable_set = [False, True]
@@ -505,6 +598,10 @@ def atom_is_aromatic(atom):
     -------
     list
         List containing one bool only.
+
+    See Also
+    --------
+    atom_is_aromatic_one_hot
     """
     return [atom.GetIsAromatic()]
 
@@ -525,6 +622,11 @@ def atom_is_in_ring_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    atom_is_in_ring
     """
     if allowable_set is None:
         allowable_set = [False, True]
@@ -542,6 +644,10 @@ def atom_is_in_ring(atom):
     -------
     list
         List containing one bool only.
+
+    See Also
+    --------
+    atom_is_in_ring_one_hot
     """
     return [atom.IsInRing()]
 
@@ -562,6 +668,10 @@ def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
     -------
     list
         List containing one bool only.
+
+    See Also
+    --------
+    one_hot_encoding
     """
     if allowable_set is None:
         allowable_set = [Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
@@ -622,7 +732,8 @@ class BaseAtomFeaturizer(object):
 
     Loop over all atoms in a molecule and featurize them with the ``featurizer_funcs``.
 
-    **We assume the resulting DGLGraph will not contain any virtual nodes.**
+    **We assume the resulting DGLGraph will not contain any virtual nodes and a node i in the
+    graph corresponds to exactly atom i in the molecule.**
 
     Parameters
     ----------
@@ -636,7 +747,7 @@ class BaseAtomFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.life_sci import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
+    >>> from dgllife.utils import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')
@@ -648,6 +759,16 @@ class BaseAtomFeaturizer(object):
      'degree': tensor([[0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
                        [0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0.],
                        [0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]])}
+    >>> # Get feature size for atom mass
+    >>> print(atom_featurizer.feat_size('mass'))
+    1
+    >>> # Get feature size for atom degree
+    >>> print(atom_featurizer.feat_size('degree'))
+    11
+
+    See Also
+    --------
+    CanonicalAtomFeaturizer
     """
     def __init__(self, featurizer_funcs, feat_sizes=None):
         self.featurizer_funcs = featurizer_funcs
@@ -746,6 +867,38 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     ----------
     atom_data_field : str
         Name for storing atom features in DGLGraphs, default to 'h'.
+
+    Examples
+    --------
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import CanonicalAtomFeaturizer
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> atom_featurizer = CanonicalAtomFeaturizer(atom_data_field='feat')
+    >>> atom_featurizer(mol)
+    {'feat': tensor([[1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
+                      1., 0.],
+                     [1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 1.,
+                      0., 0.],
+                     [0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                      0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0.,
+                      0., 0.]])}
+
+    >>> # Get feature size for nodes
+    >>> print(atom_featurizer.feat_size('feat'))
+    74
+
+    See Also
+    --------
+    BaseAtomFeaturizer
     """
     def __init__(self, atom_data_field='h'):
         super(CanonicalAtomFeaturizer, self).__init__(
@@ -934,6 +1087,10 @@ def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
     """
     if allowable_set is None:
         allowable_set = [Chem.rdchem.BondType.SINGLE,
@@ -959,6 +1116,11 @@ def bond_is_conjugated_one_hot(bond, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    bond_is_conjugated
     """
     if allowable_set is None:
         allowable_set = [False, True]
@@ -976,6 +1138,10 @@ def bond_is_conjugated(bond):
     -------
     list
         List containing one bool only.
+
+    See Also
+    --------
+    bond_is_conjugated_one_hot
     """
     return [bond.GetIsConjugated()]
 
@@ -996,6 +1162,11 @@ def bond_is_in_ring_one_hot(bond, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    bond_is_in_ring
     """
     if allowable_set is None:
         allowable_set = [False, True]
@@ -1013,6 +1184,10 @@ def bond_is_in_ring(bond):
     -------
     list
         List containing one bool only.
+
+    See Also
+    --------
+    bond_is_in_ring_one_hot
     """
     return [bond.IsInRing()]
 
@@ -1036,6 +1211,10 @@ def bond_stereo_one_hot(bond, allowable_set=None, encode_unknown=False):
     -------
     list
         List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
     """
     if allowable_set is None:
         allowable_set = [Chem.rdchem.BondStereo.STEREONONE,
@@ -1068,17 +1247,26 @@ class BaseBondFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.life_sci import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
+    >>> from dgllife.utils import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')
-    >>> bond_featurizer = BaseBondFeaturizer({'bond_type': bond_type_one_hot, 'in_ring': bond_is_in_ring})
+    >>> bond_featurizer = BaseBondFeaturizer({'type': bond_type_one_hot, 'ring': bond_is_in_ring})
     >>> bond_featurizer(mol)
-    {'bond_type': tensor([[1., 0., 0., 0.],
-                          [1., 0., 0., 0.],
-                          [1., 0., 0., 0.],
-                          [1., 0., 0., 0.]]),
-     'in_ring': tensor([[0.], [0.], [0.], [0.]])}
+    {'type': tensor([[1., 0., 0., 0.],
+                     [1., 0., 0., 0.],
+                     [1., 0., 0., 0.],
+                     [1., 0., 0., 0.]]),
+     'ring': tensor([[0.], [0.], [0.], [0.]])}
+    >>> # Get feature size
+    >>> bond_featurizer.feat_size('type')
+    4
+    >>> bond_featurizer.feat_size('ring')
+    1
+
+    See Also
+    --------
+    CanonicalBondFeaturizer
     """
     def __init__(self, featurizer_funcs, feat_sizes=None):
         self.featurizer_funcs = featurizer_funcs
@@ -1163,6 +1351,26 @@ class CanonicalBondFeaturizer(BaseBondFeaturizer):
 
     **We assume the resulting DGLGraph will be created with :func:`smiles_to_bigraph` without
     self loops.**
+
+    Examples
+    --------
+    >>> from dgllife.utils import CanonicalBondFeaturizer
+    >>> from rdkit import Chem
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> bond_featurizer = CanonicalBondFeaturizer(bond_data_field='feat')
+    >>> bond_featurizer(mol)
+    {'feat': tensor([[1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0.],
+                     [1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0.],
+                     [1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0.],
+                     [1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0.]])}
+    >>> # Get feature size
+    >>> bond_featurizer.feat_size('type')
+    12
+
+    See Also
+    --------
+    BaseBondFeaturizer
     """
     def __init__(self, bond_data_field='e'):
         super(CanonicalBondFeaturizer, self).__init__(

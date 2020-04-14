@@ -1,4 +1,5 @@
 """Graph Convolutional Networks."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -6,6 +7,7 @@ from dgl.nn.pytorch import GraphConv
 
 __all__ = ['GCN']
 
+# pylint: disable=W0221, C0103
 class GCNLayer(nn.Module):
     r"""Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks
     <https://arxiv.org/abs/1609.02907>`__
@@ -33,7 +35,7 @@ class GCNLayer(nn.Module):
 
         self.activation = activation
         self.graph_conv = GraphConv(in_feats=in_feats, out_feats=out_feats,
-                                    norm=False, activation=activation)
+                                    norm='none', activation=activation)
         self.dropout = nn.Dropout(dropout)
 
         self.residual = residual
