@@ -268,8 +268,5 @@ if __name__ == '__main__':
     test_schnet_gnn()
     test_mgcn_gnn()
     test_mpnn_gnn()
-<<<<<<< HEAD
     test_wln()
-=======
     test_weave()
->>>>>>> c9a2d7dd7207a103fc967efb7473a3b3dc3ebe54

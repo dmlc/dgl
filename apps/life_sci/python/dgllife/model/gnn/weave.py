@@ -1,13 +1,13 @@
 """Weave"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dgl import DGLGraph
-
 __all__ = ['WeaveGNN']
 
+# pylint: disable=W0221, E1101
 class WeaveLayer(nn.Module):
     r"""Single Weave layer from `Molecular Graph Convolutions: Moving Beyond Fingerprints
     <https://arxiv.org/abs/1603.00856>`__

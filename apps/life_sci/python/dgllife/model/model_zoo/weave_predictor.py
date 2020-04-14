@@ -1,4 +1,5 @@
 """Weave"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -7,6 +8,7 @@ from ..readout import WeaveGather
 
 __all__ = ['WeavePredictor']
 
+# pylint: disable=W0221
 class WeavePredictor(nn.Module):
     r"""Weave for regression and classification on graphs.
 

@@ -1,16 +1,16 @@
 """Node and edge featurization for molecular graphs."""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import itertools
-from collections import defaultdict
-import dgl.backend as F
-import numpy as np
 import os.path as osp
-import torch
 
 from collections import defaultdict
 from functools import partial
 from rdkit import Chem, RDConfig
 from rdkit.Chem import AllChem, ChemicalFeatures
+
+import numpy as np
+import torch
+import dgl.backend as F
 
 __all__ = ['one_hot_encoding',
            'atom_type_one_hot',
@@ -1006,15 +1006,16 @@ class WeaveAtomFeaturizer(object):
         is_donor = defaultdict(bool)
         is_acceptor = defaultdict(bool)
         # Get hydrogen bond donor/acceptor information
-        for i in range(len(mol_feats)):
-            if mol_feats[i].GetFamily() == 'Donor':
-                nodes = mol_feats[i].GetAtomIds()
+        for feats in mol_feats:
+            if feats.GetFamily() == 'Donor':
+                nodes = feats.GetAtomIds()
                 for u in nodes:
                     is_donor[u] = True
-            elif mol_feats[i].GetFamily() == 'Acceptor':
-                nodes = mol_feats[i].GetAtomIds()
+            elif feats.GetFamily() == 'Acceptor':
+                nodes = feats.GetAtomIds()
                 for u in nodes:
                     is_acceptor[u] = True
+
         return is_donor, is_acceptor
 
     def __call__(self, mol):
@@ -1381,6 +1382,7 @@ class CanonicalBondFeaturizer(BaseBondFeaturizer):
                  bond_stereo_one_hot]
             )})
 
+# pylint: disable=E1102
 class WeaveEdgeFeaturizer(object):
     """Edge featurizer in Weave.
 

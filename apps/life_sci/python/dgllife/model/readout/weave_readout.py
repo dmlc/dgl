@@ -1,4 +1,5 @@
 """Readout for Weave"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl
 import torch
 import torch.nn as nn
@@ -7,6 +8,7 @@ from torch.distributions import Normal
 
 __all__ = ['WeaveGather']
 
+# pylint: disable=W0221, E1101, E1102
 class WeaveGather(nn.Module):
     r"""Readout in Weave
 
