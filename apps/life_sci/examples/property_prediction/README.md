@@ -22,7 +22,7 @@ explicitly modeling the interactions between adjacent atoms.
 
 Use `classification.py` with arguments
 ```
--m {GCN, GAT}, MODEL, model to use
+-m {GCN, GAT, Weave}, MODEL, model to use
 -d {Tox21}, DATASET, dataset to use
 ```
 
@@ -48,6 +48,12 @@ a real difference.
 | Source           | Averaged Test ROC-AUC Score |
 | ---------------- | --------------------------- |
 | Pretrained model | 0.853                       |
+
+#### Weave on Tox21
+
+| Source           | Averaged Test ROC-AUC Score |
+| ---------------- | --------------------------- |
+| Pretrained model | 0.8074                      |
 
 ## Regression   
 

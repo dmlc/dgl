@@ -8,13 +8,14 @@ from dgl.data.utils import _get_dgl_url, download, get_download_dir, extract_arc
 from rdkit import Chem
 
 from ..model import GCNPredictor, GATPredictor, AttentiveFPPredictor, DGMG, DGLJTNNVAE, \
-    WLNReactionCenter
+    WLNReactionCenter, WeavePredictor
 
 __all__ = ['load_pretrained']
 
 URL = {
     'GCN_Tox21': 'dgllife/pre_trained/gcn_tox21.pth',
     'GAT_Tox21': 'dgllife/pre_trained/gat_tox21.pth',
+    'Weave_Tox21': 'dgllife/pre_trained/weave_tox21.pth',
     'AttentiveFP_Aromaticity': 'dgllife/pre_trained/attentivefp_aromaticity.pth',
     'DGMG_ChEMBL_canonical': 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random': 'pre_trained/dgmg_ChEMBL_random.pth',
@@ -70,6 +71,7 @@ def load_pretrained(model_name, log=True):
 
         * ``'GCN_Tox21'``: A GCN-based model for molecular property prediction on Tox21
         * ``'GAT_Tox21'``: A GAT-based model for molecular property prediction on Tox21
+        * ``'Weave_Tox21'``: A Weave model for molecular property prediction on Tox21
         * ``'AttentiveFP_Aromaticity'``: An AttentiveFP model for predicting number of
           aromatic atoms on a subset of Pubmed
         * ``'DGMG_ChEMBL_canonical'``: A DGMG model trained on ChEMBL with a canonical
@@ -107,6 +109,14 @@ def load_pretrained(model_name, log=True):
                              activations=[F.elu, None],
                              classifier_hidden_feats=64,
                              n_tasks=12)
+
+    elif model_name == 'Weave_Tox21':
+        model = WeavePredictor(node_in_feats=27,
+                               edge_in_feats=12,
+                               num_gnn_layers=2,
+                               gnn_hidden_feats=50,
+                               graph_feats=128,
+                               n_tasks=12)
 
     elif model_name == 'AttentiveFP_Aromaticity':
         model = AttentiveFPPredictor(node_feat_size=39,
