@@ -728,16 +728,21 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::cout << "555555\n";
     // Recv remote message
     for (int i = 0; i < msg_count; ++i) {
+      std::cout << "aaaaa\n";
       KVStoreMsg *kv_msg = recv_kv_message(receiver);
+      std::cout << "bbbbb\n";
       int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
       int part_id = kv_msg->rank / group_count;
       char* data_char = static_cast<char*>(kv_msg->data->data);
+      std::cout << "ccccc\n";
       for (size_t n = 0; n < id_size; ++n) {
         memcpy(return_data + remote_ids_original[part_id][n] * row_size,
                data_char + n * row_size,
                row_size);
       }
+      std::cout << "ddddd\n";
       delete kv_msg;
+      std::cout << "eeeeee\n";
     }
     std::cout << "6666666\n";
     // Get final tensor
