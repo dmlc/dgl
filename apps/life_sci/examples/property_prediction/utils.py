@@ -5,7 +5,6 @@ import torch
 
 from dgllife.utils.featurizers import one_hot_encoding
 from dgllife.utils.splitters import RandomSplitter
-from dgllife.utils.weave_featurizer import *
 
 def set_random_seed(seed=0):
     """Set random seed.
