@@ -366,6 +366,7 @@ def _fast_pull(name, id_tensor,
         target tensor
     """
     if g2l is not None:
+        print("has_g2l")
         res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
                                     F.zerocopy_to_dgl_ndarray(id_tensor),
                                     F.zerocopy_to_dgl_ndarray(partition_book),
@@ -373,6 +374,7 @@ def _fast_pull(name, id_tensor,
                                     sender, receiver, 'has_g2l',
                                     F.zerocopy_to_dgl_ndarray(g2l))
     else:
+        print("no_g2l")
         res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
                                     F.zerocopy_to_dgl_ndarray(id_tensor),
                                     F.zerocopy_to_dgl_ndarray(partition_book),

@@ -855,6 +855,7 @@ class KVClient(object):
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
         if self._udf_pull is None:
+            print("fast pull")
             g2l = None
             if name+'-g2l-' in self._data_store:
                g2l = self._data_store[name+'-g2l-']

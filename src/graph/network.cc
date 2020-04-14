@@ -637,6 +637,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
 
 DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::cout << "000000\n";
     std::string name = args[0];
     int local_machine_id = args[1];
     int machine_count = args[2];
@@ -659,6 +660,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<int64_t> local_data_shape;
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
     std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
+    std::cout << "111111\n";
     int row_size = 1;
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
@@ -666,6 +668,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         row_size *= local_data->shape[i];
       }
     }
+    std::cout << "222222\n";
     row_size *= sizeof(float);
     // Get local id and remote id
     if (str_flag.compare("has_g2l") == 0) {
@@ -696,6 +699,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         }
       }
     }
+    std::cout << "333333\n";
     int msg_count = 0;
     for (int i = 0; i < remote_ids.size(); ++i) {
       if (remote_ids[i].size() != 0) {
@@ -713,6 +717,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     char *return_data = new char[ID_size*row_size];
+    std::cout << "444444\n";
     // Copy local data
 #pragma omp parallel for
     for (int64_t i = 0; i < local_ids.size(); ++i) {
@@ -733,6 +738,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
       delete kv_msg;
     }
+    std::cout << "555555\n";
     // Get final tensor
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
@@ -742,6 +748,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                           return_data,
                           AUTO_FREE);
     *rv = res_tensor;
+    std::cout << "666666\n";
   });
 
 }  // namespace network
