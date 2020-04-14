@@ -2,8 +2,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..gnn import WeaveGNN
-from ..readout import WeaveGather
+from apps.life_sci.dgllife.model.gnn import WeaveGNN
+from apps.life_sci.dgllife.model.readout import WeaveGather
 
 __all__ = ['WeavePredictor']
 
