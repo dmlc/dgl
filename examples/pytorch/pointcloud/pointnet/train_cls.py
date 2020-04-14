@@ -15,7 +15,7 @@ import argparse
 
 from dataset import ModelNet
 from pointnet_cls import PointNetCls, compute_loss
-from pointnet2 import PointNet2Cls
+from pointnet2 import PointNet2SSGCls, PointNet2MSGCls
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset-path', type=str, default='')
@@ -23,7 +23,7 @@ parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
 parser.add_argument('--num-workers', type=int, default=6)
-parser.add_argument('--batch-size', type=int, default=24)
+parser.add_argument('--batch-size', type=int, default=16)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -102,7 +102,8 @@ dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # dev = "cpu"
 
 # net = PointNetCls(40)
-net = PointNet2Cls(40, batch_size)
+net = PointNet2SSGCls(40, batch_size)
+# net = PointNet2MSGCls(40, batch_size)
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
