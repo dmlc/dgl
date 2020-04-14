@@ -102,7 +102,6 @@ pipeline {
         docker {
           label "linux-auto-cpu-node"
           image "dgllib/dgl-ci-lint"
-          // args "--group-add 777" 
         }
       }
       steps {
@@ -139,7 +138,6 @@ pipeline {
             docker {
               label "linux-auto-cpu-node"
               image "dgllib/dgl-ci-gpu:conda"
-              args "--user 0"
             }
           }
           steps {
@@ -221,8 +219,7 @@ pipeline {
           agent { 
             docker { 
               label "linux-gpu-node"
-              image "dgllib/dgl-ci-gpu:conda" 
-              args "--runtime nvidia"
+              image "dgllib/dgl-ci-gpu:conda"
             }
           }
           stages {
@@ -242,8 +239,7 @@ pipeline {
           agent { 
             docker {
               label "linux-auto-cpu-node"
-              image "dgllib/dgl-ci-cpu:conda" 
-              args "--user 0"
+              image "dgllib/dgl-ci-cpu:conda"
             }
           }
           stages {

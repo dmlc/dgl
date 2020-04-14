@@ -37,6 +37,3 @@ python3 setup.py install
 python3 setup.py build_ext --inplace
 done
 popd
-
-# Fix permission issue due to different user between host and docker
-sudo chmod -R 777 ./
