@@ -595,7 +595,7 @@ class WLNRankDataset(object):
         self.valid_candidate_combos, self.candidate_bond_changes, self.node_feats, \
         self.combo_bias, self.reactant_info = self.pre_process(
             node_featurizer, num_candidate_bond_changes,
-            max_num_changes_per_reaction, max_num_change_combos_per_reaction)
+            max_num_changes_per_reaction, max_num_change_combos_per_reaction, log_every)
         self.candidate_graphs = self.construct_and_featurize_edges(
             mol_graph_path, edge_featurizer, load, log_every)
 
@@ -1011,7 +1011,7 @@ class WLNRankDataset(object):
         return self.edit_mol(reactant_mols, edits, product_info)
 
     def pre_process(self, node_featurizer, num_candidate_bond_changes,
-                    max_num_changes_per_reaction, max_num_change_combos_per_reaction):
+                    max_num_changes_per_reaction, max_num_change_combos_per_reaction, log_every):
         """Pre-process for the experiments.
 
         Parameters
@@ -1025,6 +1025,8 @@ class WLNRankDataset(object):
             Maximum number of bond changes per reaction.
         max_num_change_combos_per_reaction : int
             Number of bond change combos to consider for each reaction.
+        log_every : int
+            Print a progress update every time ``log_every`` reactions are pre-processed.
 
         Returns
         -------
@@ -1056,6 +1058,8 @@ class WLNRankDataset(object):
         all_combo_bias = []
         all_reactant_info = []
         for i in range(len(self.reactant_mols)):
+            if i % log_every == 0:
+                print('Processing line {:d}'.format(i))
             candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
                                in self.candidate_bond_changes[i]]
             reactant_mol = self.reactant_mols[i]
