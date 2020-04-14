@@ -257,7 +257,7 @@ def test_weave():
     gnn = WeaveGNN(node_in_feats=1,
                    edge_in_feats=2,
                    num_layers=1,
-                   hidden_feats=2)
+                   hidden_feats=2).to(device)
     assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 2])
     assert gnn(bg, batch_node_feats, batch_edge_feats).shape == torch.Size([8, 2])
 

@@ -90,11 +90,11 @@ def test_weave_readout():
     bg, batch_node_feats = test_graph2()
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
 
-    model = WeaveGather(node_in_feats=1)
+    model = WeaveGather(node_in_feats=1).to(device)
     assert model(g, node_feats).shape == torch.Size([1, 1])
     assert model(bg, batch_node_feats).shape == torch.Size([2, 1])
 
-    model = WeaveGather(node_in_feats=1, gaussian_expand=False)
+    model = WeaveGather(node_in_feats=1, gaussian_expand=False).to(device)
     assert model(g, node_feats).shape == torch.Size([1, 1])
     assert model(bg, batch_node_feats).shape == torch.Size([2, 1])
 

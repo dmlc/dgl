@@ -100,9 +100,9 @@ def test_weave_tox21():
     node_featurizer = WeaveAtomFeaturizer()
     edge_featurizer = WeaveEdgeFeaturizer(max_distance=2)
     g1 = smiles_to_complete_graph('CO', node_featurizer=node_featurizer,
-                                  edge_featurizer=edge_featurizer)
+                                  edge_featurizer=edge_featurizer, add_self_loop=True)
     g2 = smiles_to_complete_graph('CCO', node_featurizer=node_featurizer,
-                                  edge_featurizer=edge_featurizer)
+                                  edge_featurizer=edge_featurizer, add_self_loop=True)
     bg = dgl.batch([g1, g2])
 
     model = load_pretrained('Weave_Tox21').to(device)
