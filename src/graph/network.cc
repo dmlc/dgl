@@ -648,15 +648,11 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     CommunicatorHandle chandle_sender = args[8];
     CommunicatorHandle chandle_receiver = args[9];
     std::string str_flag = args[10];
-    if (str_flag.compare("has_g2l") == 0) {
-        NDArray g2l = args[11];
-    }
     network::Sender* sender = static_cast<network::Sender*>(chandle_sender);
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle_receiver);
     int64_t ID_size = ID.GetSize() / sizeof(int64_t);
     int64_t* ID_data = static_cast<int64_t*>(ID->data);
     int64_t* pb_data = static_cast<int64_t*>(pb->data);
-    int64_t* g2l_data = static_cast<int64_t*>(g2l->data);
     char* local_data_char = static_cast<char*>(local_data->data);
     std::vector<int64_t> local_ids;
     std::vector<int64_t> local_ids_orginal;
@@ -673,6 +669,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     row_size *= sizeof(float);
     // Get local id and remote id
     if (str_flag.compare("has_g2l") == 0) {
+      NDArray g2l = args[11];
+      int64_t* g2l_data = static_cast<int64_t*>(g2l->data);
       for (int64_t i = 0; i < ID_size; ++i) {
         int64_t id = ID_data[i];
         int64_t part_id = pb_data[id];
