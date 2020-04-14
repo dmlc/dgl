@@ -26,3 +26,8 @@ Weighted Sum and Max Readout
 ----------------------------
 .. automodule:: dgllife.model.readout.weighted_sum_and_max
     :members:
+
+Weave Readout
+-------------
+.. automodule:: dgllife.model.readout.weave_readout
+    :members:
