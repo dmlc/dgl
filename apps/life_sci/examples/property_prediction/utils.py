@@ -7,15 +7,6 @@ from dgllife.utils.featurizers import one_hot_encoding
 from dgllife.utils.splitters import RandomSplitter
 from dgllife.utils.weave_featurizer import *
 
-
-def smiles_to_bigraph(smiles, add_self_loop=False,
-                      node_featurizer=None,
-                      edge_featurizer=None,
-                      canonical_atom_order=True):
-    mol = Chem.MolFromSmiles(smiles)
-    return construct_graph_and_featurize(mol)
-
-
 def set_random_seed(seed=0):
     """Set random seed.
     Parameters
