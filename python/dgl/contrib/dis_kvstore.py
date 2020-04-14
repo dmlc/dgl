@@ -855,13 +855,16 @@ class KVClient(object):
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
         if self._udf_pull is None:
+            g2l = None
+            if name+'-g2l-' in self._data_store:
+               g2l = self._data_store[name+'-g2l-']
             return _fast_pull(name, id_tensor,
                         self._machine_count,
                         self._group_count,
                         self._machine_id,
                         self._client_id,
                         self._data_store[name+'-part-'], 
-                        self._data_store[name+'-g2l-'], 
+                        g2l, 
                         self._data_store[name+'-data-'],
                         self._sender,
                         self._receiver)

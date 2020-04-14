@@ -365,11 +365,18 @@ def _fast_pull(name, id_tensor,
     tensor
         target tensor
     """
-    res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
-                                F.zerocopy_to_dgl_ndarray(id_tensor),
-                                F.zerocopy_to_dgl_ndarray(partition_book),
-                                F.zerocopy_to_dgl_ndarray(g2l),
-                                F.zerocopy_to_dgl_ndarray(local_data),
-                                sender, receiver)
+    if g2l is not None:
+        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
+                                    F.zerocopy_to_dgl_ndarray(id_tensor),
+                                    F.zerocopy_to_dgl_ndarray(partition_book),
+                                    F.zerocopy_to_dgl_ndarray(local_data),
+                                    sender, receiver, 'has_g2l',
+                                    F.zerocopy_to_dgl_ndarray(g2l))
+    else:
+        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
+                                    F.zerocopy_to_dgl_ndarray(id_tensor),
+                                    F.zerocopy_to_dgl_ndarray(partition_book),
+                                    F.zerocopy_to_dgl_ndarray(local_data),
+                                    sender, receiver, 'no_g2l')
 
     return F.zerocopy_from_dgl_ndarray(res_tensor)

@@ -644,10 +644,13 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     int client_id = args[4];
     NDArray ID = args[5];
     NDArray pb = args[6];
-    NDArray g2l = args[7];
-    NDArray local_data = args[8];
-    CommunicatorHandle chandle_sender = args[9];
-    CommunicatorHandle chandle_receiver = args[10];
+    NDArray local_data = args[7];
+    CommunicatorHandle chandle_sender = args[8];
+    CommunicatorHandle chandle_receiver = args[9];
+    std::string str_flag = args[10];
+    if (str_flag.compare("has_g2l") == 0) {
+        NDArray g2l = args[11];
+    }
     network::Sender* sender = static_cast<network::Sender*>(chandle_sender);
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle_receiver);
     int64_t ID_size = ID.GetSize() / sizeof(int64_t);
@@ -669,16 +672,30 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     }
     row_size *= sizeof(float);
     // Get local id and remote id
-    for (int64_t i = 0; i < ID_size; ++i) {
-      int64_t id = ID_data[i];
-      int64_t part_id = pb_data[id];
-      if (part_id == local_machine_id) {
-        int64_t local_id = g2l_data[id];
-        local_ids.push_back(local_id);
-        local_ids_orginal.push_back(i);
-      } else {
-        remote_ids[part_id].push_back(id);
-        remote_ids_original[part_id].push_back(i);
+    if (str_flag.compare("has_g2l") == 0) {
+      for (int64_t i = 0; i < ID_size; ++i) {
+        int64_t id = ID_data[i];
+        int64_t part_id = pb_data[id];
+        if (part_id == local_machine_id) {
+          int64_t local_id = g2l_data[id];
+          local_ids.push_back(local_id);
+          local_ids_orginal.push_back(i);
+        } else {
+          remote_ids[part_id].push_back(id);
+          remote_ids_original[part_id].push_back(i);
+        }
+      }
+    } else {
+      for (int64_t i = 0; i < ID_size; ++i) {
+        int64_t id = ID_data[i];
+        int64_t part_id = pb_data[id];
+        if (part_id == local_machine_id) {
+          local_ids.push_back(id);
+          local_ids_orginal.push_back(i);
+        } else {
+          remote_ids[part_id].push_back(id);
+          remote_ids_original[part_id].push_back(i);
+        }
       }
     }
     int msg_count = 0;
