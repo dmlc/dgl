@@ -11,8 +11,6 @@ from dgllife.utils import CanonicalAtomFeaturizer, BaseAtomFeaturizer, WeaveAtom
 # edge featurization
 from dgllife.utils.featurizers import BaseBondFeaturizer, WeaveEdgeFeaturizer
 
-from dgllife.utils.weave_featurizer import *
-
 from utils import chirality
 
 GCN_Tox21 = {
