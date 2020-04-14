@@ -116,23 +116,6 @@ pipeline {
     }
     stage("Build") {
       parallel {
-        stage("CPU Build") {
-          agent { 
-            docker {
-              label "linux-auto-cpu-node"
-              image "dgllib/dgl-ci-cpu:conda" 
-              args "--user 0"
-            }
-          }
-          steps {
-            build_dgl_linux("cpu")
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
         stage("GPU Build") {
           agent {
             docker {
@@ -143,6 +126,23 @@ pipeline {
           steps {
             // sh "nvidia-smi"
             build_dgl_linux("gpu")
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
+        stage("CPU Build") {
+          agent { 
+            docker {
+              label "linux-auto-cpu-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+              args "--user 0"
+            }
+          }
+          steps {
+            build_dgl_linux("cpu")
           }
           post {
             always {
