@@ -15,7 +15,6 @@ import argparse
 
 from dataset import ShapeNet
 from pointnet_partseg import PointNetPartSeg, PartSegLoss
-from pointnet2 import FarthestPointSampler, EpsBallPoints
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset-path', type=str, default='')
