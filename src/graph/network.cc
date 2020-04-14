@@ -734,7 +734,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
       int part_id = kv_msg->rank / group_count;
       char* data_char = static_cast<char*>(kv_msg->data->data);
-      std::cout << "ccccc\n";
+      std::cout << "id_size: " << id_size << "\n";
+      std::cout << "part_id: " << part_id << "\n";
       for (size_t n = 0; n < id_size; ++n) {
         memcpy(return_data + remote_ids_original[part_id][n] * row_size,
                data_char + n * row_size,
