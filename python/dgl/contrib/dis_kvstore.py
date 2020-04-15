@@ -690,6 +690,8 @@ class KVClient(object):
         self._addr = self._get_local_usable_addr()
         client_ip, client_port = self._addr.split(':')
 
+        print("444444")
+
         msg = KVStoreMsg(
             type=KVMsgType.IP_ID,
             rank=0, # a tmp client ID
@@ -698,10 +700,14 @@ class KVClient(object):
             data=None,
             c_ptr=None)
 
+        print("55555")
+
         for server_id in range(self._server_count):
             _send_kv_msg(self._sender, msg, server_id)
 
         _receiver_wait(self._receiver, client_ip, int(client_port), self._server_count)
+
+        print("666666")
 
         # Recv client ID from server
         msg = _recv_kv_msg(self._receiver)
