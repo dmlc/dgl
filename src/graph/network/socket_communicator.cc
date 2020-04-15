@@ -202,7 +202,6 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   std::string accept_ip;
   int accept_port;
   for (int i = 0; i < num_sender_; ++i) {
-    std::cout << "wait: " << i << "----------\n";
     sockets_[i] = std::make_shared<TCPSocket>();
     if (server_socket_->Accept(sockets_[i].get(), &accept_ip, &accept_port) == false) {
       LOG(WARNING) << "Error on accept socket.";
