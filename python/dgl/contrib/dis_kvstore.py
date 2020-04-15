@@ -431,9 +431,7 @@ class KVServer(object):
             _clear_kv_msg(msg)
 
             self._msg_count += 1
-
-            print(self._msg_count)
-
+            
 
     def _serialize_shared_tensor(self, name, dtype):
         """Serialize shared tensor information.
