@@ -719,7 +719,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     }
     char *return_data = new char[ID_size*row_size];
     // Copy local data
-#pragma omp parallel for
+//#pragma omp parallel for
     for (int64_t i = 0; i < local_ids.size(); ++i) {
       memcpy(return_data + local_ids_orginal[i] * row_size,
              local_data_char + local_ids[i] * row_size,
