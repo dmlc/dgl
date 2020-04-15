@@ -854,7 +854,7 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
-        if self._udf_pull is None:
+        if self._udf_pull is not None:
             g2l = None
             if name+'-g2l-' in self._data_store:
                g2l = self._data_store[name+'-g2l-']
@@ -913,7 +913,7 @@ class KVClient(object):
 
             msg_list = []
             if local_id is not None: # local pull
-                local_data = self._udf_pull(name+'-data-', local_id, self._data_store)
+                local_data = self._default_pull_handler(name+'-data-', local_id, self._data_store)
                 s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
                 local_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK, 
