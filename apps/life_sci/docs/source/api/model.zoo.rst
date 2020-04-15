@@ -49,6 +49,11 @@ SchNet Predictor
 .. automodule:: dgllife.model.model_zoo.schnet_predictor
     :members:
 
+Weave Predictor
+```````````````
+.. automodule:: dgllife.model.model_zoo.weave_predictor
+    :members:
+
 Generative Models
 -----------------
 
