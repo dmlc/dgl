@@ -869,6 +869,7 @@ class KVClient(object):
                         self._sender,
                         self._receiver)
         else:
+            print("original pull")
             for msg in self._garbage_msg:
                 _clear_kv_msg(msg)
             self._garbage_msg = []
