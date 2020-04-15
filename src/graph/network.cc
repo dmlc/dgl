@@ -745,7 +745,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                           DLDataType{kDLFloat, 32, 1},
                           DLContext{kDLCPU, 0},
                           return_data,
-                          AUTO_FREE);
+                          !AUTO_FREE);
     *rv = res_tensor;
   });
 
