@@ -141,6 +141,8 @@ class WLN(nn.Module):
             concat_edge_feats = torch.cat([g.edata['he_src'], edge_feats], dim=1)
             g.edata['he'] = self.project_concatenated_messages(concat_edge_feats)
             g.update_all(fn.copy_edge('he', 'm'), fn.sum('m', 'hv_new'))
+            node_feats = self.get_new_node_feats(
+                torch.cat([node_feats, g.ndata['hv_new']], dim=1))
 
         g = g.local_var()
         g.ndata['hv'] = self.project_node_messages(node_feats)
