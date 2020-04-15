@@ -66,7 +66,7 @@ Once you have installed the package, you can verify the success of installation 
 import dgllife
 
 print(dgllife.__version__)
-# 0.2.1
+# 0.2.2
 ```
 
 If you are new to DGL, the first time you import dgl a message will pop up as below:
