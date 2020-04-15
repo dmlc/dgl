@@ -322,7 +322,7 @@ class KVServer(object):
         # Get connected with all client nodes
         _receiver_wait(self._receiver, self._ip, self._port, self._client_count)
 
-        print("11111111")
+        print("%d clients connected!" % self._client_count)
 
         # recv client address information
         addr_list = []
@@ -431,7 +431,7 @@ class KVServer(object):
             _clear_kv_msg(msg)
 
             self._msg_count += 1
-            
+
 
     def _serialize_shared_tensor(self, name, dtype):
         """Serialize shared tensor information.
