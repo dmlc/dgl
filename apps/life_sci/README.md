@@ -12,6 +12,8 @@ with graph neural networks.
 We provide various functionalities, including but not limited to methods for graph construction, 
 featurization, and evaluation, model architectures, training scripts and pre-trained models.
 
+For a list of community contributors, see [here](CONTRIBUTORS.md).
+
 **For a full list of work implemented in DGL-LifeSci, see [here](examples/README.md).**
 
 ## Installation
