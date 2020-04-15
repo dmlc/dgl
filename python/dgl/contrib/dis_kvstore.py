@@ -677,11 +677,14 @@ class KVClient(object):
 
         """
         # Get connected with all server nodes
+        print("111111")
         for ID, addr in self._server_namebook.items():
             server_ip = addr[1]
             server_port = addr[2]
             _add_receiver_addr(self._sender, server_ip, server_port, ID)
+        print("2222222")
         _sender_connect(self._sender)
+        print("3333333")
 
         # Send client address to server nodes
         self._addr = self._get_local_usable_addr()
