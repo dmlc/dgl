@@ -1,11 +1,16 @@
 """Node and edge featurization for molecular graphs."""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import itertools
-from collections import defaultdict
-import dgl.backend as F
-import numpy as np
+import os.path as osp
 
-from rdkit import Chem
+from collections import defaultdict
+from functools import partial
+from rdkit import Chem, RDConfig
+from rdkit.Chem import AllChem, ChemicalFeatures
+
+import numpy as np
+import torch
+import dgl.backend as F
 
 __all__ = ['one_hot_encoding',
            'atom_type_one_hot',
@@ -35,6 +40,7 @@ __all__ = ['one_hot_encoding',
            'ConcatFeaturizer',
            'BaseAtomFeaturizer',
            'CanonicalAtomFeaturizer',
+           'WeaveAtomFeaturizer',
            'bond_type_one_hot',
            'bond_is_conjugated_one_hot',
            'bond_is_conjugated',
@@ -42,7 +48,8 @@ __all__ = ['one_hot_encoding',
            'bond_is_in_ring',
            'bond_stereo_one_hot',
            'BaseBondFeaturizer',
-           'CanonicalBondFeaturizer']
+           'CanonicalBondFeaturizer',
+           'WeaveEdgeFeaturizer']
 
 def one_hot_encoding(x, allowable_set, encode_unknown=False):
     """One-hot encoding.
@@ -482,6 +489,30 @@ def atom_formal_charge(atom):
     """
     return [atom.GetFormalCharge()]
 
+def atom_partial_charge(atom):
+    """Get Gasteiger partial charge for an atom.
+
+    For using this function, you must have called ``AllChem.ComputeGasteigerCharges(mol)``
+    to compute Gasteiger charges.
+
+    Occasionally, we can get nan or infinity Gasteiger charges, in which case we will set
+    the result to be 0.
+
+    Parameters
+    ----------
+    atom : rdkit.Chem.rdchem.Atom
+        RDKit atom instance.
+
+    Returns
+    -------
+    list
+        List containing one float only.
+    """
+    gasteiger_charge = atom.GetProp('_GasteigerCharge')
+    if gasteiger_charge in ['-nan', 'nan', '-inf', 'inf']:
+        gasteiger_charge = 0
+    return [float(gasteiger_charge)]
+
 def atom_num_radical_electrons_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the number of radical electrons of an atom.
 
@@ -633,6 +664,11 @@ def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
         ``rdkit.Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW``,
         ``rdkit.Chem.rdchem.ChiralType.CHI_OTHER``.
 
+    Returns
+    -------
+    list
+        List containing one bool only.
+
     See Also
     --------
     one_hot_encoding
@@ -740,14 +776,26 @@ class BaseAtomFeaturizer(object):
             feat_sizes = dict()
         self._feat_sizes = feat_sizes
 
-    def feat_size(self, feat_name):
+    def feat_size(self, feat_name=None):
         """Get the feature size for ``feat_name``.
+
+        When there is only one feature, users do not need to provide ``feat_name``.
+
+        Parameters
+        ----------
+        feat_name : str
+            Feature for query.
 
         Returns
         -------
         int
-            Feature size for the feature with name ``feat_name``.
+            Feature size for the feature with name ``feat_name``. Default to None.
         """
+        if feat_name is None:
+            assert len(self.featurizer_funcs) == 1, \
+                'feat_name should be provided if there are more than one features'
+            feat_name = list(self.featurizer_funcs.keys())[0]
+
         if feat_name not in self.featurizer_funcs:
             return ValueError('Expect feat_name to be in {}, got {}'.format(
                 list(self.featurizer_funcs.keys()), feat_name))
@@ -818,7 +866,7 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     Parameters
     ----------
     atom_data_field : str
-        Name for storing atom features in DGLGraphs, default to be 'h'.
+        Name for storing atom features in DGLGraphs, default to 'h'.
 
     Examples
     --------
@@ -864,6 +912,162 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
                  atom_is_aromatic,
                  atom_total_num_H_one_hot]
             )})
+
+class WeaveAtomFeaturizer(object):
+    """Atom featurizer in Weave.
+
+    The atom featurization performed in `Molecular Graph Convolutions: Moving Beyond Fingerprints
+    <https://arxiv.org/abs/1603.00856>`__, which considers:
+
+    * atom types
+    * chirality
+    * formal charge
+    * partial charge
+    * aromatic atom
+    * hybridization
+    * hydrogen bond donor
+    * hydrogen bond acceptor
+    * the number of rings the atom belongs to for ring size between 3 and 8
+
+    Parameters
+    ----------
+    atom_data_field : str
+        Name for storing atom features in DGLGraphs, default to 'h'.
+    atom_types : list of str or None
+        Atom types to consider for one-hot encoding. If None, we will use a default
+        choice of ``'H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl', 'Br', 'I'``.
+    chiral_types : list of Chem.rdchem.ChiralType or None
+        Atom chirality to consider for one-hot encoding. If None, we will use a default
+        choice of ``Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+        Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW``.
+    hybridization_types : list of Chem.rdchem.HybridizationType or None
+        Atom hybridization types to consider for one-hot encoding. If None, we will use a
+        default choice of ``Chem.rdchem.HybridizationType.SP, Chem.rdchem.HybridizationType.SP2,
+        Chem.rdchem.HybridizationType.SP3``.
+    """
+    def __init__(self, atom_data_field='h', atom_types=None, chiral_types=None,
+                 hybridization_types=None):
+        super(WeaveAtomFeaturizer, self).__init__()
+
+        self._atom_data_field = atom_data_field
+
+        if atom_types is None:
+            atom_types = ['H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl', 'Br', 'I']
+        self._atom_types = atom_types
+
+        if chiral_types is None:
+            chiral_types = [Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+                            Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW]
+        self._chiral_types = chiral_types
+
+        if hybridization_types is None:
+            hybridization_types = [Chem.rdchem.HybridizationType.SP,
+                                   Chem.rdchem.HybridizationType.SP2,
+                                   Chem.rdchem.HybridizationType.SP3]
+        self._hybridization_types = hybridization_types
+
+        self._featurizer = ConcatFeaturizer([
+            partial(atom_type_one_hot, allowable_set=atom_types, encode_unknown=True),
+            partial(atom_chiral_tag_one_hot, allowable_set=chiral_types),
+            atom_formal_charge, atom_partial_charge, atom_is_aromatic,
+            partial(atom_hybridization_one_hot, allowable_set=hybridization_types)
+        ])
+
+    def feat_size(self):
+        """Get the feature size.
+
+        Returns
+        -------
+        int
+            Feature size.
+        """
+        mol = Chem.MolFromSmiles('C')
+        feats = self(mol)[self._atom_data_field]
+
+        return feats.shape[-1]
+
+    def get_donor_acceptor_info(self, mol_feats):
+        """Bookkeep whether an atom is donor/acceptor for hydrogen bonds.
+
+        Parameters
+        ----------
+        mol_feats : tuple of rdkit.Chem.rdMolChemicalFeatures.MolChemicalFeature
+            Features for molecules.
+
+        Returns
+        -------
+        is_donor : dict
+            Mapping atom ids to binary values indicating whether atoms
+            are donors for hydrogen bonds
+        is_acceptor : dict
+            Mapping atom ids to binary values indicating whether atoms
+            are acceptors for hydrogen bonds
+        """
+        is_donor = defaultdict(bool)
+        is_acceptor = defaultdict(bool)
+        # Get hydrogen bond donor/acceptor information
+        for feats in mol_feats:
+            if feats.GetFamily() == 'Donor':
+                nodes = feats.GetAtomIds()
+                for u in nodes:
+                    is_donor[u] = True
+            elif feats.GetFamily() == 'Acceptor':
+                nodes = feats.GetAtomIds()
+                for u in nodes:
+                    is_acceptor[u] = True
+
+        return is_donor, is_acceptor
+
+    def __call__(self, mol):
+        """Featurizes the input molecule.
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance.
+
+        Returns
+        -------
+        dict
+            Mapping atom_data_field as specified in the input argument to the atom
+            features, which is a float32 tensor of shape (N, M), N is the number of
+            atoms and M is the feature size.
+        """
+        atom_features = []
+
+        AllChem.ComputeGasteigerCharges(mol)
+        num_atoms = mol.GetNumAtoms()
+
+        # Get information for donor and acceptor
+        fdef_name = osp.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
+        mol_featurizer = ChemicalFeatures.BuildFeatureFactory(fdef_name)
+        mol_feats = mol_featurizer.GetFeaturesForMol(mol)
+        is_donor, is_acceptor = self.get_donor_acceptor_info(mol_feats)
+
+        # Get a symmetrized smallest set of smallest rings
+        # Following the practice from Chainer Chemistry (https://github.com/chainer/
+        # chainer-chemistry/blob/da2507b38f903a8ee333e487d422ba6dcec49b05/chainer_chemistry/
+        # dataset/preprocessors/weavenet_preprocessor.py)
+        sssr = Chem.GetSymmSSSR(mol)
+
+        for i in range(num_atoms):
+            atom = mol.GetAtomWithIdx(i)
+            # Features that can be computed directly from RDKit atom instances, which is a list
+            feats = self._featurizer(atom)
+            # Donor/acceptor indicator
+            feats.append(float(is_donor[i]))
+            feats.append(float(is_acceptor[i]))
+            # Count the number of rings the atom belongs to for ring size between 3 and 8
+            count = [0 for _ in range(3, 9)]
+            for ring in sssr:
+                ring_size = len(ring)
+                if i in ring and 3 <= ring_size <= 8:
+                    count[ring_size - 3] += 1
+            feats.extend(count)
+            atom_features.append(feats)
+        atom_features = np.stack(atom_features)
+
+        return {self._atom_data_field: F.zerocopy_from_numpy(atom_features.astype(np.float32))}
 
 def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for the type of a bond.
@@ -1071,14 +1275,26 @@ class BaseBondFeaturizer(object):
             feat_sizes = dict()
         self._feat_sizes = feat_sizes
 
-    def feat_size(self, feat_name):
+    def feat_size(self, feat_name=None):
         """Get the feature size for ``feat_name``.
+
+        When there is only one feature, users do not need to provide ``feat_name``.
+
+        Parameters
+        ----------
+        feat_name : str
+            Feature for query.
 
         Returns
         -------
         int
-            Feature size for the feature with name ``feat_name``.
+            Feature size for the feature with name ``feat_name``. Default to None.
         """
+        if feat_name is None:
+            assert len(self.featurizer_funcs) == 1, \
+                'feat_name should be provided if there are more than one features'
+            feat_name = list(self.featurizer_funcs.keys())[0]
+
         if feat_name not in self.featurizer_funcs:
             return ValueError('Expect feat_name to be in {}, got {}'.format(
                 list(self.featurizer_funcs.keys()), feat_name))
@@ -1165,3 +1381,101 @@ class CanonicalBondFeaturizer(BaseBondFeaturizer):
                  bond_is_in_ring,
                  bond_stereo_one_hot]
             )})
+
+# pylint: disable=E1102
+class WeaveEdgeFeaturizer(object):
+    """Edge featurizer in Weave.
+
+    The edge featurization is introduced in `Molecular Graph Convolutions:
+    Moving Beyond Fingerprints <https://arxiv.org/abs/1603.00856>`__.
+
+    This featurization is performed for a complete graph of atoms with self loops added,
+    which considers:
+
+    * Number of bonds between each pairs of atoms
+    * One-hot encoding of bond type if a bond exists between a pair of atoms
+    * Whether a pair of atoms belongs to a same ring
+
+    Parameters
+    ----------
+    edge_data_field : str
+        Name for storing edge features in DGLGraphs, default to ``'e'``.
+    max_distance : int
+        Maximum number of bonds to consider between each pair of atoms.
+        Default to 7.
+    bond_types : list of Chem.rdchem.BondType or None
+        Bond types to consider for one hot encoding. If None, we consider by
+        default single, double, triple and aromatic bonds.
+    """
+    def __init__(self, edge_data_field='e', max_distance=7, bond_types=None):
+        super(WeaveEdgeFeaturizer, self).__init__()
+
+        self._edge_data_field = edge_data_field
+        self._max_distance = max_distance
+        if bond_types is None:
+            bond_types = [Chem.rdchem.BondType.SINGLE,
+                          Chem.rdchem.BondType.DOUBLE,
+                          Chem.rdchem.BondType.TRIPLE,
+                          Chem.rdchem.BondType.AROMATIC]
+        self._bond_types = bond_types
+
+    def feat_size(self):
+        """Get the feature size.
+
+        Returns
+        -------
+        int
+            Feature size.
+        """
+        mol = Chem.MolFromSmiles('C')
+        feats = self(mol)[self._edge_data_field]
+
+        return feats.shape[-1]
+
+    def __call__(self, mol):
+        """Featurizes the input molecule.
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance.
+
+        Returns
+        -------
+        dict
+            Mapping self._edge_data_field to a float32 tensor of shape (N, M), where
+            N is the number of atom pairs and M is the feature size.
+        """
+        # Part 1 based on number of bonds between each pair of atoms
+        distance_matrix = torch.from_numpy(Chem.GetDistanceMatrix(mol))
+        # Change shape from (V, V, 1) to (V^2, 1)
+        distance_matrix = distance_matrix.float().reshape(-1, 1)
+        # Elementwise compare if distance is bigger than 0, 1, ..., max_distance - 1
+        distance_indicators = (distance_matrix >
+                               torch.arange(0, self._max_distance).float()).float()
+
+        # Part 2 for one hot encoding of bond type.
+        num_atoms = mol.GetNumAtoms()
+        bond_indicators = torch.zeros(num_atoms, num_atoms, len(self._bond_types))
+        for bond in mol.GetBonds():
+            bond_type_encoding = torch.tensor(
+                bond_type_one_hot(bond, allowable_set=self._bond_types)).float()
+            begin_atom_idx, end_atom_idx = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            bond_indicators[begin_atom_idx, end_atom_idx] = bond_type_encoding
+            bond_indicators[end_atom_idx, begin_atom_idx] = bond_type_encoding
+        # Reshape from (V, V, num_bond_types) to (V^2, num_bond_types)
+        bond_indicators = bond_indicators.reshape(-1, len(self._bond_types))
+
+        # Part 3 for whether a pair of atoms belongs to a same ring.
+        sssr = Chem.GetSymmSSSR(mol)
+        ring_mate_indicators = torch.zeros(num_atoms, num_atoms, 1)
+        for ring in sssr:
+            ring = list(ring)
+            num_atoms_in_ring = len(ring)
+            for i in range(num_atoms_in_ring):
+                ring_mate_indicators[ring[i], torch.tensor(ring)] = 1
+        ring_mate_indicators = ring_mate_indicators.reshape(-1, 1)
+
+        return {self._edge_data_field: torch.cat([distance_indicators,
+                                                  bond_indicators,
+                                                  ring_mate_indicators], dim=1)}
