@@ -148,9 +148,10 @@ class KVServer(object):
         # record for total message count
         self._msg_count = 0
         # user-defined push handler
-        self._udf_push = None
+        self._udf_push_handler = None
+        self._udf_push_param = None
         # user-defined pull handler
-        self._udf_pull = None
+        self._udf_pull_handler = None
 
 
     def __del__(self):
@@ -385,8 +386,8 @@ class KVServer(object):
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
-                if self._udf_push is not None:
-                    self._udf_push(msg.name+'-data-', local_id, msg.data, self._data_store)
+                if self._udf_push_handler is not None:
+                    self._udf_push_handler(msg.name+'-data-', local_id, msg.data, self._data_store, self._udf_push_param)
                 else:
                     self._default_push_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
             # Pull message
@@ -395,8 +396,8 @@ class KVServer(object):
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
-                if self._udf_pull is not None:
-                    res_tensor = self._udf_pull(msg.name+'-data-', local_id, self._data_store)
+                if self._udf_pull_handler is not None:
+                    res_tensor = self._udf_pull_handler(msg.name+'-data-', local_id, self._data_store)
                 else:
                     res_tensor = self._default_pull_handler(msg.name+'-data-', local_id, self._data_store)
                 back_msg = KVStoreMsg(
@@ -608,9 +609,10 @@ class KVClient(object):
         # Gargage_collection
         self._garbage_msg = []
         # User-defined pull handler
-        self._udf_pull = None
+        self._udf_pull_handler = None
         # User-defined push handler
-        self._udf_push = None
+        self._udf_push_handler = None
+        self._udf_push_param = None
         # Used load-balance
         random.seed(time.time())
 
@@ -830,8 +832,8 @@ class KVClient(object):
             start += count[idx]
 
         if local_id is not None: # local push
-            if self._udf_push is not None:
-                self._udf_push(name+'-data-', local_id, local_data, self._data_store)
+            if self._udf_push_handler is not None:
+                self._udf_push_handler(name+'-data-', local_id, local_data, self._data_store, self._udf_push_param)
             else:
                 self._default_push_handler(name+'-data-', local_id, local_data, self._data_store)
     
@@ -854,7 +856,7 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
-        if self._udf_pull is None:
+        if self._udf_pull_handler is None: # Use fast-pull
             g2l = None
             if name+'-g2l-' in self._data_store:
                g2l = self._data_store[name+'-g2l-']
@@ -913,7 +915,7 @@ class KVClient(object):
 
             msg_list = []
             if local_id is not None: # local pull
-                local_data = self._udf_pull(name+'-data-', local_id, self._data_store)
+                local_data = self._udf_pull_handler(name+'-data-', local_id, self._data_store)
                 s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
                 local_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK, 
@@ -1135,26 +1137,4 @@ class KVClient(object):
             self._data_store
         """
         target[name][ID] = data
-
-
-    def _default_pull_handler(self, name, ID, target):
-        """Default handler for PULL operation.
-
-        On default, _pull_handler perform get operation for the tensor.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        ID : tensor (mx.ndarray or torch.tensor)
-            a vector storing the ID list.
-        target : dict of data
-            self._data_store
-
-        Return
-        ------
-        tensor
-            a tensor with the same row size of ID.
-        """
-        return target[name][ID]
     
