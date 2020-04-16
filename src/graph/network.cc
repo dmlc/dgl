@@ -735,6 +735,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     row_size *= (local_data->dtype.bits / 8);
+    CHECK_GT(local_data_shape.size(), 0);
+    CHECK_EQ(row_size * local_data_shape[0], data_size);
     // Get local id and remote id
     if (str_flag.compare("has_g2l") == 0) {
       NDArray g2l = args[11];
@@ -744,6 +746,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         int64_t part_id = pb_data[id];
         if (part_id == local_machine_id) {
           int64_t local_id = g2l_data[id];
+	  CHECK_LT(local_id, local_data_shape[0]);
+	  CHECK_GE(local_id, 0);
           local_ids.push_back(local_id);
           local_ids_orginal.push_back(i);
         } else {
@@ -756,6 +760,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         int64_t id = ID_data[i];
         int64_t part_id = pb_data[id];
         if (part_id == local_machine_id) {
+	  CHECK_LT(id, local_data_shape[0]);
+	  CHECK_GE(id, 0);
           local_ids.push_back(id);
           local_ids_orginal.push_back(i);
         } else {
@@ -791,6 +797,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     // Copy local data
 #pragma omp parallel for
     for (int64_t i = 0; i < local_ids.size(); ++i) {
+      CHECK_GE(ID_size*row_size, local_ids_orginal[i] * row_size + row_size);
+      CHECK_GE(data_size, local_ids[i] * row_size + row_size);
+      CHECK_GE(local_ids[i], 0);
       memcpy(return_data + local_ids_orginal[i] * row_size,
              local_data_char + local_ids[i] * row_size,
              row_size);
