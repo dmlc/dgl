@@ -712,7 +712,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                                          !AUTO_FREE);
         int lower = i*group_count;
         int higher = (i+1)*group_count-1;
-        int s_id = (rand() % (higher-lower+1))+lower;
+        int s_id = (rand_r() % (higher-lower+1))+lower;
         send_kv_message(sender, &kv_msg, s_id, !AUTO_FREE);
         msg_count++;
       }
