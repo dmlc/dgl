@@ -23,7 +23,7 @@ class spatio_conv_layer_A(nn.Module):
     def __init__(self, c, Lk):
         super(spatio_conv_layer_A, self).__init__()
         self.g = Lk
-        print('c :',c)
+        # print('c :',c)
         self.gc = GraphConv(c, c, activation=F.relu)
         # self.gc = ChebConv(c, c, 3)
 
