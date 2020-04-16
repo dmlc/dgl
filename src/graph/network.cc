@@ -713,7 +713,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
                                          !AUTO_FREE);
         int lower = i*group_count;
         int higher = (i+1)*group_count-1;
-#ifndef _WIN32 // windows does not support rand_r()
+#ifndef _WIN32  // windows does not support rand_r()
         int s_id = (rand_r(&seed) % (higher-lower+1))+lower;
         send_kv_message(sender, &kv_msg, s_id, !AUTO_FREE);
 #endif
