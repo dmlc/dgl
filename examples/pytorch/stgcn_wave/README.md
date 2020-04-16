@@ -13,7 +13,8 @@ Dependencies
 
 How to run
 ----------
-
+please get METR_LA dataset from [https://drive.google.com/open?id=10FOTa6HXPqX8Pf5WRoRwcFnW9BrNZEIX](https://drive.google.com/open?id=10FOTa6HXPqX8Pf5WRoRwcFnW9BrNZEIX).
+and [https://github.com/chnsh/DCRNN_PyTorch](https://github.com/chnsh/DCRNN_PyTorch)
 An experiment in default settings can be run with
 
 ```bash
