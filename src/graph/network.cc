@@ -661,7 +661,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     std::vector<int64_t> local_data_shape;
     std::vector<std::vector<int64_t> > remote_ids(machine_count);
     std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
-    int seed = 314;
+    unsigned int seed = 314;
     int row_size = 1;
     for (int i = 0; i < local_data->ndim; ++i) {
       local_data_shape.push_back(local_data->shape[i]);
