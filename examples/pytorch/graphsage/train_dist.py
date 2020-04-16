@@ -62,6 +62,7 @@ def run(args, device, data):
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
+    model = th.nn.parallel.DistributedDataParallel(model)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -105,6 +106,13 @@ def run(args, device, data):
             forward_time += forward_end - start
             backward_time += compute_end - forward_end
 
+            # Aggregate gradients in multiple nodes.
+            for param in model.parameters():
+                if param.requires_grad and param.grad is not None:
+                    th.distributed.all_reduce(param.grad.data,
+                            op=th.distributed.ReduceOp.SUM)
+                    param.grad.data /= args.num_procs
+
             optimizer.step()
             update_time += time.time() - compute_end
 
@@ -134,6 +142,7 @@ def run(args, device, data):
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args):
+    th.distributed.init_process_group(backend='gloo')
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
     g = DistGraphStore(server_namebook, args.graph_name)
@@ -191,6 +200,8 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
+    parser.add_argument('--local_rank', type=int, help='get rank of the process')
+    parser.add_argument('--num_procs', type=int, help='the number of training processes')
     args = parser.parse_args()
 
     print(args)
