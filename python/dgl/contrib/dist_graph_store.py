@@ -72,7 +72,7 @@ class KVStoreTensorView:
         self.name = name
 
     def __getitem__(self, idx):
-        return self.kv.fast_pull(name=self.name, id_tensor=idx)
+        return self.kv.pull(name=self.name, id_tensor=idx)
 
 
 class NodeDataView(MutableMapping):
