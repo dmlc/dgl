@@ -21,9 +21,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
-parser.add_argument('--num-epochs', type=int, default=250)
-parser.add_argument('--num-workers', type=int, default=4)
-parser.add_argument('--batch-size', type=int, default=32)
+parser.add_argument('--num-epochs', type=int, default=200)
+parser.add_argument('--num-workers', type=int, default=6)
+parser.add_argument('--batch-size', type=int, default=24)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -107,7 +107,7 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.Adam(net.parameters(), lr=0.001, weight_decay=1e-4)
+opt = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
 
 scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.7)
 
