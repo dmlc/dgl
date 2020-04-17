@@ -45,7 +45,7 @@ class FarthestPointSampler(nn.Module):
         batch_indices = torch.arange(B, dtype=torch.long).to(device)
         for i in range(self.npoints):
             centroids[:, i] = farthest
-            centroid = pos[batch_indices, farthest, :].view(B, 1, 3)
+            centroid = pos[batch_indices, farthest, :].view(B, 1, C)
             dist = torch.sum((pos - centroid) ** 2, -1)
             mask = dist < distance
             distance[mask] = dist[mask]
@@ -152,7 +152,7 @@ class PointNetConv(nn.Module):
         return h
 
 class SAModule(nn.Module):
-    def __init__(self, npoints, radius, mlp_sizes, batch_size, n_neighbor=64,
+    def __init__(self, npoints, batch_size, radius, mlp_sizes, n_neighbor=64,
                  group_all=False):
         super(SAModule, self).__init__()
         self.group_all = group_all
@@ -162,7 +162,7 @@ class SAModule(nn.Module):
         self.message = GroupMessage(n_neighbor)
         self.conv = PointNetConv(mlp_sizes, batch_size)
         self.batch_size = batch_size
-    
+
     def forward(self, pos, feat):
         if self.group_all:
             return self.conv.group_all(pos, feat)
@@ -177,14 +177,46 @@ class SAModule(nn.Module):
         feat_res = g.ndata['new_feat'][mask].view(self.batch_size, -1, feat_dim)
         return pos_res, feat_res
 
-class PointNet2Cls(nn.Module):
+class SAMSGModule(nn.Module):
+    def __init__(self, npoints, batch_size, radius_list, n_neighbor_list, mlp_sizes_list):
+        super(SAMSGModule, self).__init__()
+        self.batch_size = batch_size
+        self.group_size = len(radius_list)
+
+        self.fps = FarthestPointSampler(npoints)
+        self.frnn_graph_list = nn.ModuleList()
+        self.message_list = nn.ModuleList()
+        self.conv_list = nn.ModuleList()
+        for i in range(self.group_size):
+            self.frnn_graph_list.append(FixedRadiusNNGraph(radius_list[i],
+                                                           n_neighbor_list[i]))
+            self.message_list.append(GroupMessage(n_neighbor_list[i]))
+            self.conv_list.append(PointNetConv(mlp_sizes_list[i], batch_size))
+
+    def forward(self, pos, feat):
+        centroids = self.fps(pos)
+        feat_res_list = []
+        for i in range(self.group_size):
+            g = self.frnn_graph_list[i](pos, centroids, feat)
+            g.update_all(self.message_list[i], self.conv_list[i])
+            mask = g.ndata['center'] == 1
+            pos_dim = g.ndata['pos'].shape[-1]
+            feat_dim = g.ndata['new_feat'].shape[-1]
+            if i == 0:
+                pos_res = g.ndata['pos'][mask].view(self.batch_size, -1, pos_dim)
+            feat_res = g.ndata['new_feat'][mask].view(self.batch_size, -1, feat_dim)
+            feat_res_list.append(feat_res)
+        feat_res = torch.cat(feat_res_list, 2)
+        return pos_res, feat_res
+
+class PointNet2SSGCls(nn.Module):
     def __init__(self, output_classes, batch_size, input_dims=3, dropout_prob=0.4):
-        super(PointNet2Cls, self).__init__()
+        super(PointNet2SSGCls, self).__init__()
         self.input_dims = input_dims
 
-        self.sa_module1 = SAModule(512, 0.2, [3, 64, 64, 128], batch_size)
-        self.sa_module2 = SAModule(128, 0.4, [128 + 3, 128, 128, 256], batch_size)
-        self.sa_module3 = SAModule(None, None, [256 + 3, 256, 512, 1024], batch_size,
+        self.sa_module1 = SAModule(512, batch_size, 0.2, [input_dims, 64, 64, 128])
+        self.sa_module2 = SAModule(128, batch_size, 0.4, [128 + 3, 128, 128, 256])
+        self.sa_module3 = SAModule(None, batch_size, None, [256 + 3, 256, 512, 1024],
                                    group_all=True)
 
         self.mlp1 = nn.Linear(1024, 512)
@@ -198,8 +230,61 @@ class PointNet2Cls(nn.Module):
         self.mlp_out = nn.Linear(256, output_classes)
 
     def forward(self, x):
-        pos, feat = self.sa_module1(x, None)
+        if x.shape[-1] > 3:
+            pos = x[:, :, :3]
+            feat = x[:, :, 3:]
+        else:
+            pos = x
+            feat = None
+        pos, feat = self.sa_module1(pos, feat)
         pos, feat = self.sa_module2(pos, feat)
+        h = self.sa_module3(pos, feat)
+
+        h = self.mlp1(h)
+        h = self.bn1(h)
+        h = F.relu(h)
+        h = self.drop1(h)
+        h = self.mlp2(h)
+        h = self.bn2(h)
+        h = F.relu(h)
+        h = self.drop2(h)
+
+        out = self.mlp_out(h)
+        return out
+
+class PointNet2MSGCls(nn.Module):
+    def __init__(self, output_classes, batch_size, input_dims=3, dropout_prob=0.4):
+        super(PointNet2MSGCls, self).__init__()
+        self.input_dims = input_dims
+
+        self.sa_msg_module1 = SAMSGModule(512, batch_size, [0.1, 0.2, 0.4], [16, 32, 128],
+                                          [[input_dims, 32, 32, 64], [input_dims, 64, 64, 128],
+                                           [input_dims, 64, 96, 128]])
+        self.sa_msg_module2 = SAMSGModule(128, batch_size, [0.2, 0.4, 0.8], [32, 64, 128],
+                                          [[320 + 3, 64, 64, 128], [320 + 3, 128, 128, 256],
+                                           [320 + 3, 128, 128, 256]])
+        self.sa_module3 = SAModule(None, batch_size, None, [640 + 3, 256, 512, 1024],
+                                   group_all=True)
+
+        self.mlp1 = nn.Linear(1024, 512)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.drop1 = nn.Dropout(dropout_prob)
+
+        self.mlp2 = nn.Linear(512, 256)
+        self.bn2 = nn.BatchNorm1d(256)
+        self.drop2 = nn.Dropout(dropout_prob)
+
+        self.mlp_out = nn.Linear(256, output_classes)
+
+    def forward(self, x):
+        if x.shape[-1] > 3:
+            pos = x[:, :, :3]
+            feat = x[:, :, 3:]
+        else:
+            pos = x
+            feat = None
+        pos, feat = self.sa_msg_module1(x, None)
+        pos, feat = self.sa_msg_module2(pos, feat)
         h = self.sa_module3(pos, feat)
 
         h = self.mlp1(h)

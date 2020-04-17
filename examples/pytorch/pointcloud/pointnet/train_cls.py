@@ -13,9 +13,11 @@ import urllib
 import os
 import argparse
 
-from dataset import ModelNet
+# from dataset import ModelNet
+import provider
+from ModelNetDataLoader import ModelNetDataLoader
 from pointnet_cls import PointNetCls, compute_loss
-from pointnet2 import PointNet2Cls
+from pointnet2 import PointNet2SSGCls, PointNet2MSGCls
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset-path', type=str, default='')
@@ -23,16 +25,28 @@ parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
 parser.add_argument('--num-workers', type=int, default=6)
-parser.add_argument('--batch-size', type=int, default=24)
+parser.add_argument('--batch-size', type=int, default=16)
 args = parser.parse_args()
 
 num_workers = args.num_workers
 batch_size = args.batch_size
+
+data_filename = 'modelnet40_normal_resampled.zip'
+download_path = os.path.join(get_download_dir(), data_filename)
+local_path = args.dataset_path or os.path.join(get_download_dir(), modelnet40_normal_resampled)
+
+if not os.path.exists(local_path):
+    download('https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip', download_path)
+    from zipfile import ZipFile
+    with ZipFile(fpath) as z:
+        z.extractall(path=local_path)
+'''
 data_filename = 'modelnet40-sampled-2048.h5'
 local_path = args.dataset_path or os.path.join(get_download_dir(), data_filename)
 
 if not os.path.exists(local_path):
     download('https://data.dgl.ai/dataset/modelnet40-sampled-2048.h5', local_path)
+'''
 
 CustomDataLoader = partial(
         DataLoader,
@@ -52,6 +66,14 @@ def train(net, opt, scheduler, train_loader, dev):
     with tqdm.tqdm(train_loader, ascii=True) as tq:
         # for data, label in tq:
         for data, label in tq:
+            data = data.data.numpy()
+            data = provider.random_point_dropout(data)
+            data[:, :, 0:3] = provider.random_scale_point_cloud(data[:, :, 0:3])
+            data[:, :, 0:3] = provider.jitter_point_cloud(data[:, :, 0:3])
+            data[:, :, 0:3] = provider.shift_point_cloud(data[:, :, 0:3])
+            data = torch.tensor(data)
+            label = label[:, 0]
+
             num_examples = label.shape[0]
             data, label = data.to(dev), label.to(dev).squeeze().long()
             opt.zero_grad()
@@ -83,6 +105,7 @@ def evaluate(net, test_loader, dev):
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
             for data, label in tq:
+                label = label[:,0]
                 num_examples = label.shape[0]
                 data, label = data.to(dev), label.to(dev).squeeze().long()
                 logits = net(data)
@@ -101,8 +124,9 @@ def evaluate(net, test_loader, dev):
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # dev = "cpu"
 
-# net = PointNetCls(40)
-net = PointNet2Cls(40, batch_size)
+# net = PointNetCls(40, input_dims=6)
+net = PointNet2SSGCls(40, batch_size, input_dims=6)
+# net = PointNet2MSGCls(40, batch_size)
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
@@ -111,16 +135,23 @@ opt = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
 
 scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.7)
 
+'''
 modelnet = ModelNet(local_path, 1024)
 
 train_loader = CustomDataLoader(modelnet.train())
 test_loader = CustomDataLoader(modelnet.test())
+'''
+
+train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
+test_dataset = ModelNetDataLoader(local_path, 1024, split='test')
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True)
 
 best_test_acc = 0
 
 for epoch in range(args.num_epochs):
     train(net, opt, scheduler, train_loader, dev)
-    if (epoch + 1) % 5 == 0:
+    if (epoch + 1) % 1 == 0:
         print('Epoch #%d Testing' % epoch)
         test_acc = evaluate(net, test_loader, dev)
         if test_acc > best_test_acc:
