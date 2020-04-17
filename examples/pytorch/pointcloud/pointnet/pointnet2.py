@@ -45,7 +45,7 @@ class FarthestPointSampler(nn.Module):
         batch_indices = torch.arange(B, dtype=torch.long).to(device)
         for i in range(self.npoints):
             centroids[:, i] = farthest
-            centroid = pos[batch_indices, farthest, :].view(B, 1, 3)
+            centroid = pos[batch_indices, farthest, :].view(B, 1, C)
             dist = torch.sum((pos - centroid) ** 2, -1)
             mask = dist < distance
             distance[mask] = dist[mask]
@@ -214,7 +214,7 @@ class PointNet2SSGCls(nn.Module):
         super(PointNet2SSGCls, self).__init__()
         self.input_dims = input_dims
 
-        self.sa_module1 = SAModule(512, batch_size, 0.2, [3, 64, 64, 128])
+        self.sa_module1 = SAModule(512, batch_size, 0.2, [input_dims, 64, 64, 128])
         self.sa_module2 = SAModule(128, batch_size, 0.4, [128 + 3, 128, 128, 256])
         self.sa_module3 = SAModule(None, batch_size, None, [256 + 3, 256, 512, 1024],
                                    group_all=True)
@@ -230,7 +230,13 @@ class PointNet2SSGCls(nn.Module):
         self.mlp_out = nn.Linear(256, output_classes)
 
     def forward(self, x):
-        pos, feat = self.sa_module1(x, None)
+        if x.shape[-1] > 3:
+            pos = x[:, :, :3]
+            feat = x[:, :, 3:]
+        else:
+            pos = x
+            feat = None
+        pos, feat = self.sa_module1(pos, feat)
         pos, feat = self.sa_module2(pos, feat)
         h = self.sa_module3(pos, feat)
 
@@ -252,7 +258,8 @@ class PointNet2MSGCls(nn.Module):
         self.input_dims = input_dims
 
         self.sa_msg_module1 = SAMSGModule(512, batch_size, [0.1, 0.2, 0.4], [16, 32, 128],
-                                          [[3, 32, 32, 64], [3, 64, 64, 128], [3, 64, 96, 128]])
+                                          [[input_dims, 32, 32, 64], [input_dims, 64, 64, 128],
+                                           [input_dims, 64, 96, 128]])
         self.sa_msg_module2 = SAMSGModule(128, batch_size, [0.2, 0.4, 0.8], [32, 64, 128],
                                           [[320 + 3, 64, 64, 128], [320 + 3, 128, 128, 256],
                                            [320 + 3, 128, 128, 256]])
@@ -270,6 +277,12 @@ class PointNet2MSGCls(nn.Module):
         self.mlp_out = nn.Linear(256, output_classes)
 
     def forward(self, x):
+        if x.shape[-1] > 3:
+            pos = x[:, :, :3]
+            feat = x[:, :, 3:]
+        else:
+            pos = x
+            feat = None
         pos, feat = self.sa_msg_module1(x, None)
         pos, feat = self.sa_msg_module2(pos, feat)
         h = self.sa_module3(pos, feat)

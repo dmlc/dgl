@@ -43,8 +43,8 @@ class PointNetCls(nn.Module):
 
         self.use_transform = use_transform
         if use_transform:
-            self.transform1 = TransformNet(3)
-            self.trans_bn1 = nn.BatchNorm1d(3)
+            self.transform1 = TransformNet(input_dims)
+            self.trans_bn1 = nn.BatchNorm1d(input_dims)
             self.transform2 = TransformNet(64)
             self.trans_bn2 = nn.BatchNorm1d(64)
 
