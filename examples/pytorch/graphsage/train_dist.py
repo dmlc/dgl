@@ -36,6 +36,7 @@ def load_subtensor(g, blocks, device):
     # The nodes for input lies at the LHS side of the first block.
     # The nodes for output lies at the RHS side of the last block.
     input_nodes = blocks[0].srcdata[dgl.NID]
+    # TODO this is the current way of getting global node Ids.
     input_nodes = g.g.ndata[dgl.NID][input_nodes]
     # TODO we should get global node id directly from the sampler.
     seeds = blocks[-1].dstdata[dgl.NID]
@@ -153,12 +154,13 @@ def main(args):
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     th.manual_seed(g.get_id())
-    train_mask = g.ndata['train_mask'][g.local_nids].numpy()
-    val_mask = g.ndata['val_mask'][g.local_nids].numpy()
-    test_mask = g.ndata['test_mask'][g.local_nids].numpy()
+    train_mask = g.ndata['train_mask'][g.local_gnids].numpy()
+    val_mask = g.ndata['val_mask'][g.local_gnids].numpy()
+    test_mask = g.ndata['test_mask'][g.local_gnids].numpy()
     print('part {}, train: {}, val: {}, test: {}'.format(g.get_id(),
         np.sum(train_mask), np.sum(val_mask), np.sum(test_mask)), flush=True)
 
+    # These have to be low node Ids.
     train_nid = g.local_nids[train_mask == 1].long()
     val_nid = g.local_nids[val_mask == 1].long()
     test_nid = g.local_nids[test_mask == 1].long()

@@ -242,6 +242,10 @@ class DistGraphStore:
     def local_nids(self):
         return self._local_nids
 
+    @property
+    def local_gnids(self):
+        return self._local_gnid
+
     def get_id(self):
         return self._client.get_id()
 
