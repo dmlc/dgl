@@ -735,6 +735,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     row_size *= (local_data->dtype.bits / 8);
+    size_t data_size = local_data.GetSize();
     CHECK_GT(local_data_shape.size(), 0);
     CHECK_EQ(row_size * local_data_shape[0], data_size);
     // Get local id and remote id
