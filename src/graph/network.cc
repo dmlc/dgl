@@ -669,7 +669,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         row_size *= local_data->shape[i];
       }
     }
-    row_size *= sizeof(float);
+    row_size *= (local_data->dtype.bits / 8);
     // Get local id and remote id
     if (str_flag.compare("has_g2l") == 0) {
       NDArray g2l = args[11];
