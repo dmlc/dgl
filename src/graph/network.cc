@@ -716,6 +716,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
 #ifndef _WIN32  // windows does not support rand_r()
         int s_id = (rand_r(&seed) % (higher-lower+1))+lower;
         send_kv_message(sender, &kv_msg, s_id, !AUTO_FREE);
+#else
+        LOG(FATAL) << "KVStore does not support Windows yet.";
 #endif
         msg_count++;
       }
