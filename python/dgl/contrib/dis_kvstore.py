@@ -193,7 +193,7 @@ class KVServer(object):
             self._open_file_list.append(name+'-g2l-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-g2l-shape')):
+                if (os.path.exists(name+'-g2l-shape'+str(self._machine_id))):
                     time.sleep(2) # wait writing finish
                     break
                 else:
@@ -229,7 +229,7 @@ class KVServer(object):
             self._open_file_list.append(name+'-data-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-data-shape')):
+                if (os.path.exists(name+'-data-shape'+str(self._machine_id))):
                     break
                 else:
                     time.sleep(2) # wait until the file been created
