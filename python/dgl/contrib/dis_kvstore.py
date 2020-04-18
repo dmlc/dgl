@@ -190,7 +190,7 @@ class KVServer(object):
             self._data_store[name+'-g2l-'][:] = global2local[:]
             # write data information to temp file that can be read by other processes
             self._write_data_shape(name+'-g2l-shape'+str(self._machine_id), global2local)
-            self._open_file_list.append(name+'-g2l-shape')
+            self._open_file_list.append(name+'-g2l-shape'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
                 if (os.path.exists(name+'-g2l-shape')):
@@ -198,7 +198,7 @@ class KVServer(object):
                     break
                 else:
                     time.sleep(2) # wait until the file been created
-            data_shape = self._read_data_shape(name+'-g2l-shape'+self._machine_id)
+            data_shape = self._read_data_shape(name+'-g2l-shape'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-g2l-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
@@ -226,14 +226,14 @@ class KVServer(object):
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-data-'][:] = data_tensor[:]
             self._write_data_shape(name+'-data-shape'+str(self._machine_id), data_tensor)
-            self._open_file_list.append(name+'-data-shape')
+            self._open_file_list.append(name+'-data-shape'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
                 if (os.path.exists(name+'-data-shape')):
                     break
                 else:
                     time.sleep(2) # wait until the file been created
-            data_shape = self._read_data_shape(name+'-data-shape'+self._machine_id)
+            data_shape = self._read_data_shape(name+'-data-shape'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-data-', False, data_shape, 'float32')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
@@ -651,7 +651,7 @@ class KVClient(object):
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-part-'][:] = partition_book[:]
             self._write_data_shape(name+'-part-shape'+str(self._machine_id), partition_book)
-            self._open_file_list.append(name+'-part-shape')
+            self._open_file_list.append(name+'-part-shape'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
                 if (os.path.exists(name+'-part-shape')):
