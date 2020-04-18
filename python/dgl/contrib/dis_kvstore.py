@@ -193,7 +193,7 @@ class KVServer(object):
             self._open_file_list.append(name+'-g2l-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-g2l-shape'+str(self._machine_id))):
+                if (os.path.exists(name+'-g2l-shape-'+str(self._machine_id))):
                     time.sleep(2) # wait writing finish
                     break
                 else:
@@ -229,7 +229,7 @@ class KVServer(object):
             self._open_file_list.append(name+'-data-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-data-shape'+str(self._machine_id))):
+                if (os.path.exists(name+'-data-shape-'+str(self._machine_id))):
                     break
                 else:
                     time.sleep(2) # wait until the file been created
@@ -654,7 +654,7 @@ class KVClient(object):
             self._open_file_list.append(name+'-part-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-part-shape')):
+                if (os.path.exists(name+'-part-shape-')+str(self._machine_id)):
                     time.sleep(2) # wait writing finish
                     break
                 else:
@@ -715,12 +715,12 @@ class KVClient(object):
             if data != '':
                 tensor_name, dtype = self._deserialize_shared_tensor(data)
                 while True:
-                    if (os.path.exists(tensor_name+'shape'+str(self._machine_id))):
+                    if (os.path.exists(tensor_name+'shape-'+str(self._machine_id))):
                         time.sleep(2) # wait writing finish
                         break
                     else:
                         time.sleep(2) # wait until the file been created 
-                shape = self._read_data_shape(tensor_name+'shape'+str(self._machine_id))
+                shape = self._read_data_shape(tensor_name+'shape-'+str(self._machine_id))
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[tensor_name] = F.zerocopy_from_dlpack(dlpack)
