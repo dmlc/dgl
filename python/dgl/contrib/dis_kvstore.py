@@ -654,7 +654,7 @@ class KVClient(object):
             self._open_file_list.append(name+'-part-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-part-shape-')+str(self._machine_id)):
+                if (os.path.exists(name+'-part-shape-'+str(self._machine_id))):
                     time.sleep(2) # wait writing finish
                     break
                 else:
