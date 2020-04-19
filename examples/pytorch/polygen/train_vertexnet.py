@@ -10,7 +10,7 @@ import torch
 from functools import partial
 import torch.distributed as dist
 
-def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True):
+def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True, log_f=None):
     with loss_compute:
         for i, g in enumerate(data_iter):
             with T.set_grad_enabled(is_train):
@@ -18,15 +18,10 @@ def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=Tr
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
                 loss = loss_compute(output, tgt_y, n_tokens)
-                print (torch.argmax(output, axis=-1))
-                print (tgt_y)
                 print (i, loss)
-            if i == 100:
-                break
-    if universal:
-        for step in range(1, model.MAX_DEPTH + 1):
-            print("nodes entering step {}: {:.2f}%".format(step, (1.0 * model.stat[step] / model.stat[0])))
-        model.reset_stat()
+                if log_f:
+                    info = str(i) + ': ' + str(loss) + '\n'
+                    log_f.write(info)
     print('Epoch {} {}: Dev {} average loss: {}, accuracy {}'.format(
         epoch, "Training" if is_train else "Evaluating",
         dev_rank, loss_compute.avg_loss, loss_compute.accuracy))
@@ -48,6 +43,12 @@ def main(dev_id, args):
         device = torch.device('cpu')
     else:
         device = torch.device('cuda:{}'.format(dev_id))
+    # Create ckpt dir
+    os.makedirs(args.ckpt_dir, exist_ok=True)
+    log_path = os.path.join(args.ckpt_dir, 'log.txt')
+    print (log_path)
+    log_f = open(log_path, 'w')
+
     # Set current device
     th.cuda.set_device(device)
     # Prepare dataset
@@ -91,7 +92,10 @@ def main(dev_id, args):
                              device=device, dev_rank=dev_rank, ndev=ndev)
         model.train(True)
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
-                  loss_compute(opt=model_opt), is_train=True)
+                  loss_compute(opt=model_opt), is_train=True, log_f=log_f)
+        ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(epoch)+'.pt')
+        print (ckpt_path)
+        torch.save(model.state_dict(), ckpt_path)
 
 if __name__ == '__main__':
     if not os.path.exists('checkpoints'):
@@ -102,6 +106,7 @@ if __name__ == '__main__':
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
     argparser.add_argument('--dataset', default='vertex', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
+    argparser.add_argument('--ckpt-dir', default='.', type=str, help='checkpoint path')
     argparser.add_argument('--viz', action='store_true',
                            help='visualize attention')
     argparser.add_argument('--universal', action='store_true',
