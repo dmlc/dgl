@@ -22,10 +22,7 @@ class Decoder(nn.Module):
         def func(nodes):
             x = nodes.data['x']
             norm_x = layer.sublayer[l].norm(x) if fields.startswith('q') else x
-            if fields != 'qkv':
-                return layer.src_attn.get(norm_x, fields)
-            else:
-                return layer.self_attn.get(norm_x, fields)
+            return layer.self_attn.get(norm_x, fields)
         return func
 
     def post_func(self, i, l=0):
@@ -185,7 +182,7 @@ def make_vertex_model(N=6, dim_model=512, dim_ff=2048, h=8, dropout=0.1, univers
     coord_embed = PositionalEncoding(dim_model, dropout, max_len=3)
     pos_embed = PositionalEncoding(dim_model, dropout, max_len=800*3)
 
-    decoder = Decoder(DecoderLayer(dim_model, c(attn), c(attn), c(ff), dropout), N)
+    decoder = Decoder(DecoderLayer(dim_model, c(attn), None, None, dropout), N)
     # Do we need to consider INIT_BIN?
     tgt_vocab = 64 + 3
     value_embed = Embeddings(tgt_vocab, dim_model)

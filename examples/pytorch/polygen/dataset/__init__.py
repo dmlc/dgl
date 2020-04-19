@@ -78,8 +78,6 @@ class ShapeNetVertextDataset(object):
                 if mode == 'test':
                     yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
                 else:
-                    for k, v in enumerate(tgt_buf):
-                        print (k, len(v))
                     yield graph_pool(tgt_buf, device=device)
                 tgt_buf = []
 

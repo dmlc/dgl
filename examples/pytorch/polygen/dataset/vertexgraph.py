@@ -126,6 +126,7 @@ class VertexNetGraphPool:
             d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
             n_nodes += n
             n_tokens += n
+            n_edges += n_dd
 
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
