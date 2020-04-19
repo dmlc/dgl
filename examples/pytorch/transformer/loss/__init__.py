@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
 
+
 class LabelSmoothing(nn.Module):
     """
     Computer loss at one time step.
@@ -60,6 +61,7 @@ class SimpleLossCompute(nn.Module):
         self.loss = 0
         self.batch_count = 0
         self.grad_accum = grad_accum
+        self.padding_idx = ShapeNetVertexDataset.PAD_BIN 
 
     def __enter__(self):
         self.batch_count = 0
@@ -96,7 +98,7 @@ class SimpleLossCompute(nn.Module):
         self.loss = self.criterion(y_pred, y) / norm
         if self.opt is not None:
             self.backward_and_step()
-        self.n_correct += ((y_pred.max(dim=-1)[1] == y) & (y != self.criterion.padding_idx)).sum().item()
+        self.n_correct += ((y_pred.max(dim=-1)[1] == y) & (y != self.padding_idx)).sum().item()
         self.acc_loss += self.loss.item() * norm
         self.norm_term += norm
         return self.loss.item() * norm

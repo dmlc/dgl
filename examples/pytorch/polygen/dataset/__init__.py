@@ -10,11 +10,11 @@ class ClassificationDataset(object):
     def __init__(self):
         raise NotImplementedError
 
-class ShapeNetVertextDataset(object):
+class ShapeNetVertexDataset(object):
     '''
     Dataset class for ShapeNet Vertex.
     '''
-    COORD_BIN = 64
+    COORD_BIN = 32
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
@@ -71,8 +71,9 @@ class ShapeNetVertextDataset(object):
             reordered_verts[:,2] = verts[:,2]
             flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
             # exp
-            if len(flattern_verts) > 300:
-                flattern_verts = flattern_verts[:299] + [self.EOS_BIN]
+            if len(flattern_verts) > 400:
+                continue
+                flattern_verts = flattern_verts[:399] + [self.EOS_BIN]
             tgt_buf.append(flattern_verts)
             if len(tgt_buf) == batch_size:
                 if mode == 'test':
@@ -244,7 +245,7 @@ def get_dataset(dataset):
             test='test',
         )
     elif dataset == 'vertex':
-        return ShapeNetVertextDataset()
+        return ShapeNetVertexDataset()
     elif dataset == 'multi30k':
         return TranslationDataset(
             'data/multi30k',

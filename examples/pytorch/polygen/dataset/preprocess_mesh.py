@@ -12,7 +12,7 @@ from pytorch3d.io.obj_io import load_obj as load_3d_obj
 def preprocess(obj_file):
     verts, faces, aux = load_3d_obj(obj_file)
     # Quantilization
-    quant_verts = np.clip((verts.data.numpy()+0.5) * 63, 0, 63).astype(np.int64).astype(np.float32)
+    quant_verts = np.clip((verts.data.numpy()+0.5) * 31, 0, 31).astype(np.int64).astype(np.float32)
     # Sorting, first Y(up), then X(front), then Z(right)
     vert_val = quant_verts[:,1]*256*256 + quant_verts[:,0]*256 + quant_verts[:,2]
 

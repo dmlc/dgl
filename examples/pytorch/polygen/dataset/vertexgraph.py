@@ -10,7 +10,7 @@ VertexGraph = namedtuple('Graph',
 
 class VertexNetGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
-    def __init__(self, n=300):
+    def __init__(self, n=400):
         '''
         args:
             n: maximum number of vertexes

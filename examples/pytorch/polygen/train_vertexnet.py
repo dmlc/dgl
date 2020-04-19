@@ -18,6 +18,11 @@ def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=Tr
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
                 loss = loss_compute(output, tgt_y, n_tokens)
+                print (torch.argmax(output, axis=-1))
+                print (tgt_y)
+                print (i, loss)
+            if i == 100:
+                break
     if universal:
         for step in range(1, model.MAX_DEPTH + 1):
             print("nodes entering step {}: {:.2f}%".format(step, (1.0 * model.stat[step] / model.stat[0])))
@@ -48,8 +53,9 @@ def main(dev_id, args):
     # Prepare dataset
     dataset = get_dataset('vertex')
     V = dataset.vocab_size
-    criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
-    dim_model = 512
+    #criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
+    criterion = torch.nn.NLLLoss()
+    dim_model = 256
     # Build graph pool
     graph_pool = VertexNetGraphPool()
     # Create model
@@ -75,7 +81,7 @@ def main(dev_id, args):
 
     # Optimizer
     model_opt = NoamOpt(dim_model, 0.1, 4000,
-                        T.optim.Adam(model.parameters(), lr=1e-3,
+                        T.optim.Adam(model.parameters(), lr=3e-4,
                                      betas=(0.9, 0.98), eps=1e-9))
 
     # Train & evaluate

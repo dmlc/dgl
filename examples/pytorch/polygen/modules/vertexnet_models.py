@@ -174,7 +174,7 @@ class Transformer(nn.Module):
         ]
 
 
-def make_vertex_model(N=6, dim_model=512, dim_ff=2048, h=8, dropout=0.1, universal=False):
+def make_vertex_model(N=6, dim_model=512, dim_ff=256, h=8, dropout=0.1, universal=False):
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)
