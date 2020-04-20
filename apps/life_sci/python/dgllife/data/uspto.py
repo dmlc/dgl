@@ -515,6 +515,9 @@ class USPTOCenter(WLNCenterDataset):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
+    log_every : int
+        Print a progress update every time ``log_every`` reactions are pre-processed.
+        Default to 10000.
     num_processes : int
         Number of processes to use for data pre-processing. Default to 1.
     """
@@ -525,6 +528,7 @@ class USPTOCenter(WLNCenterDataset):
                  edge_featurizer=default_edge_featurizer_center,
                  atom_pair_featurizer=default_atom_pair_featurizer,
                  load=True,
+                 log_every=10000,
                  num_processes=1):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
@@ -546,7 +550,9 @@ class USPTOCenter(WLNCenterDataset):
             node_featurizer=node_featurizer,
             edge_featurizer=edge_featurizer,
             atom_pair_featurizer=atom_pair_featurizer,
-            load=load)
+            load=load,
+            log_every=log_every,
+            num_processes=num_processes)
 
     @property
     def subset(self):
