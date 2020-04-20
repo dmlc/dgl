@@ -270,8 +270,7 @@ def process_file(path, num_processes):
             results.append(process_line(li))
     else:
         with Pool(processes=num_processes) as pool:
-            results = pool.map_async(process_line, lines)
-            results = results.get()
+            results = pool.map(process_line, lines)
     with open(path + '.proc', 'w') as output_file:
         for line in results:
             output_file.write(line)
@@ -383,11 +382,10 @@ class WLNCenterDataset(object):
             else:
                 torch.multiprocessing.set_sharing_strategy('file_system')
                 with Pool(processes=num_processes) as pool:
-                    self.reactant_mol_graphs = pool.map_async(
+                    self.reactant_mol_graphs = pool.map(
                         partial(mol_to_graph, node_featurizer=node_featurizer,
                                 edge_featurizer=edge_featurizer, canonical_atom_order=False),
                         full_mols)
-                    self.reactant_mol_graphs = self.reactant_mol_graphs.get()
 
             save_graphs(mol_graph_path, self.reactant_mol_graphs)
 
@@ -428,8 +426,7 @@ class WLNCenterDataset(object):
                 results.append((mol, reaction, graph_edits))
         else:
             with Pool(processes=num_processes) as pool:
-                results = pool.map_async(load_one_reaction, lines)
-                results = results.get()
+                results = pool.map(load_one_reaction, lines)
 
         for mol, reaction, graph_edits in results:
             if mol is None:
