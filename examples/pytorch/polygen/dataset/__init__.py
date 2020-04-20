@@ -18,7 +18,8 @@ class ShapeNetVertexDataset(object):
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
-    MAX_LENGTH = 800 * 3
+    MAX_VERT_LENGTH = 133
+    MAX_LENGTH = MAX_VERT_LENGTH * 3 + 1
     
     def __init__(self, dataset_list_file ='table_chair.txt'):
         dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
@@ -71,9 +72,9 @@ class ShapeNetVertexDataset(object):
             reordered_verts[:,2] = verts[:,2]
             flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
             # exp
-            if len(flattern_verts) > 400:
+            if len(flattern_verts) > self.MAX_LENGTH:
                 continue
-                flattern_verts = flattern_verts[:399] + [self.EOS_BIN]
+                flattern_verts = flattern_verts[:self.MAX_LENGTH-1] + [self.EOS_BIN]
             tgt_buf.append(flattern_verts)
             if len(tgt_buf) == batch_size:
                 if mode == 'test':
@@ -102,7 +103,7 @@ class ShapeNetFaceDataset(object):
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
     MAX_VERT_LENGTH = 133
-    MAX_FACE_LENGTH = 800
+    MAX_FACE_LENGTH = (800 + 1) // 3
     
     def __init__(self, dataset_list_file ='table_chair.txt'):
         dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
@@ -115,9 +116,6 @@ class ShapeNetFaceDataset(object):
         #                       preprocessing=lambda seq: [self.INIT_INDEX] + seq + [self.EOS_INDEX],
         #                       postprocessing=strip_func)
     
-    @property
-    def vocab_size(self):
-        return self.MAX_FACE_LENGTH 
 
     def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
                  device='cpu', dev_rank=0, ndev=1):
@@ -161,7 +159,8 @@ class ShapeNetFaceDataset(object):
             # since we can have at most 133 nodes, the eos_face id is 133
             FACE_EOS_BIN = self.MAX_VERT_LENGTH
             flattern_faces = reordered_verts.flatten().astype(np.int64).tolist() + [FACE_EOS_BIN]
-            if len(flattern_faces) > self.MAX_FACE_LENGTH:
+            # -1 for considering the FACE_EOS_BIN
+            if len(flattern_faces) > (self.MAX_FACE_LENGTH * 3) - 1:
                 continue
 
             tgt_buf.append(flattern_verts)

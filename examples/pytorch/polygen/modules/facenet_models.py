@@ -5,6 +5,7 @@ from .viz import *
 from .layers import *
 from .functions import *
 from .embedding import *
+from dataset import *
 import threading
 import torch as th
 import dgl.function as fn
@@ -229,13 +230,12 @@ class Transformer(nn.Module):
         ]
 
 
-def make_face_model(N=6, dim_model=512, dim_ff=2048, h=8, dropout=0.1, universal=False):
-    if universal:
-        return make_universal_model(src_vocab, tgt_vocab, dim_model, dim_ff, h, dropout)
+def make_face_model(N=6, dim_model=256, dim_ff=256, h=8, dropout=0.1, universal=False):
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)
-    pos_embed = PositionalEncoding(dim_model, dropout)
+    # Number of faces is the max len
+    pos_embed = PositionalEncoding(dim_model, dropout, max_len=ShapeNetFaceDataset.MAX_FACE_L)
     vert_idx_in_face_embed = PositionalEncoding(dim_model, dropout)
 
     encoder = Encoder(EncoderLayer(dim_model, c(attn), c(ff), dropout), N)
