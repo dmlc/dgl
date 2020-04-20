@@ -272,6 +272,8 @@ def process_file(path, num_processes):
             output_file.write(line)
     print('Finished processing {}'.format(path))
 
+
+
 class WLNCenterDataset(object):
     """Dataset for reaction center prediction with WLN
 
@@ -329,11 +331,16 @@ class WLNCenterDataset(object):
 
         path_to_reaction_file = raw_file_path + '.proc'
         if not os.path.isfile(path_to_reaction_file):
-            # Pre-process graph edits information
+            print('Pre-processing graph edits from reaction data')
             process_file(raw_file_path, num_processes)
 
+        import time
+        t0 = time.time()
         full_mols, full_reactions, full_graph_edits = \
             self.load_reaction_data(path_to_reaction_file, log_every)
+        print('Time spent', time.tiem() - t0)
+
+        """
         if load and os.path.isfile(mol_graph_path):
             print('Loading previously saved graphs...')
             self.reactant_mol_graphs, _ = load_graphs(mol_graph_path)
@@ -356,6 +363,7 @@ class WLNCenterDataset(object):
         self.graph_edits = full_graph_edits
         self.atom_pair_features.extend([None for _ in range(len(self.mols))])
         self.atom_pair_labels.extend([None for _ in range(len(self.mols))])
+        """
 
     def load_reaction_data(self, file_path, log_every):
         """Load reaction data from the raw file.
