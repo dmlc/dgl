@@ -364,19 +364,16 @@ class WLNCenterDataset(object):
             self.load_reaction_data(path_to_reaction_file, num_processes)
         print('Time spent', time.time() - t0)
 
-        """
         if load and os.path.isfile(mol_graph_path):
             print('Loading previously saved graphs...')
             self.reactant_mol_graphs, _ = load_graphs(mol_graph_path)
         else:
             print('Constructing graphs from scratch...')
-            self.reactant_mol_graphs = []
-            for i in range(len(full_mols)):
-                mol = full_mols[i]
-                reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
-                                                  edge_featurizer=edge_featurizer,
-                                                  canonical_atom_order=False)
-                self.reactant_mol_graphs.append(reactant_mol_graph)
+            with Pool(processes=num_processes) as pool:
+                self.reactant_mol_graphs = list(tqdm(pool.imap(
+                    partial(mol_to_graph, node_featurizer=node_featurizer,
+                            edge_featurizer=edge_featurizer, canonical_atom_order=False), 
+                    full_mols), total=len(full_mols)))
 
             save_graphs(mol_graph_path, self.reactant_mol_graphs)
 
@@ -385,7 +382,6 @@ class WLNCenterDataset(object):
         self.graph_edits = full_graph_edits
         self.atom_pair_features.extend([None for _ in range(len(self.mols))])
         self.atom_pair_labels.extend([None for _ in range(len(self.mols))])
-        """
 
     def load_reaction_data(self, file_path, num_processes):
         """Load reaction data from the raw file.
@@ -441,8 +437,6 @@ class WLNCenterDataset(object):
             Reaction
         str
             Graph edits for the reaction
-        rdkit.Chem.rdchem.Mol
-            RDKit molecule instance
         DGLGraph
             DGLGraph for the ith molecular graph
         DGLGraph
@@ -468,7 +462,7 @@ class WLNCenterDataset(object):
         if self.atom_pair_labels[item] is None:
             self.atom_pair_labels[item] = get_pair_label(mol, self.graph_edits[item])
 
-        return self.reactions[item], self.graph_edits[item], mol, \
+        return self.reactions[item], self.graph_edits[item], \
                self.reactant_mol_graphs[item], \
                self.complete_graphs[num_atoms], \
                self.atom_pair_features[item], \

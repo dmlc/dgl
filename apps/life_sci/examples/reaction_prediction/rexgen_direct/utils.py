@@ -76,8 +76,6 @@ def collate(data):
         List of reactions.
     graph_edits : list of str
         List of graph edits in the reactions.
-    mols : list of rdkit.Chem.rdchem.Mol
-        List of RDKit molecule instances for the reactants.
     batch_mol_graphs : DGLGraph
         DGLGraph for a batch of molecular graphs.
     batch_complete_graphs : DGLGraph
@@ -85,7 +83,7 @@ def collate(data):
     batch_atom_pair_labels : float32 tensor of shape (V, 10)
         Labels of atom pairs in the batch of graphs.
     """
-    reactions, graph_edits, mols, mol_graphs, complete_graphs, \
+    reactions, graph_edits, mol_graphs, complete_graphs, \
     atom_pair_feats, atom_pair_labels = map(list, zip(*data))
 
     batch_mol_graphs = dgl.batch(mol_graphs)
@@ -99,7 +97,7 @@ def collate(data):
 
     batch_atom_pair_labels = torch.cat(atom_pair_labels, dim=0)
 
-    return reactions, graph_edits, mols, batch_mol_graphs, \
+    return reactions, graph_edits, batch_mol_graphs, \
            batch_complete_graphs, batch_atom_pair_labels
 
 def reaction_center_prediction(device, model, mol_graphs, complete_graphs):

@@ -64,7 +64,7 @@ def main(args):
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
 
-            batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
+            batch_reactions, batch_graph_edits, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
             labels = batch_atom_pair_labels.to(args['device'])
             pred, biased_pred = reaction_center_prediction(
