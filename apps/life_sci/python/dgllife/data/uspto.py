@@ -12,6 +12,7 @@ from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_arc
     save_graphs, load_graphs
 from functools import partial
 from itertools import combinations
+from multiprocessing import Pool
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
 from tqdm import tqdm
@@ -232,6 +233,26 @@ def get_bond_changes(reaction):
 
     return bond_changes
 
+def process_line(line):
+    """Process one line consisting of one reaction for working with WLN.
+
+    Parameters
+    ----------
+    line : str
+        One reaction in one line
+
+    Returns
+    -------
+    formatted_reaction : str
+        Formatted reaction
+    """
+    reaction = line.strip()
+    bond_changes = get_bond_changes(reaction)
+    formatted_reaction = '{} {}\n'.format(
+        reaction, ';'.join(['{}-{}-{}'.format(x[0], x[1], x[2]) for x in bond_changes]))
+
+    return formatted_reaction
+
 def process_file(path, num_processes):
     """Pre-process a file of reactions for working with WLN.
 
@@ -242,13 +263,13 @@ def process_file(path, num_processes):
     num_processes : int
         Number of processes to use for data pre-processing.
     """
-    with open(path, 'r') as input_file, open(path + '.proc', 'w') as output_file:
-        for line in tqdm(input_file):
-            reaction = line.strip()
-            bond_changes = get_bond_changes(reaction)
-            output_file.write('{} {}\n'.format(
-                reaction,
-                ';'.join(['{}-{}-{}'.format(x[0], x[1], x[2]) for x in bond_changes])))
+    with open(path, 'r') as input_file:
+        lines = input_file.readlines()
+    with Pool(processes=num_processes) as pool:
+        results = list(tqdm(pool.imap(process_line, lines), total=len(lines)))
+    with open(path + '.proc', 'w') as output_file:
+        for line in results:
+            output_file.write(line)
     print('Finished processing {}'.format(path))
 
 class WLNCenterDataset(object):
