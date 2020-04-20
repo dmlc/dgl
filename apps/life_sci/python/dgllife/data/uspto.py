@@ -369,10 +369,11 @@ class WLNCenterDataset(object):
             self.reactant_mol_graphs, _ = load_graphs(mol_graph_path)
         else:
             print('Constructing graphs from scratch...')
+            torch.multiprocessing.set_sharing_strategy('file_system')
             with Pool(processes=num_processes) as pool:
                 self.reactant_mol_graphs = list(tqdm(pool.imap(
                     partial(mol_to_graph, node_featurizer=node_featurizer,
-                            edge_featurizer=edge_featurizer, canonical_atom_order=False), 
+                            edge_featurizer=edge_featurizer, canonical_atom_order=False),
                     full_mols), total=len(full_mols)))
 
             save_graphs(mol_graph_path, self.reactant_mol_graphs)
