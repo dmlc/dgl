@@ -272,7 +272,35 @@ def process_file(path, num_processes):
             output_file.write(line)
     print('Finished processing {}'.format(path))
 
+def load_one_reaction(line):
+    # Each line represents a reaction and the corresponding graph edits
+    #
+    # reaction example:
+    # [CH3:14][OH:15].[NH2:12][NH2:13].[OH2:11].[n:1]1[n:2][cH:3][c:4]
+    # ([C:7]([O:9][CH3:8])=[O:10])[cH:5][cH:6]1>>[n:1]1[n:2][cH:3][c:4]
+    # ([C:7](=[O:9])[NH:12][NH2:13])[cH:5][cH:6]1
+    # The reactants are on the left-hand-side of the reaction and the product
+    # is on the right-hand-side of the reaction. The numbers represent atom mapping.
+    #
+    # graph_edits example:
+    # 23-33-1.0;23-25-0.0
+    # For a triplet a-b-c, a and b are the atoms that form or loss the bond.
+    # c specifies the particular change, 0.0 for losing a bond, 1.0, 2.0, 3.0 and
+    # 1.5 separately for forming a single, double, triple or aromatic bond.
+    reaction, graph_edits = line.strip("\r\n ").split()
+    reactants = reaction.split('>')[0]
+    mol = Chem.MolFromSmiles(reactants)
+    if mol is None:
+        return None, None, None
 
+    # Reorder atoms according to the order specified in the atom map
+    atom_map_order = [-1 for _ in range(mol.GetNumAtoms())]
+    for j in range(mol.GetNumAtoms()):
+        atom = mol.GetAtomWithIdx(j)
+        atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = j
+    mol = rdmolops.RenumberAtoms(mol, atom_map_order)
+
+    return mol, reaction, graph_edits
 
 class WLNCenterDataset(object):
     """Dataset for reaction center prediction with WLN
@@ -305,9 +333,6 @@ class WLNCenterDataset(object):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
-    log_every : int
-        Print a progress update every time ``log_every`` reactions are pre-processed.
-        Default to 10000.
     num_processes : int
         Number of processes to use for data pre-processing. Default to 1.
     """
@@ -319,7 +344,6 @@ class WLNCenterDataset(object):
                  edge_featurizer=default_edge_featurizer_center,
                  atom_pair_featurizer=default_atom_pair_featurizer,
                  load=True,
-                 log_every=10000,
                  num_processes=1):
         super(WLNCenterDataset, self).__init__()
 
@@ -337,8 +361,8 @@ class WLNCenterDataset(object):
         import time
         t0 = time.time()
         full_mols, full_reactions, full_graph_edits = \
-            self.load_reaction_data(path_to_reaction_file, log_every)
-        print('Time spent', time.tiem() - t0)
+            self.load_reaction_data(path_to_reaction_file, num_processes)
+        print('Time spent', time.time() - t0)
 
         """
         if load and os.path.isfile(mol_graph_path):
@@ -348,8 +372,6 @@ class WLNCenterDataset(object):
             print('Constructing graphs from scratch...')
             self.reactant_mol_graphs = []
             for i in range(len(full_mols)):
-                if i % log_every == 0:
-                    print('Processing reaction {:d}/{:d}'.format(i + 1, len(full_mols)))
                 mol = full_mols[i]
                 reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
                                                   edge_featurizer=edge_featurizer,
@@ -365,15 +387,15 @@ class WLNCenterDataset(object):
         self.atom_pair_labels.extend([None for _ in range(len(self.mols))])
         """
 
-    def load_reaction_data(self, file_path, log_every):
+    def load_reaction_data(self, file_path, num_processes):
         """Load reaction data from the raw file.
 
         Parameters
         ----------
         file_path : str
             Path to read the file.
-        log_every : int
-            Print a progress update every time ``log_every`` reactions are pre-processed.
+        num_processes : int
+            Number of processes to use for data pre-processing.
 
         Returns
         -------
@@ -388,35 +410,12 @@ class WLNCenterDataset(object):
         all_reactions = []
         all_graph_edits = []
         with open(file_path, 'r') as f:
-            for i, line in enumerate(f):
-                if i % log_every == 0:
-                    print('Processing line {:d}'.format(i))
-                # Each line represents a reaction and the corresponding graph edits
-                #
-                # reaction example:
-                # [CH3:14][OH:15].[NH2:12][NH2:13].[OH2:11].[n:1]1[n:2][cH:3][c:4]
-                # ([C:7]([O:9][CH3:8])=[O:10])[cH:5][cH:6]1>>[n:1]1[n:2][cH:3][c:4]
-                # ([C:7](=[O:9])[NH:12][NH2:13])[cH:5][cH:6]1
-                # The reactants are on the left-hand-side of the reaction and the product
-                # is on the right-hand-side of the reaction. The numbers represent atom mapping.
-                #
-                # graph_edits example:
-                # 23-33-1.0;23-25-0.0
-                # For a triplet a-b-c, a and b are the atoms that form or loss the bond.
-                # c specifies the particular change, 0.0 for losing a bond, 1.0, 2.0, 3.0 and
-                # 1.5 separately for forming a single, double, triple or aromatic bond.
-                reaction, graph_edits = line.strip("\r\n ").split()
-                reactants = reaction.split('>')[0]
-                mol = Chem.MolFromSmiles(reactants)
+            lines = f.readlines()
+        with Pool(processes=num_processes) as pool:
+            results = list(tqdm(pool.imap(load_one_reaction, lines), total=len(lines)))
+            for mol, reaction, graph_edits in results:
                 if mol is None:
                     continue
-
-                # Reorder atoms according to the order specified in the atom map
-                atom_map_order = [-1 for _ in range(mol.GetNumAtoms())]
-                for j in range(mol.GetNumAtoms()):
-                    atom = mol.GetAtomWithIdx(j)
-                    atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = j
-                mol = rdmolops.RenumberAtoms(mol, atom_map_order)
                 all_mols.append(mol)
                 all_reactions.append(reaction)
                 all_graph_edits.append(graph_edits)
@@ -515,9 +514,6 @@ class USPTOCenter(WLNCenterDataset):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
-    log_every : int
-        Print a progress update every time ``log_every`` reactions are pre-processed.
-        Default to 10000.
     num_processes : int
         Number of processes to use for data pre-processing. Default to 1.
     """
@@ -528,7 +524,6 @@ class USPTOCenter(WLNCenterDataset):
                  edge_featurizer=default_edge_featurizer_center,
                  atom_pair_featurizer=default_atom_pair_featurizer,
                  load=True,
-                 log_every=10000,
                  num_processes=1):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
@@ -551,7 +546,6 @@ class USPTOCenter(WLNCenterDataset):
             edge_featurizer=edge_featurizer,
             atom_pair_featurizer=atom_pair_featurizer,
             load=load,
-            log_every=log_every,
             num_processes=num_processes)
 
     @property
