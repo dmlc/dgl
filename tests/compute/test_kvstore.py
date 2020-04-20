@@ -33,19 +33,6 @@ def start_server():
     my_server.init_data(name='data_0', data_tensor=data_0)
     my_server.init_data(name='data_1', data_tensor=data_1)
 
-    name_list = my_server.get_data_name_list()
-    assert len(name_list) == 2
-    assert 'data_0' in name_list
-    assert 'data_1' in name_list
-
-    meta_0 = my_server.get_data_meta('data_0')
-    assert meta_0[0] == F.float32
-    assert_array_equal(meta_0[2], partition_0)
-
-    meta_1 = my_server.get_data_meta('data_1')
-    assert meta_1[0] == F.float32
-    assert_array_equal(meta_1[2], partition_1)
-
     my_server.start()
 
 

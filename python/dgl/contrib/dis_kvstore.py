@@ -128,7 +128,6 @@ class KVServer(object):
         self._has_data = set()
         # Store the tensor data with specified data name
         self._data_store = {}
-        self._data_name_list = []
         # Used for barrier() API on KVClient
         self._barrier_count = 0
         # Server information
@@ -277,7 +276,6 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
 
-        self._data_name_list.append(name)
         self._has_data.add(name+'-data-')
 
 
@@ -334,40 +332,6 @@ class KVServer(object):
             count of message
         """
         return self._msg_count
-
-
-    def get_data_name_list(self):
-        """Get all the data name
-
-        Return
-        ------
-        list of str
-            name list
-        """
-        return self._data_name_list
-
-
-    def get_data_meta(self, name):
-        """Get meta data (data_type, data_shape, partition_book) of the target shared-tensor
-
-        Parameter
-        ---------
-        name : str
-            data name
-
-        Return
-        ------
-        tuple
-            (data_type, data_shape, partition_book)
-        """
-        assert len(name) > 0, 'name cannot be empty.'
-        assert name + '-data-' in self._has_data, 'Data (%s) does not exist!' % name
-
-        data_type = F.dtype(self._data_store[name+'-data-'])
-        data_shape = F.shape(self._data_store[name+'-data-'])
-        partition_book = self._data_store[name+'-part-']
-
-        return (data_type, data_shape, partition_book)
 
 
     def print(self):
