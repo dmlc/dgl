@@ -12,7 +12,7 @@ import time
 num_entries = 10
 dim_size = 3
 
-server_namebook = {0:[0, '127.0.0.1, 30070', 1]}
+server_namebook = {0:[0, '127.0.0.1', 30070, 1]}
 
 def start_server():
     my_server = KVServer(server_id=0, server_namebook=server_namebook, num_client=1)
