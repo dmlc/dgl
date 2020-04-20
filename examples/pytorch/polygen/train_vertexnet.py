@@ -20,7 +20,7 @@ def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=Tr
                 loss = loss_compute(output, tgt_y, n_tokens)
                 print (i, loss)
                 if log_f:
-                    info = str(i) + ': ' + str(loss) + '\n'
+                    info = str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
                     log_f.write(info)
     print('Epoch {} {}: Dev {} average loss: {}, accuracy {}'.format(
         epoch, "Training" if is_train else "Evaluating",
@@ -93,9 +93,11 @@ def main(dev_id, args):
         model.train(True)
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
                   loss_compute(opt=model_opt), is_train=True, log_f=log_f)
-        ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(epoch)+'.pt')
-        print (ckpt_path)
-        torch.save(model.state_dict(), ckpt_path)
+
+        if dev_rank == 0:
+            ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(epoch)+'.pt')
+            print (ckpt_path)
+            torch.save(model.state_dict(), ckpt_path)
 
 if __name__ == '__main__':
     if not os.path.exists('checkpoints'):

@@ -93,6 +93,96 @@ class ShapeNetVertexDataset(object):
         return batch
 
 
+class ShapeNetFaceDataset(object):
+    '''
+    Dataset class for ShapeNet Vertex.
+    '''
+    COORD_BIN = 32
+    INIT_BIN = COORD_BIN
+    EOS_BIN = COORD_BIN + 1
+    PAD_BIN = COORD_BIN + 2
+    MAX_VERT_LENGTH = 133
+    MAX_FACE_LENGTH = 800
+    
+    def __init__(self, dataset_list_file ='table_chair.txt'):
+        dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
+        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_file)
+        with open(dataset_list_path, 'r') as f:
+            self.dataset_list = f.readlines()
+        self.pad_id = self.PAD_BIN
+        # We don't need field since we handle them in preprocess
+        # self.tgt_field = Field(np.range(COORD_BIN+2),
+        #                       preprocessing=lambda seq: [self.INIT_INDEX] + seq + [self.EOS_INDEX],
+        #                       postprocessing=strip_func)
+    
+    @property
+    def vocab_size(self):
+        return self.MAX_FACE_LENGTH 
+
+    def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
+                 device='cpu', dev_rank=0, ndev=1):
+        '''
+        Create a batched graph correspond to the mini-batch of the dataset.
+        args:
+            graph_pool: a GraphPool object for accelerating.
+            mode: train/valid/test
+            batch_size: batch size
+            k: beam size(only required for test)
+            device: str or torch.device
+            dev_rank: rank (id) of current device
+            ndev: number of devices
+        '''
+        dataset_list = self.dataset_list
+        n = len(dataset_list)
+        # make sure all devices have the same number of batch
+        n = n // ndev * ndev
+
+        # XXX: partition then shuffle may not be equivalent to shuffle then
+        # partition
+        order = list(range(dev_rank, n, ndev))
+        if mode == 'train':
+            random.shuffle(order)
+
+        src_buf, tgt_buf = [], []
+
+        for idx in order:
+            obj_file = dataset_list[idx].strip()
+            verts, faces = preprocess_mesh_obj(obj_file)
+            # Flattern verts, order Y(up), X(front), Z(right)
+            reordered_verts = np.zeros_like(verts)
+            reordered_verts[:,0] = verts[:,1]
+            reordered_verts[:,1] = verts[:,0]
+            reordered_verts[:,2] = verts[:,2]
+            flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
+            # verts
+            if len(flattern_verts) > self.MAX_VERT_LENGTH * 3 + 1:
+                continue
+            # faces go to 800
+            # since we can have at most 133 nodes, the eos_face id is 133
+            FACE_EOS_BIN = self.MAX_VERT_LENGTH
+            flattern_faces = reordered_verts.flatten().astype(np.int64).tolist() + [FACE_EOS_BIN]
+            if len(flattern_faces) > self.MAX_FACE_LENGTH:
+                continue
+
+            tgt_buf.append(flattern_verts)
+            if len(tgt_buf) == batch_size:
+                if mode == 'test':
+                    yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+                else:
+                    yield graph_pool(src_buf, tgt_buf, device=device)
+                src_buf, tgt_buf = [], []
+
+        if len(tgt_buf) != 0:
+            if mode == 'test':
+                yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+            else:
+                yield graph_pool(src_buf, tgt_buf, device=device)
+
+    def get_sequence(self, batch):
+        "return a list of sequence from a list of index arrays"
+        return batch
+
+
 class TranslationDataset(object):
     '''
     Dataset class for translation task.

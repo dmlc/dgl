@@ -10,24 +10,18 @@ import torch
 from functools import partial
 import torch.distributed as dist
 
-def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True):
-    universal = isinstance(model, UTransformer)
+def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True, log_f=None):
     with loss_compute:
         for i, g in enumerate(data_iter):
             with T.set_grad_enabled(is_train):
-                if universal:
-                    output, loss_act = model(g)
-                    if is_train: loss_act.backward(retain_graph=True)
-                else:
-                    output = model(g)
+                output = model(g)
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
                 loss = loss_compute(output, tgt_y, n_tokens)
-
-    if universal:
-        for step in range(1, model.MAX_DEPTH + 1):
-            print("nodes entering step {}: {:.2f}%".format(step, (1.0 * model.stat[step] / model.stat[0])))
-        model.reset_stat()
+                print (i, loss)
+                if log_f:
+                    info = str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
+                    log_f.write(info)
     print('Epoch {} {}: Dev {} average loss: {}, accuracy {}'.format(
         epoch, "Training" if is_train else "Evaluating",
         dev_rank, loss_compute.avg_loss, loss_compute.accuracy))
@@ -49,13 +43,19 @@ def main(dev_id, args):
         device = torch.device('cpu')
     else:
         device = torch.device('cuda:{}'.format(dev_id))
+    # Create ckpt dir
+    os.makedirs(args.ckpt_dir, exist_ok=True)
+    log_path = os.path.join(args.ckpt_dir, 'log.txt')
+    print (log_path)
+    log_f = open(log_path, 'w')
+
     # Set current device
     th.cuda.set_device(device)
     # Prepare dataset
-    dataset = get_dataset(args.dataset)
+    dataset = get_dataset('face')
     V = dataset.vocab_size
-    criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
-    dim_model = 512
+    criterion = torch.nn.NLLLoss()
+    dim_model = 256
     # Build graph pool
     graph_pool = FaceGraphPool()
     # Create model
@@ -81,7 +81,7 @@ def main(dev_id, args):
 
     # Optimizer
     model_opt = NoamOpt(dim_model, 0.1, 4000,
-                        T.optim.Adam(model.parameters(), lr=1e-3,
+                        T.optim.Adam(model.parameters(), lr=3e-4,
                                      betas=(0.9, 0.98), eps=1e-9))
 
     # Train & evaluate
@@ -93,24 +93,10 @@ def main(dev_id, args):
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
                   loss_compute(opt=model_opt), is_train=True)
         if dev_rank == 0:
-            model.att_weight_map = None
-            model.eval()
-            valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch,
-                                 device=device, dev_rank=dev_rank, ndev=1)
-            run_epoch(epoch, valid_iter, dev_rank, 1, model,
-                      loss_compute(opt=None), is_train=False)
-            end = time.time()
-            print("epoch time: {}".format(end - start))
+            ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(epoch)+'.pt')
+            print (ckpt_path)
+            torch.save(model.state_dict(), ckpt_path)
 
-            # Visualize attention
-            if args.viz:
-                src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
-                tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
-                draw_atts(model.att_weight_map, src_seq, tgt_seq, exp_setting, 'epoch_{}'.format(epoch))
-            args_filter = ['batch', 'gpus', 'viz', 'master_ip', 'master_port', 'grad_accum', 'ngpu']
-            exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
-            with open('checkpoints/{}-{}.pkl'.format(exp_setting, epoch), 'wb') as f:
-                torch.save(model.state_dict(), f)
 
 if __name__ == '__main__':
     if not os.path.exists('checkpoints'):
@@ -119,8 +105,9 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
-    argparser.add_argument('--dataset', default='multi30k', help='dataset')
+    argparser.add_argument('--dataset', default='face', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
+    argparser.add_argument('--ckpt-dir', default='.', type=str, help='checkpoint path')
     argparser.add_argument('--viz', action='store_true',
                            help='visualize attention')
     argparser.add_argument('--universal', action='store_true',
