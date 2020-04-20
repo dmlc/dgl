@@ -27,37 +27,19 @@ def mkdir_p(path):
         else:
             raise
 
-def setup(args, seed=0):
-    """Setup for the experiment:
-
-    1. Decide whether to use CPU or GPU for training
-    2. Fix random seed for python, NumPy and PyTorch.
+def set_seed(seed=0):
+    """Fix random seed.
 
     Parameters
     ----------
     seed : int
-        Random seed to use.
-
-    Returns
-    -------
-    args
-        Updated configuration
+        Random seed to use. Default to 0.
     """
-    if torch.cuda.is_available():
-        args['device'] = 'cuda:0'
-    else:
-        args['device'] = 'cpu'
-
-    # Set random seed
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
-
-    mkdir_p(args['result_path'])
-
-    return args
 
 def collate(data):
     """Collate multiple datapoints

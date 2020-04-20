@@ -29,15 +29,10 @@ whose reaction centers have all been selected.
 We use GPU whenever possible. To train the model with default options, simply do 
 
 ```bash
-python find_reaction_center.py
+python find_reaction_center_train.py
 ```
 
-By default we use 32 processes for data pre-processing. If you encounter an error with 
-`BrokenPipeError: [Errno 32] Broken pipe`, you can specify a smaller number of processes with 
-```bash
-python find_reaction_center.py -np X
-```
-where `X` is the number of processes that you would like to use.
+### Training Checkpoints
 
 Once the training process starts, the progress will be printed out in the terminal as follows:
 
@@ -55,15 +50,14 @@ Epoch 4/50, validation | acc@10 0.8213 | acc@20 0.9016 |
 
 By default, we store the model per 10000 iterations in `center_results`.
 
-**Speedup**: For an epoch of training, our implementation takes about 5095s for the first epoch  while the authors' 
-implementation takes about 11657s, which is roughly a speedup by 2.3x.
+### Evaluation
 
 For model evaluation, we can choose whether to exclude reactants not contributing heavy atoms to the product 
 (e.g. reagents and solvents) in top-k atom pair selection, which will make the task easier. 
 For the easier evaluation, do
 
 ```bash
-python find_reaction_center.py --easy
+python find_reaction_center_eval.py --easy
 ```
 
 A summary of the model performance is as follows:
@@ -74,15 +68,37 @@ A summary of the model performance is as follows:
 | Hard evaluation | 88.8           | 91.6           | 92.9            |
 | Easy evaluation | 91.0           | 93.7           | 94.9            |
 
+### Multi-GPU Training
+
+By default we use one GPU only. We also allow multi-gpu training. To use GPUs with ids `id1,id2,...`, do
+
+```bash
+python find_reaction_center_train.py --gpus id1,id2,...
+```
+
+### Data Pre-processing with Multi-Processing
+
+By default we use 32 processes for data pre-processing. If you encounter an error with 
+`BrokenPipeError: [Errno 32] Broken pipe`, you can specify a smaller number of processes with 
+```bash
+python find_reaction_center_train.py -np X
+```
+where `X` is the number of processes that you would like to use.
+
+### Speedup
+
+For an epoch of training, our implementation takes about 5095s for the first epoch  while the authors' 
+implementation takes about 11657s, which is roughly a speedup by 2.3x.
+
 ### Pre-trained Model
 
 We provide a pre-trained model so users do not need to train from scratch. To evaluate the pre-trained model, simply do
 
 ```bash
-python find_reaction_center.py -p
+python find_reaction_center_eval.py -p
 ```
 
-### Adapting to a new dataset.
+### Adapting to a New Dataset
 
 New datasets should be processed such that each line corresponds to the SMILES for a reaction like below:
 
@@ -96,10 +112,18 @@ In addition, atom mapping information is provided.
 You can then train a model on new datasets with 
 
 ```bash
-python find_reaction_center.py --train-path X --val-path Y --test-path Z
+python find_reaction_center_train.py --train-path X --val-path Y
 ```
 
-where `X`, `Y`, `Z` are paths to the new training/validation/test set as described above.
+where `X`, `Y` are paths to the new training/validation as described above.
+
+For evaluation,
+
+```bash
+python find_reaction_center_eval.py --eval-path Z
+```
+
+where `Z` is the path to the new test set as described above.
 
 ## Candidate Ranking
 

@@ -10,10 +10,10 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
-from utils import setup, collate, reaction_center_prediction, \
-    reaction_center_rough_eval_on_a_loader, reaction_center_final_eval
+from utils import collate, reaction_center_prediction, reaction_center_rough_eval_on_a_loader, \
+    mkdir_p, set_seed
 
-def main(args):
+def load_dataset(args):
     if args['train_path'] is None:
         train_set = USPTOCenter('train', num_processes=args['num_processes'])
     else:
@@ -26,38 +26,38 @@ def main(args):
         val_set = WLNCenterDataset(raw_file_path=args['val_path'],
                                    mol_graph_path='val.bin',
                                    num_processes=args['num_processes'])
-    if args['test_path'] is None:
-        test_set = USPTOCenter('test', num_processes=args['num_processes'])
+
+    return train_set, val_set
+
+def main(dev_id, args, train_set, val_set):
+    set_seed()
+    if dev_id == -1:
+        args['device'] = torch.device('cpu')
     else:
-        test_set = WLNCenterDataset(raw_file_path=args['test_path'],
-                                    mol_graph_path='test.bin',
-                                    num_processes=args['num_processes'])
+        args['device'] = torch.device('cuda:{}'.format(dev_id))
+    # Set current device
+    torch.cuda.set_device(args['device'])
+
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
                             collate_fn=collate, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=args['batch_size'],
-                             collate_fn=collate, shuffle=False)
 
-    if args['pre_trained']:
-        model = load_pretrained('wln_center_uspto').to(args['device'])
-        args['num_epochs'] = 0
-    else:
-        model = WLNReactionCenter(node_in_feats=args['node_in_feats'],
-                                  edge_in_feats=args['edge_in_feats'],
-                                  node_pair_in_feats=args['node_pair_in_feats'],
-                                  node_out_feats=args['node_out_feats'],
-                                  n_layers=args['n_layers'],
-                                  n_tasks=args['n_tasks']).to(args['device'])
+    model = WLNReactionCenter(node_in_feats=args['node_in_feats'],
+                              edge_in_feats=args['edge_in_feats'],
+                              node_pair_in_feats=args['node_pair_in_feats'],
+                              node_out_feats=args['node_out_feats'],
+                              n_layers=args['n_layers'],
+                              n_tasks=args['n_tasks']).to(args['device'])
 
-        criterion = BCEWithLogitsLoss(reduction='sum')
-        optimizer = Adam(model.parameters(), lr=args['lr'])
-        scheduler = StepLR(optimizer, step_size=args['decay_every'], gamma=args['lr_decay_factor'])
+    criterion = BCEWithLogitsLoss(reduction='sum')
+    optimizer = Adam(model.parameters(), lr=args['lr'])
+    scheduler = StepLR(optimizer, step_size=args['decay_every'], gamma=args['lr_decay_factor'])
 
-        total_iter = 0
-        grad_norm_sum = 0
-        loss_sum = 0
-        dur = []
+    total_iter = 0
+    grad_norm_sum = 0
+    loss_sum = 0
+    dur = []
 
     for epoch in range(args['num_epochs']):
         t0 = time.time()
@@ -96,22 +96,27 @@ def main(args):
         print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
               reaction_center_rough_eval_on_a_loader(args, model, val_loader))
 
-    del train_loader
-    del val_loader
-    del train_set
-    del val_set
-    print('Evaluation on the test set.')
-    test_result = reaction_center_final_eval(args, model, test_loader, args['easy'])
-    print(test_result)
-    with open(args['result_path'] + '/results.txt', 'w') as f:
-        f.write(test_result)
+def run(dev_id, args, train_set, val_set):
+    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+        master_ip=args['master_ip'], master_port=args['master_port'])
+    world_size = args.num_gpus
+    torch.distributed.init_process_group(backend="nccl",
+                                         init_method=dist_init_method,
+                                         world_size=world_size,
+                                         rank=dev_id)
+    gpu_rank = torch.distributed.get_rank()
+    assert gpu_rank == dev_id
+    main(dev_id, args, train_set, val_set)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
     from configure import reaction_center_config
 
-    parser = ArgumentParser(description='Reaction Center Identification')
+    parser = ArgumentParser(description='Reaction Center Identification -- Training')
+    parser.add_argument('--gpus', default='0', type=str,
+                        help='To use multi-gpu training, '
+                             'pass multiple gpu ids with --gpus id1,id2,...')
     parser.add_argument('--result-path', type=str, default='center_results',
                         help='Path to save modeling results')
     parser.add_argument('--train-path', type=str, default=None,
@@ -120,23 +125,34 @@ if __name__ == '__main__':
     parser.add_argument('--val-path', type=str, default=None,
                         help='Path to a new validation set. '
                              'If None, we will use the default validation set in USPTO.')
-    parser.add_argument('--test-path', type=str, default=None,
-                        help='Path to a new test set.'
-                             'If None, we will use the default test set in USPTO.')
-    parser.add_argument('-p', '--pre-trained', action='store_true', default=False,
-                        help='If true, we will directly evaluate a '
-                             'pretrained model on the test set.')
-    parser.add_argument('--easy', action='store_true', default=False,
-                        help='Whether to exclude reactants not contributing heavy atoms to the '
-                             'product in top-k atom pair selection, which will make the '
-                             'task easier.')
     parser.add_argument('-np', '--num-processes', type=int, default=32,
                         help='Number of processes to use for data pre-processing')
+    parser.add_argument('--master-ip', type=str, default='127.0.0.1',
+                        help='master ip address')
+    parser.add_argument('--master-port', type=str, default='12345',
+                        help='master port')
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)
 
     assert args['max_k'] >= max(args['top_ks']), \
         'Expect max_k to be no smaller than the possible options ' \
         'of top_ks, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks']))
-    setup(args)
-    main(args)
+    mkdir_p(args['result_path'])
+
+    devices = list(map(int, args.gpus.split(',')))
+    train_set, val_set = load_dataset(args)
+
+    if len(devices) == 1:
+        if torch.cuda.is_available():
+            args.num_gpus = 0
+            device_id = -1
+        else:
+            args.num_gpus = 1
+            device_id = devices[0]
+        main(device_id, args, train_set, val_set)
+    else:
+        args.num_gpus = len(devices)
+        mp = torch.multiprocessing.get_context('spawn')
+        procs = []
+        for device_id in devices:
+            
