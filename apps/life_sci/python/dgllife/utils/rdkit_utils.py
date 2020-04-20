@@ -169,7 +169,7 @@ def multiprocess_load_molecules(files, sanitize=False, calc_charges=False,
         The first element of each 2-tuple is an RDKit molecule instance. The second element
         of each 2-tuple is the 3D atom coordinates of the corresponding molecule if
         use_conformation is True and the coordinates has been successfully loaded. Otherwise,
-        it will be None.x
+        it will be None.
     """
     if num_processes == 1:
         mols_loaded = []
