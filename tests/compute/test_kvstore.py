@@ -10,9 +10,9 @@ import os
 import time
 
 num_entries = 10
-dim_size = 10
+dim_size = 3
 
-server_namebook = {0:[0, 127.0.0.1, 30070, 1]}
+server_namebook = {0:[0, '127.0.0.1, 30070', 1]}
 
 def start_server():
     my_server = KVServer(server_id=0, server_namebook=server_namebook, num_client=1)
@@ -52,6 +52,30 @@ def start_server():
 def start_client():
     my_client = KVClient(server_namebook=server_namebook)
     my_client.connect()
+
+    name_list = my_client.get_data_name_list()
+    assert len(name_list) == 2
+    assert 'data_0' in name_list
+    assert 'data_1' in name_list
+
+    meta_0 = my_client.get_data_meta('data_0')
+    assert meta_0[0] == F.float32
+    assert meta_0[1] == F.shape(num_entries, dim_size)
+    assert meta_0[2] == partition_0
+
+    meta_1 = my_client.get_data_meta('data_1')
+    assert meta_1[0] == F.float32
+    assert meta_1[1] == F.shape(num_entries*2, dim_size)
+    assert meta_1[2] == partition_1
+
+
+    my_client.push(name='data_0', id_tensor=F.tensor([0], F.int64, F.cpu()), data_tensor=F.tensor([1.,1.,1.]))
+    my_client.push(name='data_0', id_tensor=F.tensor([1], F.int64, F.cpu()), data_tensor=F.tensor([1.,1.,1.]))
+    my_client.push(name='data_0', id_tensor=F.tensor([2], F.int64, F.cpu()), data_tensor=F.tensor([1.,1.,1.]))
+
+    res = my_client.pull(name='data_0', id_tensor=F.tensor([0, 1, 2]))
+
+
     my_client.shut_down()
 
 
