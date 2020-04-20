@@ -2,13 +2,13 @@ import torch as th
 import torch.nn as nn
 from torch.nn import LayerNorm
 
-class Generator(nn.Module):
+class VertexGenerator(nn.Module):
     '''
     Generate next token from the representation. This part is separated from the decoder, mostly for the convenience of sharing weight between embedding and generator.
     log(softmax(Wx + b))
     '''
     def __init__(self, dim_model, vocab_size):
-        super(Generator, self).__init__()
+        super(VertexGenerator, self).__init__()
         self.proj = nn.Linear(dim_model, vocab_size)
     
     def forward(self, x):

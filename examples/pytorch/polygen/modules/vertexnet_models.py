@@ -5,6 +5,7 @@ from .viz import *
 from .layers import *
 from .functions import *
 from .embedding import *
+from dataset import *
 import threading
 import torch as th
 import dgl.function as fn
@@ -174,19 +175,19 @@ class Transformer(nn.Module):
         ]
 
 
-def make_vertex_model(N=6, dim_model=512, dim_ff=256, h=8, dropout=0.1, universal=False):
+def make_vertex_model(N=6, dim_model=256, dim_ff=256, h=8, dropout=0.1, universal=False):
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)
     # coord only have x, y, z
     coord_embed = PositionalEncoding(dim_model, dropout, max_len=3)
-    pos_embed = PositionalEncoding(dim_model, dropout, max_len=800*3)
+    pos_embed = PositionalEncoding(dim_model, dropout, max_len=ShapeNetVertexDataset.MAX_VERT_LENGTH+1)
 
     decoder = Decoder(DecoderLayer(dim_model, c(attn), None, None, dropout), N)
     # Do we need to consider INIT_BIN?
-    tgt_vocab = 64 + 3
+    tgt_vocab = ShapeNetVertexDataset.COORD_BIN + 3
     value_embed = Embeddings(tgt_vocab, dim_model)
-    generator = Generator(dim_model, tgt_vocab)
+    generator = VertexGenerator(dim_model, tgt_vocab)
     model = Transformer(
         decoder, coord_embed, pos_embed, value_embed, generator, h, dim_model // h)
     # xavier init
