@@ -103,7 +103,10 @@ class ShapeNetFaceDataset(object):
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
     MAX_VERT_LENGTH = 133
-    MAX_FACE_LENGTH = (800 + 1) // 3
+    START_FACE_VERT_IDX = 0
+    STOP_FACE_VERT_IDX = 1
+    FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
+    MAX_FACE_LENGTH = (800 + 2) // 3
     
     def __init__(self, dataset_list_file ='table_chair.txt'):
         dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
@@ -151,18 +154,27 @@ class ShapeNetFaceDataset(object):
             reordered_verts[:,0] = verts[:,1]
             reordered_verts[:,1] = verts[:,0]
             reordered_verts[:,2] = verts[:,2]
-            flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
+            # pad start and end bin at the front
+            st_end_verts = np.array([[self.INIT_BIN] * 3, [self.EOS_BIN] * 3])
+            full_verts = np.concatenate([st_end_verts, reordered_verts], axis=0).astype(np.int64)
             # verts
-            if len(flattern_verts) > self.MAX_VERT_LENGTH * 3 + 1:
+            if full_verts.shape[0] > self.MAX_VERT_LENGTH + 2:
                 continue
-            # faces go to 800
-            # since we can have at most 133 nodes, the eos_face id is 133
-            FACE_EOS_BIN = self.MAX_VERT_LENGTH
-            flattern_faces = reordered_verts.flatten().astype(np.int64).tolist() + [FACE_EOS_BIN]
-            # -1 for considering the FACE_EOS_BIN
-            if len(flattern_faces) > (self.MAX_FACE_LENGTH * 3) - 1:
-                continue
+            # NOTES: we are padding for now. but the padding can be applied in final decoder recv phase
+            #padded_verts = (np.ones(self.MAX_VERT_LENGTH + 2, 3) * self.PAD_BIN).astype(np.int64)
+            #padded_verts[:full_verts.shape[0], :] = full_verts
+            src_buf.append(full_verts)
 
+            # faces go to 800
+            # START_FACE_BIN is num_of_node + 1, STOP_FACE_BIN is num_of_node + 2
+            # TODO: does it matter to put the START/STOP at the beginning of the sequence or the end?
+            # I suppose doesn't matter. Let's first try append at the beginning.
+            faces += self.FACE_VERT_OFFSET
+            flattern_faces = [self.START_FACE_VERT_IDX] + faces.flatten().astype(np.int64).tolist() + [self.STOP_FACE_VERT_IDX]
+            # -1 for considering the FACE_EOS_BIN
+            if faces.shape[0] > self.MAX_FACE_LENGTH:
+                continue
+            
             tgt_buf.append(flattern_verts)
             if len(tgt_buf) == batch_size:
                 if mode == 'test':

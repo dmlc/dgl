@@ -32,6 +32,7 @@ class Encoder(nn.Module):
             x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
             o = layer.self_attn.get_o(wv / z)
             x = x + layer.sublayer[0].dropout(o)
+            # Not sure whether do we need that
             x = layer.sublayer[1](x, layer.feed_forward)
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
@@ -66,12 +67,13 @@ class Decoder(nn.Module):
         return func
 
 class Transformer(nn.Module):
-    def __init__(self, encoder, decoder, pos_embed, vert_idx_in_face_embed, vert_embeb, generator, h, d_k):
+    def __init__(self, encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, generator, h, d_k):
         super(Transformer, self).__init__()
         self.encoder,  self.decoder = encoder, decoder
-        self.pos_enc = pos_enc
-        self.vert_idx_in_face_embed = vert_idx_in_face_embed
-        self.vert_embed = vert_embed
+        self.vert_val_embed = vert_val_embed
+        self.vert_pos_enc = vert_pos_enc
+        self.face_pos_enc = face_pos_enc
+        self.vert_idx_in_face_enc = vert_idx_in_face_enc
         self.generator = generator
         self.h, self.d_k = h, d_k
         self.att_weight_map = None
@@ -96,42 +98,74 @@ class Transformer(nn.Module):
         for post_func, nids in post_pairs:
             g.apply_nodes(post_func, nids)
 
+    # pointer network
+    # group message
+    def pointer_dot(nn.Module):
+        def __init__(self):
+            super(pointer_dot, self).__init__()
+        
+        def forward(self, edges):
+            dot_res = th.dot(edges.src['x'], edges.dst['x'])
+            return {'pointer_dot': dot_res, 'src_idx': edges.src['idx']}
+    # recv fun
+    def softmax_and_pad(nn.Module):
+        def __init__(self, max_len = ShapeNetFaceDataset.MAX_VERT_LENGTH+2):
+            super(softmax_and_pad, self).__init()
+            self.max_len = max_len
+            self.eps = 1e-8
+
+        def forward(self.nodes):
+            shape = nodes.mailbox['pointer_dot'].shape
+            # reorder based on src idx
+            pointer_dot = nodes.mailbox['pointer_dot']
+            src_idx = nodes.mailbox['src_idx']
+            ordered_pointer_dot = pointer_dot.index_select(0, src_idx)
+            # log softmax
+            log_softmax_pointer_dot = th.log_softmax(ordered_pointer_dot, dim=-1)
+            pad_num = self.max_len - shap[0]
+            if pad_num:
+                pad_tensor = th.tensor(np.ones(pad_num)*self.eps)
+                padded_res = th.cat([log_softmax_pointer_dot, pad_tensor], axis=0)
+                return {'log_softmax_res': padded_res}
+            else:
+                return {'log_softmax_res': log_softmax_pointer_dot}
+
     def forward(self, graph):
         g = graph.g
         nids, eids = graph.nids, graph.eids
 
-        # embed all vertex
-        vert_embed = self.vert_embed(graph.src[0])
-        pos_embed = self.pos_embed(graph.tgt[1]//3)
-        vert_idx_in_face_embed = self.vert_idx_in_face_embed(graph.tgt[1]%3)
-        tgt_embed = self.gatther_vert_embed(graph.tgt[0], vert_embed)
-        g.nodes[nids['enc']].data['x'] = self.pos_enc.dropout(vert_embed)
-        g.nodes[nids['dec']].data['x'] = self.pos_enc.dropout(tgt_embed + pos_embed + vert_idx_in_face_embed)
-
+        # Embed all vertex
+        vert_val_embed = self.vert_val_embed(graph.src[0])
+        vert_pos_enc = self.vert_pos_enc(graph.src[1])
+        g.nodes[nids['enc']].data['x'] = self.pos_enc.dropout(vert_val_embed + vert_pos_enc)
+        g.nodes[nids['enc']].data['idx'] = graph.src[0]
+        # Run encoder
         for i in range(self.encoder.N):
             pre_func = self.encoder.pre_func(i, 'qkv')
             post_func = self.encoder.post_func(i)
             nodes, edges = nids['enc'], eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
+        # Indexing result
+        tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, graph.tgt[0])
+        face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
+        vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
+        g.nodes[nids['dec']].data['x'] = self.pos_enc.dropout(tgt_embed + face_pos_enc + vert_idx_in_face_enc)
+        g.nodes[nids['dec']].data['idx'] = graph.tgt[1]
+
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
             post_func = self.decoder.post_func(i)
             nodes, edges = nids['dec'], eids['dd']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-            pre_q = self.decoder.pre_func(i, 'q', 1)
-            pre_kv = self.decoder.pre_func(i, 'kv', 1)
-            post_func = self.decoder.post_func(i, 1)
-            nodes_e, edges = nids['enc'], eids['ed']
-            self.update_graph(g, edges, [(pre_q, nodes), (pre_kv, nodes_e)], [(post_func, nodes)])
+        
+        nodes, edges = nids['dec'], eids['ed']
+        # pointer net
+        g.send_and_recv(edges,
+                        [pointer_dot],
+                        [softmax_and_pad])
 
-        # visualize attention
-        """
-            if self.att_weight_map is None:
-                self._register_att_map(g, graph.nid_arr['enc'][VIZ_IDX], graph.nid_arr['dec'][VIZ_IDX])
-        """
-
-        return self.generator(g.ndata['x'][nids['dec']])
+        return g.ndata['log_softmax_res'][nids['dec']]
 
     def infer(self, graph, max_len, eos_id, k, alpha=1.0):
         '''
@@ -235,15 +269,20 @@ def make_face_model(N=6, dim_model=256, dim_ff=256, h=8, dropout=0.1, universal=
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)
     # Number of faces is the max len
-    pos_embed = PositionalEncoding(dim_model, dropout, max_len=ShapeNetFaceDataset.MAX_FACE_L)
-    vert_idx_in_face_embed = PositionalEncoding(dim_model, dropout)
+    vert_pos_enc = PositionalEncoding(dim_model, dropout, max_len=ShapeNetFaceDataset.MAX_VERT_LENGTH+2)
+    face_pos_enc = PositionalEncoding(dim_model, dropout, max_len=ShapeNetFaceDataset.MAX_FACE_LENGTH+1)
+    vert_idx_in_face_enc = PositionalEncoding(dim_model, dropout, max_len=3)
 
     encoder = Encoder(EncoderLayer(dim_model, c(attn), c(ff), dropout), N)
-    decoder = Decoder(DecoderLayer(dim_model, c(attn), c(attn), c(ff), dropout), N)
-    vertex_embed = Embeddings(np.range(MAX_VERT_NUM), dim_model)
-    generator = Face_Generator(dim_model, tgt_vocab)
+    decoder = Decoder(DecoderLayer(dim_model, c(attn), None, None, dropout), N)
+     
+    vert_val_vocab = ShapeNetVertexDataset.COORD_BIN + 3
+    vert_val_embed = VertCoordJointEmbeddings(vert_val_vocab, dim_model)
+
+    
+    generator = FaceNetGenerator(dim_model, tgt_vocab)
     model = Transformer(
-        encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, dim_model // h)
+        encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, generator, h, dim_model // h)
     # xavier init
     for p in model.parameters():
         if p.dim() > 1:

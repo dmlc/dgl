@@ -1,6 +1,7 @@
 import torch as th
 import torch.nn as nn
 import numpy as np
+from copy import deepcopy as c
 
 class PositionalEncoding(nn.Module):
     "Position Encoding module"
@@ -30,3 +31,15 @@ class Embeddings(nn.Module):
 
     def forward(self, x):
         return self.lut(x) * np.sqrt(self.dim_model)
+
+class VertCoordJointEmbeddings(nn.Module):
+    """ Jointly embed x,y,z coords of a vertext """
+    def __init__(self, vocab_size, dim_model):
+        super(VertCoordJointEmbeddings, self).__init__()
+        lut = Embedding(vocab_size, dim_model)
+        self.dim_model = dim_model
+        self.luts = [c(lut), c(lut), c(lut)]
+        self.linear = nn.Linear(dim_model*3, dim_model) 
+
+    def forward(self, x):
+        return self.linear(th.cat((self.luts[0](x[:, 0]), self.luts[1](x[:, 1]), self.luts[2](x[:, 2])), 1))

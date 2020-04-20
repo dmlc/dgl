@@ -10,7 +10,7 @@ FaceGraph = namedtuple('Graph',
 
 class FaceGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
-    def __init__(self, n=400, m=800):
+    def __init__(self, n=135, m=800):
         '''
         args:
             n: maximum length of input sequence.
@@ -126,11 +126,11 @@ class FaceGraphPool:
         g_list = []
         src_lens = [len(_) for _ in src_buf]
         tgt_lens = [len(_) - 1 for _ in tgt_buf]
-        num_edges = {'ee': [], 'ed': [], 'dd': []}
+        num_edges = {'ee': [], 'dd': []}
         for src_len, tgt_len in zip(src_lens, tgt_lens):
             i, j = src_len - 1, tgt_len - 1
             g_list.append(self.g_pool[i][j])
-            for key in ['ee', 'ed', 'dd']:
+            for key in ['ee', 'dd']:
                 num_edges[key].append(int(self.num_edges[key][i][j]))
 
         g = dgl.batch(g_list)
@@ -139,8 +139,10 @@ class FaceGraphPool:
         enc_ids, dec_ids = [], []
         e2e_eids, d2d_eids, e2d_eids = [], [], []
         n_nodes, n_edges, n_tokens = 0, 0, 0
-        for src_sample, tgt_sample, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
+        for src_sample, tgt_sample, n, m, n_ee, n_dd in zip(src_buf, tgt_buf, src_lens, tgt_lens, num_edges['ee'], num_edges['dd']):
             src.append(th.tensor(src_sample, dtype=th.long, device=device))
+            # Add the tgt with current n_node for forward indexing
+            tgt_sample += n_nodes
             tgt.append(th.tensor(tgt_sample[:-1], dtype=th.long, device=device))
             tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
             src_pos.append(th.arange(n, dtype=th.long, device=device))
@@ -151,8 +153,6 @@ class FaceGraphPool:
             n_nodes += m
             e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
             n_edges += n_ee
-            e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
-            n_edges += n_ed
             d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
             n_edges += n_dd
             n_tokens += m
@@ -165,7 +165,7 @@ class FaceGraphPool:
                      tgt=(th.cat(tgt), th.cat(tgt_pos)),
                      tgt_y=th.cat(tgt_y),
                      nids = {'enc': th.cat(enc_ids), 'dec': th.cat(dec_ids)},
-                     eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
+                     eids = {'ee': th.cat(e2e_eids), 'dd': th.cat(d2d_eids)},
                      nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
                      n_edges=n_edges,
