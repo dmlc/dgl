@@ -130,7 +130,7 @@ if __name__ == '__main__':
                         help='Whether to exclude reactants not contributing heavy atoms to the '
                              'product in top-k atom pair selection, which will make the '
                              'task easier.')
-    parser.add_argument('-np', '--num-processes', type=int, default=64,
+    parser.add_argument('-np', '--num-processes', type=int, default=32,
                         help='Number of processes to use for data pre-processing')
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)

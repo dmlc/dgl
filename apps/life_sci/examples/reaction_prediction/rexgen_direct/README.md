@@ -32,6 +32,13 @@ We use GPU whenever possible. To train the model with default options, simply do
 python find_reaction_center.py
 ```
 
+By default we use 32 processes for data pre-processing. If you encounter an error with 
+`BrokenPipeError: [Errno 32] Broken pipe`, you can specify a smaller number of processes with 
+```bash
+python find_reaction_center.py -np X
+```
+where `X` is the number of processes that you would like to use.
+
 Once the training process starts, the progress will be printed out in the terminal as follows:
 
 ```bash
