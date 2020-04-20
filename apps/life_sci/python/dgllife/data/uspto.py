@@ -232,13 +232,15 @@ def get_bond_changes(reaction):
 
     return bond_changes
 
-def process_file(path):
+def process_file(path, num_processes):
     """Pre-process a file of reactions for working with WLN.
 
     Parameters
     ----------
     path : str
         Path to the file of reactions
+    num_processes : int
+        Number of processes to use for data pre-processing.
     """
     with open(path, 'r') as input_file, open(path + '.proc', 'w') as output_file:
         for line in tqdm(input_file):
@@ -283,6 +285,8 @@ class WLNCenterDataset(object):
     log_every : int
         Print a progress update every time ``log_every`` reactions are pre-processed.
         Default to 10000.
+    num_processes : int
+        Number of processes to use for data pre-processing. Default to 1.
     """
     def __init__(self,
                  raw_file_path,
@@ -292,7 +296,8 @@ class WLNCenterDataset(object):
                  edge_featurizer=default_edge_featurizer_center,
                  atom_pair_featurizer=default_atom_pair_featurizer,
                  load=True,
-                 log_every=10000):
+                 log_every=10000,
+                 num_processes=1):
         super(WLNCenterDataset, self).__init__()
 
         self._atom_pair_featurizer = atom_pair_featurizer
@@ -304,7 +309,7 @@ class WLNCenterDataset(object):
         path_to_reaction_file = raw_file_path + '.proc'
         if not os.path.isfile(path_to_reaction_file):
             # Pre-process graph edits information
-            process_file(raw_file_path)
+            process_file(raw_file_path, num_processes)
 
         full_mols, full_reactions, full_graph_edits = \
             self.load_reaction_data(path_to_reaction_file, log_every)
@@ -481,6 +486,8 @@ class USPTOCenter(WLNCenterDataset):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
+    num_processes : int
+        Number of processes to use for data pre-processing. Default to 1.
     """
     def __init__(self,
                  subset,
@@ -488,7 +495,8 @@ class USPTOCenter(WLNCenterDataset):
                  node_featurizer=default_node_featurizer_center,
                  edge_featurizer=default_edge_featurizer_center,
                  atom_pair_featurizer=default_atom_pair_featurizer,
-                 load=True):
+                 load=True,
+                 num_processes=1):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         print('Preparing {} subset of USPTO for reaction center prediction.'.format(subset))
@@ -1059,7 +1067,7 @@ class WLNRankDataset(object):
         all_reactant_info = []
         for i in range(len(self.reactant_mols)):
             if i % log_every == 0:
-                print('Processing line {:d}'.format(i))
+                print('Processing line {:d}/{:d}'.format(i, len(self.reactant_mols)))
             candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
                                in self.candidate_bond_changes[i]]
             reactant_mol = self.reactant_mols[i]

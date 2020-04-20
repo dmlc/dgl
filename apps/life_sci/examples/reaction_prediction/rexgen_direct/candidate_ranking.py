@@ -32,6 +32,8 @@ if __name__ == '__main__':
                              'By default we use the official pre-trained model. If not None, '
                              'the model should follow the hyperparameters specified in '
                              'reaction_center_config.')
+    parser.add_argument('-np', '--num-processes', type=int, default=64,
+                        help='Number of processes to use for data pre-processing')
     args = parser.parse_args().__dict__
     args.update(candidate_ranking_config)
     args = setup(args)

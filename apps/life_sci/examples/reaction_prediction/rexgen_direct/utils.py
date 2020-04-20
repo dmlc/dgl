@@ -384,20 +384,23 @@ def prepare_reaction_center(args, reaction_center_config):
         reaction_center_model = reaction_center_model.to(args['device'])
 
     if args['train_path'] is None:
-        train_set = USPTOCenter('train')
+        train_set = USPTOCenter('train', num_processes=args['num_processes'])
     else:
         train_set = WLNCenterDataset(raw_file_path=args['train_path'],
-                                     mol_graph_path='train.bin')
+                                     mol_graph_path='train.bin',
+                                     num_processes=args['num_processes'])
     if args['val_path'] is None:
-        val_set = USPTOCenter('val')
+        val_set = USPTOCenter('val', num_processes=args['num_processes'])
     else:
         val_set = WLNCenterDataset(raw_file_path=args['val_path'],
-                                   mol_graph_path='val.bin')
+                                   mol_graph_path='val.bin',
+                                   num_processes=args['num_processes'])
     if args['test_path'] is None:
-        test_set = USPTOCenter('test')
+        test_set = USPTOCenter('test', num_processes=args['num_processes'])
     else:
         test_set = WLNCenterDataset(raw_file_path=args['test_path'],
-                                    mol_graph_path='test.bin')
+                                    mol_graph_path='test.bin',
+                                    num_processes=args['num_processes'])
 
     train_loader = DataLoader(train_set, batch_size=reaction_center_config['batch_size'],
                               collate_fn=collate, shuffle=False)

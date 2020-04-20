@@ -15,20 +15,23 @@ from utils import setup, collate, reaction_center_prediction, \
 
 def main(args):
     if args['train_path'] is None:
-        train_set = USPTOCenter('train')
+        train_set = USPTOCenter('train', num_processes=args['num_processes'])
     else:
         train_set = WLNCenterDataset(raw_file_path=args['train_path'],
-                                     mol_graph_path='train.bin')
+                                     mol_graph_path='train.bin',
+                                     num_processes=args['num_processes'])
     if args['val_path'] is None:
-        val_set = USPTOCenter('val')
+        val_set = USPTOCenter('val', num_processes=args['num_processes'])
     else:
         val_set = WLNCenterDataset(raw_file_path=args['val_path'],
-                                   mol_graph_path='val.bin')
+                                   mol_graph_path='val.bin',
+                                   num_processes=args['num_processes'])
     if args['test_path'] is None:
-        test_set = USPTOCenter('test')
+        test_set = USPTOCenter('test', num_processes=args['num_processes'])
     else:
         test_set = WLNCenterDataset(raw_file_path=args['test_path'],
-                                    mol_graph_path='test.bin')
+                                    mol_graph_path='test.bin',
+                                    num_processes=args['num_processes'])
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
@@ -127,6 +130,8 @@ if __name__ == '__main__':
                         help='Whether to exclude reactants not contributing heavy atoms to the '
                              'product in top-k atom pair selection, which will make the '
                              'task easier.')
+    parser.add_argument('-np', '--num-processes', type=int, default=64,
+                        help='Number of processes to use for data pre-processing')
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)
 
