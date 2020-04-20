@@ -271,7 +271,10 @@ def process_file(path, num_processes):
             results.append(process_line(li))
     else:
         with Pool(processes=num_processes) as pool:
-            results = list(tqdm(pool.imap(process_line, lines, chunksize=500), total=len(lines)))
+            results = list(tqdm(pool.imap(
+                process_line, lines,
+                chunksize=len(lines) // num_processes),
+                total=len(lines)))
     with open(path + '.proc', 'w') as output_file:
         for line in results:
             output_file.write(line)
@@ -386,7 +389,9 @@ class WLNCenterDataset(object):
                     self.reactant_mol_graphs = list(tqdm(pool.imap(
                         partial(mol_to_graph, node_featurizer=node_featurizer,
                                 edge_featurizer=edge_featurizer, canonical_atom_order=False),
-                        full_mols, chunksize=500), total=len(full_mols)))
+                        full_mols,
+                        chunksize=len(full_mols) // num_processes),
+                        total=len(full_mols)))
 
             save_graphs(mol_graph_path, self.reactant_mol_graphs)
 
@@ -427,8 +432,10 @@ class WLNCenterDataset(object):
                 results.append((mol, reaction, graph_edits))
         else:
             with Pool(processes=num_processes) as pool:
-                results = list(tqdm(
-                    pool.imap(load_one_reaction, lines, chunksize=500), total=len(lines)))
+                results = list(tqdm(pool.imap(
+                    load_one_reaction, lines,
+                    chunksize=len(lines) // num_processes),
+                    total=len(lines)))
 
         for mol, reaction, graph_edits in results:
             if mol is None:
