@@ -153,11 +153,11 @@ def main(args):
     g.g = hg
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
-    th.manual_seed(g.get_id())
+    th.manual_seed(g.rank)
     train_mask = g.ndata['train_mask'][g.local_gnids].numpy()
     val_mask = g.ndata['val_mask'][g.local_gnids].numpy()
     test_mask = g.ndata['test_mask'][g.local_gnids].numpy()
-    print('part {}, train: {}, val: {}, test: {}'.format(g.get_id(),
+    print('part {}, train: {}, val: {}, test: {}'.format(g.rank,
         np.sum(train_mask), np.sum(val_mask), np.sum(test_mask)), flush=True)
 
     # These have to be low node Ids.

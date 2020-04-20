@@ -74,6 +74,19 @@ class KVStoreTensorView:
     def __getitem__(self, idx):
         return self.kv.pull(name=self.name, id_tensor=idx)
 
+    def __setitem__(self, idx, val):
+        # TODO
+        pass
+
+    def __len__(self):
+        pass
+
+    def shape(self):
+        pass
+
+    def dtype(self):
+        pass
+
 
 class NodeDataView(MutableMapping):
     """The data view class when G.nodes[...].data is called.
@@ -205,15 +218,119 @@ class DistGraphStore:
         self._local_nids = F.nonzero_1d(self.g.ndata['local_node'])
         self._local_gnid = self.g.ndata[NID][self._local_nids]
 
+
+    def init_ndata(self, ndata_name, shape, dtype):
+        '''Initialize node data
+
+        This initializes the node data in the distributed KVStore.
+
+        Parameters
+        ----------
+        name : string
+            The name of the node data.
+        shape : tuple
+            The shape of the node data.
+        dtype : string
+            The data type of the node data.
+        '''
+        assert shape[0] == self.number_of_nodes()
+        self._client.init_data(ndata_name, shape, dtype)
+
+    def init_edata(self, edata_name, shape, dtype):
+        '''Initialize edge data
+
+        This initializes the edge data in the distributed KVStore.
+
+        Parameters
+        ----------
+        name : string
+            The name of the edge data.
+        shape : tuple
+            The shape of the edge data.
+        dtype : string
+            The data type of the edge data.
+        '''
+        assert shape[1] == self.number_of_edges()
+        self._client.init_data(edata_name, shape, dtype)
+
+    def set_n_initializer(self, initializer, field=None):
+        '''Set the initializer for empty node features.
+
+        Initializer is a callable that returns a tensor given the shape, data type
+        and device context.
+
+        When a subset of the nodes are assigned a new feature, initializer is
+        used to create feature for rest of the nodes.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+        '''
+        # TODO
+        pass
+
+    def set_e_initializer(self, initializer, field=None):
+        '''Set the initializer for empty edge features.
+
+        Initializer is a callable that returns a tensor given the shape, data
+        type and device context.
+
+        When a subset of the edges are assigned a new feature, initializer is
+        used to create feature for rest of the edges.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+        '''
+        # TODO
+        pass
+
+    def init_node_emb(self, name, shape, dtype, initializer):
+        ''' Initialize node embeddings.
+
+        This initializes the node embeddings in the distributed KVStore.
+
+        Parameters
+        ----------
+        name : string
+            The name of the node embeddings.
+        shape : tuple
+            The shape of the node embeddings.
+        dtype : string
+            The data type of the node embeddings.
+        initializer : callable
+            The initializer.
+        '''
+        # TODO
+        pass
+
+    def get_node_embeddings(self):
+        ''' Return node embeddings
+
+        Returns
+        -------
+        a dict of SparseEmbedding
+            All node embeddings in the graph store.
+        '''
+        # TODO
+        pass
+
     @property
     def ndata(self):
         """Return the data view of all the nodes.
 
-        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
-
-        See Also
-        --------
-        dgl.DGLGraph.nodes
+        Returns
+        -------
+        NodeDataView
+            The data view in the distributed KVStore.
         """
         return NodeDataView(self, self.graph_name)
 
@@ -221,11 +338,10 @@ class DistGraphStore:
     def edata(self):
         """Return the data view of all the edges.
 
-        DGLGraph.data is an abbreviation of DGLGraph.edges[:].data
-
-        See Also
-        --------
-        dgl.DGLGraph.edges
+        Returns
+        -------
+        EdgeDataView
+            The data view in the distributed KVStore.
         """
         return EdgeDataView(self, self.graph_name)
 
@@ -233,6 +349,13 @@ class DistGraphStore:
         return self.meta[0]
 
     def number_of_local_nodes(self):
+        ''' The number of nodes owned by the local graph store.
+
+        Returns
+        -------
+        int
+            The number of nodes owned by the local graph store.
+        '''
         return len(self._local_nids)
 
     def number_of_edges(self):
@@ -244,11 +367,42 @@ class DistGraphStore:
 
     @property
     def local_gnids(self):
+        ''' The Ids of the nodes owned by the local graph store.
+
+        The node Ids are global node Ids.
+
+        Returns
+        -------
+        tensor
+            The node Ids.
+        '''
         return self._local_gnid
 
-    def get_id(self):
+    def rank(self):
+        ''' The rank of the distributed graph store.
+
+        Returns
+        -------
+        int
+            The rank of the current graph store.
+        '''
         return self._client.get_id()
 
     def is_local(self, nids):
+        ''' Test if the node Ids are owned by the local graph store.
+
+        Returns
+        -------
+        Boolean tensor
+            Indicate whether the node Ids are owned by the local graph store.
+        '''
         #TODO we need to implement it more carefully.
         return self.g.ndata['local_node'][nids]
+
+    def barrier(self):
+        ''' The barrier for all processes.
+
+        When a process enters a barrier, it can only exit from
+        the barrier when all other processes enter the barrier.
+        '''
+        self._client.barrier()
