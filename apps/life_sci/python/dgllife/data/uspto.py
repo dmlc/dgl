@@ -15,7 +15,6 @@ from itertools import combinations
 from multiprocessing import Pool
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
-from tqdm import tqdm
 
 from ..utils.featurizers import BaseAtomFeaturizer, ConcatFeaturizer, one_hot_encoding, \
     atom_type_one_hot, atom_degree_one_hot, atom_explicit_valence_one_hot, \
@@ -271,10 +270,8 @@ def process_file(path, num_processes):
             results.append(process_line(li))
     else:
         with Pool(processes=num_processes) as pool:
-            results = list(tqdm(pool.imap(
-                process_line, lines,
-                chunksize=len(lines) // num_processes),
-                total=len(lines)))
+            results = pool.map_async(process_line, lines)
+            results = results.get()
     with open(path + '.proc', 'w') as output_file:
         for line in results:
             output_file.write(line)
@@ -386,12 +383,11 @@ class WLNCenterDataset(object):
             else:
                 torch.multiprocessing.set_sharing_strategy('file_system')
                 with Pool(processes=num_processes) as pool:
-                    self.reactant_mol_graphs = list(tqdm(pool.imap(
+                    self.reactant_mol_graphs = pool.map_async(
                         partial(mol_to_graph, node_featurizer=node_featurizer,
                                 edge_featurizer=edge_featurizer, canonical_atom_order=False),
-                        full_mols,
-                        chunksize=len(full_mols) // num_processes),
-                        total=len(full_mols)))
+                        full_mols)
+                    self.reactant_mol_graphs = self.reactant_mol_graphs.get()
 
             save_graphs(mol_graph_path, self.reactant_mol_graphs)
 
@@ -432,10 +428,8 @@ class WLNCenterDataset(object):
                 results.append((mol, reaction, graph_edits))
         else:
             with Pool(processes=num_processes) as pool:
-                results = list(tqdm(pool.imap(
-                    load_one_reaction, lines,
-                    chunksize=len(lines) // num_processes),
-                    total=len(lines)))
+                results = pool.map_async(load_one_reaction, lines)
+                results = results.get()
 
         for mol, reaction, graph_edits in results:
             if mol is None:
