@@ -169,7 +169,7 @@ def reaction_center_rough_eval_on_a_loader(args, model, data_loader):
     model.eval()
     num_correct = {k: [] for k in args['top_ks']}
     for batch_id, batch_data in enumerate(data_loader):
-        batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
+        batch_reactions, batch_graph_edits, batch_mol_graphs, \
         batch_complete_graphs, batch_atom_pair_labels = batch_data
         with torch.no_grad():
             pred, biased_pred = reaction_center_prediction(
@@ -327,7 +327,7 @@ def reaction_center_final_eval(args, model, data_loader, easy):
     model.eval()
     num_correct = {k: 0 for k in args['top_ks']}
     for batch_id, batch_data in enumerate(data_loader):
-        batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
+        batch_reactions, batch_graph_edits, batch_mol_graphs, \
         batch_complete_graphs, batch_atom_pair_labels = batch_data
         with torch.no_grad():
             pred, biased_pred = reaction_center_prediction(
@@ -413,7 +413,7 @@ def prepare_reaction_center(args, reaction_center_config):
     }.items():
         set_candidate_bonds = []
         for batch_id, batch_data in enumerate(data_loader):
-            batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
+            batch_reactions, batch_graph_edits, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
             with torch.no_grad():
                 pred, biased_pred = reaction_center_prediction(
