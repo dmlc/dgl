@@ -5,6 +5,7 @@ import dgl
 from dgl import utils
 from dgl.contrib import KVServer
 from dgl.contrib import KVClient
+from numpy.testing import assert_array_equal
 
 import os
 import time
@@ -14,15 +15,16 @@ dim_size = 3
 
 server_namebook = {0:[0, '127.0.0.1', 30070, 1]}
 
+data_0 = F.zeros((num_entries, dim_size), F.float32, F.cpu())
+g2l_0 = F.arange(0, num_entries)
+partition_0 = F.zeros(num_entries, F.int64, F.cpu())
+
+data_1 = F.zeros((num_entries*2, dim_size), F.float32, F.cpu())
+g2l_1 = F.arange(0, num_entries*2)
+partition_1 = F.zeros(num_entries*2, F.int64, F.cpu())
+
 def start_server():
     my_server = KVServer(server_id=0, server_namebook=server_namebook, num_client=1)
-    data_0 = F.zeros((num_entries, dim_size), F.float32, F.cpu())
-    g2l_0 = F.arange(0, num_entries)
-    partition_0 = F.zeros(num_entries, F.int64, F.cpu())
-
-    data_1 = F.zeros((num_entries*2, dim_size), F.float32, F.cpu())
-    g2l_1 = F.arange(0, num_entries*2)
-    partition_1 = F.zeros(num_entries*2, F.int64, F.cpu())
 
     my_server.set_global2local(name='data_0', global2local=g2l_0)
     my_server.set_global2local(name='data_1', global2local=g2l_1)
@@ -38,13 +40,11 @@ def start_server():
 
     meta_0 = my_server.get_data_meta('data_0')
     assert meta_0[0] == F.float32
-    assert meta_0[1] == F.shape(num_entries, dim_size)
-    assert meta_0[2] == partition_0
+    assert_array_equal(meta_0[2], partition_0)
 
     meta_1 = my_server.get_data_meta('data_1')
     assert meta_1[0] == F.float32
-    assert meta_1[1] == F.shape(num_entries*2, dim_size)
-    assert meta_1[2] == partition_1
+    assert_array_equal(meta_1[2], partition_1)
 
     my_server.start()
 
@@ -60,21 +60,19 @@ def start_client():
 
     meta_0 = my_client.get_data_meta('data_0')
     assert meta_0[0] == F.float32
-    assert meta_0[1] == F.shape(num_entries, dim_size)
-    assert meta_0[2] == partition_0
+    assert_array_equal(meta_0[2], partition_0)
 
     meta_1 = my_client.get_data_meta('data_1')
     assert meta_1[0] == F.float32
-    assert meta_1[1] == F.shape(num_entries*2, dim_size)
-    assert meta_1[2] == partition_1
+    assert_array_equal(meta_1[2], partition_1)
 
-
-    my_client.push(name='data_0', id_tensor=F.tensor([0], F.int64, F.cpu()), data_tensor=F.tensor([1.,1.,1.]))
-    my_client.push(name='data_0', id_tensor=F.tensor([1], F.int64, F.cpu()), data_tensor=F.tensor([1.,1.,1.]))
-    my_client.push(name='data_0', id_tensor=F.tensor([2], F.int64, F.cpu()), data_tensor=F.tensor([1.,1.,1.]))
+    my_client.push(name='data_0', id_tensor=F.tensor([0, 1, 2]), data_tensor=F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]]))
 
     res = my_client.pull(name='data_0', id_tensor=F.tensor([0, 1, 2]))
 
+    target = F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]])
+
+    assert_array_equal(res, target)
 
     my_client.shut_down()
 
