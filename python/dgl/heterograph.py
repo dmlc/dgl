@@ -2515,12 +2515,12 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._graph.dtype)
+            v = utils.toindex(v, self._graph.dtype)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             _, _, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._graph.dtype)
 
         # sanity check
         if not utils.is_dict_like(data):
@@ -2530,7 +2530,7 @@ class DGLHeteroGraph(object):
         if is_all(eid):
             num_edges = self._graph.number_of_edges(etid)
         else:
-            eid = utils.toindex(eid)
+            eid = utils.toindex(eid, self._graph.dtype)
             num_edges = len(eid)
         for key, val in data.items():
             nfeats = F.shape(val)[0]
@@ -2567,8 +2567,8 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._graph.dtype)
+            v = utils.toindex(v, self._graph.dtype)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             _, _, eid = self._graph.edge_ids(etid, u, v)
         else:
@@ -2833,16 +2833,16 @@ class DGLHeteroGraph(object):
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
         if is_all(edges):
-            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
+            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)), self._graph.dtype)
             u, v, _ = self._graph.edges(etid, 'eid')
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._graph.dtype)
+            v = utils.toindex(v, self._graph.dtype)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._graph.dtype)
             u, v, _ = self._graph.find_edges(etid, eid)
 
         if len(eid) == 0:

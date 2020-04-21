@@ -149,6 +149,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroContext(self)
 
+    @utils.cached_member(cache='_cache', prefix='nbits')
     def nbits(self):
         """Return the number of integer bits used in the storage (32 or 64).
 
@@ -907,6 +908,13 @@ class HeteroGraphIndex(ObjectBase):
         rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
         rev_order = rev_csr(2)
         return utils.toindex(order), utils.toindex(rev_order)
+    
+    @property
+    def dtype(self):
+        if self.nbits()==32:
+            return "int32"
+        else:
+            return "int64"
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):

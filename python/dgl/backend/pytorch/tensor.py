@@ -153,7 +153,7 @@ def repeat(input, repeats, dim):
     return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
 
 def gather_row(data, row_index):
-    return th.index_select(data, 0, row_index)
+    return th.index_select(data, 0, row_index.long())
 
 def slice_axis(data, axis, begin, end):
     return th.narrow(data, axis, begin, end - begin)
@@ -166,7 +166,7 @@ def narrow_row(x, start, stop):
     return x[start:stop]
 
 def scatter_row(data, row_index, value):
-    return data.index_copy(0, row_index, value)
+    return data.index_copy(0, row_index.long(), value)
 
 def scatter_row_inplace(data, row_index, value):
     data[row_index] = value
