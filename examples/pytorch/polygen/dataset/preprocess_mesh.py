@@ -53,6 +53,9 @@ def preprocess(obj_file):
                     processed_face_verts_idx[:,2]
     sort_face_idx = np.argsort(face_sort_val)
     processed_face_verts_idx = processed_face_verts_idx[sort_face_idx, :]
+    # Unique again since sort with face, might have same face
+    processed_face_verts_idx = np.unique(processed_face_verts_idx , axis=0)
+
     return processed_verts, processed_face_verts_idx
 
 

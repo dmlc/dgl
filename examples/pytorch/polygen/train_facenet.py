@@ -53,7 +53,6 @@ def main(dev_id, args):
     th.cuda.set_device(device)
     # Prepare dataset
     dataset = get_dataset('face')
-    V = dataset.vocab_size
     criterion = torch.nn.NLLLoss()
     dim_model = 256
     # Build graph pool

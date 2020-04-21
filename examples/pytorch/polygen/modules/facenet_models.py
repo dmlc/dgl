@@ -9,6 +9,7 @@ from dataset import *
 import threading
 import torch as th
 import dgl.function as fn
+import torch.nn as nn
 import torch.nn.init as INIT
 
 class Encoder(nn.Module):
@@ -66,15 +67,38 @@ class Decoder(nn.Module):
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
+# pointer network
+# group message
+def pointer_dot(edges):
+    dot_res = th.bmm(edges.src['x'].unsqueeze(1), edges.dst['x'].unsqueeze(-1))
+    return {'pointer_dot': dot_res.flatten(), 'src_idx': edges.src['idx']}
+# recv fun
+def softmax_and_pad(nodes):
+    max_len = ShapeNetFaceDataset.MAX_VERT_LENGTH+2
+    eps = 1e-8
+    shape = nodes.mailbox['pointer_dot'].shape
+    # reorder based on src idx
+    pointer_dot = nodes.mailbox['pointer_dot']
+    src_idx = nodes.mailbox['src_idx']
+    ordered_pointer_dot = th.gather(pointer_dot, 1, src_idx)
+    # log softmax
+    log_softmax_pointer_dot = th.log_softmax(ordered_pointer_dot, dim=-1)
+    pad_num = max_len - shape[1]
+    if pad_num:
+        pad_tensor = th.ones([shape[0], pad_num], dtype=log_softmax_pointer_dot.dtype, device=log_softmax_pointer_dot.device)*eps
+        padded_res = th.cat([log_softmax_pointer_dot, pad_tensor], axis=1)
+        return {'log_softmax_res': padded_res}
+    else:
+        return {'log_softmax_res': log_softmax_pointer_dot}
+
 class Transformer(nn.Module):
-    def __init__(self, encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, generator, h, d_k):
+    def __init__(self, encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, h, d_k):
         super(Transformer, self).__init__()
         self.encoder,  self.decoder = encoder, decoder
         self.vert_val_embed = vert_val_embed
         self.vert_pos_enc = vert_pos_enc
         self.face_pos_enc = face_pos_enc
         self.vert_idx_in_face_enc = vert_idx_in_face_enc
-        self.generator = generator
         self.h, self.d_k = h, d_k
         self.att_weight_map = None
 
@@ -93,42 +117,11 @@ class Transformer(nn.Module):
         # Pre-compute queries and key-value pairs.
         for pre_func, nids in pre_pairs:
             g.apply_nodes(pre_func, nids)
+
         self.propagate_attention(g, eids)
         # Further calculation after attention mechanism
         for post_func, nids in post_pairs:
             g.apply_nodes(post_func, nids)
-
-    # pointer network
-    # group message
-    def pointer_dot(nn.Module):
-        def __init__(self):
-            super(pointer_dot, self).__init__()
-        
-        def forward(self, edges):
-            dot_res = th.dot(edges.src['x'], edges.dst['x'])
-            return {'pointer_dot': dot_res, 'src_idx': edges.src['idx']}
-    # recv fun
-    def softmax_and_pad(nn.Module):
-        def __init__(self, max_len = ShapeNetFaceDataset.MAX_VERT_LENGTH+2):
-            super(softmax_and_pad, self).__init()
-            self.max_len = max_len
-            self.eps = 1e-8
-
-        def forward(self.nodes):
-            shape = nodes.mailbox['pointer_dot'].shape
-            # reorder based on src idx
-            pointer_dot = nodes.mailbox['pointer_dot']
-            src_idx = nodes.mailbox['src_idx']
-            ordered_pointer_dot = pointer_dot.index_select(0, src_idx)
-            # log softmax
-            log_softmax_pointer_dot = th.log_softmax(ordered_pointer_dot, dim=-1)
-            pad_num = self.max_len - shap[0]
-            if pad_num:
-                pad_tensor = th.tensor(np.ones(pad_num)*self.eps)
-                padded_res = th.cat([log_softmax_pointer_dot, pad_tensor], axis=0)
-                return {'log_softmax_res': padded_res}
-            else:
-                return {'log_softmax_res': log_softmax_pointer_dot}
 
     def forward(self, graph):
         g = graph.g
@@ -137,8 +130,8 @@ class Transformer(nn.Module):
         # Embed all vertex
         vert_val_embed = self.vert_val_embed(graph.src[0])
         vert_pos_enc = self.vert_pos_enc(graph.src[1])
-        g.nodes[nids['enc']].data['x'] = self.pos_enc.dropout(vert_val_embed + vert_pos_enc)
-        g.nodes[nids['enc']].data['idx'] = graph.src[0]
+        g.nodes[nids['enc']].data['x'] = self.vert_pos_enc.dropout(vert_val_embed + vert_pos_enc)
+        g.nodes[nids['enc']].data['idx'] = graph.src[1]
         # Run encoder
         for i in range(self.encoder.N):
             pre_func = self.encoder.pre_func(i, 'qkv')
@@ -150,7 +143,7 @@ class Transformer(nn.Module):
         tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, graph.tgt[0])
         face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
         vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
-        g.nodes[nids['dec']].data['x'] = self.pos_enc.dropout(tgt_embed + face_pos_enc + vert_idx_in_face_enc)
+        g.nodes[nids['dec']].data['x'] = self.face_pos_enc.dropout(tgt_embed + face_pos_enc + vert_idx_in_face_enc)
         g.nodes[nids['dec']].data['idx'] = graph.tgt[1]
 
         for i in range(self.decoder.N):
@@ -161,10 +154,8 @@ class Transformer(nn.Module):
         
         nodes, edges = nids['dec'], eids['ed']
         # pointer net
-        g.send_and_recv(edges,
-                        [pointer_dot],
-                        [softmax_and_pad])
-
+        g.send(edges=g.find_edges(edges), message_func=pointer_dot)
+        g.recv(v=nodes, reduce_func=softmax_and_pad)
         return g.ndata['log_softmax_res'][nids['dec']]
 
     def infer(self, graph, max_len, eos_id, k, alpha=1.0):
@@ -279,10 +270,8 @@ def make_face_model(N=6, dim_model=256, dim_ff=256, h=8, dropout=0.1, universal=
     vert_val_vocab = ShapeNetVertexDataset.COORD_BIN + 3
     vert_val_embed = VertCoordJointEmbeddings(vert_val_vocab, dim_model)
 
-    
-    generator = FaceNetGenerator(dim_model, tgt_vocab)
     model = Transformer(
-        encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, generator, h, dim_model // h)
+        encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, h, dim_model // h)
     # xavier init
     for p in model.parameters():
         if p.dim() > 1:

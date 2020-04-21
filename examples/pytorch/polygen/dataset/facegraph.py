@@ -10,7 +10,7 @@ FaceGraph = namedtuple('Graph',
 
 class FaceGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
-    def __init__(self, n=135, m=800):
+    def __init__(self, n=50, m=800):
         '''
         args:
             n: maximum length of input sequence.
@@ -21,11 +21,14 @@ class FaceGraphPool:
         self.n, self.m = n, m
         g_pool = [[dgl.DGLGraph() for _ in range(m)] for _ in range(n)]
         num_edges = {
-            'ee': np.zeros((n, n)).astype(int),
+            'ee': np.zeros((n, m)).astype(int),
             'ed': np.zeros((n, m)).astype(int),
-            'dd': np.zeros((m, m)).astype(int)
+            'dd': np.zeros((n, m)).astype(int)
         }
         for i, j in itertools.product(range(n), range(m)):
+            if i != 45:
+                continue
+
             src_length = i + 1
             tgt_length = j + 1
 
@@ -126,11 +129,11 @@ class FaceGraphPool:
         g_list = []
         src_lens = [len(_) for _ in src_buf]
         tgt_lens = [len(_) - 1 for _ in tgt_buf]
-        num_edges = {'ee': [], 'dd': []}
+        num_edges = {'ee': [], 'ed': [], 'dd': []}
         for src_len, tgt_len in zip(src_lens, tgt_lens):
             i, j = src_len - 1, tgt_len - 1
             g_list.append(self.g_pool[i][j])
-            for key in ['ee', 'dd']:
+            for key in ['ee', 'ed', 'dd']:
                 num_edges[key].append(int(self.num_edges[key][i][j]))
 
         g = dgl.batch(g_list)
@@ -139,11 +142,14 @@ class FaceGraphPool:
         enc_ids, dec_ids = [], []
         e2e_eids, d2d_eids, e2d_eids = [], [], []
         n_nodes, n_edges, n_tokens = 0, 0, 0
-        for src_sample, tgt_sample, n, m, n_ee, n_dd in zip(src_buf, tgt_buf, src_lens, tgt_lens, num_edges['ee'], num_edges['dd']):
+        n_enc_nodes = 0
+        for src_sample, tgt_sample, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
             src.append(th.tensor(src_sample, dtype=th.long, device=device))
             # Add the tgt with current n_node for forward indexing
-            tgt_sample += n_nodes
-            tgt.append(th.tensor(tgt_sample[:-1], dtype=th.long, device=device))
+            tgt_sample = np.array(tgt_sample)
+            indexed_tgt_sample = tgt_sample + n_enc_nodes
+            n_enc_nodes += n
+            tgt.append(th.tensor(indexed_tgt_sample[:-1], dtype=th.long, device=device))
             tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
             src_pos.append(th.arange(n, dtype=th.long, device=device))
             tgt_pos.append(th.arange(m, dtype=th.long, device=device))
@@ -153,6 +159,8 @@ class FaceGraphPool:
             n_nodes += m
             e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
             n_edges += n_ee
+            e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
+            n_edges += n_ed
             d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
             n_edges += n_dd
             n_tokens += m
@@ -160,12 +168,12 @@ class FaceGraphPool:
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
 
-        return Graph(g=g,
+        return FaceGraph(g=g,
                      src=(th.cat(src), th.cat(src_pos)),
                      tgt=(th.cat(tgt), th.cat(tgt_pos)),
                      tgt_y=th.cat(tgt_y),
                      nids = {'enc': th.cat(enc_ids), 'dec': th.cat(dec_ids)},
-                     eids = {'ee': th.cat(e2e_eids), 'dd': th.cat(d2d_eids)},
+                     eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
                      nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
                      n_edges=n_edges,

@@ -1,4 +1,5 @@
 from .vertexgraph import *
+from .facegraph import *
 from .fields import *
 from .utils import prepare_dataset
 from .preprocess_mesh import preprocess as preprocess_mesh_obj
@@ -102,11 +103,13 @@ class ShapeNetFaceDataset(object):
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
-    MAX_VERT_LENGTH = 133
+    #MAX_VERT_LENGTH = 133
+    MAX_VERT_LENGTH = 48
     START_FACE_VERT_IDX = 0
     STOP_FACE_VERT_IDX = 1
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
     MAX_FACE_LENGTH = (800 + 2) // 3
+    #MAX_FACE_LENGTH = (800 + 2) // 3
     
     def __init__(self, dataset_list_file ='table_chair.txt'):
         dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
@@ -147,7 +150,8 @@ class ShapeNetFaceDataset(object):
         src_buf, tgt_buf = [], []
 
         for idx in order:
-            obj_file = dataset_list[idx].strip()
+            same_idx = 0
+            obj_file = dataset_list[same_idx].strip()
             verts, faces = preprocess_mesh_obj(obj_file)
             # Flattern verts, order Y(up), X(front), Z(right)
             reordered_verts = np.zeros_like(verts)
@@ -174,8 +178,7 @@ class ShapeNetFaceDataset(object):
             # -1 for considering the FACE_EOS_BIN
             if faces.shape[0] > self.MAX_FACE_LENGTH:
                 continue
-            
-            tgt_buf.append(flattern_verts)
+            tgt_buf.append(flattern_faces)
             if len(tgt_buf) == batch_size:
                 if mode == 'test':
                     yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
@@ -347,6 +350,8 @@ def get_dataset(dataset):
         )
     elif dataset == 'vertex':
         return ShapeNetVertexDataset()
+    elif dataset == 'face':
+        return ShapeNetFaceDataset()
     elif dataset == 'multi30k':
         return TranslationDataset(
             'data/multi30k',
