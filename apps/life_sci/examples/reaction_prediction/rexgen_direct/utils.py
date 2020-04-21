@@ -115,10 +115,10 @@ class Optimizer(nn.Module):
         grad_norm : float
             Gradient norm. If self.max_grad_norm is None, None will be returned.
         """
+        self._reset()
         loss.backward()
         grad_norm = self._clip_grad_norm()
         self.optimizer.step()
-        self._reset()
 
         return grad_norm
 

@@ -68,6 +68,7 @@ def main(rank, dev_id, args):
     dur = []
 
     for epoch in range(args['num_epochs']):
+        model.train()
         if rank == 0 and epoch >= 1:
             t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
