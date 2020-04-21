@@ -81,17 +81,17 @@ def main(rank, dev_id, args):
             loss = criterion(pred, labels) / len(batch_reactions)
             loss_sum += loss.cpu().detach().data.item()
             grad_norm_sum += optimizer.backward_and_step(loss)
-            if total_iter % args['decay_every']:
+            if total_iter % args['decay_every'] // args['num_devices']:
                 optimizer.decay_lr(args['lr_decay_factor'])
 
-            if total_iter % args['print_every'] // args['num_devices'] == 0 and rank == 0:
+            if total_iter % args['print_every'] == 0 and rank == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
                     loss_sum / args['print_every'], grad_norm_sum / args['print_every'])
+                print(progress)
                 grad_norm_sum = 0
                 loss_sum = 0
-                print(progress)
 
             if total_iter % args['decay_every'] // args['num_devices'] == 0 and rank == 0:
                 torch.save({'model_state_dict': model.state_dict()},
