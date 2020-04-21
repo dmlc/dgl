@@ -56,10 +56,11 @@ def main(rank, dev_id, args):
     optimizer = Adam(model.parameters(), lr=args['lr'])
     if args['num_devices'] <= 1:
         from utils import Optimizer
-        optimizer = Optimizer(model, args['lr'], optimizer)
+        optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'])
     else:
         from utils import MultiProcessOptimizer
-        optimizer = MultiProcessOptimizer(args['num_devices'], model, args['lr'], optimizer)
+        optimizer = MultiProcessOptimizer(args['num_devices'], model, args['lr'],
+                                          optimizer, max_grad_norm=args['max_norm'])
 
     total_iter = 0
     grad_norm_sum = 0
