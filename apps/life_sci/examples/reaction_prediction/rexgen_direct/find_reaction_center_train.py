@@ -82,8 +82,8 @@ def main(rank, dev_id, args):
             loss = criterion(pred, labels) / len(batch_reactions)
             loss_sum += loss.cpu().detach().data.item()
             grad_norm_sum += optimizer.backward_and_step(loss)
-            #if total_iter % args['decay_every'] // args['num_devices']:
-            #    optimizer.decay_lr(args['lr_decay_factor'])
+            if total_iter % (args['decay_every'] // args['num_devices']) == 0:
+                optimizer.decay_lr(args['lr_decay_factor'])
 
             if total_iter % args['print_every'] == 0 and rank == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | ' \
