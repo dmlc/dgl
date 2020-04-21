@@ -84,7 +84,7 @@ def main(rank, dev_id, args):
             if total_iter % args['decay_every']:
                 optimizer.decay_lr(args['lr_decay_factor'])
 
-            if total_iter % args['print_every'] == 0 and rank == 0:
+            if total_iter % args['print_every'] // args['num_devices'] == 0 and rank == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
@@ -93,7 +93,7 @@ def main(rank, dev_id, args):
                 loss_sum = 0
                 print(progress)
 
-            if total_iter % args['decay_every'] == 0 and rank == 0:
+            if total_iter % args['decay_every'] // args['num_devices'] == 0 and rank == 0:
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model.pkl')
 
