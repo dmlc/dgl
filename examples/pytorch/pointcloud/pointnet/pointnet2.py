@@ -283,7 +283,7 @@ class PointNet2MSGCls(nn.Module):
         else:
             pos = x
             feat = None
-        pos, feat = self.sa_msg_module1(x, None)
+        pos, feat = self.sa_msg_module1(pos, feat)
         pos, feat = self.sa_msg_module2(pos, feat)
         h = self.sa_module3(pos, feat)
 

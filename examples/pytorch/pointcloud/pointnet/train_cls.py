@@ -24,8 +24,8 @@ parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
-parser.add_argument('--num-workers', type=int, default=6)
-parser.add_argument('--batch-size', type=int, default=16)
+parser.add_argument('--num-workers', type=int, default=8)
+parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -33,13 +33,13 @@ batch_size = args.batch_size
 
 data_filename = 'modelnet40_normal_resampled.zip'
 download_path = os.path.join(get_download_dir(), data_filename)
-local_path = args.dataset_path or os.path.join(get_download_dir(), modelnet40_normal_resampled)
+local_path = args.dataset_path or os.path.join(get_download_dir(), 'modelnet40_normal_resampled')
 
 if not os.path.exists(local_path):
     download('https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip', download_path)
     from zipfile import ZipFile
-    with ZipFile(fpath) as z:
-        z.extractall(path=local_path)
+    with ZipFile(download_path) as z:
+        z.extractall(path=get_download_dir())
 '''
 data_filename = 'modelnet40-sampled-2048.h5'
 local_path = args.dataset_path or os.path.join(get_download_dir(), data_filename)
@@ -125,13 +125,13 @@ dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # dev = "cpu"
 
 # net = PointNetCls(40, input_dims=6)
-net = PointNet2SSGCls(40, batch_size, input_dims=6)
-# net = PointNet2MSGCls(40, batch_size)
+# net = PointNet2SSGCls(40, batch_size, input_dims=6)
+net = PointNet2MSGCls(40, batch_size, input_dims=6)
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
+opt = optim.Adam(net.parameters(), lr=1e-3, weight_decay=1e-4)
 
 scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.7)
 
