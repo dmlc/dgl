@@ -80,8 +80,7 @@ def main(rank, dev_id, args):
                 args['device'], model, batch_mol_graphs, batch_complete_graphs)
             loss = criterion(pred, labels) / len(batch_reactions)
             loss_sum += loss.cpu().detach().data.item()
-            grad_norm = optimizer.backward_and_step(loss)
-            grad_norm_sum += grad_norm
+            grad_norm_sum += optimizer.backward_and_step(loss)
             if total_iter % args['decay_every']:
                 optimizer.decay_lr(args['lr_decay_factor'])
 
@@ -154,8 +153,14 @@ if __name__ == '__main__':
         device_id = devices[0] if torch.cuda.is_available() else -1
         main(0, device_id, args)
     else:
+        if (args['train_path'] is not None) or (args['val_path'] is not None):
+            print('First pass for constructing DGLGraphs with multiprocessing')
+            load_dataset(args)
         # Subprocesses are not allowed for daemon mode
         args['num_processes'] = 1
+        # With multi-gpu training, the batch size increases and we need to
+        # increase learning rate accordingly.
+        args['lr'] = args['lr'] * args['num_devices']
         mp = torch.multiprocessing.get_context('spawn')
         procs = []
         for id, device_id in enumerate(devices):
