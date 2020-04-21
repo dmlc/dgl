@@ -52,12 +52,12 @@ def main(rank, dev_id, args, train_set, val_set):
 
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
-    if args.num_gpus <= 1:
+    if args['num_gpus'] <= 1:
         from utils import Optimizer
         optimizer = Optimizer(model, args['lr'], optimizer)
     else:
         from utils import MultiProcessOptimizer
-        optimizer = MultiProcessOptimizer(args.num_gpus, model, args['lr'], optimizer)
+        optimizer = MultiProcessOptimizer(args['num_gpus'], model, args['lr'], optimizer)
 
     total_iter = 0
     grad_norm_sum = 0
@@ -104,10 +104,9 @@ def main(rank, dev_id, args, train_set, val_set):
 def run(rank, dev_id, args, train_set, val_set):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=args['master_ip'], master_port=args['master_port'])
-    world_size = args.num_gpus
     torch.distributed.init_process_group(backend="nccl",
                                          init_method=dist_init_method,
-                                         world_size=world_size,
+                                         world_size=args['num_gpus'],
                                          rank=dev_id)
     gpu_rank = torch.distributed.get_rank()
     assert gpu_rank == dev_id
@@ -144,19 +143,19 @@ if __name__ == '__main__':
         'of top_ks, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks']))
     mkdir_p(args['result_path'])
 
-    devices = list(map(int, args.gpus.split(',')))
+    devices = list(map(int, args['gpus'].split(',')))
     train_set, val_set = load_dataset(args)
 
     if len(devices) == 1:
         if torch.cuda.is_available():
-            args.num_gpus = 0
+            args['num_gpus'] = 0
             device_id = -1
         else:
-            args.num_gpus = 1
+            args['num_gpus'] = 1
             device_id = devices[0]
         main(0, device_id, args, train_set, val_set)
     else:
-        args.num_gpus = len(devices)
+        args['num_gpus'] = len(devices)
         train_subset_size = len(train_set) // len(devices)
         mp = torch.multiprocessing.get_context('spawn')
         procs = []
