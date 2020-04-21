@@ -96,8 +96,8 @@ def main(rank, dev_id, args, train_set, val_set):
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model.pkl')
 
-        dur.append(time.time() - t0)
         if rank == 0:
+            dur.append(time.time() - t0)
             print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
                   reaction_center_rough_eval_on_a_loader(args, model, val_loader))
 

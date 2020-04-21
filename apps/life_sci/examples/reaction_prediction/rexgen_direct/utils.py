@@ -49,11 +49,11 @@ class Optimizer(nn.Module):
 
     Parameters
     ----------
-    model
+    model : nn.Module
         Model being trained
     lr : float
         Initial learning rate
-    optimizer
+    optimizer : torch.optim.Optimizer
         model optimizer
     max_grad_norm : float or None
         If not None, gradient clipping will be performed
@@ -114,11 +114,11 @@ class MultiProcessOptimizer(Optimizer):
     ----------
     n_processes : int
         Number of processes used
-    model
+    model : nn.Module
         Model being trained
     lr : float
         Initial learning rate
-    optimizer
+    optimizer : torch.optim.Optimizer
         model optimizer
     max_grad_norm : float or None
         If not None, gradient clipping will be performed.
