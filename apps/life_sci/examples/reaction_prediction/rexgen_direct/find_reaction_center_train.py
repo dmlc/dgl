@@ -159,6 +159,7 @@ if __name__ == '__main__':
         mp = torch.multiprocessing.get_context('spawn')
         procs = []
         for id, device_id in enumerate(devices):
+            print('Preparing for gpu {:d}/{:d}'.format(id + 1, args['num_devices']))
             train_subset = deepcopy(train_set)
             val_susbet = deepcopy(val_set)
             get_center_subset(train_subset, id, args['num_devices'])
