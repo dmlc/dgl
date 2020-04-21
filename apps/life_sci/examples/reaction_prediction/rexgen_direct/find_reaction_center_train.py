@@ -105,7 +105,7 @@ def main(rank, dev_id, args):
                   reaction_center_rough_eval_on_a_loader(args, model, val_loader))
         synchronize(args['num_devices'])
 
-def run(rank, dev_id, args, train_set, val_set):
+def run(rank, dev_id, args):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=args['master_ip'], master_port=args['master_port'])
     torch.distributed.init_process_group(backend="nccl",
@@ -113,7 +113,7 @@ def run(rank, dev_id, args, train_set, val_set):
                                          world_size=args['num_devices'],
                                          rank=dev_id)
     assert torch.distributed.get_rank() == dev_id
-    main(rank, dev_id, args, train_set, val_set)
+    main(rank, dev_id, args)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
