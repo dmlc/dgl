@@ -54,6 +54,9 @@ def main(rank, dev_id, args):
 
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
+    from torch.optim.lr_scheduler import StepLR
+    from torch.nn.utils import clip_grad_norm_
+    """
     if args['num_devices'] <= 1:
         from utils import Optimizer
         optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'])
@@ -61,6 +64,7 @@ def main(rank, dev_id, args):
         from utils import MultiProcessOptimizer
         optimizer = MultiProcessOptimizer(args['num_devices'], model, args['lr'],
                                           optimizer, max_grad_norm=args['max_norm'])
+    """
 
     total_iter = 0
     grad_norm_sum = 0
@@ -81,7 +85,12 @@ def main(rank, dev_id, args):
                 args['device'], model, batch_mol_graphs, batch_complete_graphs)
             loss = criterion(pred, labels) / len(batch_reactions)
             loss_sum += loss.cpu().detach().data.item()
-            grad_norm_sum += optimizer.backward_and_step(loss)
+            optimizer.zero_grad()
+            loss.backward()
+            grad_norm = clip_grad_norm_(model.parameters(), args['max_norm'])
+            grad_norm_sum += grad_norm
+            optimizer.step()
+            # grad_norm_sum += optimizer.backward_and_step(loss)
             if total_iter % args['decay_every'] // args['num_devices']:
                 optimizer.decay_lr(args['lr_decay_factor'])
 
