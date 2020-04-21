@@ -5,10 +5,8 @@ import torch
 from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import WLNReactionCenter, load_pretrained
 from torch.nn import BCEWithLogitsLoss
-from torch.nn.utils import clip_grad_norm_
 from torch.optim import Adam
-from torch.optim.lr_scheduler import StepLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 from utils import collate, reaction_center_prediction, reaction_center_rough_eval_on_a_loader, \
     mkdir_p, set_seed
@@ -29,8 +27,10 @@ def load_dataset(args):
 
     return train_set, val_set
 
-def main(dev_id, args, train_set, val_set):
+def main(rank, dev_id, args, train_set, val_set):
     set_seed()
+    # Remove the line below will result in problems for multiprocess
+    torch.set_num_threads(1)
     if dev_id == -1:
         args['device'] = torch.device('cpu')
     else:
@@ -52,7 +52,12 @@ def main(dev_id, args, train_set, val_set):
 
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
-    scheduler = StepLR(optimizer, step_size=args['decay_every'], gamma=args['lr_decay_factor'])
+    if args.num_gpus <= 1:
+        from utils import Optimizer
+        optimizer = Optimizer(model, args['lr'], optimizer)
+    else:
+        from utils import MultiProcessOptimizer
+        optimizer = MultiProcessOptimizer(args.num_gpus, model, args['lr'], optimizer)
 
     total_iter = 0
     grad_norm_sum = 0
@@ -60,7 +65,8 @@ def main(dev_id, args, train_set, val_set):
     dur = []
 
     for epoch in range(args['num_epochs']):
-        t0 = time.time()
+        if rank == 0:
+            t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
 
@@ -71,14 +77,12 @@ def main(dev_id, args, train_set, val_set):
                 args['device'], model, batch_mol_graphs, batch_complete_graphs)
             loss = criterion(pred, labels) / len(batch_reactions)
             loss_sum += loss.cpu().detach().data.item()
-            optimizer.zero_grad()
-            loss.backward()
-            grad_norm = clip_grad_norm_(model.parameters(), args['max_norm'])
+            grad_norm = optimizer.backward_and_step(loss)
             grad_norm_sum += grad_norm
-            optimizer.step()
-            scheduler.step()
+            if total_iter % args['decay_every']:
+                optimizer.decay_lr(args['lr_decay_factor'])
 
-            if total_iter % args['print_every'] == 0:
+            if total_iter % args['print_every'] == 0 and rank == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/minibatch {:.4f} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
@@ -88,15 +92,16 @@ def main(dev_id, args, train_set, val_set):
                 loss_sum = 0
                 print(progress)
 
-            if total_iter % args['decay_every'] == 0:
+            if total_iter % args['decay_every'] == 0 and rank == 0:
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model.pkl')
 
         dur.append(time.time() - t0)
-        print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
-              reaction_center_rough_eval_on_a_loader(args, model, val_loader))
+        if rank == 0:
+            print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
+                  reaction_center_rough_eval_on_a_loader(args, model, val_loader))
 
-def run(dev_id, args, train_set, val_set):
+def run(rank, dev_id, args, train_set, val_set):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=args['master_ip'], master_port=args['master_port'])
     world_size = args.num_gpus
@@ -106,7 +111,7 @@ def run(dev_id, args, train_set, val_set):
                                          rank=dev_id)
     gpu_rank = torch.distributed.get_rank()
     assert gpu_rank == dev_id
-    main(dev_id, args, train_set, val_set)
+    main(rank, dev_id, args, train_set, val_set)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
@@ -149,10 +154,17 @@ if __name__ == '__main__':
         else:
             args.num_gpus = 1
             device_id = devices[0]
-        main(device_id, args, train_set, val_set)
+        main(0, device_id, args, train_set, val_set)
     else:
         args.num_gpus = len(devices)
+        train_subset_size = len(train_set) // len(devices)
         mp = torch.multiprocessing.get_context('spawn')
         procs = []
-        for device_id in devices:
-            
+        for id, device_id in enumerate(devices):
+            train_subset = Subset(train_set, list(
+                range(id * train_subset_size, (id + 1) * train_subset_size)))
+            procs.append(mp.Process(target=run, args=(
+                id, device_id, args, train_subset, val_set), daemon=True))
+            procs[-1].start()
+        for p in procs:
+            p.join()

@@ -277,6 +277,24 @@ def process_file(path, num_processes):
     print('Finished processing {}'.format(path))
 
 def load_one_reaction(line):
+    """Load one reaction and check if the reactants are valid.
+
+    Parameters
+    ----------
+    line : str
+        One reaction and the associated graph edits
+
+    Returns
+    -------
+    mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for the reactants. None will be returned if the
+        reactants are not valid.
+    reaction : str
+        Reaction. None will be returned if the reactants are not valid.
+    graph_edits : str
+        Graph edits associated with the reaction. None will be returned if the
+        reactants are not valid.
+    """
     # Each line represents a reaction and the corresponding graph edits
     #
     # reaction example:

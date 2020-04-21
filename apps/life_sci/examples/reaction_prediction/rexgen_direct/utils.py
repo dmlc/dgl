@@ -4,11 +4,14 @@ import numpy as np
 import os
 import random
 import torch
+import torch.distributed as dist
+import torch.nn as nn
 
 from collections import defaultdict
 from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import load_pretrained, WLNReactionCenter
 from rdkit import Chem
+from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 
 def mkdir_p(path):
@@ -40,6 +43,118 @@ def set_seed(seed=0):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
+
+class Optimizer(nn.Module):
+    """Wrapper for optimization
+
+    Parameters
+    ----------
+    model
+        Model being trained
+    lr : float
+        Initial learning rate
+    optimizer
+        model optimizer
+    max_grad_norm : float or None
+        If not None, gradient clipping will be performed
+    """
+    def __init__(self, model, lr, optimizer, max_grad_norm=None):
+        super(Optimizer, self).__init__()
+        self.model = model
+        self.lr = lr
+        self.optimizer = optimizer
+        self.max_grad_norm = max_grad_norm
+        self._reset()
+
+    def _reset(self):
+        self.optimizer.zero_grad()
+
+    def _clip_grad_norm(self):
+        grad_norm = None
+        if self.max_grad_norm is not None:
+            grad_norm = clip_grad_norm_(self.model.parameters(),
+                                        self.max_grad_norm)
+        return grad_norm
+
+    def backward_and_step(self, loss):
+        """Backward and update model.
+
+        Parameters
+        ----------
+        loss : torch.tensor consisting of a float only
+
+        Returns
+        -------
+        grad_norm : float
+            Gradient norm. If self.max_grad_norm is None, None will be returned.
+        """
+        loss.backward()
+        grad_norm = self._clip_grad_norm()
+        self.optimizer.step()
+        self._reset()
+
+        return grad_norm
+
+    def decay_lr(self, decay_rate):
+        """Decay learning rate.
+
+        Parameters
+        ----------
+        decay_rate : float
+            Multiply the current learning rate by the decay_rate
+        """
+        self.lr *= decay_rate
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = self.lr
+
+class MultiProcessOptimizer(Optimizer):
+    """Wrapper for optimization with multiprocess
+
+    Parameters
+    ----------
+    n_processes : int
+        Number of processes used
+    model
+        Model being trained
+    lr : float
+        Initial learning rate
+    optimizer
+        model optimizer
+    max_grad_norm : float or None
+        If not None, gradient clipping will be performed.
+    """
+    def __init__(self, n_processes, model, lr, optimizer, max_grad_norm=None):
+        super(MultiProcessOptimizer, self).__init__(lr=lr, model=model, optimizer=optimizer,
+                                                    max_grad_norm=max_grad_norm)
+        self.n_processes = n_processes
+
+    def _sync_gradient(self):
+        """Average gradients across all subprocesses."""
+        for param_group in self.optimizer.param_groups:
+            for p in param_group['params']:
+                if p.requires_grad and p.grad is not None:
+                    dist.all_reduce(p.grad.data, op=dist.ReduceOp.SUM)
+                    p.grad.data /= self.n_processes
+
+    def backward_and_step(self, loss):
+        """Backward and update model.
+
+        Parameters
+        ----------
+        loss : torch.tensor consisting of a float only
+
+        Returns
+        -------
+        grad_norm : float
+            Gradient norm. If self.max_grad_norm is None, None will be returned.
+        """
+        loss.backward()
+        self._sync_gradient()
+        grad_norm = self._clip_grad_norm()
+        self.optimizer.step()
+        self._reset()
+
+        return grad_norm
 
 def collate(data):
     """Collate multiple datapoints
