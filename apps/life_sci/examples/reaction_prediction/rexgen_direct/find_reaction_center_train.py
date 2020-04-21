@@ -2,7 +2,6 @@ import numpy as np
 import time
 import torch
 
-from copy import deepcopy
 from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import WLNReactionCenter, load_pretrained
 from torch.nn import BCEWithLogitsLoss
@@ -28,7 +27,7 @@ def load_dataset(args):
 
     return train_set, val_set
 
-def main(rank, dev_id, args, train_set, val_set):
+def main(rank, dev_id, args):
     set_seed()
     # Remove the line below will result in problems for multiprocess
     torch.set_num_threads(1)
@@ -39,10 +38,8 @@ def main(rank, dev_id, args, train_set, val_set):
     # Set current device
     torch.cuda.set_device(args['device'])
 
-    """
     train_set, val_set = load_dataset(args)
     get_center_subset(train_set, rank, args['num_devices'])
-    """
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
@@ -70,7 +67,7 @@ def main(rank, dev_id, args, train_set, val_set):
     dur = []
 
     for epoch in range(args['num_epochs']):
-        if rank == 0:
+        if rank == 0 and epoch >= 1:
             t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
@@ -88,11 +85,10 @@ def main(rank, dev_id, args, train_set, val_set):
                 optimizer.decay_lr(args['lr_decay_factor'])
 
             if total_iter % args['print_every'] == 0 and rank == 0:
-                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/minibatch {:.4f} | ' \
+                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
-                    (np.sum(dur) + time.time() - t0) / total_iter, loss_sum / args['print_every'],
-                    grad_norm_sum / args['print_every'])
+                    loss_sum / args['print_every'], grad_norm_sum / args['print_every'])
                 grad_norm_sum = 0
                 loss_sum = 0
                 print(progress)
@@ -102,7 +98,9 @@ def main(rank, dev_id, args, train_set, val_set):
                            args['result_path'] + '/model.pkl')
 
         if rank == 0:
-            dur.append(time.time() - t0)
+            if epoch >= 1:
+                dur.append(time.time() - t0)
+                print('Training time per epoch: {:.4f}'.format(np.mean(dur)))
             print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
                   reaction_center_rough_eval_on_a_loader(args, model, val_loader))
         synchronize(args['num_devices'])
@@ -150,22 +148,19 @@ if __name__ == '__main__':
 
     devices = list(map(int, args['gpus'].split(',')))
     args['num_devices'] = len(devices)
-    train_set, val_set = load_dataset(args)
 
     if len(devices) == 1:
         device_id = devices[0] if torch.cuda.is_available() else -1
-        main(0, device_id, args, train_set, val_set)
+        main(0, device_id, args)
     else:
+        # Subprocesses are not allowed for daemon mode
+        args['num_processes'] = 1
         mp = torch.multiprocessing.get_context('spawn')
         procs = []
         for id, device_id in enumerate(devices):
             print('Preparing for gpu {:d}/{:d}'.format(id + 1, args['num_devices']))
-            train_subset = deepcopy(train_set)
-            val_susbet = deepcopy(val_set)
-            get_center_subset(train_subset, id, args['num_devices'])
-            get_center_subset(val_susbet, id, args['num_devices'])
             procs.append(mp.Process(target=run, args=(
-                id, device_id, args, train_subset, val_susbet), daemon=True))
+                id, device_id, args), daemon=True))
             procs[-1].start()
         for p in procs:
             p.join()
