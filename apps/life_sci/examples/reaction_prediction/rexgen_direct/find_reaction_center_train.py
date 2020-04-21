@@ -6,10 +6,10 @@ from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import WLNReactionCenter, load_pretrained
 from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 
 from utils import collate, reaction_center_prediction, reaction_center_rough_eval_on_a_loader, \
-    mkdir_p, set_seed
+    mkdir_p, set_seed, synchronize, get_center_subset
 
 def load_dataset(args):
     if args['train_path'] is None:
@@ -27,7 +27,7 @@ def load_dataset(args):
 
     return train_set, val_set
 
-def main(rank, dev_id, args, train_set, val_set):
+def main(rank, dev_id, args):
     set_seed()
     # Remove the line below will result in problems for multiprocess
     torch.set_num_threads(1)
@@ -38,6 +38,8 @@ def main(rank, dev_id, args, train_set, val_set):
     # Set current device
     torch.cuda.set_device(args['device'])
 
+    train_set, val_set = load_dataset(args)
+    get_center_subset(train_set, rank, args['num_devices'])
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
@@ -52,12 +54,12 @@ def main(rank, dev_id, args, train_set, val_set):
 
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
-    if args['num_gpus'] <= 1:
+    if args['num_devices'] <= 1:
         from utils import Optimizer
         optimizer = Optimizer(model, args['lr'], optimizer)
     else:
         from utils import MultiProcessOptimizer
-        optimizer = MultiProcessOptimizer(args['num_gpus'], model, args['lr'], optimizer)
+        optimizer = MultiProcessOptimizer(args['num_devices'], model, args['lr'], optimizer)
 
     total_iter = 0
     grad_norm_sum = 0
@@ -100,17 +102,17 @@ def main(rank, dev_id, args, train_set, val_set):
             dur.append(time.time() - t0)
             print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
                   reaction_center_rough_eval_on_a_loader(args, model, val_loader))
+        synchronize(args['num_devices'])
 
-def run(rank, dev_id, args, train_set, val_set):
+def run(rank, dev_id, args):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=args['master_ip'], master_port=args['master_port'])
     torch.distributed.init_process_group(backend="nccl",
                                          init_method=dist_init_method,
-                                         world_size=args['num_gpus'],
+                                         world_size=args['num_devices'],
                                          rank=dev_id)
-    gpu_rank = torch.distributed.get_rank()
-    assert gpu_rank == dev_id
-    main(rank, dev_id, args, train_set, val_set)
+    assert torch.distributed.get_rank() == dev_id
+    main(rank, dev_id, args)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
@@ -144,26 +146,17 @@ if __name__ == '__main__':
     mkdir_p(args['result_path'])
 
     devices = list(map(int, args['gpus'].split(',')))
-    train_set, val_set = load_dataset(args)
+    args['num_devices'] = len(devices)
 
     if len(devices) == 1:
-        if torch.cuda.is_available():
-            args['num_gpus'] = 0
-            device_id = -1
-        else:
-            args['num_gpus'] = 1
-            device_id = devices[0]
-        main(0, device_id, args, train_set, val_set)
+        device_id = devices[0] if torch.cuda.is_available() else -1
+        main(0, device_id, args)
     else:
-        args['num_gpus'] = len(devices)
-        train_subset_size = len(train_set) // len(devices)
         mp = torch.multiprocessing.get_context('spawn')
         procs = []
         for id, device_id in enumerate(devices):
-            train_subset = Subset(train_set, list(
-                range(id * train_subset_size, (id + 1) * train_subset_size)))
             procs.append(mp.Process(target=run, args=(
-                id, device_id, args, train_subset, val_set), daemon=True))
+                id, device_id, args), daemon=True))
             procs[-1].start()
         for p in procs:
             p.join()

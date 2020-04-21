@@ -44,6 +44,33 @@ def set_seed(seed=0):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
 
+def get_center_subset(dataset, subset_id, num_subsets):
+    """Get subset for reaction center identification.
+
+    Parameters
+    ----------
+    dataset : WLNCenterDataset
+        Dataset for reaction center prediction with WLN
+    subset_id : int
+        Index for the subset
+    num_subsets : int
+        Number of total subsets
+    """
+    if num_subsets == 1:
+        return
+
+    total_size = len(dataset)
+    subset_size = total_size // num_subsets
+    start = subset_id * subset_size
+    end = (subset_id + 1) * subset_size
+
+    dataset.mols = dataset.mols[start:end]
+    dataset.reactions = dataset.reactions[start:end]
+    dataset.graph_edits = dataset.graph_edits[start:end]
+    dataset.reactant_mol_graphs = dataset.reactant_mol_graphs[start:end]
+    dataset.atom_pair_features = [None for _ in range(subset_size)]
+    dataset.atom_pair_labels = [None for _ in range(subset_size)]
+
 class Optimizer(nn.Module):
     """Wrapper for optimization
 
@@ -155,6 +182,17 @@ class MultiProcessOptimizer(Optimizer):
         self._reset()
 
         return grad_norm
+
+def synchronize(num_gpus):
+    """Synchronize all processes for multi-gpu training.
+
+    Parameters
+    ----------
+    num_gpus : int
+        Number of gpus used
+    """
+    if num_gpus > 1:
+        dist.barrier()
 
 def collate(data):
     """Collate multiple datapoints
