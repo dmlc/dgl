@@ -2,6 +2,7 @@ import numpy as np
 import time
 import torch
 
+from copy import deepcopy
 from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import WLNReactionCenter, load_pretrained
 from torch.nn import BCEWithLogitsLoss
@@ -27,7 +28,7 @@ def load_dataset(args):
 
     return train_set, val_set
 
-def main(rank, dev_id, args):
+def main(rank, dev_id, args, train_set, val_set):
     set_seed()
     # Remove the line below will result in problems for multiprocess
     torch.set_num_threads(1)
@@ -38,8 +39,10 @@ def main(rank, dev_id, args):
     # Set current device
     torch.cuda.set_device(args['device'])
 
+    """
     train_set, val_set = load_dataset(args)
     get_center_subset(train_set, rank, args['num_devices'])
+    """
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
@@ -104,7 +107,7 @@ def main(rank, dev_id, args):
                   reaction_center_rough_eval_on_a_loader(args, model, val_loader))
         synchronize(args['num_devices'])
 
-def run(rank, dev_id, args):
+def run(rank, dev_id, args, train_set, val_set):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=args['master_ip'], master_port=args['master_port'])
     torch.distributed.init_process_group(backend="nccl",
@@ -112,7 +115,7 @@ def run(rank, dev_id, args):
                                          world_size=args['num_devices'],
                                          rank=dev_id)
     assert torch.distributed.get_rank() == dev_id
-    main(rank, dev_id, args)
+    main(rank, dev_id, args, train_set, val_set)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
@@ -147,16 +150,21 @@ if __name__ == '__main__':
 
     devices = list(map(int, args['gpus'].split(',')))
     args['num_devices'] = len(devices)
+    train_set, val_set = load_dataset(args)
 
     if len(devices) == 1:
         device_id = devices[0] if torch.cuda.is_available() else -1
-        main(0, device_id, args)
+        main(0, device_id, args, train_set, val_set)
     else:
         mp = torch.multiprocessing.get_context('spawn')
         procs = []
         for id, device_id in enumerate(devices):
+            train_subset = deepcopy(train_set)
+            val_susbet = deepcopy(val_set)
+            get_center_subset(train_subset, id, args['num_devices'])
+            get_center_subset(val_susbet, id, args['num_devices'])
             procs.append(mp.Process(target=run, args=(
-                id, device_id, args), daemon=True))
+                id, device_id, args, train_subset, val_susbet), daemon=True))
             procs[-1].start()
         for p in procs:
             p.join()
