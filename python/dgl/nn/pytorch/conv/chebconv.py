@@ -99,7 +99,7 @@ class ChebConv(nn.Module):
             return graph.ndata.pop('h') * D_sqrt
 
         with graph.local_scope():
-            D_sqrt = torch.pow(graph.in_degrees().float().clamp(
+            D_sqrt = th.pow(graph.in_degrees().float().clamp(
                 min=1), -0.5).unsqueeze(-1).to(signal.device)
 
             if lambda_max is None:
@@ -107,10 +107,10 @@ class ChebConv(nn.Module):
                     lambda_max = dgl.laplacian_lambda_max(graph)
                 except BaseException:
                     # if the largest eigonvalue is not found
-                    lambda_max = torch.Tensor(2).to(signal.device)
+                    lambda_max = th.Tensor(2).to(signal.device)
 
             if isinstance(lambda_max, list):
-                lambda_max = torch.Tensor(lambda_max).to(signal.device)
+                lambda_max = th.Tensor(lambda_max).to(signal.device)
             if lambda_max.dim() == 1:
                 lambda_max = lambda_max.unsqueeze(-1)  # (B,) to (B, 1)
 
