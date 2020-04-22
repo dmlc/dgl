@@ -100,17 +100,17 @@ class ChebConv(nn.Module):
 
         with graph.local_scope():
             D_sqrt = th.pow(graph.in_degrees().float().clamp(
-                min=1), -0.5).unsqueeze(-1).to(signal.device)
+                min=1), -0.5).unsqueeze(-1).to(feat.device)
 
             if lambda_max is None:
                 try:
                     lambda_max = dgl.laplacian_lambda_max(graph)
                 except BaseException:
                     # if the largest eigonvalue is not found
-                    lambda_max = th.Tensor(2).to(signal.device)
+                    lambda_max = th.Tensor(2).to(feat.device)
 
             if isinstance(lambda_max, list):
-                lambda_max = th.Tensor(lambda_max).to(signal.device)
+                lambda_max = th.Tensor(lambda_max).to(feat.device)
             if lambda_max.dim() == 1:
                 lambda_max = lambda_max.unsqueeze(-1)  # (B,) to (B, 1)
 
