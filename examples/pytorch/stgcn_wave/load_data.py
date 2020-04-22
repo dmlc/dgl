@@ -16,14 +16,12 @@ def load_data(file_path, len_train, len_val):
 
 
 def data_transform(data, n_his, n_pred, day_slot, device):
+    # produce data slices for training and testing
     n_day = len(data) // day_slot
     n_route = data.shape[1]
     l = len(data)
-    # print('n_day :',n_day)
     n_slot = day_slot - n_his - n_pred + 1
     num = l-n_his-n_pred
-    # x = np.zeros([n_day * n_slot, 1, n_his, n_route])
-    # y = np.zeros([n_day * n_slot, n_route])
     x = np.zeros([num, 1, n_his, n_route])
     y = np.zeros([num, n_route])
     
@@ -34,12 +32,4 @@ def data_transform(data, n_his, n_pred, day_slot, device):
         x[cnt, :, :, :] = data[head: tail].reshape(1, n_his, n_route)
         y[cnt] = data[tail + n_pred - 1]
         cnt += 1
-    # print('cnt :',cnt,'l :',l)
-    # for i in range(n_day):
-    #     for j in range(n_slot):
-    #         t = i * n_slot + j
-    #         s = i * day_slot + j
-    #         e = s + n_his
-    #         x[t, :, :, :] = data[s:e].reshape(1, n_his, n_route)
-    #         y[t] = data[e + n_pred - 1]
     return torch.Tensor(x).to(device), torch.Tensor(y).to(device)
