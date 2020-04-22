@@ -6,9 +6,9 @@ import torch.nn.functional as F
 from dgl.nn.pytorch import GraphConv
 from dgl.nn.pytorch.conv import ChebConv
 
-class temporal_conv_layer(nn.Module):
+class TemporalConvLayer(nn.Module):
     def __init__(self, c_in, c_out, dia = 1,act="relu"):
-        super(temporal_conv_layer, self).__init__()
+        super(TemporalConvLayer, self).__init__()
         self.act = act
         self.c_out = c_out
         self.c_in = c_in
@@ -19,9 +19,9 @@ class temporal_conv_layer(nn.Module):
         return torch.relu(self.conv(x))
 
 
-class spatio_conv_layer_A(nn.Module):
+class SpatioConvLayer(nn.Module):
     def __init__(self, c, Lk):
-        super(spatio_conv_layer_A, self).__init__()
+        super(SpatioConvLayer, self).__init__()
         self.g = Lk
         # print('c :',c)
         self.gc = GraphConv(c, c, activation=F.relu)
@@ -39,21 +39,21 @@ class spatio_conv_layer_A(nn.Module):
         output = output.transpose(0, 3)
         return torch.relu(output)
 
-class fully_conv_layer(nn.Module):
+class FullyConvLayer(nn.Module):
     def __init__(self, c):
-        super(fully_conv_layer, self).__init__()
+        super(FullyConvLayer, self).__init__()
         self.conv = nn.Conv2d(c, 1, 1)
 
     def forward(self, x):
         return self.conv(x)
 
-class output_layer(nn.Module):
+class OutputLayer(nn.Module):
     def __init__(self, c, T, n):
-        super(output_layer, self).__init__()
+        super(OutputLayer, self).__init__()
         self.tconv1 = nn.Conv2d(c, c, (T, 1), 1, dilation = 1, padding = (0,0))
         self.ln = nn.LayerNorm([n, c])
         self.tconv2 = nn.Conv2d(c, c, (1, 1), 1, dilation = 1, padding = (0,0))
-        self.fc = fully_conv_layer(c)
+        self.fc = FullyConvLayer(c)
 
     def forward(self, x):
         x_t1 = self.tconv1(x)
@@ -64,23 +64,23 @@ class output_layer(nn.Module):
 class STGCN_WAVE(nn.Module):
     def __init__(self, c, T, n, Lk, p):
         super(STGCN_WAVE, self).__init__()
-        self.tlayer1 = temporal_conv_layer(c[0], c[1], dia = 1)
+        self.tlayer1 = TemporalConvLayer(c[0], c[1], dia = 1)
         self.ln1 = nn.LayerNorm([n, c[1]])
-        self.tlayer2 = temporal_conv_layer(c[1], c[2], dia = 2)
-        self.slayer1 = spatio_conv_layer_A(c[2], Lk)
+        self.tlayer2 = TemporalConvLayer(c[1], c[2], dia = 2)
+        self.slayer1 = SpatioConvLayer(c[2], Lk)
 
-        self.tlayer3 = temporal_conv_layer(c[2], c[3], dia = 4)
+        self.tlayer3 = TemporalConvLayer(c[2], c[3], dia = 4)
         self.ln2 = nn.LayerNorm([n, c[3]])
-        self.tlayer4 = temporal_conv_layer(c[3], c[4], dia = 8)
-        self.slayer2 = spatio_conv_layer_A(c[4], Lk)
-        self.tlayer5 = temporal_conv_layer(c[4], c[5], dia = 16)
+        self.tlayer4 = TemporalConvLayer(c[3], c[4], dia = 8)
+        self.slayer2 = SpatioConvLayer(c[4], Lk)
+        self.tlayer5 = TemporalConvLayer(c[4], c[5], dia = 16)
         # self.ln3 = nn.LayerNorm([n, c[6]])
-        # self.tlayer6 = temporal_conv_layer(c[5], c[6])
-        # self.slayer3 = spatio_conv_layer_A(ks, c[6], Lk)
-        # self.tlayer7 = temporal_conv_layer(c[6], c[7])
+        # self.tlayer6 = TemporalConvLayer(c[5], c[6])
+        # self.slayer3 = SpatioConvLayer(ks, c[6], Lk)
+        # self.tlayer7 = TemporalConvLayer(c[6], c[7])
         
         print('T :',T)
-        self.output = output_layer(c[5], T - 31, n)
+        self.output = OutputLayer(c[5], T - 31, n)
 
     def forward(self, x):
         x = self.tlayer1(x)
