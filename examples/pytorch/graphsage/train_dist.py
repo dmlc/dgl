@@ -153,7 +153,7 @@ def main(args):
     g.g = hg
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
-    th.manual_seed(g.rank)
+    th.manual_seed(g.rank())
     train_mask = g.ndata['train_mask'][g.local_gnids].numpy()
     val_mask = g.ndata['val_mask'][g.local_gnids].numpy()
     test_mask = g.ndata['test_mask'][g.local_gnids].numpy()
@@ -168,23 +168,18 @@ def main(args):
     device = th.device('cpu')
 
     # Pack data
-    data = train_nid, val_nid, args.n_features, args.n_classes, g
-    if args.model == "gcn_ns":
-        run(args, device, data)
-    else:
-        print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
+    in_feats = g.ndata['features'].shape[1]
+    data = train_nid, val_nid, in_feats, args.n_classes, g
+    run(args, device, data)
     print("parent ends")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument("--model", type=str,
-                        help="select a model. Valid models: gcn_ns, gcn_cv, graphsage_cv")
     parser.add_argument('--server', action='store_true',
             help='whether this is a server.')
     parser.add_argument('--graph-name', type=str, help='graph name')
     parser.add_argument('--id', type=int, help='the partition id')
-    parser.add_argument('--n-features', type=int, help='the input feature size')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--data_path', type=str, help='The folder with all data')
     parser.add_argument('--num-client', type=int, help='The number of clients')

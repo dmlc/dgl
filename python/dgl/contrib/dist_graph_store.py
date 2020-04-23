@@ -33,6 +33,18 @@ field_dict = {'part_id': F.int64,
               NID: F.int64,
               EID: F.int64}
 
+def get_ndata_name(name):
+    return 'node:' + name
+
+def get_edata_name(name):
+    return 'edge:' + name
+
+def is_ndata_name(name):
+    return name[:5] == 'node:'
+
+def is_edata_name(name):
+    return name[:5] == 'edge:'
+
 def get_shared_mem_ndata(g, graph_name, name):
     shape = (g.number_of_nodes(),)
     dtype = field_dict[name]
@@ -70,6 +82,9 @@ class KVStoreTensorView:
     def __init__(self, kv, name):
         self.kv = kv
         self.name = name
+        dtype, shape, _ = self.kv.get_data_meta(name)
+        self._shape = shape
+        self._dtype = dtype
 
     def __getitem__(self, idx):
         return self.kv.pull(name=self.name, id_tensor=idx)
@@ -79,13 +94,15 @@ class KVStoreTensorView:
         pass
 
     def __len__(self):
-        pass
+        return self._shape[0]
 
+    @property
     def shape(self):
-        pass
+        return self._shape
 
+    @property
     def dtype(self):
-        pass
+        return self._dtype
 
 
 class NodeDataView(MutableMapping):
@@ -102,7 +119,7 @@ class NodeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return KVStoreTensorView(self._graph._client, key)
+        return KVStoreTensorView(self._graph._client, get_ndata_name(key))
 
     def __setitem__(self, key, val):
         #TODO how to set data to the kvstore.
@@ -120,8 +137,12 @@ class NodeDataView(MutableMapping):
         pass
 
     def __repr__(self):
-        # TODO
-        pass
+        name_list = self._graph._get_all_ndata_names()
+        reprs = {}
+        for name in name_list:
+            dtype, shape, _ = self._graph._client.get_data_meta(name)
+            reprs[name] = 'KVStoreTensorView(shape={}, dtype={})'.format(str(shape), str(dtype))
+        return repr(reprs)
 
 class EdgeDataView(MutableMapping):
     """The data view class when G.edges[...].data is called.
@@ -137,7 +158,7 @@ class EdgeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return KVStoreTensorView(self._graph._client, key)
+        return KVStoreTensorView(self._graph._client, get_edata_name(key))
 
     def __setitem__(self, key, val):
         #TODO
@@ -155,8 +176,12 @@ class EdgeDataView(MutableMapping):
         pass
 
     def __repr__(self):
-        #TODO
-        pass
+        name_list = self._graph._get_all_edata_names()
+        reprs = {}
+        for name in name_list:
+            dtype, shape, _ = self._graph._client.get_data_meta(name)
+            reprs[name] = 'KVStoreTensorView(shape={}, dtype={})'.format(str(shape), str(dtype))
+        return repr(reprs)
 
 def load_data(data_path, graph_name, part_id):
     server_data = '{}/{}-server-{}.dgl'.format(data_path, graph_name, part_id)
@@ -183,15 +208,21 @@ class DistGraphStoreServer(KVServer):
         self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu())
         self.g2l[:] = -1
         self.g2l[self.part_g.ndata[NID]] = F.arange(0, self.part_g.number_of_nodes())
+
+        # TODO this works if the HALO nodes can cover all nodes used by mini-batches.
+        partition = F.zeros(shape=(num_nodes,), dtype=F.int64, ctx=F.cpu())
+        partition[self.client_g.ndata[NID]] = self.client_g.ndata['part_id']
+
         if self.get_id() % self.get_group_count() == 0: # master server
-            for ndata_name in self.part_g.ndata.keys():
-                print(ndata_name)
-                self.set_global2local(name=ndata_name, global2local=self.g2l)
-                self.init_data(name=ndata_name, data_tensor=self.part_g.ndata[ndata_name])
+            for name in self.part_g.ndata.keys():
+                self.set_global2local(name=get_ndata_name(name), global2local=self.g2l)
+                self.init_data(name=get_ndata_name(name), data_tensor=self.part_g.ndata[name])
+                self.set_partition_book(name=get_ndata_name(name), partition_book=partition)
         else:
-            for ndata_name in self.part_g.ndata.keys():
-                self.set_global2local(name=ndata_name)
-                self.init_data(name=ndata_name)
+            for name in self.part_g.ndata.keys():
+                self.set_global2local(name=get_ndata_name(name))
+                self.init_data(name=get_ndata_name(name))
+                self.set_partition_book(name=get_ndata_name(name), partition_book=partition)
         # TODO Do I need synchronization?
 
 class DistGraphStore:
@@ -202,21 +233,27 @@ class DistGraphStore:
         self.g = get_graph_from_shared_mem(graph_name)
         self.graph_name = graph_name
         self.meta = F.asnumpy(get_shared_mem_metadata(graph_name))
-        num_nodes = self.number_of_nodes()
-
-        partition = F.zeros(shape=(num_nodes,), dtype=F.int64, ctx=F.cpu())
-        partition[self.g.ndata[NID]] = self.g.ndata['part_id']
-        # TODO what is the node data name?
-        self._client.set_partition_book(name='features', partition_book=partition)
-        self._client.set_partition_book(name='labels', partition_book=partition)
-        self._client.set_partition_book(name='test_mask', partition_book=partition)
-        self._client.set_partition_book(name='val_mask', partition_book=partition)
-        self._client.set_partition_book(name='train_mask', partition_book=partition)
 
         self._client.barrier()
 
         self._local_nids = F.nonzero_1d(self.g.ndata['local_node'])
         self._local_gnid = self.g.ndata[NID][self._local_nids]
+
+    def _get_all_ndata_names(self):
+        names = self._client.get_data_name_list()
+        ndata_names = []
+        for name in names:
+            if is_ndata_name(name):
+                ndata_names.append(name)
+        return ndata_names
+
+    def _get_all_edata_names(self):
+        names = self._client.get_data_name_list()
+        edata_names = []
+        for name in names:
+            if is_edata_name(name):
+                edata_names.append(name)
+        return edata_names
 
 
     def init_ndata(self, ndata_name, shape, dtype):
@@ -234,7 +271,7 @@ class DistGraphStore:
             The data type of the node data.
         '''
         assert shape[0] == self.number_of_nodes()
-        self._client.init_data(ndata_name, shape, dtype)
+        self._client.init_data(get_ndata_name(ndata_name), shape, dtype)
 
     def init_edata(self, edata_name, shape, dtype):
         '''Initialize edge data
@@ -251,7 +288,7 @@ class DistGraphStore:
             The data type of the edge data.
         '''
         assert shape[1] == self.number_of_edges()
-        self._client.init_data(edata_name, shape, dtype)
+        self._client.init_data(get_edata_name(edata_name), shape, dtype)
 
     def set_n_initializer(self, initializer, field=None):
         '''Set the initializer for empty node features.
