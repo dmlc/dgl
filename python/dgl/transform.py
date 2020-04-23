@@ -906,8 +906,11 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     for i, ntype in enumerate(g.ntypes):
         new_graph.srcnodes[ntype].data[NID] = F.zerocopy_from_dgl_ndarray(src_nodes_nd[i].data)
-    for ntype, dst_nids in dst_nodes.items():
-        new_graph.dstnodes[ntype].data[NID] = dst_nids
+        if ntype in dst_nodes:
+            new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
+        else:
+            # For empty dst node sets, still create empty mapping arrays.
+            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=F.int64)
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
