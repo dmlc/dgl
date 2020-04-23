@@ -79,7 +79,7 @@ def get_shared_mem_metadata(graph_name):
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
 
-class KVStoreTensorView:
+class DistTensor:
     def __init__(self, kv, name):
         self.kv = kv
         self.name = name
@@ -120,7 +120,7 @@ class NodeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return KVStoreTensorView(self._graph._client, get_ndata_name(key))
+        return DistTensor(self._graph._client, get_ndata_name(key))
 
     def __setitem__(self, key, val):
         #TODO how to set data to the kvstore.
@@ -141,7 +141,7 @@ class NodeDataView(MutableMapping):
         reprs = {}
         for name in name_list:
             dtype, shape, _ = self._graph._client.get_data_meta(get_ndata_name(name))
-            reprs[name] = 'KVStoreTensorView(shape={}, dtype={})'.format(str(shape), str(dtype))
+            reprs[name] = 'DistTensor(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
 class EdgeDataView(MutableMapping):
@@ -158,7 +158,7 @@ class EdgeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return KVStoreTensorView(self._graph._client, get_edata_name(key))
+        return DistTensor(self._graph._client, get_edata_name(key))
 
     def __setitem__(self, key, val):
         #TODO
@@ -179,7 +179,7 @@ class EdgeDataView(MutableMapping):
         reprs = {}
         for name in name_list:
             dtype, shape, _ = self._graph._client.get_data_meta(get_edata_name(name))
-            reprs[name] = 'KVStoreTensorView(shape={}, dtype={})'.format(str(shape), str(dtype))
+            reprs[name] = 'DistTensor(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
 def load_data(data_path, graph_name, part_id):
