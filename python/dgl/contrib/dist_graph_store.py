@@ -7,6 +7,7 @@ from .graph_store import _get_ndata_path, _get_edata_path, _get_graph_path, dtyp
 from .dis_kvstore import KVServer, KVClient
 from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
+from ..frame import infer_scheme
 
 import socket
 import numpy as np
@@ -133,14 +134,13 @@ class NodeDataView(MutableMapping):
         return self._graph.number_of_nodes()
 
     def __iter__(self):
-        # TODO
-        pass
+        return iter(self._graph._get_all_ndata_names())
 
     def __repr__(self):
         name_list = self._graph._get_all_ndata_names()
         reprs = {}
         for name in name_list:
-            dtype, shape, _ = self._graph._client.get_data_meta(name)
+            dtype, shape, _ = self._graph._client.get_data_meta(get_ndata_name(name))
             reprs[name] = 'KVStoreTensorView(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
@@ -172,14 +172,13 @@ class EdgeDataView(MutableMapping):
         return self._graph.number_of_edges()
 
     def __iter__(self):
-        #TODO
-        pass
+        return iter(self._graph._get_all_edata_names())
 
     def __repr__(self):
         name_list = self._graph._get_all_edata_names()
         reprs = {}
         for name in name_list:
-            dtype, shape, _ = self._graph._client.get_data_meta(name)
+            dtype, shape, _ = self._graph._client.get_data_meta(get_edata_name(name))
             reprs[name] = 'KVStoreTensorView(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
@@ -244,7 +243,8 @@ class DistGraphStore:
         ndata_names = []
         for name in names:
             if is_ndata_name(name):
-                ndata_names.append(name)
+                # Remove the prefix "node:"
+                ndata_names.append(name[5:])
         return ndata_names
 
     def _get_all_edata_names(self):
@@ -252,7 +252,8 @@ class DistGraphStore:
         edata_names = []
         for name in names:
             if is_edata_name(name):
-                edata_names.append(name)
+                # Remove the prefix "edge:"
+                edata_names.append(name[5:])
         return edata_names
 
 
@@ -289,46 +290,6 @@ class DistGraphStore:
         '''
         assert shape[1] == self.number_of_edges()
         self._client.init_data(get_edata_name(edata_name), shape, dtype)
-
-    def set_n_initializer(self, initializer, field=None):
-        '''Set the initializer for empty node features.
-
-        Initializer is a callable that returns a tensor given the shape, data type
-        and device context.
-
-        When a subset of the nodes are assigned a new feature, initializer is
-        used to create feature for rest of the nodes.
-
-        Parameters
-        ----------
-        initializer : callable
-            The initializer.
-        field : str, optional
-            The feature field name. Default is set an initializer for all the
-            feature fields.
-        '''
-        # TODO
-        pass
-
-    def set_e_initializer(self, initializer, field=None):
-        '''Set the initializer for empty edge features.
-
-        Initializer is a callable that returns a tensor given the shape, data
-        type and device context.
-
-        When a subset of the edges are assigned a new feature, initializer is
-        used to create feature for rest of the edges.
-
-        Parameters
-        ----------
-        initializer : callable
-            The initializer.
-        field : str, optional
-            The feature field name. Default is set an initializer for all the
-            feature fields.
-        '''
-        # TODO
-        pass
 
     def init_node_emb(self, name, shape, dtype, initializer):
         ''' Initialize node embeddings.
@@ -383,20 +344,26 @@ class DistGraphStore:
         return EdgeDataView(self, self.graph_name)
 
     def number_of_nodes(self):
+        """Return the number of nodes"""
         return self.meta[0]
 
-    def number_of_local_nodes(self):
-        ''' The number of nodes owned by the local graph store.
-
-        Returns
-        -------
-        int
-            The number of nodes owned by the local graph store.
-        '''
-        return len(self._local_nids)
-
     def number_of_edges(self):
+        """Return the number of edges"""
         return self.meta[1]
+
+    def node_attr_schemes(self):
+        """Return the node feature and embedding schemes."""
+        schemes = {}
+        for key in self.ndata:
+            schemes[key] = infer_scheme(self.ndata[key])
+        return schemes
+
+    def edge_attr_schemes(self):
+        """Return the edge feature and embedding schemes."""
+        schemes = {}
+        for key in self.edata:
+            schemes[key] = infer_scheme(self.edata[key])
+        return schemes
 
     @property
     def local_nids(self):
