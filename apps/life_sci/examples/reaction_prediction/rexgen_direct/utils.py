@@ -10,9 +10,12 @@ import torch.nn as nn
 from collections import defaultdict
 from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import load_pretrained, WLNReactionCenter
+from functools import partial
+from multiprocessing import Pool
 from rdkit import Chem
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 def mkdir_p(path):
     """Create a folder for the given path.
@@ -476,7 +479,23 @@ def reaction_center_final_eval(args, model, data_loader, easy):
 
     return msg
 
-def prepare_reaction_center(args, reaction_center_config):
+def output_candidate_bonds_for_a_reaction(info, max_k):
+    """"""
+    reaction, preds, num_nodes = info
+    # Note that we use the easy mode by default, which is also the
+    # setting in the paper.
+    candidate_bonds = get_candidate_bonds(reaction, preds, num_nodes, max_k,
+                                          easy=True, include_scores=True)
+    candidate_string = ''
+    for candidate in candidate_bonds:
+        # A 4-tuple consisting of the atom mapping number of atom 1,
+        # atom 2, the bond change type and the score
+        candidate_string += '{} {} {:.1f} {:.3f};'.format(
+            candidate[0], candidate[1], candidate[2], candidate[3])
+    candidate_string += '\n'
+    return candidate_string
+
+def prepare_reaction_center(args, reaction_center_config, loader_batch_size=60):
     """Use a trained model for reaction center prediction to prepare candidate bonds.
 
     Parameters
@@ -485,6 +504,8 @@ def prepare_reaction_center(args, reaction_center_config):
         Configuration for the experiment.
     reaction_center_config : dict
         Configuration for the experiment on reaction center prediction.
+    loader_batch_size : int
+        Batch size for reaction center prediction.
 
     Returns
     -------
@@ -527,11 +548,11 @@ def prepare_reaction_center(args, reaction_center_config):
                                        mol_graph_path='{}.bin'.format(subset),
                                        num_processes=args['num_processes'])
 
-        dataloader = DataLoader(dataset, batch_size=reaction_center_config['batch_size'],
+        dataloader = DataLoader(dataset, batch_size=loader_batch_size,
                                 collate_fn=collate, shuffle=False)
 
-        print('Stage 2/3: Preparing candidate bonds...')
-        set_candidate_bonds = []
+        print('Stage 2/3: Performing model prediction...')
+        info_for_candidate_bonds = []
         for batch_id, batch_data in enumerate(dataloader):
             print('Computing candidate bonds for batch {:d}/{:d}'.format(
                 batch_id + 1, len(dataloader)))
@@ -545,28 +566,22 @@ def prepare_reaction_center(args, reaction_center_config):
             start = 0
             for i in range(batch_size):
                 end = start + batch_complete_graphs.batch_num_edges[i]
-                # Note that we use the easy mode by default, which is also the
-                # setting in the paper.
-                candidate_bonds = get_candidate_bonds(
+                info_for_candidate_bonds.append((
                     batch_reactions[i], biased_pred[start:end, :].flatten(),
-                    batch_complete_graphs.batch_num_nodes[i],
-                    reaction_center_config['max_k'], easy=True, include_scores=True)
-                set_candidate_bonds.append(candidate_bonds)
+                    batch_complete_graphs.batch_num_nodes[i]
+                ))
                 start = end
 
         print('Stage 3/3: Output candidate bonds...')
+        with Pool(processes=args['num_processes']) as pool:
+            output_strings = list(tqdm(pool.imap(
+                partial(output_candidate_bonds_for_a_reaction,
+                        max_k=reaction_center_config['max_k']),
+                info_for_candidate_bonds), total=len(info_for_candidate_bonds)))
         with open(path_to_candidate_bonds[dataset], 'w') as f:
-            for id, reaction_candidate_bonds in enumerate(set_candidate_bonds):
-                print('Output candidate bonds for batch {:d}/{:d}'.format(
-                    id + 1, len(set_candidate_bonds)))
-                candidate_string = ''
-                for candidate in reaction_candidate_bonds:
-                    # A 4-tuple consisting of the atom mapping number of atom 1,
-                    # atom 2, the bond change type and the score
-                    candidate_string += '{} {} {:.1f} {:.3f};'.format(
-                        candidate[0], candidate[1], candidate[2], candidate[3])
-                candidate_string += '\n'
+            for candidate_string in output_strings:
                 f.write(candidate_string)
+
         del dataset
         del dataloader
 

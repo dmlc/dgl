@@ -15,6 +15,7 @@ from itertools import combinations
 from multiprocessing import Pool
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
+from tqdm import tqdm
 
 from ..utils.featurizers import BaseAtomFeaturizer, ConcatFeaturizer, one_hot_encoding, \
     atom_type_one_hot, atom_degree_one_hot, atom_explicit_valence_one_hot, \
@@ -662,7 +663,6 @@ def load_one_reaction_rank(line, train_mode):
         atom1, atom2 = int(atom1) - 1, int(atom2) - 1
         reaction_real_bond_changes.append(
             (min(atom1, atom2), max(atom1, atom2), float(change_type)))
-    all_real_bond_changes.append(reaction_real_bond_changes)
 
     if train_mode:
         return reactants_mol, product_mol, reaction, graph_edits, reaction_real_bond_changes
@@ -1080,7 +1080,7 @@ class WLNRankDataset(object):
             SMILES for the main products
         """
         bond_change_to_type = {1: Chem.rdchem.BondType.SINGLE, 2: Chem.rdchem.BondType.DOUBLE,
-                             3: Chem.rdchem.BondType.TRIPLE, 1.5: Chem.rdchem.BondType.AROMATIC}
+                               3: Chem.rdchem.BondType.TRIPLE, 1.5: Chem.rdchem.BondType.AROMATIC}
 
         new_mol = Chem.RWMol(reactant_mols)
         [atom.SetNumExplicitHs(0) for atom in new_mol.GetAtoms()]
