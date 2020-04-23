@@ -473,6 +473,29 @@ class KVServer(object):
                     data=res_tensor,
                     c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
+            # Init new data
+            elif msg.type == KVStoreMsg.NEW_DATA:
+                assert msg.rank == 0
+                data_str, target_name = msg.name.split('|')
+                data_name, date_type = self._deserialize_shared_tensor(data_str)
+                dtype = F.data_type_dict()[data_type]
+                data_shape = F.asnumpy(msg.id).tolist()
+                if self._server_id % self._group_count == 0: # master server
+                    data_tensor = F.zeros(data_shape, dtype, F.cpu())
+                    self.init_data(name=data_name, data_tensor=data_tensor)
+                else: # backup server
+                    self.init_data(name=data_name)
+                g2l = self._data_store[target_name+'-g2l-']
+                self._data_store[data_name+'-g2l-'] = g2l
+                self._has_data.add(data_name+'-g2l-')
+                back_msg = KVStoreMsg(
+                    type=KVMsgType.NEW_DATA,
+                    rank=self._server_id,
+                    name=msg.name,
+                    id=msg.id,
+                    data=None,
+                    c_ptr=None)
+                _send_kv_msg(self._sender, back_msg, 0)
             # Barrier message
             elif msg.type == KVMsgType.BARRIER:
                 self._barrier_count += 1
@@ -755,6 +778,63 @@ class KVClient(object):
                 self._has_data.add(tensor_name)
 
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
+
+
+    def init_data(self, name, shape, dtype, target_name):
+        """Send message to kvserver to initialize new data and 
+        get corresponded shared-tensor on kvclient. 
+
+        Note that, this API must be invoked after the conenct() API.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        shape : list of int
+            data shape
+        dtype : dtype
+            data type
+        target_name : str
+            target name is used to find existing partition_book and g2l mapping.
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert len(shape) > 0, 'shape cannot be empty.'
+        assert len(target_name) > 0, 'target_name cannot be empty.'
+
+        if self._client_id == 0: # only client_0 send message to server
+            partition_book = self._data_store[target_name+'-part-']
+            machines, count = np.unique(F.asnumpy(partition_book), return_counts=True)
+            assert shape[0] == len(partition_book)
+            # send message to all of the server nodes
+            for m_id in machines:
+                data_name = self._serialize_shared_tensor(name, dtype)
+                data_name = data_name + '|' + target_name
+                local_shape = shape.copy()
+                local_shape[0] = count[0]
+                shape_tensor = F.tensor(local_shape)
+                for n in range(self._group_count):
+                    server_id = m_id * self._group_count + n
+                    msg = KVStoreMsg(
+                        type=KVMsgType.NEW_DATA,
+                        rank=self._client_id,
+                        name=data_name,
+                        id=shape_tensor,
+                        data=None,
+                        c_ptr=None)
+                    _send_kv_msg(self._sender, msg, server_id)
+            # recv confirm message from server nodes
+            for server_id in range(self._server_count):
+                msg = _recv_kv_msg(self._receiver)
+                assert msg.type == KVMsgType.NEW_DATA
+            self.barrier()
+        else:
+            self.barrier()
+        g2l = self._data_store[target_name+'-g2l-']
+        partition_book = self._data_store[target_name+'-part-']
+        self._data_store[name+'-g2l-'] = g2l
+        self._has_data.add(name+'-g2l-')
+        self._data_store[name+'-part-'] = partition_book
+        self._has_data.add(name+'-part-')
 
 
     def print(self):

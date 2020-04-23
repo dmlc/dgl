@@ -192,6 +192,7 @@ class KVMsgType(Enum):
     PULL_BACK = 5
     BARRIER = 6
     IP_ID = 7
+    NEW_DATA = 8
 
 
 KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data c_ptr")
@@ -225,7 +226,7 @@ def _send_kv_msg(sender, msg, recv_id):
     recv_id : int
         receiver's ID
     """
-    if msg.type == KVMsgType.PULL:
+    if msg.type == KVMsgType.PULL or msg_type == KVMsgType.NEW_DATA:
         tensor_id = F.zerocopy_to_dgl_ndarray(msg.id)
         _CAPI_SenderSendKVMsg(
             sender,

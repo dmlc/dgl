@@ -486,7 +486,7 @@ static void send_kv_message(network::Sender* sender,
     // Send ArrayMeta
     ArrayMeta meta(kv_msg->msg_type);
     meta.AddArray(kv_msg->id);
-    if (kv_msg->msg_type != kPullMsg) {
+    if (kv_msg->msg_type != kPullMsg && kv_msg->msg_type != kNewDataMsg) {
       meta.AddArray(kv_msg->data);
     }
     int64_t meta_size = 0;
@@ -506,7 +506,7 @@ static void send_kv_message(network::Sender* sender,
     send_id_msg.deallocator = [id](Message*) {};
     CHECK_EQ(sender->Send(send_id_msg, recv_id), ADD_SUCCESS);
     // Send data NDArray
-    if (kv_msg->msg_type != kPullMsg) {
+    if (kv_msg->msg_type != kPullMsg && kv_msg->msg_type != kNewDataMsg) {
       Message send_data_msg;
       send_data_msg.data = static_cast<char*>(kv_msg->data->data);
       send_data_msg.size = kv_msg->data.GetSize();
@@ -548,7 +548,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     recv_id_msg.data,
     AUTO_FREE);
   // Recv Data NDArray
-  if (kv_msg->msg_type != kPullMsg) {
+  if (kv_msg->msg_type != kPullMsg && kv_msg->msg_type != kNewDataMsg) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
     CHECK_GE(meta.data_shape_[2], 1);
@@ -581,7 +581,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
       if (kv_msg.msg_type != kIPIDMsg) {
         kv_msg.id = args[args_count++];
       }
-      if (kv_msg.msg_type != kPullMsg && kv_msg.msg_type != kIPIDMsg) {
+      if (kv_msg.msg_type != kPullMsg && 
+          kv_msg.msg_type != kIPIDMsg && 
+          kv_msg.msg_type != kNewDataMsg) {
         kv_msg.data = args[args_count++];
       }
     }

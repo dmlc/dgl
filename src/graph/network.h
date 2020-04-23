@@ -64,7 +64,11 @@ enum MessageType {
   /*!
    * \brief IP and ID msg for KVStore
    */  
-  kIPIDMsg = 7
+  kIPIDMsg = 7,
+  /*!
+   * \brief New data msg for KVStore
+   */  
+  kNewDataMsg = 8
 };
 
 /*!
