@@ -21,7 +21,6 @@ if os.name != 'nt':
     import fcntl
     import struct
 
-
 def read_ip_config(filename):
     """Read network configuration information of kvstore from file.
 
