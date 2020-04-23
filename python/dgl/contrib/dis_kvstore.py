@@ -49,14 +49,14 @@ def read_ip_config(filename):
 
         [server_id]:[machine_id, ip, port, group_count]
 
-          {0:'[0, 172.31.40.143, 30050, 2],
-           1:'[0, 172.31.40.143, 30051, 2],
-           2:'[1, 172.31.36.140, 30050, 2],
-           3:'[1, 172.31.36.140, 30051, 2],
-           4:'[2, 172.31.47.147, 30050, 2],
-           5:'[2, 172.31.47.147, 30051, 2],
-           6:'[3, 172.31.30.180, 30050, 2],
-           7:'[3, 172.31.30.180, 30051, 2]}
+          {0:[0, '172.31.40.143', 30050, 2],
+           1:[0, '172.31.40.143', 30051, 2],
+           2:[1, '172.31.36.140', 30050, 2],
+           3:[1, '172.31.36.140', 30051, 2],
+           4:[2, '172.31.47.147', 30050, 2],
+           5:[2, '172.31.47.147', 30051, 2],
+           6:[3, '172.31.30.180', 30050, 2],
+           7:[3, '172.31.30.180', 30051, 2]}
     """
     assert len(filename) > 0, 'filename cannot be empty.'
 
@@ -189,21 +189,59 @@ class KVServer(object):
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-g2l-'][:] = global2local[:]
             # write data information to temp file that can be read by other processes
-            self._write_data_shape(name+'-g2l-shape', global2local)
-            self._open_file_list.append(name+'-g2l-shape')
+            self._write_data_shape(name+'-g2l-shape-'+str(self._machine_id), global2local)
+            self._open_file_list.append(name+'-g2l-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-g2l-shape')):
+                if (os.path.exists(name+'-g2l-shape-'+str(self._machine_id))):
                     time.sleep(2) # wait writing finish
                     break
                 else:
                     time.sleep(2) # wait until the file been created
-            data_shape = self._read_data_shape(name+'-g2l-shape')
+            data_shape = self._read_data_shape(name+'-g2l-shape-'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-g2l-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
 
         self._has_data.add(name+'-g2l-')
+
+
+    def set_partition_book(self, name, partition_book=None):
+        """Partition book contains the data mapping of global ID to machine ID.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        partition_book : list or tensor (mx.ndarray or torch.tensor)
+            Mapping global ID to target machine ID.
+
+        Note that, if the partition_book is None KVClient will read shared-tensor by name.
+        """
+        assert len(name) > 0, 'name connot be empty.'
+
+        if partition_book is not None: # Create shared-tensor
+            if isinstance(partition_book, list):
+                partition_book = F.tensor(partition_book)
+            shared_data = empty_shared_mem(name+'-part-', True, partition_book.shape, 'int64')
+            dlpack = shared_data.to_dlpack()
+            self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
+            self._data_store[name+'-part-'][:] = partition_book[:]
+            self._write_data_shape(name+'-part-shape-'+str(self._machine_id), partition_book)
+            self._open_file_list.append(name+'-part-shape-'+str(self._machine_id))
+        else: # Read shared-tensor
+            while True:
+                if (os.path.exists(name+'-part-shape-'+str(self._machine_id))):
+                    time.sleep(2) # wait writing finish
+                    break
+                else:
+                    time.sleep(2) # wait until the file been created    
+            data_shape = self._read_data_shape(name+'-part-shape-'+str(self._machine_id))
+            shared_data = empty_shared_mem(name+'-part-', False, data_shape, 'int64')
+            dlpack = shared_data.to_dlpack()
+            self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
+
+        self._has_data.add(name+'-part-')
 
 
     def init_data(self, name, data_tensor=None):
@@ -225,15 +263,15 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-data-'][:] = data_tensor[:]
-            self._write_data_shape(name+'-data-shape', data_tensor)
-            self._open_file_list.append(name+'-data-shape')
+            self._write_data_shape(name+'-data-shape-'+str(self._machine_id), data_tensor)
+            self._open_file_list.append(name+'-data-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-data-shape')):
+                if (os.path.exists(name+'-data-shape-'+str(self._machine_id))):
                     break
                 else:
                     time.sleep(2) # wait until the file been created
-            data_shape = self._read_data_shape(name+'-data-shape')
+            data_shape = self._read_data_shape(name+'-data-shape-'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-data-', False, data_shape, 'float32')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
@@ -592,6 +630,7 @@ class KVClient(object):
         self._has_data = set()
         # This is used to store local data, which can share memory with local KVServer.
         self._data_store = {}
+        self._data_name_list = []
         # Server information
         self._server_namebook = server_namebook
         self._server_count = len(server_namebook)
@@ -627,44 +666,6 @@ class KVClient(object):
         for file in self._open_file_list:
             if(os.path.exists(file)):
                 os.remove(file)
-
-
-    def set_partition_book(self, name, partition_book=None):
-        """Partition book contains the data mapping of global ID to machine ID.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        partition_book : list or tensor (mx.ndarray or torch.tensor)
-            Mapping global ID to target machine ID.
-
-        Note that, if the partition_book is None KVClient will read shared-tensor by name.
-        """
-        assert len(name) > 0, 'name connot be empty.'
-
-        if partition_book is not None: # Create shared-tensor
-            if isinstance(partition_book, list):
-                partition_book = F.tensor(partition_book)
-            shared_data = empty_shared_mem(name+'-part-', True, partition_book.shape, 'int64')
-            dlpack = shared_data.to_dlpack()
-            self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
-            self._data_store[name+'-part-'][:] = partition_book[:]
-            self._write_data_shape(name+'-part-shape', partition_book)
-            self._open_file_list.append(name+'-part-shape')
-        else: # Read shared-tensor
-            while True:
-                if (os.path.exists(name+'-part-shape')):
-                    time.sleep(2) # wait writing finish
-                    break
-                else:
-                    time.sleep(2) # wait until the file been created    
-            data_shape = self._read_data_shape(name+'-part-shape')
-            shared_data = empty_shared_mem(name+'-part-', False, data_shape, 'int64')
-            dlpack = shared_data.to_dlpack()
-            self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
-
-        self._has_data.add(name+'-part-')
 
 
     def connect(self):
@@ -715,15 +716,17 @@ class KVClient(object):
             if data != '':
                 tensor_name, dtype = self._deserialize_shared_tensor(data)
                 while True:
-                    if (os.path.exists(tensor_name+'shape')):
+                    if (os.path.exists(tensor_name+'shape-'+str(self._machine_id))):
                         time.sleep(2) # wait writing finish
                         break
                     else:
                         time.sleep(2) # wait until the file been created 
-                shape = self._read_data_shape(tensor_name+'shape')
+                shape = self._read_data_shape(tensor_name+'shape-'+str(self._machine_id))
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[tensor_name] = F.zerocopy_from_dlpack(dlpack)
+                if '-data-' in tensor_name:
+                    self._data_name_list.append(tensor_name[0:-6])
                 self._has_data.add(tensor_name)
 
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
@@ -772,6 +775,40 @@ class KVClient(object):
             machine ID
         """
         return self._machine_id
+
+
+    def get_data_name_list(self):
+        """Get all the data name
+
+        Return
+        ------
+        list of str
+            name list
+        """
+        return self._data_name_list
+
+
+    def get_data_meta(self, name):
+        """Get meta data (data_type, data_shape, partition_book) of the target shared-tensor
+
+        Parameter
+        ---------
+        name : str
+            data name
+
+        Return
+        ------
+        tuple
+            (data_type, data_shape, partition_book)
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert name + '-data-' in self._has_data, 'Data (%s) does not exist!' % name
+
+        data_type = F.dtype(self._data_store[name+'-data-'])
+        data_shape = F.shape(self._data_store[name+'-data-'])
+        partition_book = self._data_store[name+'-part-']
+
+        return (data_type, data_shape, partition_book)
 
 
     def push(self, name, id_tensor, data_tensor):
