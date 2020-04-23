@@ -1150,7 +1150,7 @@ class KVClient(object):
         f.close()
 
 
-    def _read_data_shape(self, filename):
+    def _read_data_shape_type(self, filename):
         """Read data shape from a tmp file.
 
         Parameters
@@ -1168,13 +1168,13 @@ class KVClient(object):
         f = open(filename, "r")
         str_data = f.read()
         data_list = str_data.split('|')
+        data_type = data_list[0]
         data_shape = []
-        for i in range(len(data_list)-1):
+        for i in range(1, len(data_list)-1):
             data_shape.append(int(data_list[i]))
-
         f.close()
 
-        return data_shape
+        return data_shape, data_type
 
 
     def _takeId(self, elem):
