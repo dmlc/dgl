@@ -480,7 +480,12 @@ def reaction_center_final_eval(args, model, data_loader, easy):
     return msg
 
 def output_candidate_bonds_for_a_reaction(info, max_k):
-    """"""
+    """Prepare top-k atom pairs for each reaction as candidate bonds
+
+    Parameters
+    ----------
+
+    """
     reaction, preds, num_nodes = info
     # Note that we use the easy mode by default, which is also the
     # setting in the paper.
@@ -495,7 +500,7 @@ def output_candidate_bonds_for_a_reaction(info, max_k):
     candidate_string += '\n'
     return candidate_string
 
-def prepare_reaction_center(args, reaction_center_config, loader_batch_size=60):
+def prepare_reaction_center(args, reaction_center_config, loader_batch_size=100):
     """Use a trained model for reaction center prediction to prepare candidate bonds.
 
     Parameters
@@ -505,7 +510,7 @@ def prepare_reaction_center(args, reaction_center_config, loader_batch_size=60):
     reaction_center_config : dict
         Configuration for the experiment on reaction center prediction.
     loader_batch_size : int
-        Batch size for reaction center prediction.
+        Batch size for reaction center prediction. Default to 100.
 
     Returns
     -------
