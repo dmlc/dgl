@@ -594,6 +594,81 @@ class USPTOCenter(WLNCenterDataset):
         """
         return self._subset
 
+def load_one_reaction_rank(line, train_mode):
+    """Load one reaction and check if the reactants are valid.
+
+    Parameters
+    ----------
+    line : str
+        One reaction and the associated graph edits
+    train_mode : bool
+        Whether the data will be used for training
+
+    Returns
+    -------
+    reactants_mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for the reactants. None will be returned if the
+        line is not valid.
+    product_mol : rdkit.Chem.rdchem.Mol, optional
+        RDKit molecule instance for the product. This is returned only when train_mode is True.
+        None will be returned if the line is not valid.
+    reaction : str
+        Reaction. None will be returned if the line is not valid.
+    graph_edits : str
+        Graph edits associated with the reaction. None will be returned if the line is not valid.
+    reaction_real_bond_changes : list of 3-tuples
+        Real bond changes in the reaction. Each tuple is of form (atom1, atom2, change_type). For
+        change_type, 0.0 stands for losing a bond, 1.0, 2.0, 3.0 and 1.5 separately stands for
+        forming a single, double, triple or aromatic bond.
+    """
+    # Each line represents a reaction and the corresponding graph edits
+    #
+    # reaction example:
+    # [CH3:14][OH:15].[NH2:12][NH2:13].[OH2:11].[n:1]1[n:2][cH:3][c:4]
+    # ([C:7]([O:9][CH3:8])=[O:10])[cH:5][cH:6]1>>[n:1]1[n:2][cH:3][c:4]
+    # ([C:7](=[O:9])[NH:12][NH2:13])[cH:5][cH:6]1
+    # The reactants are on the left-hand-side of the reaction and the product
+    # is on the right-hand-side of the reaction. The numbers represent atom mapping.
+    #
+    # graph_edits example:
+    # 23-33-1.0;23-25-0.0
+    # For a triplet a-b-c, a and b are the atoms that form or loss the bond.
+    # c specifies the particular change, 0.0 for losing a bond, 1.0, 2.0, 3.0 and
+    # 1.5 separately for forming a single, double, triple or aromatic bond.
+    reaction, graph_edits = line.strip("\r\n ").split()
+    reactants, _, product = reaction.split('>')
+    reactants_mol = Chem.MolFromSmiles(reactants)
+    if reactants_mol is None:
+        if train_mode:
+            return None, None, None, None, None
+        else:
+            return None, None, None, None
+
+    if train_mode:
+        product_mol = Chem.MolFromSmiles(product)
+        if product_mol is None:
+            return None, None, None, None, None
+
+    # Reorder atoms according to the order specified in the atom map
+    atom_map_order = [-1 for _ in range(reactants_mol.GetNumAtoms())]
+    for j in range(reactants_mol.GetNumAtoms()):
+        atom = reactants_mol.GetAtomWithIdx(j)
+        atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = j
+    reactants_mol = rdmolops.RenumberAtoms(reactants_mol, atom_map_order)
+
+    reaction_real_bond_changes = []
+    for changed_bond in graph_edits.split(';'):
+        atom1, atom2, change_type = changed_bond.split('-')
+        atom1, atom2 = int(atom1) - 1, int(atom2) - 1
+        reaction_real_bond_changes.append(
+            (min(atom1, atom2), max(atom1, atom2), float(change_type)))
+    all_real_bond_changes.append(reaction_real_bond_changes)
+
+    if train_mode:
+        return reactants_mol, product_mol, reaction, graph_edits, reaction_real_bond_changes
+    else:
+        return reactants_mol, reaction, graph_edits, reaction_real_bond_changes
+
 class WLNRankDataset(object):
     """Dataset for ranking candidate products with WLN
 
@@ -635,6 +710,8 @@ class WLNRankDataset(object):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
+    num_processes : int
+        Number of processes to use for data pre-processing. Default to 1.
     """
     def __init__(self,
                  raw_file_path,
@@ -648,7 +725,8 @@ class WLNRankDataset(object):
                  max_num_change_combos_per_reaction=150,
                  train_mode=True,
                  log_every=10000,
-                 load=True):
+                 load=True,
+                 num_processes=1):
         super(WLNRankDataset, self).__init__()
 
         self.ignore_large_samples = False
@@ -657,7 +735,7 @@ class WLNRankDataset(object):
 
         self.reactant_mols, self.product_mols, self.reactions, self.graph_edits, \
         self.real_bond_changes, self.ids_for_small_samples = \
-            self.load_reaction_data(raw_file_path, log_every)
+            self.load_reaction_data(raw_file_path, num_processes)
         self.candidate_bond_changes = self.load_candidate_bond_changes(
             candidate_bond_path, log_every)
         self.valid_candidate_combos, self.candidate_bond_changes, self.node_feats, \
@@ -667,7 +745,7 @@ class WLNRankDataset(object):
         self.candidate_graphs = self.construct_and_featurize_edges(
             mol_graph_path, edge_featurizer, load, log_every)
 
-    def load_reaction_data(self, file_path, log_every):
+    def load_reaction_data(self, file_path, num_processes):
         """Load reaction data from the raw file.
 
         Parameters
@@ -676,6 +754,8 @@ class WLNRankDataset(object):
             Path to read the file.
         log_every : int
             Print a progress update every time ``log_every`` reactions are pre-processed.
+        num_processes : int
+            Number of processes to use for data pre-processing.
 
         Returns
         -------
@@ -704,57 +784,38 @@ class WLNRankDataset(object):
         all_graph_edits = []
         all_real_bond_changes = []
         ids_for_small_samples = []
-        curr_id = 0
         with open(file_path, 'r') as f:
-            for i, line in enumerate(f):
-                if i % log_every == 0:
-                    print('Processing line {:d}'.format(i))
-                # Each line represents a reaction and the corresponding graph edits
-                #
-                # reaction example:
-                # [CH3:14][OH:15].[NH2:12][NH2:13].[OH2:11].[n:1]1[n:2][cH:3][c:4]
-                # ([C:7]([O:9][CH3:8])=[O:10])[cH:5][cH:6]1>>[n:1]1[n:2][cH:3][c:4]
-                # ([C:7](=[O:9])[NH:12][NH2:13])[cH:5][cH:6]1
-                # The reactants are on the left-hand-side of the reaction and the product
-                # is on the right-hand-side of the reaction. The numbers represent atom mapping.
-                #
-                # graph_edits example:
-                # 23-33-1.0;23-25-0.0
-                # For a triplet a-b-c, a and b are the atoms that form or loss the bond.
-                # c specifies the particular change, 0.0 for losing a bond, 1.0, 2.0, 3.0 and
-                # 1.5 separately for forming a single, double, triple or aromatic bond.
-                reaction, graph_edits = line.strip("\r\n ").split()
-                reactants, _, product = reaction.split('>')
-                reactants_mol = Chem.MolFromSmiles(reactants)
-                if reactants_mol is None:
-                    continue
-                if self.train_mode:
-                    product_mol = Chem.MolFromSmiles(product)
-                    if product_mol is None:
-                        continue
-                    all_product_mols.append(product_mol)
-                if reactants_mol.GetNumAtoms() <= self.size_cutoff:
-                    ids_for_small_samples.append(curr_id)
+            lines = f.readlines()
 
-                # Reorder atoms according to the order specified in the atom map
-                atom_map_order = [-1 for _ in range(reactants_mol.GetNumAtoms())]
-                for j in range(reactants_mol.GetNumAtoms()):
-                    atom = reactants_mol.GetAtomWithIdx(j)
-                    atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = j
-                reactants_mol = rdmolops.RenumberAtoms(reactants_mol, atom_map_order)
-                all_reactant_mols.append(reactants_mol)
-                all_reactions.append(reaction)
-                all_graph_edits.append(graph_edits)
+        def _update_from_line(loaded_result):
+            if self.train_mode:
+                reactants_mol, product_mol, reaction, graph_edits, \
+                reaction_real_bond_changes = loaded_result
+            else:
+                reactants_mol, reaction, graph_edits, \
+                reaction_real_bond_changes = loaded_result
+            if reactants_mol is None:
+                return
+            if self.train_mode:
+                all_product_mols.append(product_mol)
+            all_reactant_mols.append(reactants_mol)
+            all_reactions.append(reaction)
+            all_graph_edits.append(graph_edits)
+            all_real_bond_changes.append(reaction_real_bond_changes)
+            if reactants_mol.GetNumAtoms() <= self.size_cutoff:
+                ids_for_small_samples.append(id)
 
-                reaction_real_bond_changes = []
-                for changed_bond in graph_edits.split(';'):
-                    atom1, atom2, change_type = changed_bond.split('-')
-                    atom1, atom2 = int(atom1) - 1, int(atom2) - 1
-                    reaction_real_bond_changes.append(
-                        (min(atom1, atom2), max(atom1, atom2), float(change_type)))
-                all_real_bond_changes.append(reaction_real_bond_changes)
-
-                curr_id += 1
+        if num_processes == 1:
+            for id, li in enumerate(lines):
+                loaded_line = load_one_reaction_rank(li, self.train_mode)
+                _update_from_line(loaded_line)
+        else:
+            with Pool(processes=num_processes) as pool:
+                results = list(tqdm(pool.imap(
+                    partial(load_one_reaction_rank, train_mode=self.train_mode),
+                    lines), total=len(lines)))
+            for id in range(len(lines)):
+                _update_from_line(results[id])
 
         return all_reactant_mols, all_product_mols, all_reactions, all_graph_edits, \
                all_real_bond_changes, ids_for_small_samples
@@ -1431,6 +1492,8 @@ class USPTORank(WLNRankDataset):
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
+    num_processes : int
+        Number of processes to use for data pre-processing. Default to 1.
     """
     def __init__(self,
                  subset,
@@ -1438,7 +1501,8 @@ class USPTORank(WLNRankDataset):
                  size_cutoff=100,
                  max_num_changes_per_reaction=5,
                  log_every=10000,
-                 load=True):
+                 load=True,
+                 num_processes=1):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         print('Preparing {} subset of USPTO for product candidate ranking.'.format(subset))
@@ -1465,7 +1529,8 @@ class USPTORank(WLNRankDataset):
             max_num_changes_per_reaction=max_num_changes_per_reaction,
             train_mode=train_mode,
             log_every=log_every,
-            load=load)
+            load=load,
+            num_processes=num_processes)
 
     @property
     def subset(self):
