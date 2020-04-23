@@ -515,39 +515,26 @@ def prepare_reaction_center(args, reaction_center_config):
         reaction_center_model.load_state_dict(
             torch.load(args['center_model_path'])['model_state_dict'])
         reaction_center_model = reaction_center_model.to(args['device'])
-
-    if args['train_path'] is None:
-        train_set = USPTOCenter('train', num_processes=args['num_processes'])
-    else:
-        train_set = WLNCenterDataset(raw_file_path=args['train_path'],
-                                     mol_graph_path='train.bin',
-                                     num_processes=args['num_processes'])
-    if args['val_path'] is None:
-        val_set = USPTOCenter('val', num_processes=args['num_processes'])
-    else:
-        val_set = WLNCenterDataset(raw_file_path=args['val_path'],
-                                   mol_graph_path='val.bin',
-                                   num_processes=args['num_processes'])
-    if args['test_path'] is None:
-        test_set = USPTOCenter('test', num_processes=args['num_processes'])
-    else:
-        test_set = WLNCenterDataset(raw_file_path=args['test_path'],
-                                    mol_graph_path='test.bin',
-                                    num_processes=args['num_processes'])
-
-    train_loader = DataLoader(train_set, batch_size=reaction_center_config['batch_size'],
-                              collate_fn=collate, shuffle=False)
-    val_loader = DataLoader(val_set, batch_size=reaction_center_config['batch_size'],
-                            collate_fn=collate, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=reaction_center_config['batch_size'],
-                             collate_fn=collate, shuffle=False)
-
     reaction_center_model.eval()
-    for dataset, data_loader in {
-        'train': train_loader, 'val': val_loader, 'test': test_loader
-    }.items():
+
+    for subset in ['train', 'val', 'test']:
+        print('Processing subset {}...'.format(subset))
+        print('Stage 1/3: Loading dataset...')
+        if args['{}_path'.format(subset)] is None:
+            dataset = USPTOCenter(subset, num_processes=args['num_processes'])
+        else:
+            dataset = WLNCenterDataset(raw_file_path=args['{}_path'.format(subset)],
+                                       mol_graph_path='{}.bin'.format(subset),
+                                       num_processes=args['num_processes'])
+
+        dataloader = DataLoader(dataset, batch_size=reaction_center_config['batch_size'],
+                                collate_fn=collate, shuffle=False)
+
+        print('Stage 2/3: Preparing candidate bonds...')
         set_candidate_bonds = []
-        for batch_id, batch_data in enumerate(data_loader):
+        for batch_id, batch_data in enumerate(dataloader):
+            print('Computing candidate bonds for batch {:d}/{:d}'.format(
+                batch_id + 1, len(dataloader)))
             batch_reactions, batch_graph_edits, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
             with torch.no_grad():
@@ -566,8 +553,12 @@ def prepare_reaction_center(args, reaction_center_config):
                     reaction_center_config['max_k'], easy=True, include_scores=True)
                 set_candidate_bonds.append(candidate_bonds)
                 start = end
+
+        print('Stage 3/3: Output candidate bonds...')
         with open(path_to_candidate_bonds[dataset], 'w') as f:
-            for reaction_candidate_bonds in set_candidate_bonds:
+            for id, reaction_candidate_bonds in enumerate(set_candidate_bonds):
+                print('Output candidate bonds for batch {:d}/{:d}'.format(
+                    id + 1, len(set_candidate_bonds)))
                 candidate_string = ''
                 for candidate in reaction_candidate_bonds:
                     # A 4-tuple consisting of the atom mapping number of atom 1,
@@ -576,6 +567,7 @@ def prepare_reaction_center(args, reaction_center_config):
                         candidate[0], candidate[1], candidate[2], candidate[3])
                 candidate_string += '\n'
                 f.write(candidate_string)
-        del data_loader
+        del dataset
+        del dataloader
 
     return path_to_candidate_bonds
