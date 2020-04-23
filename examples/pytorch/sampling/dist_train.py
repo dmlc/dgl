@@ -7,7 +7,7 @@ import torch as th
 import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.contrib import DistGraphStoreServer, DistGraphStore
+from dgl.contrib import DistGraphServer, DistGraph
 from dgl.data.utils import load_graphs
 import socket
 
@@ -15,13 +15,13 @@ from gcn_ns_dist import gcn_ns_train
 
 def start_server(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
-    serv = DistGraphStoreServer(server_namebook, args.id, args.graph_name,
-                                args.server_data, args.client_data, args.num_client)
+    serv = DistGraphServer(server_namebook, args.id, args.graph_name,
+                           args.server_data, args.client_data, args.num_client)
     serv.start()
 
 def main(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
-    g = DistGraphStore(server_namebook, args.graph_name)
+    g = DistGraph(server_namebook, args.graph_name)
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     th.manual_seed(g.get_id())

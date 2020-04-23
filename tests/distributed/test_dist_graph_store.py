@@ -8,7 +8,7 @@ from multiprocessing import Process, Manager, Condition, Value
 import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
-from dgl.contrib import DistGraphStoreServer, DistGraphStore
+from dgl.contrib import DistGraphServer, DistGraph
 import backend as F
 import unittest
 import pickle
@@ -21,14 +21,14 @@ def create_random_graph(n):
     return dgl.DGLGraph(ig)
 
 def run_server(graph_name, server_id, num_clients, barrier):
-    g = DistGraphStoreServer(server_namebook, server_id, graph_name, '.', num_clients)
+    g = DistGraphServer(server_namebook, server_id, graph_name, '.', num_clients)
     barrier.wait()
     print('start server', server_id)
     g.start()
 
 def run_client(graph_name, part, barrier):
     barrier.wait()
-    g = DistGraphStore(server_namebook, graph_name)
+    g = DistGraph(server_namebook, graph_name)
     print('|V|={}, |E|={}, #local:{}'.format(g.number_of_nodes(), g.number_of_edges(), len(g.local_nids)))
     print('part: {}, local: {}'.format(part.number_of_nodes(), g.number_of_local_nodes()))
     assert part.number_of_nodes() == g.g.number_of_nodes()

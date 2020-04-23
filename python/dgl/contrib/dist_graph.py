@@ -190,9 +190,9 @@ def load_data(data_path, graph_name, part_id):
     meta = pickle.load(open('{}/{}-meta.pkl'.format(data_path, graph_name), 'rb'))
     return part_g, client_g, meta
 
-class DistGraphStoreServer(KVServer):
+class DistGraphServer(KVServer):
     def __init__(self, server_namebook, server_id, graph_name, data_path, num_client):
-        super(DistGraphStoreServer, self).__init__(server_id=server_id, server_namebook=server_namebook, num_client=num_client)
+        super(DistGraphServer, self).__init__(server_id=server_id, server_namebook=server_namebook, num_client=num_client)
 
         host_name = socket.gethostname()
         host_ip = socket.gethostbyname(host_name)
@@ -224,7 +224,7 @@ class DistGraphStoreServer(KVServer):
                 self.set_partition_book(name=get_ndata_name(name), partition_book=partition)
         # TODO Do I need synchronization?
 
-class DistGraphStore:
+class DistGraph:
     def __init__(self, server_namebook, graph_name):
         self._client = KVClient(server_namebook=server_namebook)
         self._client.connect()

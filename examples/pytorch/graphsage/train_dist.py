@@ -9,7 +9,7 @@ import tqdm
 import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.contrib import DistGraphStoreServer, DistGraphStore
+from dgl.contrib import DistGraphServer, DistGraph
 from dgl.data.utils import load_graphs
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
@@ -25,8 +25,8 @@ from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate
 
 def start_server(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
-    serv = DistGraphStoreServer(server_namebook, args.id, args.graph_name,
-                                args.data_path, args.num_client)
+    serv = DistGraphServer(server_namebook, args.id, args.graph_name,
+                           args.data_path, args.num_client)
     serv.start()
 
 def load_subtensor(g, blocks, device):
@@ -146,7 +146,7 @@ def main(args):
     th.distributed.init_process_group(backend='gloo')
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
-    g = DistGraphStore(server_namebook, args.graph_name)
+    g = DistGraph(server_namebook, args.graph_name)
     hg = dgl.graph(g.g.all_edges())
     hg.ndata[dgl.NID] = g.g.ndata[dgl.NID]
     hg.edata[dgl.EID] = g.g.edata[dgl.EID]
