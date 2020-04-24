@@ -796,7 +796,7 @@ class WLNRankDataset(object):
         with open(file_path, 'r') as f:
             lines = f.readlines()
 
-        def _update_from_line(loaded_result):
+        def _update_from_line(id, loaded_result):
             if self.train_mode:
                 reactants_mol, product_mol, reaction, graph_edits, \
                 reaction_real_bond_changes = loaded_result
@@ -815,16 +815,16 @@ class WLNRankDataset(object):
                 ids_for_small_samples.append(id)
 
         if num_processes == 1:
-            for li in tqdm(lines):
+            for id, li in enumerate(tqdm(lines)):
                 loaded_line = load_one_reaction_rank(li, self.train_mode)
-                _update_from_line(loaded_line)
+                _update_from_line(id, loaded_line)
         else:
             with Pool(processes=num_processes) as pool:
                 results = list(tqdm(pool.imap(
                     partial(load_one_reaction_rank, train_mode=self.train_mode),
                     lines), total=len(lines)))
             for id in range(len(lines)):
-                _update_from_line(results[id])
+                _update_from_line(id, results[id])
 
         return all_reactant_mols, all_product_mols, all_reactions, all_graph_edits, \
                all_real_bond_changes, ids_for_small_samples
