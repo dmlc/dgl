@@ -1,9 +1,15 @@
 from functools import partial
 
-from dgllife.utils.featurizers import CanonicalAtomFeaturizer, BaseAtomFeaturizer, \
-    BaseBondFeaturizer, ConcatFeaturizer, atom_type_one_hot, atom_degree_one_hot, \
-    atom_formal_charge, atom_num_radical_electrons, atom_hybridization_one_hot, \
-    atom_total_num_H_one_hot
+# graph construction
+from dgllife.utils import smiles_to_bigraph, smiles_to_complete_graph
+# general featurization
+from dgllife.utils import ConcatFeaturizer
+# node featurization
+from dgllife.utils import CanonicalAtomFeaturizer, BaseAtomFeaturizer, WeaveAtomFeaturizer, \
+    atom_type_one_hot, atom_degree_one_hot, atom_formal_charge, atom_num_radical_electrons, \
+    atom_hybridization_one_hot, atom_total_num_H_one_hot
+# edge featurization
+from dgllife.utils.featurizers import BaseBondFeaturizer, WeaveEdgeFeaturizer
 
 from utils import chirality
 
@@ -12,7 +18,7 @@ GCN_Tox21 = {
     'batch_size': 128,
     'lr': 1e-3,
     'num_epochs': 100,
-    'atom_data_field': 'h',
+    'node_data_field': 'h',
     'frac_train': 0.8,
     'frac_val': 0.1,
     'frac_test': 0.1,
@@ -20,7 +26,8 @@ GCN_Tox21 = {
     'gcn_hidden_feats': [64, 64],
     'classifier_hidden_feats': 64,
     'patience': 10,
-    'atom_featurizer': CanonicalAtomFeaturizer(),
+    'smiles_to_graph': smiles_to_bigraph,
+    'node_featurizer': CanonicalAtomFeaturizer(),
     'metric_name': 'roc_auc_score'
 }
 
@@ -29,7 +36,7 @@ GAT_Tox21 = {
     'batch_size': 128,
     'lr': 1e-3,
     'num_epochs': 100,
-    'atom_data_field': 'h',
+    'node_data_field': 'h',
     'frac_train': 0.8,
     'frac_val': 0.1,
     'frac_test': 0.1,
@@ -38,7 +45,28 @@ GAT_Tox21 = {
     'classifier_hidden_feats': 64,
     'num_heads': [4, 4],
     'patience': 10,
-    'atom_featurizer': CanonicalAtomFeaturizer(),
+    'smiles_to_graph': smiles_to_bigraph,
+    'node_featurizer': CanonicalAtomFeaturizer(),
+    'metric_name': 'roc_auc_score'
+}
+
+Weave_Tox21 = {
+    'random_seed': 2,
+    'batch_size': 32,
+    'lr': 1e-3,
+    'num_epochs': 100,
+    'node_data_field': 'h',
+    'edge_data_field': 'e',
+    'frac_train': 0.8,
+    'frac_val': 0.1,
+    'frac_test': 0.1,
+    'num_gnn_layers': 2,
+    'gnn_hidden_feats': 50,
+    'graph_feats': 128,
+    'patience': 10,
+    'smiles_to_graph': partial(smiles_to_complete_graph, add_self_loop=True),
+    'node_featurizer': WeaveAtomFeaturizer(),
+    'edge_featurizer': WeaveEdgeFeaturizer(max_distance=2),
     'metric_name': 'roc_auc_score'
 }
 
@@ -103,8 +131,9 @@ AttentiveFP_Aromaticity = {
     'frac_test': 0.1,
     'patience': 80,
     'metric_name': 'rmse',
+    'smiles_to_graph': smiles_to_bigraph,
     # Follow the atom featurization in the original work
-    'atom_featurizer': BaseAtomFeaturizer(
+    'node_featurizer': BaseAtomFeaturizer(
         featurizer_funcs={'hv': ConcatFeaturizer([
             partial(atom_type_one_hot, allowable_set=[
                 'B', 'C', 'N', 'O', 'F', 'Si', 'P', 'S', 'Cl', 'As', 'Se', 'Br', 'Te', 'I', 'At'],
@@ -117,7 +146,7 @@ AttentiveFP_Aromaticity = {
         ],
         )}
     ),
-    'bond_featurizer': BaseBondFeaturizer({
+    'edge_featurizer': BaseBondFeaturizer({
         'he': lambda bond: [0 for _ in range(10)]
     })
 }
@@ -125,6 +154,7 @@ AttentiveFP_Aromaticity = {
 experiment_configures = {
     'GCN_Tox21': GCN_Tox21,
     'GAT_Tox21': GAT_Tox21,
+    'Weave_Tox21': Weave_Tox21,
     'MPNN_Alchemy': MPNN_Alchemy,
     'SchNet_Alchemy': SchNet_Alchemy,
     'MGCN_Alchemy': MGCN_Alchemy,

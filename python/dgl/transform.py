@@ -899,8 +899,6 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_nodes_nd, include_dst_in_src)
-    src_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in src_nodes_nd]
-    dst_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd) for nodes_nd in dst_nodes_nd]
 
     # The new graph duplicates the original node types to SRC and DST sets.
     new_ntypes = ([ntype for ntype in g.ntypes], [ntype for ntype in g.ntypes])
@@ -908,8 +906,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     assert new_graph.is_unibipartite  # sanity check
 
     for i, ntype in enumerate(g.ntypes):
-        new_graph.srcnodes[ntype].data[NID] = src_nodes[i]
-        new_graph.dstnodes[ntype].data[NID] = dst_nodes[i]
+        new_graph.srcnodes[ntype].data[NID] = F.zerocopy_from_dgl_ndarray(src_nodes_nd[i].data)
+        if ntype in dst_nodes:
+            new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
+        else:
+            # For empty dst node sets, still create empty mapping arrays.
+            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=F.int64)
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
