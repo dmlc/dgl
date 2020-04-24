@@ -545,6 +545,28 @@ class KVServer(object):
         return str_data
 
 
+    def _deserialize_shared_tensor(self, data):
+        """Deserialize shared tensor information sent from server
+
+        Parameters
+        ----------
+        data : str
+            serialized string
+
+        Returns
+        -------
+        str
+            tensor name
+        str
+            data type
+        """
+        data_list = data.split('/')
+        tensor_name = data_list[0]
+        data_type = data_list[-1]
+
+        return tensor_name, data_type
+
+
     def _write_data_shape_type(self, filename, data):
         """Write data shape to a temp file.
 
@@ -782,9 +804,11 @@ class KVClient(object):
 
     def init_data(self, name, shape, dtype, target_name):
         """Send message to kvserver to initialize new data and 
-        get corresponded shared-tensor on kvclient. 
+        get corresponded shared-tensor (e.g., partition_book, g2l) on kvclient. 
 
-        Note that, this API must be invoked after the conenct() API.
+        The new data will be initialized to zeros.
+
+        Note that, this API must be invoked after the conenct() API. 
 
         Parameters
         ----------
@@ -806,35 +830,40 @@ class KVClient(object):
             machines, count = np.unique(F.asnumpy(partition_book), return_counts=True)
             assert shape[0] == len(partition_book)
             # send message to all of the server nodes
-            for m_id in machines:
-                data_name = self._serialize_shared_tensor(name, dtype)
-                data_name = data_name + '|' + target_name
-                local_shape = shape.copy()
-                local_shape[0] = count[0]
-                shape_tensor = F.tensor(local_shape)
+            for idx in range(len(machines)):
+                m_id = machines[idx]
+                data_str = self._serialize_shared_tensor(name, dtype)
+                data_str = data_str + '|' + target_name
+                partitioned_shape = shape.copy()
+                partitioned_shape[0] = count[idx]
                 for n in range(self._group_count):
                     server_id = m_id * self._group_count + n
                     msg = KVStoreMsg(
                         type=KVMsgType.NEW_DATA,
-                        rank=self._client_id,
-                        name=data_name,
-                        id=shape_tensor,
+                        rank=0,
+                        name=data_str,
+                        id=F.tensor(partitioned_shape),
                         data=None,
                         c_ptr=None)
                     _send_kv_msg(self._sender, msg, server_id)
-            # recv confirm message from server nodes
+            # recv confirmation message from server nodes
             for server_id in range(self._server_count):
                 msg = _recv_kv_msg(self._receiver)
                 assert msg.type == KVMsgType.NEW_DATA
-            self.barrier()
-        else:
-            self.barrier()
+        self.barrier() # wait all the client and server finish its job
         g2l = self._data_store[target_name+'-g2l-']
         partition_book = self._data_store[target_name+'-part-']
         self._data_store[name+'-g2l-'] = g2l
-        self._has_data.add(name+'-g2l-')
         self._data_store[name+'-part-'] = partition_book
+        self._has_data.add(name+'-g2l-')
         self._has_data.add(name+'-part-')
+        shape, data_type = self._read_data_shape_type(name+'-data-shape-'+str(self._machine_id))
+        assert data_type == get_type_str()[dtype]
+        shared_data = empty_shared_mem(name+'-data-', False, shape, dtype)
+        dlpack = shared_data.to_dlpack()
+        self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
+        self._has_data.add(name+'-data-')
+        self._data_name_list.append(name)
 
 
     def print(self):
@@ -1180,6 +1209,29 @@ class KVClient(object):
             nic.add(ip)
 
         return nic
+
+
+    def _serialize_shared_tensor(self, name, dtype):
+        """Serialize shared tensor information.
+
+        Parameters
+        ----------
+        name : str
+            tensor name
+        dtype : dtype
+            data type
+
+        Returns
+        -------
+        str
+            serialized string
+        """
+        assert len(name) > 0, 'data name cannot be empty.'
+
+        str_data = name
+        str_data += '/'
+        str_data += get_type_str(dtype)
+        return str_data
 
 
     def _deserialize_shared_tensor(self, data):
