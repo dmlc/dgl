@@ -19,7 +19,7 @@ def STR2DTYPE():
     }
 
 
-def DTYPE2STR():    
+def DTYPE2STR():
     """Convert backend dtype to string"""
     return {
         F.int32: 'int32',
@@ -27,7 +27,7 @@ def DTYPE2STR():
     }
 
 
-def STR2NPDTYPE():    
+def STR2NPDTYPE():
     """Convert string to np dtype"""
     return {
         'int32': np.int32,
@@ -203,7 +203,7 @@ class Index(object):
             # Index wrapping a slice
             start = self._slice_data.start
             index = index._slice_data
-            return Index(slice(start + index.start, start + index.stop))
+            return Index(slice(start + index.start, start + index.stop), self.dtype)
 
     def set_items(self, index, value):
         """Set values at given positions of an Index. Set is not done in place,
@@ -242,7 +242,7 @@ class Index(object):
             return self
         new_items = F.zeros((num,), dtype=F.int64, ctx=F.cpu())
         if len(self) == 0:
-            return Index(new_items)
+            return Index(new_items, self.dtype)
         else:
             tensor = self.tousertensor()
             tensor = F.cat((tensor, new_items), dim=0)
