@@ -509,7 +509,7 @@ def output_candidate_bonds_for_a_reaction(info, max_k):
 
     return candidate_string
 
-def prepare_reaction_center(args, reaction_center_config, loader_batch_size=200):
+def prepare_reaction_center(args, reaction_center_config):
     """Use a trained model for reaction center prediction to prepare candidate bonds.
 
     Parameters
@@ -518,8 +518,6 @@ def prepare_reaction_center(args, reaction_center_config, loader_batch_size=200)
         Configuration for the experiment.
     reaction_center_config : dict
         Configuration for the experiment on reaction center prediction.
-    loader_batch_size : int
-        Batch size for reaction center prediction. Default to 100.
 
     Returns
     -------
@@ -562,7 +560,7 @@ def prepare_reaction_center(args, reaction_center_config, loader_batch_size=200)
                                        mol_graph_path='{}.bin'.format(subset),
                                        num_processes=args['num_processes'])
 
-        dataloader = DataLoader(dataset, batch_size=loader_batch_size,
+        dataloader = DataLoader(dataset, batch_size=args['reaction_center_batch_size'],
                                 collate_fn=collate, shuffle=False)
 
         print('Stage 2/3: Performing model prediction...')
@@ -587,6 +585,7 @@ def prepare_reaction_center(args, reaction_center_config, loader_batch_size=200)
                 start = end
 
         print('Stage 3/3: Output candidate bonds...')
+        torch.multiprocessing.set_sharing_strategy('file_system')
         with Pool(processes=args['num_processes']) as pool:
             output_strings = list(tqdm(pool.imap(
                 partial(output_candidate_bonds_for_a_reaction,

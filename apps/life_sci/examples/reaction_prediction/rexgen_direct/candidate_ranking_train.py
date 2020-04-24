@@ -31,6 +31,9 @@ if __name__ == '__main__':
                              'By default we use the official pre-trained model. If not None, '
                              'the model should follow the hyperparameters specified in '
                              'reaction_center_config.')
+    parser.add_argument('-rcb', '--reaction-center-batch-size', type=int, default=200,
+                        help='Batch size to use for preparing candidate bonds from a trained '
+                             'model on reaction center prediction')
     parser.add_argument('-np', '--num-processes', type=int, default=32,
                         help='Number of processes to use for data pre-processing')
     args = parser.parse_args().__dict__
