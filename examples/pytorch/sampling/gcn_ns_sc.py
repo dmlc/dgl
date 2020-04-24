@@ -20,6 +20,8 @@ class NodeUpdate(nn.Module):
 
     def forward(self, node):
         h = node.data['h']
+        if self.test:
+            h = h * node.data['norm']
         h = self.linear(h)
         # skip connection
         if self.concat:
@@ -99,7 +101,7 @@ class GCNInfer(nn.Module):
             nf.layers[i].data['h'] = h
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             fn.mean(msg='m', out='h'),
+                             fn.sum(msg='m', out='h'),
                              layer)
 
         h = nf.layers[-1].data.pop('activation')
