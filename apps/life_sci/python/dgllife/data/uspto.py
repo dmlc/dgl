@@ -748,7 +748,7 @@ class WLNRankDataset(object):
         self.real_bond_changes, self.ids_for_small_samples = \
             self.load_reaction_data(raw_file_path, num_processes)
         self.candidate_bond_changes = self.load_candidate_bond_changes(
-            candidate_bond_path, log_every)
+            candidate_bond_path, num_processes)
         self.valid_candidate_combos, self.candidate_bond_changes, self.node_feats, \
         self.combo_bias, self.reactant_info = self.pre_process(
             node_featurizer, num_candidate_bond_changes,
