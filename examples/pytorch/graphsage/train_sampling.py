@@ -10,8 +10,11 @@ import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
+from _thread import start_new_thread
+from functools import wraps
 from dgl.data import RedditDataset
 import tqdm
+import traceback
 
 #### Neighbor sampler
 
@@ -25,7 +28,7 @@ class NeighborSampler(object):
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
+            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
