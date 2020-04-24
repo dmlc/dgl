@@ -564,7 +564,7 @@ def prepare_reaction_center(args, reaction_center_config):
                                 collate_fn=collate, shuffle=False)
 
         print('Stage 2/3: Performing model prediction...')
-        info_for_candidate_bonds = []
+        output_strings = []
         for batch_id, batch_data in enumerate(dataloader):
             print('Computing candidate bonds for batch {:d}/{:d}'.format(
                 batch_id + 1, len(dataloader)))
@@ -578,19 +578,13 @@ def prepare_reaction_center(args, reaction_center_config):
             start = 0
             for i in range(batch_size):
                 end = start + batch_complete_graphs.batch_num_edges[i]
-                info_for_candidate_bonds.append((
-                    batch_reactions[i], biased_pred[start:end, :].detach().flatten().cpu(),
-                    batch_complete_graphs.batch_num_nodes[i]
+                output_strings.append(output_candidate_bonds_for_a_reaction(
+                    (batch_reactions[i], biased_pred[start:end, :].flatten(),
+                    batch_complete_graphs.batch_num_nodes[i]), reaction_center_config['max_k']
                 ))
                 start = end
 
         print('Stage 3/3: Output candidate bonds...')
-        torch.multiprocessing.set_sharing_strategy('file_system')
-        with Pool(processes=args['num_processes']) as pool:
-            output_strings = list(tqdm(pool.imap(
-                partial(output_candidate_bonds_for_a_reaction,
-                        max_k=reaction_center_config['max_k']),
-                info_for_candidate_bonds), total=len(info_for_candidate_bonds)))
         with open(path_to_candidate_bonds[dataset], 'w') as f:
             for candidate_string in output_strings:
                 f.write(candidate_string)
