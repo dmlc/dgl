@@ -524,17 +524,6 @@ def prepare_reaction_center(args, reaction_center_config):
     path_to_candidate_bonds : dict
         Mapping 'train', 'val', 'test' to the corresponding files for candidate bonds.
     """
-    path_to_candidate_bonds = {
-        'train': args['result_path'] + '/train_candidate_bonds.txt',
-        'val': args['result_path'] + '/val_candidate_bonds.txt',
-        'test': args['result_path'] + '/test_candidate_bonds.txt'
-    }
-
-    if os.path.isfile(path_to_candidate_bonds['train']) and \
-        os.path.isfile(path_to_candidate_bonds['val']) and \
-        os.path.isfile(path_to_candidate_bonds['test']):
-        return path_to_candidate_bonds
-
     if args['center_model_path'] is None:
         reaction_center_model = load_pretrained('wln_center_uspto').to(args['device'])
     else:
@@ -550,7 +539,16 @@ def prepare_reaction_center(args, reaction_center_config):
         reaction_center_model = reaction_center_model.to(args['device'])
     reaction_center_model.eval()
 
+    path_to_candidate_bonds = dict()
     for subset in ['train', 'val', 'test']:
+        if '{}_path'.format(subset) not in args:
+            continue
+
+        path_to_candidate_bonds[subset] = args['result_path'] + \
+                                          '/{}_candidate_bonds.txt'.format(subset)
+        if os.path.isfile(path_to_candidate_bonds[subset]):
+            continue
+
         print('Processing subset {}...'.format(subset))
         print('Stage 1/3: Loading dataset...')
         if args['{}_path'.format(subset)] is None:
