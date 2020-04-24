@@ -863,7 +863,7 @@ class GraphIndex(ObjectBase):
             The context of the graph.
         """
         return _CAPI_DGLGraphContext(self)
-    
+
     @property
     def dtype(self):
         """Return the index dtype
