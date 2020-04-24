@@ -7,11 +7,13 @@ from utils import prepare_reaction_center, mkdir_p, set_seed
 
 def main(args, path_to_candidate_bonds):
     if args['train_path'] is None:
-        train_set = USPTORank(subset='train', candidate_bond_path=path_to_candidate_bonds['train'])
+        train_set = USPTORank(subset='train', candidate_bond_path=path_to_candidate_bonds['train'],
+                              num_processes=args['num_processes'])
     else:
         train_set = WLNRankDataset(raw_file_path=args['train_path'],
                                    candidate_bond_path=path_to_candidate_bonds['train'],
-                                   mol_graph_path='train_rank_graphs.bin')
+                                   mol_graph_path='train_rank_graphs.bin',
+                                   num_processes=args['num_processes'])
     train_set.ignore_large()
 
 if __name__ == '__main__':
