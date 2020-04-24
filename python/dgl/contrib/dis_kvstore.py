@@ -477,7 +477,7 @@ class KVServer(object):
             elif msg.type == KVMsgType.NEW_DATA:
                 assert msg.rank == 0
                 data_str, target_name = msg.name.split('|')
-                data_name, date_type = self._deserialize_shared_tensor(data_str)
+                data_name, data_type = self._deserialize_shared_tensor(data_str)
                 dtype = F.data_type_dict[data_type]
                 data_shape = F.asnumpy(msg.id).tolist()
                 if self._server_id % self._group_count == 0: # master server
