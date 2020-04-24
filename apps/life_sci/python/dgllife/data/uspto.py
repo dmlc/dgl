@@ -1056,11 +1056,6 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_changes_p
                     continue
                 product_smiles.add(smiles)
                 new_candidate_combos.append(combo)
-        else:
-            print('\nwarning! could not recover true smiles from gbonds: {}'.format(
-                Chem.MolToSmiles(product_mol)))
-            print('reactant smiles: {} graph edits: {}'.format(
-                Chem.MolToSmiles(reactant_mol), real_bond_changes))
 
     valid_candidate_combos = valid_candidate_combos[:max_num_change_combos_per_reaction]
 
