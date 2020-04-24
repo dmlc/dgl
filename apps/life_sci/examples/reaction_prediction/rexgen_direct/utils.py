@@ -585,7 +585,7 @@ def prepare_reaction_center(args, reaction_center_config):
                 start = end
 
         print('Stage 3/3: Output candidate bonds...')
-        with open(path_to_candidate_bonds[dataset], 'w') as f:
+        with open(path_to_candidate_bonds[subset], 'w') as f:
             for candidate_string in output_strings:
                 f.write(candidate_string)
 
