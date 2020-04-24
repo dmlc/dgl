@@ -40,7 +40,7 @@ def start_client():
     my_client = KVClient(server_namebook=server_namebook)
     my_client.connect()
 
-    y_client.init_data(name='data_2', shape=[num_entries, dim_size], dtype=F.float32, target_name='data_0')
+    my_client.init_data(name='data_2', shape=[num_entries, dim_size], dtype=F.float32, target_name='data_0')
 
     name_list = my_client.get_data_name_list()
     assert len(name_list) == 3
