@@ -164,6 +164,7 @@ def train(args):
                 if no_better_valid > args.train_decay_patience:
                     new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
                     if new_lr < learning_rate:
+                        learning_rate = new_lr
                         logging.info("\tChange the LR to %g" % new_lr)
                         for p in optimizer.param_groups:
                             p['lr'] = learning_rate
