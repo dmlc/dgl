@@ -25,8 +25,8 @@ from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate
 
 def start_server(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
-    serv = DistGraphServer(server_namebook, args.id, args.graph_name,
-                           args.data_path, args.num_client)
+    serv = DistGraphServer(args.id, server_namebook, args.num_client, args.graph_name,
+                           args.data_path)
     serv.start()
 
 def load_subtensor(g, blocks, device):
@@ -147,10 +147,7 @@ def main(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
     g = DistGraph(server_namebook, args.graph_name)
-    hg = dgl.graph(g.g.all_edges())
-    hg.ndata[dgl.NID] = g.g.ndata[dgl.NID]
-    hg.edata[dgl.EID] = g.g.edata[dgl.EID]
-    g.g = hg
+    g.g = dgl.as_heterograph(g.g)
 
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     th.manual_seed(g.rank())
@@ -160,7 +157,7 @@ def main(args):
     print('part {}, train: {}, val: {}, test: {}'.format(g.rank,
         np.sum(train_mask), np.sum(val_mask), np.sum(test_mask)), flush=True)
 
-    # These have to be low node Ids.
+    # TODO We don't have distributed sampler. These have to be local node Ids. 
     train_nid = g.local_nids[train_mask == 1].long()
     val_nid = g.local_nids[val_mask == 1].long()
     test_nid = g.local_nids[test_mask == 1].long()

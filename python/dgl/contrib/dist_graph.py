@@ -14,7 +14,7 @@ import numpy as np
 from collections.abc import MutableMapping
 import pickle
 
-def copy_graph_to_shared_mem(g, graph_name):
+def _copy_graph_to_shared_mem(g, graph_name):
     gidx = g._graph.copyto_shared_mem(_get_graph_path(graph_name))
     new_g = DGLGraph(gidx)
     # We should share the node/edge data to the client explicitly instead of putting them
@@ -34,19 +34,34 @@ field_dict = {'part_id': F.int64,
               NID: F.int64,
               EID: F.int64}
 
-def get_ndata_name(name):
+def _get_ndata_name(name):
+    ''' This is to get the name of node data in the kvstore.
+
+    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
+    '''
     return 'node:' + name
 
-def get_edata_name(name):
+def _get_edata_name(name):
+    ''' This is to get the name of edge data in the kvstore.
+
+    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
+    '''
     return 'edge:' + name
 
-def is_ndata_name(name):
+def _is_ndata_name(name):
+    ''' Is this node data in the kvstore '''
     return name[:5] == 'node:'
 
-def is_edata_name(name):
+def _is_edata_name(name):
+    ''' Is this edge data in the kvstore '''
     return name[:5] == 'edge:'
 
-def get_shared_mem_ndata(g, graph_name, name):
+def _get_shared_mem_ndata(g, graph_name, name):
+    ''' Get shared-memory node data from DistGraph server.
+
+    This is called by the DistGraph client to access the node data in the DistGraph server
+    with shared memory.
+    '''
     shape = (g.number_of_nodes(),)
     dtype = field_dict[name]
     dtype = dtype_dict[dtype]
@@ -54,7 +69,12 @@ def get_shared_mem_ndata(g, graph_name, name):
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
 
-def get_shared_mem_edata(g, graph_name, name):
+def _get_shared_mem_edata(g, graph_name, name):
+    ''' Get shared-memory edge data from DistGraph server.
+
+    This is called by the DistGraph client to access the edge data in the DistGraph server
+    with shared memory.
+    '''
     shape = (g.number_of_edges(),)
     dtype = field_dict[name]
     dtype = dtype_dict[dtype]
@@ -62,16 +82,27 @@ def get_shared_mem_edata(g, graph_name, name):
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
 
-def get_graph_from_shared_mem(graph_name):
+def _get_graph_from_shared_mem(graph_name):
+    ''' Get the graph from the DistGraph server.
+
+    The DistGraph server puts the graph structure of the local partition in the shared memory.
+    The client can access the graph structure and some metadata on nodes and edges directly
+    through shared memory to reduce the overhead of data access.
+    '''
     gidx = from_shared_mem_graph_index(_get_graph_path(graph_name))
     g = DGLGraph(gidx)
-    g.ndata['part_id'] = get_shared_mem_ndata(g, graph_name, 'part_id')
-    g.ndata['local_node'] = get_shared_mem_ndata(g, graph_name, 'local_node')
-    g.ndata[NID] = get_shared_mem_ndata(g, graph_name, NID)
-    g.edata[EID] = get_shared_mem_edata(g, graph_name, EID)
+    g.ndata['part_id'] = _get_shared_mem_ndata(g, graph_name, 'part_id')
+    g.ndata['local_node'] = _get_shared_mem_ndata(g, graph_name, 'local_node')
+    g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
+    g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
     return g
 
-def get_shared_mem_metadata(graph_name):
+def _get_shared_mem_metadata(graph_name):
+    ''' Get the metadata of the graph through shared memory.
+
+    The metadata includes the number of nodes and the number of edges. In the future,
+    we can add more information, especially for heterograph.
+    '''
     shape = (2,)
     dtype = F.int64
     dtype = dtype_dict[dtype]
@@ -80,6 +111,18 @@ def get_shared_mem_metadata(graph_name):
     return F.zerocopy_from_dlpack(dlpack)
 
 class DistTensor:
+    ''' Distributed tensor.
+
+    This is a wrapper on top of KVStore to access a tensor in the KVStore.
+    This wrapper provides an interface similar to the local tensor.
+
+    Parameters
+    ----------
+    kv : KVClient
+        The KVStore client.
+    name : string
+        The name of the tensor in the KVStore.
+    '''
     def __init__(self, kv, name):
         self.kv = kv
         self.name = name
@@ -120,7 +163,7 @@ class NodeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return DistTensor(self._graph._client, get_ndata_name(key))
+        return DistTensor(self._graph._client, _get_ndata_name(key))
 
     def __setitem__(self, key, val):
         #TODO how to set data to the kvstore.
@@ -140,7 +183,7 @@ class NodeDataView(MutableMapping):
         name_list = self._graph._get_all_ndata_names()
         reprs = {}
         for name in name_list:
-            dtype, shape, _ = self._graph._client.get_data_meta(get_ndata_name(name))
+            dtype, shape, _ = self._graph._client.get_data_meta(_get_ndata_name(name))
             reprs[name] = 'DistTensor(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
@@ -158,7 +201,7 @@ class EdgeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return DistTensor(self._graph._client, get_edata_name(key))
+        return DistTensor(self._graph._client, _get_edata_name(key))
 
     def __setitem__(self, key, val):
         #TODO
@@ -178,11 +221,16 @@ class EdgeDataView(MutableMapping):
         name_list = self._graph._get_all_edata_names()
         reprs = {}
         for name in name_list:
-            dtype, shape, _ = self._graph._client.get_data_meta(get_edata_name(name))
+            dtype, shape, _ = self._graph._client.get_data_meta(_get_edata_name(name))
             reprs[name] = 'DistTensor(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
-def load_data(data_path, graph_name, part_id):
+def _load_data(data_path, graph_name, part_id):
+    ''' Load data of a partition from the data path in the DistGraph server.
+
+    Here we load data through the normal filesystem interface. In the future, we need to support
+    loading data from other storage such as S3 and HDFS.
+    '''
     server_data = '{}/{}-server-{}.dgl'.format(data_path, graph_name, part_id)
     client_data = '{}/{}-client-{}.dgl'.format(data_path, graph_name, part_id)
     part_g = load_graphs(server_data)[0][0]
@@ -191,16 +239,45 @@ def load_data(data_path, graph_name, part_id):
     return part_g, client_g, meta
 
 class DistGraphServer(KVServer):
-    def __init__(self, server_namebook, server_id, graph_name, data_path, num_client):
+    ''' The DistGraph server.
+
+    This DistGraph server extends KVStore server. Its main function is to load the graph data and share
+    the data in its own partition with shared memory so that the DistGraph client can access the data
+    in the local partition with shared memory.
+
+    Parameters
+    ----------
+    server_id : int
+        KVServer's ID (start from 0).
+    server_namebook: dict
+        IP address namebook of KVServer, where key is the KVServer's ID 
+        (start from 0) and value is the server's machine_id, IP address and port, e.g.,
+
+          {0:'[0, 172.31.40.143, 30050],
+           1:'[0, 172.31.40.143, 30051],
+           2:'[1, 172.31.36.140, 30050],
+           3:'[1, 172.31.36.140, 30051],
+           4:'[2, 172.31.47.147, 30050],
+           5:'[2, 172.31.47.147, 30051],
+           6:'[3, 172.31.30.180, 30050],
+           7:'[3, 172.31.30.180, 30051]}
+    num_client : int
+        Total number of client nodes.
+    graph_name : string
+        The name of the graph.
+    data_path : string
+        The path that all graph data is stored.
+    '''
+    def __init__(self, server_id, server_namebook, num_client, graph_name, data_path):
         super(DistGraphServer, self).__init__(server_id=server_id, server_namebook=server_namebook, num_client=num_client)
 
         host_name = socket.gethostname()
         host_ip = socket.gethostbyname(host_name)
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
-        self.part_g, self.client_g, self.meta = load_data(data_path, graph_name, server_id)
+        self.part_g, self.client_g, self.meta = _load_data(data_path, graph_name, server_id)
         self.client_g.ndata['local_node'] = F.astype(self.client_g.ndata['part_id'] == server_id, F.int32)
-        self.client_g = copy_graph_to_shared_mem(self.client_g, graph_name)
+        self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
         self.meta = _move_data_to_shared_mem_array(F.tensor(self.meta), _get_ndata_path(graph_name, 'meta'))
 
         num_nodes = self.meta[0]
@@ -214,24 +291,46 @@ class DistGraphServer(KVServer):
 
         if self.get_id() % self.get_group_count() == 0: # master server
             for name in self.part_g.ndata.keys():
-                self.set_global2local(name=get_ndata_name(name), global2local=self.g2l)
-                self.init_data(name=get_ndata_name(name), data_tensor=self.part_g.ndata[name])
-                self.set_partition_book(name=get_ndata_name(name), partition_book=partition)
+                self.set_global2local(name=_get_ndata_name(name), global2local=self.g2l)
+                self.init_data(name=_get_ndata_name(name), data_tensor=self.part_g.ndata[name])
+                self.set_partition_book(name=_get_ndata_name(name), partition_book=partition)
         else:
             for name in self.part_g.ndata.keys():
-                self.set_global2local(name=get_ndata_name(name))
-                self.init_data(name=get_ndata_name(name))
-                self.set_partition_book(name=get_ndata_name(name), partition_book=partition)
+                self.set_global2local(name=_get_ndata_name(name))
+                self.init_data(name=_get_ndata_name(name))
+                self.set_partition_book(name=_get_ndata_name(name), partition_book=partition)
         # TODO Do I need synchronization?
 
 class DistGraph:
+    ''' The DistGraph client.
+
+    This provides the graph interface to access the partitioned graph data for distributed GNN training.
+    All data of partitions are loaded by the DistGraph server. The client doesn't need to load any data.
+
+    Parameters
+    ----------
+    server_namebook: dict
+        IP address namebook of KVServer, where key is the KVServer's ID 
+        (start from 0) and value is the server's machine_id, IP address and port, and group_count, e.g.,
+
+          {0:'[0, 172.31.40.143, 30050, 2],
+           1:'[0, 172.31.40.143, 30051, 2],
+           2:'[1, 172.31.36.140, 30050, 2],
+           3:'[1, 172.31.36.140, 30051, 2],
+           4:'[2, 172.31.47.147, 30050, 2],
+           5:'[2, 172.31.47.147, 30051, 2],
+           6:'[3, 172.31.30.180, 30050, 2],
+           7:'[3, 172.31.30.180, 30051, 2]}
+    graph_name : str
+        The name of the graph.
+    '''
     def __init__(self, server_namebook, graph_name):
         self._client = KVClient(server_namebook=server_namebook)
         self._client.connect()
 
-        self.g = get_graph_from_shared_mem(graph_name)
+        self.g = _get_graph_from_shared_mem(graph_name)
         self.graph_name = graph_name
-        self.meta = F.asnumpy(get_shared_mem_metadata(graph_name))
+        self.meta = F.asnumpy(_get_shared_mem_metadata(graph_name))
 
         self._client.barrier()
 
@@ -242,7 +341,7 @@ class DistGraph:
         names = self._client.get_data_name_list()
         ndata_names = []
         for name in names:
-            if is_ndata_name(name):
+            if _is_ndata_name(name):
                 # Remove the prefix "node:"
                 ndata_names.append(name[5:])
         return ndata_names
@@ -251,7 +350,7 @@ class DistGraph:
         names = self._client.get_data_name_list()
         edata_names = []
         for name in names:
-            if is_edata_name(name):
+            if _is_edata_name(name):
                 # Remove the prefix "edge:"
                 edata_names.append(name[5:])
         return edata_names
@@ -272,7 +371,7 @@ class DistGraph:
             The data type of the node data.
         '''
         assert shape[0] == self.number_of_nodes()
-        self._client.init_data(get_ndata_name(ndata_name), shape, dtype)
+        self._client.init_data(_get_ndata_name(ndata_name), shape, dtype)
 
     def init_edata(self, edata_name, shape, dtype):
         '''Initialize edge data
@@ -289,7 +388,7 @@ class DistGraph:
             The data type of the edge data.
         '''
         assert shape[1] == self.number_of_edges()
-        self._client.init_data(get_edata_name(edata_name), shape, dtype)
+        self._client.init_data(_get_edata_name(edata_name), shape, dtype)
 
     def init_node_emb(self, name, shape, dtype, initializer):
         ''' Initialize node embeddings.

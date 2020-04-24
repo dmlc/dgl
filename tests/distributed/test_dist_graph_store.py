@@ -21,7 +21,7 @@ def create_random_graph(n):
     return dgl.DGLGraph(ig)
 
 def run_server(graph_name, server_id, num_clients, barrier):
-    g = DistGraphServer(server_namebook, server_id, graph_name, '.', num_clients)
+    g = DistGraphServer(server_id, server_namebook, num_clients, graph_name, '.')
     barrier.wait()
     print('start server', server_id)
     g.start()
