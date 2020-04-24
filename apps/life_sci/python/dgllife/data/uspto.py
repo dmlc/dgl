@@ -1215,7 +1215,7 @@ class WLNRankDataset(object):
             with Pool(processes=num_processes) as pool:
                 results = list(tqdm(pool.imap(
                     partial(load_one_reaction_rank, train_mode=self.train_mode),
-                    lines), total=len(lines)))
+                    lines, chunksize=len(lines) // num_processes), total=len(lines)))
             for id in range(len(lines)):
                 _update_from_line(id, results[id])
 
@@ -1251,7 +1251,7 @@ class WLNRankDataset(object):
             with Pool(processes=num_processes) as pool:
                 all_candidate_bond_changes = list(tqdm(pool.imap(
                     load_candidate_bond_changes_for_one_reaction,
-                    lines), total=len(lines)))
+                    lines, chunksize=len(lines) // num_processes), total=len(lines)))
 
         return all_candidate_bond_changes
 
@@ -1326,11 +1326,12 @@ class WLNRankDataset(object):
             with Pool(processes=num_processes) as pool:
                 results = list(tqdm(pool.imap(partial(
                     pre_process_one_reaction,
-                    um_candidate_bond_changes=num_candidate_bond_changes,
+                    num_candidate_bond_changes=num_candidate_bond_changes,
                     max_num_changes_per_reaction=max_num_changes_per_reaction,
                     max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
                     node_featurizer=node_featurizer, train_mode=self.train_mode),
-                    all_reaction_info), total=len(all_reaction_info)))
+                    all_reaction_info, chunksize=len(all_reaction_info) // num_processes),
+                    total=len(all_reaction_info)))
                 all_valid_candidate_combos, all_candidate_bond_changes, all_node_feats, \
                 all_combo_bias, all_reactant_info = map(list, zip(*results))
 
