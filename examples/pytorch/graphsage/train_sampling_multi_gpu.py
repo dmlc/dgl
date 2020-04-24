@@ -197,7 +197,7 @@ def run(proc_id, n_gpus, args, devices, data):
         th.distributed.init_process_group(backend="nccl",
                                           init_method=dist_init_method,
                                           world_size=world_size,
-                                          rank=dev_id)
+                                          rank=proc_id)
     th.cuda.set_device(dev_id)
 
     # Unpack data
@@ -208,7 +208,7 @@ def run(proc_id, n_gpus, args, devices, data):
     val_mask = th.BoolTensor(val_mask)
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
+    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])

@@ -10,6 +10,7 @@ import dgl.nn.pytorch as dglnn
 import time
 import argparse
 import tqdm
+import traceback
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
@@ -105,7 +106,7 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
+            for start in range(0, len(nodes), batch_size):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
@@ -131,16 +132,21 @@ class NeighborSampler(object):
     def sample_blocks(self, seeds):
         seeds = th.LongTensor(seeds)
         blocks = []
+        hist_blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
             frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout)
+            # For history aggregation we sample all neighbors.
+            hist_frontier = dgl.in_subgraph(self.g, seeds)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
+            hist_block = dgl.to_block(hist_frontier, seeds)
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
             blocks.insert(0, block)
-        return blocks
+            hist_blocks.insert(0, hist_block)
+        return blocks, hist_blocks
 
 # According to https://github.com/pytorch/pytorch/issues/17199, this decorator
 # is necessary to make fork() and openmp work together.
@@ -205,17 +211,24 @@ def evaluate(model, g, labels, val_mask, batch_size, device):
     model.train()
     return compute_acc(pred[val_mask], labels[val_mask])
 
-def load_subtensor(g, labels, blocks, dev_id):
+def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device=False):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
     blocks[0].srcdata['features'] = g.ndata['features'][blocks[0].srcdata[dgl.NID]].to(dev_id)
     blocks[-1].dstdata['label'] = labels[blocks[-1].dstdata[dgl.NID]].to(dev_id)
-    for i, block in enumerate(blocks):
+    for i, (block, hist_block) in enumerate(zip(blocks, hist_blocks)):
         hist_col = 'features' if i == 0 else 'hist_%d' % i
         block.srcdata['hist'] = g.ndata[hist_col][block.srcdata[dgl.NID]].to(dev_id)
-        block.dstdata['agg_hist'] = g.ndata['sum_hist_%d' % i][block.dstdata[dgl.NID]].to(dev_id)
-        block.dstdata['agg_hist'] /= g.ndata['deg'][block.dstdata[dgl.NID]].to(dev_id)[:, None]
+
+        # Aggregate history
+        hist_block.srcdata['hist'] = g.ndata[hist_col][hist_block.srcdata[dgl.NID]]
+        if aggregation_on_device:
+            hist_block.srcdata['hist'] = hist_block.srcdata['hist'].to(dev_id)
+        hist_block.update_all(fn.copy_u('hist', 'm'), fn.mean('m', 'agg_hist'))
+        block.dstdata['agg_hist'] = hist_block.dstdata['agg_hist']
+        if not aggregation_on_device:
+            block.dstdata['agg_hist'] = block.dstdata['agg_hist'].to(dev_id)
 
 def init_history(g, model, dev_id):
     with th.no_grad():
@@ -224,35 +237,15 @@ def init_history(g, model, dev_id):
             if layer > 0:
                 hist_col = 'hist_%d' % layer
                 g.ndata['hist_%d' % layer] = history[layer - 1]
-            else:
-                hist_col = 'features'
-            agg_hist_col = 'sum_hist_%d' % layer
-            # TODO: can we avoid this column?
-            g.ndata['hist_delta_%d' % layer] = g.ndata[hist_col].clone().zero_()
-            g.update_all(fn.copy_u(hist_col, 'm'), fn.sum('m', agg_hist_col))
-
-        g.ndata['deg'] = g.in_degrees().float().clamp(min=1)    # avoid 0 in denominator
 
 def update_history(g, blocks):
     with th.no_grad():
         for i, block in enumerate(blocks):
             ids = block.dstdata[dgl.NID]
             hist_col = 'hist_%d' % (i + 1)
-            hist_delta_col = 'hist_delta_%d' % (i + 1)
-            agg_hist_col = 'sum_hist_%d' % (i + 1)
-            agg_new_col = 'agg_new_%d' % (i + 1)
 
             h_new = block.dstdata['h_new'].cpu()
-            old_hist = g.ndata[hist_col][ids]
-            g.ndata[hist_delta_col][ids] = h_new - old_hist
             g.ndata[hist_col][ids] = h_new
-            # TODO: can we avoid creating a new feature called agg_new_col?
-            g.push(
-                ids,
-                fn.copy_u(hist_delta_col, 'm'),
-                fn.sum('m', agg_new_col),
-                lambda nodes: {agg_hist_col: nodes.data[agg_hist_col] + nodes.data[agg_new_col]},
-                inplace=True)
 
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
@@ -266,7 +259,7 @@ def run(proc_id, n_gpus, args, devices, data):
         th.distributed.init_process_group(backend="nccl",
                                           init_method=dist_init_method,
                                           world_size=world_size,
-                                          rank=dev_id)
+                                          rank=proc_id)
     th.cuda.set_device(dev_id)
 
     # Unpack data
@@ -277,7 +270,7 @@ def run(proc_id, n_gpus, args, devices, data):
     val_mask = th.BoolTensor(val_mask)
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
+    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
@@ -317,7 +310,7 @@ def run(proc_id, n_gpus, args, devices, data):
     for epoch in range(args.num_epochs):
         tic = time.time()
         model.train()
-        for step, blocks in enumerate(dataloader):
+        for step, (blocks, hist_blocks) in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
 
@@ -326,7 +319,7 @@ def run(proc_id, n_gpus, args, devices, data):
             input_nodes = blocks[0].srcdata[dgl.NID]
             seeds = blocks[-1].dstdata[dgl.NID]
 
-            load_subtensor(g, labels, blocks, dev_id)
+            load_subtensor(g, labels, blocks, hist_blocks, dev_id, True)
 
             # forward
             batch_pred = model(blocks)
