@@ -12,20 +12,23 @@ from . import ndarray as nd
 
 
 def STR2DTYPE():
-     return {
-         'int32': F.int32,
-         'int64': F.int64
-     }
+    """Convert string to backend dtype"""
+    return {
+        'int32': F.int32,
+        'int64': F.int64
+    }
 
 
-def DTYPE2STR():
-     return {
-         F.int32: 'int32',
-         F.int64: 'int64'
-     }
+def DTYPE2STR():    
+    """Convert backend dtype to string"""
+    return {
+        F.int32: 'int32',
+        F.int64: 'int64'
+    }
 
 
-def STR2NPDTYPE():
+def STR2NPDTYPE():    
+    """Convert string to np dtype"""
     return {
         'int32': np.int32,
         'int64': np.int64

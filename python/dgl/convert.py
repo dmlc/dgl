@@ -497,7 +497,9 @@ def heterograph(data_dict, num_nodes_dict=None, index_dtype='int64'):
     return hetero_from_relations(rel_graphs, num_nodes_dict,
                                  index_dtype=index_dtype)
 
-def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph=None, index_dtype='int64'):
+
+def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
+              metagraph=None, index_dtype='int64'):
     """Convert the given homogeneous graph to a heterogeneous graph.
 
     The input graph should have only one type of nodes and edges. Each node and edge
