@@ -815,7 +815,7 @@ class WLNRankDataset(object):
                 ids_for_small_samples.append(id)
 
         if num_processes == 1:
-            for id, li in enumerate(lines):
+            for li in tqdm(lines):
                 loaded_line = load_one_reaction_rank(li, self.train_mode)
                 _update_from_line(loaded_line)
         else:
@@ -851,7 +851,7 @@ class WLNRankDataset(object):
 
         if num_processes == 1:
             all_candidate_bond_changes = []
-            for li in lines:
+            for li in tqdm(lines):
                 all_candidate_bond_changes.append(
                     load_candidate_bond_changes_for_one_reaction(li))
         else:
@@ -1149,7 +1149,8 @@ class WLNRankDataset(object):
         return self.edit_mol(reactant_mols, edits, product_info)
 
     def pre_process(self, node_featurizer, num_candidate_bond_changes,
-                    max_num_changes_per_reaction, max_num_change_combos_per_reaction, log_every):
+                    max_num_changes_per_reaction, max_num_change_combos_per_reaction,
+                    num_processes):
         """Pre-process for the experiments.
 
         Parameters
