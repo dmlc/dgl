@@ -276,7 +276,7 @@ def _recv_kv_msg(receiver):
     msg_ptr = CAPI_ReceiverRecvKVMsg(receiver)
     msg_type = KVMsgType(_CAPI_ReceiverGetKVMsgType(msg_ptr))
     rank = _CAPI_ReceiverGetKVMsgRank(msg_ptr)
-    if msg.type == KVMsgType.PULL or msg.type == KVMsgType.NEW_DATA:
+    if msg_type == KVMsgType.PULL or msg_type == KVMsgType.NEW_DATA:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
         tensor_id = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
         msg = KVStoreMsg(
