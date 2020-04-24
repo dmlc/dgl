@@ -581,8 +581,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
       if (kv_msg.msg_type != kIPIDMsg) {
         kv_msg.id = args[args_count++];
       }
-      if (kv_msg.msg_type != kPullMsg && 
-          kv_msg.msg_type != kIPIDMsg && 
+      if (kv_msg.msg_type != kPullMsg &&
+          kv_msg.msg_type != kIPIDMsg &&
           kv_msg.msg_type != kNewDataMsg) {
         kv_msg.data = args[args_count++];
       }
