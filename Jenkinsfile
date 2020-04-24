@@ -100,7 +100,7 @@ pipeline {
     stage("Lint Check") {
       agent { 
         docker {
-          label "linux-cpu-node"
+          label "linux-c52x-node"
           image "dgllib/dgl-ci-lint" 
         }
       }
@@ -119,7 +119,7 @@ pipeline {
         stage("CPU Build") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
             }
           }
@@ -135,7 +135,7 @@ pipeline {
         stage("GPU Build") {
           agent {
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-gpu:conda"
               args "-u root"
             }
@@ -171,7 +171,7 @@ pipeline {
         stage("C++ CPU") {
           agent { 
             docker { 
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda"
             }
           }
@@ -198,7 +198,7 @@ pipeline {
         stage("Tensorflow CPU") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
             }
           }
@@ -239,7 +239,7 @@ pipeline {
         stage("Torch CPU") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
             }
           }
@@ -316,7 +316,7 @@ pipeline {
         stage("MXNet CPU") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
             }
           }
