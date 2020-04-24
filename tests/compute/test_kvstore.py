@@ -40,10 +40,13 @@ def start_client():
     my_client = KVClient(server_namebook=server_namebook)
     my_client.connect()
 
+    y_client.init_data(name='data_2', shape=[num_entries, dim_size], dtype=F.float32, target_name='data_0')
+
     name_list = my_client.get_data_name_list()
-    assert len(name_list) == 2
+    assert len(name_list) == 3
     assert 'data_0' in name_list
     assert 'data_1' in name_list
+    assert 'data_2' in name_list
 
     meta_0 = my_client.get_data_meta('data_0')
     assert meta_0[0] == F.float32
@@ -53,12 +56,19 @@ def start_client():
     assert meta_1[0] == F.float32
     assert_array_equal(meta_1[2], partition_1)
 
-    my_client.push(name='data_0', id_tensor=F.tensor([0, 1, 2]), data_tensor=F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]]))
+    meta_2 = my_client.get_data_meta('data_2')
+    assert meta_2[0] == F.float32
+    assert_array_equal(meta_2[2], partition_0)
 
-    res = my_client.pull(name='data_0', id_tensor=F.tensor([0, 1, 2]))
+    my_client.push(name='data_0', id_tensor=F.tensor([0, 1, 2]), data_tensor=F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]]))
+    my_client.push(name='data_2', id_tensor=F.tensor([0, 1, 2]), data_tensor=F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]]))
 
     target = F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]])
 
+    res = my_client.pull(name='data_0', id_tensor=F.tensor([0, 1, 2]))
+    assert_array_equal(res, target)
+
+    res = my_client.pull(name='data_2', id_tensor=F.tensor([0, 1, 2]))
     assert_array_equal(res, target)
 
     my_client.shut_down()
