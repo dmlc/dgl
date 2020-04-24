@@ -484,7 +484,15 @@ def output_candidate_bonds_for_a_reaction(info, max_k):
 
     Parameters
     ----------
+    info : 3-tuple for a reaction
+        Consists of the reaction, the scores for atom-pairs in reactants
+        and the number of nodes in reactants.
 
+    Returns
+    -------
+    candidate_string : str
+        String representing candidate bonds for a reaction. Each candidate
+        bond is of format 'atom1 atom2 change_type score'.
     """
     reaction, preds, num_nodes = info
     # Note that we use the easy mode by default, which is also the
@@ -498,6 +506,7 @@ def output_candidate_bonds_for_a_reaction(info, max_k):
         candidate_string += '{} {} {:.1f} {:.3f};'.format(
             candidate[0], candidate[1], candidate[2], candidate[3])
     candidate_string += '\n'
+
     return candidate_string
 
 def prepare_reaction_center(args, reaction_center_config, loader_batch_size=100):
@@ -572,7 +581,7 @@ def prepare_reaction_center(args, reaction_center_config, loader_batch_size=100)
             for i in range(batch_size):
                 end = start + batch_complete_graphs.batch_num_edges[i]
                 info_for_candidate_bonds.append((
-                    batch_reactions[i], biased_pred[start:end, :].flatten(),
+                    batch_reactions[i], biased_pred[start:end, :].detach().flatten().cpu(),
                     batch_complete_graphs.batch_num_nodes[i]
                 ))
                 start = end
