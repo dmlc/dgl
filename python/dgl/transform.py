@@ -720,13 +720,13 @@ def compact_graphs(graphs, always_preserve=None):
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
-    graph_dtype = graphs[0]._graph.dtype()
+    graph_dtype = graphs[0]._graph.dtype
     graph_ctx = graphs[0]._graph.ctx()
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
-        assert graph_dtype == g._graph.dtype(), "Graph data type mismatch"
+        assert graph_dtype == g._graph.dtype, "Graph data type mismatch"
         assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
 
     # Process the dictionary or tensor of "always preserve" nodes

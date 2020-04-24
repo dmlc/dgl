@@ -1888,7 +1888,8 @@ class DGLHeteroGraph(object):
         --------
         edge_subgraph
         """
-        induced_nodes = [utils.toindex(nodes.get(ntype, []), self._graph.dtype) for ntype in self.ntypes]
+        induced_nodes = [utils.toindex(nodes.get(ntype, []), self._graph.dtype)
+                         for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
         induced_edges = sgi.induced_edges
 
@@ -2052,9 +2053,11 @@ class DGLHeteroGraph(object):
                 edge_frames.append(self._edge_frames[i])
 
         metagraph = graph_index.from_edge_list(meta_edges, True)
+        # num_nodes_per_type doesn't need to be int32
         hgidx = heterograph_index.create_heterograph_from_relations(
-            metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64")) # num_nodes_per_type doesn't need to be int32
-        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes,
+                            node_frames, edge_frames)
         return hg
 
     def edge_type_subgraph(self, etypes):

@@ -129,6 +129,7 @@ class HeteroGraphIndex(ObjectBase):
         _CAPI_DGLHeteroClear(self)
         self._cache.clear()
 
+    @property
     def dtype(self):
         """Return the data type of this graph index.
 
@@ -683,8 +684,10 @@ class HeteroGraphIndex(ObjectBase):
             idx = F.copy_to(utils.toindex(rst(0), self.dtype).tousertensor(), ctx)
             idx = F.reshape(idx, (2, nnz))
             dat = F.ones((nnz,), dtype=F.float32, ctx=ctx)
-            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (nrows, ncols))
-            shuffle_idx = utils.toindex(shuffle_idx, self.dtype) if shuffle_idx is not None else None
+            adj, shuffle_idx = F.sparse_matrix(
+                dat, ('coo', idx), (nrows, ncols))
+            shuffle_idx = utils.toindex(
+                shuffle_idx, self.dtype) if shuffle_idx is not None else None
             return adj, shuffle_idx
         else:
             raise Exception("unknown format")
@@ -908,13 +911,7 @@ class HeteroGraphIndex(ObjectBase):
         rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
-    
-    @property
-    def dtype(self):
-        if self.nbits()==32:
-            return "int32"
-        else:
-            return "int64"
+
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):

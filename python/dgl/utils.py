@@ -1,3 +1,4 @@
+# pylint: disable=C0103
 """Utility module."""
 from __future__ import absolute_import, division
 
@@ -10,21 +11,25 @@ from . import backend as F
 from . import ndarray as nd
 
 
-def STR2DTYPE(): return {
-    'int32': F.int32,
-    'int64': F.int64
-}
+def STR2DTYPE():
+     return {
+         'int32': F.int32,
+         'int64': F.int64
+     }
 
 
-def DTYPE2STR(): return {
-    F.int32: 'int32',
-    F.int64: 'int64'
-}
+def DTYPE2STR():
+     return {
+         F.int32: 'int32',
+         F.int64: 'int64'
+     }
 
-def STR2NPDTYPE(): return {
-    'int32': np.int32,
-    'int64': np.int64
-}
+
+def STR2NPDTYPE():
+    return {
+        'int32': np.int32,
+        'int64': np.int64
+    }
 
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
@@ -63,10 +68,12 @@ class Index(object):
         """Store data based on its type."""
         if F.is_tensor(data):
             if F.dtype(data) != STR2DTYPE()[self.dtype]:
-                raise DGLError('Index data specified as %s, but got: %s' % (self.dtype, DTYPE2STR()[F.dtype(data)]))
+                raise DGLError('Index data specified as %s, but got: %s' %
+                               (self.dtype, DTYPE2STR()[F.dtype(data)]))
                 # self.dtype = DTYPE2STR()[F.dtype(data)]
             if len(F.shape(data)) > 1:
-                raise DGLError('Index data must be 1D int32/int64 vector, but got: %s' % str(F.dtype(data)))
+                raise DGLError('Index data must be 1D int32/int64 vector, but got: %s' %
+                               str(F.dtype(data)))
             if len(F.shape(data)) == 0:
                 # a tensor of one int
                 self._dispatch(int(data))
@@ -74,7 +81,8 @@ class Index(object):
                 self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == self.dtype and len(data.shape) == 1):
-                raise DGLError('Index data must be 1D %s vector, but got: %s' % (self.dtype, data.dtype))
+                raise DGLError('Index data must be 1D %s vector, but got: %s' %
+                               (self.dtype, data.dtype))
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
             # save it in the _pydata temporarily; materialize it if `tonumpy` is called
@@ -177,13 +185,16 @@ class Index(object):
             tensor = self.tousertensor()
             index = index.tousertensor()
             # TODO(Allen): Change F.gather_row to dgl operation
-            return Index(F.astype(F.gather_row(tensor, index), F.data_type_dict[self.dtype]), self.dtype)
+            return Index(F.astype(F.gather_row(tensor, index),
+                                  F.data_type_dict[self.dtype]), self.dtype)
         elif self._slice_data is None:
             # the current index is not a slice but the provided is a slice
             tensor = self.tousertensor()
             index = index._slice_data
-            # TODO(Allen): Change F.narrow_row to dgl operation 
-            return Index(F.astype(F.narrow_row(tensor, index.start, index.stop), F.data_type_dict[self.dtype]), self.dtype)
+            # TODO(Allen): Change F.narrow_row to dgl operation
+            return Index(F.astype(F.narrow_row(tensor, index.start, index.stop),
+                                  F.data_type_dict[self.dtype]),
+                         self.dtype)
         else:
             # both self and index wrap a slice object, then return another
             # Index wrapping a slice
@@ -271,7 +282,8 @@ def zero_index(size, dtype="int64"):
     ----------
     size: int
     """
-    return Index(F.zeros((size,), dtype=F.data_type_dict[dtype], ctx=F.cpu()), dtype=dtype)
+    return Index(F.zeros((size,), dtype=F.data_type_dict[dtype], ctx=F.cpu()),
+                 dtype=dtype)
 
 def set_diff(ar1, ar2):
     """Find the set difference of two index arrays.

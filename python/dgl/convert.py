@@ -290,8 +290,9 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', num_nodes=None, card=Non
         return create_from_scipy(
             data, utype, etype, vtype, restrict_format=restrict_format, index_dtype=index_dtype)
     elif isinstance(data, nx.Graph):
-        return create_from_networkx_bipartite(
-            data, utype, etype, vtype, restrict_format=restrict_format, index_dtype=index_dtype, **kwargs)
+        return create_from_networkx_bipartite(data, utype, etype,
+                                              vtype, restrict_format=restrict_format,
+                                              index_dtype=index_dtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
@@ -388,7 +389,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None, index_dtype='int6
     for rgrh in rel_graphs:
         if rgrh._graph.dtype != index_dtype:
             raise Exception("Expect relation graphs to be {}, but got {}".format(
-                index_dtype, rgrh._graph.dtype))        
+                index_dtype, rgrh._graph.dtype))
         stype, etype, dtype = rgrh.canonical_etypes[0]
         meta_edges_src.append(ntype_dict[stype])
         meta_edges_dst.append(ntype_dict[dtype])
@@ -490,9 +491,11 @@ def heterograph(data_dict, num_nodes_dict=None, index_dtype='int64'):
         else:
             rel_graphs.append(bipartite(
                 data, srctype, etype, dsttype,
-                num_nodes=(num_nodes_dict[srctype], num_nodes_dict[dsttype]), validate=False, index_dtype=index_dtype))
+                num_nodes=(num_nodes_dict[srctype], num_nodes_dict[dsttype]),
+                validate=False, index_dtype=index_dtype))
 
-    return hetero_from_relations(rel_graphs, num_nodes_dict, index_dtype=index_dtype)
+    return hetero_from_relations(rel_graphs, num_nodes_dict,
+                                 index_dtype=index_dtype)
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph=None, index_dtype='int64'):
     """Convert the given homogeneous graph to a heterogeneous graph.
@@ -646,12 +649,16 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
                 num_nodes=ntype_count[stid], validate=False, index_dtype=index_dtype)
         else:
             rel_graph = bipartite(
-                (src_of_etype, dst_of_etype), ntypes[stid], etypes[etid], ntypes[dtid],
-                num_nodes=(ntype_count[stid], ntype_count[dtid]), validate=False, index_dtype=index_dtype)
+                (src_of_etype,
+                 dst_of_etype), ntypes[stid], etypes[etid], ntypes[dtid],
+                num_nodes=(ntype_count[stid], ntype_count[dtid]),
+                validate=False, index_dtype=index_dtype)
         rel_graphs.append(rel_graph)
 
-    hg = hetero_from_relations(
-        rel_graphs, {ntype: count for ntype, count in zip(ntypes, ntype_count)}, index_dtype=index_dtype)
+    hg = hetero_from_relations(rel_graphs,
+                               {ntype: count for ntype, count in zip(
+                                   ntypes, ntype_count)},
+                               index_dtype=index_dtype)
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
     for ntid, ntype in enumerate(hg.ntypes):
@@ -735,7 +742,8 @@ def to_homo(G):
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges))
 
-    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes, validate=False, index_dtype=G._graph.dtype)
+    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
+                 validate=False, index_dtype=G._graph.dtype)
     retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
     retg.ndata[NID] = F.cat(nids, 0)
     retg.edata[ETYPE] = F.cat(etype_ids, 0)
@@ -855,8 +863,8 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
         u, v = zip(*elist)
         u = list(u)
         v = list(v)
-    return create_from_edges(
-        u, v, utype, etype, vtype, urange, vrange, validate, restrict_format, index_dtype=index_dtype)
+    return create_from_edges(u, v, utype, etype, vtype, urange, vrange,
+                             validate, restrict_format, index_dtype=index_dtype)
 
 def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
                       restrict_format='any', index_dtype='int64'):
@@ -1082,9 +1090,9 @@ def create_from_networkx_bipartite(nx_graph,
                 dst.append(bottom_map[e[1]])
     src = utils.toindex(src, index_dtype)
     dst = utils.toindex(dst, index_dtype)
-    g = create_from_edges(
-        src, dst, utype, etype, vtype,
-        len(top_nodes), len(bottom_nodes), validate=False, restrict_format=restrict_format, index_dtype=index_dtype)
+    g = create_from_edges(src, dst, utype, etype, vtype,
+                          len(top_nodes), len(bottom_nodes), validate=False,
+                          restrict_format=restrict_format, index_dtype=index_dtype)
 
     # TODO attributes
     assert node_attrs is None, 'Retrieval of node attributes are not supported yet.'
