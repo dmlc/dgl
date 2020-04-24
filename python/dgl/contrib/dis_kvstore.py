@@ -857,8 +857,9 @@ class KVClient(object):
         self._data_store[name+'-part-'] = partition_book
         self._has_data.add(name+'-g2l-')
         self._has_data.add(name+'-part-')
+        # Read new data from shared-memory created by server
         shape, data_type = self._read_data_shape_type(name+'-data-shape-'+str(self._machine_id))
-        assert data_type == get_type_str()[dtype]
+        assert data_type == get_type_str(dtype)
         shared_data = empty_shared_mem(name+'-data-', False, shape, dtype)
         dlpack = shared_data.to_dlpack()
         self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
