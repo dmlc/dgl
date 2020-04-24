@@ -549,8 +549,7 @@ def remove_self_loop(g):
     return new_g
 
 def partition_graph_with_halo(g, node_part, num_hops):
-    '''
-    This is to partition a graph. Each partition contains HALO nodes
+    ''' This is to partition a graph. Each partition contains HALO nodes
     so that we can generate NodeFlow in each partition correctly.
 
     Parameters
@@ -587,6 +586,22 @@ def partition_graph_with_halo(g, node_part, num_hops):
     return subg_dict
 
 def metis_partition_assignment(g, k):
+    ''' This assigns nodes to different partitions with Metis partitioning algorithm.
+
+    After the partition assignment, we construct partitions.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph to be partitioned
+    k : int
+        The number of partitions.
+
+    Returns
+    -------
+    a 1-D tensor
+        A vector with each element that indicates the partition Id of a vertex.
+    '''
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     sym_g = to_bidirected(g, readonly=True)
@@ -598,8 +613,7 @@ def metis_partition_assignment(g, k):
         return node_part.tousertensor()
 
 def metis_partition(g, k, extra_cached_hops=0):
-    '''
-    This is to partition a graph with Metis partitioning.
+    ''' This is to partition a graph with Metis partitioning.
 
     Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
     to the partitions and their incoming edges.
