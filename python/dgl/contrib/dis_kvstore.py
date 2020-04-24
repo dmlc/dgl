@@ -860,7 +860,7 @@ class KVClient(object):
         # Read new data from shared-memory created by server
         shape, data_type = self._read_data_shape_type(name+'-data-shape-'+str(self._machine_id))
         assert data_type == get_type_str(dtype)
-        shared_data = empty_shared_mem(name+'-data-', False, shape, dtype)
+        shared_data = empty_shared_mem(name+'-data-', False, shape, data_type)
         dlpack = shared_data.to_dlpack()
         self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
         self._has_data.add(name+'-data-')
