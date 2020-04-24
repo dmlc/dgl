@@ -391,22 +391,3 @@ class DistGraph:
             The rank of the current graph store.
         '''
         return self._client.get_id()
-
-    def is_local(self, nids):
-        ''' Test if the node Ids are owned by the local graph store.
-
-        Returns
-        -------
-        Boolean tensor
-            Indicate whether the node Ids are owned by the local graph store.
-        '''
-        #TODO we need to implement it more carefully.
-        return self.g.ndata['local_node'][nids]
-
-    def barrier(self):
-        ''' The barrier for all processes.
-
-        When a process enters a barrier, it can only exit from
-        the barrier when all other processes enter the barrier.
-        '''
-        self._client.barrier()
