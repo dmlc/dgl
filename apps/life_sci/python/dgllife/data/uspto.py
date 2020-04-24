@@ -1,5 +1,6 @@
 """USPTO for reaction prediction"""
 import itertools
+import math
 import numpy as np
 import os
 import random
@@ -1333,17 +1334,20 @@ class WLNRankDataset(object):
             all_reaction_info = list(zip(self.candidate_bond_changes,
                                          self.real_bond_changes,
                                          self.reactant_mols, self.product_mols))
-            for i in range(0, len(all_reaction_info), 10000):
-                print('Processing {:d}/{:d}'.format(i * 10000, len(all_reaction_info)))
+            batch_size = 10000
+            for i in range(0, len(all_reaction_info), batch_size):
+                print('Processing batch {:d}/{:d}'.format(
+                    i + 1, math.ceil(len(all_reaction_info) / batch_size)))
                 with Pool(processes=num_processes) as pool:
+                    batch_reaction_info = all_reaction_info[i * batch_size: (i + 1) * batch_size]
                     results = list(tqdm(pool.imap(partial(
                         pre_process_one_reaction,
                         num_candidate_bond_changes=num_candidate_bond_changes,
                         max_num_changes_per_reaction=max_num_changes_per_reaction,
                         max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
                         node_featurizer=node_featurizer, train_mode=self.train_mode),
-                        all_reaction_info, chunksize=10000 // num_processes),
-                        total=len(all_reaction_info)))
+                        batch_reaction_info, chunksize=batch_size // num_processes),
+                        total=len(batch_reaction_info)))
                 batch_valid_candidate_combos, batch_candidate_bond_changes, batch_node_feats, \
                 batch_combo_bias, batch_reactant_info = map(list, zip(*results))
                 all_valid_candidate_combos.extend(batch_valid_candidate_combos)
