@@ -463,6 +463,7 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or bipartite graph.
     """
     adj = 1
+    index_dtype = g._graph.dtype
     for etype in metapath:
         adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
@@ -471,9 +472,9 @@ def metapath_reachable_graph(g, metapath):
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     if srctype == dsttype:
         assert adj.shape[0] == adj.shape[1]
-        new_g = graph(adj, ntype=srctype)
+        new_g = graph(adj, ntype=srctype, index_dtype=index_dtype)
     else:
-        new_g = bipartite(adj, utype=srctype, vtype=dsttype)
+        new_g = bipartite(adj, utype=srctype, vtype=dsttype, index_dtype=index_dtype)
 
     for key, value in g.nodes[srctype].data.items():
         new_g.nodes[srctype].data[key] = value

@@ -8,8 +8,9 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
+from utils import parametrize_dtype
 
-def create_test_heterograph():
+def create_test_heterograph(index_dtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
     # 3 users, 2 games, 2 developers
     # metagraph:
@@ -25,14 +26,19 @@ def create_test_heterograph():
     wishes_nx.add_edge('u0', 'g1', id=0)
     wishes_nx.add_edge('u2', 'g0', id=1)
 
-    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
-    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game')
-    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', index_dtype=index_dtype)
+    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game', index_dtype=index_dtype)
+    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game', index_dtype=index_dtype)
+    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game', index_dtype=index_dtype)
+    assert follows_g._graph.dtype == index_dtype
+    assert plays_g._graph.dtype == index_dtype
+    assert wishes_g._graph.dtype == index_dtype
+    assert develops_g._graph.dtype == index_dtype
+    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g], index_dtype=index_dtype)
+    assert g._graph.dtype == index_dtype
     return g
 
-def create_test_heterograph1():
+def create_test_heterograph1(index_dtype):
     edges = []
     edges.extend([(0,1), (1,2)])  # follows
     edges.extend([(0,3), (1,3), (2,4), (1,4)])  # plays
@@ -45,7 +51,7 @@ def create_test_heterograph1():
     g0.edata[dgl.ETYPE] = etypes
     return dgl.to_hetero(g0, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'])
 
-def create_test_heterograph2():
+def create_test_heterograph2(index_dtype):
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     wishes_nx = nx.DiGraph()
     wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
@@ -62,7 +68,7 @@ def create_test_heterograph2():
         })
     return g
 
-def create_test_heterograph3():
+def create_test_heterograph3(index_dtype):
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     wishes_nx = nx.DiGraph()
     wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
@@ -82,10 +88,11 @@ def create_test_heterograph3():
 def get_redfn(name):
     return getattr(F, name)
 
-def test_create():
-    g0 = create_test_heterograph()
-    g1 = create_test_heterograph1()
-    g2 = create_test_heterograph2()
+@parametrize_dtype
+def test_create(index_dtype):
+    g0 = create_test_heterograph(index_dtype)
+    g1 = create_test_heterograph1(index_dtype)
+    g2 = create_test_heterograph2(index_dtype)
     assert set(g0.ntypes) == set(g1.ntypes) == set(g2.ntypes)
     assert set(g0.canonical_etypes) == set(g1.canonical_etypes) == set(g2.canonical_etypes)
 
@@ -142,8 +149,9 @@ def test_create():
     _test_validate_bipartite((3, 3))
     _test_validate_bipartite((2, 4))
 
-def test_query():
-    g = create_test_heterograph()
+@parametrize_dtype
+def test_query(index_dtype):
+    g = create_test_heterograph(index_dtype)
 
     ntypes = ['user', 'game', 'developer']
     canonical_etypes = [
@@ -265,11 +273,11 @@ def test_query():
         'wishes': ([0, 1], [0, 1]),
         'develops': ([0, 1], [1, 0]),
     }
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     _test(g)
-    g = create_test_heterograph1()
+    g = create_test_heterograph1(index_dtype)
     _test(g)
-    g = create_test_heterograph3()
+    g = create_test_heterograph3(index_dtype)
     _test(g)
 
     etypes = canonical_etypes
@@ -286,11 +294,11 @@ def test_query():
         ('user', 'wishes', 'game'): ([0, 1], [0, 1]),
         ('developer', 'develops', 'game'): ([0, 1], [1, 0]),
         }
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     _test(g)
-    g = create_test_heterograph1()
+    g = create_test_heterograph1(index_dtype)
     _test(g)
-    g = create_test_heterograph3()
+    g = create_test_heterograph3(index_dtype)
     _test(g)
 
     # test repr
@@ -387,8 +395,9 @@ def test_edge_ids():
     with pytest.raises(AssertionError):
         eid = g2.edge_id(0, 1, etype='follows')
 
-def test_adj():
-    g = create_test_heterograph()
+@parametrize_dtype
+def test_adj(index_dtype):
+    g = create_test_heterograph(index_dtype)
     adj = F.sparse_to_numpy(g.adj(etype='follows'))
     assert np.allclose(
             adj,
@@ -442,8 +451,9 @@ def test_adj():
                       [1., 0., 0.],
                       [0., 1., 0.]]))
 
-def test_inc():
-    g = create_test_heterograph()
+@parametrize_dtype
+def test_inc(index_dtype):
+    g = create_test_heterograph(index_dtype)
     #follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
     adj = F.sparse_to_numpy(g['follows'].inc('in'))
     assert np.allclose(
@@ -480,10 +490,11 @@ def test_inc():
             np.array([[-1., 0.],
                       [1., -1.],
                       [0., 1.]]))
-    
-def test_view():
+
+@parametrize_dtype
+def test_view(index_dtype):
     # test data view
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
 
     f1 = F.randn((3, 6))
     g.nodes['user'].data['h'] = f1       # ok
@@ -499,9 +510,10 @@ def test_view():
     assert F.array_equal(f3, f5)
     assert F.array_equal(F.tensor(g.edges(etype='follows', form='eid')), F.arange(0, 2))
 
-def test_view1():
+@parametrize_dtype
+def test_view1(index_dtype):
     # test relation view
-    HG = create_test_heterograph()
+    HG = create_test_heterograph(index_dtype)
     ntypes = ['user', 'game', 'developer']
     canonical_etypes = [
         ('user', 'follows', 'user'),
@@ -642,7 +654,8 @@ def test_view1():
         fail = True
     assert fail
 
-def test_flatten():
+@parametrize_dtype
+def test_flatten(index_dtype):
     def check_mapping(g, fg):
         if len(fg.ntypes) == 1:
             SRC = DST = fg.ntypes[0]
@@ -666,7 +679,7 @@ def test_flatten():
             assert g.canonical_etypes[etype][2] == g.ntypes[tid]
 
     # check for wildcard slices
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     g.nodes['user'].data['h'] = F.ones((3, 5))
     g.nodes['game'].data['i'] = F.ones((2, 5))
     g.edges['plays'].data['e'] = F.ones((4, 4))
@@ -737,23 +750,25 @@ def test_flatten():
     check_mapping(g, fg)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
-def test_to_device():
-    hg = create_test_heterograph()
+@parametrize_dtype
+def test_to_device(index_dtype):
+    hg = create_test_heterograph(index_dtype)
     if F.is_cuda_available():
         hg = hg.to(F.cuda())
         assert hg is not None
 
-def test_convert_bound():
+@parametrize_dtype
+def test_convert_bound(index_dtype):
     def _test_bipartite_bound(data, card):
         try:
-            dgl.bipartite(data, num_nodes=card)
+            dgl.bipartite(data, num_nodes=card, index_dtype=index_dtype)
         except dgl.DGLError:
             return
         assert False, 'bipartite bound test with wrong uid failed'
 
     def _test_graph_bound(data, card):
         try:
-            dgl.graph(data, num_nodes=card)
+            dgl.graph(data, num_nodes=card, index_dtype=index_dtype)
         except dgl.DGLError:
             return
         assert False, 'graph bound test with wrong uid failed'
@@ -764,8 +779,9 @@ def test_convert_bound():
     _test_graph_bound(([0,1],[1,3]),3)
 
 
-def test_convert():
-    hg = create_test_heterograph()
+@parametrize_dtype
+def test_convert(index_dtype):
+    hg = create_test_heterograph(index_dtype)
     hs = []
     for ntype in hg.ntypes:
         h = F.randn((hg.number_of_nodes(ntype), 5))
@@ -780,6 +796,7 @@ def test_convert():
     hg.edges['plays'].data['x'] = F.randn((4, 3))
 
     g = dgl.to_homo(hg)
+    assert g._graph.dtype == index_dtype
     assert F.array_equal(F.cat(hs, dim=0), g.ndata['h'])
     assert 'x' not in g.ndata
     assert F.array_equal(F.cat(ws, dim=0), g.edata['w'])
@@ -807,7 +824,7 @@ def test_convert():
     for _mg in [None, mg]:
         hg2 = dgl.to_hetero(
                 g, hg.ntypes, hg.etypes,
-                ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg)
+                ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg, index_dtype=index_dtype)
         assert set(hg.ntypes) == set(hg2.ntypes)
         assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
         for ntype in hg.ntypes:
@@ -857,25 +874,27 @@ def test_convert():
     g = dgl.to_homo(hg)
     assert g.number_of_nodes() == 5
 
-def test_transform():
-    g = create_test_heterograph()
+@parametrize_dtype
+def test_transform(index_dtype):
+    g = create_test_heterograph(index_dtype)
     x = F.randn((3, 5))
     g.nodes['user'].data['h'] = x
 
     new_g = dgl.metapath_reachable_graph(g, ['follows', 'plays'])
-
+    assert new_g._graph.dtype == index_dtype
     assert new_g.ntypes == ['user', 'game']
     assert new_g.number_of_edges() == 3
     assert F.asnumpy(new_g.has_edges_between([0, 0, 1], [0, 1, 1])).all()
 
     new_g = dgl.metapath_reachable_graph(g, ['follows'])
-
+    assert new_g._graph.dtype == index_dtype
     assert new_g.ntypes == ['user']
     assert new_g.number_of_edges() == 2
     assert F.asnumpy(new_g.has_edges_between([0, 1], [1, 2])).all()
 
-def test_subgraph():
-    g = create_test_heterograph()
+@parametrize_dtype
+def test_subgraph(index_dtype):
+    g = create_test_heterograph(index_dtype)
     x = F.randn((3, 5))
     y = F.randn((2, 4))
     g.nodes['user'].data['h'] = x
@@ -952,13 +971,14 @@ def test_subgraph():
         assert np.array_equal(src, np.array([1]))
         assert np.array_equal(dst, np.array([0]))
 
-def test_apply():
+@parametrize_dtype
+def test_apply(index_dtype):
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
     def edge_udf(edges):
         return {'h': edges.data['h'] * 2 + edges.src['h']}
 
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     g.nodes['user'].data['h'] = F.ones((3, 5))
     g.apply_nodes(node_udf, ntype='user')
     assert F.array_equal(g.nodes['user'].data['h'], F.ones((3, 5)) * 2)
@@ -990,14 +1010,15 @@ def test_apply():
         fail = True
     assert fail
 
-def test_level1():
+@parametrize_dtype
+def test_level1(index_dtype):
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
     #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
     #    'wishes': ([0, 2], [1, 0]),
     #    'develops': ([0, 1], [0, 1]),
     #}
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     def rfunc(nodes):
         return {'y': F.sum(nodes.mailbox['m'], 1)}
     def rfunc2(nodes):
@@ -1082,14 +1103,15 @@ def test_level1():
     assert fail
 
 
-def test_level2():
+@parametrize_dtype
+def test_level2(index_dtype):
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
     #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
     #    'wishes': ([0, 2], [1, 0]),
     #    'develops': ([0, 1], [0, 1]),
     #}
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     def rfunc(nodes):
         return {'y': F.sum(nodes.mailbox['m'], 1)}
     def rfunc2(nodes):
@@ -1310,14 +1332,15 @@ def test_level2():
 
     g.nodes['game'].data.clear()
 
-def test_updates():
+@parametrize_dtype
+def test_updates(index_dtype):
     def msg_func(edges):
         return {'m': edges.src['h']}
     def reduce_func(nodes):
         return {'y': F.sum(nodes.mailbox['m'], 1)}
     def apply_func(nodes):
         return {'y': nodes.data['y'] * 2}
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     x = F.randn((3, 5))
     g.nodes['user'].data['h'] = x
 
@@ -1358,8 +1381,10 @@ def test_updates():
         assert F.array_equal(y[0], x[0] * multiplier)
         del g.nodes['game'].data['y']
 
-def test_backward():
-    g = create_test_heterograph()
+
+@parametrize_dtype
+def test_backward(index_dtype):
+    g = create_test_heterograph(index_dtype)
     x = F.randn((3, 5))
     F.attach_grad(x)
     g.nodes['user'].data['h'] = x
@@ -1375,7 +1400,9 @@ def test_backward():
                                               [2., 2., 2., 2., 2.],
                                               [2., 2., 2., 2., 2.]]))
 
-def test_empty_heterograph():
+
+@parametrize_dtype
+def test_empty_heterograph(index_dtype):
     def assert_empty(g):
         assert g.number_of_nodes('user') == 0
         assert g.number_of_edges('plays') == 0
@@ -1390,12 +1417,15 @@ def test_empty_heterograph():
     # empty networkx graph
     assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
 
-    g = dgl.heterograph({('user', 'follows', 'user'): []})
+    g = dgl.heterograph({('user', 'follows', 'user'): []}, index_dtype=index_dtype)
+    assert g._graph.dtype == index_dtype
     assert g.number_of_nodes('user') == 0
     assert g.number_of_edges('follows') == 0
 
     # empty relation graph with others
-    g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [(0, 0), (1, 1)]})
+    g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [
+                        (0, 0), (1, 1)]}, index_dtype=index_dtype)
+    assert g._graph.dtype == index_dtype
     assert g.number_of_nodes('user') == 0
     assert g.number_of_edges('plays') == 0
     assert g.number_of_nodes('game') == 2
@@ -1460,14 +1490,15 @@ def test_types_in_function():
     g.filter_nodes(filter_nodes2, ntype='game')
     g.filter_edges(filter_edges2)
 
-def test_stack_reduce():
+@parametrize_dtype
+def test_stack_reduce(index_dtype):
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
     #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
     #    'wishes': ([0, 2], [1, 0]),
     #    'develops': ([0, 1], [0, 1]),
     #}
-    g = create_test_heterograph()
+    g = create_test_heterograph(index_dtype)
     g.nodes['user'].data['h'] = F.randn((3, 200))
     def rfunc(nodes):
         return {'y': F.sum(nodes.mailbox['m'], 1)}
@@ -1486,7 +1517,8 @@ def test_stack_reduce():
             'stack')
     assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 1, 200)
 
-def test_isolated_ntype():
+@parametrize_dtype
+def test_isolated_ntype(index_dtype):
     g = dgl.heterograph({
         ('A', 'AB', 'B'): [(0, 1), (1, 2), (2, 3)]},
         num_nodes_dict={'A': 3, 'B': 4, 'C': 4})
@@ -1506,31 +1538,38 @@ def test_isolated_ntype():
     G.add_edges([0, 1, 2], [4, 5, 6])
     G.ndata[dgl.NTYPE] = F.tensor([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2], dtype=F.int64)
     G.edata[dgl.ETYPE] = F.tensor([0, 0, 0], dtype=F.int64)
-    g = dgl.to_hetero(G, ['A', 'B', 'C'], ['AB'])
+    g = dgl.to_hetero(G, ['A', 'B', 'C'], ['AB'], index_dtype=index_dtype)
     assert g.number_of_nodes('A') == 3
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4
 
-def test_ismultigraph():
-    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5), (2, 5)], 'A', 'AB', 'B', num_nodes=(6, 6))
+
+@parametrize_dtype
+def test_ismultigraph(index_dtype):
+    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5), (2, 5)], 'A',
+                       'AB', 'B', num_nodes=(6, 6), index_dtype=index_dtype)
     assert g1.is_multigraph == False
-    g2 = dgl.bipartite([(0, 1), (0, 1), (0, 2), (1, 5)], 'A', 'AC', 'C', num_nodes=(6, 6))
+    g2 = dgl.bipartite([(0, 1), (0, 1), (0, 2), (1, 5)], 'A',
+                       'AC', 'C', num_nodes=(6, 6), index_dtype=index_dtype)
     assert g2.is_multigraph == True
-    g3 = dgl.graph([(0, 1), (1, 2)], 'A', 'AA', num_nodes=6)
+    g3 = dgl.graph([(0, 1), (1, 2)], 'A', 'AA',
+                   num_nodes=6, index_dtype=index_dtype)
     assert g3.is_multigraph == False
-    g4 = dgl.graph([(0, 1), (0, 1), (1, 2)], 'A', 'AA', num_nodes=6)
+    g4 = dgl.graph([(0, 1), (0, 1), (1, 2)], 'A', 'AA',
+                   num_nodes=6, index_dtype=index_dtype)
     assert g4.is_multigraph == True
-    g = dgl.hetero_from_relations([g1, g3])
+    g = dgl.hetero_from_relations([g1, g3], index_dtype=index_dtype)
     assert g.is_multigraph == False
-    g = dgl.hetero_from_relations([g1, g2])
+    g = dgl.hetero_from_relations([g1, g2], index_dtype=index_dtype)
     assert g.is_multigraph == True
-    g = dgl.hetero_from_relations([g1, g4])
+    g = dgl.hetero_from_relations([g1, g4], index_dtype=index_dtype)
     assert g.is_multigraph == True
-    g = dgl.hetero_from_relations([g2, g4])
+    g = dgl.hetero_from_relations([g2, g4], index_dtype=index_dtype)
     assert g.is_multigraph == True
 
-def test_bipartite():
-    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B')
+@parametrize_dtype
+def test_bipartite(index_dtype):
+    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B', index_dtype=index_dtype)
     assert g1.is_unibipartite
     assert len(g1.ntypes) == 2
     assert g1.etypes == ['AB']
@@ -1553,8 +1592,8 @@ def test_bipartite():
     assert F.array_equal(g1.nodes['DST/B'].data['h'], g1.dstdata['h'])
 
     # more complicated bipartite
-    g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C')
-    g3 = dgl.hetero_from_relations([g1, g2])
+    g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C', index_dtype=index_dtype)
+    g3 = dgl.hetero_from_relations([g1, g2], index_dtype=index_dtype)
     assert g3.is_unibipartite
     assert g3.srctypes == ['A']
     assert set(g3.dsttypes) == {'B', 'C'}
@@ -1570,31 +1609,31 @@ def test_bipartite():
     assert F.array_equal(g3.nodes['A'].data['h'], g3.srcdata['h'])
     assert F.array_equal(g3.nodes['SRC/A'].data['h'], g3.srcdata['h'])
 
-    g4 = dgl.graph([(0, 0), (1, 1)], 'A', 'AA')
-    g5 = dgl.hetero_from_relations([g1, g2, g4])
+    g4 = dgl.graph([(0, 0), (1, 1)], 'A', 'AA', index_dtype=index_dtype)
+    g5 = dgl.hetero_from_relations([g1, g2, g4], index_dtype=index_dtype)
     assert not g5.is_unibipartite
 
 if __name__ == '__main__':
-    test_create()
-    test_query()
-    test_hypersparse()
-    test_adj()
-    test_inc()
-    test_view()
-    test_view1()
-    test_flatten()
-    test_convert_bound()
-    test_convert()
-    test_to_device()
-    test_transform()
-    test_subgraph()
-    test_apply()
-    test_level1()
-    test_level2()
-    test_updates()
-    test_backward()
-    test_empty_heterograph()
-    test_types_in_function()
-    test_stack_reduce()
-    test_isolated_ntype()
-    test_bipartite()
+    # test_create()
+    # test_query()
+    # test_hypersparse()
+    # test_adj("int32")
+    # test_inc()
+    # test_view()
+    # test_view1()
+    # test_flatten()
+    # test_convert_bound()
+    # test_convert()
+    # test_to_device()
+    test_transform("int32")
+    # test_subgraph()
+    # test_apply()
+    # test_level1()
+    # test_level2()
+    # test_updates()
+    # test_backward()
+    # test_empty_heterograph()
+    # test_types_in_function()
+    # test_stack_reduce()
+    # test_isolated_ntype()
+    # test_bipartite()

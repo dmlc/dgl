@@ -29,6 +29,7 @@ namespace sched {
  *         mids: message ids
  *         mid_section: number of messages in each bucket (used to split mids)
  */
+template <class IdType>
 std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
         const IdArray& recv_ids);
 
@@ -49,6 +50,7 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
  *         sections: number of edges in each degree bucket (used to partition
  *                   new_uids, new_vids, and new_eids)
  */
+template <class IdType>
 std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids,
         const IdArray& vids, const IdArray& eids);
 

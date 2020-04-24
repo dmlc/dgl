@@ -8,8 +8,7 @@ from collections import defaultdict as ddict
 import unittest
 import pytest
 import inspect
-
-parametrize_dtype = pytest.mark.parametrize("index_dtype", ['int32', 'int64'])
+from utils import parametrize_dtype
 
 D = 5
 reduce_msg_shapes = set()
@@ -102,11 +101,11 @@ def test_batch_setter_getter(index_dtype):
     assert len(g.ndata) == old_len - 1
     g.ndata['h'] = F.zeros((10, D))
     # set partial nodes
-    u = F.tensor([1, 3, 5])
+    u = F.tensor([1, 3, 5], F.data_type_dict[index_dtype])
     g.nodes[u].data['h'] = F.ones((3, D))
     assert _pfc(g.ndata['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
     # get partial nodes
-    u = F.tensor([1, 2, 3])
+    u = F.tensor([1, 2, 3], F.data_type_dict[index_dtype])
     assert _pfc(g.nodes[u].data['h']) == [1., 0., 1.]
 
     '''
@@ -175,7 +174,7 @@ def test_batch_setter_autograd(index_dtype):
     g = generate_graph(index_dtype=index_dtype, grad=True)
     h1 = g.ndata['h']
     # partial set
-    v = F.tensor([1, 2, 8])
+    v = F.tensor([1, 2, 8], F.data_type_dict[index_dtype])
     hh = F.attach_grad(F.zeros((len(v), D)))
     with F.record_grad():
         g.nodes[v].data['h'] = hh
@@ -313,55 +312,60 @@ def test_batch_send(index_dtype):
         assert tuple(F.shape(edges.src['h'])) == (5, D)
         return {'m' : edges.src['h']}
     # many-many send
-    u = F.tensor([0, 0, 0, 0, 0])
-    v = F.tensor([1, 2, 3, 4, 5])
+    u = F.tensor([0, 0, 0, 0, 0],  dtype=F.data_type_dict[index_dtype])
+    v = F.tensor([1, 2, 3, 4, 5],  dtype=F.data_type_dict[index_dtype])
     g.send((u, v), _fmsg)
     # one-many send
-    u = F.tensor([0])
-    v = F.tensor([1, 2, 3, 4, 5])
+    u = F.tensor([0],  dtype=F.data_type_dict[index_dtype])
+    v = F.tensor([1, 2, 3, 4, 5],  dtype=F.data_type_dict[index_dtype])
     g.send((u, v), _fmsg)
     # many-one send
-    u = F.tensor([1, 2, 3, 4, 5])
-    v = F.tensor([9])
+    u = F.tensor([1, 2, 3, 4, 5],  dtype=F.data_type_dict[index_dtype])
+    v = F.tensor([9],  dtype=F.data_type_dict[index_dtype])
     g.send((u, v), _fmsg)
 
-def test_batch_recv():
+@parametrize_dtype
+def test_batch_recv(index_dtype):
     # basic recv test
-    g = generate_graph()
-    u = F.tensor([0, 0, 0, 4, 5, 6])
-    v = F.tensor([1, 2, 3, 9, 9, 9])
+    g = generate_graph(index_dtype=index_dtype)
+    u = F.tensor([0, 0, 0, 4, 5, 6],  dtype=F.data_type_dict[index_dtype])
+    v = F.tensor([1, 2, 3, 9, 9, 9],  dtype=F.data_type_dict[index_dtype])
     reduce_msg_shapes.clear()
     g.send((u, v), message_func)
-    g.recv(F.unique(v), reduce_func, apply_node_func)
+    g.recv(F.astype(F.unique(v), F.data_type_dict[index_dtype]), reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_apply_nodes():
+
+@parametrize_dtype
+def test_apply_nodes(index_dtype):
     def _upd(nodes):
         return {'h' : nodes.data['h'] * 2}
-    g = generate_graph()
+    g = generate_graph(index_dtype=index_dtype)
     old = g.ndata['h']
     g.apply_nodes(_upd)
     assert F.allclose(old * 2, g.ndata['h'])
-    u = F.tensor([0, 3, 4, 6])
+    u = F.tensor([0, 3, 4, 6], F.data_type_dict[index_dtype])
     g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
     assert F.allclose(F.gather_row(g.ndata['h'], u), F.zeros((4, D)))
 
-def test_apply_edges():
+@parametrize_dtype
+def test_apply_edges(index_dtype):
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
-    g = generate_graph()
+    g = generate_graph(index_dtype=index_dtype)
     old = g.edata['w']
     g.apply_edges(_upd)
     assert F.allclose(old * 2, g.edata['w'])
-    u = F.tensor([0, 0, 0, 4, 5, 6])
-    v = F.tensor([1, 2, 3, 9, 9, 9])
+    u = F.tensor([0, 0, 0, 4, 5, 6], F.data_type_dict[index_dtype])
+    v = F.tensor([1, 2, 3, 9, 9, 9], F.data_type_dict[index_dtype])
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
-    eid = F.tensor(g.edge_ids(u, v))
+    eid = F.tensor(g.edge_ids(u, v), F.data_type_dict[index_dtype])
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
-def test_update_routines():
-    g = generate_graph()
+@parametrize_dtype
+def test_update_routines(index_dtype):
+    g = generate_graph(index_dtype=index_dtype)
 
     # send_and_recv
     reduce_msg_shapes.clear()
@@ -377,14 +381,14 @@ def test_update_routines():
         pass
 
     # pull
-    v = F.tensor([1, 2, 3, 9])
+    v = F.tensor([1, 2, 3, 9], F.data_type_dict[index_dtype])
     reduce_msg_shapes.clear()
     g.pull(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 8, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
     # push
-    v = F.tensor([0, 1, 2, 3])
+    v = F.tensor([0, 1, 2, 3], F.data_type_dict[index_dtype])
     reduce_msg_shapes.clear()
     g.push(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
@@ -396,9 +400,10 @@ def test_update_routines():
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_recv_0deg():
+@parametrize_dtype
+def test_recv_0deg(index_dtype):
     # test recv with 0deg nodes;
-    g = dgl.graph([(0,1)])
+    g = dgl.graph([(0,1)], index_dtype=index_dtype)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -430,9 +435,11 @@ def test_recv_0deg():
     # non-0deg check: untouched
     assert F.allclose(new[1], old[1])
 
-def test_recv_0deg_newfld():
+
+@parametrize_dtype
+def test_recv_0deg_newfld(index_dtype):
     # test recv with 0deg nodes; the reducer also creates a new field
-    g = dgl.graph([(0,1)])
+    g = dgl.graph([(0,1)], index_dtype=index_dtype)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -465,9 +472,10 @@ def test_recv_0deg_newfld():
     # non-0deg check: not changed
     assert F.allclose(new[1], F.full_1d(5, -1, F.int64))
 
-def test_update_all_0deg():
+@parametrize_dtype
+def test_update_all_0deg(index_dtype):
     # test#1
-    g = dgl.graph([(1,0), (2,0), (3,0), (4,0)])
+    g = dgl.graph([(1,0), (2,0), (3,0), (4,0)], index_dtype=index_dtype)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -488,7 +496,7 @@ def test_update_all_0deg():
     assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
     # test#2:
-    g = dgl.graph([], num_nodes=5)
+    g = dgl.graph([], num_nodes=5, index_dtype=index_dtype)
     g.set_n_initializer(_init2, 'h')
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, _apply)
@@ -496,8 +504,9 @@ def test_update_all_0deg():
     # should fallback to apply
     assert F.allclose(new_repr, 2*old_repr)
 
-def test_pull_0deg():
-    g = dgl.graph([(0,1)])
+@parametrize_dtype
+def test_pull_0deg(index_dtype):
+    g = dgl.graph([(0,1)], index_dtype=index_dtype)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -527,8 +536,9 @@ def test_pull_0deg():
     # non-0deg check: not touched
     assert F.allclose(new[1], old[1])
 
-def test_send_multigraph():
-    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)])
+@parametrize_dtype
+def test_send_multigraph(index_dtype):
+    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)], index_dtype=index_dtype)
 
     def _message_a(edges):
         return {'a': edges.data['a']}
@@ -625,9 +635,9 @@ def _test_dynamic_addition():
     g.add_edge(2, 1, {'h1': F.randn((1, D))})
     assert len(g.edata['h1']) == len(g.edata['h2'])
 
-
-def test_repr():
-    G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10)
+@parametrize_dtype
+def test_repr(index_dtype):
+    G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, index_dtype=index_dtype)
     repr_string = G.__repr__()
     print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
@@ -636,7 +646,8 @@ def test_repr():
     print(repr_string)
 
 
-def test_group_apply_edges():
+@parametrize_dtype
+def test_group_apply_edges(index_dtype):
     def edge_udf(edges):
         h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)
         normalized_feat = F.softmax(h, dim=1)
@@ -649,7 +660,7 @@ def test_group_apply_edges():
         elist.append((1, v))
     for v in [2, 3, 4, 5, 6, 7, 8]:
         elist.append((2, v))
-    g = dgl.graph(elist)
+    g = dgl.graph(elist, index_dtype=index_dtype)
 
     g.ndata['h'] = F.randn((g.number_of_nodes(), D))
     g.edata['feat'] = F.randn((g.number_of_edges(), D))
@@ -671,8 +682,9 @@ def test_group_apply_edges():
     # test group by destination nodes
     _test('dst')
 
-def test_local_var():
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)])
+@parametrize_dtype
+def test_local_var(index_dtype):
+    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], index_dtype=index_dtype)
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -728,8 +740,9 @@ def test_local_var():
         assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
     foo(g)
 
-def test_local_scope():
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)])
+@parametrize_dtype
+def test_local_scope(index_dtype):
+    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], index_dtype=index_dtype)
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -780,7 +793,7 @@ def test_local_scope():
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)])
+    g = dgl.graph([(0,1), (1,1)], index_dtype=index_dtype)
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         with g.local_scope():
@@ -799,18 +812,21 @@ def test_local_scope():
             assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
     foo(g)
 
-def test_issue_1088():
+@parametrize_dtype
+def test_issue_1088(index_dtype):
     # This test ensures that message passing on a heterograph with one edge type
     # would not crash (GitHub issue #1088).
     import dgl.function as fn
-    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])})
+    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])}, index_dtype=index_dtype)
     g.nodes['U'].data['x'] = F.randn((3, 3))
     g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
 
 if __name__ == '__main__':
-    test_isolated_nodes("int32")
+    # test_isolated_nodes("int32")
     # test_nx_conversion()
-    test_batch_setter_getter("int32")
+    # test_batch_setter_getter("int32")
+    # test_batch_recv("int64")
+    test_apply_edges("int32")
     # test_batch_setter_autograd()
     # test_batch_send()
     # test_batch_recv()

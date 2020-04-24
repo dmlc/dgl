@@ -110,7 +110,7 @@ def schedule_recv(graph,
         var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
         # sort and unique the argument
         recv_nodes, _ = F.sort_1d(F.unique(recv_nodes.tousertensor()))
-        recv_nodes = utils.toindex(recv_nodes)
+        recv_nodes = utils.toindex(recv_nodes, graph.gidx.dtype)
         var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
         # reduce
         reduced_feat = _gen_reduce(graph, reduce_func, (src, dst, eid),
@@ -161,7 +161,7 @@ def schedule_snr(graph,
     """
     u, v, eid = edge_tuples
     recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
-    recv_nodes = utils.toindex(recv_nodes)
+    recv_nodes = utils.toindex(recv_nodes, graph.gidx.dtype)
     # create vars
     var_dst_nf = var.FEAT_DICT(graph.dstframe, 'dst_nf')
     var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
@@ -216,13 +216,13 @@ def schedule_update_all(graph,
     if graph.num_edges() == 0:
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
-            nodes = utils.toindex(slice(0, graph.num_dst()))
+            nodes = utils.toindex(slice(0, graph.num_dst()), graph.gidx.dtype)
             schedule_apply_nodes(nodes, apply_func, graph.dstframe,
                                  inplace=False, outframe=outframe,
                                  ntype=graph.canonical_etype[-1])
     else:
-        eid = utils.toindex(slice(0, graph.num_edges())) # ALL
-        recv_nodes = utils.toindex(slice(0, graph.num_dst())) # ALL
+        eid = utils.toindex(slice(0, graph.num_edges()), graph.gidx.dtype) # ALL
+        recv_nodes = utils.toindex(slice(0, graph.num_dst()), graph.gidx.dtype) # ALL
         # create vars
         var_dst_nf = var.FEAT_DICT(graph.dstframe, name='dst_nf')
         var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
@@ -484,8 +484,9 @@ def schedule_pull(graph,
             schedule_apply_nodes(pull_nodes, apply_func, graph.dstframe, inplace,
                                  outframe, ntype=graph.canonical_etype[-1])
     else:
+        # TODO(Allen): Change operation to dgl operation
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
-        pull_nodes = utils.toindex(pull_nodes)
+        pull_nodes = utils.toindex(pull_nodes, graph.gidx.dtype)
         # create vars
         var_dst_nf = var.FEAT_DICT(graph.dstframe, name='dst_nf')
         var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
@@ -953,7 +954,7 @@ def _gen_send_reduce(
         return var_out
     else:
         # gen degree bucketing schedule for UDF recv
-        mid = utils.toindex(slice(0, len(var_v.data)))
+        mid = utils.toindex(slice(0, len(var_v.data)), var_v.data.dtype)
         db.gen_degree_bucketing_schedule(rfunc, mid, var_v.data,
                                          reduce_nodes, var_dst_nf, var_mf,
                                          var_out, ntype=canonical_etype[-1])

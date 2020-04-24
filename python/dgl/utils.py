@@ -73,8 +73,8 @@ class Index(object):
             else:
                 self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
-            if not (data.dtype in ['int32', 'int64'] and len(data.shape) == 1):
-                raise DGLError('Index data must be 1D int32/int64 vector, but got: %s' % str(data))
+            if not (data.dtype == self.dtype and len(data.shape) == 1):
+                raise DGLError('Index data must be 1D %s vector, but got: %s' % (self.dtype, data.dtype))
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
             # save it in the _pydata temporarily; materialize it if `tonumpy` is called
@@ -176,12 +176,14 @@ class Index(object):
             # the provided index is not a slice
             tensor = self.tousertensor()
             index = index.tousertensor()
-            return Index(F.gather_row(tensor, index), self.dtype)
+            # TODO(Allen): Change F.gather_row to dgl operation
+            return Index(F.astype(F.gather_row(tensor, index), F.data_type_dict[self.dtype]), self.dtype)
         elif self._slice_data is None:
             # the current index is not a slice but the provided is a slice
             tensor = self.tousertensor()
             index = index._slice_data
-            return Index(F.narrow_row(tensor, index.start, index.stop), self.dtype)
+            # TODO(Allen): Change F.narrow_row to dgl operation 
+            return Index(F.astype(F.narrow_row(tensor, index.start, index.stop), F.data_type_dict[self.dtype]), self.dtype)
         else:
             # both self and index wrap a slice object, then return another
             # Index wrapping a slice

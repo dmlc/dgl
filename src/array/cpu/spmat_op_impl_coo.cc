@@ -171,12 +171,11 @@ template NDArray COOGetData<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 
 ///////////////////////////// COOGetDataAndIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename MatType, typename IdType>
+template <DLDeviceType XPU, typename IdType>
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {  
   CHECK_SAME_DTYPE(coo.col, rows);
   CHECK_SAME_DTYPE(coo.col, cols);
-  // CHECK_EQ(coo.col->dtype, rows->dtype) << "Inconsistent dtype";
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
 

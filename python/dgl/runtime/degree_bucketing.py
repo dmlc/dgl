@@ -1,5 +1,6 @@
 """Module for degree bucketing schedulers."""
 from __future__ import absolute_import
+from functools import partial
 
 from .._ffi.function import _init_api
 from .. import backend as F
@@ -118,11 +119,12 @@ def _process_node_buckets(buckets):
         The zero-degree nodes
     """
     # get back results
-    degs = utils.toindex(buckets(0))
-    v = utils.toindex(buckets(1))
+    dtype = buckets(0).dtype
+    degs = utils.toindex(buckets(0), dtype)
+    v = utils.toindex(buckets(1), dtype)
     # XXX: convert directly from ndarary to python list?
     v_section = buckets(2).asnumpy().tolist()
-    msg_ids = utils.toindex(buckets(3))
+    msg_ids = utils.toindex(buckets(3), dtype)
     msg_section = buckets(4).asnumpy().tolist()
 
     # split buckets
@@ -131,8 +133,8 @@ def _process_node_buckets(buckets):
     msg_ids = F.split(msg_ids, msg_section, 0)
 
     # convert to utils.Index
-    dsts = [utils.toindex(dst) for dst in dsts]
-    msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
+    dsts = [utils.toindex(dst, dtype) for dst in dsts]
+    msg_ids = [utils.toindex(msg_id, dtype) for msg_id in msg_ids]
 
     # handle zero deg
     degs = degs.tonumpy()
@@ -266,17 +268,18 @@ def _process_edge_buckets(buckets):
         A list of edge id buckets
     """
     # get back results
+    dtype = buckets(0).dtype
     degs = buckets(0).asnumpy()
-    uids = utils.toindex(buckets(1))
-    vids = utils.toindex(buckets(2))
-    eids = utils.toindex(buckets(3))
+    uids = utils.toindex(buckets(1), dtype)
+    vids = utils.toindex(buckets(2), dtype)
+    eids = utils.toindex(buckets(3), dtype)
     # XXX: convert directly from ndarary to python list?
     sections = buckets(4).asnumpy().tolist()
 
     # split buckets and convert to index
     def split(to_split):
         res = F.split(to_split.tousertensor(), sections, 0)
-        return map(utils.toindex, res)
+        return map(partial(utils.toindex, dtype=dtype), res)
 
     uids = split(uids)
     vids = split(vids)

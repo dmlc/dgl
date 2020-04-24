@@ -214,6 +214,10 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
+
+  // template class for Flatten
+  template <class IdType>
+  FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
 };
 
 }  // namespace dgl
