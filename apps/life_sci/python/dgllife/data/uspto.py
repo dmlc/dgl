@@ -979,11 +979,10 @@ def get_product_smiles(reactant_mols, edits, product_info):
         return smiles
     return edit_mol(reactant_mols, edits, product_info)
 
-def pre_process_one_reaction(candidate_bond_changes, real_bond_changes, reactant_mol,
-                             product_mol, num_candidate_bond_changes,
-                             max_num_changes_per_reaction, max_num_change_combos_per_reaction,
-                             node_featurizer, train_mode):
+def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_changes_per_reaction,
+                             max_num_change_combos_per_reaction, node_featurizer, train_mode):
     """"""
+    candidate_bond_changes, real_bond_changes, reactant_mol, product_mol = info
     candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
                        in candidate_bond_changes]
     reactant_info = bookkeep_reactant(reactant_mol, candidate_pairs)
@@ -1305,11 +1304,12 @@ class WLNRankDataset(object):
         all_combo_bias = []
         all_reactant_info = []
         if num_processes == 1:
-            for i in tqdm(list(range(len(self.reactant_mols)))):
+            ids = list(range(len(self.reactant_mols)))
+            for i in tqdm(ids):
                 valid_candidate_combos, candidate_bond_changes, node_feats, \
                 combo_bias, reactant_info = pre_process_one_reaction(
-                    self.candidate_bond_changes[i], self.real_bond_changes[i],
-                    self.reactant_mols[i], self.product_mols[i], num_candidate_bond_changes,
+                    (self.candidate_bond_changes[i], self.real_bond_changes[i],
+                     self.reactant_mols[i], self.product_mols[i]), num_candidate_bond_changes,
                     max_num_changes_per_reaction, max_num_change_combos_per_reaction,
                     node_featurizer, self.train_mode)
                 all_valid_candidate_combos.append(valid_candidate_combos)
