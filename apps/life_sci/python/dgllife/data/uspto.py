@@ -1309,12 +1309,12 @@ class WLNRankDataset(object):
         """
         print('Stage 3/4: preparing candidate products and node features')
 
+        all_valid_candidate_combos = []
+        all_candidate_bond_changes = []
+        all_node_feats = []
+        all_combo_bias = []
+        all_reactant_info = []
         if num_processes == 1:
-            all_valid_candidate_combos = []
-            all_candidate_bond_changes = []
-            all_node_feats = []
-            all_combo_bias = []
-            all_reactant_info = []
             ids = list(range(len(self.reactant_mols)))
 
             for i in tqdm(ids):
@@ -1333,18 +1333,24 @@ class WLNRankDataset(object):
             all_reaction_info = list(zip(self.candidate_bond_changes,
                                          self.real_bond_changes,
                                          self.reactant_mols, self.product_mols))
-            torch.multiprocessing.set_sharing_strategy('file_system')
-            with Pool(processes=num_processes) as pool:
-                results = list(tqdm(pool.imap(partial(
-                    pre_process_one_reaction,
-                    num_candidate_bond_changes=num_candidate_bond_changes,
-                    max_num_changes_per_reaction=max_num_changes_per_reaction,
-                    max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
-                    node_featurizer=node_featurizer, train_mode=self.train_mode),
-                    all_reaction_info, chunksize=1),
-                    total=len(all_reaction_info)))
-                all_valid_candidate_combos, all_candidate_bond_changes, all_node_feats, \
-                all_combo_bias, all_reactant_info = map(list, zip(*results))
+            for i in range(0, len(all_reaction_info), 10000):
+                print('Processing {:d}/{:d}'.format(i * 10000, len(all_reaction_info)))
+                with Pool(processes=num_processes) as pool:
+                    results = list(tqdm(pool.imap(partial(
+                        pre_process_one_reaction,
+                        num_candidate_bond_changes=num_candidate_bond_changes,
+                        max_num_changes_per_reaction=max_num_changes_per_reaction,
+                        max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
+                        node_featurizer=node_featurizer, train_mode=self.train_mode),
+                        all_reaction_info, chunksize=10000 // num_processes),
+                        total=len(all_reaction_info)))
+                batch_valid_candidate_combos, batch_candidate_bond_changes, batch_node_feats, \
+                batch_combo_bias, batch_reactant_info = map(list, zip(*results))
+                all_valid_candidate_combos.extend(batch_valid_candidate_combos)
+                all_candidate_bond_changes.extend(batch_candidate_bond_changes)
+                all_node_feats.extend(batch_node_feats)
+                all_combo_bias.extend(batch_combo_bias)
+                all_reactant_info.extend(batch_reactant_info)
 
         return all_valid_candidate_combos, all_candidate_bond_changes, \
                all_node_feats, all_combo_bias, all_reactant_info
