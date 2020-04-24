@@ -981,7 +981,22 @@ def get_product_smiles(reactant_mols, edits, product_info):
 
 def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_changes_per_reaction,
                              max_num_change_combos_per_reaction, node_featurizer, train_mode):
-    """"""
+    """Pre-process one reaction for candidate ranking.
+
+    Parameters
+    ----------
+    info : 4-tuple
+
+    num_candidate_bond_changes
+    max_num_changes_per_reaction
+    max_num_change_combos_per_reaction
+    node_featurizer
+    train_mode
+
+    Returns
+    -------
+
+    """
     candidate_bond_changes, real_bond_changes, reactant_mol, product_mol = info
     candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
                        in candidate_bond_changes]
@@ -1318,6 +1333,7 @@ class WLNRankDataset(object):
             all_reaction_info = list(zip(self.candidate_bond_changes,
                                          self.real_bond_changes,
                                          self.reactant_mols, self.product_mols))
+            torch.multiprocessing.set_sharing_strategy('file_system')
             with Pool(processes=num_processes) as pool:
                 results = list(tqdm(pool.imap(partial(
                     pre_process_one_reaction,
@@ -1325,7 +1341,7 @@ class WLNRankDataset(object):
                     max_num_changes_per_reaction=max_num_changes_per_reaction,
                     max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
                     node_featurizer=node_featurizer, train_mode=self.train_mode),
-                    all_reaction_info, chunksize=len(all_reaction_info) // num_processes),
+                    all_reaction_info, chunksize=1),
                     total=len(all_reaction_info)))
                 all_valid_candidate_combos, all_candidate_bond_changes, all_node_feats, \
                 all_combo_bias, all_reactant_info = map(list, zip(*results))
