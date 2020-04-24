@@ -1298,13 +1298,15 @@ class WLNRankDataset(object):
             Reaction-related information of reactants for each reaction.
         """
         print('Stage 3/4: preparing candidate products and node features')
-        all_valid_candidate_combos = []
-        all_candidate_bond_changes = []
-        all_node_feats = []
-        all_combo_bias = []
-        all_reactant_info = []
+
         if num_processes == 1:
+            all_valid_candidate_combos = []
+            all_candidate_bond_changes = []
+            all_node_feats = []
+            all_combo_bias = []
+            all_reactant_info = []
             ids = list(range(len(self.reactant_mols)))
+
             for i in tqdm(ids):
                 valid_candidate_combos, candidate_bond_changes, node_feats, \
                 combo_bias, reactant_info = pre_process_one_reaction(
@@ -1318,7 +1320,19 @@ class WLNRankDataset(object):
                 all_combo_bias.append(combo_bias)
                 all_reactant_info.append(reactant_info)
         else:
-            return NotImplementedError
+            all_reaction_info = list(zip(self.candidate_bond_changes,
+                                         self.real_bond_changes,
+                                         self.reactant_mols, self.product_mols))
+            with Pool(processes=num_processes) as pool:
+                results = list(tqdm(pool.imap(partial(
+                    pre_process_one_reaction,
+                    um_candidate_bond_changes=num_candidate_bond_changes,
+                    max_num_changes_per_reaction=max_num_changes_per_reaction,
+                    max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
+                    node_featurizer=node_featurizer, train_mode=self.train_mode),
+                    all_reaction_info), total=len(all_reaction_info)))
+                all_valid_candidate_combos, all_candidate_bond_changes, all_node_feats, \
+                all_combo_bias, all_reactant_info = map(list, zip(*results))
 
         return all_valid_candidate_combos, all_candidate_bond_changes, \
                all_node_feats, all_combo_bias, all_reactant_info
