@@ -747,8 +747,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         int64_t part_id = pb_data[id];
         if (part_id == local_machine_id) {
           int64_t local_id = g2l_data[id];
-	  CHECK_LT(local_id, local_data_shape[0]);
-	  CHECK_GE(local_id, 0);
+          CHECK_LT(local_id, local_data_shape[0]);
+          CHECK_GE(local_id, 0);
           local_ids.push_back(local_id);
           local_ids_orginal.push_back(i);
         } else {
@@ -761,8 +761,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         int64_t id = ID_data[i];
         int64_t part_id = pb_data[id];
         if (part_id == local_machine_id) {
-	  CHECK_LT(id, local_data_shape[0]);
-	  CHECK_GE(id, 0);
+          CHECK_LT(id, local_data_shape[0]);
+          CHECK_GE(id, 0);
           local_ids.push_back(id);
           local_ids_orginal.push_back(i);
         } else {
