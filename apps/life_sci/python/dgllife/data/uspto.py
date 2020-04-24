@@ -669,6 +669,17 @@ def load_one_reaction_rank(line, train_mode):
     else:
         return reactants_mol, reaction, graph_edits, reaction_real_bond_changes
 
+def load_candidate_bond_changes_for_one_reaction(line):
+    reaction_candidate_bond_changes = []
+    elements = line.strip().split(';')[:-1]
+    for candidate in elements:
+        atom1, atom2, change_type, score = candidate.split(' ')
+        atom1, atom2 = int(atom1) - 1, int(atom2) - 1
+        reaction_candidate_bond_changes.append((
+            min(atom1, atom2), max(atom1, atom2), float(change_type), float(score)))
+
+    return reaction_candidate_bond_changes
+
 class WLNRankDataset(object):
     """Dataset for ranking candidate products with WLN
 
@@ -752,8 +763,6 @@ class WLNRankDataset(object):
         ----------
         file_path : str
             Path to read the file.
-        log_every : int
-            Print a progress update every time ``log_every`` reactions are pre-processed.
         num_processes : int
             Number of processes to use for data pre-processing.
 
@@ -820,15 +829,15 @@ class WLNRankDataset(object):
         return all_reactant_mols, all_product_mols, all_reactions, all_graph_edits, \
                all_real_bond_changes, ids_for_small_samples
 
-    def load_candidate_bond_changes(self, file_path, log_every):
+    def load_candidate_bond_changes(self, file_path, num_processes):
         """Load candidate bond changes predicted by a WLN for reaction center prediction.
 
         Parameters
         ----------
         file_path : str
             Path to a file of candidate bond changes for each reaction.
-        log_every : int
-            Print a progress update every time ``log_every`` reactions are pre-processed.
+        num_processes : int
+            Number of processes to use for data pre-processing.
 
         Returns
         -------
@@ -837,19 +846,19 @@ class WLNRankDataset(object):
             bond changes for a reaction.
         """
         print('Stage 2/4: loading candidate bond changes...')
-        all_candidate_bond_changes = []
         with open(file_path, 'r') as f:
-            for i, line in enumerate(f):
-                if i % log_every == 0:
-                    print('Processing line {:d}'.format(i))
-                reaction_candidate_bond_changes = []
-                elements = line.strip().split(';')[:-1]
-                for candidate in elements:
-                    atom1, atom2, change_type, score = candidate.split(' ')
-                    atom1, atom2 = int(atom1) - 1, int(atom2) - 1
-                    reaction_candidate_bond_changes.append((
-                        min(atom1, atom2), max(atom1, atom2), float(change_type), float(score)))
-                all_candidate_bond_changes.append(reaction_candidate_bond_changes)
+            lines = f.readlines()
+
+        if num_processes == 1:
+            all_candidate_bond_changes = []
+            for li in lines:
+                all_candidate_bond_changes.append(
+                    load_candidate_bond_changes_for_one_reaction(li))
+        else:
+            with Pool(processes=num_processes) as pool:
+                all_candidate_bond_changes = list(tqdm(pool.imap(
+                    load_candidate_bond_changes_for_one_reaction,
+                    lines), total=len(lines)))
 
         return all_candidate_bond_changes
 
