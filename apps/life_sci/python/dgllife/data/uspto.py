@@ -1334,7 +1334,7 @@ class WLNRankDataset(object):
             all_reaction_info = list(zip(self.candidate_bond_changes,
                                          self.real_bond_changes,
                                          self.reactant_mols, self.product_mols))
-            batch_size = 2000
+            batch_size = 1000
             for i in range(0, len(all_reaction_info), batch_size):
                 print('Processing batch {:d}/{:d}'.format(
                     i + 1, math.ceil(len(all_reaction_info) / batch_size)))
