@@ -474,7 +474,7 @@ class KVServer(object):
                     c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
             # Init new data
-            elif msg.type == KVStoreMsg.NEW_DATA:
+            elif msg.type == KVMsgType.NEW_DATA:
                 assert msg.rank == 0
                 data_str, target_name = msg.name.split('|')
                 data_name, date_type = self._deserialize_shared_tensor(data_str)
