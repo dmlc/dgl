@@ -863,6 +863,17 @@ class GraphIndex(ObjectBase):
             The context of the graph.
         """
         return _CAPI_DGLGraphContext(self)
+    
+    @property
+    def dtype(self):
+        """Return the index dtype
+
+        Returns
+        ----------
+        str
+            The dtype of graph index
+        """
+        return "int64"
 
     def copy_to(self, ctx):
         """Copy this immutable graph index to the given device context.

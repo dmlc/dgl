@@ -36,7 +36,7 @@ def STR2NPDTYPE():
 
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
-    def __init__(self, data, dtype):
+    def __init__(self, data, dtype="int64"):
         assert dtype in ['int32', 'int64']
         self.dtype = dtype
         self._initialize_data(data)
