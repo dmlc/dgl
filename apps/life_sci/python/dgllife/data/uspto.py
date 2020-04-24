@@ -1,6 +1,5 @@
 """USPTO for reaction prediction"""
 import itertools
-import math
 import numpy as np
 import os
 import random
@@ -1336,10 +1335,9 @@ class WLNRankDataset(object):
                                          self.reactant_mols, self.product_mols))
             batch_size = 1000
             for i in range(0, len(all_reaction_info), batch_size):
-                print('Processing batch {:d}/{:d}'.format(
-                    i + 1, math.ceil(len(all_reaction_info) / batch_size)))
+                print('Processing reaction {:d}/{:d}'.format(i, len(all_reaction_info)))
                 with Pool(processes=num_processes) as pool:
-                    batch_reaction_info = all_reaction_info[i * batch_size: (i + 1) * batch_size]
+                    batch_reaction_info = all_reaction_info[i: i + batch_size]
                     results = list(tqdm(pool.imap(partial(
                         pre_process_one_reaction,
                         num_candidate_bond_changes=num_candidate_bond_changes,
