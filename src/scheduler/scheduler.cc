@@ -93,80 +93,82 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
     return std::move(ret);
 }
 
-template std::vector<IdArray> DegreeBucketing<int32_t>(const IdArray& msg_ids, const IdArray& vids,
-        const IdArray& recv_ids);
-        
-template std::vector<IdArray> DegreeBucketing<int64_t>(const IdArray& msg_ids, const IdArray& vids,
-        const IdArray& recv_ids);
+template std::vector<IdArray> DegreeBucketing<int32_t>(const IdArray& msg_ids,
+                                                       const IdArray& vids,
+                                                       const IdArray& recv_ids);
+
+template std::vector<IdArray> DegreeBucketing<int64_t>(const IdArray& msg_ids,
+                                                       const IdArray& vids,
+                                                       const IdArray& recv_ids);
 
 template <class IdType>
-std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids, const IdArray& vids,
-        const IdArray& eids) {
-    auto n_edge = eids->shape[0];
-    const IdType* eid_data = static_cast<IdType*>(eids->data);
-    const IdType* uid_data = static_cast<IdType*>(uids->data);
-    const IdType* vid_data = static_cast<IdType*>(vids->data);
+std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids,
+                                           const IdArray& vids,
+                                           const IdArray& eids) {
+  auto n_edge = eids->shape[0];
+  const IdType* eid_data = static_cast<IdType*>(eids->data);
+  const IdType* uid_data = static_cast<IdType*>(uids->data);
+  const IdType* vid_data = static_cast<IdType*>(vids->data);
 
-    // node2edge: group_by nodes uid -> (eid, the other end vid)
-    std::unordered_map<IdType,
-        std::vector<std::pair<IdType, IdType>>> node2edge;
-    for (IdType i = 0; i < n_edge; ++i) {
-        node2edge[uid_data[i]].emplace_back(eid_data[i], vid_data[i]);
+  // node2edge: group_by nodes uid -> (eid, the other end vid)
+  std::unordered_map<IdType, std::vector<std::pair<IdType, IdType>>> node2edge;
+  for (IdType i = 0; i < n_edge; ++i) {
+    node2edge[uid_data[i]].emplace_back(eid_data[i], vid_data[i]);
+  }
+
+  // bkt: deg -> group_by node uid
+  std::unordered_map<IdType, std::vector<IdType>> bkt;
+  for (const auto& it : node2edge) {
+    bkt[it.second.size()].push_back(it.first);
+  }
+
+  // number of unique degree
+  IdType n_deg = bkt.size();
+
+  // initialize output
+  IdArray degs = IdArray::Empty({n_deg}, eids->dtype, eids->ctx);
+  IdArray new_uids = IdArray::Empty({n_edge}, uids->dtype, uids->ctx);
+  IdArray new_vids = IdArray::Empty({n_edge}, vids->dtype, vids->ctx);
+  IdArray new_eids = IdArray::Empty({n_edge}, eids->dtype, eids->ctx);
+  IdArray sections = IdArray::Empty({n_deg}, eids->dtype, eids->ctx);
+  IdType* deg_ptr = static_cast<IdType*>(degs->data);
+  IdType* uid_ptr = static_cast<IdType*>(new_uids->data);
+  IdType* vid_ptr = static_cast<IdType*>(new_vids->data);
+  IdType* eid_ptr = static_cast<IdType*>(new_eids->data);
+  IdType* sec_ptr = static_cast<IdType*>(sections->data);
+
+  // fill in bucketing ordering
+  for (const auto& it : bkt) {  // for each bucket
+    // degree of this bucket
+    const IdType deg = it.first;
+    // number of edges in this bucket
+    const IdType bucket_size = it.second.size();
+    *deg_ptr++ = deg;
+    *sec_ptr++ = deg * bucket_size;
+    for (const auto u : it.second) {           // for uid in this bucket
+      for (const auto& pair : node2edge[u]) {  // for each edge of uid
+        *uid_ptr++ = u;
+        *vid_ptr++ = pair.second;
+        *eid_ptr++ = pair.first;
+      }
     }
+  }
 
-    // bkt: deg -> group_by node uid
-    std::unordered_map<IdType, std::vector<IdType>> bkt;
-    for (const auto& it : node2edge) {
-        bkt[it.second.size()].push_back(it.first);
-    }
+  std::vector<IdArray> ret;
+  ret.push_back(std::move(degs));
+  ret.push_back(std::move(new_uids));
+  ret.push_back(std::move(new_vids));
+  ret.push_back(std::move(new_eids));
+  ret.push_back(std::move(sections));
 
-    // number of unique degree
-    IdType n_deg = bkt.size();
-
-    // initialize output
-    IdArray degs = IdArray::Empty({n_deg}, eids->dtype, eids->ctx);
-    IdArray new_uids = IdArray::Empty({n_edge}, uids->dtype, uids->ctx);
-    IdArray new_vids = IdArray::Empty({n_edge}, vids->dtype, vids->ctx);
-    IdArray new_eids = IdArray::Empty({n_edge}, eids->dtype, eids->ctx);
-    IdArray sections = IdArray::Empty({n_deg}, eids->dtype, eids->ctx);
-    IdType* deg_ptr = static_cast<IdType*>(degs->data);
-    IdType* uid_ptr = static_cast<IdType*>(new_uids->data);
-    IdType* vid_ptr = static_cast<IdType*>(new_vids->data);
-    IdType* eid_ptr = static_cast<IdType*>(new_eids->data);
-    IdType* sec_ptr = static_cast<IdType*>(sections->data);
-
-    // fill in bucketing ordering
-    for (const auto& it : bkt) {  // for each bucket
-        // degree of this bucket
-        const IdType deg = it.first;
-        // number of edges in this bucket
-        const IdType bucket_size = it.second.size();
-        *deg_ptr++ = deg;
-        *sec_ptr++ = deg * bucket_size;
-        for (const auto u : it.second) {  // for uid in this bucket
-            for (const auto& pair : node2edge[u]) {  // for each edge of uid
-                *uid_ptr++ = u;
-                *vid_ptr++ = pair.second;
-                *eid_ptr++ = pair.first;
-            }
-        }
-    }
-
-    std::vector<IdArray> ret;
-    ret.push_back(std::move(degs));
-    ret.push_back(std::move(new_uids));
-    ret.push_back(std::move(new_vids));
-    ret.push_back(std::move(new_eids));
-    ret.push_back(std::move(sections));
-
-    return std::move(ret);
+  return std::move(ret);
 }
 
-template std::vector<IdArray> GroupEdgeByNodeDegree<int32_t>(const IdArray& uids, const IdArray& vids,
-        const IdArray& eids);
+template std::vector<IdArray> GroupEdgeByNodeDegree<int32_t>(
+    const IdArray& uids, const IdArray& vids, const IdArray& eids);
 
-template std::vector<IdArray> GroupEdgeByNodeDegree<int64_t>(const IdArray& uids, const IdArray& vids,
-        const IdArray& eids);
+template std::vector<IdArray> GroupEdgeByNodeDegree<int64_t>(
+    const IdArray& uids, const IdArray& vids, const IdArray& eids);
 
 }  // namespace sched
 

@@ -15,18 +15,19 @@ using dgl::runtime::NDArray;
 namespace dgl {
 
 DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  .set_body([](DGLArgs args, DGLRetValue* rv) {
     const IdArray msg_ids = args[0];
     const IdArray vids = args[1];
     const IdArray nids = args[2];
     CHECK_SAME_DTYPE(msg_ids, vids);
     CHECK_SAME_DTYPE(msg_ids, nids);
-    if (msg_ids->dtype.bits == 32){      
-      *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing<int32_t>(msg_ids, vids, nids));
-    } else if (msg_ids->dtype.bits == 64){
-      *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing<int64_t>(msg_ids, vids, nids));
+    if (msg_ids->dtype.bits == 32) {
+      *rv = ConvertNDArrayVectorToPackedFunc(
+          sched::DegreeBucketing<int32_t>(msg_ids, vids, nids));
+    } else if (msg_ids->dtype.bits == 64) {
+      *rv = ConvertNDArrayVectorToPackedFunc(
+          sched::DegreeBucketing<int64_t>(msg_ids, vids, nids));
     }
-    
   });
 
 DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")

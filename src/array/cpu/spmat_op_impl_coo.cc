@@ -172,8 +172,8 @@ template NDArray COOGetData<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 ///////////////////////////// COOGetDataAndIndices /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-std::vector<NDArray> COOGetDataAndIndices(
-    COOMatrix coo, NDArray rows, NDArray cols) {  
+std::vector<NDArray> COOGetDataAndIndices(COOMatrix coo, NDArray rows,
+                                          NDArray cols) {
   CHECK_SAME_DTYPE(coo.col, rows);
   CHECK_SAME_DTYPE(coo.col, cols);
   const int64_t rowlen = rows->shape[0];
