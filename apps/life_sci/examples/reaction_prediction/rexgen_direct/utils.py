@@ -509,7 +509,7 @@ def output_candidate_bonds_for_a_reaction(info, max_k):
 
     return candidate_string
 
-def prepare_reaction_center(args, reaction_center_config, loader_batch_size=100):
+def prepare_reaction_center(args, reaction_center_config, loader_batch_size=200):
     """Use a trained model for reaction center prediction to prepare candidate bonds.
 
     Parameters
