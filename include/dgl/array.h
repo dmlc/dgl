@@ -318,8 +318,6 @@ struct CSRMatrix {
         sorted(sorted_flag) {
     CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
         << "Inconsistent bits between indptr and indices";
-    CHECK_EQ(indptr->dtype.bits, data->dtype.bits)
-        << "Inconsistent bits between indptr and data";
   }
 
   /*! \brief constructor from SparseMatrix object */
@@ -331,8 +329,6 @@ struct CSRMatrix {
         data(spmat.indices[2]),
         sorted(spmat.flags[0]) {
     CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
-        << "Inconsistent bits between indptr and indices";
-    CHECK_EQ(indptr->dtype.bits, data->dtype.bits)
         << "Inconsistent bits between indptr and indices";
   }
 
