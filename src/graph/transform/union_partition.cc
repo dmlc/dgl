@@ -54,10 +54,9 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
 
 template HeteroGraphPtr DisjointUnionHeteroGraph<int32_t>(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
-    
+
 template HeteroGraphPtr DisjointUnionHeteroGraph<int64_t>(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
-
 
 template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(

@@ -316,9 +316,11 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
-          CHECK_EQ(indptr->dtype.bits, indices->dtype.bits) << "Inconsistent bits between indptr and indices";
-          CHECK_EQ(indptr->dtype.bits, data->dtype.bits) << "Inconsistent bits between indptr and data";;
-        }
+    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
+        << "Inconsistent bits between indptr and indices";
+    CHECK_EQ(indptr->dtype.bits, data->dtype.bits)
+        << "Inconsistent bits between indptr and data";
+  }
 
   /*! \brief constructor from SparseMatrix object */
   explicit CSRMatrix(const SparseMatrix& spmat)
@@ -327,10 +329,12 @@ struct CSRMatrix {
         indptr(spmat.indices[0]),
         indices(spmat.indices[1]),
         data(spmat.indices[2]),
-        sorted(spmat.flags[0]) {          
-          CHECK_EQ(indptr->dtype.bits, indices->dtype.bits) << "Inconsistent bits between indptr and indices";
-          CHECK_EQ(indptr->dtype.bits, data->dtype.bits) << "Inconsistent bits between indptr and indices";
-        }
+        sorted(spmat.flags[0]) {
+    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
+        << "Inconsistent bits between indptr and indices";
+    CHECK_EQ(indptr->dtype.bits, data->dtype.bits)
+        << "Inconsistent bits between indptr and indices";
+  }
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
