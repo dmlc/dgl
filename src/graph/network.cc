@@ -593,7 +593,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
       recv_data_msg.data,
       AUTO_FREE);
   }
-  // Recv Shape 
+  // Recv Shape
   if (kv_msg->msg_type != kPullMsg &&
       kv_msg->msg_type != kPushMsg &&
       kv_msg->msg_type != kPullBackMsg) {
