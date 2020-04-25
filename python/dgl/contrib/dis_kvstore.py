@@ -418,6 +418,7 @@ class KVServer(object):
                     name=str(client_id),
                     id=None,
                     data=None,
+                    shape=None,
                     c_ptr=None)
                 _send_kv_msg(self._sender, msg, client_id)
 
@@ -435,6 +436,7 @@ class KVServer(object):
                 name=shared_tensor,
                 id=None,
                 data=None,
+                shape=None,
                 c_ptr=None)
 
             for client_id in range(len(self._client_namebook)):
@@ -471,15 +473,16 @@ class KVServer(object):
                     name=msg.name,
                     id=msg.id,
                     data=res_tensor,
+                    shape=None,
                     c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
             # Init new data
-            elif msg.type == KVMsgType.NEW_DATA:
+            elif msg.type == KVMsgType.INIT:
                 assert msg.rank == 0
                 data_str, target_name = msg.name.split('|')
                 data_name, data_type = self._deserialize_shared_tensor(data_str)
                 dtype = F.data_type_dict[data_type]
-                data_shape = F.asnumpy(msg.id).tolist()
+                data_shape = F.asnumpy(msg.shape).tolist()
                 if self._server_id % self._group_count == 0: # master server
                     data_tensor = F.zeros(data_shape, dtype, F.cpu())
                     self.init_data(name=data_name, data_tensor=data_tensor)
@@ -489,11 +492,12 @@ class KVServer(object):
                 self._data_store[data_name+'-g2l-'] = g2l
                 self._has_data.add(data_name+'-g2l-')
                 back_msg = KVStoreMsg(
-                    type=KVMsgType.NEW_DATA,
+                    type=KVMsgType.INIT,
                     rank=self._server_id,
                     name=msg.name,
-                    id=msg.id,
+                    id=None,
                     data=None,
+                    shape=msg.shape,
                     c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, 0)
             # Barrier message
@@ -506,6 +510,7 @@ class KVServer(object):
                         name=None,
                         id=None,
                         data=None,
+                        shape=None,
                         c_ptr=None)
                     for client_id in range(self._client_count):
                         _send_kv_msg(self._sender, back_msg, client_id)
@@ -765,6 +770,7 @@ class KVClient(object):
             name=self._addr,
             id=None,
             data=None,
+            shape=None,
             c_ptr=None)
 
         for server_id in range(self._server_count):
@@ -839,17 +845,18 @@ class KVClient(object):
                 for n in range(self._group_count):
                     server_id = m_id * self._group_count + n
                     msg = KVStoreMsg(
-                        type=KVMsgType.NEW_DATA,
+                        type=KVMsgType.INIT,
                         rank=0,
                         name=data_str,
-                        id=F.tensor(partitioned_shape),
+                        id=None,
                         data=None,
+                        shape=F.tensor(partitioned_shape)
                         c_ptr=None)
                     _send_kv_msg(self._sender, msg, server_id)
             # recv confirmation message from server nodes
             for server_id in range(self._server_count):
                 msg = _recv_kv_msg(self._receiver)
-                assert msg.type == KVMsgType.NEW_DATA
+                assert msg.type == KVMsgType.INIT
         self.barrier() # wait all the client and server finish its job
         g2l = self._data_store[target_name+'-g2l-']
         partition_book = self._data_store[target_name+'-part-']
@@ -996,6 +1003,7 @@ class KVClient(object):
                     name=name,
                     id=partial_id, 
                     data=partial_data,
+                    shape=None,
                     c_ptr=None)
                 # randomly select a server node in target machine for load-balance
                 s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
@@ -1077,6 +1085,7 @@ class KVClient(object):
                         name=name, 
                         id=partial_id,
                         data=None,
+                        shape=None,
                         c_ptr=None)
                     # randomly select a server node in target machine for load-balance
                     s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
@@ -1095,6 +1104,7 @@ class KVClient(object):
                     name=name, 
                     id=None,
                     data=local_data,
+                    shape=None,
                     c_ptr=None)
                 msg_list.append(local_msg)
                 self._garbage_msg.append(local_msg)
@@ -1123,6 +1133,7 @@ class KVClient(object):
             name=None,
             id=None,
             data=None,
+            shape=None,
             c_ptr=None)
 
         for server_id in range(self._server_count):
@@ -1145,6 +1156,7 @@ class KVClient(object):
                 name=None,
                 id=None,
                 data=None,
+                shape=None,
                 c_ptr=None)
             _send_kv_msg(self._sender, msg, server_id)
 

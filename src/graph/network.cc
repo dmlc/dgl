@@ -485,9 +485,17 @@ static void send_kv_message(network::Sender* sender,
       kv_msg->msg_type != kIPIDMsg) {
     // Send ArrayMeta
     ArrayMeta meta(kv_msg->msg_type);
-    meta.AddArray(kv_msg->id);
-    if (kv_msg->msg_type != kPullMsg && kv_msg->msg_type != kNewDataMsg) {
+    if (kv_msg->msg_type != kInitMsg) {
+      meta.AddArray(kv_msg->id);
+    }
+    if (kv_msg->msg_type != kPullMsg &&
+        kv_msg->msg_type != kInitMsg) {
       meta.AddArray(kv_msg->data);
+    }
+    if (kv_msg.msg_type != kPullMsg &&
+        kv_msg.msg_type != kPushMsg &&
+        kv_msg.msg_type != kPullBackMsg) {
+      meta.AddArray(kv_msg->shape);
     }
     int64_t meta_size = 0;
     char* meta_data = meta.Serialize(&meta_size);
@@ -499,14 +507,19 @@ static void send_kv_message(network::Sender* sender,
     }
     CHECK_EQ(sender->Send(send_meta_msg, recv_id), ADD_SUCCESS);
     // Send ID NDArray
-    Message send_id_msg;
-    send_id_msg.data = static_cast<char*>(kv_msg->id->data);
-    send_id_msg.size = kv_msg->id.GetSize();
-    NDArray id = kv_msg->id;
-    send_id_msg.deallocator = [id](Message*) {};
-    CHECK_EQ(sender->Send(send_id_msg, recv_id), ADD_SUCCESS);
+    if (kv_msg->msg_type != kInitMsg) {
+      Message send_id_msg;
+      send_id_msg.data = static_cast<char*>(kv_msg->id->data);
+      send_id_msg.size = kv_msg->id.GetSize();
+      NDArray id = kv_msg->id;
+      if (auto_free) {
+        send_id_msg.deallocator = [id](Message*) {};
+      }
+      CHECK_EQ(sender->Send(send_id_msg, recv_id), ADD_SUCCESS);
+    }
     // Send data NDArray
-    if (kv_msg->msg_type != kPullMsg && kv_msg->msg_type != kNewDataMsg) {
+    if (kv_msg->msg_type != kPullMsg &&
+        kv_msg->msg_type != kInitMsg) {
       Message send_data_msg;
       send_data_msg.data = static_cast<char*>(kv_msg->data->data);
       send_data_msg.size = kv_msg->data.GetSize();
@@ -515,6 +528,19 @@ static void send_kv_message(network::Sender* sender,
         send_data_msg.deallocator = [data](Message*) {};
       }
       CHECK_EQ(sender->Send(send_data_msg, recv_id), ADD_SUCCESS);
+    }
+    // Send shape NDArray
+    if (kv_msg.msg_type != kPullMsg &&
+        kv_msg.msg_type != kPushMsg &&
+        kv_msg.msg_type != kPullBackMsg) {
+      Message send_shape_msg;
+      send_shape_msg.data = static_cast<char*>(kv_msg->shape->data);
+      send_shape_msg.size = kv_msg->shape.GetSize();
+      NDArray shape = kv_msg->shape;
+      if (auto_free) {
+        send_shape_msg.deallocator = [shape](Message*) {};
+      }
+      CHECK_EQ(sender->Send(send_shape_msg, recv_id), ADD_SUCCESS);
     }
   }
 }
@@ -538,23 +564,27 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   ArrayMeta meta(recv_meta_msg.data, recv_meta_msg.size);
   recv_meta_msg.deallocator(&recv_meta_msg);
   // Recv ID NDArray
-  Message recv_id_msg;
-  CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
-  CHECK_EQ(meta.data_shape_[0], 1);
-  kv_msg->id = CreateNDArrayFromRaw(
-    {meta.data_shape_[1]},
-    DLDataType{kDLInt, 64, 1},
-    DLContext{kDLCPU, 0},
-    recv_id_msg.data,
-    AUTO_FREE);
+  if (kv_msg->msg_type != kInitMsg) {
+    Message recv_id_msg;
+    CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
+    CHECK_EQ(meta.data_shape_[0], 1);
+    kv_msg->id = CreateNDArrayFromRaw(
+      {meta.data_shape_[1]},
+      DLDataType{kDLInt, 64, 1},
+      DLContext{kDLCPU, 0},
+      recv_id_msg.data,
+      AUTO_FREE);
+  }
   // Recv Data NDArray
-  if (kv_msg->msg_type != kPullMsg && kv_msg->msg_type != kNewDataMsg) {
+  if (kv_msg->msg_type != kPullMsg &&
+      kv_msg->msg_type != kInitMsg) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
-    CHECK_GE(meta.data_shape_[2], 1);
+    int64_t ndim = meta.data_shape_[2];
+    CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
-    for (int i = 3; i < meta.data_shape_.size(); ++i) {
-      vec_shape.push_back(meta.data_shape_[i]);
+    for (int i = 0; i < ndim; ++i) {
+      vec_shape.push_back(meta.data_shape_[3+i]);
     }
     kv_msg->data = CreateNDArrayFromRaw(
       vec_shape,
@@ -562,6 +592,25 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
       DLContext{kDLCPU, 0},
       recv_data_msg.data,
       AUTO_FREE);
+  }
+  // Recv Shape 
+  if (kv_msg.msg_type != kPullMsg &&
+      kv_msg.msg_type != kPushMsg &&
+      kv_msg.msg_type != kPullBackMsg) {
+    Message recv_shape_msg;
+    CHECK_EQ(receiver->RecvFrom(&recv_shape_msg, send_id), REMOVE_SUCCESS);
+    int64_t ndim = meta.data_shape_[0];
+    CHECK_GE(ndim, 1);
+    std::vector<int64_t> vec_shape;
+    for (int i = 0; i < ndim; ++i) {
+      vec_shape.push_back(meta.data_shape_[1+i]);
+    }
+    kv_msg->shape = CreateNDArrayFromRaw(
+      vec_shape,
+      DLDataType{kDLFloat, 32, 1},
+      DLContext{kDLCPU, 0},
+      recv_data_msg.data,
+      AUTO_FREE);  
   }
   return kv_msg;
 }
@@ -578,13 +627,20 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
     if (kv_msg.msg_type != kFinalMsg && kv_msg.msg_type != kBarrierMsg) {
       std::string name = args[args_count++];
       kv_msg.name = name;
-      if (kv_msg.msg_type != kIPIDMsg) {
+      if (kv_msg.msg_type != kIPIDMsg &&
+          kv_msg.msg_type != kInitMsg) {
         kv_msg.id = args[args_count++];
       }
       if (kv_msg.msg_type != kPullMsg &&
           kv_msg.msg_type != kIPIDMsg &&
-          kv_msg.msg_type != kNewDataMsg) {
+          kv_msg.msg_type != kInitMsg) {
         kv_msg.data = args[args_count++];
+      }
+      if (kv_msg.msg_type != kIPIDMsg &&
+          kv_msg.msg_type != kPullMsg &&
+          kv_msg.msg_type != kPushMsg &&
+          kv_msg.msg_type != kPullBackMsg) {
+        kv_msg.shape = args[args_count++];
       }
     }
     send_kv_message(sender, &kv_msg, recv_id, AUTO_FREE);
@@ -630,6 +686,13 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgData")
     KVMsgHandle chandle = args[0];
     network::KVStoreMsg* msg = static_cast<KVStoreMsg*>(chandle);
     *rv = msg->data;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgShape")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<KVStoreMsg*>(chandle);
+    *rv = msg->shape;
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")

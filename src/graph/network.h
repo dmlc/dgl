@@ -64,11 +64,7 @@ enum MessageType {
   /*!
    * \brief IP and ID msg for KVStore
    */  
-  kIPIDMsg = 7,
-  /*!
-   * \brief New data msg for KVStore
-   */  
-  kNewDataMsg = 8
+  kIPIDMsg = 7
 };
 
 /*!
@@ -198,6 +194,10 @@ class KVStoreMsg {
   * \brief data matrix
   */
   NDArray data;
+  /*!
+  * \brief data shape
+  */
+  NDArray shape;
 };
 
 }  // namespace network
