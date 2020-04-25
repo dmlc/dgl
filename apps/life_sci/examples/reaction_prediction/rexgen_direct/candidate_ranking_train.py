@@ -2,9 +2,12 @@ import torch
 
 from dgllife.data import USPTORank, WLNRankDataset
 from dgllife.model import WLNReactionRanking
+from torch.nn import BCEWithLogitsLoss
+from torch.optim import Adam
+from torch.utils.data import DataLoader
 
 from configure import reaction_center_config, candidate_ranking_config
-from utils import prepare_reaction_center, mkdir_p, set_seed
+from utils import prepare_reaction_center, mkdir_p, set_seed, collate_rank
 
 def main(args, path_to_candidate_bonds):
     if args['train_path'] is None:
@@ -28,11 +31,18 @@ def main(args, path_to_candidate_bonds):
                                  train_mode=False,
                                  num_processes=args['num_processes'])
 
+    train_loader = DataLoader(train_set, batch_size=1, collate_fn=collate_rank, shuffle=True)
+    val_loader = DataLoader(val_set, batch_size=1, collate_fn=collate_rank, shuffle=False)
+
     model = WLNReactionRanking(
         node_in_feats=args['node_in_feats'],
         edge_in_feats=args['edge_in_feats'],
         node_hidden_feats=args['hidden_size'],
         num_encode_gnn_layers=args['num_encode_gnn_layers']).to(args['device'])
+    criterion = BCEWithLogitsLoss(reduction='sum')
+    optimizer = Adam(model.parameters(), lr=args['lr'])
+
+    dur = []
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

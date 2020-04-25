@@ -26,5 +26,6 @@ candidate_ranking_config = {
     'max_norm': 50.0,
     'num_epochs': 25,
     'node_in_feats': 89,
-    'edge_in_feats': 5
+    'edge_in_feats': 5,
+    'lr': 0.001
 }

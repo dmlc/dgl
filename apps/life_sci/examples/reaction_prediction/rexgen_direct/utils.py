@@ -606,7 +606,24 @@ def collate_rank(data):
 
     Returns
     -------
-    candidate_combos
+    candidate_combos : list
+        Each element of the list is a list of 4-tuples, which is a combo of bond changes for
+        generating a reaction candidate product. Each tuple is of form
+        ``(atom1, atom2, change_type, score)``, where ``atom1`` and ``atom2`` are the end
+        atoms to form or lose a bond, ``change_type`` is the type of bond change and
+        ``score`` represents the confidence for the bond change by a model.
+    bg : DGLGraph
+        A batch of B molecular graphs, where the first graph is the reactants and
+        the rest graphs are candidate products.
+    node_feats : float32 tensor of shape (B * N, M1)
+        Node features. N for the number of atoms in reactants and M1 for the feature size.
+    edge_feats : float32 tensor of shape (E, M2)
+        Edge features. E for the number of edges in the batch of graphs and
+        M2 for the feature size.
+    combo_scores : float32 tensor of shape (B - 1, 1)
+        Scores for candidate products by the model for reaction center prediction.
+    labels : float32 tensor of shape (B - 1, 1)
+        Binary labels for candidate products, where 1 indicates the real product.
     """
     assert len(data) == 1, 'This collate function only works with batch size 1.'
     data = data[0]
@@ -619,6 +636,7 @@ def collate_rank(data):
     old_feats_shape = node_feats.shape
     node_feats = node_feats.reshape((1,) + old_feats_shape)
     node_feats = node_feats.expand((bg.batch_size,) + old_feats_shape)
+    node_feats.reshape(-1, node_feats.shape[-1])
 
     if len(data) == 4:
         return candidate_combos, bg, node_feats, edge_feats, combo_scores
