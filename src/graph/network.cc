@@ -607,7 +607,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     }
     kv_msg->shape = CreateNDArrayFromRaw(
       vec_shape,
-      DLDataType{kDLFloat, 32, 1},
+      DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0},
       recv_shape_msg.data,
       AUTO_FREE);
