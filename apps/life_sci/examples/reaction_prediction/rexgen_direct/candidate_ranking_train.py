@@ -1,6 +1,7 @@
 import torch
 
 from dgllife.data import USPTORank, WLNRankDataset
+from dgllife.model import WLNReactionRanking
 
 from configure import reaction_center_config, candidate_ranking_config
 from utils import prepare_reaction_center, mkdir_p, set_seed
@@ -16,6 +17,22 @@ def main(args, path_to_candidate_bonds):
                                    mol_graph_path='train_rank_graphs.bin',
                                    num_processes=args['num_processes'])
     train_set.ignore_large()
+    if args['val_path'] is None:
+        val_set = USPTORank(subset='val', candidate_bond_path=path_to_candidate_bonds['val'],
+                            num_processes=args['num_processes'])
+    else:
+        val_set = WLNRankDataset(path_to_save_results=args['result_path'] + '/val',
+                                 raw_file_path=args['val_path'],
+                                 candidate_bond_path=path_to_candidate_bonds['val'],
+                                 mol_graph_path='val_rank_graphs.bin',
+                                 train_mode=False,
+                                 num_processes=args['num_processes'])
+
+    model = WLNReactionRanking(
+        node_in_feats=args['node_in_feats'],
+        edge_in_feats=args['edge_in_feats'],
+        node_hidden_feats=args['hidden_size'],
+        num_encode_gnn_layers=args['num_encode_gnn_layers']).to(args['device'])
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

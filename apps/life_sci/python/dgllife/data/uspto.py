@@ -1152,6 +1152,98 @@ def featurize_nodes_and_compute_combo_scores(
 
     return node_feats, combo_bias
 
+def construct_graphs_rank(edge_featurizer, info):
+    """Construct graphs for reactants and candidate products in a reaction and featurize
+    their edges
+
+    Parameters
+    ----------
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
+        edata for a DGLGraph.
+    info : 4-tuple
+        * reactant_mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for reactants in a reaction
+        * candidate_combos : list
+            candidate_combos[i] gives a list of tuples, which is the i-th valid combo
+            of candidate bond changes for the reaction.
+        * candidate_bond_changes : list of 4-tuples
+            Refined candidate bond changes considered for candidate products
+        * reactant_info : dict
+            Reaction-related information of reactants.
+
+    Returns
+    -------
+    reaction_graphs : list of DGLGraphs
+        DGLGraphs for reactants and candidate products with edge features in edata['he'],
+        where the first graph is for reactants.
+    """
+    reactant_mol, candidate_combos, candidate_bond_changes, reactant_info = info
+    # Graphs for reactants and candidate products
+    reaction_graphs = []
+
+    # Get graph for the reactants
+    reactant_graph = mol_to_bigraph(reactant_mol, edge_featurizer=edge_featurizer,
+                                    canonical_atom_order=False)
+    reaction_graphs.append(reactant_graph)
+
+    candidate_bond_changes_no_score = [
+        (atom1, atom2, change_type)
+        for (atom1, atom2, change_type, score) in candidate_bond_changes]
+
+    # Prepare common components across all candidate products
+    breaking_reactant_neighbors = []
+    common_src_list = []
+    common_dst_list = []
+    common_edge_feats = []
+    num_bonds = reactant_mol.GetNumBonds()
+    for j in range(num_bonds):
+        bond = reactant_mol.GetBondWithIdx(j)
+        u = bond.GetBeginAtomIdx()
+        v = bond.GetEndAtomIdx()
+        u_sort, v_sort = min(u, v), max(u, v)
+        # Whether a bond in reactants might get broken
+        if (u_sort, v_sort, 0.0) not in candidate_bond_changes_no_score:
+            common_src_list.extend([u, v])
+            common_dst_list.extend([v, u])
+            common_edge_feats.extend([reactant_graph.edata['he'][2 * j],
+                                      reactant_graph.edata['he'][2 * j + 1]])
+        else:
+            breaking_reactant_neighbors.append((
+                u_sort, v_sort, bond.GetBondTypeAsDouble()))
+
+    for combo in candidate_combos:
+        combo_src_list = deepcopy(common_src_list)
+        combo_dst_list = deepcopy(common_dst_list)
+        combo_edge_feats = deepcopy(common_edge_feats)
+        candidate_bond_end_atoms = [
+            (atom1, atom2) for (atom1, atom2, change_type, score) in combo]
+        for (atom1, atom2, change_type) in breaking_reactant_neighbors:
+            if (atom1, atom2) not in candidate_bond_end_atoms:
+                # If a bond might be broken in some other combos but not this,
+                # add it as a negative sample
+                combo.append((atom1, atom2, change_type, 0.0))
+
+        for (atom1, atom2, change_type, score) in combo:
+            if change_type == 0:
+                continue
+            combo_src_list.extend([atom1, atom2])
+            combo_dst_list.extend([atom2, atom1])
+            feats = one_hot_encoding(change_type, [1.0, 2.0, 3.0, 1.5, -1])
+            if (atom1, atom2) in reactant_info['ring_bonds']:
+                feats[-1] = 1
+            feats = torch.tensor(feats).float()
+            combo_edge_feats.extend([feats, feats.clone()])
+
+        combo_edge_feats = torch.stack(combo_edge_feats, dim=0)
+        combo_graph = DGLGraph()
+        combo_graph.add_nodes(reactant_graph.number_of_nodes())
+        combo_graph.add_edges(combo_src_list, combo_dst_list)
+        combo_graph.edata['he'] = combo_edge_feats
+        reaction_graphs.append(combo_graph)
+
+    return reaction_graphs
+
 class WLNRankDataset(object):
     """Dataset for ranking candidate products with WLN
 
@@ -1188,9 +1280,6 @@ class WLNRankDataset(object):
         Number of bond change combos to consider for each reaction. Default to 150.
     train_mode : bool
         Whether the dataset is to be used for training. Default to True.
-    log_every : int
-        Print a progress update every time ``log_every`` reactions are pre-processed.
-        Default to 10000.
     load : bool
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
@@ -1210,7 +1299,6 @@ class WLNRankDataset(object):
                  num_candidate_bond_changes=16,
                  max_num_change_combos_per_reaction=150,
                  train_mode=True,
-                 log_every=10000,
                  load=True,
                  num_processes=1):
         super(WLNRankDataset, self).__init__()
@@ -1233,7 +1321,7 @@ class WLNRankDataset(object):
         self.node_feats, self.combo_bias = \
             self.get_node_feats_and_candidate_scores(node_featurizer)
         self.candidate_graphs = self.construct_and_featurize_edges(
-            mol_graph_path, edge_featurizer, load, log_every)
+            mol_graph_path, edge_featurizer, load, num_processes)
 
     def load_reaction_data(self, file_path, num_processes):
         """Load reaction data from the raw file.
@@ -1456,6 +1544,15 @@ class WLNRankDataset(object):
         node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
             Featurization for nodes like atoms in a molecule, which can be used to update
             ndata for a DGLGraph.
+
+        Returns
+        -------
+        all_node_features : list of float32 tensor of shape (Ni, M)
+            Node features for reactants in all reactions, Ni for the number of nodes in
+            the i-th reaction and M for feature size.
+        all_combo_bias : list of float32 tensor of shape (Bi, 1)
+            Scores for candidate products in all reactions, Bi for the number of candidate
+            products in the i-th reaction.
         """
         print('Stage 4/5: preparing node features and candidate scores')
 
@@ -1471,7 +1568,7 @@ class WLNRankDataset(object):
 
         return all_node_features, all_combo_bias
 
-    def construct_and_featurize_edges(self, mol_graph_path, edge_featurizer, load, log_every):
+    def construct_and_featurize_edges(self, mol_graph_path, edge_featurizer, load, num_processes):
         """Construct DGLGraphs and featurize their edges.
 
         Parameters
@@ -1485,98 +1582,50 @@ class WLNRankDataset(object):
             Whether to load the previously pre-processed dataset or pre-process from scratch.
             ``load`` should be False when we want to try different graph construction and
             featurization methods and need to preprocess from scratch.
-        log_every : int
-            Print a progress update every time ``log_every`` reactions are pre-processed.
+        num_processes : int
+            Number of processes to use for data pre-processing.
+
+        Returns
+        -------
+        all_graphs : list of list
+            all_graphs[i] gives the graphs for reactants and candidate products
+            in the i-th reaction, where the first graph is for reactants.
         """
         print('Stage 5/5: constructing DGLGraphs and featurize their edges...')
-        self.graphs = []
+        all_graphs = []
         if load and os.path.isfile(mol_graph_path):
             print('Loading previously saved graphs...')
             graphs, _ = load_graphs(mol_graph_path)
             start = 0
-            for i in range(len(self.reactant_mols)):
-                if i % log_every == 0:
-                    print('Processing reaction {:d}/{:d}'.format(i + 1, len(self.reactant_mols)))
+            ids = list(range(len(self.reactant_mols)))
+            for i in tqdm(ids):
                 # One additional graph for reactants
                 num_graphs_i = len(self.valid_candidate_combos[i]) + 1
                 end = start + num_graphs_i
-                self.graphs.append(graphs[start:end])
+                all_graphs.append(graphs[start:end])
                 start = end
         else:
             print('Constructing graphs from scratch...')
-            for i in range(len(self.reactant_mols)):
-                if i % log_every == 0:
-                    print('Processing reaction {:d}/{:d}'.format(i + 1, len(self.reactant_mols)))
+            if num_processes == 1:
+                ids = list(range(len(self.reactant_mols)))
+                for i in tqdm(ids):
+                    all_graphs.append(construct_graphs_rank(
+                        edge_featurizer, (self.reactant_mols[i], self.valid_candidate_combos[i],
+                        self.candidate_bond_changes[i], self.reactant_info[i])))
+            else:
+                all_reaction_info = list(zip(self.reactant_mols,
+                                             self.valid_candidate_combos,
+                                             self.candidate_bond_changes, self.reactant_info))
+                with Pool(processes=num_processes) as pool:
+                    all_graphs = list(tqdm(pool.imap(partial(
+                        construct_graphs_rank,
+                        edge_featurizer=edge_featurizer),
+                        all_reaction_info, chunksize=len(all_reaction_info) // num_processes),
+                        total=len(all_reaction_info)))
 
-                # Graphs for reactants and candidate products
-                reaction_graphs = []
+            save_graphs(mol_graph_path, list(itertools.chain.from_iterable(all_graphs)))
 
-                # Get graph for the reactants
-                reactant_mol = self.reactant_mols[i]
-                reactant_graph = mol_to_bigraph(reactant_mol, edge_featurizer=edge_featurizer,
-                                                canonical_atom_order=False)
-                reaction_graphs.append(reactant_graph)
-
-                candidate_combos = self.valid_candidate_combos[i]
-                candidate_bond_changes = self.candidate_bond_changes[i]
-                candidate_bond_changes_no_score = [
-                    (atom1, atom2, change_type)
-                    for (atom1, atom2, change_type, score) in candidate_bond_changes]
-
-                # Prepare common components across all candidate products
-                breaking_reactant_neighbors = []
-                common_src_list = []
-                common_dst_list = []
-                common_edge_feats = []
-                num_bonds = reactant_mol.GetNumBonds()
-                for j in range(num_bonds):
-                    bond = reactant_mol.GetBondWithIdx(j)
-                    u = bond.GetBeginAtomIdx()
-                    v = bond.GetEndAtomIdx()
-                    u_sort, v_sort = min(u, v), max(u, v)
-                    # Whether a bond in reactants might get broken
-                    if (u_sort, v_sort, 0.0) not in candidate_bond_changes_no_score:
-                        common_src_list.extend([u, v])
-                        common_dst_list.extend([v, u])
-                        common_edge_feats.extend([reactant_graph.edata['he'][2 * j],
-                                                  reactant_graph.edata['he'][2 * j + 1]])
-                    else:
-                        breaking_reactant_neighbors.append((
-                            u_sort, v_sort, bond.GetBondTypeAsDouble()))
-
-                reactant_info = self.reactant_info[i]
-                for combo in candidate_combos:
-                    combo_src_list = deepcopy(common_src_list)
-                    combo_dst_list = deepcopy(common_dst_list)
-                    combo_edge_feats = deepcopy(common_edge_feats)
-                    candidate_bond_end_atoms = [
-                        (atom1, atom2) for (atom1, atom2, change_type)
-                        in candidate_bond_changes_no_score]
-                    for (atom1, atom2, change_type) in breaking_reactant_neighbors:
-                        if (atom1, atom2) not in candidate_bond_end_atoms:
-                            # If a bond might be broken in some other combos but not this,
-                            # add it as a negative sample
-                            combo.append((atom1, atom2, change_type, 0.0))
-
-                    for (atom1, atom2, change_type, score) in combo:
-                        if change_type == 0:
-                            continue
-                        combo_src_list.extend([atom1, atom2])
-                        combo_dst_list.extend([atom2, atom1])
-                        feats = one_hot_encoding(change_type, [1.0, 2.0, 3.0, 1.5, -1])
-                        if (atom1, atom2) in reactant_info['ring_bonds']:
-                            feats[-1] = 1
-                        feats = torch.tensor(feats).float()
-                        combo_edge_feats.extend([feats, feats.clone()])
-
-                    combo_edge_feats = torch.stack(combo_edge_feats, dim=0)
-                    combo_graph = DGLGraph()
-                    combo_graph.add_nodes(reactant_graph.number_of_nodes())
-                    combo_graph.add_edges(combo_src_list, combo_dst_list)
-                    combo_graph.edata['he'] = combo_edge_feats
-                    reaction_graphs.append(combo_graph)
-                self.graphs.append(reaction_graphs)
-            save_graphs(mol_graph_path, list(itertools.chain.from_iterable(self.graphs)))
+        return all_graphs
 
     def ignore_large(self, ignore=True):
         """Whether to ignore reactions where reactants contain too many atoms.
@@ -1618,8 +1667,8 @@ class WLNRankDataset(object):
             atoms to form or lose a bond, ``change_type`` is the type of bond change and
             ``score`` represents the confidence for the bond change by a model.
         list of B + 1 DGLGraph
-            The first entry in the list is the DGLGraph for the reactants. Each DGLGraph has
-            edge features in edata['he'].
+            The first entry in the list is the DGLGraph for the reactants and the rest are
+            DGLGraphs for candidate products. Each DGLGraph has edge features in edata['he'].
         float32 tensor of shape (N, M)
             Atom features that are shared over all product candidates, where N is the number of
             atoms and M is the feature size.
@@ -1675,9 +1724,6 @@ class USPTORank(WLNRankDataset):
         Default to 16.
     max_num_change_combos_per_reaction : int
         Number of bond change combos to consider for each reaction. Default to 150.
-    log_every : int
-        Print a progress update every time ``log_every`` reactions are pre-processed.
-        Default to 10000.
     load : bool
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
@@ -1692,7 +1738,6 @@ class USPTORank(WLNRankDataset):
                  max_num_changes_per_reaction=5,
                  num_candidate_bond_changes=16,
                  max_num_change_combos_per_reaction=150,
-                 log_every=10000,
                  load=True,
                  num_processes=1):
         assert subset in ['train', 'val', 'test'], \
@@ -1725,7 +1770,6 @@ class USPTORank(WLNRankDataset):
             num_candidate_bond_changes=num_candidate_bond_changes,
             max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
             train_mode=train_mode,
-            log_every=log_every,
             load=load,
             num_processes=num_processes)
 

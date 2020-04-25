@@ -3,13 +3,13 @@ import time
 import torch
 
 from dgllife.data import USPTOCenter, WLNCenterDataset
-from dgllife.model import WLNReactionCenter, load_pretrained
+from dgllife.model import WLNReactionCenter
 from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from utils import collate, reaction_center_prediction, reaction_center_rough_eval_on_a_loader, \
-    mkdir_p, set_seed, synchronize, get_center_subset
+from utils import collate_center, reaction_center_prediction, \
+    reaction_center_rough_eval_on_a_loader, mkdir_p, set_seed, synchronize, get_center_subset
 
 def load_dataset(args):
     if args['train_path'] is None:
@@ -41,9 +41,9 @@ def main(rank, dev_id, args):
     train_set, val_set = load_dataset(args)
     get_center_subset(train_set, rank, args['num_devices'])
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
-                              collate_fn=collate, shuffle=True)
+                              collate_fn=collate_center, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
-                            collate_fn=collate, shuffle=False)
+                            collate_fn=collate_center, shuffle=False)
 
     model = WLNReactionCenter(node_in_feats=args['node_in_feats'],
                               edge_in_feats=args['edge_in_feats'],

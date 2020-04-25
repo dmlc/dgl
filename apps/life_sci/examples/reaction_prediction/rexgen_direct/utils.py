@@ -194,8 +194,8 @@ def synchronize(num_gpus):
     if num_gpus > 1:
         dist.barrier()
 
-def collate(data):
-    """Collate multiple datapoints
+def collate_center(data):
+    """Collate multiple datapoints for reaction center prediction
 
     Parameters
     ----------
@@ -592,3 +592,35 @@ def prepare_reaction_center(args, reaction_center_config):
         del dataloader
 
     return path_to_candidate_bonds
+
+def collate_rank(data):
+    """Collate multiple datapoints for candidate product ranking
+
+    Parameters
+    ----------
+    data : list of 4-tuples or 5-tuples
+        Each tuple is for a single datapoint, consisting of combos of bond changes for candidate
+        products, DGLGraphs for reactants and candidate products, node features shared across
+        all DGLGraphs, scores for candidate products by the model for reaction center prediction,
+        and labels for candidate products.
+
+    Returns
+    -------
+    candidate_combos
+    """
+    assert len(data) == 1, 'This collate function only works with batch size 1.'
+    data = data[0]
+    if len(data) == 4:
+        candidate_combos, graphs, node_feats, combo_scores = data
+    else:
+        candidate_combos, graphs, node_feats, combo_scores, labels = data
+    bg = dgl.batch(graphs)
+    edge_feats = bg.edata.pop('he')
+    old_feats_shape = node_feats.shape
+    node_feats = node_feats.reshape((1,) + old_feats_shape)
+    node_feats = node_feats.expand((bg.batch_size,) + old_feats_shape)
+
+    if len(data) == 4:
+        return candidate_combos, bg, node_feats, edge_feats, combo_scores
+    else:
+        return candidate_combos, bg, node_feats, edge_feats, combo_scores, labels

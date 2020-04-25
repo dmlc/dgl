@@ -91,19 +91,34 @@ class WLN(nn.Module):
     n_layers : int
         Number of times for message passing. Note that same parameters
         are shared across n_layers message passing. Default to 3.
+    project_in_feats : bool
+        Whether to project input node features. If this is False, we expect node_in_feats
+        to be the same as node_out_feats. Default to True.
+    set_comparison : bool
+        Whether to perform final node representation update mimicking
+        set comparison. Default to True.
     """
     def __init__(self,
                  node_in_feats,
                  edge_in_feats,
                  node_out_feats=300,
-                 n_layers=3):
+                 n_layers=3,
+                 project_in_feats=True,
+                 set_comparison=True):
         super(WLN, self).__init__()
 
         self.n_layers = n_layers
-        self.project_node_in_feats = nn.Sequential(
-            WLNLinear(node_in_feats, node_out_feats, bias=False),
-            nn.ReLU()
-        )
+        self.project_in_feats = project_in_feats
+        if project_in_feats:
+            self.project_node_in_feats = nn.Sequential(
+                WLNLinear(node_in_feats, node_out_feats, bias=False),
+                nn.ReLU()
+            )
+        else:
+            assert node_in_feats == node_out_feats, \
+                'Expect input node features to have the same size as that of output ' \
+                'node features, got {:d} and {:d}'.format(node_in_feats, node_out_feats)
+
         self.project_concatenated_messages = nn.Sequential(
             WLNLinear(edge_in_feats + node_out_feats, node_out_feats),
             nn.ReLU()
@@ -112,9 +127,11 @@ class WLN(nn.Module):
             WLNLinear(2 * node_out_feats, node_out_feats),
             nn.ReLU()
         )
-        self.project_edge_messages = WLNLinear(edge_in_feats, node_out_feats, bias=False)
-        self.project_node_messages = WLNLinear(node_out_feats, node_out_feats, bias=False)
-        self.project_self = WLNLinear(node_out_feats, node_out_feats, bias=False)
+        self.set_comparison = set_comparison
+        if set_comparison:
+            self.project_edge_messages = WLNLinear(edge_in_feats, node_out_feats, bias=False)
+            self.project_node_messages = WLNLinear(node_out_feats, node_out_feats, bias=False)
+            self.project_self = WLNLinear(node_out_feats, node_out_feats, bias=False)
 
     def forward(self, g, node_feats, edge_feats):
         """Performs message passing and updates node representations.
@@ -133,7 +150,8 @@ class WLN(nn.Module):
         float32 tensor of shape (V, node_out_feats)
             Updated node representations.
         """
-        node_feats = self.project_node_in_feats(node_feats)
+        if self.project_in_feats:
+            node_feats = self.project_node_in_feats(node_feats)
         for _ in range(self.n_layers):
             g = g.local_var()
             g.ndata['hv'] = node_feats
@@ -144,9 +162,12 @@ class WLN(nn.Module):
             node_feats = self.get_new_node_feats(
                 torch.cat([node_feats, g.ndata['hv_new']], dim=1))
 
-        g = g.local_var()
-        g.ndata['hv'] = self.project_node_messages(node_feats)
-        g.edata['he'] = self.project_edge_messages(edge_feats)
-        g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h_nbr'))
-        h_self = self.project_self(node_feats)  # (V, node_out_feats)
-        return g.ndata['h_nbr'] * h_self
+        if not self.set_comparison:
+            return node_feats
+        else:
+            g = g.local_var()
+            g.ndata['hv'] = self.project_node_messages(node_feats)
+            g.edata['he'] = self.project_edge_messages(edge_feats)
+            g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h_nbr'))
+            h_self = self.project_self(node_feats)  # (V, node_out_feats)
+            return g.ndata['h_nbr'] * h_self

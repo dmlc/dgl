@@ -22,7 +22,9 @@ reaction_center_config = {
 candidate_ranking_config = {
     'batch_size': 4,
     'hidden_size': 500,
-    'n_layers': 3,
+    'num_encode_gnn_layers': 3,
     'max_norm': 50.0,
-    'num_epochs': 25
+    'num_epochs': 25,
+    'node_in_feats': 89,
+    'edge_in_feats': 5
 }

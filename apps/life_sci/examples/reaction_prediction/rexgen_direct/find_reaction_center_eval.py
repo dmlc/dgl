@@ -4,7 +4,7 @@ from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import WLNReactionCenter, load_pretrained
 from torch.utils.data import DataLoader
 
-from utils import reaction_center_final_eval, set_seed, collate
+from utils import reaction_center_final_eval, set_seed, collate_center
 
 def main(args):
     set_seed()
@@ -22,7 +22,7 @@ def main(args):
                                     mol_graph_path='test.bin',
                                     num_processes=args['num_processes'])
     test_loader = DataLoader(test_set, batch_size=args['batch_size'],
-                             collate_fn=collate, shuffle=False)
+                             collate_fn=collate_center, shuffle=False)
 
     if args['pre_trained']:
         model = load_pretrained('wln_center_uspto')
