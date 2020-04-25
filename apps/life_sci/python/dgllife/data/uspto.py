@@ -979,34 +979,49 @@ def get_product_smiles(reactant_mols, edits, product_info):
         return smiles
     return edit_mol(reactant_mols, edits, product_info)
 
-def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_changes_per_reaction,
-                             max_num_change_combos_per_reaction, node_featurizer, train_mode):
+def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_changes,
+                             max_num_change_combos, node_featurizer, train_mode):
     """Pre-process one reaction for candidate ranking.
 
     Parameters
     ----------
     info : 4-tuple
-
-    num_candidate_bond_changes
-    max_num_changes_per_reaction
-    max_num_change_combos_per_reaction
-    node_featurizer
-    train_mode
+        * candidate_bond_changes : list of tuples
+            The candidate bond changes for the reaction
+        * real_bond_changes : list of tuples
+            The real bond changes for the reaction
+        * reactant_mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for reactants
+        * product_mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for product
+    num_candidate_bond_changes : int
+        Number of candidate bond changes to consider for the ground truth reaction.
+    max_num_bond_changes : int
+        Maximum number of bond changes per reaction.
+    max_num_change_combos : int
+        Number of bond change combos to consider for each reaction.
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
+        ndata for a DGLGraph.
+    train_mode : bool
+        Whether the dataset is to be used for training.
 
     Returns
     -------
-
+    valid_candidate_combos : list
+        valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
+        of candidate bond changes.
     """
-    candidate_bond_changes, real_bond_changes, reactant_mol, product_mol = info
+    candidate_bond_changes_, real_bond_changes, reactant_mol, product_mol = info
     candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
-                       in candidate_bond_changes]
+                       in candidate_bond_changes_]
     reactant_info = bookkeep_reactant(reactant_mol, candidate_pairs)
     if train_mode:
         product_info = bookkeep_product(product_mol)
 
     # Filter out candidate new bonds already in reactants
     candidate_bond_changes = []
-    for (atom1, atom2, change_type, score) in candidate_bond_changes:
+    for (atom1, atom2, change_type, score) in candidate_bond_changes_:
         if ((atom1, atom2) not in reactant_info['pair_to_bond_val']) or \
                 (reactant_info['pair_to_bond_val'][(atom1, atom2)] != change_type):
             candidate_bond_changes.append((atom1, atom2, change_type, score))
@@ -1026,7 +1041,7 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_changes_p
     # those that are connected and chemically valid
     valid_candidate_combos = []
     cand_change_ids = range(len(candidate_bond_changes))
-    for k in range(1, max_num_changes_per_reaction + 1):
+    for k in range(1, max_num_bond_changes + 1):
         for combo_ids in combinations(cand_change_ids, k):
             # Check if the changed bonds form a connected component
             if not is_connected_change_combo(combo_ids, cand_change_adj):
@@ -1072,7 +1087,7 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_changes_p
                 product_smiles.add(smiles)
                 new_candidate_combos.append(combo)
 
-    valid_candidate_combos = valid_candidate_combos[:max_num_change_combos_per_reaction]
+    valid_candidate_combos = valid_candidate_combos[:max_num_change_combos]
 
     # node features
     combo_bias = torch.zeros(len(valid_candidate_combos), 1).float()
@@ -1341,8 +1356,8 @@ class WLNRankDataset(object):
                     results = list(tqdm(pool.imap(partial(
                         pre_process_one_reaction,
                         num_candidate_bond_changes=num_candidate_bond_changes,
-                        max_num_changes_per_reaction=max_num_changes_per_reaction,
-                        max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
+                        max_num_bond_changes=max_num_changes_per_reaction,
+                        max_num_change_combos=max_num_change_combos_per_reaction,
                         node_featurizer=node_featurizer, train_mode=self.train_mode),
                         batch_reaction_info, chunksize=batch_size // num_processes),
                         total=len(batch_reaction_info)))
@@ -1556,6 +1571,11 @@ class USPTORank(WLNRankDataset):
         contain more than ``size_cutoff`` atoms. Default to 100.
     max_num_changes_per_reaction : int
         Maximum number of bond changes per reaction. Default to 5.
+    num_candidate_bond_changes : int
+        Number of candidate bond changes to consider for each ground truth reaction.
+        Default to 16.
+    max_num_change_combos_per_reaction : int
+        Number of bond change combos to consider for each reaction. Default to 150.
     log_every : int
         Print a progress update every time ``log_every`` reactions are pre-processed.
         Default to 10000.
@@ -1571,6 +1591,8 @@ class USPTORank(WLNRankDataset):
                  candidate_bond_path,
                  size_cutoff=100,
                  max_num_changes_per_reaction=5,
+                 num_candidate_bond_changes=16,
+                 max_num_change_combos_per_reaction=150,
                  log_every=10000,
                  load=True,
                  num_processes=1):
@@ -1598,6 +1620,8 @@ class USPTORank(WLNRankDataset):
             mol_graph_path=extracted_data_path + '/{}_mol_graphs_rank.bin'.format(subset),
             size_cutoff=size_cutoff,
             max_num_changes_per_reaction=max_num_changes_per_reaction,
+            num_candidate_bond_changes=num_candidate_bond_changes,
+            max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
             train_mode=train_mode,
             log_every=log_every,
             load=load,

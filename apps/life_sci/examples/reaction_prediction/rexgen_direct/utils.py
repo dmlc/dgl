@@ -10,12 +10,9 @@ import torch.nn as nn
 from collections import defaultdict
 from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import load_pretrained, WLNReactionCenter
-from functools import partial
-from multiprocessing import Pool
 from rdkit import Chem
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 def mkdir_p(path):
     """Create a folder for the given path.
@@ -362,12 +359,15 @@ def get_candidate_bonds(reaction, preds, num_nodes, max_k, easy, include_scores=
     for reactant in reactants.split('.'):
         reactant_mol = Chem.MolFromSmiles(reactant)
         reactant_atoms = [atom.GetAtomMapNum() for atom in reactant_mol.GetAtoms()]
+        # In the hard mode, all reactant atoms will be included.
+        # In the easy mode, only reactants contributing atoms to the product will be included.
         if (len(set(reactant_atoms) & product_atoms) > 0) or (not easy):
             reaction_atoms.extend(reactant_atoms)
             for bond in reactant_mol.GetBonds():
                 end_atoms = sorted([bond.GetBeginAtom().GetAtomMapNum(),
                                     bond.GetEndAtom().GetAtomMapNum()])
                 bond = tuple(end_atoms + [bond.GetBondTypeAsDouble()])
+                # Bookkeep bonds already in reactants
                 reaction_bonds[bond] = True
 
     candidate_bonds = []
@@ -379,6 +379,7 @@ def get_candidate_bonds(reaction, preds, num_nodes, max_k, easy, include_scores=
         change_id = preds_j % num_change_types
         change_type = id_to_bond_change[change_id]
         pair_id = preds_j // num_change_types
+        # Atom map numbers
         atom1 = pair_id // num_nodes + 1
         atom2 = pair_id % num_nodes + 1
         # Avoid duplicates and an atom cannot form a bond with itself
