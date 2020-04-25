@@ -90,6 +90,9 @@ def _get_graph_from_shared_mem(graph_name):
     through shared memory to reduce the overhead of data access.
     '''
     gidx = from_shared_mem_graph_index(_get_graph_path(graph_name))
+    if gidx is None:
+        return gidx
+
     g = DGLGraph(gidx)
     g.ndata['part_id'] = _get_shared_mem_ndata(g, graph_name, 'part_id')
     g.ndata['local_node'] = _get_shared_mem_ndata(g, graph_name, 'local_node')
@@ -337,8 +340,12 @@ class DistGraph:
 
         self._client.barrier()
 
-        self._local_nids = F.nonzero_1d(self.g.ndata['local_node'])
-        self._local_gnid = self.g.ndata[NID][self._local_nids]
+        if self.g is not None:
+            self._local_nids = F.nonzero_1d(self.g.ndata['local_node'])
+            self._local_gnid = self.g.ndata[NID][self._local_nids]
+        else:
+            self._local_nids = None
+            self._local_gnid = None
 
     def _get_all_ndata_names(self):
         names = self._client.get_data_name_list()

@@ -65,6 +65,13 @@ class SharedMemory {
    * \return the address of the shared memory
    */
   void *open(size_t size);
+
+  /*
+   * \brief check if the shared memory exist.
+   * \param name the name of the shared memory.
+   * \return a boolean value to indicate if the shared memory exists.
+   */
+  static bool exist(const std::string &name);
 };
 #endif  // _WIN32
 
