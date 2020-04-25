@@ -850,7 +850,7 @@ class KVClient(object):
                         name=data_str,
                         id=None,
                         data=None,
-                        shape=F.tensor(partitioned_shape)
+                        shape=F.tensor(partitioned_shape),
                         c_ptr=None)
                     _send_kv_msg(self._sender, msg, server_id)
             # recv confirmation message from server nodes
