@@ -39,6 +39,11 @@ SchNet
 .. automodule:: dgllife.model.gnn.schnet
     :members:
 
+Weave
+-----
+.. automodule:: dgllife.model.gnn.weave
+    :members:
+
 WLN
 ---
 .. automodule:: dgllife.model.gnn.wln

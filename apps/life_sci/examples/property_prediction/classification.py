@@ -9,16 +9,21 @@ from torch.utils.data import DataLoader
 
 from utils import set_random_seed, load_dataset_for_classification, collate_molgraphs, load_model
 
+def predict(args, model, bg):
+    node_feats = bg.ndata.pop(args['node_data_field']).to(args['device'])
+    if args.get('edge_featurizer', None) is not None:
+        edge_feats = bg.edata.pop(args['edge_data_field']).to(args['device'])
+        return model(bg, node_feats, edge_feats)
+    else:
+        return model(bg, node_feats)
+
 def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer):
     model.train()
     train_meter = Meter()
     for batch_id, batch_data in enumerate(data_loader):
         smiles, bg, labels, masks = batch_data
-        atom_feats = bg.ndata.pop(args['atom_data_field'])
-        atom_feats, labels, masks = atom_feats.to(args['device']), \
-                                    labels.to(args['device']), \
-                                    masks.to(args['device'])
-        logits = model(bg, atom_feats)
+        labels, masks = labels.to(args['device']), masks.to(args['device'])
+        logits = predict(args, model, bg)
         # Mask non-existing labels
         loss = (loss_criterion(logits, labels) * (masks != 0).float()).mean()
         optimizer.zero_grad()
@@ -37,9 +42,8 @@ def run_an_eval_epoch(args, model, data_loader):
     with torch.no_grad():
         for batch_id, batch_data in enumerate(data_loader):
             smiles, bg, labels, masks = batch_data
-            atom_feats = bg.ndata.pop(args['atom_data_field'])
-            atom_feats, labels = atom_feats.to(args['device']), labels.to(args['device'])
-            logits = model(bg, atom_feats)
+            labels = labels.to(args['device'])
+            logits = predict(args, model, bg)
             eval_meter.update(logits, labels, masks)
     return np.mean(eval_meter.compute_metric(args['metric_name']))
 
@@ -92,7 +96,7 @@ if __name__ == '__main__':
     from configure import get_exp_configure
 
     parser = argparse.ArgumentParser(description='Molecule Classification')
-    parser.add_argument('-m', '--model', type=str, choices=['GCN', 'GAT'],
+    parser.add_argument('-m', '--model', type=str, choices=['GCN', 'GAT', 'Weave'],
                         help='Model to use')
     parser.add_argument('-d', '--dataset', type=str, choices=['Tox21'],
                         help='Dataset to use')

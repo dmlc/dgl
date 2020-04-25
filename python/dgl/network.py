@@ -327,3 +327,56 @@ def _clear_kv_msg(msg):
     F.sync()
     if msg.c_ptr is not None:
         _CAPI_DeleteKVMsg(msg.c_ptr)
+
+
+def _fast_pull(name, id_tensor,
+               machine_count, group_count, machine_id, client_id,
+               partition_book, g2l, local_data,
+               sender, receiver):
+    """ Pull message
+
+    Parameters
+    ----------
+    name : str
+        data name string
+    id_tensor : tensor
+        tensor of ID
+    machine_count : int
+        count of total machine
+    group_count : int
+        count of server group
+    machine_id : int
+        current machine id
+    client_id : int
+        current client ID
+    partition_book : tensor
+        tensor of partition book
+    g2l : tensor
+        tensor of global2local
+    local_data : tensor
+        tensor of local shared data
+    sender : ctypes.c_void_p
+        C Sender handle
+    receiver : ctypes.c_void_p
+        C Receiver handle
+
+    Return
+    ------
+    tensor
+        target tensor
+    """
+    if g2l is not None:
+        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
+                                    F.zerocopy_to_dgl_ndarray(id_tensor),
+                                    F.zerocopy_to_dgl_ndarray(partition_book),
+                                    F.zerocopy_to_dgl_ndarray(local_data),
+                                    sender, receiver, 'has_g2l',
+                                    F.zerocopy_to_dgl_ndarray(g2l))
+    else:
+        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
+                                    F.zerocopy_to_dgl_ndarray(id_tensor),
+                                    F.zerocopy_to_dgl_ndarray(partition_book),
+                                    F.zerocopy_to_dgl_ndarray(local_data),
+                                    sender, receiver, 'no_g2l')
+
+    return F.zerocopy_from_dgl_ndarray(res_tensor)

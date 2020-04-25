@@ -12,6 +12,7 @@ stress response pathways. Each target yields a binary prediction problem. Molecu
 into training, validation and test set with a 80/10/10 ratio. By default we follow their split method.
 
 ### Models
+- **Weave** [9]. Weave is one of the pioneering efforts in applying graph neural networks to molecular property prediction.
 - **Graph Convolutional Network** [2], [3]. Graph Convolutional Networks (GCN) have been one of the most popular graph neural
 networks and they can be easily extended for graph level prediction. MoleculeNet [1] reports baseline results of graph
 convolutions over multiple datasets.
@@ -22,7 +23,7 @@ explicitly modeling the interactions between adjacent atoms.
 
 Use `classification.py` with arguments
 ```
--m {GCN, GAT}, MODEL, model to use
+-m {GCN, GAT, Weave}, MODEL, model to use
 -d {Tox21}, DATASET, dataset to use
 ```
 
@@ -48,6 +49,12 @@ a real difference.
 | Source           | Averaged Test ROC-AUC Score |
 | ---------------- | --------------------------- |
 | Pretrained model | 0.853                       |
+
+#### Weave on Tox21
+
+| Source           | Averaged Test ROC-AUC Score |
+| ---------------- | --------------------------- |
+| Pretrained model | 0.8074                      |
 
 ## Regression   
 
@@ -177,3 +184,6 @@ Machine Learning*, JMLR. 1263-1272.
 
 [8] Xiong et al. (2019) Pushing the Boundaries of Molecular Representation for Drug Discovery with the Graph 
 Attention Mechanism. *Journal of Medicinal Chemistry*.
+
+[9] Kearnes et al. (2016) Molecular graph convolutions: moving beyond fingerprints. 
+*Journal of Computer-Aided Molecular Design*.

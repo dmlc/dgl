@@ -31,7 +31,7 @@ class MoleculeCSVDataset(object):
         Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph.
     smiles_column: str
-        Column name that including smiles in ``df``.
+        Column name for smiles in ``df``.
     cache_file_path: str
         Path to store the preprocessed DGLGraphs. For example, this can be ``'dglgraph.bin'``.
     task_names : list of str or None
