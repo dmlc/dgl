@@ -1152,15 +1152,12 @@ def featurize_nodes_and_compute_combo_scores(
 
     return node_feats, combo_bias
 
-def construct_graphs_rank(edge_featurizer, info):
+def construct_graphs_rank(info, edge_featurizer):
     """Construct graphs for reactants and candidate products in a reaction and featurize
     their edges
 
     Parameters
     ----------
-    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for edges like bonds in a molecule, which can be used to update
-        edata for a DGLGraph.
     info : 4-tuple
         * reactant_mol : rdkit.Chem.rdchem.Mol
             RDKit molecule instance for reactants in a reaction
@@ -1171,6 +1168,9 @@ def construct_graphs_rank(edge_featurizer, info):
             Refined candidate bond changes considered for candidate products
         * reactant_info : dict
             Reaction-related information of reactants.
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
+        edata for a DGLGraph.
 
     Returns
     -------
@@ -1610,8 +1610,8 @@ class WLNRankDataset(object):
                 ids = list(range(len(self.reactant_mols)))
                 for i in tqdm(ids):
                     all_graphs.append(construct_graphs_rank(
-                        edge_featurizer, (self.reactant_mols[i], self.valid_candidate_combos[i],
-                        self.candidate_bond_changes[i], self.reactant_info[i])))
+                        (self.reactant_mols[i], self.valid_candidate_combos[i],
+                        self.candidate_bond_changes[i], self.reactant_info[i]), edge_featurizer))
             else:
                 all_reaction_info = list(zip(self.reactant_mols,
                                              self.valid_candidate_combos,
