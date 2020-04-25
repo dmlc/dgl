@@ -668,12 +668,11 @@ def test_flatten(index_dtype):
 
         for i, (etype, eid) in enumerate(zip(etypes, eids)):
             src_g, dst_g = g.find_edges([eid], g.canonical_etypes[etype])
-            print("@@@@@@@@@@@@@@@@@@")
-            print(src_g.dtype)
             src_fg, dst_fg = fg.find_edges([i])
             # TODO(gq): I feel this code is quite redundant; can we just add new members (like
             # "induced_srcid") to returned heterograph object and not store them as features?
             # TODO(Allen): Remove
+            raise Exception(str(src_g.dtype))
             assert int(src_g) == int(F.gather_row(fg.nodes[SRC].data[dgl.NID], src_fg)[0])
             tid = F.asnumpy(F.gather_row(fg.nodes[SRC].data[dgl.NTYPE], src_fg)).item()
             assert g.canonical_etypes[etype][0] == g.ntypes[tid]
@@ -729,13 +728,13 @@ def test_flatten(index_dtype):
     check_mapping(g, fg)
 
     # Test another heterograph
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows')
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows')
+    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows', index_dtype=index_dtype)
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', index_dtype=index_dtype)
     g_x.nodes['user'].data['h'] = F.randn((4, 3))
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
     g_y.nodes['user'].data['hh'] = F.randn((4, 5))
     g_y.edges['knows'].data['ww'] = F.randn((2, 10))
-    g = dgl.hetero_from_relations([g_x, g_y])
+    g = dgl.hetero_from_relations([g_x, g_y], index_dtype=index_dtype)
 
     assert F.array_equal(g.ndata['h'], g_x.ndata['h'])
     assert F.array_equal(g.ndata['hh'], g_y.ndata['hh'])
