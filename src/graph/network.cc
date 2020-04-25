@@ -492,9 +492,9 @@ static void send_kv_message(network::Sender* sender,
         kv_msg->msg_type != kInitMsg) {
       meta.AddArray(kv_msg->data);
     }
-    if (kv_msg.msg_type != kPullMsg &&
-        kv_msg.msg_type != kPushMsg &&
-        kv_msg.msg_type != kPullBackMsg) {
+    if (kv_msg->msg_type != kPullMsg &&
+        kv_msg->msg_type != kPushMsg &&
+        kv_msg->msg_type != kPullBackMsg) {
       meta.AddArray(kv_msg->shape);
     }
     int64_t meta_size = 0;
@@ -530,9 +530,9 @@ static void send_kv_message(network::Sender* sender,
       CHECK_EQ(sender->Send(send_data_msg, recv_id), ADD_SUCCESS);
     }
     // Send shape NDArray
-    if (kv_msg.msg_type != kPullMsg &&
-        kv_msg.msg_type != kPushMsg &&
-        kv_msg.msg_type != kPullBackMsg) {
+    if (kv_msg->msg_type != kPullMsg &&
+        kv_msg->msg_type != kPushMsg &&
+        kv_msg->msg_type != kPullBackMsg) {
       Message send_shape_msg;
       send_shape_msg.data = static_cast<char*>(kv_msg->shape->data);
       send_shape_msg.size = kv_msg->shape.GetSize();
@@ -594,9 +594,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
       AUTO_FREE);
   }
   // Recv Shape 
-  if (kv_msg.msg_type != kPullMsg &&
-      kv_msg.msg_type != kPushMsg &&
-      kv_msg.msg_type != kPullBackMsg) {
+  if (kv_msg->msg_type != kPullMsg &&
+      kv_msg->msg_type != kPushMsg &&
+      kv_msg->msg_type != kPullBackMsg) {
     Message recv_shape_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_shape_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[0];
