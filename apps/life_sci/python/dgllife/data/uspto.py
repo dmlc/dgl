@@ -1,7 +1,9 @@
 """USPTO for reaction prediction"""
+import errno
 import itertools
 import numpy as np
 import os
+import pickle
 import random
 import torch
 
@@ -595,6 +597,23 @@ class USPTOCenter(WLNCenterDataset):
         """
         return self._subset
 
+def mkdir_p(path):
+    """Create a folder for the given path.
+
+    Parameters
+    ----------
+    path: str
+        Folder to create
+    """
+    try:
+        os.makedirs(path)
+        print('Created directory {}'.format(path))
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            print('Directory {} already exists.'.format(path))
+        else:
+            raise
+
 def load_one_reaction_rank(line, train_mode):
     """Load one reaction and check if the reactants are valid.
 
@@ -1105,7 +1124,26 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
 
 def featurize_nodes_and_compute_combo_scores(
         node_featurizer, reactant_mol, valid_candidate_combos):
-    """"""
+    """Featurize atoms in reactants and compute scores for combos of bond changes
+
+    Parameters
+    ----------
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
+        ndata for a DGLGraph.
+    reactant_mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for reactants in a reaction
+    valid_candidate_combos : list
+        valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
+        of candidate bond changes for the reaction.
+
+    Returns
+    -------
+    node_feats : float32 tensor of shape (N, M)
+        Node features for reactants, N for the number of nodes and M for the feature size
+    combo_bias : float32 tensor of shape (B, 1)
+        Scores for combos of bond changes, B equals len(valid_candidate_combos)
+    """
     node_feats = node_featurizer(reactant_mol)['hv']
     combo_bias = torch.zeros(len(valid_candidate_combos), 1).float()
     for combo_id, combo in enumerate(valid_candidate_combos):
@@ -1119,6 +1157,8 @@ class WLNRankDataset(object):
 
     Parameters
     ----------
+    path_to_save_results : str
+        Path to save results that are time-consuming for computation.
     raw_file_path : str
         Path to the raw reaction file, where each line is the SMILES for a reaction and
         the corresponding graph edits.
@@ -1159,6 +1199,7 @@ class WLNRankDataset(object):
         Number of processes to use for data pre-processing. Default to 1.
     """
     def __init__(self,
+                 path_to_save_results,
                  raw_file_path,
                  candidate_bond_path,
                  mol_graph_path,
@@ -1174,6 +1215,8 @@ class WLNRankDataset(object):
                  num_processes=1):
         super(WLNRankDataset, self).__init__()
 
+        mkdir_p(path_to_save_results)
+
         self.ignore_large_samples = False
         self.size_cutoff = size_cutoff
         self.train_mode = train_mode
@@ -1183,10 +1226,12 @@ class WLNRankDataset(object):
             self.load_reaction_data(raw_file_path, num_processes)
         self.candidate_bond_changes = self.load_candidate_bond_changes(
             candidate_bond_path, num_processes)
-        self.valid_candidate_combos, self.candidate_bond_changes, self.node_feats, \
-        self.combo_bias, self.reactant_info = self.pre_process(
-            node_featurizer, num_candidate_bond_changes,
-            max_num_changes_per_reaction, max_num_change_combos_per_reaction, num_processes)
+        self.valid_candidate_combos, self.candidate_bond_changes, self.reactant_info = \
+            self.pre_process(path_to_save_results, num_candidate_bond_changes,
+                             max_num_changes_per_reaction, max_num_change_combos_per_reaction,
+                             num_processes)
+        self.node_feats, self.combo_bias = \
+            self.get_node_feats_and_candidate_scores(node_featurizer)
         self.candidate_graphs = self.construct_and_featurize_edges(
             mol_graph_path, edge_featurizer, load, log_every)
 
@@ -1217,7 +1262,7 @@ class WLNRankDataset(object):
         ids_for_small_samples : list of int
             Indices for reactions whose reactants do not contain too many atoms
         """
-        print('Stage 1/4: loading reaction data...')
+        print('Stage 1/5: loading reaction data...')
         all_reactant_mols = []
         if self.train_mode:
             all_product_mols = []
@@ -1279,7 +1324,7 @@ class WLNRankDataset(object):
             ``all_candidate_bond_changes[i]`` gives a list of tuples, which are candidate
             bond changes for a reaction.
         """
-        print('Stage 2/4: loading candidate bond changes...')
+        print('Stage 2/5: loading candidate bond changes...')
         with open(file_path, 'r') as f:
             lines = f.readlines()
 
@@ -1296,16 +1341,15 @@ class WLNRankDataset(object):
 
         return all_candidate_bond_changes
 
-    def pre_process(self, node_featurizer, num_candidate_bond_changes,
+    def pre_process(self, path_to_save_results, num_candidate_bond_changes,
                     max_num_changes_per_reaction, max_num_change_combos_per_reaction,
                     num_processes):
         """Pre-process for the experiments.
 
         Parameters
         ----------
-        node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-            Featurization for nodes like atoms in a molecule, which can be used to update
-            ndata for a DGLGraph.
+        path_to_save_results : str
+            Path to save results that are time-consuming for computation.
         num_candidate_bond_changes : int
             Number of candidate bond changes to consider for each ground truth reaction.
         max_num_changes_per_reaction : int
@@ -1331,19 +1375,29 @@ class WLNRankDataset(object):
             ``atom1, atom2, change_type, score``, where ``atom1`` and ``atom2`` are end atoms for
             the bond to form/break, ``change_type`` is the type for the bond change and ``score``
             is the confidence in the bond change by a model.
-        all_node_feats : list of float32 tensor of shape (N, M)
-            Node features for reactants, where N is the number of atoms and M is the feature size.
-        all_combo_bias : list of float32 tensor of shape (B, 1)
-            The sum of scores for bond changes in each combo, where B is the number of combos.
         all_reactant_info : list of dictionary
             Reaction-related information of reactants for each reaction.
         """
-        print('Stage 3/4: preparing candidate products and node features')
+        print('Stage 3/5: preparing candidate products')
+
+        path_to_valid_candidate_combos = path_to_save_results + '/valid_candidate_combos.pkl'
+        path_to_candidate_bond_changes = path_to_save_results + '/candidate_bond_changes.pkl'
+        path_to_reactant_info = path_to_save_results + '/reactant_info.pkl'
+
+        if os.path.isfile(path_to_valid_candidate_combos) and \
+            os.path.isfile(path_to_candidate_bond_changes) and \
+            os.path.isfile(path_to_reactant_info):
+            with open(path_to_valid_candidate_combos, 'rb') as f:
+                all_valid_candidate_combos = pickle.load(f)
+            with open(path_to_candidate_bond_changes, 'rb') as f:
+                all_candidate_bond_changes = pickle.load(f)
+            with open(path_to_reactant_info, 'rb') as f:
+                all_reactant_info = pickle.load(f)
+
+            return all_valid_candidate_combos, all_candidate_bond_changes, all_reactant_info
 
         all_valid_candidate_combos = []
         all_candidate_bond_changes = []
-        all_node_feats = []
-        all_combo_bias = []
         all_reactant_info = []
 
         if num_processes == 1:
@@ -1357,12 +1411,8 @@ class WLNRankDataset(object):
                          reactant_mol, self.product_mols[i]),
                         num_candidate_bond_changes, max_num_changes_per_reaction,
                         max_num_change_combos_per_reaction, self.train_mode)
-                node_feats, combo_bias = featurize_nodes_and_compute_combo_scores(
-                    node_featurizer, reactant_mol, valid_candidate_combos)
                 all_valid_candidate_combos.append(valid_candidate_combos)
                 all_candidate_bond_changes.append(candidate_bond_changes)
-                all_node_feats.append(node_feats)
-                all_combo_bias.append(combo_bias)
                 all_reactant_info.append(reactant_info)
         else:
             all_reaction_info = list(zip(self.candidate_bond_changes,
@@ -1386,14 +1436,40 @@ class WLNRankDataset(object):
                 all_valid_candidate_combos.extend(batch_valid_candidate_combos)
                 all_candidate_bond_changes.extend(batch_candidate_bond_changes)
                 all_reactant_info.extend(batch_reactant_info)
-                for j in range(len(batch_reaction_info)):
-                    node_feats, combo_bias = featurize_nodes_and_compute_combo_scores(
-                    node_featurizer, batch_reaction_info[j][2], batch_valid_candidate_combos[j])
-                    all_node_feats.append(node_feats)
-                    all_combo_bias.append(combo_bias)
 
-        return all_valid_candidate_combos, all_candidate_bond_changes, \
-               all_node_feats, all_combo_bias, all_reactant_info
+        with open(path_to_valid_candidate_combos, 'wb') as f:
+            pickle.dump(all_valid_candidate_combos, f)
+        with open(path_to_candidate_bond_changes, 'wb') as f:
+            pickle.dump(all_candidate_bond_changes, f)
+        with open(path_to_reactant_info, 'wb') as f:
+            pickle.dump(all_reactant_info, f)
+
+        return all_valid_candidate_combos, all_candidate_bond_changes, all_reactant_info
+
+    def get_node_feats_and_candidate_scores(self, node_featurizer):
+        """Compute node features and scores of candidate products.
+
+        This is performed for all reactions in the dataset.
+
+        Parameters
+        ----------
+        node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+            Featurization for nodes like atoms in a molecule, which can be used to update
+            ndata for a DGLGraph.
+        """
+        print('Stage 4/5: preparing node features and candidate scores')
+
+        ids = list(range(len(self.reactant_mols)))
+        all_node_features = []
+        all_combo_bias = []
+
+        for i in tqdm(ids):
+            node_feats, combo_bias = featurize_nodes_and_compute_combo_scores(
+                node_featurizer, self.reactant_mols[i], self.valid_candidate_combos[i])
+            all_node_features.append(node_feats)
+            all_combo_bias.append(combo_bias)
+
+        return all_node_features, all_combo_bias
 
     def construct_and_featurize_edges(self, mol_graph_path, edge_featurizer, load, log_every):
         """Construct DGLGraphs and featurize their edges.
@@ -1412,7 +1488,7 @@ class WLNRankDataset(object):
         log_every : int
             Print a progress update every time ``log_every`` reactions are pre-processed.
         """
-        print('Stage 4/4: constructing DGLGraphs and featurize their edges...')
+        print('Stage 5/5: constructing DGLGraphs and featurize their edges...')
         self.graphs = []
         if load and os.path.isfile(mol_graph_path):
             print('Loading previously saved graphs...')
@@ -1637,7 +1713,10 @@ class USPTORank(WLNRankDataset):
         else:
             train_mode = False
 
+        path_to_save_results = extracted_data_path + '/{}'.format(subset)
+
         super(USPTORank, self).__init__(
+            path_to_save_results=path_to_save_results,
             raw_file_path=extracted_data_path + '/{}.txt.proc'.format(subset),
             candidate_bond_path=candidate_bond_path,
             mol_graph_path=extracted_data_path + '/{}_mol_graphs_rank.bin'.format(subset),

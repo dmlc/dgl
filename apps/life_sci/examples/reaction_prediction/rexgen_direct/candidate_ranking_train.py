@@ -10,7 +10,8 @@ def main(args, path_to_candidate_bonds):
         train_set = USPTORank(subset='train', candidate_bond_path=path_to_candidate_bonds['train'],
                               num_processes=args['num_processes'])
     else:
-        train_set = WLNRankDataset(raw_file_path=args['train_path'],
+        train_set = WLNRankDataset(path_to_save_results=args['result_path'] + '/train',
+                                   raw_file_path=args['train_path'],
                                    candidate_bond_path=path_to_candidate_bonds['train'],
                                    mol_graph_path='train_rank_graphs.bin',
                                    num_processes=args['num_processes'])
