@@ -668,17 +668,16 @@ def test_flatten(index_dtype):
 
         for i, (etype, eid) in enumerate(zip(etypes, eids)):
             src_g, dst_g = g.find_edges([eid], g.canonical_etypes[etype])
+            print("@@@@@@@@@@@@@@@@@@")
+            print(src_g.dtype)
             src_fg, dst_fg = fg.find_edges([i])
             # TODO(gq): I feel this code is quite redundant; can we just add new members (like
             # "induced_srcid") to returned heterograph object and not store them as features?
             # TODO(Allen): Remove
-            print(src_g)
-            a = F.gather_row(fg.nodes[SRC].data[dgl.NID], src_fg)[0]
-            assert src_g == a
-            assert src_g == F.gather_row(fg.nodes[SRC].data[dgl.NID], src_fg)[0]
+            assert int(src_g) == int(F.gather_row(fg.nodes[SRC].data[dgl.NID], src_fg)[0])
             tid = F.asnumpy(F.gather_row(fg.nodes[SRC].data[dgl.NTYPE], src_fg)).item()
             assert g.canonical_etypes[etype][0] == g.ntypes[tid]
-            assert dst_g == F.gather_row(fg.nodes[DST].data[dgl.NID], dst_fg)[0]
+            assert int(dst_g) == int(F.gather_row(fg.nodes[DST].data[dgl.NID], dst_fg)[0])
             tid = F.asnumpy(F.gather_row(fg.nodes[DST].data[dgl.NTYPE], dst_fg)).item()
             assert g.canonical_etypes[etype][2] == g.ntypes[tid]
 
