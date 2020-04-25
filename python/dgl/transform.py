@@ -895,7 +895,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         if nodes is not None:
             dst_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
         else:
-            dst_nodes_nd.append(nd.null())
+            dst_nodes_nd.append(nd.null(g._graph.dtype))
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_nodes_nd, include_dst_in_src)
@@ -911,7 +911,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
             new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
         else:
             # For empty dst node sets, still create empty mapping arrays.
-            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=F.int64)
+            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=getattr(F, g._graph.dtype))
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
@@ -946,8 +946,11 @@ def remove_edges(g, edge_ids):
                 "Graph has more than one edge type; specify a dict for edge_id instead.")
         edge_ids = {g.canonical_etypes[0]: edge_ids}
 
-    edge_ids_nd = [nd.null()] * len(g.etypes)
+    edge_ids_nd = [nd.null(g._graph.dtype)] * len(g.etypes)
     for key, value in edge_ids.items():
+        if value.dtype != getattr(F, g._graph.dtype):
+            # if didn't check, this function still works, but returns wrong result
+            raise Exception("Inconsistent dtype between edge ids and graph data type")
         edge_ids_nd[g.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
     new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(g._graph, edge_ids_nd)
 
@@ -994,9 +997,9 @@ def in_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._graph.dtype).todgltensor())
         else:
-            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+            nodes_all_types.append(nd.array(np.array([], dtype=g._graph.dtype), ctx=nd.cpu()))
 
     subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1033,9 +1036,9 @@ def out_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._graph.dtype).todgltensor())
         else:
-            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+            nodes_all_types.append(nd.array(np.array([], dtype=g._graph.dtype), ctx=nd.cpu()))
 
     subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1111,7 +1114,7 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
 
-    Node and edge features are preserved.
+    Node and edge features are preserved. Returns 64 bits graphh
 
     Parameters
     ----------

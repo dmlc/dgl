@@ -673,6 +673,7 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
  * \param component_graphs Input graphs
  * \return One graph that unions all the components
  */
+template <class IdType>
 HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
@@ -695,6 +696,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
  * \param edge_sizes Number of vertices of each component.
  * \return A list of graphs representing each disjoint components.
  */
+template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     GraphPtr meta_graph,
     HeteroGraphPtr batched_graph,

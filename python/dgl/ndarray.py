@@ -90,7 +90,7 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
-def null():
+def null(dtype=_np.int64):
     """Return a ndarray representing null value. It can be safely converted
     to other backend tensors.
 
@@ -99,7 +99,7 @@ def null():
     NDArray
         A null array
     """
-    return array(_np.array([], dtype=_np.int64))
+    return array(_np.array([], dtype=dtype))
 
 class SparseFormat:
     """Format code"""

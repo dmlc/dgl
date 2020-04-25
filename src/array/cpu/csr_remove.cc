@@ -22,6 +22,7 @@ void CSRRemoveConsecutive(
     std::vector<IdType> *new_indptr,
     std::vector<IdType> *new_indices,
     std::vector<IdType> *new_eids) {
+  CHECK_SAME_DTYPE(csr.indices, entries);
   const int64_t n_entries = entries->shape[0];
   const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
   const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
@@ -54,6 +55,7 @@ void CSRRemoveShuffled(
     std::vector<IdType> *new_indptr,
     std::vector<IdType> *new_indices,
     std::vector<IdType> *new_eids) {
+  CHECK_SAME_DTYPE(csr.indices, entries);
   const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
   const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
   const IdType *eid_data = static_cast<IdType *>(csr.data->data);
@@ -77,6 +79,7 @@ void CSRRemoveShuffled(
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
+  CHECK_SAME_DTYPE(csr.indices, entries);
   const int64_t nnz = csr.indices->shape[0];
   const int64_t n_entries = entries->shape[0];
   if (n_entries == 0)
