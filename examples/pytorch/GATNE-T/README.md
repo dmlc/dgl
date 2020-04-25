@@ -6,10 +6,10 @@ Representation Learning for Attributed Multiplex Heterogeneous Network (GANTE)
 
 Requirements
 ------------
-- requests
+- requirements
 
 ``bash
-pip install requests
+pip install requirements
 ``
 
 
