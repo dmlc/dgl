@@ -840,7 +840,7 @@ def is_valid_combo(combo_changes, reactant_info):
     for (atom1, atom2, change_type, score) in combo_changes:
         if pair_seen[(atom1, atom2)]:
             # A pair of atoms cannot have two types of changes. Even if we
-            # randomly pick one, that will be reduced to a combo of less changed
+            # randomly pick one, that will be reduced to a combo of less changes
             return False
         pair_seen[(atom1, atom2)] = True
 
@@ -980,7 +980,7 @@ def get_product_smiles(reactant_mols, edits, product_info):
     return edit_mol(reactant_mols, edits, product_info)
 
 def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_changes,
-                             max_num_change_combos, node_featurizer, train_mode):
+                             max_num_change_combos, train_mode):
     """Pre-process one reaction for candidate ranking.
 
     Parameters
@@ -1010,7 +1010,11 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
     -------
     valid_candidate_combos : list
         valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
-        of candidate bond changes.
+        of candidate bond changes for the reaction.
+    candidate_bond_changes : list of 4-tuples
+        Refined candidate bond changes considered for combos.
+    reactant_info : dict
+        Reaction-related information of reactants.
     """
     candidate_bond_changes_, real_bond_changes, reactant_mol, product_mol = info
     candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
@@ -1029,13 +1033,13 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
 
     # Check if two bond changes have atom in common
     cand_change_adj = np.eye(len(candidate_bond_changes), dtype=bool)
-    for id1, candidate1 in enumerate(candidate_bond_changes):
-        atom1_1, atom1_2, _, _ = candidate1
-        for id2, candidate2 in enumerate(candidate_bond_changes):
-            atom2_1, atom2_2, _, _ = candidate2
+    for i in range(len(candidate_bond_changes)):
+        atom1_1, atom1_2, _, _ = candidate_bond_changes[i]
+        for j in range(i + 1, len(candidate_bond_changes)):
+            atom2_1, atom2_2, _, _ = candidate_bond_changes[j]
             if atom1_1 == atom2_1 or atom1_1 == atom2_2 or \
                     atom1_2 == atom2_1 or atom1_2 == atom2_2:
-                cand_change_adj[id1, id2] = cand_change_adj[id2, id1] = True
+                cand_change_adj[i, j] = cand_change_adj[j, i] = True
 
     # Enumerate combinations of k candidate bond changes and record
     # those that are connected and chemically valid
@@ -1086,17 +1090,22 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
                     continue
                 product_smiles.add(smiles)
                 new_candidate_combos.append(combo)
+            valid_candidate_combos = new_candidate_combos
 
     valid_candidate_combos = valid_candidate_combos[:max_num_change_combos]
 
-    # node features
+    return valid_candidate_combos, candidate_bond_changes, reactant_info
+
+def featurize_nodes_and_compute_combo_scores(
+        node_featurizer, reactant_mol, valid_candidate_combos):
+    """"""
+    node_feats = node_featurizer(reactant_mol)['hv']
     combo_bias = torch.zeros(len(valid_candidate_combos), 1).float()
     for combo_id, combo in enumerate(valid_candidate_combos):
         combo_bias[combo_id] = sum([
             score for (atom1, atom2, change_type, score) in combo])
 
-    return valid_candidate_combos, candidate_bond_changes, node_featurizer(reactant_mol)['hv'], \
-           combo_bias, reactant_info
+    return node_feats, combo_bias
 
 class WLNRankDataset(object):
     """Dataset for ranking candidate products with WLN
@@ -1329,16 +1338,20 @@ class WLNRankDataset(object):
         all_node_feats = []
         all_combo_bias = []
         all_reactant_info = []
+
         if num_processes == 1:
             ids = list(range(len(self.reactant_mols)))
 
             for i in tqdm(ids):
-                valid_candidate_combos, candidate_bond_changes, node_feats, \
-                combo_bias, reactant_info = pre_process_one_reaction(
-                    (self.candidate_bond_changes[i], self.real_bond_changes[i],
-                     self.reactant_mols[i], self.product_mols[i]), num_candidate_bond_changes,
-                    max_num_changes_per_reaction, max_num_change_combos_per_reaction,
-                    node_featurizer, self.train_mode)
+                reactant_mol = self.reactant_mols[i]
+                valid_candidate_combos, candidate_bond_changes, reactant_info = \
+                    pre_process_one_reaction(
+                        (self.candidate_bond_changes[i], self.real_bond_changes[i],
+                         reactant_mol, self.product_mols[i]),
+                        num_candidate_bond_changes, max_num_changes_per_reaction,
+                        max_num_change_combos_per_reaction, self.train_mode)
+                node_feats, combo_bias = featurize_nodes_and_compute_combo_scores(
+                    node_featurizer, reactant_mol, valid_candidate_combos)
                 all_valid_candidate_combos.append(valid_candidate_combos)
                 all_candidate_bond_changes.append(candidate_bond_changes)
                 all_node_feats.append(node_feats)
@@ -1351,23 +1364,26 @@ class WLNRankDataset(object):
             batch_size = 1000
             for i in range(0, len(all_reaction_info), batch_size):
                 print('Processing reaction {:d}/{:d}'.format(i, len(all_reaction_info)))
+                batch_reaction_info = all_reaction_info[i: i + batch_size]
                 with Pool(processes=num_processes) as pool:
-                    batch_reaction_info = all_reaction_info[i: i + batch_size]
                     results = list(tqdm(pool.imap(partial(
                         pre_process_one_reaction,
                         num_candidate_bond_changes=num_candidate_bond_changes,
                         max_num_bond_changes=max_num_changes_per_reaction,
                         max_num_change_combos=max_num_change_combos_per_reaction,
-                        node_featurizer=node_featurizer, train_mode=self.train_mode),
+                        train_mode=self.train_mode),
                         batch_reaction_info, chunksize=batch_size // num_processes),
                         total=len(batch_reaction_info)))
-                batch_valid_candidate_combos, batch_candidate_bond_changes, batch_node_feats, \
-                batch_combo_bias, batch_reactant_info = map(list, zip(*results))
+                batch_valid_candidate_combos, batch_candidate_bond_changes, \
+                batch_reactant_info = map(list, zip(*results))
                 all_valid_candidate_combos.extend(batch_valid_candidate_combos)
                 all_candidate_bond_changes.extend(batch_candidate_bond_changes)
-                all_node_feats.extend(batch_node_feats)
-                all_combo_bias.extend(batch_combo_bias)
                 all_reactant_info.extend(batch_reactant_info)
+                for j in range(len(batch_reaction_info)):
+                    node_feats, combo_bias = featurize_nodes_and_compute_combo_scores(
+                    node_featurizer, batch_reaction_info[j][2], batch_valid_candidate_combos[j])
+                    all_node_feats.append(node_feats)
+                    all_combo_bias.append(combo_bias)
 
         return all_valid_candidate_combos, all_candidate_bond_changes, \
                all_node_feats, all_combo_bias, all_reactant_info
