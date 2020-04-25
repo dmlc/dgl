@@ -99,7 +99,7 @@ template int64_t CSRGetRowNNZ<kDLCPU, int32_t>(CSRMatrix, int64_t);
 template int64_t CSRGetRowNNZ<kDLCPU, int64_t>(CSRMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
-NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {  
+NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   const auto len = rows->shape[0];
   const IdType* vid_data = static_cast<IdType*>(rows->data);
@@ -196,7 +196,7 @@ template NDArray CSRGetData<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
 template NDArray CSRGetData<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
-NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {  
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
   const int64_t rowlen = rows->shape[0];
