@@ -1025,11 +1025,14 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
 
     # Filter out candidate new bonds already in reactants
     candidate_bond_changes = []
+    count = 0
     for (atom1, atom2, change_type, score) in candidate_bond_changes_:
         if ((atom1, atom2) not in reactant_info['pair_to_bond_val']) or \
                 (reactant_info['pair_to_bond_val'][(atom1, atom2)] != change_type):
             candidate_bond_changes.append((atom1, atom2, change_type, score))
-    candidate_bond_changes = candidate_bond_changes[:num_candidate_bond_changes]
+            count += 1
+            if count == num_candidate_bond_changes:
+                break
 
     # Check if two bond changes have atom in common
     cand_change_adj = np.eye(len(candidate_bond_changes), dtype=bool)
@@ -1084,15 +1087,19 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
             product_smiles = set([product_smiles])
             new_candidate_combos = [valid_candidate_combos[0]]
 
+            count = 0
             for combo in valid_candidate_combos[1:]:
                 smiles = get_product_smiles(reactant_mol, combo, product_info)
                 if smiles in product_smiles or len(smiles) == 0:
                     continue
                 product_smiles.add(smiles)
                 new_candidate_combos.append(combo)
+                count += 1
+                if count == max_num_change_combos:
+                    break
             valid_candidate_combos = new_candidate_combos
-
-    valid_candidate_combos = valid_candidate_combos[:max_num_change_combos]
+    else:
+        valid_candidate_combos = valid_candidate_combos[:max_num_change_combos]
 
     return valid_candidate_combos, candidate_bond_changes, reactant_info
 
