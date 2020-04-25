@@ -24,8 +24,8 @@ candidate_ranking_config = {
     'hidden_size': 500,
     'num_encode_gnn_layers': 3,
     'max_norm': 50.0,
-    'num_epochs': 25,
     'node_in_feats': 89,
     'edge_in_feats': 5,
-    'lr': 0.001
+    'lr': 0.001,
+    'num_epochs': 6
 }

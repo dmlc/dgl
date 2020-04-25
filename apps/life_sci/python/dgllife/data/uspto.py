@@ -632,10 +632,6 @@ def load_one_reaction_rank(line, train_mode):
     product_mol : rdkit.Chem.rdchem.Mol, optional
         RDKit molecule instance for the product. This is returned only when train_mode is True.
         None will be returned if the line is not valid.
-    reaction : str
-        Reaction. None will be returned if the line is not valid.
-    graph_edits : str
-        Graph edits associated with the reaction. None will be returned if the line is not valid.
     reaction_real_bond_changes : list of 3-tuples
         Real bond changes in the reaction. Each tuple is of form (atom1, atom2, change_type). For
         change_type, 0.0 stands for losing a bond, 1.0, 2.0, 3.0 and 1.5 separately stands for
@@ -684,9 +680,9 @@ def load_one_reaction_rank(line, train_mode):
             (min(atom1, atom2), max(atom1, atom2), float(change_type)))
 
     if train_mode:
-        return reactants_mol, product_mol, reaction, graph_edits, reaction_real_bond_changes
+        return reactants_mol, product_mol, reaction_real_bond_changes
     else:
-        return reactants_mol, reaction, graph_edits, reaction_real_bond_changes
+        return reactants_mol, reaction_real_bond_changes
 
 def load_candidate_bond_changes_for_one_reaction(line):
     """Load candidate bond changes for a reaction
@@ -1309,15 +1305,16 @@ class WLNRankDataset(object):
         self.size_cutoff = size_cutoff
         self.train_mode = train_mode
 
-        self.reactant_mols, self.product_mols, self.reactions, self.graph_edits, \
-        self.real_bond_changes, self.ids_for_small_samples = \
-            self.load_reaction_data(raw_file_path, num_processes)
+        self.reactant_mols, self.product_mols, self.real_bond_changes, \
+        self.ids_for_small_samples = self.load_reaction_data(raw_file_path, num_processes)
         self.candidate_bond_changes = self.load_candidate_bond_changes(
             candidate_bond_path, num_processes)
         self.valid_candidate_combos, self.candidate_bond_changes, self.reactant_info = \
             self.pre_process(path_to_save_results, num_candidate_bond_changes,
                              max_num_changes_per_reaction, max_num_change_combos_per_reaction,
                              num_processes)
+        del self.product_mols
+        del self.real_bond_changes
         self.node_feats, self.combo_bias = \
             self.get_node_feats_and_candidate_scores(node_featurizer)
         self.candidate_graphs = self.construct_and_featurize_edges(
@@ -1340,10 +1337,6 @@ class WLNRankDataset(object):
         all_product_mols : list of rdkit.Chem.rdchem.Mol
             RDKit molecule instances for products if the dataset is for training and
             None otherwise.
-        all_reactions : list of str
-            Reactions
-        all_graph_edits : list of str
-            Graph edits in the reactions.
         all_real_bond_changes : list of list
             ``all_real_bond_changes[i]`` gives a list of tuples, which are ground
             truth bond changes for a reaction.
@@ -1356,8 +1349,6 @@ class WLNRankDataset(object):
             all_product_mols = []
         else:
             all_product_mols = None
-        all_reactions = []
-        all_graph_edits = []
         all_real_bond_changes = []
         ids_for_small_samples = []
         with open(file_path, 'r') as f:
@@ -1365,18 +1356,14 @@ class WLNRankDataset(object):
 
         def _update_from_line(id, loaded_result):
             if self.train_mode:
-                reactants_mol, product_mol, reaction, graph_edits, \
-                reaction_real_bond_changes = loaded_result
+                reactants_mol, product_mol, reaction_real_bond_changes = loaded_result
             else:
-                reactants_mol, reaction, graph_edits, \
-                reaction_real_bond_changes = loaded_result
+                reactants_mol, reaction_real_bond_changes = loaded_result
             if reactants_mol is None:
                 return
             if self.train_mode:
                 all_product_mols.append(product_mol)
             all_reactant_mols.append(reactants_mol)
-            all_reactions.append(reaction)
-            all_graph_edits.append(graph_edits)
             all_real_bond_changes.append(reaction_real_bond_changes)
             if reactants_mol.GetNumAtoms() <= self.size_cutoff:
                 ids_for_small_samples.append(id)
@@ -1393,8 +1380,7 @@ class WLNRankDataset(object):
             for id in range(len(lines)):
                 _update_from_line(id, results[id])
 
-        return all_reactant_mols, all_product_mols, all_reactions, all_graph_edits, \
-               all_real_bond_changes, ids_for_small_samples
+        return all_reactant_mols, all_product_mols, all_real_bond_changes, ids_for_small_samples
 
     def load_candidate_bond_changes(self, file_path, num_processes):
         """Load candidate bond changes predicted by a WLN for reaction center prediction.
