@@ -609,8 +609,8 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
       vec_shape,
       DLDataType{kDLFloat, 32, 1},
       DLContext{kDLCPU, 0},
-      recv_data_msg.data,
-      AUTO_FREE);  
+      recv_shape_msg.data,
+      AUTO_FREE);
   }
   return kv_msg;
 }
