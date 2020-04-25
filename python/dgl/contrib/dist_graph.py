@@ -123,11 +123,14 @@ class DistTensor:
     name : string
         The name of the tensor in the KVStore.
     '''
-    def __init__(self, kv, name):
-        self.kv = kv
+    def __init__(self, g, name):
+        self.kv = g._client
         self.name = name
-        dtype, shape, _ = self.kv.get_data_meta(name)
-        self._shape = shape
+        dtype, shape, _ = g._client.get_data_meta(name)
+        # We need to ensure that the first dim is the number of nodes in a graph.
+        shape = [s for s in shape]
+        shape[0] = g.number_of_nodes()
+        self._shape = tuple(shape)
         self._dtype = dtype
 
     def __getitem__(self, idx):
@@ -163,7 +166,7 @@ class NodeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return DistTensor(self._graph._client, _get_ndata_name(key))
+        return DistTensor(self._graph, _get_ndata_name(key))
 
     def __setitem__(self, key, val):
         #TODO how to set data to the kvstore.
@@ -201,7 +204,7 @@ class EdgeDataView(MutableMapping):
         self._graph_name = graph_name
 
     def __getitem__(self, key):
-        return DistTensor(self._graph._client, _get_edata_name(key))
+        return DistTensor(self._graph, _get_edata_name(key))
 
     def __setitem__(self, key, val):
         #TODO
@@ -490,3 +493,10 @@ class DistGraph:
             The rank of the current graph store.
         '''
         return self._client.get_id()
+
+    def shut_down(self):
+        """Shut down all KVServer nodes.
+
+        We usually invoke this API by just one client (e.g., client_0).
+        """
+        self._client.shut_down()

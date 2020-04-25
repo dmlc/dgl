@@ -1,3 +1,5 @@
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
 import dgl
 import sys
 import numpy as np
@@ -26,23 +28,36 @@ def run_server(graph_name, server_id, num_clients, barrier):
     print('start server', server_id)
     g.start()
 
-def run_client(graph_name, part, barrier):
+def run_client(graph_name, part, barrier, num_nodes, num_edges):
     barrier.wait()
     g = DistGraph(server_namebook, graph_name)
-    print('|V|={}, |E|={}, #local:{}'.format(g.number_of_nodes(), g.number_of_edges(), len(g.local_nids)))
-    print('part: {}, local: {}'.format(part.number_of_nodes(), g.number_of_local_nodes()))
+
+    # Test API
+    assert g.number_of_nodes() == num_nodes
+    assert g.number_of_edges() == num_edges
+    nids = g.local_gnids
+    feats = F.squeeze(g.ndata['features'][nids], 1)
+    assert np.all(F.asnumpy(feats == nids))
+    assert len(g.ndata['features']) == g.number_of_nodes()
+    assert g.ndata['features'].shape == (g.number_of_nodes(), 1)
+    assert g.ndata['features'].dtype == F.float32
+    assert g.node_attr_schemes()['features'].dtype == F.float32
+    assert g.node_attr_schemes()['features'].shape == (1,)
+
+    # Test internal
+    assert np.all(F.asnumpy(part.ndata['part_id'] == g.g.ndata['part_id']))
     assert part.number_of_nodes() == g.g.number_of_nodes()
     assert part.number_of_edges() == g.g.number_of_edges()
-    #assert np.all(F.asnumpy(part.ndata['part_id'] == g.ndata['features'][g.local_nids]))
-    assert np.all(F.asnumpy(part.ndata['part_id'] == g.g.ndata['part_id']))
+
+    g.shut_down()
     print('end')
 
-def test_create():
+def run_server_client():
     g = create_random_graph(10000)
 
     # Partition the graph
     num_parts = 4
-    g.ndata['features'] = F.arange(0, g.number_of_nodes())
+    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     node_parts = dgl.transform.metis_partition_assignment(g, num_parts)
     server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
     client_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 1)
@@ -73,15 +88,14 @@ def test_create():
     cli_ps = []
     for cli_id in range(1):
         print('start client', cli_id)
-        p = Process(target=run_client, args=(graph_name, client_parts[cli_id], barrier))
+        p = Process(target=run_client, args=(graph_name, client_parts[cli_id], barrier,
+                                             g.number_of_nodes(), g.number_of_edges()))
         p.start()
         cli_ps.append(p)
 
-    #for p in serv_ps:
-    #    p.join()
     for p in cli_ps:
         p.join()
     print('clients have terminated')
 
 if __name__ == '__main__':
-    test_create()
+    run_server_client()
