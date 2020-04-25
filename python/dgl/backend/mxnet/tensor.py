@@ -334,11 +334,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop):
+def arange(start, stop, dtype=np.int64):
     if start >= stop:
-        return nd.array([], dtype=np.int64)
+        return nd.array([], dtype=dtype)
     else:
-        return nd.arange(start, stop, dtype=np.int64)
+        return nd.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)
