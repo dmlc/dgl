@@ -87,18 +87,34 @@ class FixedRadiusNNGraph(nn.Module):
         for i in range(B):
             center = torch.zeros((N)).to(dev)
             center[centroids[i]] = 1
+            src = group_idx[i].contiguous().view(-1)
+            dst = centroids[i].view(-1, 1).repeat(1, self.n_neighbor).view(-1)
+
+            unified = torch.cat([src, dst])
+            uniq, idx, inv_idx = np.unique(unified.cpu().numpy(), return_index=True, return_inverse=True)
+            src_idx = inv_idx[:src.shape[0]]
+            dst_idx = inv_idx[src.shape[0]:]
+
+            g = dgl.DGLGraph((src_idx, dst_idx), readonly=True)
+            g.ndata['pos'] = pos[i][uniq]
+            g.ndata['center'] = center[uniq]
+            if feat is not None:
+                g.ndata['feat'] = feat[i][uniq]
+            '''
             g = dgl.DGLGraph()
             if feat is not None:
                 g.add_nodes(N, {'pos': pos[i], 'feat': feat[i], 'center': center})
             else:
                 g.add_nodes(N, {'pos': pos[i], 'center': center})
-            src = group_idx[0].contiguous().view(-1)
-            dst = centroids[0].view(-1, 1).repeat(1, self.n_neighbor).view(-1)
+            src = group_idx[i].contiguous().view(-1)
+            dst = centroids[i].view(-1, 1).repeat(1, self.n_neighbor).view(-1)
             g.add_edges(src, dst)
             sub_nodes = sorted(list(set(centroids[i].tolist() + src.tolist() + dst.tolist())))
             subg = g.subgraph(sub_nodes)
             subg.copy_from_parent()
             glist.append(subg)
+            '''
+            glist.append(g)
         bg = dgl.batch(glist)
         return bg
 
