@@ -59,9 +59,9 @@ class MPNNGNN(nn.Module):
         g : DGLGraph
             DGLGraph for a batch of graphs.
         node_feats : float32 tensor of shape (V, node_in_feats)
-            Input node features.
+            Input node features. V for the number of nodes in the batch of graphs.
         edge_feats : float32 tensor of shape (E, edge_in_feats)
-            Input edge features.
+            Input edge features. E for the number of edges in the batch of graphs.
 
         Returns
         -------
