@@ -124,13 +124,10 @@ class Transformer(nn.Module):
             edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
             nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
             for i in range(self.decoder.N):
-                pre_func, post_func = self.decoder.pre_func(i, 'qkv'), self.decoder.post_func(i)
-                nodes, edges = nodes_d, edges_dd
+                pre_func = self.decoder.pre_func(i, 'qkv')
+                post_func = self.decoder.post_func(i)
+                nodes, edges = nids['dec'], eids['dd']
                 self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-                pre_q, pre_kv = self.decoder.pre_func(i, 'q', 1), self.decoder.pre_func(i, 'kv', 1)
-                post_func = self.decoder.post_func(i, 1)
-                nodes_e, nodes_d, edges = nids['enc'], nodes_d, edges_ed
-                self.update_graph(g, edges, [(pre_q, nodes_d), (pre_kv, nodes_e)], [(post_func, nodes_d)])
 
             frontiers = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
             out = self.generator(g.ndata['x'][frontiers])
