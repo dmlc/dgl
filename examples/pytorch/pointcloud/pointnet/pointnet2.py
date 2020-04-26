@@ -100,20 +100,6 @@ class FixedRadiusNNGraph(nn.Module):
             g.ndata['center'] = center[uniq]
             if feat is not None:
                 g.ndata['feat'] = feat[i][uniq]
-            '''
-            g = dgl.DGLGraph()
-            if feat is not None:
-                g.add_nodes(N, {'pos': pos[i], 'feat': feat[i], 'center': center})
-            else:
-                g.add_nodes(N, {'pos': pos[i], 'center': center})
-            src = group_idx[i].contiguous().view(-1)
-            dst = centroids[i].view(-1, 1).repeat(1, self.n_neighbor).view(-1)
-            g.add_edges(src, dst)
-            sub_nodes = sorted(list(set(centroids[i].tolist() + src.tolist() + dst.tolist())))
-            subg = g.subgraph(sub_nodes)
-            subg.copy_from_parent()
-            glist.append(subg)
-            '''
             glist.append(g)
         bg = dgl.batch(glist)
         return bg
