@@ -10,7 +10,7 @@ FaceGraph = namedtuple('Graph',
 
 class FaceGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
-    def __init__(self, n=50, m=800):
+    def __init__(self, n=100, m=800):
         '''
         args:
             n: maximum length of input sequence.

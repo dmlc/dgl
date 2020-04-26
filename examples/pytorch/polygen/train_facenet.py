@@ -10,6 +10,7 @@ import torch
 from functools import partial
 import torch.distributed as dist
 
+
 def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True, log_f=None):
     with loss_compute:
         for i, g in enumerate(data_iter):
@@ -45,9 +46,10 @@ def main(dev_id, args):
         device = torch.device('cuda:{}'.format(dev_id))
     # Create ckpt dir
     os.makedirs(args.ckpt_dir, exist_ok=True)
-    log_path = os.path.join(args.ckpt_dir, 'log.txt')
-    print (log_path)
-    log_f = open(log_path, 'w')
+    train_log_path = os.path.join(args.ckpt_dir, 'log.txt.train')
+    train_log_f = open(train_log_path, 'w')
+    test_log_path = os.path.join(args.ckpt_dir, 'log.txt.test')
+    test_log_f = open(test_log_path, 'w')
 
     # Set current device
     th.cuda.set_device(device)
@@ -88,18 +90,27 @@ def main(dev_id, args):
         start = time.time()
         train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
                              device=device, dev_rank=dev_rank, ndev=ndev)
+
         model.train(True)
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
-                  loss_compute(opt=model_opt), is_train=True)
+                  loss_compute(opt=model_opt), is_train=True, log_f=train_log_f)
         if dev_rank == 0:
+            '''
+            model.att_weight_map = None
+            model.eval()
+            valid_iter = dataset(graph_pool, mode='test', batch_size=args.batch,
+                                 device=device, dev_rank=dev_rank, ndev=ndev)
+            run_epoch(epoch, valid_iter, dev_rank, 1, model,
+                      loss_compute(opt=None), is_train=False)
+            end = time.time()
+            print("epoch time: {}".format(end - start))
+            '''
             ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(epoch)+'.pt')
             print (ckpt_path)
             torch.save(model.state_dict(), ckpt_path)
 
 
 if __name__ == '__main__':
-    if not os.path.exists('checkpoints'):
-        os.makedirs('checkpoints')
     np.random.seed(1111)
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')

@@ -104,18 +104,25 @@ class ShapeNetFaceDataset(object):
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
     #MAX_VERT_LENGTH = 133
-    MAX_VERT_LENGTH = 48
+    MAX_VERT_LENGTH = 98
     START_FACE_VERT_IDX = 0
     STOP_FACE_VERT_IDX = 1
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
     MAX_FACE_LENGTH = (800 + 2) // 3
-    #MAX_FACE_LENGTH = (800 + 2) // 3
     
+    #def __init__(self, dataset_list_file ='all_file_list.txt'):
     def __init__(self, dataset_list_file ='table_chair.txt'):
         dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
         dataset_list_path = os.path.join(dataset_list_dir, dataset_list_file)
+        # train
+        #with open(dataset_list_path+'.train.check', 'r') as f:
         with open(dataset_list_path, 'r') as f:
-            self.dataset_list = f.readlines()
+            self.train_dataset_list = f.readlines()
+        # test
+        #with open(dataset_list_path+'.test.check', 'r') as f:
+        with open(dataset_list_path, 'r') as f:
+            self.test_dataset_list = f.readlines()
+ 
         self.pad_id = self.PAD_BIN
         # We don't need field since we handle them in preprocess
         # self.tgt_field = Field(np.range(COORD_BIN+2),
@@ -136,7 +143,13 @@ class ShapeNetFaceDataset(object):
             dev_rank: rank (id) of current device
             ndev: number of devices
         '''
-        dataset_list = self.dataset_list
+        if mode == 'train':
+            dataset_list = self.train_dataset_list
+            print ('train', len(dataset_list))
+        else:
+            dataset_list = self.test_dataset_list
+            print ('test', len(dataset_list))
+
         n = len(dataset_list)
         # make sure all devices have the same number of batch
         n = n // ndev * ndev
@@ -144,15 +157,15 @@ class ShapeNetFaceDataset(object):
         # XXX: partition then shuffle may not be equivalent to shuffle then
         # partition
         order = list(range(dev_rank, n, ndev))
-        if mode == 'train':
-            random.shuffle(order)
+        #if mode == 'train':
+        random.shuffle(order)
 
         src_buf, tgt_buf = [], []
 
         for idx in order:
-            #same_idx = 0
-            #obj_file = dataset_list[same_idx].strip()
-            obj_file = dataset_list[idx].strip()
+            same_idx = 0
+            obj_file = dataset_list[same_idx].strip()
+            #obj_file = dataset_list[idx].strip()
             verts, faces = preprocess_mesh_obj(obj_file)
             # Flattern verts, order Y(up), X(front), Z(right)
             reordered_verts = np.zeros_like(verts)
@@ -179,17 +192,20 @@ class ShapeNetFaceDataset(object):
             # -1 for considering the FACE_EOS_BIN
             if faces.shape[0] > self.MAX_FACE_LENGTH:
                 continue
+
             tgt_buf.append(flattern_faces)
             if len(tgt_buf) == batch_size:
                 if mode == 'test':
-                    yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+                    #yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+                    yield graph_pool(src_buf, tgt_buf, device=device)
                 else:
                     yield graph_pool(src_buf, tgt_buf, device=device)
                 src_buf, tgt_buf = [], []
 
         if len(tgt_buf) != 0:
             if mode == 'test':
-                yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+                #yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+                yield graph_pool(src_buf, tgt_buf, device=device)
             else:
                 yield graph_pool(src_buf, tgt_buf, device=device)
 
