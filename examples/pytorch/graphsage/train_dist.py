@@ -26,7 +26,7 @@ from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate
 def start_server(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
     serv = DistGraphServer(args.id, server_namebook, args.num_client, args.graph_name,
-                           args.data_path)
+                           args.conf_path)
     serv.start()
 
 def load_subtensor(g, blocks, device):
@@ -140,6 +140,7 @@ def run(args, device, data):
             eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
+    g.shut_down()
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args):
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     parser.add_argument('--graph-name', type=str, help='graph name')
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
-    parser.add_argument('--data_path', type=str, help='The folder with all data')
+    parser.add_argument('--conf_path', type=str, help='The path to the partition config file')
     parser.add_argument('--num-client', type=int, help='The number of clients')
     parser.add_argument('--n-classes', type=int, help='the number of classes')
     parser.add_argument('--gpu', type=int, default=0,
