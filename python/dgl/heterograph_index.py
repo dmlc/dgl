@@ -162,6 +162,7 @@ class HeteroGraphIndex(ObjectBase):
         return _CAPI_DGLHeteroNumBits(self)
 
     def bits_needed(self, etype):
+        #pylint: disable=unused-argument
         """Return the number of integer bits needed to represent the unitgraph graph.
 
         Parameters
