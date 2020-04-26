@@ -14,16 +14,10 @@ import argparse
 
 parser = argparse.ArgumentParser(description='STGCN_WAVE')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
-parser.add_argument('--seed', default=2333, type=int, help='seed')
 parser.add_argument('--disablecuda', action='store_true', help='Disable CUDA')
 parser.add_argument('--batch_size', type=int, default=50, help='batch size for training and validation (default: 50)')
 parser.add_argument('--epochs', type=int, default=50, help='epochsfor training  (default: 50)')
 args = parser.parse_args()
-torch.manual_seed(args.seed)
-torch.cuda.manual_seed(args.seed)
-np.random.seed(args.seed)
-random.seed(args.seed)
-torch.backends.cudnn.deterministic = True
 
 device = torch.device("cuda") if torch.cuda.is_available() and not args.disablecuda else torch.device("cpu")
 
@@ -47,7 +41,6 @@ save_path = "save/stgcnwavemodel.pt"
 
 
 day_slot = 288
-n_train, n_val, n_test = 34, 5, 5
 
 
 n_pred = 3
