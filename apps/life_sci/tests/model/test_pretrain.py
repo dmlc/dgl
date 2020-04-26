@@ -91,6 +91,27 @@ def test_gat_tox21():
 
     remove_file('GAT_Tox21_pre_trained.pth')
 
+def test_weave_tox21():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
+    node_featurizer = WeaveAtomFeaturizer()
+    edge_featurizer = WeaveEdgeFeaturizer(max_distance=2)
+    g1 = smiles_to_complete_graph('CO', node_featurizer=node_featurizer,
+                                  edge_featurizer=edge_featurizer, add_self_loop=True)
+    g2 = smiles_to_complete_graph('CCO', node_featurizer=node_featurizer,
+                                  edge_featurizer=edge_featurizer, add_self_loop=True)
+    bg = dgl.batch([g1, g2])
+
+    model = load_pretrained('Weave_Tox21').to(device)
+    model(bg.to(device), bg.ndata.pop('h').to(device), bg.edata.pop('e').to(device))
+    model.eval()
+    model(g1.to(device), g1.ndata.pop('h').to(device), g1.edata.pop('e').to(device))
+
+    remove_file('Weave_Tox21_pre_trained.pth')
+
 def chirality(atom):
     try:
         return one_hot_encoding(atom.GetProp('_CIPCode'), ['R', 'S']) + \

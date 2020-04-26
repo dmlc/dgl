@@ -194,6 +194,10 @@ class KVStoreMsg {
   * \brief data matrix
   */
   NDArray data;
+  /*!
+  * \brief data shape
+  */
+  NDArray shape;
 };
 
 }  // namespace network

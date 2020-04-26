@@ -194,7 +194,7 @@ class KVMsgType(Enum):
     IP_ID = 7
 
 
-KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data c_ptr")
+KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data shape c_ptr")
 """Message of DGL kvstore
 
 Data Field
@@ -234,6 +234,15 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.rank,
             msg.name,
             tensor_id)
+    elif msg.type == KVMsgType.INIT:
+        tensor_shape = F.zerocopy_to_dgl_ndarray(msg.shape)
+        _CAPI_SenderSendKVMsg(
+            sender,
+            int(recv_id),
+            msg.type.value,
+            msg.rank,
+            msg.name,
+            tensor_shape)
     elif msg.type == KVMsgType.IP_ID:
         _CAPI_SenderSendKVMsg(
             sender,
@@ -284,6 +293,19 @@ def _recv_kv_msg(receiver):
             name=name,
             id=tensor_id,
             data=None,
+            shape=None,
+            c_ptr=msg_ptr)
+        return msg
+    elif msg_type == KVMsgType.INIT:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
+        tensor_shape = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgShape(msg_ptr))
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=name,
+            id=None,
+            data=None,
+            shape=tensor_shape,
             c_ptr=msg_ptr)
         return msg
     elif msg_type == KVMsgType.IP_ID:
@@ -294,6 +316,7 @@ def _recv_kv_msg(receiver):
             name=name,
             id=None,
             data=None,
+            shape=None,
             c_ptr=msg_ptr)
         return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
@@ -303,6 +326,7 @@ def _recv_kv_msg(receiver):
             name=None,
             id=None,
             data=None,
+            shape=None,
             c_ptr=msg_ptr)
         return msg
     else:
@@ -315,6 +339,7 @@ def _recv_kv_msg(receiver):
             name=name,
             id=tensor_id,
             data=data,
+            shape=None,
             c_ptr=msg_ptr)
         return msg
 
@@ -327,3 +352,56 @@ def _clear_kv_msg(msg):
     F.sync()
     if msg.c_ptr is not None:
         _CAPI_DeleteKVMsg(msg.c_ptr)
+
+
+def _fast_pull(name, id_tensor,
+               machine_count, group_count, machine_id, client_id,
+               partition_book, g2l, local_data,
+               sender, receiver):
+    """ Pull message
+
+    Parameters
+    ----------
+    name : str
+        data name string
+    id_tensor : tensor
+        tensor of ID
+    machine_count : int
+        count of total machine
+    group_count : int
+        count of server group
+    machine_id : int
+        current machine id
+    client_id : int
+        current client ID
+    partition_book : tensor
+        tensor of partition book
+    g2l : tensor
+        tensor of global2local
+    local_data : tensor
+        tensor of local shared data
+    sender : ctypes.c_void_p
+        C Sender handle
+    receiver : ctypes.c_void_p
+        C Receiver handle
+
+    Return
+    ------
+    tensor
+        target tensor
+    """
+    if g2l is not None:
+        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
+                                    F.zerocopy_to_dgl_ndarray(id_tensor),
+                                    F.zerocopy_to_dgl_ndarray(partition_book),
+                                    F.zerocopy_to_dgl_ndarray(local_data),
+                                    sender, receiver, 'has_g2l',
+                                    F.zerocopy_to_dgl_ndarray(g2l))
+    else:
+        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
+                                    F.zerocopy_to_dgl_ndarray(id_tensor),
+                                    F.zerocopy_to_dgl_ndarray(partition_book),
+                                    F.zerocopy_to_dgl_ndarray(local_data),
+                                    sender, receiver, 'no_g2l')
+
+    return F.zerocopy_from_dgl_ndarray(res_tensor)
