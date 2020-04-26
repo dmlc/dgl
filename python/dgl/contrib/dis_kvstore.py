@@ -21,6 +21,7 @@ if os.name != 'nt':
     import fcntl
     import struct
 
+
 def read_ip_config(filename):
     """Read network configuration information of kvstore from file.
 
@@ -75,29 +76,6 @@ def read_ip_config(filename):
         print("Error: data format on each line should be: [ip] [base_port] [server_count]")
 
     return server_namebook
-
-
-def get_type_str(dtype):
-    """Get data type string
-    """
-    if 'float16' in str(dtype):
-        return 'float16'
-    elif 'float32' in str(dtype):
-        return 'float32'
-    elif 'float64' in str(dtype):
-        return 'float64'
-    elif 'uint8' in str(dtype):
-        return 'uint8'
-    elif 'int8' in str(dtype):
-        return 'int8'
-    elif 'int16' in str(dtype):
-        return 'int16'
-    elif 'int32' in str(dtype):
-        return 'int32'
-    elif 'int64' in str(dtype):
-        return 'int64'
-    else:
-        raise RuntimeError('Unknown data type: %s' % str(dtype))
 
 
 class KVServer(object):
@@ -206,13 +184,12 @@ class KVServer(object):
         if global2local is not None: # Create shared-tensor
             if isinstance(global2local, list):
                 global2local = F.tensor(global2local)
-            assert 'int64' == get_type_str(F.dtype(global2local)), 'global2local must be int64 type.'
             shared_data = empty_shared_mem(name+'-g2l-', True, global2local.shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-g2l-'][:] = global2local[:]
             # write data information to temp file that can be read by other processes
-            self._write_data_shape_type(name+'-g2l-shape-'+str(self._machine_id), global2local)
+            self._write_data_shape(name+'-g2l-shape-'+str(self._machine_id), global2local)
             self._open_file_list.append(name+'-g2l-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
@@ -221,8 +198,7 @@ class KVServer(object):
                     break
                 else:
                     time.sleep(2) # wait until the file been created
-            data_shape, data_type = self._read_data_shape_type(name+'-g2l-shape-'+str(self._machine_id))
-            assert data_type == 'int64'
+            data_shape = self._read_data_shape(name+'-g2l-shape-'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-g2l-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
@@ -247,12 +223,11 @@ class KVServer(object):
         if partition_book is not None: # Create shared-tensor
             if isinstance(partition_book, list):
                 partition_book = F.tensor(partition_book)
-            assert 'int64' == get_type_str(F.dtype(partition_book)), 'partition_book must be int64 type.'
             shared_data = empty_shared_mem(name+'-part-', True, partition_book.shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-part-'][:] = partition_book[:]
-            self._write_data_shape_type(name+'-part-shape-'+str(self._machine_id), partition_book)
+            self._write_data_shape(name+'-part-shape-'+str(self._machine_id), partition_book)
             self._open_file_list.append(name+'-part-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
@@ -261,8 +236,7 @@ class KVServer(object):
                     break
                 else:
                     time.sleep(2) # wait until the file been created    
-            data_shape, data_type = self._read_data_shape_type(name+'-part-shape-'+str(self._machine_id))
-            assert data_type == 'int64'
+            data_shape = self._read_data_shape(name+'-part-shape-'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-part-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
@@ -285,12 +259,11 @@ class KVServer(object):
         assert len(name) > 0, 'name cannot be empty.'
 
         if data_tensor is not None: # Create shared-tensor
-            data_type = get_type_str(F.dtype(data_tensor))
-            shared_data = empty_shared_mem(name+'-data-', True, data_tensor.shape, data_type)
+            shared_data = empty_shared_mem(name+'-data-', True, data_tensor.shape, 'float32')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-data-'][:] = data_tensor[:]
-            self._write_data_shape_type(name+'-data-shape-'+str(self._machine_id), data_tensor)
+            self._write_data_shape(name+'-data-shape-'+str(self._machine_id), data_tensor)
             self._open_file_list.append(name+'-data-shape-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
@@ -298,8 +271,8 @@ class KVServer(object):
                     break
                 else:
                     time.sleep(2) # wait until the file been created
-            data_shape, data_type = self._read_data_shape_type(name+'-data-shape-'+str(self._machine_id))
-            shared_data = empty_shared_mem(name+'-data-', False, data_shape, data_type)
+            data_shape = self._read_data_shape(name+'-data-shape-'+str(self._machine_id))
+            shared_data = empty_shared_mem(name+'-data-', False, data_shape, 'float32')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
 
@@ -534,7 +507,7 @@ class KVServer(object):
         ----------
         name : str
             tensor name
-        dtype : dtype
+        dtype : str
             data type
 
         Returns
@@ -546,7 +519,13 @@ class KVServer(object):
 
         str_data = name
         str_data += '/'
-        str_data += get_type_str(dtype)
+        if 'float32' in str(dtype):
+            str_data += 'float32'
+        elif 'int64' in str(dtype):
+            str_data += 'int64'
+        else:
+            raise RuntimeError('We can only process int64 and float32 shared-memory tensor now.')
+
         return str_data
 
 
@@ -572,7 +551,7 @@ class KVServer(object):
         return tensor_name, data_type
 
 
-    def _write_data_shape_type(self, filename, data):
+    def _write_data_shape(self, filename, data):
         """Write data shape to a temp file.
 
         Parameters
@@ -589,8 +568,6 @@ class KVServer(object):
 
         shape = F.shape(data)
         str_data = ''
-        str_data += get_type_str(F.dtype(data))
-        str_data += '|'
         f = open(filename, "a");
         for s in shape:
             str_data += str(s)
@@ -599,7 +576,7 @@ class KVServer(object):
         f.close()
 
 
-    def _read_data_shape_type(self, filename):
+    def _read_data_shape(self, filename):
         """Read data shape from a tmp file.
 
         Parameters
@@ -617,13 +594,12 @@ class KVServer(object):
         f = open(filename, "r")
         str_data = f.read()
         data_list = str_data.split('|')
-        data_type = data_list[0]
         data_shape = []
-        for i in range(1, len(data_list)-1):
+        for i in range(len(data_list)-1):
             data_shape.append(int(data_list[i]))
         f.close()
 
-        return data_shape, data_type
+        return data_shape
 
 
     def _default_push_handler(self, name, ID, data, target):
@@ -796,8 +772,7 @@ class KVClient(object):
                         break
                     else:
                         time.sleep(2) # wait until the file been created 
-                shape, data_type = self._read_data_shape_type(tensor_name+'shape-'+str(self._machine_id))
-                assert data_type == dtype
+                shape = self._read_data_shape(tensor_name+'shape-'+str(self._machine_id))
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[tensor_name] = F.zerocopy_from_dlpack(dlpack)
@@ -1294,7 +1269,7 @@ class KVClient(object):
         f.close()
 
 
-    def _read_data_shape_type(self, filename):
+    def _read_data_shape(self, filename):
         """Read data shape from a tmp file.
 
         Parameters
@@ -1312,13 +1287,13 @@ class KVClient(object):
         f = open(filename, "r")
         str_data = f.read()
         data_list = str_data.split('|')
-        data_type = data_list[0]
         data_shape = []
-        for i in range(1, len(data_list)-1):
+        for i in range(len(data_list)-1):
             data_shape.append(int(data_list[i]))
+
         f.close()
 
-        return data_shape, data_type
+        return data_shape
 
 
     def _takeId(self, elem):
