@@ -12,8 +12,8 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser('testing translation model')
     argparser.add_argument('--gpu', default=-1, help='gpu id')
     argparser.add_argument('--N', default=6, type=int, help='num of layers')
-    argparser.add_argument('--dataset', default='multi30k', help='dataset')
-    argparser.add_argument('--batch', default=64, help='batch size')
+    argparser.add_argument('--dataset', default='vertex', help='dataset')
+    argparser.add_argument('--batch', default=64, type=int, help='batch size')
     argparser.add_argument('--ckpt-dir', default='.', type=str, help='checkpoint path')
     argparser.add_argument('--epoch', default=1, help='epoch number')
     args = argparser.parse_args()
@@ -32,10 +32,10 @@ if __name__ == '__main__':
         model.load_state_dict(th.load(f, map_location=lambda storage, loc: storage))
     model = model.to(device)
     model.eval()
-    test_iter = dataset(graph_pool, mode='test', batch_size=args.batch, devices=[device], k=k)
+    test_iter = dataset(graph_pool, mode='infer', batch_size=args.batch, device=device, k=k)
     for i, g in enumerate(test_iter):
         with th.no_grad():
-            output = model.infer(g, dataset.MAX_LENGTH, dataset.eos_id, k, alpha=0.6)
+            output = model.infer(g, dataset.MAX_LENGTH, dataset.INIT_BIN, k, alpha=0.6)
         for line in dataset.get_sequence(output):
             print(line, file=fpred)
         for line in dataset.tgt['test']:

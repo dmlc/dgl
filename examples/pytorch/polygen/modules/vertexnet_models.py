@@ -110,19 +110,23 @@ class Transformer(nn.Module):
 
         # init mask
         device = next(self.parameters()).device
-        g.ndata['mask'] = th.zeros(N, dtype=th.uint8, device=device)
+
+        g.ndata['mask'] = th.zeros(N, dtype=th.bool, device=device)
+        g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
+        coord_embed = self.coord_embed(graph.tgt[1]%3)
+        pos_embed = self.pos_embed(graph.tgt[1]//3) 
+        res = graph.tgt_y
 
         # decode
         log_prob = None
         y = graph.tgt[0]
         for step in range(1, max_len):
             y = y.view(-1)
-            coord_embed = self.coord_embed(graph.tgt[1]%3)
-            pos_embed = self.pos_embed(graph.tgt[1]//3) 
-            value_embed = self.value_embed(graph.tgt[0]) 
-            g.ndata['x'][nids['dec']] = self.pos_enc.dropout(coord_embed + pos_embed + value_embed)
+            value_embed = self.value_embed(y) 
+            g.nodes[nids['dec']].data['x'] = self.pos_embed.dropout(coord_embed + pos_embed + value_embed)
             edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
             nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
+
             for i in range(self.decoder.N):
                 pre_func = self.decoder.pre_func(i, 'qkv')
                 post_func = self.decoder.post_func(i)
@@ -141,7 +145,7 @@ class Transformer(nn.Module):
 
             if log_prob is None:
                 log_prob, pos = out.view(batch_size, k, -1)[:, 0, :].topk(k, dim=-1)
-                eos = th.zeros(batch_size, k).byte()
+                eos = th.zeros(batch_size, k).bool()
             else:
                 norm_old = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((4. + step) / 6, alpha)
                 norm_new = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((5. + step) / 6, alpha)
@@ -157,7 +161,7 @@ class Transformer(nn.Module):
                     y[i*k+j, :] = _y[i*k+_j, :]
                     y[i*k+j, step] = token
                     eos[i, j] = _eos[i, _j] | (token == eos_id)
-
+            print (y[0],)
             if eos.all():
                 break
             else:

@@ -78,15 +78,15 @@ class ShapeNetVertexDataset(object):
                 flattern_verts = flattern_verts[:self.MAX_LENGTH-1] + [self.EOS_BIN]
             tgt_buf.append(flattern_verts)
             if len(tgt_buf) == batch_size:
-                if mode == 'test':
-                    yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+                if mode == 'infer':
+                    yield graph_pool.beam(tgt_buf, self.INIT_BIN, self.MAX_LENGTH, k, device=device)
                 else:
                     yield graph_pool(tgt_buf, device=device)
                 tgt_buf = []
 
         if len(tgt_buf) != 0:
-            if mode == 'test':
-                yield graph_pool.beam(self.sos_id, self.MAX_LENGTH, k, device=device)
+            if mode == 'infer':
+                yield graph_pool.beam(self.INIT_BIN, self.MAX_LENGTH, k, device=device)
             else:
                 yield graph_pool(tgt_buf, device=device)
 

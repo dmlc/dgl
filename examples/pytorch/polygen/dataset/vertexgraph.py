@@ -39,22 +39,23 @@ class VertexNetGraphPool:
         self.g_pool = g_pool
         self.num_edges = num_edges
 
-    def beam(self, src_buf, start_sym, max_len, k, device='cpu'):
+    def beam(self, tgt_buf, start_sym, max_len, k, device='cpu'):
         '''
         Return a batched graph for beam search during inference of Transformer.
         args:
-            src_buf: a list of input sequence
+            tgt_buf: a list of input sequence
             start_sym: the index of start-of-sequence symbol
             max_len: maximum length for decoding
             k: beam size
             device: 'cpu' or 'cuda:*' 
         '''
         g_list = []
-        tgt_lens = [len(_) - 1 for _ in tgt_buf]
+        tgt_lens = [max_len] * len(tgt_buf)
         num_edges = {'dd': []}
         for tgt_len in tgt_lens:
             i = tgt_len - 1
-            g_list.append(self.g_pool[i])
+            for _ in range(k):
+                g_list.append(self.g_pool[i])
             num_edges['dd'].append(int(self.num_edges['dd'][i]))
 
         g = dgl.batch(g_list)
@@ -65,7 +66,9 @@ class VertexNetGraphPool:
         n_nodes, n_edges, n_tokens = 0, 0, 0
         for tgt_sample, n, n_dd in zip(tgt_buf, tgt_lens, num_edges['dd']):
             for _ in range(k):
-                tgt.append(th.tensor(tgt_sample[:-1], dtype=th.long, device=device))
+                tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
+                tgt_seq[0] = start_sym
+                tgt.append(tgt_seq)
                 tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
                 tgt_pos.append(th.arange(n, dtype=th.long, device=device))
                 dec_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
