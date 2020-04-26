@@ -418,6 +418,7 @@ class KVServer(object):
                     name=str(client_id),
                     id=None,
                     data=None,
+                    shape=None,
                     c_ptr=None)
                 _send_kv_msg(self._sender, msg, client_id)
 
@@ -435,6 +436,7 @@ class KVServer(object):
                 name=shared_tensor,
                 id=None,
                 data=None,
+                shape=None,
                 c_ptr=None)
 
             for client_id in range(len(self._client_namebook)):
@@ -471,8 +473,33 @@ class KVServer(object):
                     name=msg.name,
                     id=msg.id,
                     data=res_tensor,
+                    shape=None,
                     c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
+            # Init new data
+            elif msg.type == KVMsgType.INIT:
+                assert msg.rank == 0
+                data_str, target_name = msg.name.split('|')
+                data_name, data_type = self._deserialize_shared_tensor(data_str)
+                dtype = F.data_type_dict[data_type]
+                data_shape = F.asnumpy(msg.shape).tolist()
+                if self._server_id % self._group_count == 0: # master server
+                    data_tensor = F.zeros(data_shape, dtype, F.cpu())
+                    self.init_data(name=data_name, data_tensor=data_tensor)
+                else: # backup server
+                    self.init_data(name=data_name)
+                g2l = self._data_store[target_name+'-g2l-']
+                self._data_store[data_name+'-g2l-'] = g2l
+                self._has_data.add(data_name+'-g2l-')
+                back_msg = KVStoreMsg(
+                    type=KVMsgType.INIT,
+                    rank=self._server_id,
+                    name=msg.name,
+                    id=None,
+                    data=None,
+                    shape=msg.shape,
+                    c_ptr=None)
+                _send_kv_msg(self._sender, back_msg, 0)
             # Barrier message
             elif msg.type == KVMsgType.BARRIER:
                 self._barrier_count += 1
@@ -483,6 +510,7 @@ class KVServer(object):
                         name=None,
                         id=None,
                         data=None,
+                        shape=None,
                         c_ptr=None)
                     for client_id in range(self._client_count):
                         _send_kv_msg(self._sender, back_msg, client_id)
@@ -520,6 +548,28 @@ class KVServer(object):
         str_data += '/'
         str_data += get_type_str(dtype)
         return str_data
+
+
+    def _deserialize_shared_tensor(self, data):
+        """Deserialize shared tensor information sent from server
+
+        Parameters
+        ----------
+        data : str
+            serialized string
+
+        Returns
+        -------
+        str
+            tensor name
+        str
+            data type
+        """
+        data_list = data.split('/')
+        tensor_name = data_list[0]
+        data_type = data_list[-1]
+
+        return tensor_name, data_type
 
 
     def _write_data_shape_type(self, filename, data):
@@ -720,6 +770,7 @@ class KVClient(object):
             name=self._addr,
             id=None,
             data=None,
+            shape=None,
             c_ptr=None)
 
         for server_id in range(self._server_count):
@@ -755,6 +806,72 @@ class KVClient(object):
                 self._has_data.add(tensor_name)
 
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
+
+
+    def init_data(self, name, shape, dtype, target_name):
+        """Send message to kvserver to initialize new data and 
+        get corresponded shared-tensor (e.g., partition_book, g2l) on kvclient. 
+
+        The new data will be initialized to zeros.
+
+        Note that, this API must be invoked after the conenct() API. 
+
+        Parameters
+        ----------
+        name : str
+            data name
+        shape : list of int
+            data shape
+        dtype : dtype
+            data type
+        target_name : str
+            target name is used to find existing partition_book and g2l mapping.
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert len(shape) > 0, 'shape cannot be empty.'
+        assert len(target_name) > 0, 'target_name cannot be empty.'
+
+        if self._client_id == 0: # only client_0 send message to server
+            partition_book = self._data_store[target_name+'-part-']
+            machines, count = np.unique(F.asnumpy(partition_book), return_counts=True)
+            assert shape[0] == len(partition_book)
+            # send message to all of the server nodes
+            for idx in range(len(machines)):
+                m_id = machines[idx]
+                data_str = self._serialize_shared_tensor(name, dtype)
+                data_str = data_str + '|' + target_name
+                partitioned_shape = shape.copy()
+                partitioned_shape[0] = count[idx]
+                for n in range(self._group_count):
+                    server_id = m_id * self._group_count + n
+                    msg = KVStoreMsg(
+                        type=KVMsgType.INIT,
+                        rank=0,
+                        name=data_str,
+                        id=None,
+                        data=None,
+                        shape=F.tensor(partitioned_shape),
+                        c_ptr=None)
+                    _send_kv_msg(self._sender, msg, server_id)
+            # recv confirmation message from server nodes
+            for server_id in range(self._server_count):
+                msg = _recv_kv_msg(self._receiver)
+                assert msg.type == KVMsgType.INIT
+        self.barrier() # wait all the client and server finish its job
+        g2l = self._data_store[target_name+'-g2l-']
+        partition_book = self._data_store[target_name+'-part-']
+        self._data_store[name+'-g2l-'] = g2l
+        self._data_store[name+'-part-'] = partition_book
+        self._has_data.add(name+'-g2l-')
+        self._has_data.add(name+'-part-')
+        # Read new data from shared-memory created by server
+        shape, data_type = self._read_data_shape_type(name+'-data-shape-'+str(self._machine_id))
+        assert data_type == get_type_str(dtype)
+        shared_data = empty_shared_mem(name+'-data-', False, shape, data_type)
+        dlpack = shared_data.to_dlpack()
+        self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
+        self._has_data.add(name+'-data-')
+        self._data_name_list.append(name)
 
 
     def print(self):
@@ -886,6 +1003,7 @@ class KVClient(object):
                     name=name,
                     id=partial_id, 
                     data=partial_data,
+                    shape=None,
                     c_ptr=None)
                 # randomly select a server node in target machine for load-balance
                 s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
@@ -967,6 +1085,7 @@ class KVClient(object):
                         name=name, 
                         id=partial_id,
                         data=None,
+                        shape=None,
                         c_ptr=None)
                     # randomly select a server node in target machine for load-balance
                     s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
@@ -985,6 +1104,7 @@ class KVClient(object):
                     name=name, 
                     id=None,
                     data=local_data,
+                    shape=None,
                     c_ptr=None)
                 msg_list.append(local_msg)
                 self._garbage_msg.append(local_msg)
@@ -1013,6 +1133,7 @@ class KVClient(object):
             name=None,
             id=None,
             data=None,
+            shape=None,
             c_ptr=None)
 
         for server_id in range(self._server_count):
@@ -1035,6 +1156,7 @@ class KVClient(object):
                 name=None,
                 id=None,
                 data=None,
+                shape=None,
                 c_ptr=None)
             _send_kv_msg(self._sender, msg, server_id)
 
@@ -1100,6 +1222,29 @@ class KVClient(object):
             nic.add(ip)
 
         return nic
+
+
+    def _serialize_shared_tensor(self, name, dtype):
+        """Serialize shared tensor information.
+
+        Parameters
+        ----------
+        name : str
+            tensor name
+        dtype : dtype
+            data type
+
+        Returns
+        -------
+        str
+            serialized string
+        """
+        assert len(name) > 0, 'data name cannot be empty.'
+
+        str_data = name
+        str_data += '/'
+        str_data += get_type_str(dtype)
+        return str_data
 
 
     def _deserialize_shared_tensor(self, data):
