@@ -31,7 +31,7 @@ def _copy_graph_to_shared_mem(g, graph_name):
     return new_g
 
 field_dict = {'part_id': F.int64,
-              'local_node': F.int32,
+              'local_node': F.int64,
               NID: F.int64,
               EID: F.int64}
 
@@ -246,6 +246,12 @@ def load_partition(conf_file, part_id):
     client_g = load_graphs(part_files['part_graph'])[0][0]
     node_map = pickle.load(open(part_metadata['node_map'], 'rb'))
     meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map)
+
+    part_ids = node_map[client_g.ndata[NID]]
+    # TODO we need to fix this. DGL backend doesn't support boolean or byte.
+    # int64 is unnecessary.
+    client_g.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
+
     return client_g, node_feats, edge_feats, meta
 
 def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
@@ -400,10 +406,6 @@ class DistGraphServer(KVServer):
 
         self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
         full_part_ids = self.meta[2]
-        part_ids = full_part_ids[self.client_g.ndata[NID]]
-        # TODO we need to fix this. DGL backend doesn't support boolean or byte.
-        # int64 is unnecessary.
-        self.client_g.ndata['local_node'] = F.astype(part_ids == server_id, F.int64)
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
         self.meta = _move_data_to_shared_mem_array(F.tensor([self.meta[0], self.meta[1]]),
                                                    _get_ndata_path(graph_name, 'meta'))
@@ -411,7 +413,10 @@ class DistGraphServer(KVServer):
         num_nodes = self.meta[0]
         self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu())
         self.g2l[:] = -1
-        nids = F.boolean_mask(self.client_g.ndata[NID], self.client_g.ndata['local_node'])
+        local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
+        # The nodes that belong to this partition.
+        nids = self.client_g.ndata[NID][local_nids]
+        assert np.all(F.asnumpy(full_part_ids[nids] == server_id))
         self.g2l[nids] = F.arange(0, len(nids))
 
         if self.get_id() % self.get_group_count() == 0: # master server
