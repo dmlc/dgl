@@ -8,7 +8,10 @@ from .dis_kvstore import KVServer, KVClient
 from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
+from ..transform import metis_partition_assignment, partition_graph_with_halo
+from ..data.utils import save_graphs
 
+import json
 import socket
 import numpy as np
 from collections.abc import MutableMapping
@@ -19,8 +22,6 @@ def _copy_graph_to_shared_mem(g, graph_name):
     new_g = DGLGraph(gidx)
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
-    new_g.ndata['part_id'] = _move_data_to_shared_mem_array(g.ndata['part_id'],
-                                                            _get_ndata_path(graph_name, 'part_id'))
     new_g.ndata['local_node'] = _move_data_to_shared_mem_array(g.ndata['local_node'],
                                                                _get_ndata_path(graph_name, 'local_node'))
     new_g.ndata[NID] = _move_data_to_shared_mem_array(g.ndata[NID],
@@ -94,7 +95,6 @@ def _get_graph_from_shared_mem(graph_name):
         return gidx
 
     g = DGLGraph(gidx)
-    g.ndata['part_id'] = _get_shared_mem_ndata(g, graph_name, 'part_id')
     g.ndata['local_node'] = _get_shared_mem_ndata(g, graph_name, 'local_node')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
@@ -231,18 +231,135 @@ class EdgeDataView(MutableMapping):
             reprs[name] = 'DistTensor(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
-def _load_data(data_path, graph_name, part_id):
+def load_partition(conf_file, part_id):
     ''' Load data of a partition from the data path in the DistGraph server.
 
     Here we load data through the normal filesystem interface. In the future, we need to support
     loading data from other storage such as S3 and HDFS.
     '''
-    server_data = '{}/{}-server-{}.dgl'.format(data_path, graph_name, part_id)
-    client_data = '{}/{}-client-{}.dgl'.format(data_path, graph_name, part_id)
-    part_g = load_graphs(server_data)[0][0]
-    client_g = load_graphs(client_data)[0][0]
-    meta = pickle.load(open('{}/{}-meta.pkl'.format(data_path, graph_name), 'rb'))
-    return part_g, client_g, meta
+    with open(conf_file) as f:
+        part_metadata = json.load(f)
+    graph_name = part_metadata['graph_name']
+    part_files = part_metadata['part-{}'.format(part_id)]
+    node_feats = pickle.load(open(part_files['node_feats'], 'rb'))
+    edge_feats = pickle.load(open(part_files['edge_feats'], 'rb'))
+    client_g = load_graphs(part_files['part_graph'])[0][0]
+    node_map = pickle.load(open(part_metadata['node_map'], 'rb'))
+    meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map)
+    return client_g, node_feats, edge_feats, meta
+
+def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
+    ''' Partition a graph for distributed training and store the partitions on files.
+
+    The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
+    assign nodes to partitions; 2) construct partition graph structure based on
+    the node assignment; 3) split the node features and edge features based on
+    the partition result.
+
+    The partitioned data is stored into multiple files.
+
+    First, the metadata of the original graph and the partitioning is stored in a JSON file
+    named after `graph_name`. This JSON file contains the information of the originla graph
+    as well as the file names that store each partition.
+
+    The node assignment is stored in a separate file if we don't reshuffle node Ids to ensure
+    that all nodes in a partition fall into a contiguous Id range. The node assignment is stored
+    in a pickle file.
+
+    All node features in a partition are stored in a pickle file. The node features are stored
+    in a dictionary, in which the key is the node data name and the value is a tensor.
+
+    All edge features in a partition are stored in a pickle file. The edge features are stored
+    in a dictionary, in which the key is the edge data name and the value is a tensor.
+
+    The graph structure of a partition is stored in a file with the DGLGraph format. The DGLGraph
+    contains the mapping of node/edge Ids to the Ids in the original graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph to partition
+    graph_name : str
+        The name of the graph.
+    num_parts : int
+        The number of partitions
+    num_hops : int
+        The number of hops of HALO nodes we construct on a partition graph structure.
+    part_method : str
+        The partition method. It supports "random" and "metis".
+    out_path : str
+        The path to store the files for all partitioned data.
+    '''
+    if num_parts == 1:
+        client_parts = {0: g}
+        node_parts = F.zeros((g.number_of_nodes()), F.int64, F.cpu())
+        g.ndata[NID] = F.arange(0, g.number_of_nodes())
+        g.edata[EID] = F.arange(0, g.number_of_edges())
+    elif part_method == 'metis':
+        node_parts = metis_partition_assignment(g, num_parts)
+        client_parts = partition_graph_with_halo(g, node_parts, num_hops)
+    elif part_method == 'random':
+        node_parts = np.random.choice(num_parts, g.number_of_nodes())
+        client_parts = partition_graph_with_halo(g, node_parts, num_hops)
+    else:
+        raise Exception('unknown partitioning method: ' + part_method)
+
+    tot_num_inner_edges = 0
+    node_part_file = '{}/{}-node_part.pkl'.format(out_path, graph_name)
+    pickle.dump(node_parts, open(node_part_file, 'wb'))
+    part_metadata = {'graph_name': graph_name,
+                     'num_nodes': g.number_of_nodes(),
+                     'num_edges': g.number_of_edges(),
+                     'part_method': part_method,
+                     'num_parts': num_parts,
+                     'halo_hops': num_hops,
+                     'node_split': 'original',
+                     'node_map': node_part_file}
+    for part_id in range(num_parts):
+        part = client_parts[part_id]
+
+        # Get the node Ids that belong to this partition.
+        part_ids = node_parts[part.ndata[NID]]
+        local_nids = F.asnumpy(part.ndata[NID])[F.asnumpy(part_ids) == part_id]
+
+        # Get the node/edge features of each partition.
+        node_feats = {}
+        edge_feats = {}
+        if num_parts > 1:
+            local_nodes = F.asnumpy(part.ndata[NID])[F.asnumpy(part.ndata['inner_node']) == 1]
+            local_edges = F.asnumpy(part.edata[EID])[F.asnumpy(part.edata['inner_edge']) == 1]
+            print('part {} has {} nodes and {} edges. {} nodes and {} edges are inside the partition'.format(
+                part_id, part.number_of_nodes(), part.number_of_edges(),
+                len(local_nodes), len(local_edges)))
+            tot_num_inner_edges += len(local_edges)
+            for name in g.ndata:
+                node_feats[name] = g.ndata[name][local_nodes]
+            for name in g.edata:
+                edge_feats[name] = g.edata[name][local_edges]
+        else:
+            for name in g.ndata:
+                node_feats[name] = g.ndata[name]
+            for name in g.edata:
+                edge_feats[name] = g.edata[name]
+
+        node_feat_file = '{}/{}-node_feat-{}.pkl'.format(out_path, graph_name, part_id)
+        edge_feat_file = '{}/{}-edge_feat-{}.pkl'.format(out_path, graph_name, part_id)
+        part_graph_file = '{}/{}-part_graph-{}.dgl'.format(out_path, graph_name, part_id)
+        part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
+                                                    'edge_feats': edge_feat_file,
+                                                    'part_graph': part_graph_file}
+        pickle.dump(node_feats, open(node_feat_file, 'wb'))
+        pickle.dump(edge_feats, open(edge_feat_file, 'wb'))
+        save_graphs(part_graph_file, [part])
+
+    with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:
+        json.dump(part_metadata, outfile, sort_keys=True, indent=4)
+
+    num_cuts = g.number_of_edges() - tot_num_inner_edges
+    if num_parts == 1:
+        num_cuts = 0
+    print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
+        g.number_of_edges(), num_cuts, num_parts))
 
 class DistGraphServer(KVServer):
     ''' The DistGraph server.
@@ -271,40 +388,42 @@ class DistGraphServer(KVServer):
         Total number of client nodes.
     graph_name : string
         The name of the graph.
-    data_path : string
-        The path that all graph data is stored.
+    conf_file : string
+        The path of the config file generated by the partition tool.
     '''
-    def __init__(self, server_id, server_namebook, num_client, graph_name, data_path):
+    def __init__(self, server_id, server_namebook, num_client, graph_name, conf_file):
         super(DistGraphServer, self).__init__(server_id=server_id, server_namebook=server_namebook, num_client=num_client)
 
         host_name = socket.gethostname()
         host_ip = socket.gethostbyname(host_name)
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
-        self.part_g, self.client_g, self.meta = _load_data(data_path, graph_name, server_id)
-        self.client_g.ndata['local_node'] = F.astype(self.client_g.ndata['part_id'] == server_id, F.int32)
+        self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
+        full_part_ids = self.meta[2]
+        part_ids = full_part_ids[self.client_g.ndata[NID]]
+        # TODO we need to fix this. DGL backend doesn't support boolean or byte.
+        # int64 is unnecessary.
+        self.client_g.ndata['local_node'] = F.astype(part_ids == server_id, F.int64)
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
-        self.meta = _move_data_to_shared_mem_array(F.tensor(self.meta), _get_ndata_path(graph_name, 'meta'))
+        self.meta = _move_data_to_shared_mem_array(F.tensor([self.meta[0], self.meta[1]]),
+                                                   _get_ndata_path(graph_name, 'meta'))
 
         num_nodes = self.meta[0]
         self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu())
         self.g2l[:] = -1
-        self.g2l[self.part_g.ndata[NID]] = F.arange(0, self.part_g.number_of_nodes())
-
-        # TODO this works if the HALO nodes can cover all nodes used by mini-batches.
-        partition = F.zeros(shape=(num_nodes,), dtype=F.int64, ctx=F.cpu())
-        partition[self.client_g.ndata[NID]] = self.client_g.ndata['part_id']
+        nids = F.boolean_mask(self.client_g.ndata[NID], self.client_g.ndata['local_node'])
+        self.g2l[nids] = F.arange(0, len(nids))
 
         if self.get_id() % self.get_group_count() == 0: # master server
-            for name in self.part_g.ndata.keys():
+            for name in node_feats.keys():
                 self.set_global2local(name=_get_ndata_name(name), global2local=self.g2l)
-                self.init_data(name=_get_ndata_name(name), data_tensor=self.part_g.ndata[name])
-                self.set_partition_book(name=_get_ndata_name(name), partition_book=partition)
+                self.init_data(name=_get_ndata_name(name), data_tensor=node_feats[name])
+                self.set_partition_book(name=_get_ndata_name(name), partition_book=full_part_ids)
         else:
-            for name in self.part_g.ndata.keys():
+            for name in node_feats.keys():
                 self.set_global2local(name=_get_ndata_name(name))
                 self.init_data(name=_get_ndata_name(name))
-                self.set_partition_book(name=_get_ndata_name(name), partition_book=partition)
+                self.set_partition_book(name=_get_ndata_name(name), partition_book=full_part_ids)
         # TODO Do I need synchronization?
 
 class DistGraph:

@@ -11,6 +11,7 @@ import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.contrib import DistGraphServer, DistGraph
+from dgl.contrib.dist_graph import partition_graph
 import backend as F
 import unittest
 import pickle
@@ -23,12 +24,13 @@ def create_random_graph(n):
     return dgl.DGLGraph(ig)
 
 def run_server(graph_name, server_id, num_clients, barrier):
-    g = DistGraphServer(server_id, server_namebook, num_clients, graph_name, '.')
+    g = DistGraphServer(server_id, server_namebook, num_clients, graph_name,
+                        '/tmp/{}.json'.format(graph_name))
     barrier.wait()
     print('start server', server_id)
     g.start()
 
-def run_client(graph_name, part, barrier, num_nodes, num_edges):
+def run_client(graph_name, barrier, num_nodes, num_edges):
     barrier.wait()
     g = DistGraph(server_namebook, graph_name)
 
@@ -44,11 +46,6 @@ def run_client(graph_name, part, barrier, num_nodes, num_edges):
     assert g.node_attr_schemes()['features'].dtype == F.float32
     assert g.node_attr_schemes()['features'].shape == (1,)
 
-    # Test internal
-    assert np.all(F.asnumpy(part.ndata['part_id'] == g.g.ndata['part_id']))
-    assert part.number_of_nodes() == g.g.number_of_nodes()
-    assert part.number_of_edges() == g.g.number_of_edges()
-
     g.shut_down()
     print('end')
 
@@ -57,24 +54,9 @@ def run_server_client():
 
     # Partition the graph
     num_parts = 4
-    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    node_parts = dgl.transform.metis_partition_assignment(g, num_parts)
-    server_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 0)
-    client_parts = dgl.transform.partition_graph_with_halo(g, node_parts, 1)
-    for part_id in client_parts:
-        part = client_parts[part_id]
-        part.ndata['part_id'] = F.gather_row(node_parts, part.ndata[dgl.NID])
-
-    # save the partitions to files.
     graph_name = 'test'
-    for part_id in range(num_parts):
-        serv_part = server_parts[part_id]
-        serv_part.ndata['features'] = g.ndata['features'][serv_part.ndata[dgl.NID]]
-        part = client_parts[part_id]
-        save_graphs('{}/{}-server-{}.dgl'.format('.', graph_name, part_id), [serv_part])
-        save_graphs('{}/{}-client-{}.dgl'.format('.', graph_name, part_id), [part])
-    meta = np.array([g.number_of_nodes(), g.number_of_edges()])
-    pickle.dump(meta, open('{}/{}-meta.pkl'.format('.', graph_name), 'wb'))
+    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
+    partition_graph(g, graph_name, num_parts, 1, 'metis', '/tmp')
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -88,8 +70,8 @@ def run_server_client():
     cli_ps = []
     for cli_id in range(1):
         print('start client', cli_id)
-        p = Process(target=run_client, args=(graph_name, client_parts[cli_id], barrier,
-                                             g.number_of_nodes(), g.number_of_edges()))
+        p = Process(target=run_client, args=(graph_name, barrier, g.number_of_nodes(),
+                                             g.number_of_edges()))
         p.start()
         cli_ps.append(p)
 
