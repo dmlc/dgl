@@ -16,6 +16,7 @@ import socket
 import numpy as np
 from collections.abc import MutableMapping
 import pickle
+import os
 
 def _copy_graph_to_shared_mem(g, graph_name):
     gidx = g._graph.copyto_shared_mem(_get_graph_path(graph_name))
@@ -311,6 +312,7 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
         raise Exception('unknown partitioning method: ' + part_method)
 
     tot_num_inner_edges = 0
+    out_path = os.path.abspath(out_path)
     node_part_file = '{}/{}-node_part.pkl'.format(out_path, graph_name)
     pickle.dump(node_parts, open(node_part_file, 'wb'))
     part_metadata = {'graph_name': graph_name,
