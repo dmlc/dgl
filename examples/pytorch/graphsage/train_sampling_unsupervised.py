@@ -61,12 +61,11 @@ class NeighborSampler(object):
             # For each seed node, sample ``fanout`` neighbors.
             frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
             # Remove all edges between heads and tails, as well as heads and neg_tails.
-            # Currently this is slow and I'm still optimizing edge_ids operation.
-            #_, _, edge_ids = frontier.edge_ids(
-            #    th.cat([heads, tails, neg_heads, neg_tails]),
-            #    th.cat([tails, heads, neg_tails, neg_heads]),
-            #    return_uv=True)
-            #frontier = dgl.remove_edges(frontier, edge_ids)
+            _, _, edge_ids = frontier.edge_ids(
+                th.cat([heads, tails, neg_heads, neg_tails]),
+                th.cat([tails, heads, neg_tails, neg_heads]),
+                return_uv=True)
+            frontier = dgl.remove_edges(frontier, edge_ids)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -295,11 +294,11 @@ if __name__ == '__main__':
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
-    argparser.add_argument('--num-negs', type=int, default=1)
+    argparser.add_argument('--num-negs', type=int, default=20)
     argparser.add_argument('--fan-out', type=str, default='10,25')
-    argparser.add_argument('--batch-size', type=int, default=1000)
+    argparser.add_argument('--batch-size', type=int, default=10000)
     argparser.add_argument('--log-every', type=int, default=20)
-    argparser.add_argument('--eval-every', type=int, default=5)
+    argparser.add_argument('--eval-every', type=int, default=10000)
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
