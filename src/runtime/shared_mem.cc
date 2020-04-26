@@ -62,10 +62,10 @@ void *SharedMemory::open(size_t size) {
 bool SharedMemory::exist(const std::string &name) {
   int fd = shm_open(name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
   if (fd >= 0) {
-	  close(fd);
-	  return true;
+    close(fd);
+    return true;
   } else {
-	  return false;
+    return false;
   }
 }
 #endif  // _WIN32
