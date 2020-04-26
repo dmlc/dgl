@@ -1149,16 +1149,17 @@ class KVClient(object):
 
         We usually invoke this API by just one client (e.g., client_0).
         """
-        for server_id in range(self._server_count):
-            msg = KVStoreMsg(
-                type=KVMsgType.FINAL,
-                rank=self._client_id,
-                name=None,
-                id=None,
-                data=None,
-                shape=None,
-                c_ptr=None)
-            _send_kv_msg(self._sender, msg, server_id)
+        if self._client_id == 0:
+            for server_id in range(self._server_count):
+                msg = KVStoreMsg(
+                    type=KVMsgType.FINAL,
+                    rank=self._client_id,
+                    name=None,
+                    id=None,
+                    data=None,
+                    shape=None,
+                    c_ptr=None)
+                _send_kv_msg(self._sender, msg, server_id)
 
 
     def _get_local_usable_addr(self):
