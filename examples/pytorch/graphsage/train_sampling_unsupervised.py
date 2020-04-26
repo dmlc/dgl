@@ -16,6 +16,7 @@ from dgl.data import RedditDataset
 import tqdm
 import traceback
 import sklearn.linear_model as lm
+import sklearn.metrics as skm
 
 #### Negative sampler
 
@@ -174,11 +175,11 @@ def prepare_mp(g):
     g.out_degree(0)
     g.find_edges([0])
 
-def compute_acc(pred, labels, train_nids, val_nids, test_nids):
+def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
     """
-    pred = pred.cpu().numpy()
+    emb = emb.cpu().numpy()
     train_nids = train_nids.cpu().numpy()
     train_labels = labels[train_nids].cpu().numpy()
     val_nids = val_nids.cpu().numpy()
@@ -186,11 +187,17 @@ def compute_acc(pred, labels, train_nids, val_nids, test_nids):
     test_nids = test_nids.cpu().numpy()
     test_labels = labels[test_nids].cpu().numpy()
 
-    pred = (pred - pred.mean(0, keepdims=True)) / pred.std(0, keepdims=True)
+    emb = (emb - emb.mean(0, keepdims=True)) / emb.std(0, keepdims=True)
 
     lr = lm.LogisticRegression(multi_class='multinomial', max_iter=10000)
-    lr.fit(pred[train_nids], labels[train_nids])
-    return lr.score(pred[val_nids], labels[val_nids]), lr.score(pred[test_nids], labels[test_nids])
+    lr.fit(emb[train_nids], labels[train_nids])
+
+    pred = lr.predict(emb)
+    f1_micro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='micro')
+    f1_micro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='micro')
+    f1_macro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='macro')
+    f1_macro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='macro')
+    return f1_micro_eval, f1_micro_test
 
 def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_size, device):
     """
