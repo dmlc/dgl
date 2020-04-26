@@ -162,7 +162,6 @@ class HeteroGraphIndex(ObjectBase):
         return _CAPI_DGLHeteroNumBits(self)
 
     def bits_needed(self, etype):
-        #pylint: disable=unused-argument
         """Return the number of integer bits needed to represent the unitgraph graph.
 
         Parameters
@@ -175,14 +174,13 @@ class HeteroGraphIndex(ObjectBase):
         int
             The number of bits needed.
         """
-        return self.nbits()
-        # stype, dtype = self.metagraph.find_edge(etype)
-        # if (self.number_of_edges(etype) >= 0x80000000 or
-        #         self.number_of_nodes(stype) >= 0x80000000 or
-        #         self.number_of_nodes(dtype) >= 0x80000000):
-        #     return 64
-        # else:
-        #     return 32
+        stype, dtype = self.metagraph.find_edge(etype)
+        if (self.number_of_edges(etype) >= 0x80000000 or
+                self.number_of_nodes(stype) >= 0x80000000 or
+                self.number_of_nodes(dtype) >= 0x80000000):
+            return 64
+        else:
+            return 32
 
     def asbits(self, bits):
         """Transform the graph to a new one with the given number of bits storage.
