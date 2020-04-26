@@ -282,9 +282,9 @@ def run(proc_id, n_gpus, args, devices, data):
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
-                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
+                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
                 else:
-                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
+                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
 
 
