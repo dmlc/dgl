@@ -25,10 +25,8 @@ class FaceGraphPool:
             'ed': np.zeros((n, m)).astype(int),
             'dd': np.zeros((n, m)).astype(int)
         }
+        '''
         for i, j in itertools.product(range(n), range(m)):
-            if i != 45:
-                continue
-
             src_length = i + 1
             tgt_length = j + 1
 
@@ -52,10 +50,47 @@ class FaceGraphPool:
             vs = dec_nodes.unsqueeze(0).repeat(tgt_length, 1)[indices]
             g_pool[i][j].add_edges(us, vs)
             num_edges['dd'][i][j] = len(us)
-
+        '''
         print('successfully created graph pool, time: {0:0.3f}s'.format(time.time() - tic))
         self.g_pool = g_pool
         self.num_edges = num_edges
+
+
+    def get_graph_for_size(self, i, j):
+        '''
+        Lazy evaluation of the graph[i][j]
+        args:
+            i: encoder size
+            j: decoder size
+        '''
+        if self.g_pool[i][j]:
+            return self.g_pool[i][j]
+        src_length = i + 1
+        tgt_length = j + 1
+        
+        self.g_pool[i][j] = dgl.DGLGraph()
+        self.g_pool[i][j].add_nodes(src_length + tgt_length)
+        enc_nodes = th.arange(src_length, dtype=th.long)
+        dec_nodes = th.arange(tgt_length, dtype=th.long) + src_length
+
+        # enc -> enc
+        us = enc_nodes.unsqueeze(-1).repeat(1, src_length).view(-1)
+        vs = enc_nodes.repeat(src_length)
+        self.g_pool[i][j].add_edges(us, vs)
+        self.num_edges['ee'][i][j] = len(us)
+        # enc -> dec
+        us = enc_nodes.unsqueeze(-1).repeat(1, tgt_length).view(-1)
+        vs = dec_nodes.repeat(src_length)
+        self.g_pool[i][j].add_edges(us, vs)
+        self.num_edges['ed'][i][j] = len(us)
+        # dec -> dec
+        indices = th.triu(th.ones(tgt_length, tgt_length)) == 1
+        us = dec_nodes.unsqueeze(-1).repeat(1, tgt_length)[indices]
+        vs = dec_nodes.unsqueeze(0).repeat(tgt_length, 1)[indices]
+        self.g_pool[i][j].add_edges(us, vs)
+        self.num_edges['dd'][i][j] = len(us)
+        return self.g_pool[i][j]
+
 
     def beam(self, src_buf, start_sym, max_len, k, device='cpu'):
         '''
@@ -74,7 +109,7 @@ class FaceGraphPool:
         for src_len, tgt_len in zip(src_lens, tgt_lens):
             i, j = src_len - 1, tgt_len - 1
             for _ in range(k):
-                g_list.append(self.g_pool[i][j])
+                g_list.append(self.get_graph_for_size(i, j))
             for key in ['ee', 'ed', 'dd']:
                 num_edges[key].append(int(self.num_edges[key][i][j]))
 
@@ -132,7 +167,7 @@ class FaceGraphPool:
         num_edges = {'ee': [], 'ed': [], 'dd': []}
         for src_len, tgt_len in zip(src_lens, tgt_lens):
             i, j = src_len - 1, tgt_len - 1
-            g_list.append(self.g_pool[i][j])
+            g_list.append(self.get_graph_for_size(i, j))
             for key in ['ee', 'ed', 'dd']:
                 num_edges[key].append(int(self.num_edges[key][i][j]))
 

@@ -151,7 +151,7 @@ class Transformer(nn.Module):
             post_func = self.decoder.post_func(i)
             nodes, edges = nids['dec'], eids['dd']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-        
+       
         nodes, edges = nids['dec'], eids['ed']
         # pointer net
         g.send(edges=g.find_edges(edges), message_func=pointer_dot)

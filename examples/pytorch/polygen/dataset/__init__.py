@@ -150,8 +150,9 @@ class ShapeNetFaceDataset(object):
         src_buf, tgt_buf = [], []
 
         for idx in order:
-            same_idx = 0
-            obj_file = dataset_list[same_idx].strip()
+            #same_idx = 0
+            #obj_file = dataset_list[same_idx].strip()
+            obj_file = dataset_list[idx].strip()
             verts, faces = preprocess_mesh_obj(obj_file)
             # Flattern verts, order Y(up), X(front), Z(right)
             reordered_verts = np.zeros_like(verts)
