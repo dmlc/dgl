@@ -752,6 +752,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
           local_ids.push_back(local_id);
           local_ids_orginal.push_back(i);
         } else {
+          CHECK_LT(part_id, machine_count) << "invalid partition ID";
           remote_ids[part_id].push_back(id);
           remote_ids_original[part_id].push_back(i);
         }
