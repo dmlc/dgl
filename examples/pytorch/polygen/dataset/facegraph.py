@@ -25,32 +25,6 @@ class FaceGraphPool:
             'ed': np.zeros((n, m)).astype(int),
             'dd': np.zeros((n, m)).astype(int)
         }
-        '''
-        for i, j in itertools.product(range(n), range(m)):
-            src_length = i + 1
-            tgt_length = j + 1
-
-            g_pool[i][j].add_nodes(src_length + tgt_length)
-            enc_nodes = th.arange(src_length, dtype=th.long)
-            dec_nodes = th.arange(tgt_length, dtype=th.long) + src_length
-
-            # enc -> enc
-            us = enc_nodes.unsqueeze(-1).repeat(1, src_length).view(-1)
-            vs = enc_nodes.repeat(src_length)
-            g_pool[i][j].add_edges(us, vs)
-            num_edges['ee'][i][j] = len(us)
-            # enc -> dec
-            us = enc_nodes.unsqueeze(-1).repeat(1, tgt_length).view(-1)
-            vs = dec_nodes.repeat(src_length)
-            g_pool[i][j].add_edges(us, vs)
-            num_edges['ed'][i][j] = len(us)
-            # dec -> dec
-            indices = th.triu(th.ones(tgt_length, tgt_length)) == 1
-            us = dec_nodes.unsqueeze(-1).repeat(1, tgt_length)[indices]
-            vs = dec_nodes.unsqueeze(0).repeat(tgt_length, 1)[indices]
-            g_pool[i][j].add_edges(us, vs)
-            num_edges['dd'][i][j] = len(us)
-        '''
         print('successfully created graph pool, time: {0:0.3f}s'.format(time.time() - tic))
         self.g_pool = g_pool
         self.num_edges = num_edges
@@ -65,6 +39,8 @@ class FaceGraphPool:
         '''
         if self.g_pool[i][j]:
             return self.g_pool[i][j]
+        
+
         src_length = i + 1
         tgt_length = j + 1
         

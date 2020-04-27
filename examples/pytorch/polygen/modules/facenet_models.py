@@ -156,6 +156,7 @@ class Transformer(nn.Module):
         # pointer net
         g.send(edges=g.find_edges(edges), message_func=pointer_dot)
         g.recv(v=nodes, reduce_func=softmax_and_pad)
+
         return g.ndata['log_softmax_res'][nids['dec']]
 
     def infer(self, graph, max_len, eos_id, k, alpha=1.0):

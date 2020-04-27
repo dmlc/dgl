@@ -107,7 +107,7 @@ class Transformer(nn.Module):
         g = graph.g
         N, E = graph.n_nodes, graph.n_edges
         nids, eids = graph.nids, graph.eids
-
+        
         # init mask
         device = next(self.parameters()).device
 
@@ -161,7 +161,6 @@ class Transformer(nn.Module):
                     y[i*k+j, :] = _y[i*k+_j, :]
                     y[i*k+j, step] = token
                     eos[i, j] = _eos[i, _j] | (token == eos_id)
-            print (y[0],)
             if eos.all():
                 break
             else:

@@ -11,18 +11,35 @@ from functools import partial
 import torch.distributed as dist
 
 
-def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True, log_f=None):
+# TODO: need refactor using real pytorch dataset
+def run_epoch(epoch, train_data_iter, graph_pool, dataset, device, dev_rank, ndev, model, loss_compute, test_loss_compute, log_interval=10, is_train=True, log_f=None):
     with loss_compute:
-        for i, g in enumerate(data_iter):
+        for i, g in enumerate(train_data_iter):
             with T.set_grad_enabled(is_train):
                 output = model(g)
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
                 loss = loss_compute(output, tgt_y, n_tokens)
+            if i % log_interval == 0:
                 print (i, loss)
                 if log_f:
-                    info = str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
+                    info = 'train,' + str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
                     log_f.write(info)
+                # Run a random test set
+                test_g = dataset.random_batch(graph_pool, mode='test', batch_size=4,
+                                              device=device, dev_rank=dev_rank, ndev=ndev)
+                model.eval()
+                with T.set_grad_enabled(False):
+                    output = model(test_g)
+                    tgt_y = test_g.tgt_y
+                    n_tokens = test_g.n_tokens
+                    loss = test_loss_compute(output, tgt_y, n_tokens)
+                    print ('test', loss)
+                    if log_f:
+                        info = 'test,' + str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
+                        log_f.write(info)
+                model.train(True)
+
     print('Epoch {} {}: Dev {} average loss: {}, accuracy {}'.format(
         epoch, "Training" if is_train else "Evaluating",
         dev_rank, loss_compute.avg_loss, loss_compute.accuracy))
@@ -92,19 +109,9 @@ def main(dev_id, args):
                              device=device, dev_rank=dev_rank, ndev=ndev)
 
         model.train(True)
-        run_epoch(epoch, train_iter, dev_rank, ndev, model,
-                  loss_compute(opt=model_opt), is_train=True, log_f=train_log_f)
+        run_epoch(epoch, train_iter, graph_pool, dataset, device, dev_rank, ndev, model,
+                  loss_compute(opt=model_opt), loss_compute(opt=None), is_train=True, log_f=train_log_f)
         if dev_rank == 0:
-            '''
-            model.att_weight_map = None
-            model.eval()
-            valid_iter = dataset(graph_pool, mode='test', batch_size=args.batch,
-                                 device=device, dev_rank=dev_rank, ndev=ndev)
-            run_epoch(epoch, valid_iter, dev_rank, 1, model,
-                      loss_compute(opt=None), is_train=False)
-            end = time.time()
-            print("epoch time: {}".format(end - start))
-            '''
             ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(epoch)+'.pt')
             print (ckpt_path)
             torch.save(model.state_dict(), ckpt_path)
