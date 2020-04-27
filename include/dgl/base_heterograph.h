@@ -371,11 +371,11 @@ class BaseHeteroGraph : public runtime::Object {
   virtual std::string GetSparseFormat() const {
     LOG(FATAL) << "Not implemented.";
     return "";
-  };
+  }
 
   virtual void SetSparseFormat(const std::string& name) {
     LOG(FATAL) << "Not implemented.";
-  };
+  }
 
   /*!
    * \brief Get adjacency matrix in COO format.

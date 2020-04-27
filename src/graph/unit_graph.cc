@@ -1278,13 +1278,12 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 }
 
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
-  if (restrict_format_ != SparseFormat::kAny)
-    if (format != restrict_format_) {
-      LOG(FATAL) << "The graph have sparse format " << GetSparseFormat() <<
-        ", different from the requested format " << ToStringSparseFormat(format) <<
-        ". Please try enabling `any` sparse format by calling to_any_sparse_format";
-      return nullptr;
-    }
+  if (restrict_format_ != SparseFormat::kAny && format != restrict_format_) {
+    LOG(FATAL) << "The graph have sparse format " << GetSparseFormat() <<
+      ", different from the requested format " << ToStringSparseFormat(format) <<
+      ". Please try enabling `any` sparse format by calling to_any_sparse_format";
+    return nullptr;
+  }
   switch (format) {
   case SparseFormat::kCSR:
     return GetOutCSR();
