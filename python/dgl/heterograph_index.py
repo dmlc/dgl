@@ -913,7 +913,7 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
-        etype : int 
+        etype : int
             The edge/relation type.
 
         Returns
@@ -928,7 +928,7 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
-        etype : int 
+        etype : int
             The edge/relation type.
         """
         _CAPI_DGLHeteroSetSparseFormat(self, etype, 'any')
