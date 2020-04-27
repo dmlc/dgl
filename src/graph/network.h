@@ -67,20 +67,6 @@ enum MessageType {
   kIPIDMsg = 7
 };
 
-typedef struct {
-  /*!
-   * \brief Type code of base types.
-   * We keep it uint8_t instead of DLDataTypeCode for minimal memory
-   * footprint, but the value should be one of DLDataTypeCode enum values.
-   * */
-  uint8_t code;
-  /*!
-   * \brief Number of bits, common choices are 8, 16, 32.
-   */
-  uint8_t bits;
-  /*! \brief Number of lanes in the type, used for vector types. */
-  uint16_t lanes;
-} DataType;
 
 /*!
  * \brief Meta data for NDArray message
@@ -151,7 +137,7 @@ class ArrayMeta {
   /*!
    * \brief DataType for each NDArray
    */
-  std::vector<DataType> data_type_;
+  std::vector<DLDataType> data_type_;
 
   /*!
    * \brief We first write the ndim to data_shape_ 

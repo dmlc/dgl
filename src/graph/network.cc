@@ -66,7 +66,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
 
 void ArrayMeta::AddArray(const NDArray& array) {
   // Get data type of current NDArray
-  DataType dtype;
+  DLDataType dtype;
   dtype.code = array->dtype.code;
   dtype.bits = array->dtype.bits;
   dtype.lanes = array->dtype.lanes;
