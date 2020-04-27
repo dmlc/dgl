@@ -22,7 +22,7 @@ URL = {
     'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
     'DGMG_ZINC_random': 'pre_trained/dgmg_ZINC_random.pth',
     'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth',
-    'wln_center_uspto': 'dgllife/pre_trained/wln_center_uspto.pth'
+    'wln_center_uspto': 'dgllife/pre_trained/wln_center_uspto_v2.pth'
 }
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
