@@ -1,4 +1,3 @@
-# pylint: disable=C0103
 """Utility module."""
 from __future__ import absolute_import, division
 
@@ -9,30 +8,6 @@ import numpy as np
 from .base import DGLError
 from . import backend as F
 from . import ndarray as nd
-
-
-def STR2DTYPE():
-    """Convert string to backend dtype"""
-    return {
-        'int32': F.int32,
-        'int64': F.int64
-    }
-
-
-def DTYPE2STR():
-    """Convert backend dtype to string"""
-    return {
-        F.int32: 'int32',
-        F.int64: 'int64'
-    }
-
-
-def STR2NPDTYPE():
-    """Convert string to np dtype"""
-    return {
-        'int32': np.int32,
-        'int64': np.int64
-    }
 
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
@@ -70,10 +45,9 @@ class Index(object):
     def _dispatch(self, data):
         """Store data based on its type."""
         if F.is_tensor(data):
-            if F.dtype(data) != STR2DTYPE()[self.dtype]:
+            if F.dtype(data) != F.data_type_dict[self.dtype]:
                 raise DGLError('Index data specified as %s, but got: %s' %
-                               (self.dtype, DTYPE2STR()[F.dtype(data)]))
-                # self.dtype = DTYPE2STR()[F.dtype(data)]
+                               (self.dtype, F.reverse_data_type_dict[F.dtype(data)]))
             if len(F.shape(data)) > 1:
                 raise DGLError('Index data must be 1D int32/int64 vector, but got: %s' %
                                str(F.dtype(data)))
@@ -159,13 +133,13 @@ class Index(object):
     def __getstate__(self):
         if self._slice_data is not None:
             # the index can be represented by a slice
-            return self._slice_data
+            return self._slice_data, self.dtype
         else:
-            return self.tousertensor()
+            return self.tousertensor(), self.dtype
 
     def __setstate__(self, state):
-        self.dtype = "int64"
-        self._initialize_data(state)
+        self.dtype, data = state
+        self._initialize_data(data)
 
     def get_items(self, index):
         """Return values at given positions of an Index

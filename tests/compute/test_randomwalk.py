@@ -2,6 +2,8 @@ import dgl
 from dgl import utils
 import backend as F
 import numpy as np
+from utils import parametrize_dtype
+import pytest
 
 def test_random_walk():
     edge_list = [(0, 1), (1, 2), (2, 3), (3, 4),
@@ -58,9 +60,11 @@ def test_random_walk_with_restart():
             trace_diff = np.diff(F.zerocopy_to_numpy(t), axis=-1)
             assert (trace_diff % 2 == 0).all()
 
-def test_metapath_random_walk():
-    g1 = dgl.bipartite(([0, 1, 2, 3], [0, 1, 2, 3]), 'a', 'ab', 'b')
-    g2 = dgl.bipartite(([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2]), 'b', 'ba', 'a')
+# @parametrize_dtype
+@pytest.mark.parametrize_dtype("index_dtype", ["int64"])
+def test_metapath_random_walk(index_dtype):
+    g1 = dgl.bipartite(([0, 1, 2, 3], [0, 1, 2, 3]), 'a', 'ab', 'b', index_dtype=index_dtype)
+    g2 = dgl.bipartite(([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2]), 'b', 'ba', 'a', index_dtype=index_dtype)
     G = dgl.hetero_from_relations([g1, g2])
     seeds = [0, 1]
     traces = dgl.contrib.sampling.metapath_random_walk(G, ['ab', 'ba'] * 4, seeds, 3)

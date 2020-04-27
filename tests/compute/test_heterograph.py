@@ -34,7 +34,7 @@ def create_test_heterograph(index_dtype):
     assert plays_g._graph.dtype == index_dtype
     assert wishes_g._graph.dtype == index_dtype
     assert develops_g._graph.dtype == index_dtype
-    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g], index_dtype=index_dtype)
+    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     assert g._graph.dtype == index_dtype
     return g
 
@@ -732,7 +732,7 @@ def test_flatten(index_dtype):
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
     g_y.nodes['user'].data['hh'] = F.randn((4, 5))
     g_y.edges['knows'].data['ww'] = F.randn((2, 10))
-    g = dgl.hetero_from_relations([g_x, g_y], index_dtype=index_dtype)
+    g = dgl.hetero_from_relations([g_x, g_y])
 
     assert F.array_equal(g.ndata['h'], g_x.ndata['h'])
     assert F.array_equal(g.ndata['hh'], g_y.ndata['hh'])
@@ -1558,13 +1558,13 @@ def test_ismultigraph(index_dtype):
     g4 = dgl.graph([(0, 1), (0, 1), (1, 2)], 'A', 'AA',
                    num_nodes=6, index_dtype=index_dtype)
     assert g4.is_multigraph == True
-    g = dgl.hetero_from_relations([g1, g3], index_dtype=index_dtype)
+    g = dgl.hetero_from_relations([g1, g3])
     assert g.is_multigraph == False
-    g = dgl.hetero_from_relations([g1, g2], index_dtype=index_dtype)
+    g = dgl.hetero_from_relations([g1, g2])
     assert g.is_multigraph == True
-    g = dgl.hetero_from_relations([g1, g4], index_dtype=index_dtype)
+    g = dgl.hetero_from_relations([g1, g4])
     assert g.is_multigraph == True
-    g = dgl.hetero_from_relations([g2, g4], index_dtype=index_dtype)
+    g = dgl.hetero_from_relations([g2, g4])
     assert g.is_multigraph == True
 
 @parametrize_dtype
@@ -1593,7 +1593,7 @@ def test_bipartite(index_dtype):
 
     # more complicated bipartite
     g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C', index_dtype=index_dtype)
-    g3 = dgl.hetero_from_relations([g1, g2], index_dtype=index_dtype)
+    g3 = dgl.hetero_from_relations([g1, g2])
     assert g3.is_unibipartite
     assert g3.srctypes == ['A']
     assert set(g3.dsttypes) == {'B', 'C'}
@@ -1610,7 +1610,7 @@ def test_bipartite(index_dtype):
     assert F.array_equal(g3.nodes['SRC/A'].data['h'], g3.srcdata['h'])
 
     g4 = dgl.graph([(0, 0), (1, 1)], 'A', 'AA', index_dtype=index_dtype)
-    g5 = dgl.hetero_from_relations([g1, g2, g4], index_dtype=index_dtype)
+    g5 = dgl.hetero_from_relations([g1, g2, g4])
     assert not g5.is_unibipartite
 
 if __name__ == '__main__':

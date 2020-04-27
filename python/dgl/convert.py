@@ -296,7 +296,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', num_nodes=None, card=Non
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
-def hetero_from_relations(rel_graphs, num_nodes_per_type=None, index_dtype='int64'):
+def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     """Create a heterograph from graphs representing connections of each relation.
 
     The input is a list of heterographs where the ``i``th graph contains edges of type
@@ -384,8 +384,9 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None, index_dtype='int6
         ntypes = list(sorted(ntype_set))
     else:
         ntypes = list(sorted(num_nodes_per_type.keys()))
-        num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes])
+        num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes], "int64")
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
+    index_dtype = rel_graphs[0]._graph.dtype
     for rgrh in rel_graphs:
         if rgrh._graph.dtype != index_dtype:
             raise Exception("Expect relation graphs to be {}, but got {}".format(
@@ -494,8 +495,7 @@ def heterograph(data_dict, num_nodes_dict=None, index_dtype='int64'):
                 num_nodes=(num_nodes_dict[srctype], num_nodes_dict[dsttype]),
                 validate=False, index_dtype=index_dtype))
 
-    return hetero_from_relations(rel_graphs, num_nodes_dict,
-                                 index_dtype=index_dtype)
+    return hetero_from_relations(rel_graphs, num_nodes_dict)
 
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
@@ -659,8 +659,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
 
     hg = hetero_from_relations(rel_graphs,
                                {ntype: count for ntype, count in zip(
-                                   ntypes, ntype_count)},
-                               index_dtype=index_dtype)
+                                   ntypes, ntype_count)})
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
     for ntid, ntype in enumerate(hg.ntypes):

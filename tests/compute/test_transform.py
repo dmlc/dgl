@@ -278,7 +278,7 @@ def test_in_subgraph(index_dtype):
     g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', index_dtype=index_dtype)
     g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', index_dtype=index_dtype)
     g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', index_dtype=index_dtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4], index_dtype=index_dtype)
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg._graph.dtype == index_dtype
     assert len(subg.ntypes) == 3
@@ -304,7 +304,7 @@ def test_out_subgraph(index_dtype):
     g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', index_dtype=index_dtype)
     g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', index_dtype=index_dtype)
     g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', index_dtype=index_dtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4], index_dtype=index_dtype)
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg._graph.dtype == index_dtype
     assert len(subg.ntypes) == 3
