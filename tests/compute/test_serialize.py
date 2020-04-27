@@ -149,7 +149,8 @@ def test_serialize_tensors():
 
     for key in tensor_dict:
         assert key in load_tensor_dict
-        assert F.array_equal(load_tensor_dict[key], tensor_dict[key])
+        assert np.array_equal(
+            F.asnumpy(load_nd_dict[key]), F.asnumpy(tensor_dict[key]))
 
     load_nd_dict = load_tensors(path, return_dgl_ndarray=True)
 
