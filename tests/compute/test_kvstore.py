@@ -24,15 +24,19 @@ g2l_1 = F.arange(0, num_entries*2)
 partition_1 = F.zeros(num_entries*2, F.int64, F.cpu())
 
 data_3 = F.zeros((num_entries, dim_size), F.int64, F.cpu())
+data_4 = F.zeros((num_entries, dim_size), F.float64, F.cpu())
+data_5 = F.zeros((num_entries, dim_size), F.int32, F.cpu())
 
 def start_server():
     my_server = KVServer(server_id=0, server_namebook=server_namebook, num_client=1)
     my_server.set_global2local(name='data_0', global2local=g2l_0)
     my_server.set_global2local(name='data_1', global2local=g2l_1)
     my_server.set_global2local(name='data_3', global2local=g2l_0)
+    my_server.set_global2local(name='data_4', global2local=g2l_0)
+    my_server.set_global2local(name='data_5', global2local=g2l_0)
     my_server.set_partition_book(name='data_0', partition_book=partition_0)
     my_server.set_partition_book(name='data_1', partition_book=partition_1)
-    my_server.set_global2local(name='data_3', global2local=g2l_0)
+
     my_server.init_data(name='data_0', data_tensor=data_0)
     my_server.init_data(name='data_1', data_tensor=data_1)
     my_server.init_data(name='data_3', data_tensor=data_3)
