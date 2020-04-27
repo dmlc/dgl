@@ -175,14 +175,11 @@ class Transformer(nn.Module):
         N, E = graph.n_nodes, graph.n_edges
         nids, eids = graph.nids, graph.eids
 
-        # embed & pos
-        src_embed = self.src_embed(graph.src[0])
-        src_pos = self.pos_enc(graph.src[1])
-        g.nodes[nids['enc']].data['pos'] = graph.src[1]
-        g.nodes[nids['enc']].data['x'] = self.pos_enc.dropout(src_embed + src_pos)
-        tgt_pos = self.pos_enc(graph.tgt[1])
-        g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
-
+        # Embed all vertex
+        vert_val_embed = self.vert_val_embed(graph.src[0])
+        vert_pos_enc = self.vert_pos_enc(graph.src[1])
+        g.nodes[nids['enc']].data['x'] = self.vert_pos_enc.dropout(vert_val_embed + vert_pos_enc)
+        g.nodes[nids['enc']].data['idx'] = graph.src[1]
         # init mask
         device = next(self.parameters()).device
         g.ndata['mask'] = th.zeros(N, dtype=th.uint8, device=device)
@@ -197,10 +194,19 @@ class Transformer(nn.Module):
         # decode
         log_prob = None
         y = graph.tgt[0]
+
+        # Indexing result
+        face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
+        vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
+        g.nodes[nids['dec']].data['idx'] = graph.tgt[1]
+
+
         for step in range(1, max_len):
             y = y.view(-1)
-            tgt_embed = self.tgt_embed(y)
-            g.ndata['x'][nids['dec']] = self.pos_enc.dropout(tgt_embed + tgt_pos)
+            tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, y)
+            g.nodes[nids['dec']].data['x'] = self.face_pos_enc.dropout(tgt_embed + face_pos_enc + vert_idx_in_face_enc)
+            # Are the two same???
+            #g.ndata['x'][nids['dec']] = self.pos_enc.dropout(tgt_embed + tgt_pos)
             edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'] , eids['ed'])
             edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
             nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
@@ -208,14 +214,14 @@ class Transformer(nn.Module):
                 pre_func, post_func = self.decoder.pre_func(i, 'qkv'), self.decoder.post_func(i)
                 nodes, edges = nodes_d, edges_dd
                 self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-                pre_q, pre_kv = self.decoder.pre_func(i, 'q', 1), self.decoder.pre_func(i, 'kv', 1)
-                post_func = self.decoder.post_func(i, 1)
-                nodes_e, nodes_d, edges = nids['enc'], nodes_d, edges_ed
-                self.update_graph(g, edges, [(pre_q, nodes_d), (pre_kv, nodes_e)], [(post_func, nodes_d)])
 
-            frontiers = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
-            out = self.generator(g.ndata['x'][frontiers])
-            batch_size = frontiers.shape[0] // k
+            nodes, edges = nids['dec'], eids['ed']
+            # pointer net
+            g.send(edges=g.find_edges(edges), message_func=pointer_dot)
+            g.recv(v=nodes, reduce_func=softmax_and_pad)
+
+            out = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
+            batch_size = out.shape[0] // k
             vocab_size = out.shape[-1]
             # Mask output for complete sequence
             one_hot = th.zeros(vocab_size).fill_(-1e9).to(device)

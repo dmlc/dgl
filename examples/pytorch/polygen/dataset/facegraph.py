@@ -118,7 +118,7 @@ class FaceGraphPool:
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
 
-        return Graph(g=g,
+        return FaceGraph(g=g,
                      src=(th.cat(src), th.cat(src_pos)),
                      tgt=(th.cat(tgt), th.cat(tgt_pos)),
                      tgt_y=None,
