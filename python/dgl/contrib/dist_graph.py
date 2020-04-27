@@ -501,11 +501,14 @@ class DistGraph:
             The name of the node data.
         shape : tuple
             The shape of the node data.
-        dtype : string
+        dtype : dtype
             The data type of the node data.
         '''
         assert shape[0] == self.number_of_nodes()
-        self._client.init_data(_get_ndata_name(ndata_name), shape, dtype, NID)
+        names = self._get_all_ndata_names()
+        # TODO we need to fix this. We should be able to init ndata even when there is no node data.
+        assert len(names) > 0
+        self._client.init_data(_get_ndata_name(ndata_name), shape, dtype, _get_ndata_name(names[0]))
 
     def init_edata(self, edata_name, shape, dtype):
         '''Initialize edge data
@@ -518,11 +521,14 @@ class DistGraph:
             The name of the edge data.
         shape : tuple
             The shape of the edge data.
-        dtype : string
+        dtype : dtype
             The data type of the edge data.
         '''
         assert shape[1] == self.number_of_edges()
-        self._client.init_data(_get_edata_name(edata_name), shape, dtype, EID)
+        names = self._get_all_edata_names()
+        # TODO we need to fix this. We should be able to init ndata even when there is no edge data.
+        assert len(names) > 0
+        self._client.init_data(_get_edata_name(edata_name), shape, dtype, _get_edata_name(names[0]))
 
     def init_node_emb(self, name, shape, dtype, initializer):
         ''' Initialize node embeddings.
