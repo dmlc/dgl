@@ -47,9 +47,9 @@ def load_tensors(filename, return_dgl_ndarray=False):
     """
     nd_dict = _CAPI_LoadNDArrayDict(filename)
     tensor_dict = {}
-    for key, value in nd_dict:
+    for key, value in nd_dict.items():
         if return_dgl_ndarray:
             tensor_dict[key] = value.data
         else:
             tensor_dict[key] = F.zerocopy_from_dgl_ndarray(value.data)
-    return nd_dict
+    return tensor_dict
