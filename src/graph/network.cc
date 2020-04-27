@@ -65,7 +65,6 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
 }
 
 void ArrayMeta::AddArray(const NDArray& array) {
-  std::cout << "Enter AddArray\n";
   // Get data type of current NDArray
   data_type_.push_back(array->dtype.code);
   data_type_.push_back(array->dtype.bits);
@@ -77,11 +76,9 @@ void ArrayMeta::AddArray(const NDArray& array) {
     data_shape_.push_back(array->shape[i]);
   }
   ndarray_count_++;
-  std::cout << "Finish AddArray\n";
 }
 
 char* ArrayMeta::Serialize(int64_t* size) {
-  std::cout << "Enter Serialize\n";
   char* buffer = nullptr;
   int64_t buffer_size = 0;
   buffer_size += sizeof(msg_type_);
@@ -118,12 +115,10 @@ char* ArrayMeta::Serialize(int64_t* size) {
         sizeof(int64_t) * data_shape_.size());
   }
   *size = buffer_size;
-  std::cout << "Finish Serialize\n";
   return buffer;
 }
 
 void ArrayMeta::Deserialize(char* buffer, int64_t size) {
-  std::cout << "Enter Deserialize\n";
   int64_t data_size = 0;
   // Read mesg_type_
   msg_type_ = *(reinterpret_cast<int*>(buffer));
@@ -151,7 +146,6 @@ void ArrayMeta::Deserialize(char* buffer, int64_t size) {
     data_size += count * sizeof(int64_t);
   }
   CHECK_EQ(data_size, size);
-  std::cout << "Finish Deserialize\n";
 }
 
 char* KVStoreMsg::Serialize(int64_t* size) {
@@ -494,7 +488,6 @@ static void send_kv_message(network::Sender* sender,
                             KVStoreMsg* kv_msg,
                             int recv_id,
                             bool auto_free) {
-  std::cout << "Enter send_kv_message\n";
   int64_t kv_size = 0;
   char* kv_data = kv_msg->Serialize(&kv_size);
   // Send kv_data
@@ -568,11 +561,9 @@ static void send_kv_message(network::Sender* sender,
       CHECK_EQ(sender->Send(send_shape_msg, recv_id), ADD_SUCCESS);
     }
   }
-  std::cout << "Finish send_kv_message\n";
 }
 
 static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
-  std::cout << "Enter recv_kv_msg\n";
   KVStoreMsg *kv_msg = new KVStoreMsg();
   // Recv kv_Msg
   Message recv_kv_msg;
@@ -648,7 +639,6 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
       recv_shape_msg.data,
       AUTO_FREE);
   }
-  std::cout << "Finish recv_kv_msg\n";
   return kv_msg;
 }
 
