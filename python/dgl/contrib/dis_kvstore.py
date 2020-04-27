@@ -820,7 +820,7 @@ class KVClient(object):
         ----------
         name : str
             data name
-        shape : tuple of int
+        shape : list or tuple of int
             data shape
         dtype : dtype
             data type
