@@ -141,8 +141,8 @@ class DistTensor:
         return self.kv.pull(name=self.name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
-        # TODO
-        pass
+        # TODO how do we want to support broadcast.
+        self.kv.push(name=self.name, id_tensor=idx, data_tensor=val)
 
     def __len__(self):
         return self._shape[0]
@@ -173,8 +173,7 @@ class NodeDataView(MutableMapping):
         return DistTensor(self._graph, _get_ndata_name(key))
 
     def __setitem__(self, key, val):
-        #TODO how to set data to the kvstore.
-        pass
+        raise DGLError("DGL doesn't support creating a new distributed tensor with set. Please call init_ndata.")
 
     def __delitem__(self, key):
         #TODO how to delete data in the kvstore.
@@ -211,8 +210,7 @@ class EdgeDataView(MutableMapping):
         return DistTensor(self._graph, _get_edata_name(key))
 
     def __setitem__(self, key, val):
-        #TODO
-        pass
+        raise DGLError("DGL doesn't support creating a new distributed tensor with set. Please call init_ndata.")
 
     def __delitem__(self, key):
         #TODO
@@ -507,7 +505,7 @@ class DistGraph:
             The data type of the node data.
         '''
         assert shape[0] == self.number_of_nodes()
-        self._client.init_data(_get_ndata_name(ndata_name), shape, dtype)
+        self._client.init_data(_get_ndata_name(ndata_name), shape, dtype, NID)
 
     def init_edata(self, edata_name, shape, dtype):
         '''Initialize edge data
@@ -524,7 +522,7 @@ class DistGraph:
             The data type of the edge data.
         '''
         assert shape[1] == self.number_of_edges()
-        self._client.init_data(_get_edata_name(edata_name), shape, dtype)
+        self._client.init_data(_get_edata_name(edata_name), shape, dtype, EID)
 
     def init_node_emb(self, name, shape, dtype, initializer):
         ''' Initialize node embeddings.
