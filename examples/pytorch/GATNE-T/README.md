@@ -12,9 +12,16 @@ Requirements
 pip install requirements
 ``
 
+Datasets
+--------
+"example": [https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/example.zip](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/example.zip)
+"amazon": [https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/amazon.zip](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/amazon.zip)
+"youtube": [https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/youtube.zip](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/youtube.zip)
+"twitter": [https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/twitter.zip](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/twitter.zip)
+
 
 Training
--------
+--------
 
 Run with following (available dataset: "example", "youtube", "amazon")
 ```bash

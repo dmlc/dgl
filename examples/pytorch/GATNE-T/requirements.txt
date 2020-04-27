@@ -4,4 +4,4 @@ sklearn
 networkx
 gensim
 requests
-dgl
+--pre dgl-cu101
