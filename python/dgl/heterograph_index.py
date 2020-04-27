@@ -923,7 +923,7 @@ class HeteroGraphIndex(ObjectBase):
         to `any` so that more efficient message-passing would be
         supported.
         """
-        _CAPI_DGLHeteroSetSparseFormat(self, etype, 3)
+        _CAPI_DGLHeteroSetSparseFormat(self, etype, 'any')
 
 
 @register_object('graph.HeteroSubgraph')

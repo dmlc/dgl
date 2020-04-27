@@ -68,26 +68,6 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
     return std::string("any");
 }
 
-inline dgl_type_t Str2IdxSparseFormat(const std::string& name) {
-  if (name == "coo")
-    return 0;
-  else if (name == "csr")
-    return 1;
-  else if (name == "csc")
-    return 2;
-  else
-    return 3;
-}
-
-inline std::string Idx2StrSparseFormat(dgl_type_t idx) {
-  switch (idx) {
-    case 0: return "coo";
-    case 1: return "csr";
-    case 2: return "csc";
-    default: return "any";
-  }
-}
-
 // Sparse matrix object that is exposed to python API.
 struct SparseMatrix : public runtime::Object {
   // Sparse format.

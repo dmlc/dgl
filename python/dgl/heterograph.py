@@ -4117,15 +4117,7 @@ class DGLHeteroGraph(object):
         -------
         string : "any", "coo", "csr", or "csc"
         """
-        idx = self._graph.sparse_format(self.get_etype_id(etype))
-        if idx == 0:
-            return "coo"
-        elif idx == 1:
-            return "csr"
-        elif idx == 2:
-            return "csc"
-        else:
-            return "any"
+        return self._graph.sparse_format(self.get_etype_id(etype))
 
     def to_any_sparse_format(self, etype=None):
         """Cast the sparse format of this hetero graph index

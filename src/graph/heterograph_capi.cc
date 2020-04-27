@@ -459,16 +459,16 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetSparseFormat")
     CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
     auto bg = std::dynamic_pointer_cast<UnitGraph>(hg.sptr());
     if (bg != nullptr) // hg itself is a unit graph.
-      *rv = static_cast<int64_t>(Str2IdxSparseFormat(hg->GetSparseFormat()));
+      *rv = hg->GetSparseFormat();
     else
-      *rv = static_cast<int64_t>(Str2IdxSparseFormat(hg->GetRelationGraph(etype)->GetSparseFormat()));
+      *rv = hg->GetRelationGraph(etype)->GetSparseFormat();
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSetSparseFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
-    std::string name = Idx2StrSparseFormat(args[2]); 
+    std::string name = args[2]; 
     CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
     auto bg = std::dynamic_pointer_cast<UnitGraph>(hg.sptr());
     if (bg != nullptr) // hg itself is a unit graph.
