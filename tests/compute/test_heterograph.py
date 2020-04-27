@@ -824,7 +824,7 @@ def test_convert(index_dtype):
     for _mg in [None, mg]:
         hg2 = dgl.to_hetero(
                 g, hg.ntypes, hg.etypes,
-                ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg, index_dtype=index_dtype)
+                ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg)
         assert set(hg.ntypes) == set(hg2.ntypes)
         assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
         for ntype in hg.ntypes:
@@ -838,10 +838,11 @@ def test_convert(index_dtype):
             assert F.array_equal(hg.edges[canonical_etype].data['w'], hg2.edges[canonical_etype].data['w'])
 
     # hetero_from_homo test case 2
-    g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3)])
+    g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3)], index_dtype=index_dtype)
     g.ndata[dgl.NTYPE] = F.tensor([0, 0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0, 1, 2])
     hg = dgl.to_hetero(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
+    assert hg._graph.dtype == index_dtype
     assert set(hg.canonical_etypes) == set(
         [('l0', 'e0', 'l1'), ('l1', 'e1', 'l2'), ('l0', 'e2', 'l2')])
     assert hg.number_of_nodes('l0') == 2
@@ -855,11 +856,12 @@ def test_convert(index_dtype):
     mg = nx.MultiDiGraph([
         ('user', 'movie', 'watches'),
         ('user', 'TV', 'watches')])
-    g = dgl.graph([(0, 1), (0, 2)])
+    g = dgl.graph([(0, 1), (0, 2)], index_dtype=index_dtype)
     g.ndata[dgl.NTYPE] = F.tensor([0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0])
     for _mg in [None, mg]:
         hg = dgl.to_hetero(g, ['user', 'TV', 'movie'], ['watches'], metagraph=_mg)
+        assert hg._graph.dtype == index_dtype
         assert set(hg.canonical_etypes) == set(
             [('user', 'watches', 'movie'), ('user', 'watches', 'TV')])
         assert hg.number_of_nodes('user') == 1
@@ -1538,7 +1540,7 @@ def test_isolated_ntype(index_dtype):
     G.add_edges([0, 1, 2], [4, 5, 6])
     G.ndata[dgl.NTYPE] = F.tensor([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2], dtype=F.int64)
     G.edata[dgl.ETYPE] = F.tensor([0, 0, 0], dtype=F.int64)
-    g = dgl.to_hetero(G, ['A', 'B', 'C'], ['AB'], index_dtype=index_dtype)
+    g = dgl.to_hetero(G, ['A', 'B', 'C'], ['AB'])
     assert g.number_of_nodes('A') == 3
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4

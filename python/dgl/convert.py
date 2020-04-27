@@ -499,7 +499,7 @@ def heterograph(data_dict, num_nodes_dict=None, index_dtype='int64'):
 
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
-              metagraph=None, index_dtype='int64'):
+              metagraph=None):
     """Convert the given homogeneous graph to a heterogeneous graph.
 
     The input graph should have only one type of nodes and edges. Each node and edge
@@ -595,6 +595,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
                        ' type of nodes and edges.')
 
     num_ntypes = len(ntypes)
+    index_dtype = G._graph.dtype
 
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
