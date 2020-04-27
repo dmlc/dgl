@@ -151,7 +151,7 @@ class ArrayMeta {
   /*!
    * \brief DataType for each NDArray
    */
-  std::vector<DLDataType> data_type_;
+  std::vector<DataType> data_type_;
 
   /*!
    * \brief We first write the ndim to data_shape_ 
