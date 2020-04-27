@@ -586,7 +586,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     CHECK_EQ(meta.data_shape_[0], 1);
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
-      DLDataType{meta.data_type_[0].code, meta.data_type_[0].bits, meta.data_type_[0].lanes;},
+      DLDataType{meta.data_type_[0].code, meta.data_type_[0].bits, meta.data_type_[0].lanes},
       DLContext{kDLCPU, 0},
       recv_id_msg.data,
       AUTO_FREE);
