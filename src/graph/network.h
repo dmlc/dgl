@@ -134,6 +134,11 @@ class ArrayMeta {
   int ndarray_count_;
 
   /*!
+   * \brief DataType for each NDArray
+   */
+  std::vector<int> data_type_;
+
+  /*!
    * \brief We first write the ndim to data_shape_ 
    * and then write the data shape. 
    */

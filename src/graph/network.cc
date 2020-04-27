@@ -65,6 +65,10 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
 }
 
 void ArrayMeta::AddArray(const NDArray& array) {
+  // Get data type of current NDArray
+  data_type_.push_back(array->dtype.code);
+  data_type_.push_back(array->dtype.bits)
+  data_type_.push_back(array->dtype.lanes);
   // We first write the ndim to the data_shape_
   data_shape_.push_back(static_cast<int64_t>(array->ndim));
   // Then we write the data shape
@@ -82,6 +86,9 @@ char* ArrayMeta::Serialize(int64_t* size) {
     buffer_size += sizeof(ndarray_count_);
     buffer_size += sizeof(data_shape_.size());
     buffer_size += sizeof(int64_t) * data_shape_.size();
+    // we don't need to write data_type_.size() 
+    // because it equals to ndarray_count_ * 3
+    buffer_size += sizeof(int) * data_type_.size() * 3;
   }
   // In the future, we should have a better memory management as
   // allocating a large chunk of memory can be very expensive.
@@ -94,6 +101,11 @@ char* ArrayMeta::Serialize(int64_t* size) {
     // Write ndarray_count_
     *(reinterpret_cast<int*>(pointer)) = ndarray_count_;
     pointer += sizeof(ndarray_count_);
+    // Write data type
+    memcpy(pointer,
+        reinterpret_cast<int*>(data_type_.data()),
+        sizeof(int) * data_type_.size());
+    pointer += (sizeof(int) * data_type_.size());
     // Write size of data_shape_
     *(reinterpret_cast<size_t*>(pointer)) = data_shape_.size();
     pointer += sizeof(data_shape_.size());
@@ -117,6 +129,11 @@ void ArrayMeta::Deserialize(char* buffer, int64_t size) {
     ndarray_count_ = *(reinterpret_cast<int*>(buffer));
     buffer += sizeof(int);
     data_size += sizeof(int);
+    // Read data type
+    data_type_.resize(ndarray_count_ * 3);
+    memcpy(data_type_.data(), buffer,
+        ndarray_count_ * sizeof(int) * 3);
+    data_size += ndarray_count_ * sizeof(int) * 3;
     // Read size of data_shape_
     size_t count = *(reinterpret_cast<size_t*>(buffer));
     buffer += sizeof(size_t);
@@ -568,9 +585,12 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_id_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
     CHECK_EQ(meta.data_shape_[0], 1);
+    int code = meta.data_type_[0];
+    int bits = meta.data_type_[1];
+    int lanes = meta.data_type_[2];
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
-      DLDataType{kDLInt, 64, 1},
+      DLDataType{code, bits, lanes},
       DLContext{kDLCPU, 0},
       recv_id_msg.data,
       AUTO_FREE);
@@ -581,6 +601,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[2];
+    int code = meta.data_type_[3];
+    int bits = meta.data_type_[4];
+    int lanes = meta.data_type_[5];
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
@@ -588,7 +611,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     }
     kv_msg->data = CreateNDArrayFromRaw(
       vec_shape,
-      DLDataType{kDLFloat, 32, 1},
+      DLDataType{code, bits, lanes},
       DLContext{kDLCPU, 0},
       recv_data_msg.data,
       AUTO_FREE);
@@ -600,6 +623,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_shape_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_shape_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[0];
+    int code = meta.data_type_[0];
+    int bits = meta.data_type_[1];
+    int lanes = meta.data_type_[2];
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
@@ -607,7 +633,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     }
     kv_msg->shape = CreateNDArrayFromRaw(
       vec_shape,
-      DLDataType{kDLInt, 64, 1},
+      DLDataType{code, bits, lanes},
       DLContext{kDLCPU, 0},
       recv_shape_msg.data,
       AUTO_FREE);
@@ -710,8 +736,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     int group_count = args[3];
     int client_id = args[4];
     NDArray ID = args[5];
+    int ID_code = ID->dtype.code;
+    int ID_bits = ID->dtype.bits;
+    int ID_lanes = ID->dtype.lanes;
     NDArray pb = args[6];
     NDArray local_data = args[7];
+    int data_code = local_data->dtype.code;
+    int data_bits = local_data->dtype.bits;
+    int data_lanes = local_data->dtype.lanes;
     CommunicatorHandle chandle_sender = args[8];
     CommunicatorHandle chandle_receiver = args[9];
     std::string str_flag = args[10];
@@ -772,7 +804,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.rank = client_id;
         kv_msg.name = name;
         kv_msg.id = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
-                                         DLDataType{kDLInt, 64, 1},
+                                         DLDataType{ID_code, ID_bits, ID_lanes},
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
                                          !AUTO_FREE);
@@ -812,7 +844,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
-                          DLDataType{kDLFloat, 32, 1},
+                          DLDataType{data_code, data_bits, data_lanes},
                           DLContext{kDLCPU, 0},
                           return_data,
                           AUTO_FREE);
