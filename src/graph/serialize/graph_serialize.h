@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/graph_serialize.h
+ * \file graph/serialize/graph_serialize.h
  * \brief Graph serialization header
  */
 #ifndef DGL_GRAPH_GRAPH_SERIALIZE_H_
@@ -20,7 +20,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
-#include "../c_api_common.h"
+#include "../../c_api_common.h"
 
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
