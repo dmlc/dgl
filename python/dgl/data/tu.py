@@ -75,6 +75,8 @@ class LegacyTUDataset(object):
         try:
             DS_node_attr = np.loadtxt(
                 self._file_path("node_attributes"), delimiter=",")
+            if DS_node_attr.ndim == 1:
+                DS_node_attr = np.expand_dims(DS_node_attr, -1)
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = DS_node_attr[idxs, :]
             self.data_mode = "node_attr"
