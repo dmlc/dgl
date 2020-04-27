@@ -138,7 +138,7 @@ class Index(object):
             return self.tousertensor(), self.dtype
 
     def __setstate__(self, state):
-        self.dtype, data = state
+        data, self.dtype = state
         self._initialize_data(data)
 
     def get_items(self, index):
