@@ -4,7 +4,7 @@ import numpy as np
 from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
 from dgl.graph_index import create_graph_index
-from dgl.contrib.dist_graph import partition_graph, load_partition
+from dgl.distributed import partition_graph, load_partition
 import backend as F
 import unittest
 import pickle

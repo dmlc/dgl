@@ -10,8 +10,8 @@ from multiprocessing import Process, Manager, Condition, Value
 import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
-from dgl.contrib import DistGraphServer, DistGraph
-from dgl.contrib.dist_graph import partition_graph
+from dgl.distributed import DistGraphServer, DistGraph
+from dgl.distributed import partition_graph
 import backend as F
 import unittest
 import pickle
