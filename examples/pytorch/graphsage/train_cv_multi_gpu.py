@@ -105,7 +105,7 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = g.ndata['hist_%d' % (l + 1)]
 
-            for start in range(0, len(nodes), batch_size):
+            for start in tqdm.trange(0, len(nodes), batch_size):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
@@ -228,6 +228,12 @@ def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device
         if not aggregation_on_device:
             block.dstdata['agg_hist'] = block.dstdata['agg_hist'].to(dev_id)
 
+def create_history_storage(g, args, n_classes):
+    # Initialize history storage
+    for l in range(args.num_layers):
+        dim = args.num_hidden if l != args.num_layers - 1 else n_classes
+        g.ndata['hist_%d' % (l + 1)] = th.zeros(g.number_of_nodes(), dim).share_memory_()
+
 def init_history(g, model, dev_id, batch_size):
     with th.no_grad():
         model.inference(g, g.ndata['features'], batch_size, dev_id)     # replaces hist_i features in-place
@@ -293,12 +299,8 @@ def run(proc_id, n_gpus, args, devices, data):
     model.eval()
     if n_gpus > 1:
         if proc_id == 0:
-            print('Init history...')
             init_history(g, model.module, dev_id, args.val_batch_size)
-            print('Init history done')
-        print('Barrier', proc_id)
         th.distributed.barrier()
-        print('Barrier', proc_id, 'done')
     else:
         init_history(g, model, dev_id, args.val_batch_size)
     model.train()
@@ -392,10 +394,7 @@ if __name__ == '__main__':
     # Construct graph
     g = dgl.graph(data.graph.all_edges())
     g.ndata['features'] = features.share_memory_()
-    # Initialize history storage
-    for l in range(args.num_layers):
-        dim = args.num_hidden if l != args.num_layers - 1 else n_classes
-        g.ndata['hist_%d' % (l + 1)] = th.zeros(g.number_of_nodes(), dim).share_memory_()
+    create_history_storage(g, args, n_classes)
 
     prepare_mp(g)
     # Pack data
