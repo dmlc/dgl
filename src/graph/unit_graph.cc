@@ -334,15 +334,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return SparseFormat::kAny;
   }
 
-  std::string GetSparseFormat() const override {
-    LOG(FATAL) << "Not enabled for COO graph";
-    return ToStringSparseFormat(SparseFormat::kCOO);
-  }
-
-  void SetSparseFormat(const std::string& name) override {
-    LOG(FATAL) << "Not enabled for COO graph";
-  }
-
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -704,15 +695,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
     LOG(FATAL) << "Not enabled for CSR graph";
     return SparseFormat::kAny;
-  }
-
-  std::string GetSparseFormat() const override {
-    LOG(FATAL) << "Not enabled for CSR graph";
-    return ToStringSparseFormat(SparseFormat::kCSR);
-  }
-
-  void SetSparseFormat(const std::string& name) override {
-    LOG(FATAL) << "Not enabled for CSR graph";
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
