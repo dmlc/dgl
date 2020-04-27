@@ -48,19 +48,20 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     new_shape = (g.number_of_nodes(), 2)
     g.init_ndata('test1', new_shape, F.int32)
     feats = g.ndata['test1'][nids]
-    assert np.all(F.asnumpy(feats) == 1)
+    assert np.all(F.asnumpy(feats) == 0)
 
     # Test write data
-    new_feats = F.ones((len(nids), 2))
+    new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
     g.ndata['test1'][nids] = new_feats
-    feats = g.ndata['features'][nids]
+    feats = g.ndata['test1'][nids]
     assert np.all(F.asnumpy(feats) == 1)
 
     # Test metadata operations.
     assert len(g.ndata['features']) == g.number_of_nodes()
     assert g.ndata['features'].shape == (g.number_of_nodes(), 1)
-    assert g.ndata['features'].dtype == F.float32
-    assert g.node_attr_schemes()['features'].dtype == F.float32
+    assert g.ndata['features'].dtype == F.int64
+    assert g.node_attr_schemes()['features'].dtype == F.int64
+    assert g.node_attr_schemes()['test1'].dtype == F.int32
     assert g.node_attr_schemes()['features'].shape == (1,)
 
     g.shut_down()
@@ -70,7 +71,7 @@ def run_server_client():
     g = create_random_graph(10000)
 
     # Partition the graph
-    num_parts = 4
+    num_parts = 1
     graph_name = 'test'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     partition_graph(g, graph_name, num_parts, 1, 'metis', '/tmp')

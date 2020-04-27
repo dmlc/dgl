@@ -823,7 +823,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
-                          DLDataType{kDLFloat, 32, 1},
+                          local_data->dtype,
                           DLContext{kDLCPU, 0},
                           return_data,
                           AUTO_FREE);

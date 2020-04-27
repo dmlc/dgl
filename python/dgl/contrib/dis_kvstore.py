@@ -830,6 +830,7 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty.'
         assert len(target_name) > 0, 'target_name cannot be empty.'
+        shape = list(shape)
 
         if self._client_id == 0: # only client_0 send message to server
             partition_book = self._data_store[target_name+'-part-']
