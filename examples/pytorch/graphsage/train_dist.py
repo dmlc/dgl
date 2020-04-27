@@ -136,9 +136,9 @@ def run(args, device, data):
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
         if epoch >= 5:
             avg += toc - tic
-        if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
-            print('Eval Acc {:.4f}'.format(eval_acc))
+        #if epoch % args.eval_every == 0 and epoch != 0:
+        #    eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
+        #    print('Eval Acc {:.4f}'.format(eval_acc))
 
     g.shut_down()
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
