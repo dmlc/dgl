@@ -909,19 +909,27 @@ class HeteroGraphIndex(ObjectBase):
         return utils.toindex(order), utils.toindex(rev_order)
 
     def sparse_format(self, etype):
-        """Return sparse format of the hetero graph index.
+        """Return sparse format of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : int 
+            The edge/relation type.
 
         Returns
         -------
-        string : "any", "coo", "csr", or "csc"
+        string : 'any', 'coo', 'csr', or 'csc'
         """
         ret = _CAPI_DGLHeteroGetSparseFormat(self, etype)
         return ret
-    
+
     def to_any_sparse_format(self, etype):
-        """Cast the sparse format of this hetero graph index
-        to `any` so that more efficient message-passing would be
-        supported.
+        """Cast the sparse format of this hetero graph index to `any`.
+
+        Parameters
+        ----------
+        etype : int 
+            The edge/relation type.
         """
         _CAPI_DGLHeteroSetSparseFormat(self, etype, 'any')
 

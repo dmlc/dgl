@@ -368,11 +368,23 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
 
+  /*!
+   * \brief Get the sparse format of the graph.
+   * 
+   * This function is only implemented for UnitGraph.
+   * \return a string representing the sparse format: 'coo'/'csr'/'csc'/'any'
+   */
   virtual std::string GetSparseFormat() const {
     LOG(FATAL) << "Not implemented.";
     return "";
   }
 
+  /*!
+   * \brief Set the sparse format of the graph.
+   * 
+   * This function is only implemented for UnitGraph.
+   * \param name String representation of the sparse format: 'coo'/'csr'/'csc'/'any'.
+   */
   virtual void SetSparseFormat(const std::string& name) {
     LOG(FATAL) << "Not implemented.";
   }

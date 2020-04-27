@@ -4111,11 +4111,21 @@ class DGLHeteroGraph(object):
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     def sparse_format(self, etype=None):
-        """Return sparse format of the hetero graph.
+        """Return sparse format of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : str, optional
+            The edge/relation type. Can be omitted if there is only
+            one node type in the graph. (Default: None)
 
         Returns
         -------
-        string : "any", "coo", "csr", or "csc"
+        string : 'any', 'coo', 'csr', or 'csc'
+
+        See Also
+        --------
+        to_any_sparse_format
         """
         return self._graph.sparse_format(self.get_etype_id(etype))
 
