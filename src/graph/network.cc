@@ -138,6 +138,7 @@ void ArrayMeta::Deserialize(char* buffer, int64_t size) {
     data_type_.resize(ndarray_count_ * 3);
     memcpy(data_type_.data(), buffer,
         ndarray_count_ * sizeof(int) * 3);
+    buffer += ndarray_count_ * sizeof(int) * 3;
     data_size += ndarray_count_ * sizeof(int) * 3;
     // Read size of data_shape_
     size_t count = *(reinterpret_cast<size_t*>(buffer));
