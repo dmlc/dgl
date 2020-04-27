@@ -75,7 +75,7 @@ def pointer_dot(edges):
 # recv fun
 def softmax_and_pad(nodes):
     max_len = ShapeNetFaceDataset.MAX_VERT_LENGTH+2
-    eps = 1e-8
+    eps = -1e8
     shape = nodes.mailbox['pointer_dot'].shape
     # reorder based on src idx
     pointer_dot = nodes.mailbox['pointer_dot']
@@ -151,7 +151,7 @@ class Transformer(nn.Module):
             post_func = self.decoder.post_func(i)
             nodes, edges = nids['dec'], eids['dd']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-       
+
         nodes, edges = nids['dec'], eids['ed']
         # pointer net
         g.send(edges=g.find_edges(edges), message_func=pointer_dot)
@@ -182,7 +182,7 @@ class Transformer(nn.Module):
         g.nodes[nids['enc']].data['idx'] = graph.src[1]
         # init mask
         device = next(self.parameters()).device
-        g.ndata['mask'] = th.zeros(N, dtype=th.uint8, device=device)
+        g.ndata['mask'] = th.zeros(N, dtype=th.uint8, device=device).bool()
 
         # encode
         for i in range(self.encoder.N):
@@ -199,7 +199,7 @@ class Transformer(nn.Module):
         face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
         vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
         g.nodes[nids['dec']].data['idx'] = graph.tgt[1]
-
+        g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
 
         for step in range(1, max_len):
             y = y.view(-1)
@@ -220,7 +220,8 @@ class Transformer(nn.Module):
             g.send(edges=g.find_edges(edges), message_func=pointer_dot)
             g.recv(v=nodes, reduce_func=softmax_and_pad)
 
-            out = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
+            frontiers = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
+            out = g.nodes[frontiers].data['log_softmax_res']
             batch_size = out.shape[0] // k
             vocab_size = out.shape[-1]
             # Mask output for complete sequence
@@ -247,12 +248,11 @@ class Transformer(nn.Module):
                     y[i*k+j, :] = _y[i*k+_j, :]
                     y[i*k+j, step] = token
                     eos[i, j] = _eos[i, _j] | (token == eos_id)
-
             if eos.all():
                 break
             else:
-                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, 1, max_len).view(-1).to(device)
-        return y.view(batch_size, k, -1)[:, 0, :].tolist()
+                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, 1, max_len).view(-1).to(device).bool()
+        return graph.src[0], y.view(batch_size, k, -1)[:, 0, :].tolist()
 
     def _register_att_map(self, g, enc_ids, dec_ids):
         self.att_weight_map = [
