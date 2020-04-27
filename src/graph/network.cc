@@ -66,11 +66,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
 
 void ArrayMeta::AddArray(const NDArray& array) {
   // Get data type of current NDArray
-  DLDataType dtype;
-  dtype.code = array->dtype.code;
-  dtype.bits = array->dtype.bits;
-  dtype.lanes = array->dtype.lanes;
-  data_type_.push_back(dtype);
+  data_type_.push_back(array->dtype);
   // We first write the ndim to the data_shape_
   data_shape_.push_back(static_cast<int64_t>(array->ndim));
   // Then we write the data shape
@@ -588,12 +584,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_id_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
     CHECK_EQ(meta.data_shape_[0], 1);
-    uint8_t code = meta.data_type_[0].code;
-    uint8_t bits = meta.data_type_[0].bits;
-    uint16_t lanes = meta.data_type_[0].lanes;
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
-      DLDataType{code, bits, lanes},
+      DLDataType{meta.data_type_[0].code, meta.data_type_[0].bits, meta.data_type_[0].lanes;},
       DLContext{kDLCPU, 0},
       recv_id_msg.data,
       AUTO_FREE);
@@ -604,9 +597,6 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[2];
-    uint8_t code = meta.data_type_[1].code;
-    uint8_t bits = meta.data_type_[1].bits;
-    uint16_t lanes = meta.data_type_[1].lanes;
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
@@ -614,7 +604,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     }
     kv_msg->data = CreateNDArrayFromRaw(
       vec_shape,
-      DLDataType{code, bits, lanes},
+      DLDataType{meta.data_type_[1].code, meta.data_type_[1].bits, meta.data_type_[1].lanes},
       DLContext{kDLCPU, 0},
       recv_data_msg.data,
       AUTO_FREE);
@@ -626,9 +616,6 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_shape_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_shape_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[0];
-    uint8_t code = meta.data_type_[0].code;
-    uint8_t bits = meta.data_type_[0].bits;
-    uint16_t lanes = meta.data_type_[0].lanes;
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
@@ -636,7 +623,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     }
     kv_msg->shape = CreateNDArrayFromRaw(
       vec_shape,
-      DLDataType{code, bits, lanes},
+      DLDataType{meta.data_type_[0].code, meta.data_type_[0].bits, meta.data_type_[0].lanes},
       DLContext{kDLCPU, 0},
       recv_shape_msg.data,
       AUTO_FREE);
@@ -739,14 +726,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     int group_count = args[3];
     int client_id = args[4];
     NDArray ID = args[5];
-    uint8_t ID_code = static_cast<uint8_t>(ID->dtype.code);
-    uint8_t ID_bits = static_cast<uint8_t>(ID->dtype.bits);
-    uint16_t ID_lanes = static_cast<uint16_t>(ID->dtype.lanes);
     NDArray pb = args[6];
     NDArray local_data = args[7];
-    uint8_t data_code = static_cast<uint8_t>(local_data->dtype.code);
-    uint8_t data_bits = static_cast<uint8_t>(local_data->dtype.bits);
-    uint16_t data_lanes = static_cast<uint16_t>(local_data->dtype.lanes);
     CommunicatorHandle chandle_sender = args[8];
     CommunicatorHandle chandle_receiver = args[9];
     std::string str_flag = args[10];
@@ -807,7 +788,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.rank = client_id;
         kv_msg.name = name;
         kv_msg.id = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
-                                         DLDataType{ID_code, ID_bits, ID_lanes},
+                                         DLDataType{ID->dtype.code, ID->dtype.bits, ID->dtype.lanes},
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
                                          !AUTO_FREE);
@@ -847,7 +828,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
-                          DLDataType{data_code, data_bits, data_lanes},
+                          DLDataType{local_data->dtype.code, local_data->dtype.bits, local_data->dtype.lanes},
                           DLContext{kDLCPU, 0},
                           return_data,
                           AUTO_FREE);
