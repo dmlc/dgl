@@ -37,9 +37,26 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     # Test API
     assert g.number_of_nodes() == num_nodes
     assert g.number_of_edges() == num_edges
+
+    # Test reading data
     nids = g.local_gnids
-    feats = F.squeeze(g.ndata['features'][nids], 1)
+    feats1 = g.ndata['features'][nids]
+    feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == nids))
+
+    # Test init data
+    new_shape = (g.number_of_nodes(), 2)
+    g.init_ndata('test1', new_shape, F.int32)
+    feats = g.ndata['test1'][nids]
+    assert np.all(F.asnumpy(feats) == 1)
+
+    # Test write data
+    new_feats = F.ones((len(nids), 2))
+    g.ndata['test1'][nids] = new_feats
+    feats = g.ndata['features'][nids]
+    assert np.all(F.asnumpy(feats) == 1)
+
+    # Test metadata operations.
     assert len(g.ndata['features']) == g.number_of_nodes()
     assert g.ndata['features'].shape == (g.number_of_nodes(), 1)
     assert g.ndata['features'].dtype == F.float32
