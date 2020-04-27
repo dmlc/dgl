@@ -21,10 +21,12 @@ def run_epoch(epoch, train_data_iter, graph_pool, dataset, device, dev_rank, nde
                 n_tokens = g.n_tokens
                 loss = loss_compute(output, tgt_y, n_tokens)
             if i % log_interval == 0:
+            #if True:
                 print (i, loss)
                 if log_f:
                     info = 'train,' + str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
                     log_f.write(info)
+                    log_f.flush()
                 # Run a random test set
                 test_g = dataset.random_batch(graph_pool, mode='test', batch_size=4,
                                               device=device, dev_rank=dev_rank, ndev=ndev)
@@ -38,6 +40,7 @@ def run_epoch(epoch, train_data_iter, graph_pool, dataset, device, dev_rank, nde
                     if log_f:
                         info = 'test,' + str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
                         log_f.write(info)
+                        log_f.flush()
                 model.train(True)
 
     print('Epoch {} {}: Dev {} average loss: {}, accuracy {}'.format(
@@ -64,6 +67,7 @@ def main(dev_id, args):
     # Create ckpt dir
     os.makedirs(args.ckpt_dir, exist_ok=True)
     train_log_path = os.path.join(args.ckpt_dir, 'log.txt.train')
+    print (train_log_path)
     train_log_f = open(train_log_path, 'w')
     test_log_path = os.path.join(args.ckpt_dir, 'log.txt.test')
     test_log_f = open(test_log_path, 'w')

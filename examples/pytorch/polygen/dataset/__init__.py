@@ -75,7 +75,10 @@ class ShapeNetVertexDataset(object):
 
         for idx in order:
             obj_file = dataset_list[idx].strip()
-            verts, faces = preprocess_mesh_obj(obj_file)
+            try:
+                verts, faces = preprocess_mesh_obj(obj_file)
+            except:
+                continue
             # Flattern verts, order Y(up), X(front), Z(right)
             reordered_verts = np.zeros_like(verts)
             reordered_verts[:,0] = verts[:,1]
@@ -117,25 +120,25 @@ class ShapeNetFaceDataset(object):
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
     #MAX_VERT_LENGTH = 133
-    #MAX_VERT_LENGTH = 78
-    MAX_VERT_LENGTH = 98
+    MAX_VERT_LENGTH = 78
+    #MAX_VERT_LENGTH = 98
     START_FACE_VERT_IDX = 0
     STOP_FACE_VERT_IDX = 1
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
     MAX_FACE_LENGTH = (800 + 2) // 3
     
-    #def __init__(self, dataset_list_file ='all_file_list.txt'):
-    def __init__(self, dataset_list_file ='table_chair.txt'):
+    def __init__(self, dataset_list_file ='all_file_list.txt'):
+    #def __init__(self, dataset_list_file ='table_chair.txt'):
         dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
         dataset_list_path = os.path.join(dataset_list_dir, dataset_list_file)
         
         # train
-        #with open(dataset_list_path+'.train', 'r') as f:
-        with open(dataset_list_path, 'r') as f:
+        with open(dataset_list_path+'.train', 'r') as f:
+        #with open(dataset_list_path, 'r') as f:
             self.train_dataset_list = f.readlines()
         # test
-        #with open(dataset_list_path+'.test', 'r') as f:
-        with open(dataset_list_path, 'r') as f:
+        with open(dataset_list_path+'.test', 'r') as f:
+        #with open(dataset_list_path, 'r') as f:
             self.test_dataset_list = f.readlines()
  
         self.pad_id = self.PAD_BIN
@@ -187,10 +190,13 @@ class ShapeNetFaceDataset(object):
         src_buf, tgt_buf = [], []
 
         for idx in order:
-            same_idx = 0
-            obj_file = dataset_list[same_idx].strip()
-            #obj_file = dataset_list[idx].strip()
-            verts, faces = preprocess_mesh_obj(obj_file)
+            #same_idx = 0
+            #obj_file = dataset_list[same_idx].strip()
+            obj_file = dataset_list[idx].strip()
+            try:
+                verts, faces = preprocess_mesh_obj(obj_file)
+            except:
+                continue
             # Flattern verts, order Y(up), X(front), Z(right)
             reordered_verts = np.zeros_like(verts)
             reordered_verts[:,0] = verts[:,1]

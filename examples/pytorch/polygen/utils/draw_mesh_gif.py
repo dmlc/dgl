@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import imageio
 from PIL import Image
 
 import pytorch3d
@@ -32,7 +33,7 @@ from pytorch3d.utils.ico_sphere import ico_sphere
 
 import matplotlib.pyplot as plt
 
-def draw_mesh_gif(obj_file_path, num_frames=10):
+def draw_mesh_gif(obj_file_path, num_frames=20):
     R, T = look_at_view_transform(dist=2.7, elev=45.0, azim=45.0)
 
     device = torch.device(type='cpu')
@@ -66,12 +67,16 @@ def draw_mesh_gif(obj_file_path, num_frames=10):
         textures = Textures(verts_rgb=torch.ones_like(verts_padded))
         pred_mesh = Meshes(verts=verts_padded, faces=faces_padded, textures=textures)
         image = renderer(pred_mesh).data.numpy()
-        np_image = (image[0,:,:,:3]*255).astype(np.uint8)
+        np_image = (image[0,::-1,:,:3]*255).astype(np.uint8)
         im = Image.fromarray(np.transpose(np_image, (1, 0, 2))[::-1,:,:])
-        imgs.append(im)
+        imgs.append(np.transpose(np_image, (1, 0, 2))[::-1,:,:])
+    for i in range(10):
+        imgs.append(np.transpose(np_image, (1, 0, 2))[::-1,:,:])
+
 
     gif_file_path = obj_file_path[:-3] + 'gif'
-    imgs[0].save(gif_file_path, save_all=True, append_images=imgs)
+    #imgs[0].save(gif_file_path, save_all=True, append_images=imgs)
+    imageio.mimsave(gif_file_path, imgs)
 
 if __name__ == '__main__':
     draw_mesh_gif(sys.argv[1])
