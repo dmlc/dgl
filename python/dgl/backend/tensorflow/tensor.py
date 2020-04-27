@@ -77,6 +77,8 @@ def sparse_matrix(data, index, shape, force_format=False):
     if fmt != 'coo':
         raise TypeError(
             'Tensorflow backend only supports COO format. But got %s.' % fmt)
+    # tf.SparseTensor only supports int64 indexing,
+    # therefore manually casting to int64 when input in int32
     spmat = tf.SparseTensor(indices=tf.cast(tf.transpose(
         index[1], (1, 0)), tf.int64), values=data, dense_shape=shape)
     return spmat, None

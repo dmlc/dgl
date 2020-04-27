@@ -317,7 +317,7 @@ struct CSRMatrix {
         data(darr),
         sorted(sorted_flag) {
     CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
-        << "Inconsistent bits between indptr and indices";
+        << "The indptr and indices arrays must have the same data type.";
   }
 
   /*! \brief constructor from SparseMatrix object */
@@ -329,7 +329,7 @@ struct CSRMatrix {
         data(spmat.indices[2]),
         sorted(spmat.flags[0]) {
     CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
-        << "Inconsistent bits between indptr and indices";
+        << "The indptr and indices arrays must have the same data type.";
   }
 
   // Convert to a SparseMatrix object that can return to python.
@@ -401,7 +401,7 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
-          CHECK_EQ(row->dtype.bits, col->dtype.bits) << "Inconsistent bits between rows and cols";
+          CHECK_EQ(row->dtype.bits, col->dtype.bits) << "The row and col arrays must have the same data type.";
         }
 
   /*! \brief constructor from SparseMatrix object */
@@ -413,7 +413,7 @@ struct COOMatrix {
         data(spmat.indices[2]),
         row_sorted(spmat.flags[0]),
         col_sorted(spmat.flags[1]) {
-          CHECK_EQ(row->dtype.bits, col->dtype.bits) << "Inconsistent bits between rows and cols";
+          CHECK_EQ(row->dtype.bits, col->dtype.bits) << "The row and col arrays must have the same data type.";
         }
 
   // Convert to a SparseMatrix object that can return to python.

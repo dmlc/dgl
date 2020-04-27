@@ -669,6 +669,7 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
  *
  * TODO(minjie): remove the meta_graph argument
  * 
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param meta_graph Metagraph of the inputs and result.
  * \param component_graphs Input graphs
  * \return One graph that unions all the components
@@ -690,6 +691,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
  * TODO(minjie): remove the meta_graph argument; use vector<IdArray> for vertex_sizes
  *   and edge_sizes.
  *
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param meta_graph Metagraph.
  * \param batched_graph Input graph.
  * \param vertex_sizes Number of vertices of each component.

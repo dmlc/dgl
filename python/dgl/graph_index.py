@@ -873,7 +873,11 @@ class GraphIndex(ObjectBase):
         str
             The dtype of graph index
         """
-        return "int64"
+        bits = self.nbits()
+        if bits == 32:
+            return "int32"
+        else:
+            return "int64"
 
     def copy_to(self, ctx):
         """Copy this immutable graph index to the given device context.
