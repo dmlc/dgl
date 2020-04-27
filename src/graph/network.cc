@@ -586,9 +586,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_id_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
     CHECK_EQ(meta.data_shape_[0], 1);
-    int code = meta.data_type_[0];
-    int bits = meta.data_type_[1];
-    int lanes = meta.data_type_[2];
+    uint8_t code = static_cast<uint8_t>(meta.data_type_[0]);
+    uint8_t bits = static_cast<uint8_t>(meta.data_type_[1]);
+    uint16_t lanes = static_cast<uint16_t>(meta.data_type_[2]);
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
       DLDataType{code, bits, lanes},
@@ -602,9 +602,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[2];
-    int code = meta.data_type_[3];
-    int bits = meta.data_type_[4];
-    int lanes = meta.data_type_[5];
+    uint8_t code = static_cast<uint8_t>(meta.data_type_[3]);
+    uint8_t bits = static_cast<uint8_t>(meta.data_type_[4]);
+    uint16_t lanes = static_cast<uint16_t>(meta.data_type_[5]);
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
@@ -737,14 +737,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     int group_count = args[3];
     int client_id = args[4];
     NDArray ID = args[5];
-    int ID_code = ID->dtype.code;
-    int ID_bits = ID->dtype.bits;
-    int ID_lanes = ID->dtype.lanes;
+    uint8_t ID_code = static_cast<uint8_t>(ID->dtype.code);
+    uint8_t ID_bits = static_cast<uint8_t>(ID->dtype.bits);
+    uint16_t ID_lanes = static_cast<uint16_t>(ID->dtype.lanes);
     NDArray pb = args[6];
     NDArray local_data = args[7];
-    int data_code = local_data->dtype.code;
-    int data_bits = local_data->dtype.bits;
-    int data_lanes = local_data->dtype.lanes;
+    uint8_t data_code = static_cast<uint8_t>(local_data->dtype.code);
+    uint8_t data_bits = static_cast<uint8_t>(local_data->dtype.bits);
+    uint16_t data_lanes = static_cast<uint16_t>(local_data->dtype.lanes);
     CommunicatorHandle chandle_sender = args[8];
     CommunicatorHandle chandle_receiver = args[9];
     std::string str_flag = args[10];
