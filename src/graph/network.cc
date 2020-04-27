@@ -66,9 +66,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
 
 void ArrayMeta::AddArray(const NDArray& array) {
   // Get data type of current NDArray
-  data_type_.push_back(array->dtype.code);
-  data_type_.push_back(array->dtype.bits);
-  data_type_.push_back(array->dtype.lanes);
+  data_type_.push_back(array->dtype);
   // We first write the ndim to the data_shape_
   data_shape_.push_back(static_cast<int64_t>(array->ndim));
   // Then we write the data shape
@@ -88,7 +86,7 @@ char* ArrayMeta::Serialize(int64_t* size) {
     buffer_size += sizeof(int64_t) * data_shape_.size();
     // we don't need to write data_type_.size()
     // because it equals to ndarray_count_ * 3
-    buffer_size += sizeof(int) * data_type_.size();
+    buffer_size += sizeof(DLDataType) * data_type_.size();
   }
   // In the future, we should have a better memory management as
   // allocating a large chunk of memory can be very expensive.
@@ -103,9 +101,9 @@ char* ArrayMeta::Serialize(int64_t* size) {
     pointer += sizeof(ndarray_count_);
     // Write data type
     memcpy(pointer,
-        reinterpret_cast<int*>(data_type_.data()),
-        sizeof(int) * data_type_.size());
-    pointer += (sizeof(int) * data_type_.size());
+        reinterpret_cast<DLDataType*>(data_type_.data()),
+        sizeof(DLDataType) * data_type_.size());
+    pointer += (sizeof(DLDataType) * data_type_.size());
     // Write size of data_shape_
     *(reinterpret_cast<size_t*>(pointer)) = data_shape_.size();
     pointer += sizeof(data_shape_.size());
@@ -130,11 +128,11 @@ void ArrayMeta::Deserialize(char* buffer, int64_t size) {
     buffer += sizeof(int);
     data_size += sizeof(int);
     // Read data type
-    data_type_.resize(ndarray_count_ * 3);
+    data_type_.resize(ndarray_count_);
     memcpy(data_type_.data(), buffer,
-        ndarray_count_ * sizeof(int) * 3);
-    buffer += ndarray_count_ * sizeof(int) * 3;
-    data_size += ndarray_count_ * sizeof(int) * 3;
+        ndarray_count_ * sizeof(DLDataType));
+    buffer += ndarray_count_ * sizeof(DLDataType);
+    data_size += ndarray_count_ * sizeof(DLDataType);
     // Read size of data_shape_
     size_t count = *(reinterpret_cast<size_t*>(buffer));
     buffer += sizeof(size_t);
@@ -586,9 +584,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_id_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
     CHECK_EQ(meta.data_shape_[0], 1);
-    uint8_t code = static_cast<uint8_t>(meta.data_type_[0]);
-    uint8_t bits = static_cast<uint8_t>(meta.data_type_[1]);
-    uint16_t lanes = static_cast<uint16_t>(meta.data_type_[2]);
+    uint8_t code = meta.data_type_[0].code;
+    uint8_t bits = meta.data_type_[0].bits;
+    uint16_t lanes = meta.data_type_[0].lanes;
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
       DLDataType{code, bits, lanes},
@@ -602,9 +600,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[2];
-    uint8_t code = static_cast<uint8_t>(meta.data_type_[3]);
-    uint8_t bits = static_cast<uint8_t>(meta.data_type_[4]);
-    uint16_t lanes = static_cast<uint16_t>(meta.data_type_[5]);
+    uint8_t code = meta.data_type_[1].code;
+    uint8_t bits = meta.data_type_[1].bits;
+    uint16_t lanes = meta.data_type_[1].lanes;
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
@@ -624,9 +622,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_shape_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_shape_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[0];
-    uint8_t code = static_cast<uint8_t>(meta.data_type_[0]);
-    uint8_t bits = static_cast<uint8_t>(meta.data_type_[1]);
-    uint16_t lanes = static_cast<uint16_t>(meta.data_type_[2]);
+    uint8_t code = meta.data_type_[0].code;
+    uint8_t bits = meta.data_type_[0].bits;
+    uint16_t lanes = meta.data_type_[0].lanes;
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
