@@ -820,7 +820,7 @@ class KVClient(object):
         ----------
         name : str
             data name
-        shape : list of int
+        shape : tuple of int
             data shape
         dtype : dtype
             data type
@@ -840,7 +840,7 @@ class KVClient(object):
                 m_id = machines[idx]
                 data_str = self._serialize_shared_tensor(name, dtype)
                 data_str = data_str + '|' + target_name
-                partitioned_shape = shape.copy()
+                partitioned_shape = list(shape)
                 partitioned_shape[0] = count[idx]
                 for n in range(self._group_count):
                     server_id = m_id * self._group_count + n
