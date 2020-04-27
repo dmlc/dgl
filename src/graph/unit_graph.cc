@@ -334,6 +334,15 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return SparseFormat::kAny;
   }
 
+  std::string GetSparseFormat() const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return ToStringSparseFormat(SparseFormat::kCOO);
+  }
+
+  void SetSparseFormat(const std::string& name) override {
+    LOG(FATAL) << "Not enabled for COO graph";
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -695,6 +704,15 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
     LOG(FATAL) << "Not enabled for CSR graph";
     return SparseFormat::kAny;
+  }
+
+  std::string GetSparseFormat() const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return ToStringSparseFormat(SparseFormat::kCSR);
+  }
+
+  void SetSparseFormat(const std::string& name) override {
+    LOG(FATAL) << "Not enabled for CSR graph";
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
@@ -1201,6 +1219,9 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
 }
 
 UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
+  if (restrict_format_ != SparseFormat::kAny && restrict_format_ != SparseFormat::kCSC)
+    LOG(FATAL) << "The graph have restricted sparse format " << GetSparseFormat() <<
+      ", cannot create CSC matrix.";
   if (!in_csr_) {
     if (out_csr_) {
       const auto& newadj = aten::CSRTranspose(out_csr_->adj());
@@ -1218,6 +1239,9 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
 
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
+  if (restrict_format_ != SparseFormat::kAny && restrict_format_ != SparseFormat::kCSR)
+    LOG(FATAL) << "The graph have restricted sparse format " << GetSparseFormat() <<
+      ", cannot create CSR matrix.";
   if (!out_csr_) {
     if (in_csr_) {
       const auto& newadj = aten::CSRTranspose(in_csr_->adj());
@@ -1233,6 +1257,9 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
 
 /* !\brief Return coo. If not exist, create from csr.*/
 UnitGraph::COOPtr UnitGraph::GetCOO() const {
+  if (restrict_format_ != SparseFormat::kAny && restrict_format_ != SparseFormat::kCOO)
+    LOG(FATAL) << "The graph have restricted sparse format " << GetSparseFormat() <<
+      ", cannot create COO matrix.";
   if (!coo_) {
     if (in_csr_) {
       const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
@@ -1269,6 +1296,13 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 }
 
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
+  if (restrict_format_ != SparseFormat::kAny)
+    if (format != restrict_format_) {
+      LOG(FATAL) << "The graph have sparse format " << GetSparseFormat() <<
+        ", different from the requested format " << ToStringSparseFormat(format) <<
+        ". Please try enabling `any` sparse format by calling to_any_sparse_format";
+      return nullptr;
+    }
   switch (format) {
   case SparseFormat::kCSR:
     return GetOutCSR();
@@ -1286,7 +1320,7 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 
 SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
   if (restrict_format_ != SparseFormat::kAny)
-    return restrict_format_;
+    return restrict_format_;  // force to select the restricted format
   else if (preferred_format != SparseFormat::kAny)
     return preferred_format;
   else if (in_csr_)

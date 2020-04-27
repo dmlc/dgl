@@ -56,6 +56,38 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
     return SparseFormat::kAny;
 }
 
+// Create string from sparse format.
+inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
+  if (sparse_format == SparseFormat::kCOO)
+    return std::string("coo");
+  else if (sparse_format == SparseFormat::kCSR)
+    return std::string("csr");
+  else if (sparse_format == SparseFormat::kCSC)
+    return std::string("csc");
+  else
+    return std::string("any");
+}
+
+inline dgl_type_t Str2IdxSparseFormat(const std::string& name) {
+  if (name == "coo")
+    return 0;
+  else if (name == "csr")
+    return 1;
+  else if (name == "csc")
+    return 2;
+  else
+    return 3;
+}
+
+inline std::string Idx2StrSparseFormat(dgl_type_t idx) {
+  switch (idx) {
+    case 0: return "coo";
+    case 1: return "csr";
+    case 2: return "csc";
+    default: return "any";
+  }
+}
+
 // Sparse matrix object that is exposed to python API.
 struct SparseMatrix : public runtime::Object {
   // Sparse format.
@@ -648,7 +680,7 @@ bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
  * \brief Batched implementation of COOIsNonZero.
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
-runtime::NDArray COOIsNonZero(COOMatrix, runtime::NDArray row, runtime::NDArray col);
+runtime::NDArray COOIsNonZero(COOMatrix , runtime::NDArray row, runtime::NDArray col);
 
 /*! \brief Return the nnz of the given row */
 int64_t COOGetRowNNZ(COOMatrix , int64_t row);

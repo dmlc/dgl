@@ -226,6 +226,14 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
+  std::string GetSparseFormat() const {
+    return ToStringSparseFormat(this->restrict_format_);
+  }
+
+  void SetSparseFormat(const std::string& name) {
+    this->restrict_format_ = ParseSparseFormat(name);
+  }
+
  private:
   friend class Serializer;
   friend class HeteroGraph;

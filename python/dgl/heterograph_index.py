@@ -908,6 +908,24 @@ class HeteroGraphIndex(ObjectBase):
         rev_order = rev_csr(2)
         return utils.toindex(order), utils.toindex(rev_order)
 
+    def sparse_format(self, etype):
+        """Return sparse format of the hetero graph index.
+
+        Returns
+        -------
+        string : "any", "coo", "csr", or "csc"
+        """
+        ret = _CAPI_DGLHeteroGetSparseFormat(self, etype)
+        return ret
+    
+    def to_any_sparse_format(self, etype):
+        """Cast the sparse format of this hetero graph index
+        to `any` so that more efficient message-passing would be
+        supported.
+        """
+        _CAPI_DGLHeteroSetSparseFormat(self, etype, 3)
+
+
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):
     """Hetero-subgraph data structure"""
@@ -947,6 +965,7 @@ class HeteroSubgraphIndex(ObjectBase):
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
         return [utils.toindex(v.data) for v in ret]
+
 
 #################################################################
 # Creators

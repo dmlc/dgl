@@ -452,6 +452,31 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     *rv = ret_list;
 });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetSparseFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg.sptr());
+    if (bg != nullptr) // hg itself is a unit graph.
+      *rv = static_cast<int64_t>(Str2IdxSparseFormat(hg->GetSparseFormat()));
+    else
+      *rv = static_cast<int64_t>(Str2IdxSparseFormat(hg->GetRelationGraph(etype)->GetSparseFormat()));
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSetSparseFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    std::string name = Idx2StrSparseFormat(args[2]); 
+    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg.sptr());
+    if (bg != nullptr) // hg itself is a unit graph.
+      hg->SetSparseFormat(name);
+    else
+      hg->GetRelationGraph(etype)->SetSparseFormat(name);
+});
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];

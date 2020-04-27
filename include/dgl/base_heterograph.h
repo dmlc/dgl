@@ -368,6 +368,15 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
 
+  virtual std::string GetSparseFormat() const {
+    LOG(FATAL) << "Not implemented.";
+    return "";
+  };
+
+  virtual void SetSparseFormat(const std::string& name) {
+    LOG(FATAL) << "Not implemented.";
+  };
+
   /*!
    * \brief Get adjacency matrix in COO format.
    * \param etype Edge type.

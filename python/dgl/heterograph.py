@@ -4110,6 +4110,30 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
+    def sparse_format(self, etype=None):
+        """Return sparse format of the hetero graph.
+
+        Returns
+        -------
+        string : "any", "coo", "csr", or "csc"
+        """
+        idx = self._graph.sparse_format(self.get_etype_id(etype))
+        if idx == 0:
+            return "coo"
+        elif idx == 1:
+            return "csr"
+        elif idx == 2:
+            return "csc"
+        else:
+            return "any"
+
+    def to_any_sparse_format(self, etype=None):
+        """Cast the sparse format of this hetero graph index
+        to `any` so that more efficient message-passing would be
+        supported.
+        """
+        self._graph.to_any_sparse_format(self.get_etype_id(etype))
+
 ############################################################
 # Internal APIs
 ############################################################
