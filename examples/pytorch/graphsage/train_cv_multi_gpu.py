@@ -5,38 +5,53 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
+import tqdm
+import traceback
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
+from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel
-import tqdm
-import traceback
 
-#### Neighbor sampler
+class SAGEConvWithCV(nn.Module):
+    def __init__(self, in_feats, out_feats, activation):
+        super().__init__()
+        self.W = nn.Linear(in_feats * 2, out_feats)
+        self.activation = activation
+        self.reset_parameters()
 
-class NeighborSampler(object):
-    def __init__(self, g, fanouts):
-        self.g = g
-        self.fanouts = fanouts
+    def reset_parameters(self):
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_uniform_(self.W.weight, gain=gain)
+        nn.init.constant_(self.W.bias, 0)
 
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
+    def forward(self, block, H, HBar=None):
+        if self.training:
+            with block.local_scope():
+                H_src, H_dst = H
+                HBar_src, agg_HBar_dst = HBar
+                block.dstdata['agg_hbar'] = agg_HBar_dst
+                block.srcdata['hdelta'] = H_src - HBar_src
+                block.update_all(fn.copy_u('hdelta', 'm'), fn.mean('m', 'hdelta_new'))
+                h_neigh = block.dstdata['agg_hbar'] + block.dstdata['hdelta_new']
+                h = self.W(th.cat([H_dst, h_neigh], 1))
+                if self.activation is not None:
+                    h = self.activation(h)
+                return h
+        else:
+            with block.local_scope():
+                H_src, H_dst = H
+                block.srcdata['h'] = H_src
+                block.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h_new'))
+                h_neigh = block.dstdata['h_new']
+                h = self.W(th.cat([H_dst, h_neigh], 1))
+                if self.activation is not None:
+                    h = self.activation(h)
+                return h
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -44,34 +59,32 @@ class SAGE(nn.Module):
                  n_hidden,
                  n_classes,
                  n_layers,
-                 activation,
-                 dropout):
+                 activation):
         super().__init__()
         self.n_layers = n_layers
         self.n_hidden = n_hidden
         self.n_classes = n_classes
         self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
+        self.layers.append(SAGEConvWithCV(in_feats, n_hidden, activation))
         for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
-        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
+            self.layers.append(SAGEConvWithCV(n_hidden, n_hidden, activation))
+        self.layers.append(SAGEConvWithCV(n_hidden, n_classes, None))
 
-    def forward(self, blocks, x):
-        h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+    def forward(self, blocks):
+        h = blocks[0].srcdata['features']
+        updates = []
+        for layer, block in zip(self.layers, blocks):
             # We need to first copy the representation of nodes on the RHS from the
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
             h_dst = h[:block.number_of_dst_nodes()]
+            hbar_src = block.srcdata['hist']
+            agg_hbar_dst = block.dstdata['agg_hist']
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
-            h = layer(block, (h, h_dst))
-            if l != len(self.layers) - 1:
-                h = self.activation(h)
-                h = self.dropout(h)
+            h = layer(block, (h, h_dst), (hbar_src, agg_hbar_dst))
+            block.dstdata['h_new'] = h
         return h
 
     def inference(self, g, x, batch_size, device):
@@ -89,28 +102,51 @@ class SAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         nodes = th.arange(g.number_of_nodes())
+        ys = []
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
+            for start in range(0, len(nodes), batch_size):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                input_nodes = block.srcdata[dgl.NID]
+                induced_nodes = block.srcdata[dgl.NID]
 
-                h = x[input_nodes].to(device)
+                h = x[induced_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
 
                 y[start:end] = h.cpu()
 
+            ys.append(y)
             x = y
-        return y
+        return y, ys
 
-#### Miscellaneous functions
+
+
+class NeighborSampler(object):
+    def __init__(self, g, fanouts):
+        self.g = g
+        self.fanouts = fanouts
+
+    def sample_blocks(self, seeds):
+        seeds = th.LongTensor(seeds)
+        blocks = []
+        hist_blocks = []
+        for fanout in self.fanouts:
+            # For each seed node, sample ``fanout`` neighbors.
+            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout)
+            # For history aggregation we sample all neighbors.
+            hist_frontier = dgl.in_subgraph(self.g, seeds)
+            # Then we compact the frontier into a bipartite graph for message passing.
+            block = dgl.to_block(frontier, seeds)
+            hist_block = dgl.to_block(hist_frontier, seeds)
+            # Obtain the seed nodes for next layer.
+            seeds = block.srcdata[dgl.NID]
+
+            blocks.insert(0, block)
+            hist_blocks.insert(0, hist_block)
+        return blocks, hist_blocks
 
 # According to https://github.com/pytorch/pytorch/issues/17199, this decorator
 # is necessary to make fork() and openmp work together.
@@ -119,9 +155,6 @@ class SAGE(nn.Module):
 # to standardize worker process creation since our operators are implemented with
 # OpenMP.
 def thread_wrapped_func(func):
-    """
-    Wraps a process entry point to make it work with OpenMP.
-    """
     @wraps(func)
     def decorated_function(*args, **kwargs):
         queue = mp.Queue()
@@ -161,7 +194,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
+def evaluate(model, g, labels, val_mask, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -173,22 +206,51 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        inputs = g.ndata['features']
+        pred, _ = model.inference(g, inputs, batch_size, device)
     model.train()
     return compute_acc(pred[val_mask], labels[val_mask])
 
-def load_subtensor(g, labels, seeds, input_nodes, dev_id):
+def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device=False):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    batch_inputs = g.ndata['features'][input_nodes].to(dev_id)
-    batch_labels = labels[seeds].to(dev_id)
-    return batch_inputs, batch_labels
+    blocks[0].srcdata['features'] = g.ndata['features'][blocks[0].srcdata[dgl.NID]].to(dev_id)
+    blocks[-1].dstdata['label'] = labels[blocks[-1].dstdata[dgl.NID]].to(dev_id)
+    for i, (block, hist_block) in enumerate(zip(blocks, hist_blocks)):
+        hist_col = 'features' if i == 0 else 'hist_%d' % i
+        block.srcdata['hist'] = g.ndata[hist_col][block.srcdata[dgl.NID]].to(dev_id)
 
-#### Entry point
+        # Aggregate history
+        hist_block.srcdata['hist'] = g.ndata[hist_col][hist_block.srcdata[dgl.NID]]
+        if aggregation_on_device:
+            hist_block.srcdata['hist'] = hist_block.srcdata['hist'].to(dev_id)
+        hist_block.update_all(fn.copy_u('hist', 'm'), fn.mean('m', 'agg_hist'))
+        block.dstdata['agg_hist'] = hist_block.dstdata['agg_hist']
+        if not aggregation_on_device:
+            block.dstdata['agg_hist'] = block.dstdata['agg_hist'].to(dev_id)
 
+def init_history(g, model, dev_id):
+    with th.no_grad():
+        history = model.inference(g, g.ndata['features'], 1000, dev_id)[1]
+        for layer in range(args.num_layers + 1):
+            if layer > 0:
+                hist_col = 'hist_%d' % layer
+                g.ndata['hist_%d' % layer] = history[layer - 1]
+
+def update_history(g, blocks):
+    with th.no_grad():
+        for i, block in enumerate(blocks):
+            ids = block.dstdata[dgl.NID]
+            hist_col = 'hist_%d' % (i + 1)
+
+            h_new = block.dstdata['h_new'].cpu()
+            g.ndata[hist_col][ids] = h_new
+
+@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
-    # Start up distributed training, if enabled.
+    dropout = 0.2
+
     dev_id = devices[proc_id]
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
@@ -211,7 +273,7 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
@@ -220,10 +282,12 @@ def run(proc_id, n_gpus, args, devices, data):
         collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
-        num_workers=args.num_workers)
+        num_workers=args.num_workers_per_gpu)
 
-    # Define model and optimizer
-    model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
+    # Define model
+    model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu)
+
+    # Move the model to GPU and define optimizer
     model = model.to(dev_id)
     if n_gpus > 1:
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
@@ -231,15 +295,22 @@ def run(proc_id, n_gpus, args, devices, data):
     loss_fcn = loss_fcn.to(dev_id)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    # Compute history tensor and their aggregation before training on CPU
+    model.eval()
+    if n_gpus > 1:
+        init_history(g, model.module, dev_id)
+        th.distributed.barrier()
+    else:
+        init_history(g, model, dev_id)
+    model.train()
+
     # Training loop
     avg = 0
     iter_tput = []
     for epoch in range(args.num_epochs):
         tic = time.time()
-
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
-        for step, blocks in enumerate(dataloader):
+        model.train()
+        for step, (blocks, hist_blocks) in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
 
@@ -248,15 +319,18 @@ def run(proc_id, n_gpus, args, devices, data):
             input_nodes = blocks[0].srcdata[dgl.NID]
             seeds = blocks[-1].dstdata[dgl.NID]
 
-            # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, dev_id)
+            load_subtensor(g, labels, blocks, hist_blocks, dev_id, True)
 
-            # Compute loss and prediction
-            batch_pred = model(blocks, batch_inputs)
+            # forward
+            batch_pred = model(blocks)
+            # update history
+            update_history(g, blocks)
+            # compute loss
+            batch_labels = blocks[-1].dstdata['label']
             loss = loss_fcn(batch_pred, batch_labels)
+            # backward
             optimizer.zero_grad()
             loss.backward()
-
             if n_gpus > 1:
                 for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
@@ -264,13 +338,12 @@ def run(proc_id, n_gpus, args, devices, data):
                                                   op=th.distributed.ReduceOp.SUM)
                         param.grad.data /= n_gpus
             optimizer.step()
-
             if proc_id == 0:
                 iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
             if step % args.log_every == 0 and proc_id == 0:
                 acc = compute_acc(batch_pred, batch_labels)
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
-                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), th.cuda.max_memory_allocated() / 1000000))
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}'.format(
+                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:])))
 
         if n_gpus > 1:
             th.distributed.barrier()
@@ -281,12 +354,10 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch >= 5:
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
-                if n_gpus == 1:
-                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
-                else:
-                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
+                model.eval()
+                eval_acc = evaluate(
+                    model if n_gpus == 1 else model.module, g, labels, val_nid, args.val_batch_size, dev_id)
                 print('Eval Acc {:.4f}'.format(eval_acc))
-
 
     if n_gpus > 1:
         th.distributed.barrier()
@@ -295,19 +366,17 @@ def run(proc_id, n_gpus, args, devices, data):
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
-    argparser.add_argument('--gpu', type=str, default='0',
-        help="Comma separated list of GPU device IDs.")
+    argparser.add_argument('--gpu', type=str, default='0')
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
-    argparser.add_argument('--fan-out', type=str, default='10,25')
+    argparser.add_argument('--fan-out', type=str, default='1,1')
     argparser.add_argument('--batch-size', type=int, default=1000)
+    argparser.add_argument('--val-batch-size', type=int, default=1000)
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.003)
-    argparser.add_argument('--dropout', type=float, default=0.5)
-    argparser.add_argument('--num-workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--num-workers-per-gpu', type=int, default=0)
     args = argparser.parse_args()
     
     devices = list(map(int, args.gpu.split(',')))
@@ -333,8 +402,7 @@ if __name__ == '__main__':
     else:
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=thread_wrapped_func(run),
-                           args=(proc_id, n_gpus, args, devices, data))
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:
