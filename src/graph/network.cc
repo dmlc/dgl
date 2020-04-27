@@ -86,7 +86,7 @@ char* ArrayMeta::Serialize(int64_t* size) {
     buffer_size += sizeof(ndarray_count_);
     buffer_size += sizeof(data_shape_.size());
     buffer_size += sizeof(int64_t) * data_shape_.size();
-    // we don't need to write data_type_.size() 
+    // we don't need to write data_type_.size()
     // because it equals to ndarray_count_ * 3
     buffer_size += sizeof(int) * data_type_.size();
   }
