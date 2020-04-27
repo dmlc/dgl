@@ -788,8 +788,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.rank = client_id;
         kv_msg.name = name;
         kv_msg.id = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
-                                         DLDataType{ID->dtype.code, 
-                                                    ID->dtype.bits, 
+                                         DLDataType{ID->dtype.code,
+                                                    ID->dtype.bits,
                                                     ID->dtype.lanes},
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
@@ -830,8 +830,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
-                          DLDataType{local_data->dtype.code, 
-                                     local_data->dtype.bits, 
+                          DLDataType{local_data->dtype.code,
+                                     local_data->dtype.bits,
                                      local_data->dtype.lanes},
                           DLContext{kDLCPU, 0},
                           return_data,
