@@ -624,9 +624,9 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     Message recv_shape_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_shape_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[0];
-    int code = meta.data_type_[0];
-    int bits = meta.data_type_[1];
-    int lanes = meta.data_type_[2];
+    uint8_t code = static_cast<uint8_t>(meta.data_type_[0]);
+    uint8_t bits = static_cast<uint8_t>(meta.data_type_[1]);
+    uint16_t lanes = static_cast<uint16_t>(meta.data_type_[2]);
     CHECK_GE(ndim, 1);
     std::vector<int64_t> vec_shape;
     for (int i = 0; i < ndim; ++i) {
