@@ -3,8 +3,8 @@
  * \file graph/serialize/graph_serialize.h
  * \brief Graph serialization header
  */
-#ifndef DGL_GRAPH_GRAPH_SERIALIZE_H_
-#define DGL_GRAPH_GRAPH_SERIALIZE_H_
+#ifndef DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
+#define DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
 
 #include <dgl/graph.h>
 #include <dgl/array.h>
@@ -112,4 +112,4 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 }  // namespace serialize
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_GRAPH_SERIALIZE_H_
+#endif  // DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
