@@ -586,7 +586,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     CHECK_EQ(meta.data_shape_[0], 1);
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
-      DLDataType{meta.data_type_[0].code, meta.data_type_[0].bits, meta.data_type_[0].lanes},
+      meta.data_type_[0],
       DLContext{kDLCPU, 0},
       recv_id_msg.data,
       AUTO_FREE);
@@ -604,7 +604,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     }
     kv_msg->data = CreateNDArrayFromRaw(
       vec_shape,
-      DLDataType{meta.data_type_[1].code, meta.data_type_[1].bits, meta.data_type_[1].lanes},
+      meta.data_type_[1],
       DLContext{kDLCPU, 0},
       recv_data_msg.data,
       AUTO_FREE);
@@ -623,7 +623,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     }
     kv_msg->shape = CreateNDArrayFromRaw(
       vec_shape,
-      DLDataType{meta.data_type_[0].code, meta.data_type_[0].bits, meta.data_type_[0].lanes},
+      meta.data_type_[0],
       DLContext{kDLCPU, 0},
       recv_shape_msg.data,
       AUTO_FREE);
@@ -788,9 +788,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.rank = client_id;
         kv_msg.name = name;
         kv_msg.id = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
-                                         DLDataType{ID->dtype.code,
-                                                    ID->dtype.bits,
-                                                    ID->dtype.lanes},
+                                         ID->dtype,
                                          DLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
                                          !AUTO_FREE);
@@ -830,9 +828,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     local_data_shape[0] = ID_size;
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
-                          DLDataType{local_data->dtype.code,
-                                     local_data->dtype.bits,
-                                     local_data->dtype.lanes},
+                          local_data->dtype,
                           DLContext{kDLCPU, 0},
                           return_data,
                           AUTO_FREE);
