@@ -61,7 +61,7 @@ def test_random_walk_with_restart():
             assert (trace_diff % 2 == 0).all()
 
 # @parametrize_dtype
-@pytest.mark.parametrize_dtype("index_dtype", ["int64"])
+@pytest.mark.parametrize("index_dtype", ["int64"])
 def test_metapath_random_walk(index_dtype):
     g1 = dgl.bipartite(([0, 1, 2, 3], [0, 1, 2, 3]), 'a', 'ab', 'b', index_dtype=index_dtype)
     g2 = dgl.bipartite(([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2]), 'b', 'ba', 'a', index_dtype=index_dtype)
