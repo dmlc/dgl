@@ -32,7 +32,7 @@ def start_server():
     my_server.set_global2local(name='data_3', global2local=g2l_0)
     my_server.set_partition_book(name='data_0', partition_book=partition_0)
     my_server.set_partition_book(name='data_1', partition_book=partition_1)
-    my_server.set_partition_book(name='data_3', partition_book=partition_0)
+    my_server.set_global2local(name='data_3', global2local=g2l_0)
     my_server.init_data(name='data_0', data_tensor=data_0)
     my_server.init_data(name='data_1', data_tensor=data_1)
     my_server.init_data(name='data_3', data_tensor=data_3)
@@ -67,7 +67,7 @@ def start_client():
 
     meta_3 = my_client.get_data_meta('data_3')
     assert meta_3[0] == F.int64
-    assert_array_equal(meta_3[2], partition_0)    
+    assert_array_equal(meta_3[2], partition_0)  
 
     my_client.push(name='data_0', id_tensor=F.tensor([0, 1, 2]), data_tensor=F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]]))
     my_client.push(name='data_2', id_tensor=F.tensor([0, 1, 2]), data_tensor=F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]]))
