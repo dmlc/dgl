@@ -490,23 +490,6 @@ class DistGraph:
             schemes[key] = infer_scheme(self.edata[key])
         return schemes
 
-    @property
-    def local_nids(self):
-        return self._local_nids
-
-    @property
-    def local_gnids(self):
-        ''' The Ids of the nodes owned by the local graph store.
-
-        The node Ids are global node Ids.
-
-        Returns
-        -------
-        tensor
-            The node Ids.
-        '''
-        return self._local_gnid
-
     def rank(self):
         ''' The rank of the distributed graph store.
 
