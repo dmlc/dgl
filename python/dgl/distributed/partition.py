@@ -1,22 +1,30 @@
-from .. import backend as F
-from ..base import ALL, NID, EID
-from ..data.utils import load_graphs, save_graphs
-from ..transform import metis_partition_assignment, partition_graph_with_halo
+"""Functions for partitions."""
 
 import json
-import numpy as np
 import pickle
 import os
+import numpy as np
+
+from .. import backend as F
+from ..base import NID, EID
+from ..data.utils import load_graphs, save_graphs
+from ..transform import metis_partition_assignment, partition_graph_with_halo
 
 def load_partition(conf_file, part_id):
     ''' Load data of a partition from the data path in the DistGraph server.
 
     Here we load data through the normal filesystem interface. In the future, we need to support
     loading data from other storage such as S3 and HDFS.
+
+    Parameters
+    ----------
+    conf_file : str
+        The path of the partition config file.
+    part_id : int
+        The partition Id.
     '''
-    with open(conf_file) as f:
-        part_metadata = json.load(f)
-    graph_name = part_metadata['graph_name']
+    with open(conf_file) as conf_f:
+        part_metadata = json.load(conf_f)
     part_files = part_metadata['part-{}'.format(part_id)]
     node_feats = pickle.load(open(part_files['node_feats'], 'rb'))
     edge_feats = pickle.load(open(part_files['edge_feats'], 'rb'))
@@ -104,16 +112,15 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
 
         # Get the node Ids that belong to this partition.
         part_ids = node_parts[part.ndata[NID]]
-        local_nids = F.asnumpy(part.ndata[NID])[F.asnumpy(part_ids) == part_id]
-
         # Get the node/edge features of each partition.
         node_feats = {}
         edge_feats = {}
         if num_parts > 1:
             local_nodes = F.asnumpy(part.ndata[NID])[F.asnumpy(part.ndata['inner_node']) == 1]
             local_edges = F.asnumpy(part.edata[EID])[F.asnumpy(part.edata['inner_edge']) == 1]
-            print('part {} has {} nodes and {} edges. {} nodes and {} edges are inside the partition'.format(
-                part_id, part.number_of_nodes(), part.number_of_edges(),
+            print('part {} has {} nodes and {} edges.'.format(
+                part_id, part.number_of_nodes(), part.number_of_edges()))
+            print('{} nodes and {} edges are inside the partition'.format(
                 len(local_nodes), len(local_edges)))
             tot_num_inner_edges += len(local_edges)
             for name in g.ndata:
