@@ -434,7 +434,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
     const int64_t bits = component_graphs[0]->NumBits();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
-      CHECK_EQ(component->NumBits(), bits) << "Inconsistent dtype for the input graphs to batch";
+      CHECK_EQ(component->NumBits(), bits)
+        << "Expect graphs to batch have the same index dtype(int" << bits
+        << "), but got int" << component->NumBits();
     }
     if (bits == 32) {
       auto hgptr =
