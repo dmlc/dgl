@@ -820,7 +820,7 @@ class KVClient(object):
         ----------
         name : str
             data name
-        shape : list of int
+        shape : list or tuple of int
             data shape
         dtype : dtype
             data type
@@ -841,7 +841,7 @@ class KVClient(object):
                 m_id = machines[idx]
                 data_str = self._serialize_shared_tensor(name, dtype)
                 data_str = data_str + '|' + target_name
-                partitioned_shape = shape.copy()
+                partitioned_shape = list(shape)
                 partitioned_shape[0] = count[idx]
                 for n in range(self._group_count):
                     server_id = m_id * self._group_count + n
@@ -1150,16 +1150,17 @@ class KVClient(object):
 
         We usually invoke this API by just one client (e.g., client_0).
         """
-        for server_id in range(self._server_count):
-            msg = KVStoreMsg(
-                type=KVMsgType.FINAL,
-                rank=self._client_id,
-                name=None,
-                id=None,
-                data=None,
-                shape=None,
-                c_ptr=None)
-            _send_kv_msg(self._sender, msg, server_id)
+        if self._client_id == 0:
+            for server_id in range(self._server_count):
+                msg = KVStoreMsg(
+                    type=KVMsgType.FINAL,
+                    rank=self._client_id,
+                    name=None,
+                    id=None,
+                    data=None,
+                    shape=None,
+                    c_ptr=None)
+                _send_kv_msg(self._sender, msg, server_id)
 
 
     def _get_local_usable_addr(self):
