@@ -48,11 +48,6 @@ def ones(shape, dtype=float32, ctx=_default_context):
 def randn(shape):
     return copy_to(_randn(shape), _default_context)
 
-default_dtype = None
-
-def set_default_dtype(dtype):
-    default_dtype = dtype
-
 def tensor(data, dtype=None):
     if dtype is None:
         if is_tensor(data):
