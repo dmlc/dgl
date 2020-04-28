@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/graph_serialize.cc
+ * \file graph/serialize/graph_serialize.cc
  * \brief Graph serialization implementation
  *
  * The storage structure is
