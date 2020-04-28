@@ -433,7 +433,6 @@ class DistGraph:
             The initializer.
         '''
         # TODO
-        pass
 
     def get_node_embeddings(self):
         ''' Return node embeddings
@@ -444,7 +443,6 @@ class DistGraph:
             All node embeddings in the graph store.
         '''
         # TODO
-        pass
 
     @property
     def ndata(self):
