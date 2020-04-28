@@ -950,7 +950,8 @@ def remove_edges(g, edge_ids):
     for key, value in edge_ids.items():
         if value.dtype != getattr(F, g.idtype):
             # if didn't check, this function still works, but returns wrong result
-            raise Exception("Inconsistent dtype between edge ids and graph data type")
+            raise Exception("Expect edge id tensors({}) to have the same index type as graph({})".format(
+                value.dtype, g.idtype))
         edge_ids_nd[g.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
     new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(g._graph, edge_ids_nd)
 
