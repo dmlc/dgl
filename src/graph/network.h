@@ -67,6 +67,7 @@ enum MessageType {
   kIPIDMsg = 7
 };
 
+
 /*!
  * \brief Meta data for NDArray message
  */
@@ -132,6 +133,11 @@ class ArrayMeta {
    * \brief count of ndarray in MetaMsg
    */
   int ndarray_count_;
+
+  /*!
+   * \brief DataType for each NDArray
+   */
+  std::vector<DLDataType> data_type_;
 
   /*!
    * \brief We first write the ndim to data_shape_ 
