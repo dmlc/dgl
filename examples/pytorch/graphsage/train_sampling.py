@@ -78,7 +78,6 @@ class SAGE(nn.Module):
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
         x : the input of entire node set.
-
         The inference code is written in a fashion that it could handle any number of nodes and
         layers.
         """
@@ -114,7 +113,6 @@ def prepare_mp(g):
     Explicitly materialize the CSR, CSC and COO representation of the given graph
     so that they could be shared via copy-on-write to sampler workers and GPU
     trainers.
-
     This is a workaround before full shared memory support on heterogeneous graphs.
     """
     g.in_degree(0)
@@ -127,13 +125,13 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
+def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     """
-    Evaluate the model on the validation set specified by ``val_nid``.
+    Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
-    val_nid : the node Ids for validation.
+    val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
     batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
@@ -141,7 +139,7 @@ def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     with th.no_grad():
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred[val_nid], labels[val_nid])
+    return compute_acc(pred[val_mask], labels[val_mask])
 
 def load_subtensor(g, labels, seeds, input_nodes, device):
     """
@@ -157,6 +155,8 @@ def run(args, device, data):
     train_mask, val_mask, in_feats, labels, n_classes, g = data
     train_nid = th.LongTensor(np.nonzero(train_mask)[0])
     val_nid = th.LongTensor(np.nonzero(val_mask)[0])
+    train_mask = th.BoolTensor(train_mask)
+    val_mask = th.BoolTensor(val_mask)
 
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
@@ -185,7 +185,6 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        step_time = []
         for step, blocks in enumerate(dataloader):
             tic_step = time.time()
 
@@ -204,21 +203,19 @@ def run(args, device, data):
             loss.backward()
             optimizer.step()
 
-            step_t = time.time() - tic_step
-            step_time.append(step_t)
-            iter_tput.append(len(seeds) / (step_t))
+            iter_tput.append(len(seeds) / (time.time() - tic_step))
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
-                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
+                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_nid, args.batch_size, device)
+            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
