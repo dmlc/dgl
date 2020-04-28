@@ -792,6 +792,17 @@ class DGLBaseGraph(object):
         else:
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
+    
+    @property
+    def idtype(self):
+        """Return the dtype of the graph index
+
+        Returns
+        ---------
+        dtype: str
+            "int32" or "int64"
+        """
+        return self._graph.dtype
 
 
 def mutation(func):

@@ -237,7 +237,7 @@ HeteroSubgraph HeteroGraph::EdgeSubgraph(
 
 FlattenedHeteroGraphPtr HeteroGraph::Flatten(
     const std::vector<dgl_type_t>& etypes) const {
-  int64_t bits = NumBits();
+  const int64_t bits = NumBits();
   if (bits == 32) {
     return FlattenImpl<int32_t>(etypes);
   } else if (bits == 64) {

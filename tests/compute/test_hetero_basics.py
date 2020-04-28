@@ -67,7 +67,7 @@ def generate_graph(index_dtype='int64', grad=False):
 @parametrize_dtype
 def test_isolated_nodes(index_dtype):
     g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, index_dtype=index_dtype)
-    assert g._graph.dtype == index_dtype
+    assert g.idtype == index_dtype
     assert g.number_of_nodes() == 5
 
     # Test backward compatibility
@@ -76,14 +76,14 @@ def test_isolated_nodes(index_dtype):
 
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
                       'game', num_nodes=(5, 7), index_dtype=index_dtype)
-    assert g._graph.dtype == index_dtype
+    assert g.idtype == index_dtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
     # Test backward compatibility
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
                       'game', card=(5, 7), index_dtype=index_dtype)
-    assert g._graph.dtype == index_dtype
+    assert g.idtype == index_dtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
@@ -235,7 +235,7 @@ def atest_nx_conversion(index_dtype):
     # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
     g = dgl.graph(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'], index_dtype=index_dtype)    
-    assert g._graph.dtype == index_dtype
+    assert g.idtype == index_dtype
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4

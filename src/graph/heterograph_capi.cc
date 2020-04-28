@@ -431,7 +431,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
     List<HeteroGraphRef> component_graphs = args[1];
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
-    int64_t bits = component_graphs[0]->NumBits();
+    const int64_t bits = component_graphs[0]->NumBits();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits) << "Inconsistent dtype for the input graphs to batch";
@@ -452,7 +452,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     HeteroGraphRef hg = args[0];
     const IdArray vertex_sizes = args[1];
     const IdArray edge_sizes = args[2];
-    int64_t bits = hg->NumBits();
+    const int64_t bits = hg->NumBits();
     std::vector<HeteroGraphPtr> ret;
     if (bits == 32) {
       ret = DisjointPartitionHeteroBySizes<int32_t>(hg->meta_graph(), hg.sptr(),

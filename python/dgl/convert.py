@@ -386,11 +386,11 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         ntypes = list(sorted(num_nodes_per_type.keys()))
         num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes], "int64")
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
-    index_dtype = rel_graphs[0]._graph.dtype
+    index_dtype = rel_graphs[0].idtype
     for rgrh in rel_graphs:
-        if rgrh._graph.dtype != index_dtype:
+        if rgrh.idtype != index_dtype:
             raise Exception("Expect relation graphs to be {}, but got {}".format(
-                index_dtype, rgrh._graph.dtype))
+                index_dtype, rgrh.idtype))
         stype, etype, dtype = rgrh.canonical_etypes[0]
         meta_edges_src.append(ntype_dict[stype])
         meta_edges_dst.append(ntype_dict[dtype])
@@ -595,7 +595,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
                        ' type of nodes and edges.')
 
     num_ntypes = len(ntypes)
-    index_dtype = G._graph.dtype
+    index_dtype = G.idtype
 
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
@@ -745,7 +745,7 @@ def to_homo(G):
         eids.append(F.arange(0, num_edges))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
-                 validate=False, index_dtype=G._graph.dtype)
+                 validate=False, index_dtype=G.idtype)
     retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
     retg.ndata[NID] = F.cat(nids, 0)
     retg.edata[ETYPE] = F.cat(etype_ids, 0)

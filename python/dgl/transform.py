@@ -463,7 +463,7 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or bipartite graph.
     """
     adj = 1
-    index_dtype = g._graph.dtype
+    index_dtype = g.idtype
     for etype in metapath:
         adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
@@ -720,13 +720,13 @@ def compact_graphs(graphs, always_preserve=None):
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
-    graph_dtype = graphs[0]._graph.dtype
+    graph_dtype = graphs[0].idtype
     graph_ctx = graphs[0]._graph.ctx()
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
-        assert graph_dtype == g._graph.dtype, "Graph data type mismatch"
+        assert graph_dtype == g.idtype, "Graph data type mismatch"
         assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
 
     # Process the dictionary or tensor of "always preserve" nodes
@@ -895,7 +895,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         if nodes is not None:
             dst_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
         else:
-            dst_nodes_nd.append(nd.null(g._graph.dtype))
+            dst_nodes_nd.append(nd.null(g.idtype))
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_nodes_nd, include_dst_in_src)
@@ -911,7 +911,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
             new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
         else:
             # For empty dst node sets, still create empty mapping arrays.
-            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=getattr(F, g._graph.dtype))
+            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=getattr(F, g.idtype))
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
@@ -946,9 +946,9 @@ def remove_edges(g, edge_ids):
                 "Graph has more than one edge type; specify a dict for edge_id instead.")
         edge_ids = {g.canonical_etypes[0]: edge_ids}
 
-    edge_ids_nd = [nd.null(g._graph.dtype)] * len(g.etypes)
+    edge_ids_nd = [nd.null(g.idtype)] * len(g.etypes)
     for key, value in edge_ids.items():
-        if value.dtype != getattr(F, g._graph.dtype):
+        if value.dtype != getattr(F, g.idtype):
             # if didn't check, this function still works, but returns wrong result
             raise Exception("Inconsistent dtype between edge ids and graph data type")
         edge_ids_nd[g.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
@@ -997,9 +997,9 @@ def in_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._graph.dtype).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g.idtype).todgltensor())
         else:
-            nodes_all_types.append(nd.array(np.array([], dtype=g._graph.dtype), ctx=nd.cpu()))
+            nodes_all_types.append(nd.array(np.array([], dtype=g.idtype), ctx=nd.cpu()))
 
     subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1036,9 +1036,9 @@ def out_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._graph.dtype).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g.idtype).todgltensor())
         else:
-            nodes_all_types.append(nd.array(np.array([], dtype=g._graph.dtype), ctx=nd.cpu()))
+            nodes_all_types.append(nd.array(np.array([], dtype=g.idtype), ctx=nd.cpu()))
 
     subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1114,7 +1114,7 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
 
-    Node and edge features are preserved. Returns 64 bits graphh
+    Node and edge features are preserved. Returns 64 bits graph
 
     Parameters
     ----------
