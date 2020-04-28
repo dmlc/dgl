@@ -792,7 +792,7 @@ class DGLBaseGraph(object):
         else:
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
-    
+
     @property
     def idtype(self):
         """Return the dtype of the graph index

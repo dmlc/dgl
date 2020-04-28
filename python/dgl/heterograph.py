@@ -1085,7 +1085,7 @@ class DGLHeteroGraph(object):
             True if the graph is readonly, False otherwise.
         """
         return self._graph.is_readonly()
-    
+
     @property
     def idtype(self):
         """The dtype of graph index
