@@ -4121,7 +4121,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     unbatch
     """
     if len(graph_list) == 1:
-        return graph_list[0]
+        return graph_list[0].local_var()
 
     def _init_attrs(attrs, mode):
         """Collect attributes of given mode (node/edge) from graph_list.
@@ -4240,7 +4240,7 @@ def unbatch(graph):
     batch
     """
     if graph.batch_size == 1:
-        return [graph]
+        return [graph.local_var()]
 
     bsize = graph.batch_size
     bnn = graph.batch_num_nodes
