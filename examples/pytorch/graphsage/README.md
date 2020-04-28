@@ -45,3 +45,21 @@ Accuracy:
 | Full Graph            | 0.9504   |
 | Neighbor Sampling     | 0.9495   |
 | Control Variate       | 0.9490   |
+
+### Unsupervised training
+
+Train w/ mini-batch sampling in an unsupervised fashion (on the Reddit dataset)
+```bash
+python3 train_sampling_unsupervised.py
+```
+
+Notably,
+
+* The loss function is defined by predicting whether an edge exists between two nodes or not.  This matches the official
+  implementation, and is equivalent to the loss defined in the paper with 1-hop random walks.
+* When computing the score of `(u, v)`, the connections between node `u` and `v` are removed from neighbor sampling.
+  This trick increases the F1-micro score on test set by 0.02.
+* The performance of the learned embeddings are measured by training a softmax regression with scikit-learn, as described
+  in the paper.
+
+Micro F1 score reaches 0.9212 on test set.
