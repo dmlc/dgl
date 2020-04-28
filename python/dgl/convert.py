@@ -395,7 +395,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         meta_edges_src.append(ntype_dict[stype])
         meta_edges_dst.append(ntype_dict[dtype])
         etypes.append(etype)
-    # TODO(Allen): metagraph is homograph, currently still using int64
+    # metagraph is DGLGraph, currently still using int64 as index dtype
     metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
 
     # create graph index
