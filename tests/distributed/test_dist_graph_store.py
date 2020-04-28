@@ -39,7 +39,7 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     assert g.number_of_edges() == num_edges
 
     # Test reading data
-    nids = g.local_gnids
+    nids = F.arange(0, int(g.number_of_nodes() / 2))
     feats1 = g.ndata['features'][nids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == nids))
