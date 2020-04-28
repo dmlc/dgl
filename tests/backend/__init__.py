@@ -53,7 +53,7 @@ def tensor(data, dtype=None):
         if is_tensor(data):
             data = zerocopy_to_numpy(data)
         else:
-            data = np.array(data, dtype=default_dtype)
+            data = np.array(data)
         dtype = int64 if np.issubdtype(data.dtype, np.integer) else float32
     return copy_to(_tensor(data, dtype), _default_context)
 
