@@ -110,8 +110,6 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
     for part_id in range(num_parts):
         part = client_parts[part_id]
 
-        # Get the node Ids that belong to this partition.
-        part_ids = node_parts[part.ndata[NID]]
         # Get the node/edge features of each partition.
         node_feats = {}
         edge_feats = {}

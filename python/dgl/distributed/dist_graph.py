@@ -1,17 +1,16 @@
 """Define distributed graph."""
 
 import socket
-import numpy as np
 from collections.abc import MutableMapping
+import numpy as np
 
 from ..graph import DGLGraph
 from .. import backend as F
-from ..base import ALL, NID, EID
+from ..base import NID, EID
 from ..contrib.dis_kvstore import KVServer, KVClient
 from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
-from ..transform import metis_partition_assignment, partition_graph_with_halo
 from .partition import load_partition
 from .. import ndarray as nd
 
@@ -24,13 +23,13 @@ def _get_edata_path(graph_name, edata_name):
 def _get_graph_path(graph_name):
     return "/" + graph_name
 
-dtype_dict = F.data_type_dict
-dtype_dict = {dtype_dict[key]:key for key in dtype_dict}
+DTYPE_DICT = F.data_type_dict
+DTYPE_DICT = {DTYPE_DICT[key]:key for key in DTYPE_DICT}
 
 def _move_data_to_shared_mem_array(arr, name):
     dlpack = F.zerocopy_to_dlpack(arr)
     dgl_tensor = nd.from_dlpack(dlpack)
-    new_arr = empty_shared_mem(name, True, F.shape(arr), dtype_dict[F.dtype(arr)])
+    new_arr = empty_shared_mem(name, True, F.shape(arr), DTYPE_DICT[F.dtype(arr)])
     dgl_tensor.copyto(new_arr)
     dlpack = new_arr.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -49,8 +48,7 @@ def _copy_graph_to_shared_mem(g, graph_name):
                                                       _get_edata_path(graph_name, EID))
     return new_g
 
-field_dict = {'part_id': F.int64,
-              'local_node': F.int64,
+FIELD_DICT = {'local_node': F.int64,
               NID: F.int64,
               EID: F.int64}
 
@@ -83,8 +81,8 @@ def _get_shared_mem_ndata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_nodes(),)
-    dtype = field_dict[name]
-    dtype = dtype_dict[dtype]
+    dtype = FIELD_DICT[name]
+    dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -96,8 +94,8 @@ def _get_shared_mem_edata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_edges(),)
-    dtype = field_dict[name]
-    dtype = dtype_dict[dtype]
+    dtype = FIELD_DICT[name]
+    dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_edata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -127,7 +125,7 @@ def _get_shared_mem_metadata(graph_name):
     '''
     shape = (2,)
     dtype = F.int64
-    dtype = dtype_dict[dtype]
+    dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -146,7 +144,7 @@ class DistTensor:
         The name of the tensor in the KVStore.
     '''
     def __init__(self, g, name):
-        self.kv = g._client
+        self.kvstore = g._client
         self.name = name
         dtype, shape, _ = g._client.get_data_meta(name)
         # We need to ensure that the first dim is the number of nodes in a graph.
@@ -156,21 +154,23 @@ class DistTensor:
         self._dtype = dtype
 
     def __getitem__(self, idx):
-        return self.kv.pull(name=self.name, id_tensor=idx)
+        return self.kvstore.pull(name=self.name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
         # TODO how do we want to support broadcast.
-        self.kv.push(name=self.name, id_tensor=idx, data_tensor=val)
+        self.kvstore.push(name=self.name, id_tensor=idx, data_tensor=val)
 
     def __len__(self):
         return self._shape[0]
 
     @property
     def shape(self):
+        ''' Return the shape of the distributed tensor. '''
         return self._shape
 
     @property
     def dtype(self):
+        ''' Return the data type of the distributed tensor. '''
         return self._dtype
 
 
@@ -287,7 +287,7 @@ class DistGraphServer(KVServer):
         host_ip = socket.gethostbyname(host_name)
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
-        self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
+        self.client_g, node_feats, _, self.meta = load_partition(conf_file, server_id)
         full_part_ids = self.meta[2]
         num_nodes = self.meta[0]
         num_edges = self.meta[1]
@@ -325,8 +325,9 @@ class DistGraph:
     Parameters
     ----------
     server_namebook: dict
-        IP address namebook of KVServer, where key is the KVServer's ID 
-        (start from 0) and value is the server's machine_id, IP address and port, and group_count, e.g.,
+        IP address namebook of KVServer, where key is the KVServer's ID
+        (start from 0) and value is the server's machine_id, IP address and port,
+        and group_count, e.g.,
 
           {0:'[0, 172.31.40.143, 30050, 2],
            1:'[0, 172.31.40.143, 30051, 2],
