@@ -1298,7 +1298,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         predecessors
-        """        
+        """
         check_same_dtype(self.idtype, v)
         return self._graph.successors(self.get_etype_id(etype), v).tousertensor()
 
@@ -1526,7 +1526,7 @@ class DGLHeteroGraph(object):
         (tensor([0, 1]), tensor([0, 2]), tensor([0, 2]))
         >>> g.in_edges([0, 2], form='uv')
         (tensor([0, 1]), tensor([0, 2]))
-        """        
+        """
         check_same_dtype(self.idtype, v)
         v = utils.toindex(v, self.idtype)
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
@@ -1578,7 +1578,7 @@ class DGLHeteroGraph(object):
         (tensor([0, 1, 1]), tensor([0, 1, 2]), tensor([0, 1, 2]))
         >>> g.out_edges([0, 1], form='uv')
         (tensor([0, 1, 1]), tensor([0, 1, 2]))
-        """        
+        """
         check_same_dtype(self.idtype, u)
         u = utils.toindex(u, self.idtype)
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
@@ -4148,18 +4148,19 @@ class DGLHeteroGraph(object):
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     def long(self):
-        """Return a heterograph object use int64 as index dtype, 
+        """Return a heterograph object use int64 as index dtype,
         with the ndata and edata as the original object
 
         Returns
         -------
         DGLHeteroGraph
-            The graph object 
+            The graph object
 
         Examples
         --------
 
-        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game', index_dtype='int32')
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game',
+        >>>                   index_dtype='int32')
         >>> g_long = g.long() # Convert g to int64 indexed, not changing the original `g`
 
         See Also
@@ -4191,7 +4192,8 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
-        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game', index_dtype='int64')
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game',
+        >>>                   index_dtype='int64')
         >>> g_int = g.int() # Convert g to int32 indexed, not changing the original `g`
 
         See Also
@@ -4536,13 +4538,16 @@ class AdaptedHeteroGraph(GraphAdapter):
         return self.graph.canonical_etypes[self.etid]
 
 
-def check_same_dtype(graph_dtype, tensor_dtype):
-    if F.is_tensor(tensor_dtype):
-        if graph_dtype != F.reverse_data_type_dict[F.dtype(tensor_dtype)]:
+def check_same_dtype(graph_dtype, tensor):
+    """check whether tensor's dtype is consistent with graph's dtype"""
+    if F.is_tensor(tensor):
+        if graph_dtype != F.reverse_data_type_dict[F.dtype(tensor)]:
             raise utils.InconsistentDtypeException(
                 "Expect the input tensor to be the same as the graph index dtype({}), but got {}"
-                .format(graph_dtype, tensor_dtype))
+                .format(graph_dtype, F.reverse_data_type_dict[F.dtype(tensor)]))
+
 
 def check_idtype_dict(graph_dtype, tensor_dict):
+    """check whether the dtypes of tensors in dict are consistent with graph's dtype"""
     for k, v in tensor_dict.items():
         check_same_dtype(graph_dtype, v)
