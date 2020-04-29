@@ -246,6 +246,9 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def clone(input):
+    return input.clone()
+
 def unique(input):
     return th.unique(input)
 

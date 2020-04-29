@@ -4033,15 +4033,8 @@ class DGLHeteroGraph(object):
         --------
         local_var
         """
-        local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
-        local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
-        # Use same per-column initializers and default initializer.
-        # If registered, a column (based on key) initializer will be used first,
-        # otherwise the default initializer will be used.
-        for fr1, fr2 in zip(local_node_frames, self._node_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
-        for fr1, fr2 in zip(local_edge_frames, self._edge_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
+        local_node_frames = [fr.clone() for fr in self._node_frames]
+        local_edge_frames = [fr.clone() for fr in self._edge_frames]
         return DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
                               local_node_frames,
                               local_edge_frames)
@@ -4093,15 +4086,8 @@ class DGLHeteroGraph(object):
         """
         old_nframes = self._node_frames
         old_eframes = self._edge_frames
-        self._node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
-        self._edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
-        # Use same per-column initializers and default initializer.
-        # If registered, a column (based on key) initializer will be used first,
-        # otherwise the default initializer will be used.
-        for fr1, fr2 in zip(self._node_frames, old_nframes):
-            sync_frame_initializer(fr1._frame, fr2._frame)
-        for fr1, fr2 in zip(self._edge_frames, old_eframes):
-            sync_frame_initializer(fr1._frame, fr2._frame)
+        self._node_frames = [fr.clone() for fr in self._node_frames]
+        self._edge_frames = [fr.clone() for fr in self._edge_frames]
         yield
         self._node_frames = old_nframes
         self._edge_frames = old_eframes

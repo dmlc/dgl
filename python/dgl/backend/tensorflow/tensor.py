@@ -347,6 +347,9 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def clone(input):
+    # TF tensor is always immutable so returning the input is safe.
+    return input
 
 def unique(input):
     return tf.unique(input).y

@@ -123,7 +123,8 @@ def graph(data, ntype='_N', etype='_E', num_nodes=None, card=None, validate=True
           edata_schemes={})
     """
     if card is not None:
-        dgl_warning("card will be deprecated, please use num_nodes='{}' instead.")
+        dgl_warning("Argument 'card' will be deprecated. "
+                    "Please use num_nodes={} instead.".format(card))
         num_nodes = card
 
     if num_nodes is not None:
@@ -271,7 +272,8 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', num_nodes=None, card=Non
     if utype == vtype:
         raise DGLError('utype should not be equal to vtype. Use ``dgl.graph`` instead.')
     if card is not None:
-        dgl_warning("card will be deprecated, please use num_nodes='{}' instead.")
+        dgl_warning("Argument 'card' will be deprecated. "
+                    "Please use num_nodes={} instead.".format(card))
         num_nodes = card
     if num_nodes is not None:
         urange, vrange = num_nodes
