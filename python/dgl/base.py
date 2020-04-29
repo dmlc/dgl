@@ -20,6 +20,6 @@ def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""
     return isinstance(arg, str) and arg == ALL
 
-dgl_warning = warnings.warn
+dgl_warning = warnings.warn  # pylint: disable=invalid-name
 
 _init_internal_api()

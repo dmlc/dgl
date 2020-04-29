@@ -2,9 +2,9 @@
 #pylint: disable= too-many-lines
 from collections import defaultdict
 from contextlib import contextmanager
+import copy
 import networkx as nx
 import numpy as np
-import copy
 
 from . import graph_index
 from . import heterograph_index
@@ -12,7 +12,7 @@ from . import utils
 from . import backend as F
 from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
-from .frame import Frame, FrameRef, frame_like, sync_frame_initializer
+from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from .udf import NodeBatch, EdgeBatch
