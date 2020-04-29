@@ -4,6 +4,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 import networkx as nx
 import numpy as np
+import copy
 
 from . import graph_index
 from . import heterograph_index
@@ -912,7 +913,7 @@ class DGLHeteroGraph(object):
                 new_ntypes = [srctype]
                 new_nframes = [self._node_frames[stid]]
             else:
-                new_ntypes = [srctype, dsttype]
+                new_ntypes = ([srctype], [dsttype])
                 new_nframes = [self._node_frames[stid], self._node_frames[dtid]]
             new_etypes = [etype]
             new_eframes = [self._edge_frames[etid]]
@@ -4035,9 +4036,10 @@ class DGLHeteroGraph(object):
         """
         local_node_frames = [fr.clone() for fr in self._node_frames]
         local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        return DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
-                              local_node_frames,
-                              local_edge_frames)
+        ret = copy.copy(self)  # shallow copy to avoid invoking __init__
+        ret._node_frames = local_node_frames
+        ret._edge_frames = local_edge_frames
+        return ret
 
     @contextmanager
     def local_scope(self):
