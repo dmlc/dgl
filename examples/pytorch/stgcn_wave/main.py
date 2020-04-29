@@ -1,5 +1,4 @@
 import dgl
-import networkx as nx
 import random
 import torch
 import numpy as np
@@ -11,6 +10,7 @@ from model import *
 from sensors2graph import *
 import torch.nn as nn
 import argparse
+import scipy.sparse as sp
 
 parser = argparse.ArgumentParser(description='STGCN_WAVE')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
@@ -26,8 +26,10 @@ with open('./data/sensor_graph/graph_sensor_ids.txt') as f:
 distance_df = pd.read_csv('./data/sensor_graph/distances_la_2012.csv', dtype={'from': 'str', 'to': 'str'})
 
 _, sensor_id_to_ind, adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
-ng = nx.from_numpy_matrix(adj_mx)
-G = dgl.DGLGraph(ng)
+sp_mx = sp.coo_matrix(adj_mx)
+G = dgl.DGLGraph()
+G.from_scipy_sparse_matrix(sp_mx)
+
 
 df = pd.read_hdf('./data/metr-la.h5')
 num_samples, num_nodes = df.shape

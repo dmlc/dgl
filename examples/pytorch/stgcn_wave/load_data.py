@@ -3,9 +3,6 @@ import numpy as np
 import pandas as pd
 
 
-def load_matrix(file_path):
-    return pd.read_csv(file_path, header=None).values.astype(float)
-
 
 def load_data(file_path, len_train, len_val):
     df = pd.read_csv(file_path, header=None).values.astype(float)
