@@ -34,7 +34,7 @@ SharedMemory::~SharedMemory() {
   }
 }
 
-void *SharedMemory::create_new(size_t size) {
+void *SharedMemory::CreateNew(size_t size) {
   this->own = true;
 
   int flag = O_RDWR|O_CREAT;
@@ -49,7 +49,7 @@ void *SharedMemory::create_new(size_t size) {
   return ptr;
 }
 
-void *SharedMemory::open(size_t size) {
+void *SharedMemory::Open(size_t size) {
   int flag = O_RDWR;
   fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
@@ -59,7 +59,7 @@ void *SharedMemory::open(size_t size) {
   return ptr;
 }
 
-bool SharedMemory::exist(const std::string &name) {
+bool SharedMemory::Exist(const std::string &name) {
   int fd = shm_open(name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
   if (fd >= 0) {
     close(fd);
