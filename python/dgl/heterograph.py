@@ -201,6 +201,7 @@ class DGLHeteroGraph(object):
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
         """Init internal states."""
         self._graph = gidx
+        self._canonical_etypes = None
 
         # Handle node types
         if isinstance(ntypes, tuple):
@@ -215,6 +216,8 @@ class DGLHeteroGraph(object):
             self._srctypes_invmap = {t : i for i, t in enumerate(ntypes[0])}
             self._dsttypes_invmap = {t : i + len(ntypes[0]) for i, t in enumerate(ntypes[1])}
             self._is_unibipartite = True
+            if len(ntypes[0]) == 1 and len(ntypes[1]) == 1 and len(etypes) == 1:
+                self._canonical_etypes = [(ntypes[0][0], etypes[0], ntypes[1][0])]
         else:
             self._ntypes = ntypes
             src_dst_map = find_src_dst_ntypes(self._ntypes, self._graph.metagraph)
@@ -227,8 +230,9 @@ class DGLHeteroGraph(object):
 
         # Handle edge types
         self._etypes = etypes
-        self._canonical_etypes = make_canonical_etypes(
-            self._etypes, self._ntypes, self._graph.metagraph)
+        if self._canonical_etypes is None:
+            self._canonical_etypes = make_canonical_etypes(
+                self._etypes, self._ntypes, self._graph.metagraph)
 
         # An internal map from etype to canonical etype tuple.
         # If two etypes have the same name, an empty tuple is stored instead to indicate
@@ -4036,7 +4040,7 @@ class DGLHeteroGraph(object):
         """
         local_node_frames = [fr.clone() for fr in self._node_frames]
         local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        ret = copy.copy(self)  # shallow copy to avoid invoking __init__
+        ret = copy.copy(self)
         ret._node_frames = local_node_frames
         ret._edge_frames = local_edge_frames
         return ret
