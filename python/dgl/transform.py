@@ -726,8 +726,8 @@ def compact_graphs(graphs, always_preserve=None):
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
-        assert graph_dtype == g.idtype, "Graph data type mismatch"
-        assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
+        assert graph_dtype == g.idtype, "Expect graph data type to be {}, but got {}".format(graph_dtype, g.idtype)
+        assert graph_ctx == g._graph.ctx(), "Expect graph device to be {}, but got {}".format(graph_ctx, g._graph.ctx())
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:
