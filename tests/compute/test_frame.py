@@ -368,7 +368,8 @@ def _reconstruct_pickle(obj):
     f.close()
     return obj
 
-@pytest.mark.parametrize('dtype', [F.float32, F.int32, F.bool])
+@pytest.mark.parametrize('dtype',
+        [F.float32, F.int32] if dgl.backend.backend_name == "mxnet" else [F.float32, F.int32, F.bool])
 def test_pickle(dtype):
     f = create_test_data(dtype=dtype)
     newf = _reconstruct_pickle(f)
