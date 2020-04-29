@@ -221,6 +221,8 @@ class RDFGraphDataset:
         g.edata[dgl.ETYPE] = F.tensor(etid)
         print('Total #nodes:', g.number_of_nodes())
         print('Total #edges:', g.number_of_edges())
+        self.number_of_nodes = g.number_of_nodes()
+        print(self.number_of_nodes)
 
         # rename names such as 'type' so that they an be used as keys
         # to nn.ModuleDict

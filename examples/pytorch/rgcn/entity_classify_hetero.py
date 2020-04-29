@@ -14,10 +14,13 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.nn.pytorch import RelGraphConv
 from dataset import load_entity
 from functools import partial
+
+from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 
 from model import BaseRGCN
 
@@ -89,14 +92,25 @@ class EntityClassify(BaseRGCN):
 
 def main(args):
     # load graph data
-    data = load_entity(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
-    num_nodes = data.num_nodes
-    num_rels = data.num_rels
-    num_classes = data.num_classes
-    labels = data.labels
-    train_idx = data.train_idx
-    test_idx = data.test_idx
-    num_of_ntype = data.num_of_ntype
+    #data = load_entity(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
+    # load graph data
+    if args.dataset == 'aifb':
+        dataset = AIFB()
+    elif args.dataset == 'mutag':
+        dataset = MUTAG()
+    elif args.dataset == 'bgs':
+        dataset = BGS()
+    elif args.dataset == 'am':
+        dataset = AM()
+    else:
+        raise ValueError()
+
+    g = dataset.graph
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    train_idx = dataset.train_idx
+    test_idx = dataset.test_idx
+    labels = dataset.labels
 
     # split dataset into train, validate, test
     if args.validation:
@@ -105,14 +119,26 @@ def main(args):
     else:
         val_idx = train_idx
 
+    category_id = len(g.ntypes)
+    for i, ntype in enumerate(g.ntypes):
+        print(i)
+        print(ntype)
+        print(g.number_of_nodes(ntype))
+        if ntype == category:
+            category_id = i
+
+    num_rels = len(g.canonical_etypes)
+    num_classes = len(g.ntypes)
+    num_of_ntype = len(g.ntypes)
+    g = dgl.to_homo(g)
+
     # since the nodes are featureless, the input feature is then the node id.
-    node_ids = torch.arange(num_nodes)
+    node_ids = torch.arange(dataset.number_of_nodes)
 
     # edge type and normalization factor
-    edge_type = torch.from_numpy(data.edge_type).long()
-    edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1).long()
-    labels = torch.from_numpy(labels).view(-1).long()
-    node_tids = torch.from_numpy(data.node_tids).long()
+    edge_type = g.edata[dgl.ETYPE]
+    node_tids = g.ndata[dgl.NTYPE]
+    print(node_tids[node_tids.long() == (category_id -1)].shape)
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -120,14 +146,8 @@ def main(args):
         torch.cuda.set_device(args.gpu)
         node_ids = node_ids.cuda()
         edge_type = edge_type.cuda()
-        edge_norm = edge_norm.cuda()
         labels = labels.cuda()
         node_tids = node_tids.cuda()
-
-    # create graph
-    g = DGLGraph()
-    g.add_nodes(num_nodes)
-    g.add_edges(data.edge_src, data.edge_dst)
 
     embed_layer = RelGraphEmbed(g,
                                 node_tids,
@@ -136,7 +156,7 @@ def main(args):
                                 args.n_hidden)
 
     # create model
-    model = EntityClassify(len(g),
+    model = EntityClassify(dataset.number_of_nodes,
                            args.n_hidden,
                            num_classes,
                            num_rels,
@@ -162,7 +182,11 @@ def main(args):
         optimizer.zero_grad()
         t0 = time.time()
         feats = embed_layer(node_ids, node_tids, [None] * num_of_ntype)
-        logits = model(g, feats, edge_type, edge_norm)
+        logits = model(g, feats, edge_type, None)
+        loc = (node_tids == category_id)
+        logits = logits[loc]
+        print(labels.shape)
+        print(logits.shape)
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -181,7 +205,11 @@ def main(args):
     print()
 
     model.eval()
-    logits = model.forward(g, feats, edge_type, edge_norm)
+    feats = embed_layer(node_ids, node_tids, [None] * num_of_ntype)
+    logits = model.forward(g, feats, edge_type, None)
+    loc = (node_tids == category_id)
+    logits = logits[loc]
+    print(logits.shape)
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
