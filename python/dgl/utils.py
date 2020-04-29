@@ -9,6 +9,13 @@ from .base import DGLError
 from . import backend as F
 from . import ndarray as nd
 
+
+class InconsistentDtypeException(DGLError):
+    def __init__(self, msg='', *args, **kwargs):
+        prefix_message = 'DGL now requires the input tensor to have\
+            the same dtype as the graph index\'s dtype(which you can get by g.idype).'
+        super().__init__(prefix_message + msg)
+
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
     def __init__(self, data, dtype="int64"):
@@ -46,11 +53,11 @@ class Index(object):
         """Store data based on its type."""
         if F.is_tensor(data):
             if F.dtype(data) != F.data_type_dict[self.dtype]:
-                raise DGLError('Index data specified as %s, but got: %s' %
-                               (self.dtype, F.reverse_data_type_dict[F.dtype(data)]))
+                raise InconsistentDtypeException('Index data specified as %s, but got: %s' %
+                                                 (self.dtype, F.reverse_data_type_dict[F.dtype(data)]))
             if len(F.shape(data)) > 1:
-                raise DGLError('Index data must be 1D int32/int64 vector, but got: %s' %
-                               str(F.dtype(data)))
+                raise InconsistentDtypeException('Index data must be 1D int32/int64 vector, but got: %s' %
+                                                 str(F.dtype(data)))
             if len(F.shape(data)) == 0:
                 # a tensor of one int
                 self._dispatch(int(data))
@@ -58,8 +65,8 @@ class Index(object):
                 self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == self.dtype and len(data.shape) == 1):
-                raise DGLError('Index data must be 1D %s vector, but got: %s' %
-                               (self.dtype, data.dtype))
+                raise InconsistentDtypeException('Index data must be 1D %s vector, but got: %s' %
+                                                 (self.dtype, data.dtype))
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
             # save it in the _pydata temporarily; materialize it if `tonumpy` is called

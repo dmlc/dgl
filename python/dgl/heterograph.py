@@ -1298,7 +1298,8 @@ class DGLHeteroGraph(object):
         See Also
         --------
         predecessors
-        """
+        """        
+        check_same_dtype(self.idtype, v)
         return self._graph.successors(self.get_etype_id(etype), v).tousertensor()
 
     def edge_id(self, u, v, force_multi=None, return_array=False, etype=None):
@@ -1431,6 +1432,8 @@ class DGLHeteroGraph(object):
         --------
         edge_id
         """
+        check_same_dtype(self.idtype, u)
+        check_same_dtype(self.idtype, v)
         u = utils.toindex(u, self.idtype)
         v = utils.toindex(v, self.idtype)
         src, dst, eid = self._graph.edge_ids(self.get_etype_id(etype), u, v)
@@ -1477,6 +1480,7 @@ class DGLHeteroGraph(object):
         >>> g.find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 2]))
         """
+        check_same_dtype(self.idtype, eid)
         eid = utils.toindex(eid, self.idtype)
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src.tousertensor(), dst.tousertensor()
@@ -1522,7 +1526,8 @@ class DGLHeteroGraph(object):
         (tensor([0, 1]), tensor([0, 2]), tensor([0, 2]))
         >>> g.in_edges([0, 2], form='uv')
         (tensor([0, 1]), tensor([0, 2]))
-        """
+        """        
+        check_same_dtype(self.idtype, v)
         v = utils.toindex(v, self.idtype)
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
@@ -1573,7 +1578,8 @@ class DGLHeteroGraph(object):
         (tensor([0, 1, 1]), tensor([0, 1, 2]), tensor([0, 1, 2]))
         >>> g.out_edges([0, 1], form='uv')
         (tensor([0, 1, 1]), tensor([0, 1, 2]))
-        """
+        """        
+        check_same_dtype(self.idtype, u)
         u = utils.toindex(u, self.idtype)
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
@@ -1716,6 +1722,7 @@ class DGLHeteroGraph(object):
         --------
         in_degree
         """
+        check_same_dtype(self.idtype, v)
         etid = self.get_etype_id(etype)
         _, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
@@ -1801,6 +1808,7 @@ class DGLHeteroGraph(object):
         --------
         out_degree
         """
+        check_same_dtype(self.idtype, u)
         etid = self.get_etype_id(etype)
         stid, _ = self._graph.metagraph.find_edge(etid)
         if is_all(u):
@@ -1899,6 +1907,7 @@ class DGLHeteroGraph(object):
         --------
         edge_subgraph
         """
+        check_same_dtype(self.idtype, nodes)
         induced_nodes = [utils.toindex(nodes.get(ntype, []), self.idtype)
                          for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -1981,6 +1990,7 @@ class DGLHeteroGraph(object):
         --------
         subgraph
         """
+        check_idtype_dict(self.idtype, edges)
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
             utils.toindex(edges.get(canonical_etype, []), self.idtype)
@@ -2651,6 +2661,7 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
+        check_same_dtype(self.idtype, v)
         ntid = self.get_ntype_id(ntype)
         if is_all(v):
             v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntype)), self.idtype)
@@ -2698,6 +2709,7 @@ class DGLHeteroGraph(object):
         apply_nodes
         group_apply_edges
         """
+        check_same_dtype(self.idtype, edges)
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
@@ -2759,6 +2771,7 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
+        check_same_dtype(self.idtype, edges)
         if group_by not in ('src', 'dst'):
             raise DGLError("Group_by should be either src or dst")
 
@@ -2844,6 +2857,7 @@ class DGLHeteroGraph(object):
         >>> # Send the feature of source nodes along multiple edges specified by their end points
         >>> g.send(([0, 1], [1, 2]), fn.copy_src('h', 'm'))
         """
+        check_same_dtype(self.idtype, edges)
         assert message_func is not None
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
@@ -2943,6 +2957,7 @@ class DGLHeteroGraph(object):
                 [0.],
                 [1.]])
         """
+        check_same_dtype(self.idtype, v)
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
@@ -3016,6 +3031,7 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [2.]])
         """
+        check_same_dtype(self.idtype, v)
         # infer receive node type
         ntype = infer_ntype_from_dict(self, reducer_dict)
         ntid = self.get_ntype_id_from_dst(ntype)
@@ -3341,6 +3357,7 @@ class DGLHeteroGraph(object):
                 [1.],
                 [1.]])
         """
+        check_same_dtype(self.idtype, v)
         # only one type of edges
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
@@ -3414,6 +3431,7 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [3.]])
         """
+        check_same_dtype(self.idtype, v)
         v = utils.toindex(v, self.idtype)
         if len(v) == 0:
             return
@@ -3506,6 +3524,7 @@ class DGLHeteroGraph(object):
                 [0.],
                 [0.]])
         """
+        check_same_dtype(self.idtype, u)
         # only one type of edges
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
@@ -3881,6 +3900,7 @@ class DGLHeteroGraph(object):
         >>> g.filter_nodes(lambda nodes: (nodes.data['h'] == 1.).squeeze(1), ntype='user')
         tensor([1, 2])
         """
+        check_same_dtype(self.idtype, nodes)
         ntid = self.get_ntype_id(ntype)
         if is_all(nodes):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(ntid)), self.idtype)
@@ -3931,6 +3951,7 @@ class DGLHeteroGraph(object):
         >>> g.filter_edges(lambda edges: (edges.data['h'] == 1.).squeeze(1), etype='follows')
         tensor([1, 2])
         """
+        check_same_dtype(self.idtype, edges)
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
@@ -4125,6 +4146,70 @@ class DGLHeteroGraph(object):
     def is_homograph(self):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
+
+    def long(self):
+        """Return a heterograph object use int64 as index dtype, 
+        with the ndata and edata as the original object
+
+        Returns
+        -------
+        DGLHeteroGraph
+            The graph object 
+
+        Examples
+        --------
+
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game', index_dtype='int32')
+        >>> g_long = g.long() # Convert g to int64 indexed, not changing the original `g`
+
+        See Also
+        --------
+        int
+        """
+        local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
+        local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
+        for fr1, fr2 in zip(local_node_frames, self._node_frames):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        for fr1, fr2 in zip(local_edge_frames, self._edge_frames):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        return DGLHeteroGraph(self._graph.asbits(64), self.ntypes, self.etypes,
+                              local_node_frames,
+                              local_edge_frames)
+
+    def int(self):
+        """Return a heterograph object use int32 as index dtype, 
+        with the ndata and edata as the original object
+
+        Returns
+        -------
+        DGLHeteroGraph
+            The graph object 
+
+        Examples
+        --------
+
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game', index_dtype='int64')
+        >>> g_int = g.int() # Convert g to int32 indexed, not changing the original `g`
+
+        See Also
+        --------
+        long
+        """
+        local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
+        local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
+        for fr1, fr2 in zip(local_node_frames, self._node_frames):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        for fr1, fr2 in zip(local_edge_frames, self._edge_frames):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
+                              local_node_frames,
+                              local_edge_frames)
 
 ############################################################
 # Internal APIs
@@ -4449,3 +4534,15 @@ class AdaptedHeteroGraph(GraphAdapter):
     def canonical_etype(self):
         """Canonical edge type."""
         return self.graph.canonical_etypes[self.etid]
+
+
+def check_same_dtype(graph_dtype, tensor_dtype):
+    if F.is_tensor(tensor_dtype):
+        if graph_dtype != F.reverse_data_type_dict[F.dtype(tensor_dtype)]:
+            raise utils.InconsistentDtypeException(
+                "Expect the input tensor to be the same as the graph index dtype({}), but got {}"
+                .format(graph_dtype, tensor_dtype))
+
+def check_idtype_dict(graph_dtype, tensor_dict):
+    for k, v in tensor_dict.items():
+        check_same_dtype(graph_dtype, v)
