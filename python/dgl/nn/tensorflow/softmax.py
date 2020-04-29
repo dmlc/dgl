@@ -11,24 +11,24 @@ __all__ = ['edge_softmax']
 def edge_softmax_real(graph, score, eids=ALL):
     """Edge Softmax function"""
     if not is_all(eids):
-        g = graph.edge_subgraph(tf.cast(eids, tf.int64))
-    with g.local_scope():
-        g.edata['s'] = score
-        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
-        g.edata['out'] = tf.math.exp(g.edata['out'])
-        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = g.edata['out']
+        graph = graph.edge_subgraph(tf.cast(eids, tf.int64))
+    with graph.local_scope():
+        graph.edata['s'] = score
+        graph.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        graph.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+        graph.edata['out'] = tf.math.exp(graph.edata['out'])
+        graph.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        graph.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+        out = graph.edata['out']
 
     def edge_softmax_backward(grad_out):
-        with g.local_scope():
+        with graph.local_scope():
             # clear backward cache explicitly
-            g.edata['out'] = out
-            g.edata['grad_s'] = out * grad_out
-            g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
-            g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
-            grad_score = g.edata['grad_s'] - g.edata['out']
+            graph.edata['out'] = out
+            graph.edata['grad_s'] = out * grad_out
+            graph.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
+            graph.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+            grad_score = graph.edata['grad_s'] - graph.edata['out']
             return grad_score
 
     return out, edge_softmax_backward

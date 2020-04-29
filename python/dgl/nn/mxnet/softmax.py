@@ -45,6 +45,7 @@ class EdgeSoftmax(mx.autograd.Function):
             out = score / score_sum    # edge_div_dst, ret dgl.EData
             return out.data
         """
+        g = self.g
         with g.local_scope():
             g.edata['s'] = score
             g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
@@ -70,6 +71,7 @@ class EdgeSoftmax(mx.autograd.Function):
             sds_sum = sds.dst_sum()  # type dgl.NData
             grad_score = sds - sds * sds_sum  # multiple expressions
         """
+        g = self.g
         with g.local_scope():
             out, = self.saved_tensors
             # clear saved tensors explicitly
