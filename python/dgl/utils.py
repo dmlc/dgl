@@ -12,7 +12,7 @@ from . import ndarray as nd
 
 class InconsistentDtypeException(DGLError):
     """Exception class for inconsistent dtype between graph and tensor"""
-    def __init__(self, msg='', *args, **kwargs): #pylint-disable=W1113
+    def __init__(self, msg='', *args, **kwargs): #pylint: disable=W1113
         prefix_message = 'DGL now requires the input tensor to have\
             the same dtype as the graph index\'s dtype(which you can get by g.idype).'
         super().__init__(prefix_message + msg, *args, **kwargs)
