@@ -3,10 +3,12 @@
  * \file graph/heterograph_capi.cc
  * \brief Heterograph CAPI bindings.
  */
-#include "./heterograph.h"
+#include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+
 #include "../c_api_common.h"
+#include "./heterograph.h"
 
 using namespace dgl::runtime;
 
@@ -429,6 +431,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef meta_graph = args[0];
     List<HeteroGraphRef> component_graphs = args[1];
+    CHECK(component_graphs.size() > 0)
+      << "Expect graph list has at least one graph";
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
@@ -438,15 +442,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
         << "Expect graphs to batch have the same index dtype(int" << bits
         << "), but got int" << component->NumBits();
     }
-    if (bits == 32) {
+    ATEN_ID_BITS_SWITCH(bits, IdType, {      
       auto hgptr =
-          DisjointUnionHeteroGraph<int32_t>(meta_graph.sptr(), component_ptrs);
+          DisjointUnionHeteroGraph<IdType>(meta_graph.sptr(), component_ptrs);
       *rv = HeteroGraphRef(hgptr);
-    } else if (bits == 64) {
-      auto hgptr =
-          DisjointUnionHeteroGraph<int64_t>(meta_graph.sptr(), component_ptrs);
-      *rv = HeteroGraphRef(hgptr);
-    }
+    });
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
@@ -456,13 +456,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     const IdArray edge_sizes = args[2];
     const int64_t bits = hg->NumBits();
     std::vector<HeteroGraphPtr> ret;
-    if (bits == 32) {
-      ret = DisjointPartitionHeteroBySizes<int32_t>(hg->meta_graph(), hg.sptr(),
-                                                    vertex_sizes, edge_sizes);
-    } else if (bits == 64) {
-      ret = DisjointPartitionHeteroBySizes<int64_t>(hg->meta_graph(), hg.sptr(),
-                                                    vertex_sizes, edge_sizes);
-    }
+    ATEN_ID_BITS_SWITCH(bits, IdType, {
+      ret = DisjointPartitionHeteroBySizes<IdType>(hg->meta_graph(), hg.sptr(),
+                                                   vertex_sizes, edge_sizes);
+    });
     List<HeteroGraphRef> ret_list;
     for (HeteroGraphPtr hgptr : ret) {
       ret_list.push_back(HeteroGraphRef(hgptr));

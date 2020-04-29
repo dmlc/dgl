@@ -3,6 +3,7 @@
  * \file scheduler/scheduler_apis.cc
  * \brief DGL scheduler APIs
  */
+#include <dgl/array.h>
 #include <dgl/graph.h>
 #include <dgl/scheduler.h>
 #include "../c_api_common.h"
@@ -21,13 +22,10 @@ DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
     const IdArray nids = args[2];
     CHECK_SAME_DTYPE(msg_ids, vids);
     CHECK_SAME_DTYPE(msg_ids, nids);
-    if (msg_ids->dtype.bits == 32) {
+    ATEN_ID_TYPE_SWITCH(msg_ids->dtype, IdType, {
       *rv = ConvertNDArrayVectorToPackedFunc(
-          sched::DegreeBucketing<int32_t>(msg_ids, vids, nids));
-    } else if (msg_ids->dtype.bits == 64) {
-      *rv = ConvertNDArrayVectorToPackedFunc(
-          sched::DegreeBucketing<int64_t>(msg_ids, vids, nids));
-    }
+        sched::DegreeBucketing<IdType>(msg_ids, vids, nids));
+    });
   });
 
 DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")
@@ -37,13 +35,10 @@ DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")
     const IdArray eids = args[2];
     CHECK_SAME_DTYPE(uids, vids);
     CHECK_SAME_DTYPE(uids, eids);
-    if (uids->dtype.bits == 32) {
+    ATEN_ID_TYPE_SWITCH(uids->dtype, IdType, {
       *rv = ConvertNDArrayVectorToPackedFunc(
-          sched::GroupEdgeByNodeDegree<int32_t>(uids, vids, eids));
-    } else if (uids->dtype.bits == 64) {
-      *rv = ConvertNDArrayVectorToPackedFunc(
-          sched::GroupEdgeByNodeDegree<int64_t>(uids, vids, eids));
-    }
+        sched::GroupEdgeByNodeDegree<IdType>(uids, vids, eids));
+    });
   });
 
 }  // namespace dgl

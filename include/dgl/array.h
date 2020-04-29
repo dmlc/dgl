@@ -893,6 +893,29 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 } while (0)
 
 /*
+ * Dispatch according to bits (either int32 or int64):
+ *
+ * ATEN_ID_BITS_SWITCH(bits, IdType, {
+ *   // Now IdType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_ID_BITS_SWITCH(bits, IdType, ...)                  \
+  do {                                                          \
+    CHECK(bits == 32 || bits == 64) << "bits must be 32 or 64"; \
+    if (bits == 32) {                                           \
+      typedef int32_t IdType;                                   \
+      { __VA_ARGS__ }                                           \
+    } else if (bits == 64) {                                    \
+      typedef int64_t IdType;                                   \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "ID can only be int32 or int64";            \
+    }                                                           \
+  } while (0)
+
+/*
  * Dispatch according to float type (either float32 or float64):
  *
  * ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, {
