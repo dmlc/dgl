@@ -442,9 +442,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
         << "Expect graphs to batch have the same index dtype(int" << bits
         << "), but got int" << component->NumBits();
     }
-    ATEN_ID_BITS_SWITCH(bits, IdType, {      
+    ATEN_ID_BITS_SWITCH(bits, IdType, {
       auto hgptr =
-          DisjointUnionHeteroGraph<IdType>(meta_graph.sptr(), component_ptrs);
+        DisjointUnionHeteroGraph<IdType>(meta_graph.sptr(), component_ptrs);
       *rv = HeteroGraphRef(hgptr);
     });
 });
