@@ -1,5 +1,6 @@
 """For Tensor Serialization"""
 from __future__ import absolute_import
+from ..ndarray import NDArray
 from .._ffi.function import _init_api
 from .. import backend as F
 
@@ -20,12 +21,14 @@ def save_tensors(filename, tensor_dict):
         Python dict using string as key and tensor as value
     """
     nd_dict = {}
+    if len(tensor_dict) == 0:
+        raise Exception("Cannot save empty dict")
     for key, value in tensor_dict.items():
         if not isinstance(key, str):
             raise Exception("Dict key has to be str")
         if F.is_tensor(value):
             nd_dict[key] = F.zerocopy_to_dgl_ndarray(value)
-        elif isinstance(value, nd.NDArray):
+        elif isinstance(value, NDArray):
             nd_dict[key] = value
         else:
             raise Exception(
