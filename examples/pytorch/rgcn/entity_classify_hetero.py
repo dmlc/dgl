@@ -16,13 +16,205 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 from dgl import DGLGraph
-from dgl.nn.pytorch import RelGraphConv
 from dataset import load_entity
 from functools import partial
 
 from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 
 from model import BaseRGCN
+
+from dgl import function as fn
+
+class RelGraphConv(nn.Module):
+    r"""Relational graph convolution layer.
+
+    Relational graph convolution is introduced in "`Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
+    and can be described as below:
+
+    .. math::
+
+       h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
+       \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
+
+    where :math:`\mathcal{N}^r(i)` is the neighbor set of node :math:`i` w.r.t. relation
+    :math:`r`. :math:`c_{i,r}` is the normalizer equal
+    to :math:`|\mathcal{N}^r(i)|`. :math:`\sigma` is an activation function. :math:`W_0`
+    is the self-loop weight.
+
+    The basis regularization decomposes :math:`W_r` by:
+
+    .. math::
+
+       W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
+
+    where :math:`B` is the number of bases.
+
+    The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
+    number of block diagonal matrices. We refer :math:`B` as the number of bases.
+
+    Parameters
+    ----------
+    in_feat : int
+        Input feature size.
+    out_feat : int
+        Output feature size.
+    num_rels : int
+        Number of relations.
+    regularizer : str
+        Which weight regularizer to use "basis" or "bdd"
+    num_bases : int, optional
+        Number of bases. If is none, use number of relations. Default: None.
+    bias : bool, optional
+        True if bias is added. Default: True
+    activation : callable, optional
+        Activation function. Default: None
+    self_loop : bool, optional
+        True to include self loop message. Default: False
+    dropout : float, optional
+        Dropout rate. Default: 0.0
+    """
+    def __init__(self,
+                 in_feat,
+                 out_feat,
+                 num_rels,
+                 regularizer="basis",
+                 num_bases=None,
+                 bias=True,
+                 activation=None,
+                 self_loop=False,
+                 dropout=0.0):
+        super(RelGraphConv, self).__init__()
+        self.in_feat = in_feat
+        self.out_feat = out_feat
+        self.num_rels = num_rels
+        self.regularizer = regularizer
+        self.num_bases = num_bases
+        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases <= 0:
+            self.num_bases = self.num_rels
+        self.bias = bias
+        self.activation = activation
+        self.self_loop = self_loop
+
+        if regularizer == "basis":
+            # add basis weights
+            self.weight = nn.Parameter(torch.Tensor(self.num_bases, self.in_feat, self.out_feat))
+            if self.num_bases < self.num_rels:
+                # linear combination coefficients
+                self.w_comp = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases))
+            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+            if self.num_bases < self.num_rels:
+                nn.init.xavier_uniform_(self.w_comp,
+                                        gain=nn.init.calculate_gain('relu'))
+            # message func
+            self.message_func = self.basis_message_func
+        elif regularizer == "bdd":
+            if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
+                raise ValueError(
+                    'Feature size must be a multiplier of num_bases (%d).'
+                    % self.num_bases
+                )
+            # add block diagonal weights
+            self.submat_in = in_feat // self.num_bases
+            self.submat_out = out_feat // self.num_bases
+
+            # assuming in_feat and out_feat are both divisible by num_bases
+            self.weight = nn.Parameter(torch.Tensor(
+                self.num_rels, self.num_bases * self.submat_in * self.submat_out))
+            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+            # message func
+            self.message_func = self.bdd_message_func
+        else:
+            raise ValueError("Regularizer must be either 'basis' or 'bdd'")
+
+        # bias
+        if self.bias:
+            self.h_bias = nn.Parameter(torch.Tensor(out_feat))
+            nn.init.zeros_(self.h_bias)
+
+        # weight for self loop
+        if self.self_loop:
+            self.loop_weight = nn.Parameter(torch.Tensor(in_feat, out_feat))
+            nn.init.xavier_uniform_(self.loop_weight,
+                                    gain=nn.init.calculate_gain('relu'))
+
+        self.dropout = nn.Dropout(dropout)
+
+    def basis_message_func(self, edges):
+        """Message function for basis regularizer"""
+        if self.num_bases < self.num_rels:
+            # generate all weights from bases
+            weight = self.weight.view(self.num_bases,
+                                      self.in_feat * self.out_feat)
+            weight = torch.matmul(self.w_comp, weight).view(
+                self.num_rels, self.in_feat, self.out_feat)
+        else:
+            weight = self.weight
+
+        w = weight.index_select(0, edges.data['type'])
+        msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
+        return {'msg': msg}
+
+    def bdd_message_func(self, edges):
+        """Message function for block-diagonal-decomposition regularizer"""
+        if edges.src['h'].dtype == torch.int64 and len(edges.src['h'].shape) == 1:
+            raise TypeError('Block decomposition does not allow integer ID feature.')
+        weight = self.weight.index_select(0, edges.data['type']).view(
+            -1, self.submat_in, self.submat_out)
+        node = edges.src['h'].view(-1, 1, self.submat_in)
+        msg = torch.bmm(node, weight).view(-1, self.out_feat)
+        return {'msg': msg}
+
+    def forward(self, g, x, etypes, norm=None):
+        """ Forward computation
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph.
+        x : torch.Tensor
+            Input node features. Could be either
+                * :math:`(|V|, D)` dense tensor
+                * :math:`(|V|,)` int64 vector, representing the categorical values of each
+                  node. We then treat the input feature as an one-hot encoding feature.
+        etypes : torch.Tensor
+            Edge type tensor. Shape: :math:`(|E|,)`
+        norm : torch.Tensor
+            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
+
+        Returns
+        -------
+        torch.Tensor
+            New node features.
+        """
+        assert g.is_homograph(), \
+            "not a homograph; convert it with to_homo and pass in the edge type as argument"
+        with g.local_scope():
+            g.ndata['h'] = x
+            g.edata['type'] = etypes
+            
+            if self.self_loop:
+                loop_message = utils.matmul_maybe_select(x, self.loop_weight)
+            # message passing
+            g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
+            # apply bias and activation
+            if norm:
+                node_repr = g.ndata['h']
+                degs = g.in_degrees().to(node_repr.device).float().clamp(min=1)
+                norm = 1.0 / degs
+                shp = norm.shape + (1,) * (node_repr.dim() - 1)
+                norm = torch.reshape(norm, shp)
+                node_repr = node_repr * norm
+            else:
+                node_repr = g.ndata['h']
+            if self.bias:
+                node_repr = node_repr + self.h_bias
+            if self.self_loop:
+                node_repr = node_repr + loop_message
+            if self.activation:
+                node_repr = self.activation(node_repr)
+            node_repr = self.dropout(node_repr)
+            return node_repr
 
 class RelGraphEmbed(nn.Module):
     r"""Embedding layer for featureless heterograph."""
@@ -105,7 +297,7 @@ def main(args):
     else:
         raise ValueError()
 
-    g = dataset.graph
+    hg = dataset.graph
     category = dataset.predict_category
     num_classes = dataset.num_classes
     train_idx = dataset.train_idx
@@ -119,18 +311,15 @@ def main(args):
     else:
         val_idx = train_idx
 
-    category_id = len(g.ntypes)
-    for i, ntype in enumerate(g.ntypes):
-        print(i)
-        print(ntype)
-        print(g.number_of_nodes(ntype))
-        if ntype == category:
-            category_id = i
+    num_rels = len(hg.canonical_etypes)
+    num_classes = len(hg.ntypes)
+    num_of_ntype = len(hg.ntypes)
+    g = dgl.to_homo(hg)
 
-    num_rels = len(g.canonical_etypes)
-    num_classes = len(g.ntypes)
-    num_of_ntype = len(g.ntypes)
-    g = dgl.to_homo(g)
+    category_id = len(hg.ntypes)
+    for i, ntype in enumerate(hg.ntypes):
+        if ntype == category:
+            category_id = hg.nodes[ntype].data[dgl.NTYPE][0]
 
     # since the nodes are featureless, the input feature is then the node id.
     node_ids = torch.arange(dataset.number_of_nodes)
@@ -138,7 +327,6 @@ def main(args):
     # edge type and normalization factor
     edge_type = g.edata[dgl.ETYPE]
     node_tids = g.ndata[dgl.NTYPE]
-    print(node_tids[node_tids.long() == (category_id -1)].shape)
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -182,11 +370,9 @@ def main(args):
         optimizer.zero_grad()
         t0 = time.time()
         feats = embed_layer(node_ids, node_tids, [None] * num_of_ntype)
-        logits = model(g, feats, edge_type, None)
+        logits = model(g, feats, edge_type, False)
         loc = (node_tids == category_id)
         logits = logits[loc]
-        print(labels.shape)
-        print(logits.shape)
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -206,10 +392,9 @@ def main(args):
 
     model.eval()
     feats = embed_layer(node_ids, node_tids, [None] * num_of_ntype)
-    logits = model.forward(g, feats, edge_type, None)
+    logits = model.forward(g, feats, edge_type, False)
     loc = (node_tids == category_id)
     logits = logits[loc]
-    print(logits.shape)
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
