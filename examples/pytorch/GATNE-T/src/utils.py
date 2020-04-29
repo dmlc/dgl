@@ -78,6 +78,7 @@ def load_training_data(f_name):
     print('Total training nodes: ' + str(len(all_nodes)))
     return edge_data_by_type
 
+
 # for each line, the data is [edge_type, node, node, true_or_false]
 def load_testing_data(f_name):
     print('We are loading data from:', f_name)
@@ -101,6 +102,7 @@ def load_testing_data(f_name):
             all_nodes.append(y)
     all_nodes = list(set(all_nodes))
     return true_edge_data_by_type, false_edge_data_by_type
+
 
 def load_node_type(f_name):
     print('We are loading node type from:', f_name)

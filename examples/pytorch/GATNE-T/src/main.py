@@ -17,7 +17,16 @@ import dgl.function as fn
 from utils import *
 
 
-# Build graph, treat all nodes as the same type
+''' Build graph, treat all nodes as the same type
+Input
+-----
+network_data: a dict with keys describing the edge types, values representing edges
+vocab: a dict mapping node IDs to node indices
+
+Output
+------
+graph: a heterogenous graph, with one node type and different edge types
+'''
 def get_graph(network_data, vocab):
     graphs = []
     num_nodes = len(vocab)
@@ -63,7 +72,6 @@ class DGLGATNE(nn.Module):
         self.dim_a = dim_a
 
         self.node_embeddings = Parameter(torch.FloatTensor(num_nodes, embedding_size))
-        # edge embedding, 511 * 2 * 10
         self.node_type_embeddings = Parameter(torch.FloatTensor(num_nodes, edge_type_count, embedding_u_size))
         self.trans_weights = Parameter(torch.FloatTensor(edge_type_count, embedding_u_size, embedding_size))
         self.trans_weights_s1 = Parameter(torch.FloatTensor(edge_type_count, embedding_u_size, dim_a))
