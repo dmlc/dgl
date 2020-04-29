@@ -733,7 +733,7 @@ def to_homo(G):
         num_nodes = G.number_of_nodes(ntype)
         total_num_nodes += num_nodes
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
-        nids.append(F.arange(0, num_nodes))
+        nids.append(F.arange(0, num_nodes, G.idtype))
 
     for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
@@ -742,7 +742,7 @@ def to_homo(G):
         srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
         dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
-        eids.append(F.arange(0, num_edges))
+        eids.append(F.arange(0, num_edges, G.idtype))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
                  validate=False, index_dtype=G.idtype)

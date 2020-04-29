@@ -2961,7 +2961,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
-            v = F.arange(0, self.number_of_nodes(dtid))
+            v = F.arange(0, self.number_of_nodes(dtid), self.idtype)
         elif isinstance(v, int):
             v = [v]
         v = utils.toindex(v, dtype=self.idtype)
@@ -3036,7 +3036,7 @@ class DGLHeteroGraph(object):
         ntype = infer_ntype_from_dict(self, reducer_dict)
         ntid = self.get_ntype_id_from_dst(ntype)
         if is_all(v):
-            v = F.arange(0, self.number_of_nodes(ntid))
+            v = F.arange(0, self.number_of_nodes(ntid), self.idtype)
         elif isinstance(v, int):
             v = [v]
         v = utils.toindex(v, self.idtype)
