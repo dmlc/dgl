@@ -28,6 +28,7 @@ def data_type_dict():
     int16
     int32
     int64
+    bool
 
     This function will be called only *once* during the initialization fo the
     backend module. The returned dictionary will become the attributes of the

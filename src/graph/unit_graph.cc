@@ -829,7 +829,7 @@ IdArray UnitGraph::Successors(dgl_type_t etype, dgl_id_t src) const {
 }
 
 IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  const SparseFormat fmt = SelectFormat(SparseFormat::kAny);
+  const SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->EdgeId(etype, dst, src);
@@ -838,7 +838,7 @@ IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
 }
 
 EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
-  const SparseFormat fmt = SelectFormat(SparseFormat::kAny);
+  const SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
     EdgeArray edges = ptr->EdgeIds(etype, dst, src);

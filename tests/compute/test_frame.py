@@ -4,6 +4,9 @@ from dgl.utils import Index, toindex
 import backend as F
 import dgl
 import unittest
+import pickle
+import pytest
+import io
 
 N = 10
 D = 5
@@ -15,10 +18,10 @@ def check_fail(fn):
     except:
         return True
 
-def create_test_data(grad=False):
-    c1 = F.randn((N, D))
-    c2 = F.randn((N, D))
-    c3 = F.randn((N, D))
+def create_test_data(grad=False, dtype=F.float32):
+    c1 = F.astype(F.randn((N, D)), dtype)
+    c2 = F.astype(F.randn((N, D)), dtype)
+    c3 = F.astype(F.randn((N, D)), dtype)
     if grad:
         c1 = F.attach_grad(c1)
         c2 = F.attach_grad(c2)
@@ -356,6 +359,23 @@ def test_inplace():
     f.update_data(toindex([1, 3, 5]), {'a2' : F.ones((3, D))}, True)
     newa2addr = id(f['a2'])
     assert a2addr == newa2addr
+
+def _reconstruct_pickle(obj):
+    f = io.BytesIO()
+    pickle.dump(obj, f)
+    f.seek(0)
+    obj = pickle.load(f)
+    f.close()
+    return obj
+
+@pytest.mark.parametrize('dtype',
+        [F.float32, F.int32] if dgl.backend.backend_name == "mxnet" else [F.float32, F.int32, F.bool])
+def test_pickle(dtype):
+    f = create_test_data(dtype=dtype)
+    newf = _reconstruct_pickle(f)
+    assert F.array_equal(f['a1'], newf['a1'])
+    assert F.array_equal(f['a2'], newf['a2'])
+    assert F.array_equal(f['a3'], newf['a3'])
 
 if __name__ == '__main__':
     test_create()
