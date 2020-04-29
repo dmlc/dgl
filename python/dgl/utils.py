@@ -162,8 +162,7 @@ class Index(object):
             tensor = self.tousertensor()
             index = index.tousertensor()
             # TODO(Allen): Change F.gather_row to dgl operation
-            return Index(F.astype(F.gather_row(tensor, index),
-                                  F.data_type_dict[self.dtype]), self.dtype)
+            return Index(F.gather_row(tensor, index), self.dtype)
         elif self._slice_data is None:
             # the current index is not a slice but the provided is a slice
             tensor = self.tousertensor()
