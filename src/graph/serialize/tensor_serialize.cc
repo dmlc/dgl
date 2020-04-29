@@ -28,8 +28,8 @@ DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_SaveNDArrayDict")
       NDArray ndarray = static_cast<NDArray>(kv.second->data);
       namedTensors.emplace_back(kv.first, ndarray);
     }
-    auto *fs = dynamic_cast<SeekStream *>(
-      SeekStream::Create(filename.c_str(), "w", true));
+    auto *fs = dmlc::Stream::Create(filename.c_str(), "w");
+    CHECK(fs) << "Filename is invalid";
     fs->Write(namedTensors);
     delete fs;
     *rv = true;
@@ -40,7 +40,7 @@ DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_LoadNDArrayDict")
     std::string filename = args[0];
     Map<std::string, Value> nd_dict;
     std::vector<NamedTensor> namedTensors;
-    SeekStream *fs = SeekStream::CreateForRead(filename.c_str(), true);
+    auto *fs = dmlc::Stream::Create(filename.c_str(), "r");
     CHECK(fs) << "Filename is invalid or file doesn't exists";
     fs->Read(&namedTensors);
     for (auto kv : namedTensors) {

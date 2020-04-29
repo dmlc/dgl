@@ -21,8 +21,8 @@ def save_tensors(filename, tensor_dict):
         Python dict using string as key and tensor as value
     """
     nd_dict = {}
-    if len(tensor_dict) == 0:
-        raise Exception("Cannot save empty dict")
+    # if len(tensor_dict) == 0:
+    #     raise Exception("Cannot save empty dict")
     for key, value in tensor_dict.items():
         if not isinstance(key, str):
             raise Exception("Dict key has to be str")
