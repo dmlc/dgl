@@ -28,20 +28,18 @@ DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_SaveNDArrayDict")
     CHECK(fs) << "Filename is invalid";
     fs->Write(kDGLSerialize_Tensors);
     bool empty_dict = args[2];
-    if (empty_dict) {
-      fs->Write(0ULL);
-      *rv = true;
-    } else {
-      Map<std::string, Value> nd_dict = args[1];
-      std::vector<NamedTensor> namedTensors;
-      fs->Write(static_cast<uint64_t>(nd_dict.size()));
-      for (auto kv : nd_dict) {
-        NDArray ndarray = static_cast<NDArray>(kv.second->data);
-        namedTensors.emplace_back(kv.first, ndarray);
-      }
-      fs->Write(namedTensors);
-      *rv = true;
+    Map<std::string, Value> nd_dict;
+    if (!empty_dict) {
+      nd_dict = args[1];
     }
+    std::vector<NamedTensor> namedTensors;
+    fs->Write(static_cast<uint64_t>(nd_dict.size()));
+    for (auto kv : nd_dict) {
+      NDArray ndarray = static_cast<NDArray>(kv.second->data);
+      namedTensors.emplace_back(kv.first, ndarray);
+    }
+    fs->Write(namedTensors);
+    *rv = true;
     delete fs;
   });
 
@@ -54,18 +52,14 @@ DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_LoadNDArrayDict")
     CHECK(fs->Read(&magincNum)) << "Invalid file";
     CHECK_EQ(magincNum, kDGLSerialize_Tensors) << "Invalid DGL tensor file";
     CHECK(fs->Read(&num_elements)) << "Invalid num of elements";
-    if (num_elements == 0) {
-      *rv = -1;
-    } else {
-      Map<std::string, Value> nd_dict;
-      std::vector<NamedTensor> namedTensors;
-      fs->Read(&namedTensors);
-      for (auto kv : namedTensors) {
-        Value ndarray = Value(MakeValue(kv.second));
-        nd_dict.Set(kv.first, ndarray);
-      }
-      *rv = nd_dict;
+    Map<std::string, Value> nd_dict;
+    std::vector<NamedTensor> namedTensors;
+    fs->Read(&namedTensors);
+    for (auto kv : namedTensors) {
+      Value ndarray = Value(MakeValue(kv.second));
+      nd_dict.Set(kv.first, ndarray);
     }
+    *rv = nd_dict;
     delete fs;
   });
 

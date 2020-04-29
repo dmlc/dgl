@@ -21,9 +21,7 @@ def save_tensors(filename, tensor_dict):
         Python dict using string as key and tensor as value
     """
     nd_dict = {}
-    is_empty_dict = len(tensor_dict) == 0;
-    # if len(tensor_dict) == 0:
-    #     raise Exception("Cannot save empty dict")
+    is_empty_dict = len(tensor_dict) == 0
     for key, value in tensor_dict.items():
         if not isinstance(key, str):
             raise Exception("Dict key has to be str")
@@ -50,9 +48,6 @@ def load_tensors(filename, return_dgl_ndarray=False):
         Whether return dict of dgl NDArrays or backend tensors
     """
     nd_dict = _CAPI_LoadNDArrayDict(filename)
-    # -1 indicates this file contains empty dict
-    if nd_dict == -1:
-        return {}
     tensor_dict = {}
     for key, value in nd_dict.items():
         if return_dgl_ndarray:
