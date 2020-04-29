@@ -4181,13 +4181,13 @@ class DGLHeteroGraph(object):
                               local_edge_frames)
 
     def int(self):
-        """Return a heterograph object use int32 as index dtype, 
+        """Return a heterograph object use int32 as index dtype,
         with the ndata and edata as the original object
 
         Returns
         -------
         DGLHeteroGraph
-            The graph object 
+            The graph object
 
         Examples
         --------
@@ -4549,5 +4549,5 @@ def check_same_dtype(graph_dtype, tensor):
 
 def check_idtype_dict(graph_dtype, tensor_dict):
     """check whether the dtypes of tensors in dict are consistent with graph's dtype"""
-    for k, v in tensor_dict.items():
+    for _, v in tensor_dict.items():
         check_same_dtype(graph_dtype, v)
