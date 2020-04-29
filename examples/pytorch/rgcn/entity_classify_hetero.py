@@ -312,7 +312,6 @@ def main(args):
         val_idx = train_idx
 
     num_rels = len(hg.canonical_etypes)
-    num_classes = len(hg.ntypes)
     num_of_ntype = len(hg.ntypes)
     g = dgl.to_homo(hg)
 
@@ -327,6 +326,8 @@ def main(args):
     # edge type and normalization factor
     edge_type = g.edata[dgl.ETYPE]
     node_tids = g.ndata[dgl.NTYPE]
+
+    #
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
