@@ -150,17 +150,6 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroContext(self)
 
-    @utils.cached_member(cache='_cache', prefix='nbits')
-    def nbits(self):
-        """Return the number of integer bits used in the storage (32 or 64).
-
-        Returns
-        -------
-        int
-            The number of bits.
-        """
-        return _CAPI_DGLHeteroNumBits(self)
-
     def bits_needed(self, etype):
         """Return the number of integer bits needed to represent the unitgraph graph.
 
