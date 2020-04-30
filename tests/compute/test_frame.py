@@ -372,10 +372,10 @@ def test_clone():
     assert 'c' not in f
 
     f1['a1'][0, 0] = -10.
-    assert f['a1'][0, 0] == -10.
-    x = f['a2'][0, 0]
+    assert F.asnumpy(f['a1'][0, 0])[0] == -10.
+    x = F.asnumpy(f['a2'][0, 0])[0]
     f2['a2'][0, 0] = -10.
-    assert f['a2'][0, 0] == x
+    assert F.asnumpy(f['a2'][0, 0])[0] == x
 
 def _reconstruct_pickle(obj):
     f = io.BytesIO()
