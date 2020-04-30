@@ -50,7 +50,8 @@ def data_type_dict():
             'int8': tf.int8,
             'int16': tf.int16,
             'int32': tf.int32,
-            'int64': tf.int64}
+            'int64': tf.int64,
+            'bool' : tf.bool}
 
 def cpu():
     return "/cpu:0"
