@@ -188,6 +188,34 @@ class MovieLens(object):
         valid_rating_pairs, valid_rating_values = self._generate_pair_value(self.valid_rating_info)
         test_rating_pairs, test_rating_values = self._generate_pair_value(self.test_rating_info)
 
+
+        # Create adjacent matrix
+        print (self.all_train_rating_info[:10])
+        print (self._num_user, self._num_movie)
+        rating_mx_train = np.zeros(self._num_user, self._num_movie)
+        if post_rating_map is None:
+            rating_mx_train[train_idx] = labels[train_idx].astype(np.float32) + 1.
+        else:
+            rating_mx_train[train_idx] = np.array([post_rating_map[r] for r in class_values[labels[train_idx]]]) + 1.
+        self.rating_mx_train = sp.csr_matrix(rating_mx_train.reshape(num_users, num_items))
+        # Create subgraphs
+        self.train_graphs, self.val_graphs, self.test_graphs = links2subgraphs(
+                adj_train,
+                train_indices,
+                val_indices,
+                test_indices,
+                train_labels,
+                val_labels,
+                test_labels,
+                args.hop,
+                args.sample_ratio,
+                args.max_nodes_per_hop,
+                u_features,
+                v_features,
+                args.hop*2+1,
+                class_values,
+                args.testing)
+
         def _make_labels(ratings):
             labels = th.LongTensor(np.searchsorted(self.possible_rating_values, ratings)).to(device)
             return labels
@@ -535,5 +563,156 @@ class MovieLens(object):
                                         axis=1)
         return movie_features
 
+
+def links2subgraphs(
+        A,
+        train_indices, 
+        val_indices, 
+        test_indices, 
+        train_labels, 
+        val_labels, 
+        test_labels, 
+        h=1, 
+        sample_ratio=1.0, 
+        max_nodes_per_hop=None, 
+        u_features=None, 
+        v_features=None, 
+        max_node_label=None, 
+        class_values=None, 
+        testing=False, 
+        parallel=True):
+    # extract enclosing subgraphs
+    if max_node_label is None:  # if not provided, infer from graphs
+        max_n_label = {'max_node_label': 0}
+
+    def helper(A, links, g_labels):
+        g_list = []
+        if not parallel or max_node_label is None:
+            with tqdm(total=len(links[0])) as pbar:
+                for i, j, g_label in zip(links[0], links[1], g_labels):
+                    g, n_labels, n_features = subgraph_extraction_labeling((i, j), A, h, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values)
+                    if max_node_label is None:
+                        max_n_label['max_node_label'] = max(max(n_labels), max_n_label['max_node_label'])
+                        g_list.append((g, g_label, n_labels, n_features))
+                    else:
+                        g_list.append(nx_to_PyGGraph(g, g_label, n_labels, n_features, max_node_label, class_values))
+                    pbar.update(1)
+        else:
+            start = time.time()
+            pool = mp.Pool(mp.cpu_count())
+            results = pool.starmap_async(parallel_worker, [(g_label, (i, j), A, h, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values) for i, j, g_label in zip(links[0], links[1], g_labels)])
+            remaining = results._number_left
+            pbar = tqdm(total=remaining)
+            while True:
+                pbar.update(remaining - results._number_left)
+                if results.ready(): break
+                remaining = results._number_left
+                time.sleep(1)
+            results = results.get()
+            pool.close()
+            pbar.close()
+            end = time.time()
+            print("Time eplased for subgraph extraction: {}s".format(end-start))
+            print("Transforming to pytorch_geometric graphs...".format(end-start))
+            g_list += [nx_to_PyGGraph(g, g_label, n_labels, n_features, max_node_label, class_values) for g_label, g, n_labels, n_features in tqdm(results)]
+            del results
+            end2 = time.time()
+            print("Time eplased for transforming to pytorch_geometric graphs: {}s".format(end2-end))
+        return g_list
+
+    print('Enclosing subgraph extraction begins...')
+    train_graphs = helper(A, train_indices, train_labels)
+    if not testing:
+        val_graphs = helper(A, val_indices, val_labels)
+    else:
+        val_graphs = []
+    test_graphs = helper(A, test_indices, test_labels)
+
+    if max_node_label is None:
+        train_graphs = [nx_to_PyGGraph(*x, **max_n_label, class_values=class_values) for x in train_graphs]
+        val_graphs = [nx_to_PyGGraph(*x, **max_n_label, class_values=class_values) for x in val_graphs]
+        test_graphs = [nx_to_PyGGraph(*x, **max_n_label, class_values=class_values) for x in test_graphs]
+    
+    return train_graphs, val_graphs, test_graphs
+
+
+def subgraph_extraction_labeling(ind, A, h=1, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
+    # extract the h-hop enclosing subgraph around link 'ind'
+    dist = 0
+    u_nodes, v_nodes = [ind[0]], [ind[1]]
+    u_dist, v_dist = [0], [0]
+    u_visited, v_visited = set([ind[0]]), set([ind[1]])
+    u_fringe, v_fringe = set([ind[0]]), set([ind[1]])
+    for dist in range(1, h+1):
+        v_fringe, u_fringe = neighbors(u_fringe, A, True), neighbors(v_fringe, A, False)
+        u_fringe = u_fringe - u_visited
+        v_fringe = v_fringe - v_visited
+        u_visited = u_visited.union(u_fringe)
+        v_visited = v_visited.union(v_fringe)
+        if sample_ratio < 1.0:
+            u_fringe = random.sample(u_fringe, int(sample_ratio*len(u_fringe)))
+            v_fringe = random.sample(v_fringe, int(sample_ratio*len(v_fringe)))
+        if max_nodes_per_hop is not None:
+            if max_nodes_per_hop < len(u_fringe):
+                u_fringe = random.sample(u_fringe, max_nodes_per_hop)
+            if max_nodes_per_hop < len(v_fringe):
+                v_fringe = random.sample(v_fringe, max_nodes_per_hop)
+        if len(u_fringe) == 0 and len(v_fringe) == 0:
+            break
+        u_nodes = u_nodes + list(u_fringe)
+        v_nodes = v_nodes + list(v_fringe)
+        u_dist = u_dist + [dist] * len(u_fringe)
+        v_dist = v_dist + [dist] * len(v_fringe)
+    subgraph = A[u_nodes, :][:, v_nodes]
+    # remove link between target nodes
+    subgraph[0, 0] = 0
+    # construct nx graph
+    g = nx.Graph()
+    g.add_nodes_from(range(len(u_nodes)), bipartite='u')
+    g.add_nodes_from(range(len(u_nodes), len(u_nodes)+len(v_nodes)), bipartite='v')
+    u, v, r = ssp.find(subgraph)  # r is 1, 2... (rating labels + 1)
+    r = r.astype(int)
+    v += len(u_nodes)
+    #g.add_weighted_edges_from(zip(u, v, r))
+    g.add_edges_from(zip(u, v))
+
+    edge_types = dict(zip(zip(u, v), r-1))  # transform r back to rating label
+    nx.set_edge_attributes(g, name='type', values=edge_types)
+    # get structural node labels
+    node_labels = [x*2 for x in u_dist] + [x*2+1 for x in v_dist]
+
+    # get node features
+    if u_features is not None:
+        u_features = u_features[u_nodes]
+    if v_features is not None:
+        v_features = v_features[v_nodes]
+    node_features = None
+    if False: 
+        # directly use padded node features
+        if u_features is not None and v_features is not None:
+            u_extended = np.concatenate([u_features, np.zeros([u_features.shape[0], v_features.shape[1]])], 1)
+            v_extended = np.concatenate([np.zeros([v_features.shape[0], u_features.shape[1]]), v_features], 1)
+            node_features = np.concatenate([u_extended, v_extended], 0)
+    if False:
+        # use identity features (one-hot encodings of node idxes)
+        u_ids = one_hot(u_nodes, A.shape[0]+A.shape[1])
+        v_ids = one_hot([x+A.shape[0] for x in v_nodes], A.shape[0]+A.shape[1])
+        node_ids = np.concatenate([u_ids, v_ids], 0)
+        #node_features = np.concatenate([node_features, node_ids], 1)
+        node_features = node_ids
+    if True:
+        # only output node features for the target user and item
+        if u_features is not None and v_features is not None:
+            node_features = [u_features[0], v_features[0]]
+
+    return g, node_labels, node_features
+
+
+def parallel_worker(g_label, ind, A, h=1, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
+    g, node_labels, node_features = subgraph_extraction_labeling(ind, A, h, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values)
+    return g_label, g, node_labels, node_features
+
+ 
+
 if __name__ == '__main__':
-    MovieLens("ml-100k", device=th.device('cpu'), symm=True)
+    MovieLens("ml-100k", device=th.device('cpu'), symm=True, use_one_hot_fea=True)

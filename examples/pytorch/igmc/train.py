@@ -11,34 +11,10 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 from data import MovieLens
+from model import GNN
+from dataset import MovieLensDataset 
 from model import BiDecoder, GCMCLayer
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
-
-class Net(nn.Module):
-    def __init__(self, args):
-        super(Net, self).__init__()
-        self._act = get_activation(args.model_activation)
-        self.encoder = GCMCLayer(args.rating_vals,
-                                 args.src_in_units,
-                                 args.dst_in_units,
-                                 args.gcn_agg_units,
-                                 args.gcn_out_units,
-                                 args.gcn_dropout,
-                                 args.gcn_agg_accum,
-                                 agg_act=self._act,
-                                 share_user_item_param=args.share_param,
-                                 device=args.device)
-        self.decoder = BiDecoder(in_units=args.gcn_out_units,
-                                 num_classes=len(args.rating_vals),
-                                 num_basis=args.gen_r_num_basis_func)
-
-    def forward(self, enc_graph, dec_graph, ufeat, ifeat):
-        user_out, movie_out = self.encoder(
-            enc_graph,
-            ufeat,
-            ifeat)
-        pred_ratings = self.decoder(dec_graph, user_out, movie_out)
-        return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
     possible_rating_values = dataset.possible_rating_values
@@ -55,21 +31,27 @@ def evaluate(args, net, dataset, segment='valid'):
     else:
         raise NotImplementedError
 
+    test_iter = MovieLensDataset(dataset_base)
+    
     # Evaluate RMSE
     net.eval()
-    with th.no_grad():
-        pred_ratings = net(enc_graph, dec_graph,
-                           dataset.user_feature, dataset.movie_feature)
-    real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
-                         nd_possible_rating_values.view(1, -1)).sum(dim=1)
-    rmse = ((real_pred_ratings - rating_values) ** 2.).mean().item()
-    rmse = np.sqrt(rmse)
-    return rmse
+    res = []
+    for batch in test_iter:
+        with th.no_grad():
+            pred_ratings = net(enc_graph, dec_graph,
+                               dataset.user_feature, dataset.movie_feature)
+        real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
+                             nd_possible_rating_values.view(1, -1)).sum(dim=1)
+        rmse = ((real_pred_ratings - rating_values) ** 2.).mean().item()
+        rmse = np.sqrt(rmse)
+        res.append(res)
+    return np.mean(res)
 
 def train(args):
     print(args)
-    dataset = MovieLens(args.data_name, args.device, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+    dataset_base = MovieLens(args.data_name, args.device, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
+    dataset = MovieLensDataset(dataset_base)
     print("Loading data finished ...\n")
 
     args.src_in_units = dataset.user_feature_shape[1]
@@ -77,7 +59,7 @@ def train(args):
     args.rating_vals = dataset.possible_rating_values
 
     ### build the net
-    net = Net(args=args)
+    net = IGMC(args=args)
     net = net.to(args.device)
     nd_possible_rating_values = th.FloatTensor(dataset.possible_rating_values).to(args.device)
     rating_loss_net = nn.CrossEntropyLoss()
@@ -105,14 +87,23 @@ def train(args):
     count_num = 0
     count_loss = 0
 
+    train_iter = MovieLensDataset(dataset_base.train_graphs)
+    test_iter = MovieLensDataset(dataset_base.test_graphs)
+    val_iter = MovieLensDataset(dataset_base.val_graphs)
+
     print("Start training ...")
     dur = []
     for iter_idx in range(1, args.train_max_iter):
         if iter_idx > 3:
             t0 = time.time()
+
+        try:
+            train_batch = train_iter.next()
+        except:
+            train_iter = MovieLensDataset(dataset_base.train_graphs)
+
         net.train()
-        pred_ratings = net(dataset.train_enc_graph, dataset.train_dec_graph,
-                           dataset.user_feature, dataset.movie_feature)
+        pred_ratings = net(train_batch)
         loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
         count_loss += loss.item()
         optimizer.zero_grad()
@@ -143,7 +134,7 @@ def train(args):
             count_num = 0
 
         if iter_idx % args.train_valid_interval == 0:
-            valid_rmse = evaluate(args=args, net=net, dataset=dataset, segment='valid')
+            valid_rmse = evaluate(args=args, net=net, dataset=val_dataset, segment='valid')
             valid_loss_logger.log(iter = iter_idx, rmse = valid_rmse)
             logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
 
@@ -151,7 +142,7 @@ def train(args):
                 best_valid_rmse = valid_rmse
                 no_better_valid = 0
                 best_iter = iter_idx
-                test_rmse = evaluate(args=args, net=net, dataset=dataset, segment='test')
+                test_rmse = evaluate(args=args, net=net, dataset=val_dataset, segment='test')
                 best_test_rmse = test_rmse
                 test_loss_logger.log(iter=iter_idx, rmse=test_rmse)
                 logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
