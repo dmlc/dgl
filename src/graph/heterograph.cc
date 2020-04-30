@@ -235,6 +235,17 @@ HeteroSubgraph HeteroGraph::EdgeSubgraph(
   }
 }
 
+HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
+  auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
+  CHECK_NOTNULL(hgindex);
+  std::vector<HeteroGraphPtr> rel_graphs;
+  for (auto g: hgindex->relation_graphs_){
+    rel_graphs.push_back(UnitGraph::AsNumBits(g, bits));    
+  }
+  return HeteroGraphPtr(new HeteroGraph(hgindex->meta_graph_, rel_graphs, hgindex->num_verts_per_type_));  
+}
+
+
 FlattenedHeteroGraphPtr HeteroGraph::Flatten(
     const std::vector<dgl_type_t>& etypes) const {
   const int64_t bits = NumBits();

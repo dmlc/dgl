@@ -411,7 +411,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAsNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     int bits = args[1];
-    HeteroGraphPtr hg_new = UnitGraph::AsNumBits(hg.sptr(), bits);
+    HeteroGraphPtr bhg_ptr = hg.sptr();
+    auto hg_ptr = std::dynamic_pointer_cast<HeteroGraph>(bhg_ptr);
+    HeteroGraphPtr hg_new;
+    if (hg_ptr) {
+      hg_new = HeteroGraph::AsNumBits(hg_ptr, bits);
+    } else {
+      hg_new = UnitGraph::AsNumBits(bhg_ptr, bits);
+    }
     *rv = HeteroGraphRef(hg_new);
   });
 

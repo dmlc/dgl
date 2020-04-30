@@ -1615,6 +1615,23 @@ def test_bipartite(index_dtype):
     g5 = dgl.hetero_from_relations([g1, g2, g4])
     assert not g5.is_unibipartite
 
+@parametrize_dtype
+def test_dtype_cast(index_dtype):
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], index_dtype=index_dtype)
+    assert g.idtype == index_dtype
+    g.ndata["feat"] = F.tensor([3, 4, 5])
+    g.edata["h"] = F.tensor([3, 4, 5, 6])
+    if index_dtype == "int32":
+        g_cast = g.long()
+        assert g_cast.idtype == 'int64'
+    else:
+        g_cast = g.int()
+        assert g_cast.idtype == 'int32'
+    assert "feat" in g_cast.ndata
+    assert "h" in g_cast.edata
+    assert F.array_equal(g.ndata["feat"], g_cast.ndata["feat"])
+    assert F.array_equal(g.edata["h"], g_cast.edata["h"])
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -1622,7 +1639,7 @@ if __name__ == '__main__':
     # test_adj("int32")
     # test_inc()
     # test_view()
-    test_view1("int32")
+    # test_view1("int32")
     # test_flatten()
     # test_convert_bound()
     # test_convert()
@@ -1639,3 +1656,4 @@ if __name__ == '__main__':
     # test_stack_reduce()
     # test_isolated_ntype()
     # test_bipartite()
+    test_dtype_cast()

@@ -4167,18 +4167,9 @@ class DGLHeteroGraph(object):
         --------
         int
         """
-        local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
-        local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
-        # Use same per-column initializers and default initializer.
-        # If registered, a column (based on key) initializer will be used first,
-        # otherwise the default initializer will be used.
-        for fr1, fr2 in zip(local_node_frames, self._node_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
-        for fr1, fr2 in zip(local_edge_frames, self._edge_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
         return DGLHeteroGraph(self._graph.asbits(64), self.ntypes, self.etypes,
-                              local_node_frames,
-                              local_edge_frames)
+                              self._node_frames,
+                              self._edge_frames)
 
     def int(self):
         """Return a heterograph object use int32 as index dtype,
@@ -4200,18 +4191,9 @@ class DGLHeteroGraph(object):
         --------
         long
         """
-        local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
-        local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
-        # Use same per-column initializers and default initializer.
-        # If registered, a column (based on key) initializer will be used first,
-        # otherwise the default initializer will be used.
-        for fr1, fr2 in zip(local_node_frames, self._node_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
-        for fr1, fr2 in zip(local_edge_frames, self._edge_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
         return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
-                              local_node_frames,
-                              local_edge_frames)
+                              self._node_frames,
+                              self._edge_frames)
 
 ############################################################
 # Internal APIs

@@ -202,6 +202,9 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \return Save HeteroGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
+  /*! \brief Convert the graph to use the given number of bits for storage */
+  static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
+
  private:
   // To create empty class
   friend class Serializer;
