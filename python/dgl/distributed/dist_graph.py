@@ -177,13 +177,23 @@ class DistTensor:
 class NodeDataView(MutableMapping):
     """The data view class when dist_graph.ndata[...].data is called.
     """
-    __slots__ = ['_graph']
+    __slots__ = ['_graph', '_data']
 
     def __init__(self, g):
         self._graph = g
+        # When this is created, the server may already load node data. We need to
+        # initialize the node data in advance.
+        names = g._get_all_ndata_names()
+        self._data = {name: DistTensor(g, _get_ndata_name(name)) for name in names}
+
+    def _get_names(self):
+        return list(self._data.keys())
+
+    def _add(self, name):
+        self._data[name] = DistTensor(self._graph, _get_ndata_name(name))
 
     def __getitem__(self, key):
-        return DistTensor(self._graph, _get_ndata_name(key))
+        return self._data[key]
 
     def __setitem__(self, key, val):
         raise DGLError("DGL doesn't support assignment. "
@@ -196,29 +206,39 @@ class NodeDataView(MutableMapping):
     def __len__(self):
         # The number of node data may change. Let's count it every time we need them.
         # It's not called frequently. It should be fine.
-        return len(self._graph._get_all_ndata_names())
+        return len(self._data)
 
     def __iter__(self):
-        return iter(self._graph._get_all_ndata_names())
+        return iter(self._data)
 
     def __repr__(self):
-        name_list = self._graph._get_all_ndata_names()
         reprs = {}
-        for name in name_list:
-            dtype, shape, _ = self._graph._client.get_data_meta(_get_ndata_name(name))
+        for name in self._data:
+            dtype = F.dtype(self._data[name])
+            shape = F.shape(self._data[name])
             reprs[name] = 'DistTensor(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
 class EdgeDataView(MutableMapping):
     """The data view class when G.edges[...].data is called.
     """
-    __slots__ = ['_graph']
+    __slots__ = ['_graph', '_data']
 
-    def __init__(self, graph):
-        self._graph = graph
+    def __init__(self, g):
+        self._graph = g
+        # When this is created, the server may already load edge data. We need to
+        # initialize the edge data in advance.
+        names = g._get_all_edata_names()
+        self._data = {name: DistTensor(g, _get_edata_name(name)) for name in names}
+
+    def _get_names(self):
+        return list(self._data.keys())
+
+    def _add(self, name):
+        self._data[name] = DistTensor(self._graph, _get_ndata_name(name))
 
     def __getitem__(self, key):
-        return DistTensor(self._graph, _get_edata_name(key))
+        return self._data[key]
 
     def __setitem__(self, key, val):
         raise DGLError("DGL doesn't support assignment. "
@@ -231,16 +251,16 @@ class EdgeDataView(MutableMapping):
     def __len__(self):
         # The number of edge data may change. Let's count it every time we need them.
         # It's not called frequently. It should be fine.
-        return len(self._graph._get_all_edata_names())
+        return len(self._data)
 
     def __iter__(self):
-        return iter(self._graph._get_all_edata_names())
+        return iter(self._data)
 
     def __repr__(self):
-        name_list = self._graph._get_all_edata_names()
         reprs = {}
-        for name in name_list:
-            dtype, shape, _ = self._graph._client.get_data_meta(_get_edata_name(name))
+        for name in self._data:
+            dtype = F.dtype(self._data[name])
+            shape = F.shape(self._data[name])
             reprs[name] = 'DistTensor(shape={}, dtype={})'.format(str(shape), str(dtype))
         return repr(reprs)
 
@@ -353,6 +373,9 @@ class DistGraph:
             self._local_nids = None
             self._local_gnid = None
 
+        self._ndata = NodeDataView(self)
+        self._edata = EdgeDataView(self)
+
     def _get_all_ndata_names(self):
         names = self._client.get_data_name_list()
         ndata_names = []
@@ -387,10 +410,11 @@ class DistGraph:
             The data type of the node data.
         '''
         assert shape[0] == self.number_of_nodes()
-        names = self._get_all_ndata_names()
+        names = self._ndata._get_names()
         # TODO we need to fix this. We should be able to init ndata even when there is no node data.
         assert len(names) > 0
         self._client.init_data(_get_ndata_name(ndata_name), shape, dtype, _get_ndata_name(names[0]))
+        self._ndata._add(ndata_name)
 
     def init_edata(self, edata_name, shape, dtype):
         '''Initialize edge data
@@ -407,10 +431,11 @@ class DistGraph:
             The data type of the edge data.
         '''
         assert shape[1] == self.number_of_edges()
-        names = self._get_all_edata_names()
+        names = self._edata._get_names()
         # TODO we need to fix this. We should be able to init ndata even when there is no edge data.
         assert len(names) > 0
         self._client.init_data(_get_edata_name(edata_name), shape, dtype, _get_edata_name(names[0]))
+        self._edata._add(edata_name)
 
     def init_node_emb(self, name, shape, dtype, initializer):
         ''' Initialize node embeddings.
@@ -449,7 +474,7 @@ class DistGraph:
         NodeDataView
             The data view in the distributed KVStore.
         """
-        return NodeDataView(self)
+        return self._ndata
 
     @property
     def edata(self):
@@ -460,7 +485,7 @@ class DistGraph:
         EdgeDataView
             The data view in the distributed KVStore.
         """
-        return EdgeDataView(self)
+        return self._edata
 
     def number_of_nodes(self):
         """Return the number of nodes"""
@@ -499,4 +524,7 @@ class DistGraph:
 
         We usually invoke this API by just one client (e.g., client_0).
         """
+        # We have to remove them. Otherwise, kvstore cannot shut down correctly.
+        self._ndata = None
+        self._edata = None
         self._client.shut_down()
