@@ -982,6 +982,21 @@ def logical_not(input):
     """
     pass
 
+def clone(input):
+    """Return a clone of the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        Input tensor.
+
+    Returns
+    -------
+    Tensor
+        A clone tensor.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

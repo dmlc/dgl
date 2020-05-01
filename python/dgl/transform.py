@@ -897,7 +897,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         if nodes is not None:
             dst_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
         else:
-            dst_nodes_nd.append(nd.null(g.idtype))
+            dst_nodes_nd.append(nd.NULL[g.idtype])
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_nodes_nd, include_dst_in_src)
@@ -948,7 +948,7 @@ def remove_edges(g, edge_ids):
                 "Graph has more than one edge type; specify a dict for edge_id instead.")
         edge_ids = {g.canonical_etypes[0]: edge_ids}
 
-    edge_ids_nd = [nd.null(g.idtype)] * len(g.etypes)
+    edge_ids_nd = [nd.NULL[g.idtype]] * len(g.etypes)
     for key, value in edge_ids.items():
         if value.dtype != getattr(F, g.idtype):
             # if didn't check, this function still works, but returns wrong result

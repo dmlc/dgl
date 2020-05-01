@@ -76,30 +76,30 @@ class TAGConv(gluon.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        assert graph.is_homograph(), 'Graph is not homogeneous'
-        graph = graph.local_var()
+        with graph.local_scope():
+            assert graph.is_homograph(), 'Graph is not homogeneous'
 
-        degs = graph.in_degrees().astype('float32')
-        norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
-        shp = norm.shape + (1,) * (feat.ndim - 1)
-        norm = norm.reshape(shp).as_in_context(feat.context)
+            degs = graph.in_degrees().astype('float32')
+            norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
+            shp = norm.shape + (1,) * (feat.ndim - 1)
+            norm = norm.reshape(shp).as_in_context(feat.context)
 
-        rst = feat
-        for _ in range(self.k):
-            rst = rst * norm
-            graph.ndata['h'] = rst
+            rst = feat
+            for _ in range(self.k):
+                rst = rst * norm
+                graph.ndata['h'] = rst
 
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.ndata['h']
-            rst = rst * norm
-            feat = mx.nd.concat(feat, rst, dim=-1)
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.ndata['h']
+                rst = rst * norm
+                feat = mx.nd.concat(feat, rst, dim=-1)
 
-        rst = mx.nd.dot(feat, self.lin.data(feat.context))
-        if self.bias is not None:
-            rst = rst + self.h_bias.data(rst.context)
+            rst = mx.nd.dot(feat, self.lin.data(feat.context))
+            if self.bias is not None:
+                rst = rst + self.h_bias.data(rst.context)
 
-        if self.activation is not None:
-            rst = self.activation(rst)
+            if self.activation is not None:
+                rst = self.activation(rst)
 
-        return rst
+            return rst

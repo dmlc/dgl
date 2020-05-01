@@ -313,6 +313,9 @@ def equal(x, y):
 def logical_not(input):
     return nd.logical_not(input)
 
+def clone(input):
+    return input.copy()
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
