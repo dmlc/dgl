@@ -1450,6 +1450,9 @@ class WLNRankDataset(object):
         print('Stage 3/3: preparing candidate products, candidate scores, node features, '
               'edge features and DGLGraphs')
 
+        if num_processes > 1:
+            torch.multiprocessing.set_sharing_strategy('file_system')
+
         for start in range(0, len(self.reactant_mols), batch_size):
             print('Processing reaction {:d}/{:d}'.format(start, len(self.reactant_mols)))
             end = min(start + batch_size, len(self.reactant_mols))
