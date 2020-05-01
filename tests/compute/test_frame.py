@@ -360,6 +360,23 @@ def test_inplace():
     newa2addr = id(f['a2'])
     assert a2addr == newa2addr
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+def test_clone():
+    f = FrameRef(Frame(create_test_data()))
+    f1 = f.clone()
+    f2 = f.deepclone()
+
+    f1['b'] = F.randn((N, D))
+    f2['c'] = F.randn((N, D))
+    assert 'b' not in f
+    assert 'c' not in f
+
+    f1['a1'][0, 0] = -10.
+    assert float(F.asnumpy(f['a1'][0, 0])) == -10.
+    x = float(F.asnumpy(f['a2'][0, 0]))
+    f2['a2'][0, 0] = -10.
+    assert float(F.asnumpy(f['a2'][0, 0])) == x
+
 def _reconstruct_pickle(obj):
     f = io.BytesIO()
     pickle.dump(obj, f)
