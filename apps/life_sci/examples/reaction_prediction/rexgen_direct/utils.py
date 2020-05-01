@@ -560,7 +560,7 @@ def prepare_reaction_center(args, reaction_center_config):
                                        num_processes=args['num_processes'])
 
         dataloader = DataLoader(dataset, batch_size=args['reaction_center_batch_size'],
-                                collate_fn=collate, shuffle=False)
+                                collate_fn=collate_center, shuffle=False)
 
         print('Stage 2/3: Performing model prediction...')
         output_strings = []
@@ -606,12 +606,6 @@ def collate_rank(data):
 
     Returns
     -------
-    candidate_combos : list
-        Each element of the list is a list of 4-tuples, which is a combo of bond changes for
-        generating a reaction candidate product. Each tuple is of form
-        ``(atom1, atom2, change_type, score)``, where ``atom1`` and ``atom2`` are the end
-        atoms to form or lose a bond, ``change_type`` is the type of bond change and
-        ``score`` represents the confidence for the bond change by a model.
     bg : DGLGraph
         A batch of B molecular graphs, where the first graph is the reactants and
         the rest graphs are candidate products.
@@ -627,18 +621,15 @@ def collate_rank(data):
     """
     assert len(data) == 1, 'This collate function only works with batch size 1.'
     data = data[0]
-    if len(data) == 4:
-        candidate_combos, graphs, node_feats, combo_scores = data
+    if len(data) == 2:
+        graphs, combo_scores = data
     else:
-        candidate_combos, graphs, node_feats, combo_scores, labels = data
+        graphs, combo_scores, labels = data
     bg = dgl.batch(graphs)
+    node_feats = bg.ndata.pop('hv')
     edge_feats = bg.edata.pop('he')
-    old_feats_shape = node_feats.shape
-    node_feats = node_feats.reshape((1,) + old_feats_shape)
-    node_feats = node_feats.expand((bg.batch_size,) + old_feats_shape)
-    node_feats.reshape(-1, node_feats.shape[-1])
 
     if len(data) == 4:
-        return candidate_combos, bg, node_feats, edge_feats, combo_scores
+        return bg, node_feats, edge_feats, combo_scores
     else:
-        return candidate_combos, bg, node_feats, edge_feats, combo_scores, labels
+        return bg, node_feats, edge_feats, combo_scores, labels
