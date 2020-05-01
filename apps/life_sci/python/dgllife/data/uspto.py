@@ -1308,7 +1308,20 @@ class WLNRankDataset(object):
         self.reactant_mols, self.product_mols, self.real_bond_changes, \
         self.ids_for_small_samples = self.load_reaction_data(raw_file_path, num_processes)
 
+        # Check if all files have been pre-processed
+        for i in range(len(self.reactant_mols)):
+            sample_path = path_to_save_results + '/{:d}'.format(i)
+            files_exist = [os.path.isfile(sample_path + file)
+                           for file in ['/valid_candidate_combos.pkl',
+                                        '/candidate_bond_changes.pkl',
+                                        '/reactant_info.pkl', 'g.bin']]
+            if False in files_exist:
+                load = False
+                print('Files have not been fully pre-processed.')
+                break
+
         if not os.path.exists(path_to_save_results) or not load:
+            print('Pre-processing from scratch')
             mkdir_p(path_to_save_results)
             self.candidate_bond_changes = self.load_candidate_bond_changes(
                 candidate_bond_path, num_processes)
