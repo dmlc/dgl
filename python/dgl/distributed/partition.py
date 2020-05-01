@@ -13,8 +13,16 @@ from ..transform import metis_partition_assignment, partition_graph_with_halo
 def load_partition(conf_file, part_id):
     ''' Load data of a partition from the data path in the DistGraph server.
 
-    Here we load data through the normal filesystem interface. In the future, we need to support
-    loading data from other storage such as S3 and HDFS.
+    A partition data includes a graph structure of the partition, a dict of node tensors,
+    a dict of edge tensors and some metadata. The partition may contain the HALO nodes,
+    which are the nodes replicated from other partitions. However, the dict of node tensors
+    only contains the node data that belongs to the local partition. Similarly, edge tensors
+    only contains the edge data that belongs to the local partition. The metadata include
+    the information of the global graph (not the local partition), which includes the number
+    of nodes, the number of edges as well as the node assignment of the global graph.
+
+    The function currently loads data through the normal filesystem interface. In the future,
+    we need to support loading data from other storage such as S3 and HDFS.
 
     Parameters
     ----------
@@ -22,6 +30,11 @@ def load_partition(conf_file, part_id):
         The path of the partition config file.
     part_id : int
         The partition Id.
+
+    Returns
+    -------
+    (DGLGraph, a dict of tensors, a dict of tensors, (int, int, tensor))
+        The data of a graph partition and the metadata of the global graph.
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
@@ -33,9 +46,7 @@ def load_partition(conf_file, part_id):
     meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map)
 
     part_ids = node_map[client_g.ndata[NID]]
-    # TODO we need to fix this. DGL backend doesn't support boolean or byte.
-    # int64 is unnecessary.
-    client_g.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
+    client_g.ndata['local_node'] = part_ids == part_id
 
     return client_g, node_feats, edge_feats, meta
 
