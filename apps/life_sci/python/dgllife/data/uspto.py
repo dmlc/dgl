@@ -1282,7 +1282,7 @@ class WLNRankDataset(object):
         Number of processes to use for data pre-processing. Default to 1.
     process_batch_size : int
         The dataset can be too large to load into memory at once. We process
-        ``process_batch_size`` reactions every time and save them locally. Default to 500.
+        ``process_batch_size`` reactions every time and save them locally. Default to 300.
     """
     def __init__(self,
                  path_to_save_results,
@@ -1297,7 +1297,7 @@ class WLNRankDataset(object):
                  train_mode=True,
                  load=True,
                  num_processes=1,
-                 process_batch_size=500):
+                 process_batch_size=300):
         super(WLNRankDataset, self).__init__()
 
         self.ignore_large_samples = False
@@ -1323,8 +1323,7 @@ class WLNRankDataset(object):
         if not os.path.exists(path_to_save_results) or not load:
             print('Pre-processing from scratch')
             mkdir_p(path_to_save_results)
-            self.candidate_bond_changes = self.load_candidate_bond_changes(
-                candidate_bond_path, num_processes)
+            self.candidate_bond_changes = self.load_candidate_bond_changes(candidate_bond_path)
             self.pre_process(path_to_save_results, num_candidate_bond_changes,
                              max_num_changes_per_reaction, max_num_change_combos_per_reaction,
                              node_featurizer, edge_featurizer, process_batch_size, num_processes)
@@ -1396,15 +1395,13 @@ class WLNRankDataset(object):
 
         return all_reactant_mols, all_product_mols, all_real_bond_changes, ids_for_small_samples
 
-    def load_candidate_bond_changes(self, file_path, num_processes):
+    def load_candidate_bond_changes(self, file_path):
         """Load candidate bond changes predicted by a WLN for reaction center prediction.
 
         Parameters
         ----------
         file_path : str
             Path to a file of candidate bond changes for each reaction.
-        num_processes : int
-            Number of processes to use for data pre-processing.
 
         Returns
         -------
@@ -1636,7 +1633,7 @@ class USPTORank(WLNRankDataset):
         Number of processes to use for data pre-processing. Default to 1.
     process_batch_size : int
         The dataset can be too large to load into memory at once. We process
-        ``process_batch_size`` reactions every time and save them locally. Default to 500.
+        ``process_batch_size`` reactions every time and save them locally. Default to 300.
     """
     def __init__(self,
                  subset,
@@ -1647,7 +1644,7 @@ class USPTORank(WLNRankDataset):
                  max_num_change_combos_per_reaction=150,
                  load=True,
                  num_processes=1,
-                 process_batch_size=500):
+                 process_batch_size=300):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         print('Preparing {} subset of USPTO for product candidate ranking.'.format(subset))
