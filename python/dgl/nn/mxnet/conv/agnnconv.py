@@ -59,17 +59,16 @@ class AGNNConv(nn.Block):
             The output feature of shape :math:`(N, *)` where :math:`*`
             should be the same as input shape.
         """
-        graph = graph.local_var()
-
-        feat_src, feat_dst = expand_as_pair(feat)
-        graph.srcdata['h'] = feat_src
-        graph.srcdata['norm_h'] = normalize(feat_src, p=2, axis=-1)
-        if isinstance(feat, tuple):
-            graph.dstdata['norm_h'] = normalize(feat_dst, p=2, axis=-1)
-        # compute cosine distance
-        graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
-        cos = graph.edata.pop('cos')
-        e = self.beta.data(feat_src.context) * cos
-        graph.edata['p'] = edge_softmax(graph, e)
-        graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
-        return graph.dstdata.pop('h')
+        with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
+            graph.srcdata['h'] = feat_src
+            graph.srcdata['norm_h'] = normalize(feat_src, p=2, axis=-1)
+            if isinstance(feat, tuple):
+                graph.dstdata['norm_h'] = normalize(feat_dst, p=2, axis=-1)
+            # compute cosine distance
+            graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
+            cos = graph.edata.pop('cos')
+            e = self.beta.data(feat_src.context) * cos
+            graph.edata['p'] = edge_softmax(graph, e)
+            graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
+            return graph.dstdata.pop('h')
