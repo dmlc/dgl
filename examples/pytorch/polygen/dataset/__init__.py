@@ -1,6 +1,7 @@
 from .vertexgraph import *
 from .facegraph import *
 from .fields import *
+from .datasets import *
 from .utils import prepare_dataset
 from .preprocess_mesh import preprocess as preprocess_mesh_obj
 import os

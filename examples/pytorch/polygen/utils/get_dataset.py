@@ -3,8 +3,6 @@ import sys
 import tqdm
 import numpy as np
 from multiprocessing import Pool, TimeoutError
-from dataset.preprocess_mesh import preprocess as preprocess_mesh_obj
-
 
 def get_all_obj_file_in_folder(data_dir, all_list_path):
     class_dirs = [os.path.join(data_dir, cdir) for cdir in os.listdir(data_dir) if 

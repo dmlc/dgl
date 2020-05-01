@@ -7,9 +7,10 @@ from torchvision import transforms, utils
 
 from .vertexgraph import *
 from .facegraph import *
+from .preprocess_mesh import preprocess as preprocess_mesh_obj
 
 VertexDataTuple = namedtuple('VertexDataTuple', ['g', 'num_edges_dd', 'tgt', 'mode', 'device'])
-VertexGraph = namedtuple('Graph',
+VertexGraph = namedtuple('VertexGraph',
                    ['g', 'tgt', 'tgt_y', 'nids', 'eids',  'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
 
@@ -22,9 +23,9 @@ class VertexDataset(Dataset):
     MAX_VERT_LENGTH = 98
     MAX_LENGTH = MAX_VERT_LENGTH * 3 + 1
     
-    def __init__(self, file_list_path, mode):
+    def __init__(self, dataset_list_path, mode):
         dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
-        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_file)
+        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path)
         self.mode = mode
         with open(dataset_list_path, 'r') as f:
             self.dataset_list = f.readlines()
@@ -39,13 +40,13 @@ class VertexDataset(Dataset):
         return len(self.dataset_list)
 
     def __getitem__(self, idx):
-        obj_file = dataset_list[idx].strip()
+        obj_file = self.dataset_list[idx].strip()
         try:
             verts, faces = preprocess_mesh_obj(obj_file)
         except:
            # If fail, try another random example
-           return self.__getitem__(self, np.random.randint(0, len(self.dataset_list))
-            
+           to_try = np.random.randint(0, len(self.dataset_list))
+           return self.__getitem__(to_try)
         # Flattern verts, order Y(up), X(front), Z(right)
         reordered_verts = np.zeros_like(verts)
         reordered_verts[:,0] = verts[:,1]
@@ -54,11 +55,12 @@ class VertexDataset(Dataset):
         flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
         # exp
         if len(flattern_verts) > self.MAX_LENGTH:
-           return self.__getitem__(self, np.random.randint(0, len(self.dataset_list))
+           to_try = np.random.randint(0, len(self.dataset_list))
+           return self.__getitem__(to_try)
         flattern_verts = flattern_verts[:self.MAX_LENGTH-1] + [self.EOS_BIN]
-        return VertexData(g=self.graph_pool.g_pool[len(flattern_verts)-1], 
-                num_edges_dd=self.graph_pool.num_edges['dd'][len(flattern_verts)-1],
-                tgt=falltern_verts, mode=self.mode, device='cpu')
+        return VertexDataTuple(g=self.graphpool.g_pool[len(flattern_verts)-1], 
+                num_edges_dd=self.graphpool.num_edges['dd'][len(flattern_verts)-1],
+                tgt=flattern_verts, mode=self.mode, device='cpu')
 
 # different collate function for infer and train?
 def collate_vertexgraphs(data):
@@ -71,12 +73,14 @@ def collate_vertexgraphs(data):
     -------
     g : tuple of batched DGLGraph and input tensors
     """
+    print ('hahaha')
     assert len(data[0]) == 5, \
             'Expect the tuple to be of length 5, got {:d}'.format(len(data[0]))
     g_list, num_edges_dd, tgt_buf, modes, devices = map(list, zip(*data))
     num_edges = {'dd': num_edges_dd}
+    tgt_lens = [len(_) - 1 for _ in tgt_buf]
     mode = modes[0]
-    device = device[0]
+    device = devices[0]
     g = dgl.batch(g_list)
     tgt, tgt_y = [], []
     tgt_pos = []
@@ -88,10 +92,10 @@ def collate_vertexgraphs(data):
         tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
         tgt_pos.append(th.arange(n, dtype=th.long, device=device))
         dec_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
-        d2d_eids.append(th.arange(n_edges, n_edges + n_dd['dd'], dtype=th.long, device=device))
+        d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
         n_nodes += n
         n_tokens += n
-        n_edges += n_dd['dd']
+        n_edges += n_dd
 
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
@@ -104,10 +108,7 @@ def collate_vertexgraphs(data):
                  nid_arr = {'dec': dec_ids},
                  n_nodes=n_nodes,
                  n_edges=n_edges,
+                 n_tokens=n_tokens)
 
 
-if __name__ == '__main__':
-    np.random.seed(1111)
-    train_dataset = VertexDataset()
-    def __init__(self, file_list_path, 'train'):
-    trainset = DataLoader(dataset=)
+
