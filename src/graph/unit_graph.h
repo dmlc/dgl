@@ -139,7 +139,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const override;
 
-  // 32bit version functions, patch for SuccVec 
+  // 32bit version functions, patch for SuccVec
   DGLIdIters32 SuccVec32(dgl_type_t etype, dgl_id_t vid) const;
 
   DGLIdIters OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const override;
