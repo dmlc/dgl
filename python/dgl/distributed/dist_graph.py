@@ -138,8 +138,8 @@ class DistTensor:
 
     Parameters
     ----------
-    kv : KVClient
-        The KVStore client.
+    kv : DistGraph
+        The distributed graph object.
     name : string
         The name of the tensor in the KVStore.
     '''
@@ -157,7 +157,7 @@ class DistTensor:
         return self.kvstore.pull(name=self.name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
-        # TODO how do we want to support broadcast.
+        # TODO(zhengda) how do we want to support broadcast.
         self.kvstore.push(name=self.name, id_tensor=idx, data_tensor=val)
 
     def __len__(self):
@@ -175,30 +175,28 @@ class DistTensor:
 
 
 class NodeDataView(MutableMapping):
-    """The data view class when G.nodes[...].data is called.
-
-    See Also
-    --------
-    dgl.DGLGraph.nodes
+    """The data view class when dist_graph.ndata[...].data is called.
     """
-    __slots__ = ['_graph', '_graph_name']
+    __slots__ = ['_graph']
 
-    def __init__(self, g, graph_name):
+    def __init__(self, g):
         self._graph = g
-        self._graph_name = graph_name
 
     def __getitem__(self, key):
         return DistTensor(self._graph, _get_ndata_name(key))
 
     def __setitem__(self, key, val):
-        raise DGLError("DGL doesn't support set items. Please call init_ndata.")
+        raise DGLError("DGL doesn't support assignment. "
+                       + "Please call init_ndata to initialize new node data.")
 
     def __delitem__(self, key):
-        #TODO how to delete data in the kvstore.
-        pass
+        #TODO(zhengda) how to delete data in the kvstore.
+        raise NotImplementedError("delete node data isn't supported yet")
 
     def __len__(self):
-        return self._graph.number_of_nodes()
+        # The number of node data may change. Let's count it every time we need them.
+        # It's not called frequently. It should be fine.
+        return len(self._graph._get_all_ndata_names())
 
     def __iter__(self):
         return iter(self._graph._get_all_ndata_names())
@@ -213,29 +211,27 @@ class NodeDataView(MutableMapping):
 
 class EdgeDataView(MutableMapping):
     """The data view class when G.edges[...].data is called.
-
-    See Also
-    --------
-    dgl.DGLGraph.edges
     """
-    __slots__ = ['_graph', '_graph_name']
+    __slots__ = ['_graph']
 
-    def __init__(self, graph, graph_name):
+    def __init__(self, graph):
         self._graph = graph
-        self._graph_name = graph_name
 
     def __getitem__(self, key):
         return DistTensor(self._graph, _get_edata_name(key))
 
     def __setitem__(self, key, val):
-        raise DGLError("DGL doesn't support set items. Please call init_ndata.")
+        raise DGLError("DGL doesn't support assignment. "
+                       + "Please call init_edata to initialize new edge data.")
 
     def __delitem__(self, key):
-        #TODO
-        pass
+        #TODO(zhengda) how to delete data in the kvstore.
+        raise NotImplementedError("delete edge data isn't supported yet")
 
     def __len__(self):
-        return self._graph.number_of_edges()
+        # The number of edge data may change. Let's count it every time we need them.
+        # It's not called frequently. It should be fine.
+        return len(self._graph._get_all_edata_names())
 
     def __iter__(self):
         return iter(self._graph._get_all_edata_names())
@@ -453,7 +449,7 @@ class DistGraph:
         NodeDataView
             The data view in the distributed KVStore.
         """
-        return NodeDataView(self, self.graph_name)
+        return NodeDataView(self)
 
     @property
     def edata(self):
@@ -464,7 +460,7 @@ class DistGraph:
         EdgeDataView
             The data view in the distributed KVStore.
         """
-        return EdgeDataView(self, self.graph_name)
+        return EdgeDataView(self)
 
     def number_of_nodes(self):
         """Return the number of nodes"""
