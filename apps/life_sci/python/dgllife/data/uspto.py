@@ -1416,16 +1416,10 @@ class WLNRankDataset(object):
         with open(file_path, 'r') as f:
             lines = f.readlines()
 
-        if num_processes == 1:
-            all_candidate_bond_changes = []
-            for li in tqdm(lines):
-                all_candidate_bond_changes.append(
-                    load_candidate_bond_changes_for_one_reaction(li))
-        else:
-            with Pool(processes=num_processes) as pool:
-                all_candidate_bond_changes = list(tqdm(pool.imap(
-                    load_candidate_bond_changes_for_one_reaction,
-                    lines, chunksize=len(lines) // num_processes), total=len(lines)))
+        all_candidate_bond_changes = []
+        for li in tqdm(lines):
+            all_candidate_bond_changes.append(
+                load_candidate_bond_changes_for_one_reaction(li))
 
         return all_candidate_bond_changes
 
