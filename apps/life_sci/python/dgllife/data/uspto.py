@@ -1499,17 +1499,6 @@ class WLNRankDataset(object):
                 batch_valid_candidate_combos, batch_candidate_bond_changes, \
                 batch_reactant_info = map(list, zip(*results))
 
-            # Get node features and candidate scores
-            batch_node_features = []
-            batch_combo_bias = []
-            for i in tqdm(batch_ids):
-                node_feats, combo_bias = featurize_nodes_and_compute_combo_scores(
-                    node_featurizer, batch_reactant_mols[i], batch_valid_candidate_combos[i])
-                # float32 tensor of shape (Ni, M), Ni for the number of nodes
-                batch_node_features.append(node_feats)
-                # float32 tensor of shape (Bi, 1), Bi for the number of candidate products
-                batch_combo_bias.append(combo_bias)
-
             # Construct DGLGraphs and featurize their edges
             if num_processes == 1:
                 batch_graphs = []
@@ -1527,6 +1516,17 @@ class WLNRankDataset(object):
                         edge_featurizer=edge_featurizer),
                         batch_reaction_info, chunksize=len(batch_ids) // num_processes),
                         total=len(batch_ids)))
+
+            # Get node features and candidate scores
+            batch_node_features = []
+            batch_combo_bias = []
+            for i in tqdm(batch_ids):
+                node_feats, combo_bias = featurize_nodes_and_compute_combo_scores(
+                    node_featurizer, batch_reactant_mols[i], batch_valid_candidate_combos[i])
+                # float32 tensor of shape (Ni, M), Ni for the number of nodes
+                batch_node_features.append(node_feats)
+                # float32 tensor of shape (Bi, 1), Bi for the number of candidate products
+                batch_combo_bias.append(combo_bias)
 
             for i in tqdm(batch_ids):
                 raw_id = start + i
