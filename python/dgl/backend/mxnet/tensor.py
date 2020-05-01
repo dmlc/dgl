@@ -28,7 +28,8 @@ def data_type_dict():
             'int8'    : np.int8,
             'int16'   : np.int16,
             'int32'   : np.int32,
-            'int64'   : np.int64}
+            'int64'   : np.int64,
+            'bool'    : np.bool}
 
 def cpu():
     return mx.cpu()
@@ -311,6 +312,9 @@ def equal(x, y):
 
 def logical_not(input):
     return nd.logical_not(input)
+
+def clone(input):
+    return input.copy()
 
 def unique(input):
     # TODO: fallback to numpy is unfortunate
