@@ -653,7 +653,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return DGLIdIters(indices_data + start, indices_data + end);
   }
 
-  DGLIdIters32 SuccVec32(dgl_type_t etype, dgl_id_t vid){
+  DGLIdIters32 SuccVec32(dgl_type_t etype, dgl_id_t vid) {
     // TODO(minjie): This still assumes the data type and device context
     //   of this graph. Should fix later.
     const int32_t* indptr_data = static_cast<int32_t*>(adj_.indptr->data);
@@ -662,7 +662,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     const int32_t end = indptr_data[vid + 1];
     return DGLIdIters32(indices_data + start, indices_data + end);
   }
-
 
   DGLIdIters OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const override {
     // TODO(minjie): This still assumes the data type and device context
