@@ -60,8 +60,7 @@ def test_random_walk_with_restart():
             trace_diff = np.diff(F.zerocopy_to_numpy(t), axis=-1)
             assert (trace_diff % 2 == 0).all()
 
-# @parametrize_dtype
-@pytest.mark.parametrize("index_dtype", ["int64"])
+@parametrize_dtype
 def test_metapath_random_walk(index_dtype):
     g1 = dgl.bipartite(([0, 1, 2, 3], [0, 1, 2, 3]), 'a', 'ab', 'b', index_dtype=index_dtype)
     g2 = dgl.bipartite(([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2]), 'b', 'ba', 'a', index_dtype=index_dtype)
@@ -78,5 +77,5 @@ def test_metapath_random_walk(index_dtype):
                 assert g2.has_edge_between(trace[2 * i + 1], trace[2 * i + 2])
 
 if __name__ == '__main__':
-    test_random_walk()
-    test_metapath_random_walk()
+    # test_random_walk()
+    test_metapath_random_walk("int32")
