@@ -46,7 +46,9 @@ def load_partition(conf_file, part_id):
     meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map)
 
     part_ids = node_map[client_g.ndata[NID]]
-    client_g.ndata['local_node'] = part_ids == part_id
+    # TODO we need to fix this. DGL backend doesn't support boolean or byte.
+    # int64 is unnecessary.
+    client_g.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
 
     return client_g, node_feats, edge_feats, meta
 
