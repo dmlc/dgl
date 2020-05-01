@@ -1282,7 +1282,7 @@ class WLNRankDataset(object):
         Number of processes to use for data pre-processing. Default to 1.
     process_batch_size : int
         The dataset can be too large to load into memory at once. We process
-        ``process_batch_size`` reactions every time and save them locally. Default to 300.
+        ``process_batch_size`` reactions every time and save them locally. Default to 200.
     """
     def __init__(self,
                  path_to_save_results,
@@ -1297,7 +1297,7 @@ class WLNRankDataset(object):
                  train_mode=True,
                  load=True,
                  num_processes=1,
-                 process_batch_size=300):
+                 process_batch_size=200):
         super(WLNRankDataset, self).__init__()
 
         self.ignore_large_samples = False
@@ -1633,7 +1633,7 @@ class USPTORank(WLNRankDataset):
         Number of processes to use for data pre-processing. Default to 1.
     process_batch_size : int
         The dataset can be too large to load into memory at once. We process
-        ``process_batch_size`` reactions every time and save them locally. Default to 300.
+        ``process_batch_size`` reactions every time and save them locally. Default to 200.
     """
     def __init__(self,
                  subset,
@@ -1644,7 +1644,7 @@ class USPTORank(WLNRankDataset):
                  max_num_change_combos_per_reaction=150,
                  load=True,
                  num_processes=1,
-                 process_batch_size=300):
+                 process_batch_size=200):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         print('Preparing {} subset of USPTO for product candidate ranking.'.format(subset))
