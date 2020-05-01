@@ -78,7 +78,7 @@ if __name__ == '__main__':
     parser.add_argument('-rcb', '--reaction-center-batch-size', type=int, default=200,
                         help='Batch size to use for preparing candidate bonds from a trained '
                              'model on reaction center prediction')
-    parser.add_argument('-np', '--num-processes', type=int, default=16,
+    parser.add_argument('-np', '--num-processes', type=int, default=32,
                         help='Number of processes to use for data pre-processing')
     args = parser.parse_args().__dict__
     args.update(candidate_ranking_config)
