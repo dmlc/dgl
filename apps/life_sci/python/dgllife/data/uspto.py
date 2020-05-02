@@ -1272,15 +1272,8 @@ class WLNRankDataset(object):
         Number of bond change combos to consider for each reaction. Default to 150.
     train_mode : bool
         Whether the dataset is to be used for training. Default to True.
-    load : bool
-        Whether to load the previously pre-processed dataset or pre-process from scratch.
-        ``load`` should be False when we want to try different graph construction and
-        featurization methods and need to preprocess from scratch. Default to True.
     num_processes : int
         Number of processes to use for data pre-processing. Default to 1.
-    process_batch_size : int
-        The dataset can be too large to load into memory at once. We process
-        ``process_batch_size`` reactions every time and save them locally. Default to 400.
     """
     def __init__(self,
                  path_to_save_results,
@@ -1293,9 +1286,7 @@ class WLNRankDataset(object):
                  num_candidate_bond_changes=16,
                  max_num_change_combos_per_reaction=150,
                  train_mode=True,
-                 load=True,
-                 num_processes=1,
-                 process_batch_size=400):
+                 num_processes=1):
         super(WLNRankDataset, self).__init__()
 
         self.ignore_large_samples = False
@@ -1305,6 +1296,7 @@ class WLNRankDataset(object):
 
         self.reactant_mols, self.product_mols, self.real_bond_changes, \
         self.ids_for_small_samples = self.load_reaction_data(raw_file_path, num_processes)
+        self.candidate_bond_changes = self.load_candidate_bond_changes(candidate_bond_path)
 
         self.num_candidate_bond_changes = num_candidate_bond_changes
         self.max_um_changes_per_reaction = max_num_changes_per_reaction
@@ -1536,15 +1528,8 @@ class USPTORank(WLNRankDataset):
         Default to 16.
     max_num_change_combos_per_reaction : int
         Number of bond change combos to consider for each reaction. Default to 150.
-    load : bool
-        Whether to load the previously pre-processed dataset or pre-process from scratch.
-        ``load`` should be False when we want to try different graph construction and
-        featurization methods and need to preprocess from scratch. Default to True.
     num_processes : int
         Number of processes to use for data pre-processing. Default to 1.
-    process_batch_size : int
-        The dataset can be too large to load into memory at once. We process
-        ``process_batch_size`` reactions every time and save them locally. Default to 400.
     """
     def __init__(self,
                  subset,
@@ -1553,9 +1538,7 @@ class USPTORank(WLNRankDataset):
                  max_num_changes_per_reaction=5,
                  num_candidate_bond_changes=16,
                  max_num_change_combos_per_reaction=150,
-                 load=True,
-                 num_processes=1,
-                 process_batch_size=400):
+                 num_processes=1):
         assert subset in ['train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         print('Preparing {} subset of USPTO for product candidate ranking.'.format(subset))
@@ -1585,9 +1568,7 @@ class USPTORank(WLNRankDataset):
             num_candidate_bond_changes=num_candidate_bond_changes,
             max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
             train_mode=train_mode,
-            load=load,
-            num_processes=num_processes,
-            process_batch_size=process_batch_size)
+            num_processes=num_processes)
 
     @property
     def subset(self):

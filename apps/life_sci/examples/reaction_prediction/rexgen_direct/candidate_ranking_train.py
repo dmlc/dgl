@@ -55,6 +55,12 @@ def main(args, path_to_candidate_bonds):
             combo_scores, labels = combo_scores.to(args['device']), labels.to(args['device'])
             pred = model(bg, node_feats, edge_feats, combo_scores)
             loss = criterion(pred, labels)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            loss = loss.cpu().detach().data.item()
+            print('Epoch {:d}/{:d}, iter {:d}/{:d}, loss {:.4f}'.format(
+                epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader), loss))
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
