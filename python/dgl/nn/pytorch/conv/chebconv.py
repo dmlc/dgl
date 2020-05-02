@@ -57,7 +57,7 @@ class ChebConv(nn.Module):
                  k,
                  activation=F.relu,
                  bias=True):
-        super(Cheb_Conv, self).__init__()
+        super(ChebConv, self).__init__()
         self._k = k
         self._in_feats = in_feats
         self._out_feats = out_feats
