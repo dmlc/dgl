@@ -322,9 +322,10 @@ class DistGraphServer(KVServer):
         local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
         # The nodes that belong to this partition.
         nids = self.client_g.ndata[NID][local_nids]
-        assert np.all(F.asnumpy(full_part_ids[nids] == server_id))
+        assert np.all(full_part_ids[nids] == server_id)
         self.g2l[nids] = F.arange(0, len(nids))
 
+        full_part_ids = F.zerocopy_from_numpy(full_part_ids)
         if self.get_id() % self.get_group_count() == 0: # master server
             for name in node_feats.keys():
                 self.set_global2local(name=_get_ndata_name(name), global2local=self.g2l)

@@ -1,13 +1,12 @@
 """Functions for partitions."""
 
 import json
-import pickle
 import os
 import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID
-from ..data.utils import load_graphs, save_graphs
+from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
 
 def load_partition(conf_file, part_id):
@@ -33,22 +32,22 @@ def load_partition(conf_file, part_id):
 
     Returns
     -------
-    (DGLGraph, a dict of tensors, a dict of tensors, (int, int, tensor))
+    (DGLGraph, a dict of tensors, a dict of tensors, (int, int, NumPy ndarray))
         The data of a graph partition and the metadata of the global graph.
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
     part_files = part_metadata['part-{}'.format(part_id)]
-    node_feats = pickle.load(open(part_files['node_feats'], 'rb'))
-    edge_feats = pickle.load(open(part_files['edge_feats'], 'rb'))
+    node_feats = load_tensors(part_files['node_feats'])
+    edge_feats = load_tensors(part_files['edge_feats'])
     client_g = load_graphs(part_files['part_graph'])[0][0]
-    node_map = pickle.load(open(part_metadata['node_map'], 'rb'))
+    node_map = np.load(part_metadata['node_map'])
     meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map)
 
     part_ids = node_map[client_g.ndata[NID]]
     # TODO we need to fix this. DGL backend doesn't support boolean or byte.
     # int64 is unnecessary.
-    client_g.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
+    client_g.ndata['local_node'] = F.tensor(part_ids == part_id, F.int64)
 
     return client_g, node_feats, edge_feats, meta
 
@@ -68,13 +67,13 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
 
     The node assignment is stored in a separate file if we don't reshuffle node Ids to ensure
     that all nodes in a partition fall into a contiguous Id range. The node assignment is stored
-    in a pickle file.
+    in a numpy file.
 
-    All node features in a partition are stored in a pickle file. The node features are stored
-    in a dictionary, in which the key is the node data name and the value is a tensor.
+    All node features in a partition are stored in a file with DGL format. The node features are
+    stored in a dictionary, in which the key is the node data name and the value is a tensor.
 
-    All edge features in a partition are stored in a pickle file. The edge features are stored
-    in a dictionary, in which the key is the edge data name and the value is a tensor.
+    All edge features in a partition are stored in a file with DGL format. The edge features are
+    stored in a dictionary, in which the key is the edge data name and the value is a tensor.
 
     The graph structure of a partition is stored in a file with the DGLGraph format. The DGLGraph
     contains the mapping of node/edge Ids to the Ids in the original graph.
@@ -103,15 +102,15 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
         node_parts = metis_partition_assignment(g, num_parts)
         client_parts = partition_graph_with_halo(g, node_parts, num_hops)
     elif part_method == 'random':
-        node_parts = np.random.choice(num_parts, g.number_of_nodes())
+        node_parts = F.zerocopy_from_numpy(np.random.choice(num_parts, g.number_of_nodes()))
         client_parts = partition_graph_with_halo(g, node_parts, num_hops)
     else:
         raise Exception('unknown partitioning method: ' + part_method)
 
     tot_num_inner_edges = 0
     out_path = os.path.abspath(out_path)
-    node_part_file = '{}/{}-node_part.pkl'.format(out_path, graph_name)
-    pickle.dump(node_parts, open(node_part_file, 'wb'))
+    node_part_file = '{}/{}-node_part'.format(out_path, graph_name)
+    np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=False)
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
                      'num_edges': g.number_of_edges(),
@@ -119,7 +118,7 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
                      'num_parts': num_parts,
                      'halo_hops': num_hops,
                      'node_split': 'original',
-                     'node_map': node_part_file}
+                     'node_map': node_part_file + ".npy"}
     for part_id in range(num_parts):
         part = client_parts[part_id]
 
@@ -144,14 +143,14 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
             for name in g.edata:
                 edge_feats[name] = g.edata[name]
 
-        node_feat_file = '{}/{}-node_feat-{}.pkl'.format(out_path, graph_name, part_id)
-        edge_feat_file = '{}/{}-edge_feat-{}.pkl'.format(out_path, graph_name, part_id)
+        node_feat_file = '{}/{}-node_feat-{}.dgl'.format(out_path, graph_name, part_id)
+        edge_feat_file = '{}/{}-edge_feat-{}.dgl'.format(out_path, graph_name, part_id)
         part_graph_file = '{}/{}-part_graph-{}.dgl'.format(out_path, graph_name, part_id)
         part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
                                                     'edge_feats': edge_feat_file,
                                                     'part_graph': part_graph_file}
-        pickle.dump(node_feats, open(node_feat_file, 'wb'))
-        pickle.dump(edge_feats, open(edge_feat_file, 'wb'))
+        save_tensors(node_feat_file, node_feats)
+        save_tensors(edge_feat_file, edge_feats)
         save_graphs(part_graph_file, [part])
 
     with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:

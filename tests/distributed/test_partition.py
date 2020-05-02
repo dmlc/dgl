@@ -30,7 +30,7 @@ def test_partition():
         assert num_edges == g.number_of_edges()
 
         # Check the node map.
-        node_map = F.asnumpy(node_map)
+        node_map = node_map
         local_nodes = np.nonzero(node_map == i)[0]
         part_ids = node_map[F.asnumpy(part_g.ndata[dgl.NID])]
         local_nodes1 = F.asnumpy(part_g.ndata[dgl.NID])[part_ids == i]
