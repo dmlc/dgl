@@ -965,7 +965,7 @@ class KVClient(object):
         if name in self._full_data_shape == True:
             data_shape = self._full_data_shape[name]
         else: # requst local shape on each server and merge them together
-            data_shape = tuple(F.shape(self._data_store[name+'-data-']))
+            data_shape = list(F.shape(self._data_store[name+'-data-']))
             data_shape[0] = 0
             msg = KVStoreMsg(
                 type=KVMsgType.GET_SHAPE,
@@ -984,7 +984,7 @@ class KVClient(object):
                 back_msg = _recv_kv_msg(self._receiver)
                 assert msg.type == KVMsgType.GET_SHAPE_BACK
                 data_shape[0] += ((F.asnumpy(back_msg.shape)).tolist())[0]
-            self._full_data_shape[name] = data_shape
+            self._full_data_shape[name] = tuple(data_shape)
 
         return (data_type, data_shape, partition_book)
 
