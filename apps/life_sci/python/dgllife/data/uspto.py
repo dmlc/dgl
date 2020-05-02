@@ -1497,8 +1497,8 @@ class WLNRankDataset(object):
                 for i in tqdm(batch_ids):
                     batch_graphs.append(construct_graphs_rank(
                         (batch_reactant_mols[i], batch_valid_candidate_combos[i],
-                         batch_candidate_bond_changes[i], batch_reactant_info[i], edge_featurizer)
-                    ))
+                         batch_candidate_bond_changes[i], batch_reactant_info[i]),
+                        edge_featurizer))
             else:
                 batch_reaction_info = list(zip(batch_reactant_mols, batch_valid_candidate_combos,
                                                batch_candidate_bond_changes, batch_reactant_info))
@@ -1507,6 +1507,7 @@ class WLNRankDataset(object):
                         construct_graphs_rank,
                         edge_featurizer=edge_featurizer),
                         batch_reaction_info)
+
             # Get node features and candidate scores
             batch_node_features = []
             batch_combo_bias = []
