@@ -19,6 +19,11 @@ def save_tensors(filename, tensor_dict):
         File name to store dict of tensors. 
     tensor_dict: dict of dgl NDArray or backend tensor
         Python dict using string as key and tensor as value
+
+    Returns
+    ----------
+    status : bool
+        Return whether save operation succeeds
     """
     nd_dict = {}
     is_empty_dict = len(tensor_dict) == 0
@@ -46,6 +51,11 @@ def load_tensors(filename, return_dgl_ndarray=False):
         File name to load dict of tensors. 
     return_dgl_ndarray: bool
         Whether return dict of dgl NDArrays or backend tensors
+
+    Returns
+    ---------
+    tensor_dict : dict
+        dict of tensor or ndarray based on return_dgl_ndarray flag
     """
     nd_dict = _CAPI_LoadNDArrayDict(filename)
     tensor_dict = {}
