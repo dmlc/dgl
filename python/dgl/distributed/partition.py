@@ -215,8 +215,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_feats = {}
         edge_feats = {}
         if num_parts > 1:
-            local_nodes = F.asnumpy(part.ndata[NID])[F.asnumpy(part.ndata['inner_node']) == 1]
-            local_edges = F.asnumpy(part.edata[EID])[F.asnumpy(part.edata['inner_edge']) == 1]
+            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'] == 1)
+            local_edges = F.boolean_mask(part.edata[EID], part.edata['inner_edge'] == 1)
             print('part {} has {} nodes and {} edges.'.format(
                 part_id, part.number_of_nodes(), part.number_of_edges()))
             print('{} nodes and {} edges are inside the partition'.format(
