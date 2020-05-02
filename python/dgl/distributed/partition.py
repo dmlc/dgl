@@ -133,10 +133,10 @@ def load_partition(conf_file, part_id):
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    part_ids = node_map[graph.ndata[NID]]
+    part_ids = F.zerocopy_from_numpy(node_map)[graph.ndata[NID]]
     # TODO we need to fix this. DGL backend doesn't support boolean or byte.
     # int64 is unnecessary.
-    graph.ndata['local_node'] = F.tensor(part_ids == part_id, F.int64)
+    graph.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
 
     return graph, node_feats, edge_feats, meta
 
