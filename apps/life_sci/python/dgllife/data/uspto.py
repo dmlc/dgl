@@ -1299,8 +1299,8 @@ class WLNRankDataset(object):
         self.candidate_bond_changes = self.load_candidate_bond_changes(candidate_bond_path)
 
         self.num_candidate_bond_changes = num_candidate_bond_changes
-        self.max_um_changes_per_reaction = max_num_changes_per_reaction
-        self.max_nnum_change_combos_per_reaction = max_num_change_combos_per_reaction
+        self.max_num_changes_per_reaction = max_num_changes_per_reaction
+        self.max_num_change_combos_per_reaction = max_num_change_combos_per_reaction
         self.node_featurizer = node_featurizer
         self.edge_featurizer = edge_featurizer
 
