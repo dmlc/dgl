@@ -982,7 +982,7 @@ class KVClient(object):
             # recv msg
             for m_id in range(self._machine_count):
                 back_msg = _recv_kv_msg(self._receiver)
-                assert msg.type == KVMsgType.GET_SHAPE_BACK
+                assert back_msg.type == KVMsgType.GET_SHAPE_BACK
                 data_shape[0] += ((F.asnumpy(back_msg.shape)).tolist())[0]
             self._full_data_shape[name] = tuple(data_shape)
 
