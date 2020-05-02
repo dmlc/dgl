@@ -818,6 +818,29 @@ class KVClient(object):
                     self._data_name_list.append(tensor_name[0:-6])
                 self._has_data.add(tensor_name)
 
+        # Get full shape of each data
+        for name in self._data_name_list:
+            data_shape = list(F.shape(self._data_store[name+'-data-']))
+            data_shape[0] = 0
+            msg = KVStoreMsg(
+                type=KVMsgType.GET_SHAPE,
+                rank=self._client_id,
+                name=name,
+                id=None, 
+                data=None,
+                shape=None,
+                c_ptr=None)
+            # send msg
+            for m_id in range(self._machine_count):
+                s_id = m_id * self._group_count
+                _send_kv_msg(self._sender, msg, s_id)
+            # recv msg
+            for m_id in range(self._machine_count):
+                back_msg = _recv_kv_msg(self._receiver)
+                assert back_msg.type == KVMsgType.GET_SHAPE_BACK
+                data_shape[0] += ((F.asnumpy(back_msg.shape)).tolist())[0]
+            self._full_data_shape[name] = tuple(data_shape)
+
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
 
 
@@ -885,6 +908,7 @@ class KVClient(object):
         self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
         self._has_data.add(name+'-data-')
         self._data_name_list.append(name)
+        self._full_data_shape[name] = tuple(shape)
 
 
     def print(self):
@@ -961,31 +985,7 @@ class KVClient(object):
 
         data_type = F.dtype(self._data_store[name+'-data-'])
         partition_book = self._data_store[name+'-part-']
-
-        if name in self._full_data_shape == True:
-            data_shape = self._full_data_shape[name]
-        else: # requst local shape on each server and merge them together
-            data_shape = list(F.shape(self._data_store[name+'-data-']))
-            data_shape[0] = 0
-            msg = KVStoreMsg(
-                type=KVMsgType.GET_SHAPE,
-                rank=self._client_id,
-                name=name,
-                id=None, 
-                data=None,
-                shape=None,
-                c_ptr=None)
-            # send msg
-            for m_id in range(self._machine_count):
-                s_id = m_id * self._group_count
-                _send_kv_msg(self._sender, msg, s_id)
-            # recv msg
-            for m_id in range(self._machine_count):
-                back_msg = _recv_kv_msg(self._receiver)
-                assert back_msg.type == KVMsgType.GET_SHAPE_BACK
-                data_shape[0] += ((F.asnumpy(back_msg.shape)).tolist())[0]
-                data_shape = tuple(data_shape)
-            self._full_data_shape[name] = data_shape
+        data_shape = self._full_data_shape[name]
 
         return (data_type, data_shape, partition_book)
 
