@@ -324,12 +324,12 @@ class DistGraphServer(KVServer):
 
         full_part_ids = F.zerocopy_from_numpy(full_part_ids)
         if self.get_id() % self.get_group_count() == 0: # master server
-            for name in node_feats.keys():
+            for name in node_feats:
                 self.set_global2local(name=_get_ndata_name(name), global2local=self.g2l)
                 self.init_data(name=_get_ndata_name(name), data_tensor=node_feats[name])
                 self.set_partition_book(name=_get_ndata_name(name), partition_book=full_part_ids)
         else:
-            for name in node_feats.keys():
+            for name in node_feats:
                 self.set_global2local(name=_get_ndata_name(name))
                 self.init_data(name=_get_ndata_name(name))
                 self.set_partition_book(name=_get_ndata_name(name), partition_book=full_part_ids)
