@@ -24,7 +24,8 @@ def main():
     args = parser.parse_args()
     glist, _ = load_graphs(args.data)
     g = glist[0]
-    partition_graph(g, args.graph_name, args.num_parts, args.num_hops, args.method, args.output)
+    partition_graph(g, args.graph_name, args.num_parts, args.output,
+                    num_hops=args.num_hops, part_method=args.method)
 
 
 if __name__ == '__main__':

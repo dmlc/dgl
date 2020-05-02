@@ -3,6 +3,7 @@
 For distributed training, a graph is partitioned and partitions are stored in files
 organized as follows:
 
+```
 data_root_dir/
   |-- part_conf.json      # partition configuration file in JSON
   |-- node_map            # partition id of each node stored in a numpy array
@@ -14,28 +15,43 @@ data_root_dir/
       |-- node_feats
       |-- edge_feats
       |-- graph
-  |-- part2/
-      |-- ...
+```
 
 The partition configuration file stores the file locations. For the above example,
 the configuration file will look like the following:
 
+```
 {
-  "node_map" : "data_root_dir/node_map",
+  "graph_name" : "test",
+  "part_method" : "metis",
+  "num_parts" : 2
+  "halo_hops" : 1,
+  "node_map" : "data_root_dir/node_map.npy",
   "num_nodes" : 1000000,
   "num_edges" : 52000000,
   "part-0" : {
-    "node_feats" : "data_root_dir/part0/node_feats",
-    "edge_feats" : "data_root_dir/part0/edge_feats",
-    "part_graph" : "data_root_dir/part0/graph",
+    "node_feats" : "data_root_dir/part0/node_feats.dgl",
+    "edge_feats" : "data_root_dir/part0/edge_feats.dgl",
+    "part_graph" : "data_root_dir/part0/graph.dgl",
   },
   "part-1" : {
-    "node_feats" : "data_root_dir/part1/node_feats",
-    "edge_feats" : "data_root_dir/part1/edge_feats",
-    "part_graph" : "data_root_dir/part1/graph",
+    "node_feats" : "data_root_dir/part1/node_feats.dgl",
+    "edge_feats" : "data_root_dir/part1/edge_feats.dgl",
+    "part_graph" : "data_root_dir/part1/graph.dgl",
   },
-  ...
 }
+```
+
+Here are the definition of the fields in the partition configuration file:
+    * `graph_name` is the name of the graph given by a user.
+    * `part_method` is the method used to assign nodes to partitions.
+      Currently, it supports "random" and "metis".
+    * `num_parts` is the number of partitions.
+    * `halo_hops` is the number of HALO nodes we want to include in a partition.
+    * `node_map` is the node assignment map, which tells the partition Id a node is assigned to.
+    * `num_nodes` is the number of nodes in the global graph.
+    * `num_edges` is the number of edges in the global graph.
+    * `part-*` stores the data of a partition.
 
 Nodes in each partition is *relabeled* to always start with zero. We call the node
 ID in the original graph, *global ID*, while the relabeled ID in each partition,
@@ -90,8 +106,14 @@ def load_partition(conf_file, part_id):
 
     Returns
     -------
-    (DGLGraph, a dict of tensors, a dict of tensors, (int, int, NumPy ndarray))
-        The data of a graph partition and the metadata of the global graph.
+    DGLGraph
+        The graph partition structure.
+    dict of tensors
+        All node features.
+    dict of tensors
+        All edge features.
+    (int, int, NumPy ndarray))
+        The metadata of the global graph: number of nodes, number of edges, node map.
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
@@ -118,7 +140,7 @@ def load_partition(conf_file, part_id):
 
     return graph, node_feats, edge_feats, meta
 
-def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
+def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis"):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -162,17 +184,17 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
     '''
     if num_parts == 1:
         client_parts = {0: g}
-        node_parts = F.zeros((g.number_of_nodes()), F.int64, F.cpu())
+        node_parts = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
         g.ndata[NID] = F.arange(0, g.number_of_nodes())
         g.edata[EID] = F.arange(0, g.number_of_edges())
     elif part_method == 'metis':
         node_parts = metis_partition_assignment(g, num_parts)
         client_parts = partition_graph_with_halo(g, node_parts, num_hops)
     elif part_method == 'random':
-        node_parts = F.zerocopy_from_numpy(np.random.choice(num_parts, g.number_of_nodes()))
+        node_parts = dgl.random.choice(num_parts, g.number_of_nodes())
         client_parts = partition_graph_with_halo(g, node_parts, num_hops)
     else:
-        raise Exception('unknown partitioning method: ' + part_method)
+        raise Exception('Unknown partitioning method: ' + part_method)
 
     os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
@@ -185,7 +207,6 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
                      'part_method': part_method,
                      'num_parts': num_parts,
                      'halo_hops': num_hops,
-                     'node_split': 'original',
                      'node_map': node_part_file + ".npy"}
     for part_id in range(num_parts):
         part = client_parts[part_id]
@@ -229,5 +250,5 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
     num_cuts = g.number_of_edges() - tot_num_inner_edges
     if num_parts == 1:
         num_cuts = 0
-    print('there are {} edges in the graph and {} edge cuts for {} partitions.'.format(
+    print('There are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), num_cuts, num_parts))

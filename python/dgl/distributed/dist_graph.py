@@ -154,7 +154,7 @@ class DistTensor:
         return self.kvstore.pull(name=self.name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
-        # TODO(zhengda) how do we want to support broadcast.
+        # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self.name, id_tensor=idx, data_tensor=val)
 
     def __len__(self):
@@ -314,12 +314,11 @@ class DistGraphServer(KVServer):
         self.meta = _move_data_to_shared_mem_array(F.tensor([num_nodes, num_edges]),
                                                    _get_ndata_path(graph_name, 'meta'))
 
-        self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu())
-        self.g2l[:] = -1
+        self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
         local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
         # The nodes that belong to this partition.
         nids = self.client_g.ndata[NID][local_nids]
-        assert np.all(full_part_ids[nids] == server_id)
+        assert np.all(full_part_ids[nids] == server_id), 'Load a wrong partition'
         self.g2l[nids] = F.arange(0, len(nids))
 
         full_part_ids = F.zerocopy_from_numpy(full_part_ids)
@@ -333,7 +332,6 @@ class DistGraphServer(KVServer):
                 self.set_global2local(name=_get_ndata_name(name))
                 self.init_data(name=_get_ndata_name(name))
                 self.set_partition_book(name=_get_ndata_name(name), partition_book=full_part_ids)
-        # TODO Do I need synchronization?
 
 class DistGraph:
     ''' The DistGraph client.
@@ -379,24 +377,6 @@ class DistGraph:
 
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
-
-    def _get_all_ndata_names(self):
-        names = self._client.get_data_name_list()
-        ndata_names = []
-        for name in names:
-            if _is_ndata_name(name):
-                # Remove the prefix "node:"
-                ndata_names.append(name[5:])
-        return ndata_names
-
-    def _get_all_edata_names(self):
-        names = self._client.get_data_name_list()
-        edata_names = []
-        for name in names:
-            if _is_edata_name(name):
-                # Remove the prefix "edge:"
-                edata_names.append(name[5:])
-        return edata_names
 
 
     def init_ndata(self, ndata_name, shape, dtype):
@@ -457,7 +437,8 @@ class DistGraph:
         initializer : callable
             The initializer.
         '''
-        # TODO
+        # TODO(zhengda)
+        raise NotImplementedError("init_node_emb isn't supported yet")
 
     def get_node_embeddings(self):
         ''' Return node embeddings
@@ -467,7 +448,8 @@ class DistGraph:
         a dict of SparseEmbedding
             All node embeddings in the graph store.
         '''
-        # TODO
+        # TODO(zhengda)
+        raise NotImplementedError("get_node_embeddings isn't supported yet")
 
     @property
     def ndata(self):
@@ -532,3 +514,25 @@ class DistGraph:
         self._ndata = None
         self._edata = None
         self._client.shut_down()
+
+    def _get_all_ndata_names(self):
+        ''' Get the names of all node data.
+        '''
+        names = self._client.get_data_name_list()
+        ndata_names = []
+        for name in names:
+            if _is_ndata_name(name):
+                # Remove the prefix "node:"
+                ndata_names.append(name[5:])
+        return ndata_names
+
+    def _get_all_edata_names(self):
+        ''' Get the names of all edge data.
+        '''
+        names = self._client.get_data_name_list()
+        edata_names = []
+        for name in names:
+            if _is_edata_name(name):
+                # Remove the prefix "edge:"
+                edata_names.append(name[5:])
+        return edata_names

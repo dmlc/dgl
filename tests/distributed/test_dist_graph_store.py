@@ -74,7 +74,7 @@ def run_server_client():
     num_parts = 1
     graph_name = 'test'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    partition_graph(g, graph_name, num_parts, 1, 'metis', '/tmp')
+    partition_graph(g, graph_name, num_parts, '/tmp')
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
