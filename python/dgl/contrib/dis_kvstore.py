@@ -984,7 +984,8 @@ class KVClient(object):
                 back_msg = _recv_kv_msg(self._receiver)
                 assert back_msg.type == KVMsgType.GET_SHAPE_BACK
                 data_shape[0] += ((F.asnumpy(back_msg.shape)).tolist())[0]
-            self._full_data_shape[name] = tuple(data_shape)
+                data_shape = tuple(data_shape)
+            self._full_data_shape[name] = data_shape
 
         return (data_type, data_shape, partition_book)
 
