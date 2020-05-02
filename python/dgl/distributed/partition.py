@@ -1,4 +1,62 @@
-"""Functions for partitions."""
+"""Functions for partitions.
+
+For distributed training, a graph is partitioned and partitions are stored in files
+organized as follows:
+
+data_root_dir/
+  |-- part_conf.json      # partition configuration file in JSON
+  |-- node_map            # partition id of each node stored in a numpy array
+  |-- part0/              # data for partition 0
+      |-- node_feats      # node features stored in binary format
+      |-- edge_feats      # edge features stored in binary format
+      |-- graph           # graph structure of this partition stored in binary format
+  |-- part1/              # data for partition 1
+      |-- node_feats
+      |-- edge_feats
+      |-- graph
+  |-- part2/
+      |-- ...
+
+The partition configuration file stores the file locations. For the above example,
+the configuration file will look like the following:
+
+{
+  "node_map" : "data_root_dir/node_map",
+  "num_nodes" : 1000000,
+  "num_edges" : 52000000,
+  "part-0" : {
+    "node_feats" : "data_root_dir/part0/node_feats",
+    "edge_feats" : "data_root_dir/part0/edge_feats",
+    "part_graph" : "data_root_dir/part0/graph",
+  },
+  "part-1" : {
+    "node_feats" : "data_root_dir/part1/node_feats",
+    "edge_feats" : "data_root_dir/part1/edge_feats",
+    "part_graph" : "data_root_dir/part1/graph",
+  },
+  ...
+}
+
+Nodes in each partition is *relabeled* to always start with zero. We call the node
+ID in the original graph, *global ID*, while the relabeled ID in each partition,
+*local ID*. Each partition graph has an integer node data tensor stored under name
+`dgl.NID` and each value is the node's global ID. Similarly, edges are relabeled too
+and the mapping from local ID to global ID is stored as an integer edge data tensor
+under name `dgl.EID`.
+
+Note that each partition can contain *HALO* nodes and edges, those belonging to
+other partitions but are included in this partition for integrity or efficiency concerns.
+We call nodes and edges that truly belong to one partition *local nodes/edges*, while
+the rest "HALO nodes/edges".
+
+Node and edge features are splitted and stored together with each graph partition.
+We do not store features of HALO nodes and edges.
+
+Two useful functions in this module:
+    * :func:`~dgl.distributed.load_partition` loads one partition and the meta data into memory.
+    * :func:`~dgl.distributed.partition` partitions a graph into files organized as above.
+
+"""
 
 import json
 import os
@@ -37,19 +95,28 @@ def load_partition(conf_file, part_id):
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
+    assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
     part_files = part_metadata['part-{}'.format(part_id)]
+    assert 'node_feats' in part_files, "the partition does not contain node features."
+    assert 'edge_feats' in part_files, "the partition does not contain edge feature."
+    assert 'part_graph' in part_files, "the partition does not contain graph structure."
     node_feats = load_tensors(part_files['node_feats'])
     edge_feats = load_tensors(part_files['edge_feats'])
-    client_g = load_graphs(part_files['part_graph'])[0][0]
+    graph = load_graphs(part_files['part_graph'])[0][0]
+    assert 'num_nodes' in part_metadata, "cannot get the number of nodes of the global graph."
+    assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
+    assert 'node_map' in part_metadata, "cannot get the node map."
     node_map = np.load(part_metadata['node_map'])
     meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map)
+    assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
+    assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    part_ids = node_map[client_g.ndata[NID]]
+    part_ids = node_map[graph.ndata[NID]]
     # TODO we need to fix this. DGL backend doesn't support boolean or byte.
     # int64 is unnecessary.
-    client_g.ndata['local_node'] = F.tensor(part_ids == part_id, F.int64)
+    graph.ndata['local_node'] = F.tensor(part_ids == part_id, F.int64)
 
-    return client_g, node_feats, edge_feats, meta
+    return graph, node_feats, edge_feats, meta
 
 def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
     ''' Partition a graph for distributed training and store the partitions on files.
@@ -107,9 +174,10 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
     else:
         raise Exception('unknown partitioning method: ' + part_method)
 
+    os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
     out_path = os.path.abspath(out_path)
-    node_part_file = '{}/{}-node_part'.format(out_path, graph_name)
+    node_part_file = os.path.join(out_path, "node_map")
     np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=False)
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
@@ -143,12 +211,14 @@ def partition_graph(g, graph_name, num_parts, num_hops, part_method, out_path):
             for name in g.edata:
                 edge_feats[name] = g.edata[name]
 
-        node_feat_file = '{}/{}-node_feat-{}.dgl'.format(out_path, graph_name, part_id)
-        edge_feat_file = '{}/{}-edge_feat-{}.dgl'.format(out_path, graph_name, part_id)
-        part_graph_file = '{}/{}-part_graph-{}.dgl'.format(out_path, graph_name, part_id)
+        part_dir = os.path.join(out_path, "part" + str(part_id))
+        node_feat_file = os.path.join(part_dir, "node_feat.dgl")
+        edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
+        part_graph_file = os.path.join(part_dir, "graph.dgl")
         part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
                                                     'edge_feats': edge_feat_file,
                                                     'part_graph': part_graph_file}
+        os.makedirs(part_dir, mode=0o775, exist_ok=True)
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
         save_graphs(part_graph_file, [part])
