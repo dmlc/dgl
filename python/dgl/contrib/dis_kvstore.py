@@ -500,7 +500,7 @@ class KVServer(object):
                     shape=msg.shape,
                     c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, 0)
-            # Get shaoe message
+            # Get shape message
             elif msg.type == KVMsgType.GET_SHAPE:
                 data_shape = F.tensor(F.shape(self._data_store[msg.name+'-data-']))
                 back_msg = KVStoreMsg(
