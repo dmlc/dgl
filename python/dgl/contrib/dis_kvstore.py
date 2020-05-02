@@ -805,10 +805,9 @@ class KVClient(object):
                 tensor_name, dtype = self._deserialize_shared_tensor(data)
                 while True:
                     if (os.path.exists(tensor_name+'shape-'+str(self._machine_id))):
-                        time.sleep(2) # wait writing finish
                         break
                     else:
-                        time.sleep(2) # wait until the file been created 
+                        time.sleep(1) # wait until the file been created 
                 shape, data_type = self._read_data_shape_type(tensor_name+'shape-'+str(self._machine_id))
                 assert data_type == dtype
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
