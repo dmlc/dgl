@@ -498,14 +498,17 @@ static void send_kv_message(network::Sender* sender,
   CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
   if (kv_msg->msg_type != kFinalMsg &&
       kv_msg->msg_type != kBarrierMsg &&
-      kv_msg->msg_type != kIPIDMsg) {
+      kv_msg->msg_type != kIPIDMsg &&
+      kv_msg->msg_type != kGetShapeMsg) {
     // Send ArrayMeta
     ArrayMeta meta(kv_msg->msg_type);
-    if (kv_msg->msg_type != kInitMsg) {
+    if (kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       meta.AddArray(kv_msg->id);
     }
     if (kv_msg->msg_type != kPullMsg &&
-        kv_msg->msg_type != kInitMsg) {
+        kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       meta.AddArray(kv_msg->data);
     }
     if (kv_msg->msg_type != kPullMsg &&
@@ -523,7 +526,9 @@ static void send_kv_message(network::Sender* sender,
     }
     CHECK_EQ(sender->Send(send_meta_msg, recv_id), ADD_SUCCESS);
     // Send ID NDArray
-    if (kv_msg->msg_type != kInitMsg) {
+    if (kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       Message send_id_msg;
       send_id_msg.data = static_cast<char*>(kv_msg->id->data);
       send_id_msg.size = kv_msg->id.GetSize();
@@ -535,7 +540,9 @@ static void send_kv_message(network::Sender* sender,
     }
     // Send data NDArray
     if (kv_msg->msg_type != kPullMsg &&
-        kv_msg->msg_type != kInitMsg) {
+        kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       Message send_data_msg;
       send_data_msg.data = static_cast<char*>(kv_msg->data->data);
       send_data_msg.size = kv_msg->data.GetSize();
@@ -571,7 +578,8 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   recv_kv_msg.deallocator(&recv_kv_msg);
   if (kv_msg->msg_type == kFinalMsg ||
       kv_msg->msg_type == kBarrierMsg ||
-      kv_msg->msg_type == kIPIDMsg) {
+      kv_msg->msg_type == kIPIDMsg ||
+      kv_msg->msg_type == kGetShapeMsg) {
     return kv_msg;
   }
   // Recv ArrayMeta
@@ -580,7 +588,8 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   ArrayMeta meta(recv_meta_msg.data, recv_meta_msg.size);
   recv_meta_msg.deallocator(&recv_meta_msg);
   // Recv ID NDArray
-  if (kv_msg->msg_type != kInitMsg) {
+  if (kv_msg->msg_type != kInitMsg &&
+      kv_msg->msg_type != kGetShapeBackMsg) {
     Message recv_id_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
     CHECK_EQ(meta.data_shape_[0], 1);
@@ -593,7 +602,8 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   }
   // Recv Data NDArray
   if (kv_msg->msg_type != kPullMsg &&
-      kv_msg->msg_type != kInitMsg) {
+      kv_msg->msg_type != kInitMsg &&
+      kv_msg->msg_type != kGetShapeBackMsg) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[2];
@@ -644,18 +654,23 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
       std::string name = args[args_count++];
       kv_msg.name = name;
       if (kv_msg.msg_type != kIPIDMsg &&
-          kv_msg.msg_type != kInitMsg) {
+          kv_msg.msg_type != kInitMsg &&
+          kv_msg.msg_type != kGetShapeMsg &&
+          kv_msg.msg_type != kGetShapeBackMsg) {
         kv_msg.id = args[args_count++];
       }
       if (kv_msg.msg_type != kPullMsg &&
           kv_msg.msg_type != kIPIDMsg &&
-          kv_msg.msg_type != kInitMsg) {
+          kv_msg.msg_type != kInitMsg &&
+          kv_msg.msg_type != kGetShapeMsg &&
+          kv_msg.msg_type != kGetShapeBackMsg) {
         kv_msg.data = args[args_count++];
       }
       if (kv_msg.msg_type != kIPIDMsg &&
           kv_msg.msg_type != kPullMsg &&
           kv_msg.msg_type != kPushMsg &&
-          kv_msg.msg_type != kPullBackMsg) {
+          kv_msg.msg_type != kPullBackMsg &&
+          kv_msg.msg_type != kGetShapeMsg) {
         kv_msg.shape = args[args_count++];
       }
     }

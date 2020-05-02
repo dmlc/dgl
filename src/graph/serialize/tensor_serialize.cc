@@ -19,36 +19,48 @@ namespace serialize {
 
 typedef std::pair<std::string, NDArray> NamedTensor;
 
+constexpr uint64_t kDGLSerialize_Tensors = 0xDD5A9FBE3FA2443F;
+
 DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_SaveNDArrayDict")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
-    Map<std::string, Value> nd_dict = args[1];
+    auto *fs = dmlc::Stream::Create(filename.c_str(), "w");
+    CHECK(fs) << "Filename is invalid";
+    fs->Write(kDGLSerialize_Tensors);
+    bool empty_dict = args[2];
+    Map<std::string, Value> nd_dict;
+    if (!empty_dict) {
+      nd_dict = args[1];
+    }
     std::vector<NamedTensor> namedTensors;
+    fs->Write(static_cast<uint64_t>(nd_dict.size()));
     for (auto kv : nd_dict) {
       NDArray ndarray = static_cast<NDArray>(kv.second->data);
       namedTensors.emplace_back(kv.first, ndarray);
     }
-    auto *fs = dynamic_cast<SeekStream *>(
-      SeekStream::Create(filename.c_str(), "w", true));
     fs->Write(namedTensors);
-    delete fs;
     *rv = true;
+    delete fs;
   });
 
 DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_LoadNDArrayDict")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
+    auto *fs = dmlc::Stream::Create(filename.c_str(), "r");
+    CHECK(fs) << "Filename is invalid or file doesn't exists";
+    uint64_t magincNum, num_elements;
+    CHECK(fs->Read(&magincNum)) << "Invalid file";
+    CHECK_EQ(magincNum, kDGLSerialize_Tensors) << "Invalid DGL tensor file";
+    CHECK(fs->Read(&num_elements)) << "Invalid num of elements";
     Map<std::string, Value> nd_dict;
     std::vector<NamedTensor> namedTensors;
-    SeekStream *fs = SeekStream::CreateForRead(filename.c_str(), true);
-    CHECK(fs) << "Filename is invalid or file doesn't exists";
     fs->Read(&namedTensors);
     for (auto kv : namedTensors) {
       Value ndarray = Value(MakeValue(kv.second));
       nd_dict.Set(kv.first, ndarray);
     }
-    delete fs;
     *rv = nd_dict;
+    delete fs;
   });
 
 }  // namespace serialize
