@@ -147,10 +147,7 @@ class DistTensor:
         self.kvstore = g._client
         self.name = name
         dtype, shape, _ = g._client.get_data_meta(name)
-        # We need to ensure that the first dim is the number of nodes in a graph.
-        shape = [s for s in shape]
-        shape[0] = g.number_of_nodes()
-        self._shape = tuple(shape)
+        self._shape = shape
         self._dtype = dtype
 
     def __getitem__(self, idx):
