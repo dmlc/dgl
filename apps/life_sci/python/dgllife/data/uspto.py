@@ -606,10 +606,9 @@ def mkdir_p(path):
     """
     try:
         os.makedirs(path)
-        print('Created directory {}'.format(path))
     except OSError as exc:
         if exc.errno == errno.EEXIST and os.path.isdir(path):
-            print('Directory {} already exists.'.format(path))
+            pass
         else:
             raise
 
