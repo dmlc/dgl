@@ -1,6 +1,5 @@
 """USPTO for reaction prediction"""
 import errno
-import itertools
 import numpy as np
 import os
 import pickle
@@ -1387,9 +1386,9 @@ class WLNRankDataset(object):
                 _update_from_line(id, loaded_line)
         else:
             with Pool(processes=num_processes) as pool:
-                results = list(tqdm(pool.imap(
+                results = pool.map(
                     partial(load_one_reaction_rank, train_mode=self.train_mode),
-                    lines, chunksize=len(lines) // num_processes), total=len(lines)))
+                    lines, chunksize=len(lines) // num_processes)
             for id in range(len(lines)):
                 _update_from_line(id, results[id])
 
@@ -1482,14 +1481,13 @@ class WLNRankDataset(object):
                                                batch_real_bond_changes,
                                                batch_reactant_mols, batch_product_mols))
                 with Pool(processes=num_processes) as pool:
-                    results = list(tqdm(pool.imap(partial(
+                    results = pool.map(partial(
                         pre_process_one_reaction,
                         num_candidate_bond_changes=num_candidate_bond_changes,
                         max_num_bond_changes=max_num_changes_per_reaction,
                         max_num_change_combos=max_num_change_combos_per_reaction,
                         train_mode=self.train_mode),
-                        batch_reaction_info, chunksize=len(batch_ids) // num_processes),
-                        total=len(batch_ids)))
+                        batch_reaction_info)
                 batch_valid_candidate_combos, batch_candidate_bond_changes, \
                 batch_reactant_info = map(list, zip(*results))
 
@@ -1505,12 +1503,10 @@ class WLNRankDataset(object):
                 batch_reaction_info = list(zip(batch_reactant_mols, batch_valid_candidate_combos,
                                                batch_candidate_bond_changes, batch_reactant_info))
                 with Pool(processes=num_processes) as pool:
-                    batch_graphs = list(tqdm(pool.imap(partial(
+                    batch_graphs = pool.map(partial(
                         construct_graphs_rank,
                         edge_featurizer=edge_featurizer),
-                        batch_reaction_info, chunksize=len(batch_ids) // num_processes),
-                        total=len(batch_ids)))
-
+                        batch_reaction_info)
             # Get node features and candidate scores
             batch_node_features = []
             batch_combo_bias = []
