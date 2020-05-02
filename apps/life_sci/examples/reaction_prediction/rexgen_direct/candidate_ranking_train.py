@@ -50,7 +50,7 @@ def main(args, path_to_candidate_bonds):
             t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
-            bg, combo_scores, labels = batch_data
+            bg, node_feats, edge_feats, combo_scores, labels = batch_data
             node_feats, edge_feats = node_feats.to(args['device']), edge_feats.to(args['device'])
             combo_scores, labels = combo_scores.to(args['device']), labels.to(args['device'])
             pred = model(bg, node_feats, edge_feats, combo_scores)
