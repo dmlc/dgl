@@ -18,7 +18,6 @@ def main(args, path_to_candidate_bonds):
         train_set = WLNRankDataset(path_to_save_results=args['result_path'] + '/train',
                                    raw_file_path=args['train_path'],
                                    candidate_bond_path=path_to_candidate_bonds['train'],
-                                   mol_graph_path='train_rank_graphs.bin',
                                    num_processes=args['num_processes'])
     train_set.ignore_large()
     if args['val_path'] is None:
@@ -28,7 +27,6 @@ def main(args, path_to_candidate_bonds):
         val_set = WLNRankDataset(path_to_save_results=args['result_path'] + '/val',
                                  raw_file_path=args['val_path'],
                                  candidate_bond_path=path_to_candidate_bonds['val'],
-                                 mol_graph_path='val_rank_graphs.bin',
                                  train_mode=False,
                                  num_processes=args['num_processes'])
 
