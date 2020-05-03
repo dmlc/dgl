@@ -222,11 +222,12 @@ class RelGraphConvLayer(nn.Module):
         with block.local_scope():
             block.srcdata['h'] = x
             block.edata['etype'] = etypes
+            #if norm is not None:
             block.edata['norm'] = norm
             # if g.edata['norm'] is None then this is no norm
 
             if self.self_loop:
-                loop_message = th.matmul(x, self.loop_weight)
+                loop_message = th.matmul(x[:block.dstdata[dgl.NID].shape[0]], self.loop_weight)
             # message passing
             block.update_all(self.message_func, fn.sum(msg='msg', out='h'))
             # apply bias and activation

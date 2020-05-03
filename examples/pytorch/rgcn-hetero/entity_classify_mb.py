@@ -57,7 +57,6 @@ def extract_embed(node_embed, block):
         emb[ntype] = node_embed[ntype][nid]
     return emb
 
-
 def evaluate(model, seeds, blocks, node_embed, labels, category, use_cuda):
     model.eval()
     emb = extract_embed(node_embed, blocks[0])
