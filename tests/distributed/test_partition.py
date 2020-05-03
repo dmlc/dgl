@@ -20,21 +20,28 @@ def test_partition():
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
     num_parts = 4
     num_hops = 2
+
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
-        num_nodes, num_edges, node_map = meta
+        num_nodes, num_edges, node_map, edge_map = meta
 
         # Check the metadata
         assert num_nodes == g.number_of_nodes()
         assert num_edges == g.number_of_edges()
 
         # Check the node map.
-        node_map = node_map
         local_nodes = np.nonzero(node_map == i)[0]
         part_ids = node_map[F.asnumpy(part_g.ndata[dgl.NID])]
         local_nodes1 = F.asnumpy(part_g.ndata[dgl.NID])[part_ids == i]
         assert np.all(local_nodes == local_nodes1)
+
+        # Check the edge map.
+        assert np.all(edge_map >= 0)
+        local_edges = np.nonzero(edge_map == i)[0]
+        part_ids = edge_map[F.asnumpy(part_g.edata[dgl.EID])]
+        local_edges1 = F.asnumpy(part_g.edata[dgl.EID])[part_ids == i]
+        assert np.all(local_edges == np.sort(local_edges1))
 
         for name in ['labels', 'feats']:
             assert name in node_feats

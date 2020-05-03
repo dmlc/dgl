@@ -42,6 +42,9 @@ def _copy_graph_to_shared_mem(g, graph_name):
     local_node_path = _get_ndata_path(graph_name, 'local_node')
     new_g.ndata['local_node'] = _move_data_to_shared_mem_array(g.ndata['local_node'],
                                                                local_node_path)
+    local_edge_path = _get_edata_path(graph_name, 'local_edge')
+    new_g.edata['local_edge'] = _move_data_to_shared_mem_array(g.edata['local_edge'],
+                                                               local_edge_path)
     new_g.ndata[NID] = _move_data_to_shared_mem_array(g.ndata[NID],
                                                       _get_ndata_path(graph_name, NID))
     new_g.edata[EID] = _move_data_to_shared_mem_array(g.edata[EID],
@@ -308,30 +311,47 @@ class DistGraphServer(KVServer):
         host_ip = socket.gethostbyname(host_name)
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
-        self.client_g, node_feats, _, self.meta = load_partition(conf_file, server_id)
-        num_nodes, num_edges, full_part_ids = self.meta
+        self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
+        num_nodes, num_edges, node_map, edge_map = self.meta
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
         self.meta = _move_data_to_shared_mem_array(F.tensor([num_nodes, num_edges]),
                                                    _get_ndata_path(graph_name, 'meta'))
 
-        self.g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
-        local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
+        # Create node global2local map.
+        self.node_g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
         # The nodes that belong to this partition.
+        local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
         nids = self.client_g.ndata[NID][local_nids]
-        assert np.all(full_part_ids[nids] == server_id), 'Load a wrong partition'
-        self.g2l[nids] = F.arange(0, len(nids))
+        assert np.all(node_map[nids] == server_id), 'Load a wrong partition'
+        F.scatter_row_inplace(self.node_g2l, nids, F.arange(0, len(nids)))
 
-        full_part_ids = F.zerocopy_from_numpy(full_part_ids)
+        # Create edge global2local map.
+        self.edge_g2l = F.zeros((num_edges), dtype=F.int64, ctx=F.cpu()) - 1
+        local_eids = F.nonzero_1d(self.client_g.edata['local_edge'])
+        eids = self.client_g.edata[EID][local_eids]
+        assert np.all(edge_map[eids] == server_id), 'Load a wrong partition'
+        F.scatter_row_inplace(self.edge_g2l, eids, F.arange(0, len(eids)))
+
+        node_map = F.zerocopy_from_numpy(node_map)
+        edge_map = F.zerocopy_from_numpy(edge_map)
         if self.get_id() % self.get_group_count() == 0: # master server
             for name in node_feats:
-                self.set_global2local(name=_get_ndata_name(name), global2local=self.g2l)
+                self.set_global2local(name=_get_ndata_name(name), global2local=self.node_g2l)
                 self.init_data(name=_get_ndata_name(name), data_tensor=node_feats[name])
-                self.set_partition_book(name=_get_ndata_name(name), partition_book=full_part_ids)
+                self.set_partition_book(name=_get_ndata_name(name), partition_book=node_map)
+            for name in edge_feats:
+                self.set_global2local(name=_get_edata_name(name), global2local=self.edge_g2l)
+                self.init_data(name=_get_edata_name(name), data_tensor=edge_feats[name])
+                self.set_partition_book(name=_get_edata_name(name), partition_book=edge_map)
         else:
             for name in node_feats:
                 self.set_global2local(name=_get_ndata_name(name))
                 self.init_data(name=_get_ndata_name(name))
-                self.set_partition_book(name=_get_ndata_name(name), partition_book=full_part_ids)
+                self.set_partition_book(name=_get_ndata_name(name), partition_book=node_map)
+            for name in edge_feats:
+                self.set_global2local(name=_get_edata_name(name))
+                self.init_data(name=_get_edata_name(name))
+                self.set_partition_book(name=_get_edata_name(name), partition_book=edge_map)
 
 class DistGraph:
     ''' The DistGraph client.

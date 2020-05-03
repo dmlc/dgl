@@ -7,6 +7,7 @@ organized as follows:
 data_root_dir/
   |-- part_conf.json      # partition configuration file in JSON
   |-- node_map            # partition id of each node stored in a numpy array
+  |-- edge_map            # partition id of each edge stored in a numpy array
   |-- part0/              # data for partition 0
       |-- node_feats      # node features stored in binary format
       |-- edge_feats      # edge features stored in binary format
@@ -27,6 +28,7 @@ the configuration file will look like the following:
   "num_parts" : 2
   "halo_hops" : 1,
   "node_map" : "data_root_dir/node_map.npy",
+  "edge_map" : "data_root_dir/edge_map.npy"
   "num_nodes" : 1000000,
   "num_edges" : 52000000,
   "part-0" : {
@@ -49,6 +51,7 @@ Here are the definition of the fields in the partition configuration file:
     * `num_parts` is the number of partitions.
     * `halo_hops` is the number of HALO nodes we want to include in a partition.
     * `node_map` is the node assignment map, which tells the partition Id a node is assigned to.
+    * `edge_map` is the edge assignment map, which tells the partition Id an edge is assigned to.
     * `num_nodes` is the number of nodes in the global graph.
     * `num_edges` is the number of edges in the global graph.
     * `part-*` stores the data of a partition.
@@ -112,8 +115,8 @@ def load_partition(conf_file, part_id):
         All node features.
     dict of tensors
         All edge features.
-    (int, int, NumPy ndarray))
-        The metadata of the global graph: number of nodes, number of edges, node map.
+    (int, int, NumPy ndarray, Numpy ndarray))
+        The metadata of the global graph: number of nodes, number of edges, node map, edge map.
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
@@ -128,15 +131,19 @@ def load_partition(conf_file, part_id):
     assert 'num_nodes' in part_metadata, "cannot get the number of nodes of the global graph."
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
     assert 'node_map' in part_metadata, "cannot get the node map."
+    assert 'edge_map' in part_metadata, "cannot get the edge map."
     node_map = np.load(part_metadata['node_map'])
-    meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map)
+    edge_map = np.load(part_metadata['edge_map'])
+    meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map, edge_map)
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    part_ids = F.zerocopy_from_numpy(node_map)[graph.ndata[NID]]
     # TODO we need to fix this. DGL backend doesn't support boolean or byte.
     # int64 is unnecessary.
+    part_ids = F.zerocopy_from_numpy(node_map)[graph.ndata[NID]]
     graph.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
+    part_ids = F.zerocopy_from_numpy(edge_map)[graph.edata[EID]]
+    graph.edata['local_edge'] = F.astype(part_ids == part_id, F.int64)
 
     return graph, node_feats, edge_feats, meta
 
@@ -196,18 +203,40 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
+    # Let's calculate edge assignment.
+    # TODO(zhengda) we should replace int64 with int16. int16 should be sufficient.
+    if num_parts > 1:
+        edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
+        num_edges = 0
+        lnodes_list = []      # The node ids of each partition
+        ledges_list = []      # The edge Ids of each partition
+        for part_id in range(num_parts):
+            part = client_parts[part_id]
+            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'] == 1)
+            local_edges = F.asnumpy(g.in_edges(local_nodes, form='eid'))
+            edge_parts[local_edges] = part_id
+            num_edges += len(local_edges)
+            lnodes_list.append(local_nodes)
+            ledges_list.append(local_edges)
+        assert num_edges == g.number_of_edges()
+    else:
+        edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64)
+
     os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
     out_path = os.path.abspath(out_path)
     node_part_file = os.path.join(out_path, "node_map")
+    edge_part_file = os.path.join(out_path, "edge_map")
     np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=False)
+    np.save(edge_part_file, edge_parts, allow_pickle=False)
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
                      'num_edges': g.number_of_edges(),
                      'part_method': part_method,
                      'num_parts': num_parts,
                      'halo_hops': num_hops,
-                     'node_map': node_part_file + ".npy"}
+                     'node_map': node_part_file + ".npy",
+                     'edge_map': edge_part_file + ".npy"}
     for part_id in range(num_parts):
         part = client_parts[part_id]
 
@@ -215,8 +244,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_feats = {}
         edge_feats = {}
         if num_parts > 1:
-            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'] == 1)
-            local_edges = F.boolean_mask(part.edata[EID], part.edata['inner_edge'] == 1)
+            local_nodes = lnodes_list[part_id]
+            local_edges = ledges_list[part_id]
             print('part {} has {} nodes and {} edges.'.format(
                 part_id, part.number_of_nodes(), part.number_of_edges()))
             print('{} nodes and {} edges are inside the partition'.format(
