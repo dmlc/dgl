@@ -235,7 +235,7 @@ class EdgeDataView(MutableMapping):
         return list(self._data.keys())
 
     def _add(self, name):
-        self._data[name] = DistTensor(self._graph, _get_ndata_name(name))
+        self._data[name] = DistTensor(self._graph, _get_edata_name(name))
 
     def __getitem__(self, key):
         return self._data[key]
@@ -318,29 +318,30 @@ class DistGraphServer(KVServer):
                                                    _get_ndata_path(graph_name, 'meta'))
 
         # Create node global2local map.
-        self.node_g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
+        node_g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
         # The nodes that belong to this partition.
         local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
         nids = self.client_g.ndata[NID][local_nids]
         assert np.all(node_map[nids] == server_id), 'Load a wrong partition'
-        F.scatter_row_inplace(self.node_g2l, nids, F.arange(0, len(nids)))
+        F.scatter_row_inplace(node_g2l, nids, F.arange(0, len(nids)))
 
         # Create edge global2local map.
-        self.edge_g2l = F.zeros((num_edges), dtype=F.int64, ctx=F.cpu()) - 1
-        local_eids = F.nonzero_1d(self.client_g.edata['local_edge'])
-        eids = self.client_g.edata[EID][local_eids]
-        assert np.all(edge_map[eids] == server_id), 'Load a wrong partition'
-        F.scatter_row_inplace(self.edge_g2l, eids, F.arange(0, len(eids)))
+        if len(edge_feats) > 0:
+            edge_g2l = F.zeros((num_edges), dtype=F.int64, ctx=F.cpu()) - 1
+            local_eids = F.nonzero_1d(self.client_g.edata['local_edge'])
+            eids = self.client_g.edata[EID][local_eids]
+            assert np.all(edge_map[eids] == server_id), 'Load a wrong partition'
+            F.scatter_row_inplace(edge_g2l, eids, F.arange(0, len(eids)))
 
         node_map = F.zerocopy_from_numpy(node_map)
         edge_map = F.zerocopy_from_numpy(edge_map)
         if self.get_id() % self.get_group_count() == 0: # master server
             for name in node_feats:
-                self.set_global2local(name=_get_ndata_name(name), global2local=self.node_g2l)
+                self.set_global2local(name=_get_ndata_name(name), global2local=node_g2l)
                 self.init_data(name=_get_ndata_name(name), data_tensor=node_feats[name])
                 self.set_partition_book(name=_get_ndata_name(name), partition_book=node_map)
             for name in edge_feats:
-                self.set_global2local(name=_get_edata_name(name), global2local=self.edge_g2l)
+                self.set_global2local(name=_get_edata_name(name), global2local=edge_g2l)
                 self.init_data(name=_get_edata_name(name), data_tensor=edge_feats[name])
                 self.set_partition_book(name=_get_edata_name(name), partition_book=edge_map)
         else:
@@ -434,7 +435,7 @@ class DistGraph:
         dtype : dtype
             The data type of the edge data.
         '''
-        assert shape[1] == self.number_of_edges()
+        assert shape[0] == self.number_of_edges()
         names = self._edata._get_names()
         # TODO we need to fix this. We should be able to init ndata even when there is no edge data.
         assert len(names) > 0

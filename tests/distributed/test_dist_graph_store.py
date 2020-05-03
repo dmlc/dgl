@@ -38,16 +38,28 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     assert g.number_of_nodes() == num_nodes
     assert g.number_of_edges() == num_edges
 
-    # Test reading data
+    # Test reading node data
     nids = F.arange(0, int(g.number_of_nodes() / 2))
     feats1 = g.ndata['features'][nids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == nids))
 
-    # Test init data
+    # Test reading edge data
+    eids = F.arange(0, int(g.number_of_edges() / 2))
+    feats1 = g.edata['features'][eids]
+    feats = F.squeeze(feats1, 1)
+    assert np.all(F.asnumpy(feats == eids))
+
+    # Test init node data
     new_shape = (g.number_of_nodes(), 2)
     g.init_ndata('test1', new_shape, F.int32)
     feats = g.ndata['test1'][nids]
+    assert np.all(F.asnumpy(feats) == 0)
+
+    # Test init edge data
+    new_shape = (g.number_of_edges(), 2)
+    g.init_edata('test1', new_shape, F.int32)
+    feats = g.edata['test1'][eids]
     assert np.all(F.asnumpy(feats) == 0)
 
     # Test write data
@@ -74,6 +86,7 @@ def run_server_client():
     num_parts = 1
     graph_name = 'test'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
+    g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp')
 
     # let's just test on one partition for now.
