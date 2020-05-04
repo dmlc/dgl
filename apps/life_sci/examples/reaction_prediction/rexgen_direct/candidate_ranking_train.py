@@ -31,9 +31,9 @@ def main(args, path_to_candidate_bonds):
                                  num_processes=args['num_processes'])
 
     train_loader = DataLoader(train_set, batch_size=1, collate_fn=collate_rank,
-                              shuffle=True, num_workers=1)
+                              shuffle=True, num_workers=args['num_workers'])
     val_loader = DataLoader(val_set, batch_size=1, collate_fn=collate_rank,
-                            shuffle=False, num_workers=1)
+                            shuffle=False, num_workers=args['num_workers'])
 
     model = WLNReactionRanking(
         node_in_feats=args['node_in_feats'],
@@ -59,6 +59,7 @@ def main(args, path_to_candidate_bonds):
             combo_scores, labels = combo_scores.to(args['device']), labels.to(args['device'])
 
             pred = model(bg, node_feats, edge_feats, combo_scores)
+            # Check if the ground truth candidate has the highest score
             acc_sum += float(pred.max(dim=0)[1].detach().cpu().data.item() == 0)
             loss = criterion(pred, labels)
             total_samples += 1
@@ -106,6 +107,8 @@ if __name__ == '__main__':
                              'model on reaction center prediction')
     parser.add_argument('-np', '--num-processes', type=int, default=8,
                         help='Number of processes to use for data pre-processing')
+    parser.add_argument('-nw', '--num-workers', type=int, default=32,
+                        help='Number of workers to use for data loading in PyTorch data loader')
     args = parser.parse_args().__dict__
     args.update(candidate_ranking_config)
     mkdir_p(args['result_path'])

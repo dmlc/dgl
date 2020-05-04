@@ -641,3 +641,25 @@ def collate_rank(data):
         return bg, node_feats, edge_feats, combo_scores
     else:
         return bg, node_feats, edge_feats, combo_scores, labels
+
+def candidate_ranking_eval(args, model, data_loader):
+    """Evaluate model performance on candidate ranking.
+
+    Parameters
+    ----------
+    args : dict
+        Configurations fot the experiment.
+    model : nn.Module
+        Model for reaction center prediction.
+    data_loader : torch.utils.data.DataLoader
+        Loader for fetching and batching data.
+    """
+    model.eval()
+
+    for batch_id, batch_data in enumerate(data_loader):
+        bg, node_feats, edge_feats, combo_scores = batch_data
+        node_feats, edge_feats = node_feats.to(args['device']), edge_feats.to(args['device'])
+        combo_scores = combo_scores.to(args['device'])
+
+        with torch.no_grad():
+            pred = model(bg, node_feats, edge_feats, combo_scores)
