@@ -68,7 +68,8 @@ def main(args, path_to_candidate_bonds):
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \
                            'accuracy {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], (batch_id + 1) // args['print_every'],
-                    len(train_loader) // args['print_every'], (time.time() - t0) / total_samples,
+                    len(train_loader) // args['print_every'],
+                    (time.time() - t0) / total_samples * args['batch_size'],
                     acc_sum / args['print_every'],
                     grad_norm_sum / args['print_every'] * args['batch_size'])
                 print(progress)
