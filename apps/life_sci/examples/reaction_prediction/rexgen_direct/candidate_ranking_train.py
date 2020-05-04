@@ -40,27 +40,44 @@ def main(args, path_to_candidate_bonds):
         num_encode_gnn_layers=args['num_encode_gnn_layers']).to(args['device'])
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
+    from utils import Optimizer
+    optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'])
 
-    total_iter = 0
-    dur = []
+    total_samples = 0
+    acc_sum = 0
+    grad_norm_sum = 0
+    t0 = time.time()
 
     for epoch in range(args['num_epochs']):
         model.train()
-        if epoch >= 1:
-            t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
-            total_iter += 1
             bg, node_feats, edge_feats, combo_scores, labels = batch_data
             node_feats, edge_feats = node_feats.to(args['device']), edge_feats.to(args['device'])
             combo_scores, labels = combo_scores.to(args['device']), labels.to(args['device'])
+
             pred = model(bg, node_feats, edge_feats, combo_scores)
+            acc_sum += float(pred.max(dim=0)[1].detach().cpu().data.item() == 0)
             loss = criterion(pred, labels)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            loss = loss.cpu().detach().data.item()
-            print('Epoch {:d}/{:d}, iter {:d}/{:d}, loss {:.4f}'.format(
-                epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader), loss))
+            total_samples += 1
+            grad_norm_sum += optimizer.backward_and_step(loss)
+
+            if total_samples % args['print_every'] == 0:
+                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \
+                           'accuracy {:.4f} | grad norm {:.4f}'.format(
+                    epoch + 1, args['num_epochs'], (batch_id + 1) // args['print_every'],
+                    len(train_loader) // args['print_every'], (time.time() - t0) / total_samples,
+                    acc_sum / args['print_every'], grad_norm_sum / args['print_every'])
+                print(progress)
+                acc_sum = 0
+                grad_norm_sum = 0
+
+            if total_samples % args['decay_every']:
+                old_lr = optimizer.lr
+                optimizer.decay_lr(args['lr_decay_factor'])
+                new_lr = optimizer.lr
+                print('Learning rate decayed from {:.4f} to {:.4f}'.format(old_lr, new_lr))
+                torch.save({'model_state_dict': model.state_dict()},
+                           args['result_path'] + '/model.pkl')
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

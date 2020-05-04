@@ -61,6 +61,11 @@ class WLNReactionRanking(nn.Module):
             Input edge features. E for the number of edges.
         candidate_scores : float32 tensor of shape (B - 1, 1)
             Scores for candidate products based on the model for reaction center prediction
+
+        Returns
+        -------
+        float32 tensor of shape (B - 1, 1)
+            Predicted scores for candidate products
         """
         # Update representations for nodes in both reactants and candidate products
         node_feats = self.gnn(batch_mol_graphs, node_feats, edge_feats)

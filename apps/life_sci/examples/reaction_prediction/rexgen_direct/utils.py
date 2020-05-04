@@ -82,14 +82,18 @@ class Optimizer(nn.Module):
         Initial learning rate
     optimizer : torch.optim.Optimizer
         model optimizer
+    num_accum_times : int
+        Number of times for accumulating gradients
     max_grad_norm : float or None
         If not None, gradient clipping will be performed
     """
-    def __init__(self, model, lr, optimizer, max_grad_norm=None):
+    def __init__(self, model, lr, optimizer, num_accum_times=1, max_grad_norm=None):
         super(Optimizer, self).__init__()
         self.model = model
         self.lr = lr
         self.optimizer = optimizer
+        self.step_count = 0
+        self.num_accum_times = num_accum_times
         self.max_grad_norm = max_grad_norm
         self._reset()
 
@@ -115,12 +119,16 @@ class Optimizer(nn.Module):
         grad_norm : float
             Gradient norm. If self.max_grad_norm is None, None will be returned.
         """
-        self._reset()
+        self.step_count += 1
         loss.backward()
-        grad_norm = self._clip_grad_norm()
-        self.optimizer.step()
+        if self.step_count % self.num_accum_times == 0:
+            grad_norm = self._clip_grad_norm()
+            self.optimizer.step()
+            self._reset()
 
-        return grad_norm
+            return grad_norm
+        else:
+            return 0
 
     def decay_lr(self, decay_rate):
         """Decay learning rate.

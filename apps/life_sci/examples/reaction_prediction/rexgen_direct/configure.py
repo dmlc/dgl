@@ -27,5 +27,10 @@ candidate_ranking_config = {
     'node_in_feats': 89,
     'edge_in_feats': 5,
     'lr': 0.001,
-    'num_epochs': 6
+    'num_epochs': 6,
+    'print_every': 20,
+    'decay_every': 100000,
+    'lr_decay_factor': 0.9
 }
+candidate_ranking_config['max_norm'] = candidate_ranking_config['max_norm'] * \
+                                       candidate_ranking_config['batch_size']
