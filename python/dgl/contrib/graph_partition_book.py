@@ -202,11 +202,12 @@ class GraphPartitionBook:
              local node IDs
         """
         if len(self._nidg2l) == 0:
-            global_id = self._part_graphs[partid].ndata[NID]
-            max_global_id = F.asnumpy(global_id).amax()
-            g2l = F.zeros((max_id+1), F.int64, F.cpu())
-            g2l[global_id] = F.arange(0, len(global_id))
-            self._nidg2l.append(g2l)
+            for partid in range(self._num_partitions):
+                global_id = self._part_graphs[partid].ndata[NID]
+                max_global_id = F.asnumpy(global_id).amax()
+                g2l = F.zeros((max_id+1), F.int64, F.cpu())
+                g2l[global_id] = F.arange(0, len(global_id))
+                self._nidg2l.append(g2l)
 
         return self._nidg2l[partid]
         
@@ -227,11 +228,12 @@ class GraphPartitionBook:
              local edge ids
         """
         if len(self._eidg2l) == 0:
-            global_id = self._part_graphs[partid].edata[EID]
-            max_global_id = F.asnumpy(global_id).amax()
-            g2l = F.zeros((max_id+1), F.int64, F.cpu())
-            g2l[global_id] = F.arange(0, len(global_id))
-            self._eidg2l.append(g2l)
+            for part_id in range(self._num_partitions):
+                global_id = self._part_graphs[partid].edata[EID]
+                max_global_id = F.asnumpy(global_id).amax()
+                g2l = F.zeros((max_id+1), F.int64, F.cpu())
+                g2l[global_id] = F.arange(0, len(global_id))
+                self._eidg2l.append(g2l)
 
         return self._eidg2l[partid]
 
