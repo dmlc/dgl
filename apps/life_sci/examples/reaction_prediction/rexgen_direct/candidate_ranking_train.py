@@ -67,6 +67,7 @@ def main(args, path_to_candidate_bonds):
                        '# products {:d}'.format(
                 batch_id + 1, reactant_graph.number_of_nodes(),
                 reactant_graph.number_of_edges(), product_graphs.batch_size)
+            print(progress)
 
             """
             pred = model(reactant_graph=reactant_graph,
