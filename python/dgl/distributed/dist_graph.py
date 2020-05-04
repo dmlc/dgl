@@ -122,7 +122,7 @@ class DistTensor:
     '''
     def __init__(self, g, name):
         self.kvstore = g._client
-        self.name = name
+        self._name = name
         dtype, shape, _ = g._client.get_data_meta(name)
         self._shape = shape
         self._dtype = dtype
@@ -130,13 +130,13 @@ class DistTensor:
     def __getitem__(self, idx):
         idx = utils.toindex(idx)
         idx = idx.tousertensor()
-        return self.kvstore.pull(name=self.name, id_tensor=idx)
+        return self.kvstore.pull(name=self._name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
         idx = utils.toindex(idx)
         idx = idx.tousertensor()
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
-        self.kvstore.push(name=self.name, id_tensor=idx, data_tensor=val)
+        self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
 
     def __len__(self):
         return self._shape[0]
@@ -150,6 +150,11 @@ class DistTensor:
     def dtype(self):
         ''' Return the data type of the distributed tensor. '''
         return self._dtype
+
+    @property
+    def name(self):
+        ''' Return the name of the distributed tensor '''
+        return self._name
 
 
 class NodeDataView(MutableMapping):
@@ -361,7 +366,7 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
 
-    def init_ndata(self, ndata_name, shape, dtype):
+    def init_ndata(self, name, shape, dtype):
         '''Initialize node data
 
         This initializes the node data in the distributed graph storage.
@@ -376,11 +381,11 @@ class DistGraph:
             The data type of the node data.
         '''
         assert shape[0] == self.number_of_nodes()
-        self._client.init_data(_get_ndata_name(ndata_name), shape, dtype, 'node', self._gpb,
+        self._client.init_data(_get_ndata_name(name), shape, dtype, 'node', self._gpb,
                                self._default_init_ndata)
-        self._ndata._add(ndata_name)
+        self._ndata._add(name)
 
-    def init_edata(self, edata_name, shape, dtype):
+    def init_edata(self, name, shape, dtype):
         '''Initialize edge data
 
         This initializes the edge data in the distributed graph storage.
@@ -395,11 +400,11 @@ class DistGraph:
             The data type of the edge data.
         '''
         assert shape[0] == self.number_of_edges()
-        self._client.init_data(_get_edata_name(edata_name), shape, dtype, 'edge', self._gpb,
+        self._client.init_data(_get_edata_name(name), shape, dtype, 'edge', self._gpb,
                                self._default_init_edata)
-        self._edata._add(edata_name)
+        self._edata._add(name)
 
-    def init_node_emb(self, name, shape, dtype, initializer):
+    def init_node_emb(self, name, shape, initializer):
         ''' Initialize node embeddings.
 
         This initializes the node embeddings in the distributed graph storage.
@@ -410,24 +415,28 @@ class DistGraph:
             The name of the node embeddings.
         shape : tuple
             The shape of the node embeddings.
-        dtype : string
-            The data type of the node embeddings.
         initializer : callable
             The initializer.
         '''
-        # TODO(zhengda)
-        raise NotImplementedError("init_node_emb isn't supported yet")
+        assert shape[0] == self.number_of_nodes()
+        names = self._ndata._get_names()
+        # TODO we need to fix this. We should be able to init ndata even when there is no node data.
+        assert len(names) > 0
+        # TODO we need to support user-defined function for data initialization.
+        ndata_name = _get_ndata_name(name)
+        self._client.init_data(ndata_name, shape, dtype, _get_ndata_name(names[0]))
+        self._ndata._add(name)
+        self._node_embs[name] = SparseEmbedding(g, ndata_name)
 
     def get_node_embeddings(self):
         ''' Return node embeddings
 
         Returns
         -------
-        a dict of SparseEmbedding
+        a list of SparseEmbedding
             All node embeddings in the graph store.
         '''
-        # TODO(zhengda)
-        raise NotImplementedError("get_node_embeddings isn't supported yet")
+        return self._node_embs.copy()
 
     @property
     def local_partition(self):
