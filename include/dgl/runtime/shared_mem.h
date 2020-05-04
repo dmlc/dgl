@@ -58,13 +58,20 @@ class SharedMemory {
    * \param size the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *create_new(size_t size);
+  void *CreateNew(size_t size);
   /*
    * \brief allocate shared memory that has been created.
    * \param size the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *open(size_t size);
+  void *Open(size_t size);
+
+  /*
+   * \brief check if the shared memory exist.
+   * \param name the name of the shared memory.
+   * \return a boolean value to indicate if the shared memory exists.
+   */
+  static bool Exist(const std::string &name);
 };
 #endif  // _WIN32
 
