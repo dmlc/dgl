@@ -18,26 +18,35 @@ class VertexNetGraphPool:
         print('start creating graph pool...')
         tic = time.time()
         self.n = n
-        g_pool = [dgl.DGLGraph() for _ in range(n)]
+        g_pool = [None for _ in range(n)]
         num_edges = {
             'dd': np.zeros(n).astype(int)
         }
-        for i in range(n):
-            n_vertex = i + 1
-
-            g_pool[i].add_nodes(n_vertex)
-            dec_nodes = th.arange(n_vertex, dtype=th.long)
-
-            # dec -> dec
-            indices = th.triu(th.ones(n_vertex, n_vertex)) == 1
-            us = dec_nodes.unsqueeze(-1).repeat(1, n_vertex)[indices]
-            vs = dec_nodes.unsqueeze(0).repeat(n_vertex, 1)[indices]
-            g_pool[i].add_edges(us, vs)
-            num_edges['dd'][i] = len(us)
-
         print('successfully created graph pool, time: {0:0.3f}s'.format(time.time() - tic))
         self.g_pool = g_pool
         self.num_edges = num_edges
+
+    def get_graph_for_size(self, i):
+        '''
+        Lazy evaluation of the graph[i]
+        args:
+            i: decoder size
+        '''
+        if self.g_pool[i]:
+            return self.g_pool[i]
+
+        n_vertex = i + 1
+
+        g_pool[i].add_nodes(n_vertex)
+        dec_nodes = th.arange(n_vertex, dtype=th.long)
+
+        # dec -> dec
+        indices = th.triu(th.ones(n_vertex, n_vertex)) == 1
+        us = dec_nodes.unsqueeze(-1).repeat(1, n_vertex)[indices]
+        vs = dec_nodes.unsqueeze(0).repeat(n_vertex, 1)[indices]
+        g_pool[i].add_edges(us, vs)
+        num_edges['dd'][i] = len(us)
+        return self.g_pool[i]
 
     def beam(self, tgt_buf, start_sym, max_len, k, device='cpu'):
         '''
@@ -55,7 +64,7 @@ class VertexNetGraphPool:
         for tgt_len in tgt_lens:
             i = tgt_len - 1
             for _ in range(k):
-                g_list.append(self.g_pool[i])
+                g_list.append(self.g_pool.get_graph_for_size(i))
             num_edges['dd'].append(int(self.num_edges['dd'][i]))
 
         g = dgl.batch(g_list)
@@ -102,7 +111,7 @@ class VertexNetGraphPool:
         num_edges = {'dd': []}
         for tgt_len in tgt_lens:
             i = tgt_len - 1
-            g_list.append(self.g_pool[i])
+            g_list.append(self.g_pool.get_graph_for_size(i))
             num_edges['dd'].append(int(self.num_edges['dd'][i]))
 
         g = dgl.batch(g_list)
