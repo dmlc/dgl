@@ -71,7 +71,7 @@ def main(args, path_to_candidate_bonds):
                 acc_sum = 0
                 grad_norm_sum = 0
 
-            if total_samples % args['decay_every']:
+            if total_samples % args['decay_every'] == 0:
                 old_lr = optimizer.lr
                 optimizer.decay_lr(args['lr_decay_factor'])
                 new_lr = optimizer.lr
