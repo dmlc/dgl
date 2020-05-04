@@ -42,7 +42,7 @@ class VertexDataset(Dataset):
     def __getitem__(self, idx):
         obj_file = self.dataset_list[idx].strip()
         try:
-            verts, faces = preprocess_mesh_obj(obj_file)
+            verts, faces = preprocess_mesh_obj(obj_file, self.COORD_BIN)
         except:
            # If fail, try another random example
            to_try = np.random.randint(0, len(self.dataset_list))

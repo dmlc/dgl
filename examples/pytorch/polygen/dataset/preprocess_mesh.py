@@ -9,12 +9,12 @@ from pytorch3d.structures import Meshes
 from pytorch3d.io.obj_io import load_obj as load_3d_obj
 
 
-def preprocess(obj_file):
+def preprocess(obj_file, bin_num):
     verts, faces, aux = load_3d_obj(obj_file)
     # Quantilization
-    quant_verts = np.clip((verts.data.numpy()+0.5) * 31, 0, 31).astype(np.int64).astype(np.float32)
+    quant_verts = np.clip((verts.data.numpy()+0.5) * (bin_num-1), 0, (bin_num-1)).astype(np.int64).astype(np.float32)
     # Sorting, first Y(up), then X(front), then Z(right)
-    vert_val = quant_verts[:,1]*256*256 + quant_verts[:,0]*256 + quant_verts[:,2]
+    vert_val = quant_verts[:,1]*bin_num*bin_num + quant_verts[:,0]*bin_num + quant_verts[:,2]
 
     # Unique on vertex
     uni_val, uni_val_idx = np.unique(vert_val, return_index=True)
@@ -35,7 +35,7 @@ def preprocess(obj_file):
     uni_face_verts_idx_within_face = uni_face_verts_idx[uni_vert_within_face]
 
     # Sort vertex
-    sort_val = uni_new_verts[:,1]*256*256 + uni_new_verts[:,0]*256 + uni_new_verts[:,2]
+    sort_val = uni_new_verts[:,1]*bin_num*bin_num + uni_new_verts[:,0]*bin_num + uni_new_verts[:,2]
     sort_idx = np.argsort(sort_val)
     processed_verts = uni_new_verts[sort_idx]
     processed_face_verts_idx = deepcopy(uni_face_verts_idx_within_face)
