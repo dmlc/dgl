@@ -30,8 +30,10 @@ def main(args, path_to_candidate_bonds):
                                  train_mode=False,
                                  num_processes=args['num_processes'])
 
-    train_loader = DataLoader(train_set, batch_size=1, collate_fn=collate_rank, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=1, collate_fn=collate_rank, shuffle=False)
+    train_loader = DataLoader(train_set, batch_size=1, collate_fn=collate_rank,
+                              shuffle=True, num_workers=1)
+    val_loader = DataLoader(val_set, batch_size=1, collate_fn=collate_rank,
+                            shuffle=False, num_workers=1)
 
     model = WLNReactionRanking(
         node_in_feats=args['node_in_feats'],
@@ -41,7 +43,8 @@ def main(args, path_to_candidate_bonds):
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
     from utils import Optimizer
-    optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'])
+    optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'],
+                          num_accum_times=args['batch_size'])
 
     total_samples = 0
     acc_sum = 0
@@ -66,7 +69,8 @@ def main(args, path_to_candidate_bonds):
                            'accuracy {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], (batch_id + 1) // args['print_every'],
                     len(train_loader) // args['print_every'], (time.time() - t0) / total_samples,
-                    acc_sum / args['print_every'], grad_norm_sum / args['print_every'])
+                    acc_sum / args['print_every'],
+                    grad_norm_sum / args['print_every'] * args['batch_size'])
                 print(progress)
                 acc_sum = 0
                 grad_norm_sum = 0
