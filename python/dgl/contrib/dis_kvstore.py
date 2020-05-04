@@ -944,6 +944,18 @@ class KVClient(object):
         return self._addr
 
 
+    def get_num_partitions(self):
+        """Get number of partitions
+
+        Return
+        ------
+        int
+            number of partition
+        """
+        # we assume that each machine only has one partition
+        return self._machine_count
+
+
     def get_machine_id(self):
         """Get local machine ID
 
