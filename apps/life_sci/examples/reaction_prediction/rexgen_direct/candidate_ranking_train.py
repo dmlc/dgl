@@ -50,9 +50,10 @@ def main(args, path_to_candidate_bonds):
     total_samples = 0
     acc_sum = 0
     grad_norm_sum = 0
-    t0 = time.time()
+    dur = []
 
     for epoch in range(args['num_epochs']):
+        t0 = time.time()
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
             reactant_graph, product_graphs, combo_scores, labels = batch_data
@@ -62,6 +63,12 @@ def main(args, path_to_candidate_bonds):
             product_node_feats = product_graphs.ndata.pop('hv').to(args['device'])
             product_edge_feats = product_graphs.edata.pop('he').to(args['device'])
 
+            progress = 'Iter {:d} | # reactant atoms {:d} | # reactant edges {:d} | ' \
+                       '# products {:d}'.format(
+                batch_id + 1, reactant_graph.number_of_nodes(),
+                reactant_graph.number_of_edges(), product_graphs.batch_size)
+
+            """
             pred = model(reactant_graph=reactant_graph,
                          reactant_node_feats=reactant_node_feats,
                          reactant_edge_feats=reactant_edge_feats,
@@ -81,9 +88,9 @@ def main(args, path_to_candidate_bonds):
                            'accuracy {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], (batch_id + 1) // args['print_every'],
                     len(train_loader) // args['print_every'],
-                    (time.time() - t0) / total_samples * args['batch_size'],
+                    (sum(dur) + time.time() - t0) / total_samples * args['print_every'],
                     acc_sum / args['print_every'],
-                    grad_norm_sum / args['print_every'] * args['batch_size'])
+                    grad_norm_sum / args['print_every'])
                 print(progress)
                 acc_sum = 0
                 grad_norm_sum = 0
@@ -95,8 +102,10 @@ def main(args, path_to_candidate_bonds):
                 print('Learning rate decayed from {:.4f} to {:.4f}'.format(old_lr, new_lr))
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model.pkl')
+            """
 
         optimizer._reset()
+        dur.append(time.time() - t0)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
