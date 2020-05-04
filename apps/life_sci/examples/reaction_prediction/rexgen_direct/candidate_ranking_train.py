@@ -8,7 +8,8 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from configure import reaction_center_config, candidate_ranking_config
-from utils import prepare_reaction_center, mkdir_p, set_seed, collate_rank
+from utils import prepare_reaction_center, mkdir_p, set_seed, collate_rank_train, \
+    collate_rank_eval
 
 def main(args, path_to_candidate_bonds):
     if args['train_path'] is None:
@@ -30,9 +31,9 @@ def main(args, path_to_candidate_bonds):
                                  train_mode=False,
                                  num_processes=args['num_processes'])
 
-    train_loader = DataLoader(train_set, batch_size=1, collate_fn=collate_rank,
+    train_loader = DataLoader(train_set, batch_size=1, collate_fn=collate_rank_train,
                               shuffle=True, num_workers=args['num_workers'])
-    val_loader = DataLoader(val_set, batch_size=1, collate_fn=collate_rank,
+    val_loader = DataLoader(val_set, batch_size=1, collate_fn=collate_rank_eval,
                             shuffle=False, num_workers=args['num_workers'])
 
     model = WLNReactionRanking(
@@ -73,6 +74,7 @@ def main(args, path_to_candidate_bonds):
             loss = criterion(pred, labels)
             total_samples += 1
             grad_norm_sum += optimizer.backward_and_step(loss)
+            torch.cuda.empty_cache()
 
             if total_samples % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \

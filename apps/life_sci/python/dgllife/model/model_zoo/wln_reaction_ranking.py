@@ -60,14 +60,13 @@ class WLNReactionRanking(nn.Module):
         reactant_edge_feats : float32 tensor of shape (E1, edge_in_feats)
             Input edge features for the reactants. E1 for the number of edges in
             reactant_graph.
-
-        batch_mol_graphs : DGLGraph
-            A batch of B molecular graphs, where the first graph is the reactants and
-            the rest graphs are candidate products.
-        node_feats : float32 tensor of shape (V, node_in_feats)
-            Input node features. V for the number of nodes.
-        edge_feats : float32 tensor of shape (E, edge_in_feats)
-            Input edge features. E for the number of edges.
+        product_graphs : DGLGraph
+            A batch of B molecular graphs for the candidate products.
+        product_node_feats : float32 tensor of shape (B * V, node_in_feats)
+            Input node features for the candidate products.
+        product_edge_feats : float32 tensor of shape (E2, edge_in_feats)
+            Input edge features for the candidate products. E2 for the number of edges
+            in the graphs for candidate products.
         candidate_scores : float32 tensor of shape (B - 1, 1)
             Scores for candidate products based on the model for reaction center prediction
 

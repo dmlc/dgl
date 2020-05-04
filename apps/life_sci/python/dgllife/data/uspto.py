@@ -1433,6 +1433,19 @@ class WLNRankDataset(object):
         labels : float32 tensor of shape (B, 1), optional
             Binary labels where 1 indicates the ground truth product of the reaction. This is
             returned only when we are not in the training mode.
+        valid_candidate_combos : list, optional
+            valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
+            of candidate bond changes for the reaction. Each tuple is of form (atom1, atom2,
+            change_type, score). atom1, atom2 are the atom mapping numbers - 1 of the two
+            end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
+            a single, double, triple, and aromatic bond.
+        reactant_mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for the reactants
+        real_bond_changes : list of tuples
+            Ground truth bond changes in a reaction. Each tuple is of form (atom1, atom2,
+            change_type). atom1, atom2 are the atom mapping numbers - 1 of the two
+            end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
+            a single, double, triple, and aromatic bond.
         """
         if self.ignore_large_samples:
             item = self.ids_for_small_samples[item]
@@ -1479,12 +1492,13 @@ class WLNRankDataset(object):
                         {'candidate_score': candidate_scores})
 
             self.candidate_bond_changes[item] = None
-            self.real_bond_changes[item] = None
-            self.reactant_mols[item] = None
             self.product_mols[item] = None
         else:
             g_list, info = load_graphs(sample_path + '/g.bin')
             candidate_scores = info['candidate_score']
+            if not self.train_mode:
+                with open(sample_path + '/valid_candidate_combos.pkl', 'rb') as f:
+                    valid_candidate_combos = pickle.load(f)
 
         batch_size = len(g_list)
         if self.train_mode:
@@ -1492,7 +1506,10 @@ class WLNRankDataset(object):
             labels[0] = 1.
             return g_list, candidate_scores, labels
         else:
-            return g_list, candidate_scores
+            reactant_mol = self.reactant_mols[item]
+            real_bond_changes = self.real_bond_changes[item]
+            return g_list, candidate_scores, valid_candidate_combos, \
+                   reactant_mol, real_bond_changes
 
 class USPTORank(WLNRankDataset):
     """USPTO dataset for ranking candidate products.

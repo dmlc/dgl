@@ -603,15 +603,14 @@ def prepare_reaction_center(args, reaction_center_config):
 
     return path_to_candidate_bonds
 
-def collate_rank(data):
-    """Collate multiple datapoints for candidate product ranking
+def collate_rank_train(data):
+    """Collate multiple datapoints for candidate product ranking during training
 
     Parameters
     ----------
-    data : list of 4-tuples or 5-tuples
-        Each tuple is for a single datapoint, consisting of combos of bond changes for candidate
-        products, DGLGraphs for reactants and candidate products, node features shared across
-        all DGLGraphs, scores for candidate products by the model for reaction center prediction,
+    data : list of 3-tuples
+        Each tuple is for a single datapoint, consisting of DGLGraphs for reactants and candidate
+        products, scores for candidate products by the model for reaction center prediction,
         and labels for candidate products.
 
     Returns
@@ -627,17 +626,61 @@ def collate_rank(data):
     """
     assert len(data) == 1, 'This collate function only works with batch size 1.'
     data = data[0]
-    if len(data) == 2:
-        graphs, combo_scores = data
-    else:
-        graphs, combo_scores, labels = data
+    graphs, combo_scores, labels = data
     reactant_graph = graphs[0]
     product_graphs = dgl.batch(graphs[1:])
 
-    if len(data) == 4:
-        return reactant_graph, product_graphs, combo_scores
-    else:
-        return reactant_graph, product_graphs, combo_scores, labels
+    return reactant_graph, product_graphs, combo_scores, labels
+
+def collate_rank_eval(data):
+    """Collate multiple datapoints for candidate product ranking during evaluation
+
+    Parameters
+    ----------
+    data : list of 3-tuples
+        Each tuple is for a single datapoint, consisting of DGLGraphs for reactants and candidate
+        products, scores for candidate products by the model for reaction center prediction,
+        and valid combos of candidate bond changes, one for each candidate product.
+
+    Returns
+    -------
+    reactant_graph : DGLGraph
+        DGLGraph for the reactants.
+    product_graphs : DGLGraph
+        DGLGraph for the candidate products.
+    combo_scores : float32 tensor of shape (B - 1, 1)
+        Scores for candidate products by the model for reaction center prediction.
+    valid_candidate_combos : list of list
+        valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
+        of candidate bond changes for the reaction. Each tuple is of form (atom1, atom2,
+        change_type, score). atom1, atom2 are the atom mapping numbers - 1 of the two
+        end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
+        a single, double, triple, and aromatic bond.
+    reactant_mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for the reactants
+    real_bond_changes : list of tuples
+        Ground truth bond changes in a reaction. Each tuple is of form (atom1, atom2,
+        change_type). atom1, atom2 are the atom mapping numbers - 1 of the two
+        end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
+        a single, double, triple, and aromatic bond.
+    """
+    assert len(data) == 1, 'This collate function only works with batch size 1.'
+    data = data[0]
+    graphs, combo_scores, valid_candidate_combos, reactant_mol, real_bond_changes = data
+    reactant_graph = graphs[0]
+    product_graphs = dgl.batch(graphs[1:])
+
+    return reactant_graph, product_graphs, combo_scores, \
+           valid_candidate_combos, reactant_mol, real_bond_changes
+
+def bookkeep_reactant(mol):
+    """Bookkeep bonds in the reactant.
+
+    Parameters
+    ----------
+    mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for reactants.
+    """
 
 def candidate_ranking_eval(args, model, data_loader):
     """Evaluate model performance on candidate ranking.
@@ -652,11 +695,24 @@ def candidate_ranking_eval(args, model, data_loader):
         Loader for fetching and batching data.
     """
     model.eval()
+    max_k = max(args['top_ks'])
 
     for batch_id, batch_data in enumerate(data_loader):
-        bg, node_feats, edge_feats, combo_scores = batch_data
-        node_feats, edge_feats = node_feats.to(args['device']), edge_feats.to(args['device'])
+        reactant_graph, product_graphs, combo_scores, \
+        valid_candidate_combos, reactant_mol, real_bond_changes = batch_data
         combo_scores = combo_scores.to(args['device'])
+        reactant_node_feats = reactant_graph.ndata.pop('hv').to(args['device'])
+        reactant_edge_feats = reactant_graph.edata.pop('he').to(args['device'])
+        product_node_feats = product_graphs.ndata.pop('hv').to(args['device'])
+        product_edge_feats = product_graphs.edata.pop('he').to(args['device'])
 
         with torch.no_grad():
-            pred = model(bg, node_feats, edge_feats, combo_scores)
+            pred = model(reactant_graph=reactant_graph,
+                         reactant_node_feats=reactant_node_feats,
+                         reactant_edge_feats=reactant_edge_feats,
+                         product_graphs=product_graphs,
+                         product_node_feats=product_node_feats,
+                         product_edge_feats=product_edge_feats,
+                         candidate_scores=combo_scores)
+        top_k = min(max_k, product_graphs.batch_size)
+        topk_values, topk_indices = torch.topk(pred, top_k)

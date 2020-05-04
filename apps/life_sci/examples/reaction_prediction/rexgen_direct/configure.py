@@ -30,7 +30,8 @@ candidate_ranking_config = {
     'num_epochs': 6,
     'print_every': 20,
     'decay_every': 100000,
-    'lr_decay_factor': 0.9
+    'lr_decay_factor': 0.9,
+    'top_ks': [10],
 }
 candidate_ranking_config['max_norm'] = candidate_ranking_config['max_norm'] * \
                                        candidate_ranking_config['batch_size']
