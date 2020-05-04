@@ -614,14 +614,10 @@ def collate_rank(data):
 
     Returns
     -------
-    bg : DGLGraph
-        A batch of B molecular graphs, where the first graph is the reactants and
-        the rest graphs are candidate products.
-    node_feats : float32 tensor of shape (B * N, M1)
-        Node features. N for the number of atoms in reactants and M1 for the feature size.
-    edge_feats : float32 tensor of shape (E, M2)
-        Edge features. E for the number of edges in the batch of graphs and
-        M2 for the feature size.
+    reactant_graph : DGLGraph
+        DGLGraph for the reactants.
+    product_graphs : DGLGraph
+        DGLGraph for the candidate products.
     combo_scores : float32 tensor of shape (B - 1, 1)
         Scores for candidate products by the model for reaction center prediction.
     labels : float32 tensor of shape (B - 1, 1)
@@ -633,14 +629,13 @@ def collate_rank(data):
         graphs, combo_scores = data
     else:
         graphs, combo_scores, labels = data
-    bg = dgl.batch(graphs)
-    node_feats = bg.ndata.pop('hv')
-    edge_feats = bg.edata.pop('he')
+    reactant_graph = graphs[0]
+    product_graphs = dgl.batch(graphs[1:])
 
     if len(data) == 4:
-        return bg, node_feats, edge_feats, combo_scores
+        return reactant_graph, product_graphs, combo_scores
     else:
-        return bg, node_feats, edge_feats, combo_scores, labels
+        return reactant_graph, product_graphs, combo_scores, labels
 
 def candidate_ranking_eval(args, model, data_loader):
     """Evaluate model performance on candidate ranking.

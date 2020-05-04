@@ -54,11 +54,20 @@ def main(args, path_to_candidate_bonds):
     for epoch in range(args['num_epochs']):
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
-            bg, node_feats, edge_feats, combo_scores, labels = batch_data
-            node_feats, edge_feats = node_feats.to(args['device']), edge_feats.to(args['device'])
+            reactant_graph, product_graphs, combo_scores, labels = batch_data
             combo_scores, labels = combo_scores.to(args['device']), labels.to(args['device'])
+            reactant_node_feats = reactant_graph.ndata.pop('hv').to(args['device'])
+            reactant_edge_feats = reactant_graph.edata.pop('he').to(args['device'])
+            product_node_feats = product_graphs.ndata.pop('hv').to(args['device'])
+            product_edge_feats = product_graphs.edata.pop('he').to(args['device'])
 
-            pred = model(bg, node_feats, edge_feats, combo_scores)
+            pred = model(reactant_graph=reactant_graph,
+                         reactant_node_feats=reactant_node_feats,
+                         reactant_edge_feats=reactant_edge_feats,
+                         product_graphs=product_graphs,
+                         product_node_feats=product_node_feats,
+                         product_edge_feats=product_edge_feats,
+                         candidate_scores=combo_scores)
             # Check if the ground truth candidate has the highest score
             acc_sum += float(pred.max(dim=0)[1].detach().cpu().data.item() == 0)
             loss = criterion(pred, labels)

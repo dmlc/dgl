@@ -47,7 +47,8 @@ class WLNReactionRanking(nn.Module):
             nn.Linear(node_hidden_feats, 1)
         )
 
-    def forward(self, batch_mol_graphs, node_feats, edge_feats, candidate_scores):
+    def forward(self, reactant_graph, reactant_node_feats, reactant_edge_feats,
+                product_graphs, product_node_feats, product_edge_feats, candidate_scores):
         r"""Predicts the score for candidate products to be the true product
 
         Parameters
@@ -68,12 +69,12 @@ class WLNReactionRanking(nn.Module):
             Predicted scores for candidate products
         """
         # Update representations for nodes in both reactants and candidate products
-        node_feats = self.gnn(batch_mol_graphs, node_feats, edge_feats)
-        num_nodes_per_graph = batch_mol_graphs.batch_num_nodes[0]
+        reactant_node_feats = self.gnn(reactant_graph, reactant_node_feats, reactant_edge_feats)
+        product_node_feats = self.gnn(product_graphs, product_node_feats, product_edge_feats)
+
         # (N, node_out_feats)
-        reactant_node_feats = node_feats[:num_nodes_per_graph, :]
         old_feats_shape = reactant_node_feats.shape
-        num_candidate_products = batch_mol_graphs.batch_size - 1
+        num_candidate_products = product_graphs.batch_size
         # (1, N, node_out_feats)
         expanded_reactant_node_feats = reactant_node_feats.reshape((1,) + old_feats_shape)
         # (B, N, node_out_feats)
@@ -81,19 +82,15 @@ class WLNReactionRanking(nn.Module):
             (num_candidate_products,) + old_feats_shape)
 
         # (B, N, node_out_feats)
-        candidate_product_node_feats = node_feats[num_nodes_per_graph:, :].reshape(
-            (batch_mol_graphs.batch_size - 1,) + old_feats_shape)
+        candidate_product_node_feats = product_node_feats.reshape(
+            (num_candidate_products,) + old_feats_shape)
 
         # Get the node representation difference between candidate products and reactants
-        candidate_node_feats_difference = candidate_product_node_feats - \
-                                          expanded_reactant_node_feats
-        diff_node_feats = torch.cat([
-            reactant_node_feats,
-            candidate_node_feats_difference.reshape(-1, reactant_node_feats.shape[-1])], dim=0)
+        diff_node_feats = candidate_product_node_feats - expanded_reactant_node_feats
+        diff_node_feats = diff_node_feats.reshape(-1, diff_node_feats.shape[-1])
 
         # One more GNN layer for message passing with the node representation difference
-        diff_node_feats = self.diff_gnn(batch_mol_graphs, diff_node_feats, edge_feats)
-        graph_feats = self.readout(batch_mol_graphs, diff_node_feats)
-        candidate_product_feats = graph_feats[1:, :]
+        diff_node_feats = self.diff_gnn(product_graphs, diff_node_feats, product_edge_feats)
+        candidate_product_feats = self.readout(product_graphs, diff_node_feats)
 
         return self.predict(candidate_product_feats) + candidate_scores
