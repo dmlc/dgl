@@ -63,13 +63,6 @@ def main(args, path_to_candidate_bonds):
             product_node_feats = product_graphs.ndata.pop('hv').to(args['device'])
             product_edge_feats = product_graphs.edata.pop('he').to(args['device'])
 
-            progress = 'Iter {:d} | # reactant atoms {:d} | # reactant edges {:d} | ' \
-                       '# products {:d}'.format(
-                batch_id + 1, reactant_graph.number_of_nodes(),
-                reactant_graph.number_of_edges(), product_graphs.batch_size)
-            print(progress)
-
-            """
             pred = model(reactant_graph=reactant_graph,
                          reactant_node_feats=reactant_node_feats,
                          reactant_edge_feats=reactant_edge_feats,
@@ -82,7 +75,6 @@ def main(args, path_to_candidate_bonds):
             loss = criterion(pred, labels)
             total_samples += 1
             grad_norm_sum += optimizer.backward_and_step(loss)
-            torch.cuda.empty_cache()
 
             if total_samples % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \
@@ -103,7 +95,6 @@ def main(args, path_to_candidate_bonds):
                 print('Learning rate decayed from {:.4f} to {:.4f}'.format(old_lr, new_lr))
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model.pkl')
-            """
 
         optimizer._reset()
         dur.append(time.time() - t0)

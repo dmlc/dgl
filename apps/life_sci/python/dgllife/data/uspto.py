@@ -1111,8 +1111,7 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
                 if count == max_num_change_combos:
                     break
             valid_candidate_combos = new_candidate_combos
-    else:
-        valid_candidate_combos = valid_candidate_combos[:max_num_change_combos]
+    valid_candidate_combos = valid_candidate_combos[:max_num_change_combos]
 
     return valid_candidate_combos, candidate_bond_changes, reactant_info
 
