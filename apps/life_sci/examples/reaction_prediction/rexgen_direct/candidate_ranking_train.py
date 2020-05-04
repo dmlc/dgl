@@ -94,6 +94,8 @@ def main(args, path_to_candidate_bonds):
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model.pkl')
 
+        optimizer._reset()
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 

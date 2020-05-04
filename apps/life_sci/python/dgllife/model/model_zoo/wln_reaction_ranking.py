@@ -53,6 +53,14 @@ class WLNReactionRanking(nn.Module):
 
         Parameters
         ----------
+        reactant_graph : DGLGraph
+            DGLGraph for the reactants.
+        reactant_node_feats : float32 tensor of shape (V, node_in_feats)
+            Input node features for the reactants. V for the number of nodes.
+        reactant_edge_feats : float32 tensor of shape (E1, edge_in_feats)
+            Input edge features for the reactants. E1 for the number of edges in
+            reactant_graph.
+
         batch_mol_graphs : DGLGraph
             A batch of B molecular graphs, where the first graph is the reactants and
             the rest graphs are candidate products.
@@ -65,7 +73,7 @@ class WLNReactionRanking(nn.Module):
 
         Returns
         -------
-        float32 tensor of shape (B - 1, 1)
+        float32 tensor of shape (B, 1)
             Predicted scores for candidate products
         """
         # Update representations for nodes in both reactants and candidate products

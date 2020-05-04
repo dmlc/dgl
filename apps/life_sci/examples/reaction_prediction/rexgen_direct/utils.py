@@ -599,6 +599,8 @@ def prepare_reaction_center(args, reaction_center_config):
         del dataset
         del dataloader
 
+    del reaction_center_model
+
     return path_to_candidate_bonds
 
 def collate_rank(data):
