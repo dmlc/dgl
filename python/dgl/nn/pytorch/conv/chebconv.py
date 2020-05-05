@@ -1,10 +1,10 @@
 """Torch Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import warnings
 import torch as th
 from torch import nn
 import torch.nn.functional as F
 
+from ....base import dgl_warning
 from .... import laplacian_lambda_max, broadcast_nodes, function as fn
 
 
@@ -109,7 +109,7 @@ class ChebConv(nn.Module):
                     lambda_max = laplacian_lambda_max(graph)
                 except BaseException:
                     # if the largest eigonvalue is not found
-                    warnings.warn(
+                    dgl_warning(
                         "Largest eigonvalue not found, using default value 2 for lambda_max",
                         RuntimeWarning)
                     lambda_max = th.Tensor(2).to(feat.device)
