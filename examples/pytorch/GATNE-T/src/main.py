@@ -17,17 +17,21 @@ import dgl.function as fn
 from utils import *
 
 
-''' Build graph, treat all nodes as the same type
-Input
------
-network_data: a dict with keys describing the edge types, values representing edges
-vocab: a dict mapping node IDs to node indices
-
-Output
-------
-graph: a heterogenous graph, with one node type and different edge types
-'''
 def get_graph(network_data, vocab):
+    ''' Build graph, treat all nodes as the same type
+    
+    Parameters
+    ----------
+    network_data: a dict
+        keys describing the edge types, values representing edges
+    vocab: a dict
+        mapping node IDs to node indices
+
+    Output
+    ------
+    DGLHeteroGraph
+        a heterogenous graph, with one node type and different edge types
+    '''
     graphs = []
     num_nodes = len(vocab)
 
