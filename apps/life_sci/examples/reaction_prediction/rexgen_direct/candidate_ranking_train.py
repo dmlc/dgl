@@ -57,6 +57,11 @@ def main(args, path_to_candidate_bonds):
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
             reactant_graph, product_graphs, combo_scores, labels = batch_data
+
+            # No valid candidate products have been predicted
+            if reactant_graph is None:
+                continue
+
             combo_scores, labels = combo_scores.to(args['device']), labels.to(args['device'])
             reactant_node_feats = reactant_graph.ndata.pop('hv').to(args['device'])
             reactant_edge_feats = reactant_graph.edata.pop('he').to(args['device'])

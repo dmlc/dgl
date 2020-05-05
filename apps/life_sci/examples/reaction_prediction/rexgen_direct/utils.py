@@ -623,17 +623,25 @@ def collate_rank_train(data):
     Returns
     -------
     reactant_graph : DGLGraph
-        DGLGraph for the reactants.
+        DGLGraph for the reactants. None will be returned if no valid candidate products exist.
     product_graphs : DGLGraph
-        DGLGraph for the candidate products.
+        DGLGraph for the candidate products. None will be returned if no valid candidate products
+        exist.
     combo_scores : float32 tensor of shape (B - 1, 1)
         Scores for candidate products by the model for reaction center prediction.
+        None will be returned if no valid candidate products exist.
     labels : float32 tensor of shape (B - 1, 1)
         Binary labels for candidate products, where 1 indicates the real product.
+        None will be returned if no valid candidate products exist.
     """
     assert len(data) == 1, 'This collate function only works with batch size 1.'
     data = data[0]
     graphs, combo_scores, labels = data
+
+    # No valid candidate products have been predicted
+    if len(graphs) == 1:
+        return None, None, None, None
+
     reactant_graph = graphs[0]
     product_graphs = dgl.batch(graphs[1:])
 
@@ -652,31 +660,42 @@ def collate_rank_eval(data):
     Returns
     -------
     reactant_graph : DGLGraph
-        DGLGraph for the reactants.
+        DGLGraph for the reactants. None will be returned if no valid candidate products exist.
     product_graphs : DGLGraph
-        DGLGraph for the candidate products.
+        DGLGraph for the candidate products. None will be returned if no valid candidate
+        products exist.
     combo_scores : float32 tensor of shape (B - 1, 1)
         Scores for candidate products by the model for reaction center prediction.
+        None will be returned if no valid candidate products exist.
     valid_candidate_combos : list of list
         valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
         of candidate bond changes for the reaction. Each tuple is of form (atom1, atom2,
         change_type, score). atom1, atom2 are the atom mapping numbers - 1 of the two
         end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
-        a single, double, triple, and aromatic bond.
+        a single, double, triple, and aromatic bond. None will be returned if no valid candidate
+        products exist.
     reactant_mol : rdkit.Chem.rdchem.Mol
-        RDKit molecule instance for the reactants
+        RDKit molecule instance for the reactants. None will be returned if no valid candidate
+        products exist.
     real_bond_changes : list of tuples
         Ground truth bond changes in a reaction. Each tuple is of form (atom1, atom2,
         change_type). atom1, atom2 are the atom mapping numbers - 1 of the two
         end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
-        a single, double, triple, and aromatic bond.
+        a single, double, triple, and aromatic bond. None will be returned if no valid candidate
+        products exist.
     product_mol : rdkit.Chem.rdchem.Mol
-        RDKit molecule instance for the product
+        RDKit molecule instance for the product. None will be returned if no valid candidate
+        products exist.
     """
     assert len(data) == 1, 'This collate function only works with batch size 1.'
     data = data[0]
     graphs, combo_scores, valid_candidate_combos, \
     reactant_mol, real_bond_changes, product_mol = data
+
+    # No valid candidate products have been predicted
+    if len(graphs) == 1:
+        return None, None, None, None, None, None, None
+
     reactant_graph = graphs[0]
     product_graphs = dgl.batch(graphs[1:])
 
@@ -1116,9 +1135,16 @@ def candidate_ranking_eval(args, model, data_loader):
         found_info_summary['top_{:d}'.format(k)] = 0
         found_info_summary['top_{:d}_sanitized'.format(k)] = 0
 
+    total_samples = 0
     for batch_id, batch_data in enumerate(data_loader):
         reactant_graph, product_graphs, combo_scores, \
         valid_candidate_combos, reactant_mol, real_bond_changes, product_mol = batch_data
+
+        # No valid candidate products have been predicted
+        if reactant_graph is None:
+            continue
+        total_samples += 1
+
         combo_scores = combo_scores.to(args['device'])
         reactant_node_feats = reactant_graph.ndata.pop('hv').to(args['device'])
         reactant_edge_feats = reactant_graph.edata.pop('he').to(args['device'])
@@ -1155,10 +1181,10 @@ def candidate_ranking_eval(args, model, data_loader):
         for k, v in batch_found_info.items():
             found_info_summary[k] += float(v)
 
-        if (batch_id + 1) % args['print_every'] == 0:
+        if total_samples % args['print_every'] == 0:
             print('Iter {:d}/{:d}'.format(
-                (batch_id + 1) // args['print_every'], len(data_loader) // args['print_every']))
+                total_samples // args['print_every'], len(data_loader) // args['print_every']))
             print(summary_candidate_ranking_info(
-                args['top_ks'], found_info_summary, batch_id + 1))
+                args['top_ks'], found_info_summary, total_samples))
 
-    return summary_candidate_ranking_info(args['top_ks'], found_info_summary, len(data_loader))
+    return summary_candidate_ranking_info(args['top_ks'], found_info_summary, total_samples)
