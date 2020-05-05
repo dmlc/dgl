@@ -37,15 +37,16 @@ class VertexNetGraphPool:
 
         n_vertex = i + 1
 
-        g_pool[i].add_nodes(n_vertex)
+        self.g_pool[i] = dgl.DGLGraph()
+        self.g_pool[i].add_nodes(n_vertex)
         dec_nodes = th.arange(n_vertex, dtype=th.long)
 
         # dec -> dec
         indices = th.triu(th.ones(n_vertex, n_vertex)) == 1
         us = dec_nodes.unsqueeze(-1).repeat(1, n_vertex)[indices]
         vs = dec_nodes.unsqueeze(0).repeat(n_vertex, 1)[indices]
-        g_pool[i].add_edges(us, vs)
-        num_edges['dd'][i] = len(us)
+        self.g_pool[i].add_edges(us, vs)
+        self.num_edges['dd'][i] = len(us)
         return self.g_pool[i]
 
     def beam(self, tgt_buf, start_sym, max_len, k, device='cpu'):

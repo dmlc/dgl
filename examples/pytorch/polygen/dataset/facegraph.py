@@ -19,7 +19,7 @@ class FaceGraphPool:
         print('start creating graph pool...')
         tic = time.time()
         self.n, self.m = n, m
-        g_pool = [[dgl.DGLGraph() for _ in range(m)] for _ in range(n)]
+        g_pool = [[None for _ in range(m)] for _ in range(n)]
         num_edges = {
             'ee': np.zeros((n, m)).astype(int),
             'ed': np.zeros((n, m)).astype(int),
@@ -39,7 +39,6 @@ class FaceGraphPool:
         '''
         if self.g_pool[i][j]:
             return self.g_pool[i][j]
-        
 
         src_length = i + 1
         tgt_length = j + 1

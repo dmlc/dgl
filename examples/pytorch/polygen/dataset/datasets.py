@@ -12,7 +12,7 @@ from .preprocess_mesh import preprocess as preprocess_mesh_obj
 VertexDataTuple = namedtuple('VertexDataTuple', ['g', 'num_edges_dd', 'tgt', 'mode', 'device'])
 VertexGraph = namedtuple('VertexGraph',
                    ['g', 'tgt', 'tgt_y', 'nids', 'eids',  'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
-FaceDataTuple = namedtuple('FaceDataTuple', ['g', 'num_edges_enc', 'num_edges_ed', 'num_edges_dd', 'src', 'tgt', 'mode', 'device'])
+FaceDataTuple = namedtuple('FaceDataTuple', ['g', 'num_edges_ee', 'num_edges_ed', 'num_edges_dd', 'src', 'tgt', 'mode', 'device'])
 FaceGraph = namedtuple('FaceGraph',
                    ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
@@ -28,7 +28,7 @@ class VertexDataset(Dataset):
     MAX_LENGTH = MAX_VERT_LENGTH * 3 + 2
     
     def __init__(self, dataset_list_path, mode):
-        dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
+        dataset_list_dir = '/home/ubuntu/data/ShapeNetCore.v2/'
         dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path)
         self.mode = mode
         with open(dataset_list_path, 'r') as f:
@@ -61,7 +61,7 @@ class VertexDataset(Dataset):
         if len(flattern_verts) > self.MAX_LENGTH:
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
-        return VertexDataTuple(g=self.graphpool.g_pool.get_graph_for_size(len(flattern_verts)-1),
+        return VertexDataTuple(g=self.graphpool.get_graph_for_size(len(flattern_verts)-1),
                 num_edges_dd=self.graphpool.num_edges['dd'][len(flattern_verts)-1],
                 tgt=flattern_verts, mode=self.mode, device='cpu')
 
@@ -70,13 +70,12 @@ def collate_vertexgraphs(data):
     """Batching a list of datapoints for dataloader.
     Parameters
     ----------
-    data : list of 3-tuples.
+    data : list of 5-tuples.
        Each tuples contains a graph, num_edges, tgt sequence, mode, device 
     Returns
     -------
     g : tuple of batched DGLGraph and input tensors
     """
-    print ('hahaha')
     assert len(data[0]) == 5, \
             'Expect the tuple to be of length 5, got {:d}'.format(len(data[0]))
     g_list, num_edges_dd, tgt_buf, modes, devices = map(list, zip(*data))
@@ -130,20 +129,19 @@ class FaceDataset(object):
     MAX_FACE_INDICES = 2800
 
     def __init__(self, dataset_list_path, mode):
-        dataset_list_dir = '/home/ubuntu/data/new/ShapeNetCore.v2/'
+        dataset_list_dir = '/home/ubuntu/data/ShapeNetCore.v2/'
         dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path)
         self.mode = mode
         with open(dataset_list_path, 'r') as f:
             self.dataset_list = f.readlines()
         self.pad_id = self.PAD_BIN
-        self.graphpool = FaceGraphPool(n=self.MAX_VERT_LENGTH, m=self.MAX_FACES_INDICES)
+        self.graphpool = FaceGraphPool(n=self.MAX_VERT_LENGTH, m=self.MAX_FACE_INDICES)
 
     def __len__(self):
         return len(self.dataset_list)
 
     def __getitem__(self, idx):
         obj_file = self.dataset_list[idx].strip()
-        print (idx)
         try:
             verts, faces = preprocess_mesh_obj(obj_file, self.COORD_BIN)
         except:
@@ -170,11 +168,11 @@ class FaceDataset(object):
         if len(flattern_faces) > self.MAX_FACE_INDICES:
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
-        
+
         return FaceDataTuple(g=self.graphpool.get_graph_for_size(len(full_verts), len(faces)+1), 
-                 num_edges_enc=self.graphpool.num_edges['enc'](len(full_verts), len(faces)+1),
-                 num_edges_ed=self.graphpool.num_edges['ed'](len(full_verts), len(faces)+1),
-                 num_edges_dd=self.graphpool.num_edges['dd'](len(full_verts), len(faces)+1),
+                 num_edges_ee=self.graphpool.num_edges['ee'][len(full_verts), len(faces)+1],
+                 num_edges_ed=self.graphpool.num_edges['ed'][len(full_verts), len(faces)+1],
+                 num_edges_dd=self.graphpool.num_edges['dd'][len(full_verts), len(faces)+1],
                  src=full_verts, tgt=flattern_faces, mode=self.mode, device='cpu')
 
 
@@ -184,17 +182,16 @@ def collate_facegraphs(data):
     Parameters
     ----------
     data : list of 8-tuples.
-       Each tuples contains a graph, num_edges_enc, num_edges_ed, num_edges_dd,
+       Each tuples contains a graph, num_edges_ee, num_edges_ed, num_edges_dd,
        src sequence, tgt sequence, mode, device 
     Returns
     -------
     g : tuple of batched DGLGraph and input tensors
     """
-    print ('hahaha')
     assert len(data[0]) == 8, \
             'Expect the tuple to be of length 5, got {:d}'.format(len(data[0]))
-    g_list, num_edges_enc, num_edges_ed, num_edges_dd, src_buf, tgt_buf, modes, devices = map(list, zip(*data))
-    num_edges = {'enc': num_edges_enc, 'ed': num_edges_ed, 'dd': num_edges_dd}
+    g_list, num_edges_ee, num_edges_ed, num_edges_dd, src_buf, tgt_buf, modes, devices = map(list, zip(*data))
+    num_edges = {'ee': num_edges_ee, 'ed': num_edges_ed, 'dd': num_edges_dd}
     src_lens = [len(_) for _ in src_buf]
     tgt_lens = [len(_) - 1 for _ in tgt_buf]
     mode = modes[0]
