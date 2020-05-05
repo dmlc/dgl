@@ -31,9 +31,11 @@ def main(args, path_to_candidate_bonds):
                                  train_mode=False,
                                  num_processes=args['num_processes'])
 
-    train_loader = DataLoader(train_set, batch_size=1, collate_fn=collate_rank_train,
+    train_loader = DataLoader(train_set, batch_size=args['batch_size'],
+                              collate_fn=collate_rank_train,
                               shuffle=True, num_workers=args['num_workers'])
-    val_loader = DataLoader(val_set, batch_size=1, collate_fn=collate_rank_eval,
+    val_loader = DataLoader(val_set, batch_size=args['batch_size'],
+                            collate_fn=collate_rank_eval,
                             shuffle=False, num_workers=args['num_workers'])
 
     model = WLNReactionRanking(
@@ -44,10 +46,8 @@ def main(args, path_to_candidate_bonds):
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
     from utils import Optimizer
-    optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'],
-                          num_accum_times=args['batch_size'])
+    optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'])
 
-    total_samples = 0
     acc_sum = 0
     grad_norm_sum = 0
     dur = []
@@ -56,31 +56,36 @@ def main(args, path_to_candidate_bonds):
         t0 = time.time()
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
-            reactant_graph, product_graphs, combo_scores, labels = batch_data
+            batch_reactant_graphs, batch_product_graphs, \
+            batch_combo_scores, batch_labels, batch_num_candidate_products = batch_data
 
-            # No valid candidate products have been predicted
-            if reactant_graph is None:
-                continue
+            batch_combo_scores = batch_combo_scores.to(args['device'])
+            batch_labels = batch_labels.to(args['device'])
+            reactant_node_feats = batch_reactant_graphs.ndata.pop('hv').to(args['device'])
+            reactant_edge_feats = batch_reactant_graphs.edata.pop('he').to(args['device'])
+            product_node_feats = batch_product_graphs.ndata.pop('hv').to(args['device'])
+            product_edge_feats = batch_product_graphs.edata.pop('he').to(args['device'])
 
-            combo_scores, labels = combo_scores.to(args['device']), labels.to(args['device'])
-            reactant_node_feats = reactant_graph.ndata.pop('hv').to(args['device'])
-            reactant_edge_feats = reactant_graph.edata.pop('he').to(args['device'])
-            product_node_feats = product_graphs.ndata.pop('hv').to(args['device'])
-            product_edge_feats = product_graphs.edata.pop('he').to(args['device'])
-
-            pred = model(reactant_graph=reactant_graph,
+            pred = model(reactant_graph=batch_reactant_graphs,
                          reactant_node_feats=reactant_node_feats,
                          reactant_edge_feats=reactant_edge_feats,
-                         product_graphs=product_graphs,
+                         product_graphs=batch_product_graphs,
                          product_node_feats=product_node_feats,
                          product_edge_feats=product_edge_feats,
-                         candidate_scores=combo_scores)
-            # Check if the ground truth candidate has the highest score
-            acc_sum += float(pred.max(dim=0)[1].detach().cpu().data.item() == 0)
-            loss = criterion(pred, labels)
-            total_samples += 1
-            grad_norm_sum += optimizer.backward_and_step(loss)
+                         candidate_scores=batch_combo_scores,
+                         batch_num_candidate_products=batch_num_candidate_products)
 
+            # Check if the ground truth candidate has the highest score
+            product_graph_start = 0
+            for i in range(len(batch_num_candidate_products)):
+                product_graph_end = product_graph_start + batch_num_candidate_products[i]
+                reaction_pred = pred[product_graph_start:product_graph_end, :]
+                acc_sum += float(reaction_pred.max(dim=0)[1].detach().cpu().data.item() == 0)
+                product_graph_start = product_graph_end
+
+            loss = criterion(pred, batch_labels)
+            grad_norm_sum += optimizer.backward_and_step(loss)
+            total_samples = batch_id + 1
             if total_samples % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \
                            'accuracy {:.4f} | grad norm {:.4f}'.format(

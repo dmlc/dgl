@@ -48,27 +48,30 @@ class WLNReactionRanking(nn.Module):
         )
 
     def forward(self, reactant_graph, reactant_node_feats, reactant_edge_feats,
-                product_graphs, product_node_feats, product_edge_feats, candidate_scores):
+                product_graphs, product_node_feats, product_edge_feats,
+                candidate_scores, batch_num_candidate_products):
         r"""Predicts the score for candidate products to be the true product
 
         Parameters
         ----------
         reactant_graph : DGLGraph
-            DGLGraph for the reactants.
-        reactant_node_feats : float32 tensor of shape (V, node_in_feats)
-            Input node features for the reactants. V for the number of nodes.
+            DGLGraph for a batch of reactants.
+        reactant_node_feats : float32 tensor of shape (V1, node_in_feats)
+            Input node features for the reactants. V1 for the number of nodes.
         reactant_edge_feats : float32 tensor of shape (E1, edge_in_feats)
             Input edge features for the reactants. E1 for the number of edges in
             reactant_graph.
         product_graphs : DGLGraph
-            A batch of B molecular graphs for the candidate products.
-        product_node_feats : float32 tensor of shape (B * V, node_in_feats)
-            Input node features for the candidate products.
+            DGLGraph for the candidate products in a batch of reactions.
+        product_node_feats : float32 tensor of shape (V2, node_in_feats)
+            Input node features for the candidate products. V2 for the number of nodes.
         product_edge_feats : float32 tensor of shape (E2, edge_in_feats)
             Input edge features for the candidate products. E2 for the number of edges
             in the graphs for candidate products.
-        candidate_scores : float32 tensor of shape (B - 1, 1)
+        candidate_scores : float32 tensor of shape (B, 1)
             Scores for candidate products based on the model for reaction center prediction
+        batch_num_candidate_products : list of int
+            Number of candidate products for the reactions in the batch
 
         Returns
         -------
@@ -76,28 +79,51 @@ class WLNReactionRanking(nn.Module):
             Predicted scores for candidate products
         """
         # Update representations for nodes in both reactants and candidate products
-        reactant_node_feats = self.gnn(reactant_graph, reactant_node_feats, reactant_edge_feats)
-        product_node_feats = self.gnn(product_graphs, product_node_feats, product_edge_feats)
+        batch_reactant_node_feats = self.gnn(
+            reactant_graph, reactant_node_feats, reactant_edge_feats)
+        batch_product_node_feats = self.gnn(
+            product_graphs, product_node_feats, product_edge_feats)
 
-        # (N, node_out_feats)
-        old_feats_shape = reactant_node_feats.shape
-        num_candidate_products = product_graphs.batch_size
-        # (1, N, node_out_feats)
-        expanded_reactant_node_feats = reactant_node_feats.reshape((1,) + old_feats_shape)
-        # (B, N, node_out_feats)
-        expanded_reactant_node_feats = expanded_reactant_node_feats.expand(
-            (num_candidate_products,) + old_feats_shape)
+        # Iterate over the reactions in the batch
+        reactant_node_start = 0
+        product_graph_start = 0
+        product_node_start = 0
+        batch_diff_node_feats = []
+        for i in range(len(batch_num_candidate_products)):
+            num_candidate_products = batch_num_candidate_products[i]
 
-        # (B, N, node_out_feats)
-        candidate_product_node_feats = product_node_feats.reshape(
-            (num_candidate_products,) + old_feats_shape)
+            reactant_node_end = reactant_node_start + reactant_graph.batch_num_nodes[i]
+            product_graph_end = product_graph_start + num_candidate_products
+            product_node_end = product_node_start + sum(
+                product_graphs.batch_num_nodes[product_graph_start: product_graph_end])
 
-        # Get the node representation difference between candidate products and reactants
-        diff_node_feats = candidate_product_node_feats - expanded_reactant_node_feats
-        diff_node_feats = diff_node_feats.reshape(-1, diff_node_feats.shape[-1])
+            # (N, node_out_feats)
+            reactant_node_feats = batch_reactant_node_feats[
+                                  reactant_node_start:reactant_node_end, :]
+            product_node_feats = batch_product_node_feats[product_node_start: product_node_end, :]
 
+            old_feats_shape = reactant_node_feats.shape
+            # (1, N, node_out_feats)
+            expanded_reactant_node_feats = reactant_node_feats.reshape((1,) + old_feats_shape)
+            # (B, N, node_out_feats)
+            expanded_reactant_node_feats = expanded_reactant_node_feats.expand(
+                (num_candidate_products,) + old_feats_shape)
+            # (B, N, node_out_feats)
+            candidate_product_node_feats = product_node_feats.reshape(
+                (num_candidate_products,) + old_feats_shape)
+
+            # Get the node representation difference between candidate products and reactants
+            diff_node_feats = candidate_product_node_feats - expanded_reactant_node_feats
+            diff_node_feats = diff_node_feats.reshape(-1, diff_node_feats.shape[-1])
+            batch_diff_node_feats.append(diff_node_feats)
+
+            reactant_node_start = reactant_node_end
+            product_graph_start = product_graph_end
+            product_node_start = product_node_end
+
+        batch_diff_node_feats = torch.cat(batch_diff_node_feats, dim=0)
         # One more GNN layer for message passing with the node representation difference
-        diff_node_feats = self.diff_gnn(product_graphs, diff_node_feats, product_edge_feats)
+        diff_node_feats = self.diff_gnn(product_graphs, batch_diff_node_feats, product_edge_feats)
         candidate_product_feats = self.readout(product_graphs, diff_node_feats)
 
         return self.predict(candidate_product_feats) + candidate_scores

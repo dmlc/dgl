@@ -622,30 +622,31 @@ def collate_rank_train(data):
 
     Returns
     -------
-    reactant_graph : DGLGraph
-        DGLGraph for the reactants. None will be returned if no valid candidate products exist.
+    batch_reactant_graphs : DGLGraph
+        DGLGraph for a batch of batch_size reactants.
     product_graphs : DGLGraph
-        DGLGraph for the candidate products. None will be returned if no valid candidate products
-        exist.
-    combo_scores : float32 tensor of shape (B - 1, 1)
+        DGLGraph for a batch of B candidate products
+    combo_scores : float32 tensor of shape (B, 1)
         Scores for candidate products by the model for reaction center prediction.
-        None will be returned if no valid candidate products exist.
-    labels : float32 tensor of shape (B - 1, 1)
+    labels : float32 tensor of shape (B, 1)
         Binary labels for candidate products, where 1 indicates the real product.
-        None will be returned if no valid candidate products exist.
+    batch_num_candidate_products : list of int
+        Number of candidate products for the reactions in this batch.
     """
-    assert len(data) == 1, 'This collate function only works with batch size 1.'
-    data = data[0]
-    graphs, combo_scores, labels = data
+    batch_graphs, batch_combo_scores, batch_labels = map(list, zip(*data))
+    batch_reactant_graphs = dgl.batch([g_list[0] for g_list in batch_graphs])
 
-    # No valid candidate products have been predicted
-    if len(graphs) == 1:
-        return None, None, None, None
+    batch_num_candidate_products = []
+    batch_product_graphs = []
+    for g_list in batch_graphs:
+        batch_num_candidate_products.append(len(g_list) - 1)
+        batch_product_graphs.extend(g_list[1:])
+    batch_product_graphs = dgl.batch(batch_product_graphs)
+    batch_combo_scores = torch.stack(batch_combo_scores, dim=0)
+    batch_labels = torch.stack(batch_labels, dim=0)
 
-    reactant_graph = graphs[0]
-    product_graphs = dgl.batch(graphs[1:])
-
-    return reactant_graph, product_graphs, combo_scores, labels
+    return batch_reactant_graphs, batch_product_graphs, batch_combo_scores, batch_labels, \
+           batch_num_candidate_products
 
 def collate_rank_eval(data):
     """Collate multiple datapoints for candidate product ranking during evaluation
@@ -659,48 +660,76 @@ def collate_rank_eval(data):
 
     Returns
     -------
-    reactant_graph : DGLGraph
-        DGLGraph for the reactants. None will be returned if no valid candidate products exist.
-    product_graphs : DGLGraph
-        DGLGraph for the candidate products. None will be returned if no valid candidate
-        products exist.
-    combo_scores : float32 tensor of shape (B - 1, 1)
+    batch_reactant_graph : DGLGraph
+        DGLGraph for a batch of batch_size reactants.
+        None will be returned if no valid candidate products exist.
+    batch_product_graphs : DGLGraph
+        DGLGraph for a batch of B candidate products.
+        None will be returned if no valid candidate products exist.
+    batch_combo_scores : float32 tensor of shape (B, 1)
         Scores for candidate products by the model for reaction center prediction.
         None will be returned if no valid candidate products exist.
-    valid_candidate_combos : list of list
-        valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
-        of candidate bond changes for the reaction. Each tuple is of form (atom1, atom2,
-        change_type, score). atom1, atom2 are the atom mapping numbers - 1 of the two
-        end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
+    batch_valid_candidate_combos : list of list
+        batch_valid_candidate_combos[i] gives valid combos of candidate bond changes for the
+        i-th reaction. batch_valid_candidate_combos[i][j] gives a list of tuples, which is
+        the j-th valid combo of candidate bond changes for the reaction. Each tuple is of form
+        (atom1, atom2, change_type, score). atom1, atom2 are the atom mapping numbers - 1 of the
+        two end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
         a single, double, triple, and aromatic bond. None will be returned if no valid candidate
         products exist.
-    reactant_mol : rdkit.Chem.rdchem.Mol
-        RDKit molecule instance for the reactants. None will be returned if no valid candidate
-        products exist.
-    real_bond_changes : list of tuples
-        Ground truth bond changes in a reaction. Each tuple is of form (atom1, atom2,
-        change_type). atom1, atom2 are the atom mapping numbers - 1 of the two
-        end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
-        a single, double, triple, and aromatic bond. None will be returned if no valid candidate
-        products exist.
-    product_mol : rdkit.Chem.rdchem.Mol
-        RDKit molecule instance for the product. None will be returned if no valid candidate
-        products exist.
+    reactant_mols_list : list of rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for the reactants in the batch.
+        None will be returned if no valid candidate products exist.
+    real_bond_changes_list : list of list
+        real_bond_changes_list[i] gives the ground truth bond changes in the i-th reaction,
+        which is a list of tuples. Each tuple is of form (atom1, atom2, change_type). atom1,
+        atom2 are the atom mapping numbers - 1 of the two end atoms. change_type can be
+        0, 1, 2, 3, 1.5, separately for losing a bond, forming a single, double, triple, and
+        aromatic bond. None will be returned if no valid candidate products exist.
+    product_mols_list : list of rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for the candidate products in each reaction.
+        None will be returned if no valid candidate products exist.
+    batch_num_candidate_products : list of int
+        Number of candidate products for the reactions in this batch.
     """
-    assert len(data) == 1, 'This collate function only works with batch size 1.'
-    data = data[0]
-    graphs, combo_scores, valid_candidate_combos, \
-    reactant_mol, real_bond_changes, product_mol = data
+    batch_graphs, batch_combo_scores, batch_valid_candidate_combos, \
+    batch_reactant_mols, batch_real_bond_changes, batch_product_mols = map(list, zip(*data))
 
-    # No valid candidate products have been predicted
-    if len(graphs) == 1:
-        return None, None, None, None, None, None, None
+    batch_reactant_graphs = []
+    batch_product_graphs = []
+    combo_scores_list = []
+    valid_candidate_combos_list = []
+    reactant_mols_list = []
+    real_bond_changes_list = []
+    product_mols_list = []
+    batch_num_candidate_products = []
 
-    reactant_graph = graphs[0]
-    product_graphs = dgl.batch(graphs[1:])
+    for i in range(len(batch_graphs)):
+        g_list = batch_graphs[i]
+        # No valid candidate products have been predicted
+        if len(g_list) == 1:
+            continue
+        batch_reactant_graphs.append(g_list[0])
+        batch_product_graphs.extend(g_list[1:])
+        combo_scores_list.append(batch_combo_scores[i])
+        valid_candidate_combos_list.append(batch_valid_candidate_combos[i])
+        reactant_mols_list.append(batch_reactant_mols[i])
+        real_bond_changes_list.append(batch_real_bond_changes[i])
+        product_mols_list.append(batch_product_mols[i])
+        batch_num_candidate_products.append(len(g_list) - 1)
 
-    return reactant_graph, product_graphs, combo_scores, \
-           valid_candidate_combos, reactant_mol, real_bond_changes, product_mol
+    if len(batch_product_graphs) == 0:
+        return None, None, None, None, None, None, None, None
+
+    batch_reactant_graphs = dgl.batch(batch_reactant_graphs)
+    batch_product_graphs = dgl.batch(batch_product_graphs)
+    batch_combo_scores = torch.cat(combo_scores_list, dim=0)
+    batch_valid_candidate_combos = valid_candidate_combos_list
+
+
+    return batch_reactant_graphs, batch_product_graphs, batch_combo_scores, \
+           batch_valid_candidate_combos, reactant_mols_list, real_bond_changes_list, \
+           product_mols_list, batch_num_candidate_products
 
 def sanitize_smiles_molvs(smiles, largest_fragment=False):
     """Sanitize a SMILES with MolVS
@@ -1137,49 +1166,63 @@ def candidate_ranking_eval(args, model, data_loader):
 
     total_samples = 0
     for batch_id, batch_data in enumerate(data_loader):
-        reactant_graph, product_graphs, combo_scores, \
-        valid_candidate_combos, reactant_mol, real_bond_changes, product_mol = batch_data
+        batch_reactant_graphs, batch_product_graphs, batch_combo_scores, \
+        batch_valid_candidate_combos, batch_reactant_mols, batch_real_bond_changes, \
+        batch_product_mols, batch_num_candidate_products = batch_data
 
         # No valid candidate products have been predicted
-        if reactant_graph is None:
+        if batch_reactant_graphs is None:
             continue
-        total_samples += 1
+        total_samples += len(batch_num_candidate_products)
 
-        combo_scores = combo_scores.to(args['device'])
-        reactant_node_feats = reactant_graph.ndata.pop('hv').to(args['device'])
-        reactant_edge_feats = reactant_graph.edata.pop('he').to(args['device'])
-        product_node_feats = product_graphs.ndata.pop('hv').to(args['device'])
-        product_edge_feats = product_graphs.edata.pop('he').to(args['device'])
+        batch_combo_scores = batch_combo_scores.to(args['device'])
+        reactant_node_feats = batch_reactant_graphs.ndata.pop('hv').to(args['device'])
+        reactant_edge_feats = batch_reactant_graphs.edata.pop('he').to(args['device'])
+        product_node_feats = batch_product_graphs.ndata.pop('hv').to(args['device'])
+        product_edge_feats = batch_product_graphs.edata.pop('he').to(args['device'])
 
         # Get candidate products with top-k ranking
         with torch.no_grad():
-            pred = model(reactant_graph=reactant_graph,
+            pred = model(reactant_graph=batch_reactant_graphs,
                          reactant_node_feats=reactant_node_feats,
                          reactant_edge_feats=reactant_edge_feats,
-                         product_graphs=product_graphs,
+                         product_graphs=batch_product_graphs,
                          product_node_feats=product_node_feats,
                          product_edge_feats=product_edge_feats,
-                         candidate_scores=combo_scores)
-        top_k = min(max_k, product_graphs.batch_size)
-        topk_values, topk_indices = torch.topk(pred, top_k, dim=0)
+                         candidate_scores=batch_combo_scores)
 
-        # Filter out invalid candidate bond changes
-        reactant_pair_to_bond = bookkeep_reactant(reactant_mol)
-        topk_combos = []
-        for i in topk_indices:
-            i = i.detach().cpu().item()
-            combo = []
-            for atom1, atom2, change_type, score in valid_candidate_combos[i]:
-                bond_in_reactant = reactant_pair_to_bond.get((atom1, atom2), None)
-                if (bond_in_reactant is None and change_type > 0) or \
-                    (bond_in_reactant is not None and bond_in_reactant != change_type):
-                    combo.append((atom1, atom2, change_type))
-            topk_combos.append(combo)
+        product_graph_start = 0
+        for i in range(len(batch_num_candidate_products)):
+            num_candidate_products = batch_num_candidate_products[i]
+            reactant_mol = batch_reactant_mols[i]
+            valid_candidate_combos = batch_valid_candidate_combos[i]
+            real_bond_changes = batch_real_bond_changes[i]
+            product_mol = batch_product_mols[i]
 
-        batch_found_info = examine_topk_candidate_product(
-            args['top_ks'], topk_combos, reactant_mol, real_bond_changes, product_mol)
-        for k, v in batch_found_info.items():
-            found_info_summary[k] += float(v)
+            product_graph_end = product_graph_start + num_candidate_products
+            top_k = min(max_k, num_candidate_products)
+            reaction_pred = pred[product_graph_start:product_graph_end, :]
+            topk_values, topk_indices = torch.topk(reaction_pred, top_k, dim=0)
+
+            # Filter out invalid candidate bond changes
+            reactant_pair_to_bond = bookkeep_reactant(reactant_mol)
+            topk_combos = []
+            for i in topk_indices:
+                i = i.detach().cpu().item()
+                combo = []
+                for atom1, atom2, change_type, score in valid_candidate_combos[i]:
+                    bond_in_reactant = reactant_pair_to_bond.get((atom1, atom2), None)
+                    if (bond_in_reactant is None and change_type > 0) or \
+                            (bond_in_reactant is not None and bond_in_reactant != change_type):
+                        combo.append((atom1, atom2, change_type))
+                topk_combos.append(combo)
+
+            batch_found_info = examine_topk_candidate_product(
+                args['top_ks'], topk_combos, reactant_mol, real_bond_changes, product_mol)
+            for k, v in batch_found_info.items():
+                found_info_summary[k] += float(v)
+
+            product_graph_start = product_graph_end
 
         if total_samples % args['print_every'] == 0:
             print('Iter {:d}/{:d}'.format(
