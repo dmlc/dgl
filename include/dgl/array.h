@@ -903,11 +903,11 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  */
 #define ATEN_ID_BITS_SWITCH(bits, IdType, ...)                  \
   do {                                                          \
-    CHECK(bits == 32 || bits == 64) << "bits must be 32 or 64"; \
-    if (bits == 32) {                                           \
+    CHECK((bits) == 32 || (bits) == 64) << "bits must be 32 or 64"; \
+    if ((bits) == 32) {                                           \
       typedef int32_t IdType;                                   \
       { __VA_ARGS__ }                                           \
-    } else if (bits == 64) {                                    \
+    } else if ((bits) == 64) {                                    \
       typedef int64_t IdType;                                   \
       { __VA_ARGS__ }                                           \
     } else {                                                    \

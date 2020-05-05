@@ -15,8 +15,8 @@
 #define CHECK_SAME_DTYPE(VAR1, VAR2)                                          \
   CHECK(VAR1->dtype == VAR2->dtype)                                           \
     << "Expected " << (#VAR2) << " to be the same type as " << (#VAR1) << "(" \
-    << VAR1->dtype << ")"                                                     \
-    << ". But got " << VAR2->dtype;
+    << (VAR1)->dtype << ")"                                                     \
+    << ". But got " << (VAR2)->dtype;
 
 namespace dgl {
 
