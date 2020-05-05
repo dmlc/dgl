@@ -669,9 +669,9 @@ def collate_rank_eval(data):
     batch_combo_scores : float32 tensor of shape (B, 1)
         Scores for candidate products by the model for reaction center prediction.
         None will be returned if no valid candidate products exist.
-    batch_valid_candidate_combos : list of list
-        batch_valid_candidate_combos[i] gives valid combos of candidate bond changes for the
-        i-th reaction. batch_valid_candidate_combos[i][j] gives a list of tuples, which is
+    valid_candidate_combos_list : list of list
+        valid_candidate_combos_list[i] gives valid combos of candidate bond changes for the
+        i-th reaction. valid_candidate_combos_list[i][j] gives a list of tuples, which is
         the j-th valid combo of candidate bond changes for the reaction. Each tuple is of form
         (atom1, atom2, change_type, score). atom1, atom2 are the atom mapping numbers - 1 of the
         two end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
@@ -724,11 +724,9 @@ def collate_rank_eval(data):
     batch_reactant_graphs = dgl.batch(batch_reactant_graphs)
     batch_product_graphs = dgl.batch(batch_product_graphs)
     batch_combo_scores = torch.cat(combo_scores_list, dim=0)
-    batch_valid_candidate_combos = valid_candidate_combos_list
-
 
     return batch_reactant_graphs, batch_product_graphs, batch_combo_scores, \
-           batch_valid_candidate_combos, reactant_mols_list, real_bond_changes_list, \
+           valid_candidate_combos_list, reactant_mols_list, real_bond_changes_list, \
            product_mols_list, batch_num_candidate_products
 
 def sanitize_smiles_molvs(smiles, largest_fragment=False):
@@ -1189,7 +1187,8 @@ def candidate_ranking_eval(args, model, data_loader):
                          product_graphs=batch_product_graphs,
                          product_node_feats=product_node_feats,
                          product_edge_feats=product_edge_feats,
-                         candidate_scores=batch_combo_scores)
+                         candidate_scores=batch_combo_scores,
+                         batch_num_candidate_products=batch_num_candidate_products)
 
         product_graph_start = 0
         for i in range(len(batch_num_candidate_products)):
@@ -1226,7 +1225,8 @@ def candidate_ranking_eval(args, model, data_loader):
 
         if total_samples % args['print_every'] == 0:
             print('Iter {:d}/{:d}'.format(
-                total_samples // args['print_every'], len(data_loader) // args['print_every']))
+                total_samples // args['print_every'],
+                len(data_loader.dataset) // args['print_every']))
             print(summary_candidate_ranking_info(
                 args['top_ks'], found_info_summary, total_samples))
 
