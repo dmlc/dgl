@@ -12,10 +12,10 @@ import pickle
 
 def create_ip_config():
     ip_config = open("ip_config.txt", "w")
-    ip_config.writelines('192.168.9.12 30050 0')
-    ip_config.writelines('192.168.9.13 30050 1')
-    ip_config.writelines('192.168.9.14 30050 2')
-    ip_config.writelines('192.168.9.15 30050 3')
+    ip_config.write('192.168.9.12 30050 0\n')
+    ip_config.write('192.168.9.13 30050 1\n')
+    ip_config.write('192.168.9.14 30050 2\n')
+    ip_config.write('192.168.9.15 30050 3\n')
     ip_config.close()
 
 def create_random_graph(n):
