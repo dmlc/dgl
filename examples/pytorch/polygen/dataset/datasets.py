@@ -16,8 +16,6 @@ FaceDataTuple = namedtuple('FaceDataTuple', ['g', 'num_edges_ee', 'num_edges_ed'
 FaceGraph = namedtuple('FaceGraph',
                    ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
-
-
 class VertexDataset(Dataset):
     """Vertex Dataset"""
     COORD_BIN = 256
@@ -26,13 +24,17 @@ class VertexDataset(Dataset):
     PAD_BIN = COORD_BIN + 2
     MAX_VERT_LENGTH = 800
     MAX_LENGTH = MAX_VERT_LENGTH * 3 + 2
-    
-    def __init__(self, dataset_list_path, mode):
+
+    def __init__(self, dataset_list_path, mode, device, dev_rank=0, ndev=1):
         dataset_list_dir = '/home/ubuntu/data/ShapeNetCore.v2/'
-        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path)
+        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path+'.'+mode)
         self.mode = mode
         with open(dataset_list_path, 'r') as f:
-            self.dataset_list = f.readlines()
+            self.whole_dataset_list = f.readlines()
+        # make sure each dev can get the same number of samples
+        valid_len = len(self.whole_dataset_list) // ndev * ndev
+        self.dataset_list = self.whole_dataset_list[dev_rank:valid_len-ndev+dev_rank:ndev]
+        self.device = device 
         self.pad_id = self.PAD_BIN
         self.graphpool = VertexNetGraphPool(n=self.MAX_LENGTH)
  
@@ -63,7 +65,7 @@ class VertexDataset(Dataset):
             return self.__getitem__(to_try)
         return VertexDataTuple(g=self.graphpool.get_graph_for_size(len(flattern_verts)-1),
                 num_edges_dd=self.graphpool.num_edges['dd'][len(flattern_verts)-1],
-                tgt=flattern_verts, mode=self.mode, device='cpu')
+                tgt=flattern_verts, mode=self.mode, device=self.device)
 
 # different collate function for infer and train?
 def collate_vertexgraphs(data):
@@ -128,12 +130,16 @@ class FaceDataset(object):
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
     MAX_FACE_INDICES = 2800
 
-    def __init__(self, dataset_list_path, mode):
+    def __init__(self, dataset_list_path, mode, device, dev_rank=0, ndev=1):
         dataset_list_dir = '/home/ubuntu/data/ShapeNetCore.v2/'
-        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path)
+        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path+'.'+mode)
         self.mode = mode
         with open(dataset_list_path, 'r') as f:
-            self.dataset_list = f.readlines()
+            self.whole_dataset_list = f.readlines()
+        # make sure each dev can get the same number of samples
+        valid_len = len(self.whole_dataset_list) // ndev * ndev
+        self.dataset_list = self.whole_dataset_list[dev_rank:valid_len-ndev+dev_rank:ndev]
+        self.device = device
         self.pad_id = self.PAD_BIN
         self.graphpool = FaceGraphPool(n=self.MAX_VERT_LENGTH, m=self.MAX_FACE_INDICES)
 
@@ -173,7 +179,7 @@ class FaceDataset(object):
                  num_edges_ee=self.graphpool.num_edges['ee'][len(full_verts), len(faces)+1],
                  num_edges_ed=self.graphpool.num_edges['ed'][len(full_verts), len(faces)+1],
                  num_edges_dd=self.graphpool.num_edges['dd'][len(full_verts), len(faces)+1],
-                 src=full_verts, tgt=flattern_faces, mode=self.mode, device='cpu')
+                 src=full_verts, tgt=flattern_faces, mode=self.mode, device=self.device)
 
 
 # different collate function for infer and train?
