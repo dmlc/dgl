@@ -10,7 +10,7 @@ import unittest
 import pickle
 
 
-def create_ip_config(num_parts):
+def create_ip_config():
     ip_config = open("ip_config.txt", "w")
     ip_config.writelines('192.168.9.12 30050 0')
     ip_config.writelines('192.168.9.13 30050 1')
@@ -30,6 +30,7 @@ def test_graph_partition_book():
     num_parts = 4
     num_hops = 2
 
+    create_ip_config()
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
     gpb = GraphPartitionBook('/tmp/test.json', 'ip_config.txt')
     assert gpb.num_partitions() == num_parts
