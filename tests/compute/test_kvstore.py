@@ -66,26 +66,32 @@ def start_client():
 
     meta_0 = my_client.get_data_meta('data_0')
     assert meta_0[0] == F.float32
+    assert meta_0[1] == tuple(F.shape(data_0))
     assert_array_equal(meta_0[2], partition_0)
 
     meta_1 = my_client.get_data_meta('data_1')
     assert meta_1[0] == F.float32
+    assert meta_1[1] == tuple(F.shape(data_1))
     assert_array_equal(meta_1[2], partition_1)
 
     meta_2 = my_client.get_data_meta('data_2')
     assert meta_2[0] == F.float32
+    assert meta_2[1] == tuple(F.shape(data_0))
     assert_array_equal(meta_2[2], partition_0)
 
     meta_3 = my_client.get_data_meta('data_3')
     assert meta_3[0] == F.int64
+    assert meta_3[1] == tuple(F.shape(data_3))
     assert_array_equal(meta_3[2], partition_0)    
 
     meta_4 = my_client.get_data_meta('data_4')
     assert meta_4[0] == F.float64
+    assert meta_4[1] == tuple(F.shape(data_4))
     assert_array_equal(meta_3[2], partition_0)  
 
     meta_5 = my_client.get_data_meta('data_5')
     assert meta_5[0] == F.int32
+    assert meta_5[1] == tuple(F.shape(data_5))
     assert_array_equal(meta_3[2], partition_0)  
 
     my_client.push(name='data_0', id_tensor=F.tensor([0, 1, 2]), data_tensor=F.tensor([[1.,1.,1.],[2.,2.,2.],[3.,3.,3.]]))
