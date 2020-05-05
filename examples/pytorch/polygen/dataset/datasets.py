@@ -18,7 +18,7 @@ FaceGraph = namedtuple('FaceGraph',
 
 class VertexDataset(Dataset):
     """Vertex Dataset"""
-    COORD_BIN = 256
+    COORD_BIN = 32
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
@@ -53,6 +53,10 @@ class VertexDataset(Dataset):
             # If fail, try another random example
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
+        if np.any(faces < 0):
+            to_try = np.random.randint(0, len(self.dataset_list))
+            return self.__getitem__(to_try)
+ 
         # Flattern verts, order Y(up), X(front), Z(right)
         reordered_verts = np.zeros_like(verts)
         reordered_verts[:,0] = verts[:,1]
@@ -154,7 +158,10 @@ class FaceDataset(object):
             # If fail, try another random example
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
-
+        if np.any(faces < 0):
+            to_try = np.random.randint(0, len(self.dataset_list))
+            return self.__getitem__(to_try)
+ 
         # Flattern verts, order Y(up), X(front), Z(right)
         reordered_verts = np.zeros_like(verts)
         reordered_verts[:,0] = verts[:,1]

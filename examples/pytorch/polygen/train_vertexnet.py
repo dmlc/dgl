@@ -10,22 +10,6 @@ import torch
 from functools import partial
 import torch.distributed as dist
 
-def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True, log_f=None):
-    with loss_compute:
-        for i, g in enumerate(data_iter):
-            with T.set_grad_enabled(is_train):
-                output = model(g)
-                tgt_y = g.tgt_y
-                n_tokens = g.n_tokens
-                loss = loss_compute(output, tgt_y, n_tokens)
-                print (i, loss)
-                if log_f:
-                    info = str(epoch) + ',' + str(i) + ',' + str(loss) + '\n'
-                    log_f.write(info)
-    print('Epoch {} {}: Dev {} average loss: {}, accuracy {}'.format(
-        epoch, "Training" if is_train else "Evaluating",
-        dev_rank, loss_compute.avg_loss, loss_compute.accuracy))
-
 def run(dev_id, args):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=args.master_ip, master_port=args.master_port)
@@ -50,9 +34,10 @@ def main(dev_id, args):
     # Prepare dataset
     # Considering data paralellism
     train_dataset = VertexDataset(args.dataset, 'train', device, dev_id, args.ngpu)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
-    train_iter = iter(train_loader)
-    
+    # TODO: debugging nan, set shuffle to false
+    train_loader = DataLoader(train_dataset, batch_size=args.batch//args.ngpu, shuffle=False, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
+    train_iter = iter(train_loader) 
+
     # Config loss
     criterion = torch.nn.NLLLoss()
     # Build model
@@ -91,10 +76,10 @@ def main(dev_id, args):
         log_f = open(log_path, 'w')
         test_dataset = VertexDataset(args.dataset, 'test', device)
         test_loader = DataLoader(test_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
-        test_iter = iter(test_loader)
+        #test_iter = iter(test_loader)
         test_loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)(opt=None)
  
-    train_iter = 0
+    train_iter_num = 0
     while True:
         # train step
         try:
@@ -105,13 +90,15 @@ def main(dev_id, args):
         with train_loss_compute:
             with T.set_grad_enabled(True):
                 output = model(train_batch)
-                tgt_y = g.tgt_y
-                n_tokens = g.n_tokens
+                tgt_y = train_batch.tgt_y
+                print (train_batch.tgt[0].shape, train_batch.tgt[1].shape)
+                n_tokens = train_batch.n_tokens
                 train_loss = train_loss_compute(output, tgt_y, n_tokens)
-        train_iter += 1
+        train_iter_num += 1
 
         # testing logging
-        if train_iter % args.log_interval == 0 and dev_rank == 0:
+        if train_iter_num % args.log_interval == 0 and dev_rank == 0:
+            '''
             # train step
             try:
                 test_batch = test_iter.next()
@@ -120,19 +107,24 @@ def main(dev_id, args):
                 test_batch = test_iter.next()
             with test_loss_compute:
                 with T.set_grad_enabled(False):
-                    output = model(train_batch)
-                    tgt_y = g.tgt_y
-                    n_tokens = g.n_tokens
+                    output = model(test_batch)
+                    tgt_y = test_batch.tgt_y
+                    n_tokens = test_batch.n_tokens
                     test_loss = test_loss_compute(output, tgt_y, n_tokens)
-            
-            print ('train', train_iter, train_loss)
-            print ('test', train_iter, test_loss)
+            '''
+            print ('train', train_iter_num, train_loss)
+            #print ('test', train_iter_num, test_loss)
+            train_info = 'train,'+str(train_iter_num)+','+str(train_loss)
+           # test_info = 'test,'+str(train_iter_num)+','+str(test_loss)
+            log_f.write(train_info+'\n')
+            #log_f.write(test_info+'\n')
+            log_f.flush()
  
-        if (train_iter % args.ckpt_interval == 0 or train_iter == args.toatl_iter) and dev_rank == 0:
-            ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(train_iter)+'.pt')
+        if (train_iter_num % args.ckpt_interval == 0 or train_iter_num == args.total_iter) and dev_rank == 0:
+            ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(train_iter_num)+'.pt')
             print (ckpt_path)
             torch.save(model.state_dict(), ckpt_path)
-            if train_iter == args.total_iter:
+            if train_iter_num == args.total_iter:
                 break
 
 if __name__ == '__main__':
@@ -142,7 +134,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
-    argparser.add_argument('--dataset', default='vertex', help='dataset')
+    argparser.add_argument('--dataset', default='file.txt', help='dataset')
     argparser.add_argument('--batch', default=16, type=int, help='batch size')
     argparser.add_argument('--workers-per-loader', default=2, type=int, help='loaders per worker')
     argparser.add_argument('--total-iter', default=1e6, type=int, help='total number of iterations')
@@ -164,7 +156,7 @@ if __name__ == '__main__':
     print(args)
 
     devices = list(map(int, args.gpus.split(',')))
-    if len(devices) == 1:
+    if len(devices) == 1 and args.workers_per_loader == 0:
         args.ngpu = 0 if devices[0] < 0 else 1
         main(devices[0], args)
     else:
@@ -173,7 +165,7 @@ if __name__ == '__main__':
         procs = []
         for dev_id in devices:
             procs.append(mp.Process(target=run, args=(dev_id, args),
-                                    daemon=True))
+                                    daemon=False))
             procs[-1].start()
         for p in procs:
             p.join()
