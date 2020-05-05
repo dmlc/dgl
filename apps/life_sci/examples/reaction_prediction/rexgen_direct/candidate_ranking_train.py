@@ -132,7 +132,7 @@ if __name__ == '__main__':
                              'model on reaction center prediction')
     parser.add_argument('-np', '--num-processes', type=int, default=8,
                         help='Number of processes to use for data pre-processing')
-    parser.add_argument('-nw', '--num-workers', type=int, default=32,
+    parser.add_argument('-nw', '--num-workers', type=int, default=100,
                         help='Number of workers to use for data loading in PyTorch data loader')
     args = parser.parse_args().__dict__
     args.update(candidate_ranking_config)
