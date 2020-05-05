@@ -54,10 +54,10 @@ class GraphPartitionBook:
             self._meta_data.append(part_info)
         # Get nid2partid
         assert 'node_map' in self._part_meta, "cannot get the node map."
-        self._nid2partid = np.load(self._part_meta['node_map'])
+        self._nid2partid = F.tensor(np.load(self._part_meta['node_map']))
         # Get eid2partid
         assert 'edge_map' in self._part_meta, "cannot get the edge map."
-        self._eid2partid = np.load(self._part_meta['edge_map'])
+        self._eid2partid = F.tensor(np.load(self._part_meta['edge_map']))
         # Get partid2nids
         self._partid2nids = []
         sorted_nid = F.tensor(np.argsort(F.asnumpy(self._nid2partid)))
