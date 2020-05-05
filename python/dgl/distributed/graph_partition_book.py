@@ -1,18 +1,20 @@
-import os
-import sys
+"""Define graph partition book."""
+
 import json
 import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID
-from ..data.utils import load_graphs, load_tensors
+from ..data.utils import load_graphs
 
 class GraphPartitionBook:
-    def __init__(self, partition_config_file, ip_config_file):
-        """Partition information. 
+    """Partition information.
 
-        Note that, we assume that all partitions exists in local machines for now.
-        Once we have the reshuffle() api we can change that.
+    Note that, we assume that all partitions exists in local machines for now.
+    Once we have the reshuffle() api we can change that.
+    """
+    def __init__(self, partition_config_file, ip_config_file):
+        """Initialization
 
         Parameters
         ----------
@@ -28,8 +30,8 @@ class GraphPartitionBook:
         lines = [line.rstrip('\n') for line in open(ip_config_file)]
         # we assume that ip is sorted by machine ID in ip_config_file
         for line in lines:
-            ip, _, _ = line.split(' ')
-            self._ip_list.append(ip)
+            ip_addr, _, _ = line.split(' ')
+            self._ip_list.append(ip_addr)
         # Get number of partitions
         assert 'num_parts' in self._part_meta, "cannot get the number of partitions."
         self._num_partitions = self._part_meta['num_parts']
@@ -37,7 +39,8 @@ class GraphPartitionBook:
         # Get part_files
         self._part_files = []
         for part_id in range(self._num_partitions):
-            assert 'part-{}'.format(part_id) in self._part_meta, "part-{} does not exist".format(part_id)
+            assert 'part-{}'.format(part_id) in self._part_meta, \
+            "part-{} does not exist".format(part_id)
             part_files = self._part_meta['part-{}'.format(part_id)]
             self._part_files.append(part_files)
         # Get nid2partid
@@ -48,8 +51,8 @@ class GraphPartitionBook:
         self._eid2partid = F.tensor(np.load(self._part_meta['edge_map']))
         # Get meta data
         self._meta_data = []
-        nid_part, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
-        eid_part, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
+        _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
+        _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
         for part_id in range(self._num_partitions):
             part_info = {}
             part_info['machine_id'] = part_id
@@ -105,24 +108,24 @@ class GraphPartitionBook:
             number of partitions
         """
         return self._num_partitions
-        
+
 
     def metadata(self):
         """Return the partition meta data.
-        
+
         The meta data includes:
 
         * The machine ID.
         * The machine IP address.
         * Number of nodes and edges of each partition.
-        
+
         Examples
         --------
         >>> print(g.get_partition_book().metadata())
         >>> [{'machine_id' : 0, 'ip': '192.168.8.12', 'num_nodes' : 3000, 'num_edges' : 5000},
         ...  {'machine_id' : 1, 'ip': '192.168.8.13', 'num_nodes' : 2000, 'num_edges' : 4888},
         ...  ...]
-        
+
         Returns
         -------
         list[dict[str, any]]
@@ -145,8 +148,8 @@ class GraphPartitionBook:
             partition IDs
         """
         return self._nid2partid[nids]
-        
-        
+
+
     def eid2partid(self, eids):
         """From global edge IDs to partition IDs
 
@@ -161,7 +164,7 @@ class GraphPartitionBook:
             partition IDs
         """
         return self._eid2partid[eids]
-    
+
 
     def partid2nids(self, partid):
         """From partition id to node IDs
@@ -194,7 +197,7 @@ class GraphPartitionBook:
         """
         return self._partid2eids[partid]
 
-    
+
     def nid2localnid(self, nids, partid):
         """Get local node IDs within the given partition.
 
@@ -211,7 +214,7 @@ class GraphPartitionBook:
              local node IDs
         """
         return self._nidg2l[partid][nids]
-        
+
 
     def eid2localeid(self, eids, partid):
         """Get the local edge ids within the given partition.
@@ -233,12 +236,12 @@ class GraphPartitionBook:
 
     def get_partition(self, partid):
         """Get the graph of one partition.
-        
+
         Parameters
         ----------
         partid : int
             Partition ID.
-            
+
         Returns
         -------
         DGLGraph
