@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from configure import reaction_center_config, candidate_ranking_config
 from utils import prepare_reaction_center, mkdir_p, set_seed, collate_rank_train, \
-    collate_rank_eval
+    collate_rank_eval, candidate_ranking_eval
 
 def main(args, path_to_candidate_bonds):
     if args['train_path'] is None:
@@ -103,6 +103,12 @@ def main(args, path_to_candidate_bonds):
 
         optimizer._reset()
         dur.append(time.time() - t0)
+        prediction_summary = candidate_ranking_eval(args, model, val_loader)
+        prediction_summary = 'Epoch {:d}/{:d}\n'.format(epoch + 1, args['num_epochs']) + \
+                             prediction_summary
+        print(prediction_summary)
+        with open(args['result_path'] + '/val_eval.txt', 'a') as f:
+            f.write(prediction_summary)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
