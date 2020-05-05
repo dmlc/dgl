@@ -29,7 +29,7 @@ def main(args, path_to_candidate_bonds):
         num_encode_gnn_layers=args['num_encode_gnn_layers']).to(args['device'])
 
     prediction_summary = candidate_ranking_eval(args, model, test_loader)
-    with open(args['result_path'], 'w') as f:
+    with open(args['result_path'] + '/test_eval.txt', 'w') as f:
         f.write(prediction_summary)
 
 if __name__ == '__main__':
