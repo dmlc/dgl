@@ -7,7 +7,7 @@ from ..base import NID, EID
 from ..data.utils import load_graphs, load_tensors
 
 class GraphPartitionBook:
-    def __init__(self, part_metadata, ip_config_file):
+    def __init__(self, partition_config_file, ip_config_file):
         """Partition information. 
 
         Note that, we assume that all partitions exists in local machines for now.
@@ -15,12 +15,13 @@ class GraphPartitionBook:
 
         Parameters
         ----------
-        part_metadata : json object
-            metadata of partitioned graph, which is created by load_partition() API.
+        partition_config_file : str
+            path of graph partition file.
         ip_config_file : str
             path of IP configuration file.
         """
-        self._part_meta = part_metadata
+        with open(conf_file) as conf_f:
+            self._part_meta = json.load(conf_f)
         # Read ip list from ip_config_file
         self._ip_list = []
         lines = [line.rstrip('\n') for line in open(ip_config_file)]
