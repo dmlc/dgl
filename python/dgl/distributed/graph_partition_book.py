@@ -131,7 +131,7 @@ class GraphPartitionBook:
             assert 'edge_map' in self._part_meta, "cannot get the edge map."
             self._eid2partid = np.load(self._part_meta['edge_map'])
 
-        return self._eid2partid
+        return self._eid2partid[eids]
     
 
     def partid2nids(self, partid):
@@ -209,7 +209,7 @@ class GraphPartitionBook:
                 g2l[global_id] = F.arange(0, len(global_id))
                 self._nidg2l.append(g2l)
 
-        return self._nidg2l[partid]
+        return self._nidg2l[partid][nids]
         
 
     def eid2localeid(self, eids, partid):
@@ -235,7 +235,7 @@ class GraphPartitionBook:
                 g2l[global_id] = F.arange(0, len(global_id))
                 self._eidg2l.append(g2l)
 
-        return self._eidg2l[partid]
+        return self._eidg2l[partid][eids]
 
 
     def get_partition(self, partid):
