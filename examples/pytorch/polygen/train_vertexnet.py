@@ -43,25 +43,22 @@ def main(dev_id, args):
         device = torch.device('cpu')
     else:
         device = torch.device('cuda:{}'.format(dev_id))
-    # Create ckpt dir
-    os.makedirs(args.ckpt_dir, exist_ok=True)
-    log_path = os.path.join(args.ckpt_dir, 'log.txt')
-    print (log_path)
-    log_f = open(log_path, 'w')
-
+    
     # Set current device
     th.cuda.set_device(device)
+
     # Prepare dataset
-    dataset = get_dataset('vertex')
-    V = dataset.vocab_size
-    #criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
+    # Considering data paralellism
+    train_dataset = VertexDataset(args.dataset, 'train', device, dev_id, args.ngpu)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
+    train_iter = iter(train_loader)
+    
+    # Config loss
     criterion = torch.nn.NLLLoss()
+    # Build model
     dim_model = 256
-    # Build graph pool
-    graph_pool = VertexNetGraphPool()
     # Create model
-    model = make_vertex_model(N=args.N, dim_model=dim_model,
-                       universal=args.universal)
+    model = make_vertex_model(N=args.N, dim_model=dim_model)
     # Move model to corresponding device
     model, criterion = model.to(device), criterion.to(device)
     # Loss function
@@ -74,7 +71,7 @@ def main(dev_id, args):
         dev_rank = 0
         ndev = 1
         loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)
-
+    # All reduce to make sure initialized model is the same
     if ndev > 1:
         for param in model.parameters():
             dist.all_reduce(param.data, op=dist.ReduceOp.SUM)
@@ -84,20 +81,59 @@ def main(dev_id, args):
     model_opt = NoamOpt(dim_model, 0.1, 4000,
                         T.optim.Adam(model.parameters(), lr=3e-4,
                                      betas=(0.9, 0.98), eps=1e-9))
+    train_loss_compute = loss_compute(opt=model_opt)
+    # Logging and testing only run on device 0
+    if dev_id == 0:
+        # Create ckpt dir
+        os.makedirs(args.ckpt_dir, exist_ok=True)
+        log_path = os.path.join(args.ckpt_dir, 'log.txt')
+        print (log_path)
+        log_f = open(log_path, 'w')
+        test_dataset = VertexDataset(args.dataset, 'test', device)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
+        test_iter = iter(test_loader)
+        test_loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)(opt=None)
+ 
+    train_iter = 0
+    while True:
+        # train step
+        try:
+            train_batch = train_iter.next()
+        except:
+            train_iter = iter(train_loader)
+            train_batch = train_iter.next()
+        with train_loss_compute:
+            with T.set_grad_enabled(True):
+                output = model(train_batch)
+                tgt_y = g.tgt_y
+                n_tokens = g.n_tokens
+                train_loss = train_loss_compute(output, tgt_y, n_tokens)
+        train_iter += 1
 
-    # Train & evaluate
-    for epoch in range(100):
-        start = time.time()
-        train_iter = dataset(graph_pool, batch_size=args.batch,
-                             device=device, dev_rank=dev_rank, ndev=ndev)
-        model.train(True)
-        run_epoch(epoch, train_iter, dev_rank, ndev, model,
-                  loss_compute(opt=model_opt), is_train=True, log_f=log_f)
-
-        if dev_rank == 0:
-            ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(epoch)+'.pt')
+        # testing logging
+        if train_iter % args.log_interval == 0 and dev_rank == 0:
+            # train step
+            try:
+                test_batch = test_iter.next()
+            except:
+                test_iter = iter(test_loader)
+                test_batch = test_iter.next()
+            with test_loss_compute:
+                with T.set_grad_enabled(False):
+                    output = model(train_batch)
+                    tgt_y = g.tgt_y
+                    n_tokens = g.n_tokens
+                    test_loss = test_loss_compute(output, tgt_y, n_tokens)
+            
+            print ('train', train_iter, train_loss)
+            print ('test', train_iter, test_loss)
+ 
+        if (train_iter % args.ckpt_interval == 0 or train_iter == args.toatl_iter) and dev_rank == 0:
+            ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(train_iter)+'.pt')
             print (ckpt_path)
             torch.save(model.state_dict(), ckpt_path)
+            if train_iter == args.total_iter:
+                break
 
 if __name__ == '__main__':
     if not os.path.exists('checkpoints'):
@@ -107,7 +143,11 @@ if __name__ == '__main__':
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
     argparser.add_argument('--dataset', default='vertex', help='dataset')
-    argparser.add_argument('--batch', default=128, type=int, help='batch size')
+    argparser.add_argument('--batch', default=16, type=int, help='batch size')
+    argparser.add_argument('--workers-per-loader', default=2, type=int, help='loaders per worker')
+    argparser.add_argument('--total-iter', default=1e6, type=int, help='total number of iterations')
+    argparser.add_argument('--log-interval', default=100, type=int, help='log interval')
+    argparser.add_argument('--ckpt-interval', default=100, type=int, help='ckpt interval')
     argparser.add_argument('--ckpt-dir', default='.', type=str, help='checkpoint path')
     argparser.add_argument('--viz', action='store_true',
                            help='visualize attention')
@@ -137,4 +177,3 @@ if __name__ == '__main__':
             procs[-1].start()
         for p in procs:
             p.join()
-
