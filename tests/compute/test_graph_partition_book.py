@@ -9,7 +9,6 @@ import backend as F
 import unittest
 import pickle
 
-
 def create_ip_config():
     ip_config = open("ip_config.txt", "w")
     ip_config.write('192.168.9.12 30050 0\n')
