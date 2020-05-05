@@ -642,8 +642,8 @@ def collate_rank_train(data):
         batch_num_candidate_products.append(len(g_list) - 1)
         batch_product_graphs.extend(g_list[1:])
     batch_product_graphs = dgl.batch(batch_product_graphs)
-    batch_combo_scores = torch.stack(batch_combo_scores, dim=0)
-    batch_labels = torch.stack(batch_labels, dim=0)
+    batch_combo_scores = torch.cat(batch_combo_scores, dim=0)
+    batch_labels = torch.cat(batch_labels, dim=0)
 
     return batch_reactant_graphs, batch_product_graphs, batch_combo_scores, batch_labels, \
            batch_num_candidate_products
