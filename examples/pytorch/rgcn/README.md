@@ -38,24 +38,24 @@ python3 entity_classify.py -d am --n-bases=40 --n-hidden=10 --l2norm=5e-4 --test
 ```
 
 #### Entity Classification with minibatch
-AIFB: accuracy 80.56% (DGL)
+AIFB: accuracy avg(5 runs) 88.89%, best 88.89% (DGL)
 ```
 python3 entity_classify_hetero_mb.py -d aifb --testing --gpu 0 --fanout=20 --batch-size 128
 ```
 
-MUTAG: accuracy 73.53% (DGL)
+MUTAG: accuracy avg(5 runs) 76.47%, best 71.47% (DGL)
 ```
-python3 entity_classify_hetero_mb.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size=128 --fanout=30 --n-epochs=30
-```
-
-BGS: accuracy 96.55% (DGL)
-```
-python3 entity_classify_hetero_mb.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout 40
+python3 entity_classify_hetero_mb.py -d mutag --l2norm 1.8e-4 --n-bases 36 --testing --gpu 0 --lr=0.005  --batch-size=128 --fanout=43 --n-epochs=30
 ```
 
-AM: accuracy 70.71% (DGL)
+BGS: accuracy avg(5 runs) 92.41%, best 93.10% (DGL) 
 ```
-python3 entity_classify_hetero_mb.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout 30 --batch-size 256 --lr 0.02 --n-hidden 10
+python3 entity_classify_hetero_mb.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout 40 --lr 0.02 --dropout 0.1 --n-epochs=60 --batch-size=128
+```
+
+AM: accuracy avg(5 runs) 82.62%, best 84.34% (DGL) 
+```
+python3 entity_classify_hetero_mb.py -d am --l2norm 2e-4 --n-bases 12 --testing --gpu 0 --fanout 35 --batch-size 256 --lr 0.025 --n-hidden 16 --use-self-loop --n-epochs=80 --dropout 0.2
 ```
 
 ### Link Prediction
