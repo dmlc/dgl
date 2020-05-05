@@ -40,41 +40,36 @@ class GraphPartitionBook:
             assert 'part-{}'.format(part_id) in self._part_meta, "part-{} does not exist".format(part_id)
             part_files = self._part_meta['part-{}'.format(part_id)]
             self._part_files.append(part_files)
-        # Get meta data
-        self._meta_data = []
-        for part_id in range(self._num_partitions):
-            part_info = {}
-            part_info['machine_id'] = part_id
-            part_info['ip'] = self._ip_list[part_id]
-            # can we avoid load these tensor?
-            node_feats = load_tensors(self._part_files[part_id]['node_feats'])
-            edge_feats = load_tensors(self._part_files[part_id]['edge_feats'])
-            part_info['num_nodes'] = len(node_feats)
-            part_info['num_edges'] = len(edge_feats)
-            self._meta_data.append(part_info)
         # Get nid2partid
         assert 'node_map' in self._part_meta, "cannot get the node map."
         self._nid2partid = F.tensor(np.load(self._part_meta['node_map']))
         # Get eid2partid
         assert 'edge_map' in self._part_meta, "cannot get the edge map."
         self._eid2partid = F.tensor(np.load(self._part_meta['edge_map']))
+        # Get meta data
+        self._meta_data = []
+        nid_part, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
+        eid_part, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
+        for part_id in range(self._num_partitions):
+            part_info = {}
+            part_info['machine_id'] = part_id
+            part_info['ip'] = self._ip_list[part_id]
+            part_info['num_nodes'] = nid_count[part_id]
+            part_info['num_edges'] = eid_count[part_id]
+            self._meta_data.append(part_info)
         # Get partid2nids
         self._partid2nids = []
         sorted_nid = F.tensor(np.argsort(F.asnumpy(self._nid2partid)))
-        part, count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
-        assert len(part) == self._num_partitions
         start = 0
-        for offset in count:
+        for offset in nid_count:
             part_nids = sorted_nid[start:start+offset]
             start += offset
             self._partid2nids.append(part_nids)
         # Get partid2eids
         self._partid2eids = []
         sorted_eid = F.tensor(np.argsort(F.asnumpy(self._eid2partid)))
-        part, count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
-        assert len(part) == self._num_partitions
         start = 0
-        for offset in count:
+        for offset in eid_count:
             part_eids = sorted_eid[start:start+offset]
             start += offset
             self._partid2eids.append(part_eids)
