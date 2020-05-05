@@ -5,7 +5,7 @@ from dgllife.model import WLNReactionRanking
 from torch.utils.data import DataLoader
 
 from configure import candidate_ranking_config, reaction_center_config
-from utils import prepare_reaction_center, collate_rank_eval, candidate_ranking_eval
+from utils import mkdir_p, prepare_reaction_center, collate_rank_eval, candidate_ranking_eval
 
 def main(args, path_to_candidate_bonds):
     if args['test_path'] is None:
@@ -55,6 +55,7 @@ if __name__ == '__main__':
                         help='Number of workers to use for data loading in PyTorch data loader')
     args = parser.parse_args().__dict__
     args.update(candidate_ranking_config)
+    mkdir_p(args['result_path'])
     if torch.cuda.is_available():
         args['device'] = torch.device('cuda:0')
     else:
