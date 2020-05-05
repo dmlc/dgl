@@ -26,7 +26,10 @@ def main(args, path_to_candidate_bonds):
         node_in_feats=args['node_in_feats'],
         edge_in_feats=args['edge_in_feats'],
         node_hidden_feats=args['hidden_size'],
-        num_encode_gnn_layers=args['num_encode_gnn_layers']).to(args['device'])
+        num_encode_gnn_layers=args['num_encode_gnn_layers'])
+    model.load_state_dict(torch.load(args['result_path'] + '/model.pkl',
+                                     map_location='cpu')['model_state_dict'])
+    model = model.to(args['device'])
 
     prediction_summary = candidate_ranking_eval(args, model, test_loader)
     with open(args['result_path'] + '/test_eval.txt', 'w') as f:
