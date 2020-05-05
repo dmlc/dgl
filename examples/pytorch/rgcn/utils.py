@@ -334,3 +334,58 @@ def calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits=[
     else:
         mrr = calc_raw_mrr(embedding, w, test_triplets, hits, eval_bz)
     return mrr
+
+###########################################################
+#
+# Build Heterogenous Graph for Link Prediction
+#
+###########################################################
+def build_heterograph_from_triplets(num_nodes, num_rels, edge_lists, reverse=True):
+    """ Create a DGL Hetero graph.
+        This function also generates edge type and normalization factor
+        (reciprocal of node incoming degree)
+    """
+    src = []
+    rel = []
+    dst = []
+    raw_subg = {}
+    print(num_rels)
+
+    # here there is noly one node type
+    s_type = "node"
+    d_type = "node"
+    edge_list = np.concatenate(edge_lists)
+    print(len(edge_list))
+
+    for edge in edge_list:
+        s, r, d = edge
+        r_type = str(r)
+        e_type = (s_type, r_type, d_type)
+
+        if raw_subg.get(e_type, None) is None:
+            raw_subg[e_type] = ([], [])
+        raw_subg[e_type][0].append(s)
+        raw_subg[e_type][1].append(d)
+
+        if reverse is True:
+            r_type = str(r + num_rels)
+            re_type = (d_type, r_type, s_type)
+            if raw_subg.get(re_type, None) is None:
+                raw_subg[re_type] = ([], [])
+            raw_subg[re_type][0].append(d)
+            raw_subg[re_type][1].append(s)
+
+    subg = []
+    for e_type, val in raw_subg.items():
+        s_type, r_type, d_type = e_type
+        s, d = val
+        s = np.asarray(s)
+        d = np.asarray(d)
+
+        subg.append(dgl.graph((s, d),
+                              s_type,
+                              r_type,
+                              num_nodes=num_nodes))
+    g = dgl.hetero_from_relations(subg)
+
+    return g
