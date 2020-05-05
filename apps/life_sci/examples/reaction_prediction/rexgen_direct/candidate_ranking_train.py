@@ -85,12 +85,12 @@ def main(args, path_to_candidate_bonds):
 
             loss = criterion(pred, batch_labels)
             grad_norm_sum += optimizer.backward_and_step(loss)
-            total_samples = batch_id + 1
+            total_samples = (batch_id + 1) * args['batch_size']
             if total_samples % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \
                            'accuracy {:.4f} | grad norm {:.4f}'.format(
-                    epoch + 1, args['num_epochs'], (batch_id + 1) // args['print_every'],
-                    len(train_loader) // args['print_every'],
+                    epoch + 1, args['num_epochs'], total_samples // args['print_every'],
+                    len(train_set) // args['print_every'],
                     (sum(dur) + time.time() - t0) / total_samples * args['print_every'],
                     acc_sum / args['print_every'],
                     grad_norm_sum / args['print_every'])
