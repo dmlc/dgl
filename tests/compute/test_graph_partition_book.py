@@ -9,6 +9,15 @@ import backend as F
 import unittest
 import pickle
 
+
+def create_ip_config(num_parts):
+    ip_config = open("ip_config.txt", "w")
+    file1.writelines('192.168.9.12 30050 0')
+    file1.writelines('192.168.9.13 30050 1')
+    file1.writelines('192.168.9.14 30050 2')
+    file1.writelines('192.168.9.15 30050 3')
+    ip_config.close()
+
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
     ig = create_graph_index(arr, readonly=True)
