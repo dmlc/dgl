@@ -20,7 +20,7 @@ class GraphPartitionBook:
         ip_config_file : str
             path of IP configuration file.
         """
-        with open(conf_file) as conf_f:
+        with open(partition_config_file) as conf_f:
             self._part_meta = json.load(conf_f)
         # Read ip list from ip_config_file
         self._ip_list = []
