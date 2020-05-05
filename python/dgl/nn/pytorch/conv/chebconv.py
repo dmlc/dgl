@@ -1,16 +1,17 @@
 """Torch Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import warnings
 import torch as th
 from torch import nn
-from torch.nn import init
 import torch.nn.functional as F
 
 from .... import laplacian_lambda_max, broadcast_nodes, function as fn
 
+
 class NodeApplyModule(nn.Module):
     """Update the node feature hv with ReLU(Whv+b)."""
 
-    def __init__(self, in_feats, out_feats, k, activation, bias=True):
+    def __init__(self, in_feats, out_feats, bias, k, activation):
         super(NodeApplyModule, self).__init__()
         self.linear = nn.Linear(k * in_feats, out_feats, bias)
         self.activation = activation
@@ -20,6 +21,7 @@ class NodeApplyModule(nn.Module):
         if self.activation:
             h = self.activation(h)
         return {'h': h}
+
 
 class ChebConv(nn.Module):
     r"""Chebyshev Spectral Graph Convolution layer from paper `Convolutional
@@ -50,7 +52,7 @@ class ChebConv(nn.Module):
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     """
-    
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -65,9 +67,9 @@ class ChebConv(nn.Module):
         self.apply_mod = NodeApplyModule(
             in_feats,
             out_feats,
-            k=self._k,
+            bias,
+            self._k,
             activation=self.activation)
-
 
     def forward(self, graph, feat, lambda_max=None):
         r"""Compute ChebNet layer.
@@ -104,9 +106,12 @@ class ChebConv(nn.Module):
 
             if lambda_max is None:
                 try:
-                    lambda_max = dgl.laplacian_lambda_max(graph)
+                    lambda_max = laplacian_lambda_max(graph)
                 except BaseException:
                     # if the largest eigonvalue is not found
+                    warnings.warn(
+                        "Largest eigonvalue not found, using default value 2 for lambda_max",
+                        RuntimeWarning)
                     lambda_max = th.Tensor(2).to(feat.device)
 
             if isinstance(lambda_max, list):
@@ -115,10 +120,10 @@ class ChebConv(nn.Module):
                 lambda_max = lambda_max.unsqueeze(-1)  # (B,) to (B, 1)
 
             # broadcast from (B, 1) to (N, 1)
-            lambda_max = dgl.broadcast_nodes(graph, lambda_max)
+            lambda_max = broadcast_nodes(graph, lambda_max)
 
             # X_0(f)
-            Xt = X_0 = signal
+            Xt = X_0 = feat
 
             # X_1(f)
             if self._k > 1:
@@ -126,14 +131,14 @@ class ChebConv(nn.Module):
                 h = unnLaplacian(X_0, D_sqrt, graph)
 
                 X_1 = - re_norm * h + X_0 * (re_norm - 1)
-                Xt = torch.cat((Xt, X_1), 1)
+                Xt = th.cat((Xt, X_1), 1)
 
             # Xi(x), i = 2...k
-            for i in range(2, self._k):
+            for _ in range(2, self._k):
                 h = unnLaplacian(X_1, D_sqrt, graph)
                 X_i = - 2 * re_norm * h + X_1 * 2 * (re_norm - 1) - X_0
 
-                Xt = torch.cat((Xt, X_i), 1)
+                Xt = th.cat((Xt, X_i), 1)
                 X_1, X_0 = X_i, X_1
 
             # forward pass
