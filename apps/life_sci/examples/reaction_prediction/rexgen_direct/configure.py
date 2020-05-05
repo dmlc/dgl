@@ -31,7 +31,7 @@ candidate_ranking_config = {
     'print_every': 20,
     'decay_every': 100000,
     'lr_decay_factor': 0.9,
-    'top_ks': [10],
+    'top_ks': [1, 2, 3, 5, 10],
 }
 candidate_ranking_config['max_norm'] = candidate_ranking_config['max_norm'] * \
                                        candidate_ranking_config['batch_size']

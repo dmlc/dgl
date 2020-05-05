@@ -149,6 +149,12 @@ For candidate ranking, we assume that a model has been trained for reaction cent
 By default, we exclude reactants not contributing heavy atoms to the product in selecting candidate bonds 
 for a consistent setting as in the paper.
 
+### Additional Dependency
+
+In addition to RDKit, MolVS is an alternative for comparing whether two molecules are the same after sanitization.
+
+- [molvs](https://molvs.readthedocs.io/en/latest/)
+
 ## References
 
 [1] D. M.Lowe, Patent reaction extraction: downloads, 

@@ -612,24 +612,21 @@ def mkdir_p(path):
         else:
             raise
 
-def load_one_reaction_rank(line, train_mode):
+def load_one_reaction_rank(line):
     """Load one reaction and check if the reactants are valid.
 
     Parameters
     ----------
     line : str
         One reaction and the associated graph edits
-    train_mode : bool
-        Whether the data will be used for training
 
     Returns
     -------
     reactants_mol : rdkit.Chem.rdchem.Mol
         RDKit molecule instance for the reactants. None will be returned if the
         line is not valid.
-    product_mol : rdkit.Chem.rdchem.Mol, optional
-        RDKit molecule instance for the product. This is returned only when train_mode is True.
-        None will be returned if the line is not valid.
+    product_mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance for the product. None will be returned if the line is not valid.
     reaction_real_bond_changes : list of 3-tuples
         Real bond changes in the reaction. Each tuple is of form (atom1, atom2, change_type). For
         change_type, 0.0 stands for losing a bond, 1.0, 2.0, 3.0 and 1.5 separately stands for
@@ -653,15 +650,11 @@ def load_one_reaction_rank(line, train_mode):
     reactants, _, product = reaction.split('>')
     reactants_mol = Chem.MolFromSmiles(reactants)
     if reactants_mol is None:
-        if train_mode:
-            return None, None, None, None, None
-        else:
-            return None, None, None, None
+        return None, None, None, None, None
 
-    if train_mode:
-        product_mol = Chem.MolFromSmiles(product)
-        if product_mol is None:
-            return None, None, None, None, None
+    product_mol = Chem.MolFromSmiles(product)
+    if product_mol is None:
+        return None, None, None, None, None
 
     # Reorder atoms according to the order specified in the atom map
     atom_map_order = [-1 for _ in range(reactants_mol.GetNumAtoms())]
@@ -677,10 +670,7 @@ def load_one_reaction_rank(line, train_mode):
         reaction_real_bond_changes.append(
             (min(atom1, atom2), max(atom1, atom2), float(change_type)))
 
-    if train_mode:
-        return reactants_mol, product_mol, reaction_real_bond_changes
-    else:
-        return reactants_mol, reaction_real_bond_changes
+    return reactants_mol, product_mol, reaction_real_bond_changes
 
 def load_candidate_bond_changes_for_one_reaction(line):
     """Load candidate bond changes for a reaction
@@ -1328,24 +1318,17 @@ class WLNRankDataset(object):
         """
         print('Stage 1/2: loading reaction data...')
         all_reactant_mols = []
-        if self.train_mode:
-            all_product_mols = []
-        else:
-            all_product_mols = None
+        all_product_mols = []
         all_real_bond_changes = []
         ids_for_small_samples = []
         with open(file_path, 'r') as f:
             lines = f.readlines()
 
         def _update_from_line(id, loaded_result):
-            if self.train_mode:
-                reactants_mol, product_mol, reaction_real_bond_changes = loaded_result
-            else:
-                reactants_mol, reaction_real_bond_changes = loaded_result
+            reactants_mol, product_mol, reaction_real_bond_changes = loaded_result
             if reactants_mol is None:
                 return
-            if self.train_mode:
-                all_product_mols.append(product_mol)
+            all_product_mols.append(product_mol)
             all_reactant_mols.append(reactants_mol)
             all_real_bond_changes.append(reaction_real_bond_changes)
             if reactants_mol.GetNumAtoms() <= self.size_cutoff:
@@ -1353,12 +1336,12 @@ class WLNRankDataset(object):
 
         if num_processes == 1:
             for id, li in enumerate(tqdm(lines)):
-                loaded_line = load_one_reaction_rank(li, self.train_mode)
+                loaded_line = load_one_reaction_rank(li)
                 _update_from_line(id, loaded_line)
         else:
             with Pool(processes=num_processes) as pool:
                 results = pool.map(
-                    partial(load_one_reaction_rank, train_mode=self.train_mode),
+                    load_one_reaction_rank,
                     lines, chunksize=len(lines) // num_processes)
             for id in range(len(lines)):
                 _update_from_line(id, results[id])
@@ -1445,6 +1428,8 @@ class WLNRankDataset(object):
             change_type). atom1, atom2 are the atom mapping numbers - 1 of the two
             end atoms. change_type can be 0, 1, 2, 3, 1.5, separately for losing a bond, forming
             a single, double, triple, and aromatic bond.
+        product_mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for the product
         """
         if self.ignore_large_samples:
             item = self.ids_for_small_samples[item]
@@ -1491,7 +1476,6 @@ class WLNRankDataset(object):
                         {'candidate_score': candidate_scores})
 
             self.candidate_bond_changes[item] = None
-            self.product_mols[item] = None
         else:
             g_list, info = load_graphs(sample_path + '/g.bin')
             candidate_scores = info['candidate_score']
@@ -1507,8 +1491,9 @@ class WLNRankDataset(object):
         else:
             reactant_mol = self.reactant_mols[item]
             real_bond_changes = self.real_bond_changes[item]
+            product_mol = self.product_mols[item]
             return g_list, candidate_scores, valid_candidate_combos, \
-                   reactant_mol, real_bond_changes
+                   reactant_mol, real_bond_changes, product_mol
 
 class USPTORank(WLNRankDataset):
     """USPTO dataset for ranking candidate products.
