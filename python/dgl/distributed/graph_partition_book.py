@@ -8,7 +8,10 @@ from ..data.utils import load_graphs, load_tensors
 
 class GraphPartitionBook:
     def __init__(self, part_metadata, ip_config_file):
-        """Partition information.
+        """Partition information. 
+
+        Note that, we assume that all partitions exists in local machines for now.
+        Once we have the reshuffle() api we can change that.
 
         Parameters
         ----------
@@ -18,13 +21,13 @@ class GraphPartitionBook:
             path of IP configuration file.
         """
         self._part_meta = part_metadata
-        self._meta_data = [] # list[dict[str, any]]
-        self._nid2partid = None
-        self._eid2partid = None
-        self._partid2nids = []
-        self._partid2eids = []
-        self._nidg2l = []
-        self._eidg2l = []
+        # Read ip list from ip_config_file
+        self._ip_list = []
+        lines = [line.rstrip('\n') for line in open(ip_config_file)]
+        # we assume that ip is sorted by machine ID in ip_config_file
+        for line in lines:
+            ip, _, _ = line.split(' ')
+            self._ip_list.append(ip)
         # Get number of partitions
         assert 'num_parts' in self._part_meta, "cannot get the number of partitions."
         self._num_partitions = self._part_meta['num_parts']
@@ -35,17 +38,65 @@ class GraphPartitionBook:
             assert 'part-{}'.format(part_id) in self._part_meta, "part-{} does not exist".format(part_id)
             part_files = self._part_meta['part-{}'.format(part_id)]
             self._part_files.append(part_files)
+        # Get meta data
+        self._meta_data = []
+        for part_id in range(self._num_partitions):
+            part_info = {}
+            part_info['machine_id'] = part_id
+            part_info['ip'] = self._ip_list[part_id]
+            # can we avoid load these tensor?
+            node_feats = load_tensors(self._part_files[part_id]['node_feats'])
+            edge_feats = load_tensors(self._part_files[part_id]['edge_feats'])
+            part_info['num_nodes'] = len(node_feats)
+            part_info['num_edges'] = len(edge_feats)
+            self._meta_data.append(part_info)
+        # Get nid2partid
+        assert 'node_map' in self._part_meta, "cannot get the node map."
+        self._nid2partid = np.load(self._part_meta['node_map'])
+        # Get eid2partid
+        assert 'edge_map' in self._part_meta, "cannot get the edge map."
+        self._eid2partid = np.load(self._part_meta['edge_map'])
+        # Get partid2nids
+        self._partid2nids = []
+        sorted_nid = F.tensor(np.argsort(F.asnumpy(self._nid2partid)))
+        part, count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
+        assert len(part) == self._num_partitions
+        start = 0
+        for offset in count:
+            part_nids = sorted_nid[start:start+offset]
+            start += offset
+            self._partid2nids.append(part_nids)
+        # Get partid2eids
+        self._partid2eids = []
+        sorted_eid = F.tensor(np.argsort(F.asnumpy(self._eid2partid)))
+        part, count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
+        assert len(part) == self._num_partitions
+        start = 0
+        for offset in count:
+            part_eids = sorted_eid[start:start+offset]
+            start += offset
+            self._partid2eids.append(part_eids)
         # Get part_graphs
         self._part_graphs = []
         for part_id in range(self._num_partitions):
             graph = load_graphs(self._part_files[part_id]['part_graph'])[0][0]
             self._part_graphs.append(graph)
-        # Read ip list from ip_config_file
-        self._ip_list = []
-        lines = [line.rstrip('\n') for line in open(ip_config_file)]
-        for line in lines:
-            ip, _, _ = line.split(' ')
-            self._ip_list.append(ip)
+        # Get nidg2l
+        self._nidg2l = []
+        for partid in range(self._num_partitions):
+            global_id = self._part_graphs[partid].ndata[NID]
+            max_global_id = (F.asnumpy(global_id)).amax()
+            g2l = F.zeros((max_id+1), F.int64, F.cpu())
+            g2l[global_id] = F.arange(0, len(global_id))
+            self._nidg2l.append(g2l)
+        # Get eidg2l
+        self._eidg2l = []
+        for part_id in range(self._num_partitions):
+            global_id = self._part_graphs[partid].edata[EID]
+            max_global_id = (F.asnumpy(global_id)).amax()
+            g2l = F.zeros((max_id+1), F.int64, F.cpu())
+            g2l[global_id] = F.arange(0, len(global_id))
+            self._eidg2l.append(g2l)
 
 
     def num_partitions(self):
@@ -80,17 +131,6 @@ class GraphPartitionBook:
         list[dict[str, any]]
             Meta data of each partition.
         """
-        if len(self._meta_data) == 0:
-            for part_id in range(self._num_partitions):
-                part_info = {}
-                part_info['machine_id'] = part_id
-                part_info['ip'] = self._ip_list[part_id]
-                node_feats = load_tensors(self._part_files[part_id]['node_feats'])
-                edge_feats = load_tensors(self._part_files[part_id]['edge_feats'])
-                part_info['num_nodes'] = len(node_feats)
-                part_info['num_edges'] = len(edge_feats)
-                self._meta_data.append(part_info)
-
         return self._meta_data
 
 
@@ -107,10 +147,6 @@ class GraphPartitionBook:
         tensor
             partition IDs
         """
-        if self._nid2partid is None:
-            assert 'node_map' in self._part_meta, "cannot get the node map."
-            self._nid2partid = np.load(self._part_meta['node_map'])
-
         return self._nid2partid[nids]
         
         
@@ -127,10 +163,6 @@ class GraphPartitionBook:
         tensor
             partition IDs
         """
-        if self._eid2partid is None:
-            assert 'edge_map' in self._part_meta, "cannot get the edge map."
-            self._eid2partid = np.load(self._part_meta['edge_map'])
-
         return self._eid2partid[eids]
     
 
@@ -147,16 +179,6 @@ class GraphPartitionBook:
         tensor
             node IDs
         """
-        if len(self._partid2nids) == 0:
-            sorted_nid = F.tensor(np.argsort(F.asnumpy(self._nid2partid)))
-            part, count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
-            assert len(part) == self._num_partitions
-            start = 0
-            for offset in count:
-                part_nids = sorted_nid[start:start+offset]
-                start += offset
-                self._partid2nids.append(part_nids)
-
         return self._partid2nids[partid]
 
 
@@ -173,16 +195,6 @@ class GraphPartitionBook:
         tensor
             edge IDs
         """
-        if len(self._partid2eids) == 0:
-            sorted_eid = F.tensor(np.argsort(F.asnumpy(self._eid2partid)))
-            part, count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
-            assert len(part) == self._num_partitions
-            start = 0
-            for offset in count:
-                part_eids = sorted_eid[start:start+offset]
-                start += offset
-                self._partid2eids.append(part_eids)
-
         return self._partid2eids[partid]
 
     
@@ -201,14 +213,6 @@ class GraphPartitionBook:
         tensor
              local node IDs
         """
-        if len(self._nidg2l) == 0:
-            for partid in range(self._num_partitions):
-                global_id = self._part_graphs[partid].ndata[NID]
-                max_global_id = F.asnumpy(global_id).amax()
-                g2l = F.zeros((max_id+1), F.int64, F.cpu())
-                g2l[global_id] = F.arange(0, len(global_id))
-                self._nidg2l.append(g2l)
-
         return self._nidg2l[partid][nids]
         
 
@@ -227,14 +231,6 @@ class GraphPartitionBook:
         tensor
              local edge ids
         """
-        if len(self._eidg2l) == 0:
-            for part_id in range(self._num_partitions):
-                global_id = self._part_graphs[partid].edata[EID]
-                max_global_id = F.asnumpy(global_id).amax()
-                g2l = F.zeros((max_id+1), F.int64, F.cpu())
-                g2l[global_id] = F.arange(0, len(global_id))
-                self._eidg2l.append(g2l)
-
         return self._eidg2l[partid][eids]
 
 
