@@ -1232,8 +1232,6 @@ class WLNRankDataset(object):
 
     Parameters
     ----------
-    path_to_save_results : str
-        Path to save results that are time-consuming for computation.
     raw_file_path : str
         Path to the raw reaction file, where each line is the SMILES for a reaction and
         the corresponding graph edits.
@@ -1265,7 +1263,6 @@ class WLNRankDataset(object):
         Number of processes to use for data pre-processing. Default to 1.
     """
     def __init__(self,
-                 path_to_save_results,
                  raw_file_path,
                  candidate_bond_path,
                  node_featurizer=default_node_featurizer_rank,
@@ -1281,7 +1278,6 @@ class WLNRankDataset(object):
         self.ignore_large_samples = False
         self.size_cutoff = size_cutoff
         self.train_mode = train_mode
-        self.path_to_save_results = path_to_save_results
 
         self.reactant_mols, self.product_mols, self.real_bond_changes, \
         self.ids_for_small_samples = self.load_reaction_data(raw_file_path, num_processes)
@@ -1434,54 +1430,30 @@ class WLNRankDataset(object):
         if self.ignore_large_samples:
             item = self.ids_for_small_samples[item]
 
-        sample_path = self.path_to_save_results + '/{:d}'.format(item)
-        files_exist = [os.path.isfile(sample_path + file)
-                       for file in ['/valid_candidate_combos.pkl',
-                                    '/candidate_bond_changes.pkl',
-                                    '/reactant_info.pkl', 'g.bin']]
-        if False in files_exist:
-            raw_candidate_bond_changes = self.candidate_bond_changes[item]
-            real_bond_changes = self.real_bond_changes[item]
-            reactant_mol = self.reactant_mols[item]
-            product_mol = self.product_mols[item]
+        raw_candidate_bond_changes = self.candidate_bond_changes[item]
+        real_bond_changes = self.real_bond_changes[item]
+        reactant_mol = self.reactant_mols[item]
+        product_mol = self.product_mols[item]
 
-            # Get valid candidate products, candidate bond changes considered and reactant info
-            valid_candidate_combos, candidate_bond_changes, reactant_info = \
-                pre_process_one_reaction(
-                    (raw_candidate_bond_changes, real_bond_changes,
-                     reactant_mol, product_mol),
-                    self.num_candidate_bond_changes, self.max_num_changes_per_reaction,
-                    self.max_num_change_combos_per_reaction, self.train_mode)
+        # Get valid candidate products, candidate bond changes considered and reactant info
+        valid_candidate_combos, candidate_bond_changes, reactant_info = \
+            pre_process_one_reaction(
+                (raw_candidate_bond_changes, real_bond_changes,
+                 reactant_mol, product_mol),
+                self.num_candidate_bond_changes, self.max_num_changes_per_reaction,
+                self.max_num_change_combos_per_reaction, self.train_mode)
 
-            # Construct DGLGraphs and featurize their edges
-            g_list = construct_graphs_rank(
-                        (reactant_mol, valid_candidate_combos,
-                         candidate_bond_changes, reactant_info),
-                        self.edge_featurizer)
+        # Construct DGLGraphs and featurize their edges
+        g_list = construct_graphs_rank(
+            (reactant_mol, valid_candidate_combos,
+             candidate_bond_changes, reactant_info),
+            self.edge_featurizer)
 
-            # Get node features and candidate scores
-            node_feats, candidate_scores = featurize_nodes_and_compute_combo_scores(
-                self.node_featurizer, reactant_mol, valid_candidate_combos)
-            for g in g_list:
-                g.ndata['hv'] = node_feats
-
-            mkdir_p(sample_path)
-            with open(sample_path + '/valid_candidate_combos.pkl', 'wb') as f:
-                pickle.dump(valid_candidate_combos, f)
-            with open(sample_path + '/candidate_bond_changes.pkl', 'wb') as f:
-                pickle.dump(candidate_bond_changes, f)
-            with open(sample_path + '/reactant_info.pkl', 'wb') as f:
-                pickle.dump(reactant_info, f)
-            save_graphs(sample_path + '/g.bin', g_list,
-                        {'candidate_score': candidate_scores})
-
-            self.candidate_bond_changes[item] = None
-        else:
-            g_list, info = load_graphs(sample_path + '/g.bin')
-            candidate_scores = info['candidate_score']
-            if not self.train_mode:
-                with open(sample_path + '/valid_candidate_combos.pkl', 'rb') as f:
-                    valid_candidate_combos = pickle.load(f)
+        # Get node features and candidate scores
+        node_feats, candidate_scores = featurize_nodes_and_compute_combo_scores(
+            self.node_featurizer, reactant_mol, valid_candidate_combos)
+        for g in g_list:
+            g.ndata['hv'] = node_feats
 
         batch_size = len(g_list)
         if self.train_mode:
@@ -1558,10 +1530,7 @@ class USPTORank(WLNRankDataset):
         else:
             train_mode = False
 
-        path_to_save_results = extracted_data_path + '/{}'.format(subset)
-
         super(USPTORank, self).__init__(
-            path_to_save_results=path_to_save_results,
             raw_file_path=extracted_data_path + '/{}.txt.proc'.format(subset),
             candidate_bond_path=candidate_bond_path,
             size_cutoff=size_cutoff,

@@ -16,8 +16,7 @@ def main(args, path_to_candidate_bonds):
         train_set = USPTORank(subset='train', candidate_bond_path=path_to_candidate_bonds['train'],
                               num_processes=args['num_processes'])
     else:
-        train_set = WLNRankDataset(path_to_save_results=args['result_path'] + '/train',
-                                   raw_file_path=args['train_path'],
+        train_set = WLNRankDataset(raw_file_path=args['train_path'],
                                    candidate_bond_path=path_to_candidate_bonds['train'],
                                    num_processes=args['num_processes'])
     train_set.ignore_large()
@@ -25,8 +24,7 @@ def main(args, path_to_candidate_bonds):
         val_set = USPTORank(subset='val', candidate_bond_path=path_to_candidate_bonds['val'],
                             num_processes=args['num_processes'])
     else:
-        val_set = WLNRankDataset(path_to_save_results=args['result_path'] + '/val',
-                                 raw_file_path=args['val_path'],
+        val_set = WLNRankDataset(raw_file_path=args['val_path'],
                                  candidate_bond_path=path_to_candidate_bonds['val'],
                                  train_mode=False,
                                  num_processes=args['num_processes'])

@@ -12,8 +12,7 @@ def main(args, path_to_candidate_bonds):
         test_set = USPTORank(subset='test', candidate_bond_path=path_to_candidate_bonds['test'],
                              num_processes=args['num_processes'])
     else:
-        test_set = WLNRankDataset(path_to_save_results=args['result_path'] + '/test',
-                                  raw_file_path=args['test_path'],
+        test_set = WLNRankDataset(raw_file_path=args['test_path'],
                                   candidate_bond_path=path_to_candidate_bonds['test'],
                                   train_mode=False,
                                   num_processes=args['num_processes'])
