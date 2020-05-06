@@ -500,6 +500,18 @@ class KVServer(object):
                     shape=msg.shape,
                     c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, 0)
+            # Get shape message
+            elif msg.type == KVMsgType.GET_SHAPE:
+                data_shape = F.tensor(F.shape(self._data_store[msg.name+'-data-']))
+                back_msg = KVStoreMsg(
+                    type=KVMsgType.GET_SHAPE_BACK,
+                    rank=self._server_id,
+                    name=msg.name,
+                    id=None,
+                    data=None,
+                    shape=data_shape,
+                    c_ptr=None)
+                _send_kv_msg(self._sender, back_msg, msg.rank)
             # Barrier message
             elif msg.type == KVMsgType.BARRIER:
                 self._barrier_count += 1
@@ -704,6 +716,7 @@ class KVClient(object):
         self._has_data = set()
         # This is used to store local data, which can share memory with local KVServer.
         self._data_store = {}
+        self._full_data_shape = {}
         self._data_name_list = []
         # Server information
         self._server_namebook = server_namebook
@@ -792,10 +805,9 @@ class KVClient(object):
                 tensor_name, dtype = self._deserialize_shared_tensor(data)
                 while True:
                     if (os.path.exists(tensor_name+'shape-'+str(self._machine_id))):
-                        time.sleep(2) # wait writing finish
                         break
                     else:
-                        time.sleep(2) # wait until the file been created 
+                        time.sleep(1) # wait until the file been created 
                 shape, data_type = self._read_data_shape_type(tensor_name+'shape-'+str(self._machine_id))
                 assert data_type == dtype
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
@@ -804,6 +816,29 @@ class KVClient(object):
                 if '-data-' in tensor_name:
                     self._data_name_list.append(tensor_name[0:-6])
                 self._has_data.add(tensor_name)
+
+        # Get full shape of each data
+        for name in self._data_name_list:
+            data_shape = list(F.shape(self._data_store[name+'-data-']))
+            data_shape[0] = 0
+            msg = KVStoreMsg(
+                type=KVMsgType.GET_SHAPE,
+                rank=self._client_id,
+                name=name,
+                id=None, 
+                data=None,
+                shape=None,
+                c_ptr=None)
+            # send msg
+            for m_id in range(self._machine_count):
+                s_id = m_id * self._group_count
+                _send_kv_msg(self._sender, msg, s_id)
+            # recv msg
+            for m_id in range(self._machine_count):
+                back_msg = _recv_kv_msg(self._receiver)
+                assert back_msg.type == KVMsgType.GET_SHAPE_BACK
+                data_shape[0] += ((F.asnumpy(back_msg.shape)).tolist())[0]
+            self._full_data_shape[name] = tuple(data_shape)
 
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
 
@@ -820,7 +855,7 @@ class KVClient(object):
         ----------
         name : str
             data name
-        shape : list of int
+        shape : list or tuple of int
             data shape
         dtype : dtype
             data type
@@ -840,7 +875,7 @@ class KVClient(object):
                 m_id = machines[idx]
                 data_str = self._serialize_shared_tensor(name, dtype)
                 data_str = data_str + '|' + target_name
-                partitioned_shape = shape.copy()
+                partitioned_shape = list(shape)
                 partitioned_shape[0] = count[idx]
                 for n in range(self._group_count):
                     server_id = m_id * self._group_count + n
@@ -872,6 +907,7 @@ class KVClient(object):
         self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
         self._has_data.add(name+'-data-')
         self._data_name_list.append(name)
+        self._full_data_shape[name] = tuple(shape)
 
 
     def print(self):
@@ -947,8 +983,8 @@ class KVClient(object):
         assert name + '-data-' in self._has_data, 'Data (%s) does not exist!' % name
 
         data_type = F.dtype(self._data_store[name+'-data-'])
-        data_shape = F.shape(self._data_store[name+'-data-'])
         partition_book = self._data_store[name+'-part-']
+        data_shape = self._full_data_shape[name]
 
         return (data_type, data_shape, partition_book)
 
@@ -1149,16 +1185,17 @@ class KVClient(object):
 
         We usually invoke this API by just one client (e.g., client_0).
         """
-        for server_id in range(self._server_count):
-            msg = KVStoreMsg(
-                type=KVMsgType.FINAL,
-                rank=self._client_id,
-                name=None,
-                id=None,
-                data=None,
-                shape=None,
-                c_ptr=None)
-            _send_kv_msg(self._sender, msg, server_id)
+        if self._client_id == 0:
+            for server_id in range(self._server_count):
+                msg = KVStoreMsg(
+                    type=KVMsgType.FINAL,
+                    rank=self._client_id,
+                    name=None,
+                    id=None,
+                    data=None,
+                    shape=None,
+                    c_ptr=None)
+                _send_kv_msg(self._sender, msg, server_id)
 
 
     def _get_local_usable_addr(self):

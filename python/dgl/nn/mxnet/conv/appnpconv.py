@@ -54,22 +54,22 @@ class APPNPConv(nn.Block):
             The output feature of shape :math:`(N, *)` where :math:`*`
             should be the same as input shape.
         """
-        graph = graph.local_var()
-        norm = mx.nd.power(mx.nd.clip(
-            graph.in_degrees().astype(feat.dtype), a_min=1, a_max=float("inf")), -0.5)
-        shp = norm.shape + (1,) * (feat.ndim - 1)
-        norm = norm.reshape(shp).as_in_context(feat.context)
-        feat_0 = feat
-        for _ in range(self._k):
-            # normalization by src node
-            feat = feat * norm
-            graph.ndata['h'] = feat
-            graph.edata['w'] = self.edge_drop(
-                nd.ones((graph.number_of_edges(), 1), ctx=feat.context))
-            graph.update_all(fn.u_mul_e('h', 'w', 'm'),
-                             fn.sum('m', 'h'))
-            feat = graph.ndata.pop('h')
-            # normalization by dst node
-            feat = feat * norm
-            feat = (1 - self._alpha) * feat + self._alpha * feat_0
-        return feat
+        with graph.local_scope():
+            norm = mx.nd.power(mx.nd.clip(
+                graph.in_degrees().astype(feat.dtype), a_min=1, a_max=float("inf")), -0.5)
+            shp = norm.shape + (1,) * (feat.ndim - 1)
+            norm = norm.reshape(shp).as_in_context(feat.context)
+            feat_0 = feat
+            for _ in range(self._k):
+                # normalization by src node
+                feat = feat * norm
+                graph.ndata['h'] = feat
+                graph.edata['w'] = self.edge_drop(
+                    nd.ones((graph.number_of_edges(), 1), ctx=feat.context))
+                graph.update_all(fn.u_mul_e('h', 'w', 'm'),
+                                 fn.sum('m', 'h'))
+                feat = graph.ndata.pop('h')
+                # normalization by dst node
+                feat = feat * norm
+                feat = (1 - self._alpha) * feat + self._alpha * feat_0
+            return feat

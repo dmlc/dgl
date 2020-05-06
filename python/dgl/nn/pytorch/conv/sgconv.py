@@ -77,27 +77,27 @@ class SGConv(nn.Module):
         If ``cache`` is se to True, ``feat`` and ``graph`` should not change during
         training, or you will get wrong results.
         """
-        graph = graph.local_var()
-        if self._cached_h is not None:
-            feat = self._cached_h
-        else:
-            # compute normalization
-            degs = graph.in_degrees().float().clamp(min=1)
-            norm = th.pow(degs, -0.5)
-            norm = norm.to(feat.device).unsqueeze(1)
-            # compute (D^-1 A^k D)^k X
-            for _ in range(self._k):
-                feat = feat * norm
-                graph.ndata['h'] = feat
-                graph.update_all(fn.copy_u('h', 'm'),
-                                 fn.sum('m', 'h'))
-                feat = graph.ndata.pop('h')
-                feat = feat * norm
+        with graph.local_scope():
+            if self._cached_h is not None:
+                feat = self._cached_h
+            else:
+                # compute normalization
+                degs = graph.in_degrees().float().clamp(min=1)
+                norm = th.pow(degs, -0.5)
+                norm = norm.to(feat.device).unsqueeze(1)
+                # compute (D^-1 A^k D)^k X
+                for _ in range(self._k):
+                    feat = feat * norm
+                    graph.ndata['h'] = feat
+                    graph.update_all(fn.copy_u('h', 'm'),
+                                     fn.sum('m', 'h'))
+                    feat = graph.ndata.pop('h')
+                    feat = feat * norm
 
-            if self.norm is not None:
-                feat = self.norm(feat)
+                if self.norm is not None:
+                    feat = self.norm(feat)
 
-            # cache feature
-            if self._cached:
-                self._cached_h = feat
-        return self.fc(feat)
+                # cache feature
+                if self._cached:
+                    self._cached_h = feat
+            return self.fc(feat)

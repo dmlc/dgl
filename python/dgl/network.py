@@ -192,6 +192,8 @@ class KVMsgType(Enum):
     PULL_BACK = 5
     BARRIER = 6
     IP_ID = 7
+    GET_SHAPE = 8
+    GET_SHAPE_BACK = 9
 
 
 KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data shape c_ptr")
@@ -234,7 +236,7 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.rank,
             msg.name,
             tensor_id)
-    elif msg.type == KVMsgType.INIT:
+    elif msg.type in (KVMsgType.INIT, KVMsgType.GET_SHAPE_BACK):
         tensor_shape = F.zerocopy_to_dgl_ndarray(msg.shape)
         _CAPI_SenderSendKVMsg(
             sender,
@@ -243,7 +245,7 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.rank,
             msg.name,
             tensor_shape)
-    elif msg.type == KVMsgType.IP_ID:
+    elif msg.type in (KVMsgType.IP_ID, KVMsgType.GET_SHAPE):
         _CAPI_SenderSendKVMsg(
             sender,
             int(recv_id),
@@ -296,7 +298,7 @@ def _recv_kv_msg(receiver):
             shape=None,
             c_ptr=msg_ptr)
         return msg
-    elif msg_type == KVMsgType.INIT:
+    elif msg_type in (KVMsgType.INIT, KVMsgType.GET_SHAPE_BACK):
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
         tensor_shape = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgShape(msg_ptr))
         msg = KVStoreMsg(
@@ -308,7 +310,7 @@ def _recv_kv_msg(receiver):
             shape=tensor_shape,
             c_ptr=msg_ptr)
         return msg
-    elif msg_type == KVMsgType.IP_ID:
+    elif msg_type in (KVMsgType.IP_ID, KVMsgType.GET_SHAPE):
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
         msg = KVStoreMsg(
             type=msg_type,
