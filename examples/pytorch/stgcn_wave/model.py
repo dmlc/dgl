@@ -62,39 +62,38 @@ class OutputLayer(nn.Module):
         return self.fc(x_t2)
 
 class STGCN_WAVE(nn.Module):
-    def __init__(self, c, T, n, Lk, p):
+    def __init__(self, c, T, n, Lk, p, num_layers):
         super(STGCN_WAVE, self).__init__()
-        self.tlayer1 = TemporalConvLayer(c[0], c[1], dia = 1)
-        self.ln1 = nn.LayerNorm([n, c[1]])
-        self.tlayer2 = TemporalConvLayer(c[1], c[2], dia = 2)
-        self.slayer1 = SpatioConvLayer(c[2], Lk)
-
-        self.tlayer3 = TemporalConvLayer(c[2], c[3], dia = 4)
-        self.ln2 = nn.LayerNorm([n, c[3]])
-        self.tlayer4 = TemporalConvLayer(c[3], c[4], dia = 8)
-        self.slayer2 = SpatioConvLayer(c[4], Lk)
-        self.tlayer5 = TemporalConvLayer(c[4], c[5], dia = 16)
-        # self.ln3 = nn.LayerNorm([n, c[6]])
-        # self.tlayer6 = TemporalConvLayer(c[5], c[6])
-        # self.slayer3 = SpatioConvLayer(ks, c[6], Lk)
-        # self.tlayer7 = TemporalConvLayer(c[6], c[7])
-        
+        self.num_layers = num_layers
         print('T :',T)
-        self.output = OutputLayer(c[5], T - 31, n)
-
+        self.layers = []
+        cnt = 0
+        diapower = 0
+        for i in range(num_layers):
+            group = i // 4 + 1
+            id = (i + 1) % 4
+            start = group * 2 - 2
+            if (i + 1) % 4 == 0:
+                self.layers.append(SpatioConvLayer(c[group * 2], Lk))
+            
+            if ((i + 1) % 4 == 1) or ((i + 1) % 4 == 3):
+                if i == 0:
+                    print('x :',start + id // 2,'y :',start + id // 2 + 1)
+                self.layers.append(TemporalConvLayer(c[start + id // 2], c[start + id // 2 + 1], dia = 2**diapower))
+                diapower += 1
+                cnt += 1
+            if (i + 1) % 4 == 2:
+                self.layers.append(nn.LayerNorm([n,c[2*group - 1]]))
+        # print('diapower :',diapower)
+        # print('cnt :',cnt, "2**(diapower) :",2**(diapower))
+        self.output = OutputLayer(c[cnt], T + 1 - 2**(diapower), n)
+        for layer in self.layers:
+            layer = layer.cuda()
     def forward(self, x):
-        x = self.tlayer1(x)
-        x = self.ln1(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  
-        x = self.tlayer2(x)
-        x = self.slayer1(x)
-        x = self.tlayer3(x)
-        x = self.ln2(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  
-        x = self.tlayer4(x)
-        x = self.slayer2(x)
-        x = self.tlayer5(x)
-        # x = self.ln3(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  
-        # x = self.tlayer6(x)
-        # x = self.slayer3(x)
-        # x = self.tlayer7(x)
-        # print('final x shape:',x.shape)
+        for i in range(self.num_layers):
+            # print('i :', i)
+            if (i + 1) % 4 == 2:
+                x = self.layers[i](x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  
+            else:
+                x = self.layers[i](x)
         return self.output(x)

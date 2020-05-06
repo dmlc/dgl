@@ -23,6 +23,7 @@ device = torch.device("cuda") if torch.cuda.is_available() and not args.disablec
 
 with open('./data/sensor_graph/graph_sensor_ids.txt') as f:
     sensor_ids = f.read().strip().split(',')
+
 distance_df = pd.read_csv('./data/sensor_graph/distances_la_2012.csv', dtype={'from': 'str', 'to': 'str'})
 
 _, sensor_id_to_ind, adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
@@ -34,7 +35,7 @@ G.from_scipy_sparse_matrix(sp_mx)
 df = pd.read_hdf('./data/metr-la.h5')
 num_samples, num_nodes = df.shape
 
-a = df.to_numpy()
+tsdata = df.to_numpy()
 
 
 n_his = 144
@@ -49,7 +50,7 @@ n_pred = 3
 n_route = 207
 blocks = [1, 16, 32, 64, 32, 128]
 drop_prob = 0
-
+num_layers = 9
 
 batch_size = args.batch_size
 epochs = args.epochs
@@ -82,7 +83,7 @@ test_iter = torch.utils.data.DataLoader(test_data, batch_size)
 
 
 loss = nn.MSELoss()
-model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob).to(device)
+model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers).to(device)
 optimizer = torch.optim.RMSprop(model.parameters(), lr=lr)
 
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7)
