@@ -122,61 +122,60 @@ class GraphConv(layers.Layer):
         tf.Tensor
             The output feature
         """
-        graph = graph.local_var()
-
-        if self._norm == 'both':
-            degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32),
-                                    clip_value_min=1,
-                                    clip_value_max=np.inf)
-            norm = tf.pow(degs, -0.5)
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = tf.reshape(norm, shp)
-            feat = feat * norm
-
-        if weight is not None:
-            if self.weight is not None:
-                raise DGLError('External weight is provided while at the same time the'
-                               ' module has defined its own weight parameter. Please'
-                               ' create the module with flag weight=False.')
-        else:
-            weight = self.weight
-
-        if self._in_feats > self._out_feats:
-            # mult W first to reduce the feature size for aggregation.
-            if weight is not None:
-                feat = tf.matmul(feat, weight)
-            graph.srcdata['h'] = feat
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.dstdata['h']
-        else:
-            # aggregate first then mult W
-            graph.srcdata['h'] = feat
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.dstdata['h']
-            if weight is not None:
-                rst = tf.matmul(rst, weight)
-
-        if self._norm != 'none':
-            degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
-                                    clip_value_min=1,
-                                    clip_value_max=np.inf)
+        with graph.local_scope():
             if self._norm == 'both':
+                degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32),
+                                        clip_value_min=1,
+                                        clip_value_max=np.inf)
                 norm = tf.pow(degs, -0.5)
+                shp = norm.shape + (1,) * (feat.ndim - 1)
+                norm = tf.reshape(norm, shp)
+                feat = feat * norm
+
+            if weight is not None:
+                if self.weight is not None:
+                    raise DGLError('External weight is provided while at the same time the'
+                                   ' module has defined its own weight parameter. Please'
+                                   ' create the module with flag weight=False.')
             else:
-                norm = 1.0 / degs
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = tf.reshape(norm, shp)
-            rst = rst * norm
+                weight = self.weight
 
-        if self.bias is not None:
-            rst = rst + self.bias
+            if self._in_feats > self._out_feats:
+                # mult W first to reduce the feature size for aggregation.
+                if weight is not None:
+                    feat = tf.matmul(feat, weight)
+                graph.srcdata['h'] = feat
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.dstdata['h']
+            else:
+                # aggregate first then mult W
+                graph.srcdata['h'] = feat
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.dstdata['h']
+                if weight is not None:
+                    rst = tf.matmul(rst, weight)
 
-        if self._activation is not None:
-            rst = self._activation(rst)
+            if self._norm != 'none':
+                degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
+                                        clip_value_min=1,
+                                        clip_value_max=np.inf)
+                if self._norm == 'both':
+                    norm = tf.pow(degs, -0.5)
+                else:
+                    norm = 1.0 / degs
+                shp = norm.shape + (1,) * (feat.ndim - 1)
+                norm = tf.reshape(norm, shp)
+                rst = rst * norm
 
-        return rst
+            if self.bias is not None:
+                rst = rst + self.bias
+
+            if self._activation is not None:
+                rst = self._activation(rst)
+
+            return rst
 
     def extra_repr(self):
         """Set the extra representation of the module,

@@ -2,6 +2,7 @@
 #pylint: disable= too-many-lines
 from collections import defaultdict
 from contextlib import contextmanager
+import copy
 import networkx as nx
 import numpy as np
 
@@ -11,7 +12,7 @@ from . import utils
 from . import backend as F
 from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
-from .frame import Frame, FrameRef, frame_like, sync_frame_initializer
+from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from .udf import NodeBatch, EdgeBatch
@@ -200,6 +201,7 @@ class DGLHeteroGraph(object):
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
         """Init internal states."""
         self._graph = gidx
+        self._canonical_etypes = None
 
         # Handle node types
         if isinstance(ntypes, tuple):
@@ -214,6 +216,8 @@ class DGLHeteroGraph(object):
             self._srctypes_invmap = {t : i for i, t in enumerate(ntypes[0])}
             self._dsttypes_invmap = {t : i + len(ntypes[0]) for i, t in enumerate(ntypes[1])}
             self._is_unibipartite = True
+            if len(ntypes[0]) == 1 and len(ntypes[1]) == 1 and len(etypes) == 1:
+                self._canonical_etypes = [(ntypes[0][0], etypes[0], ntypes[1][0])]
         else:
             self._ntypes = ntypes
             src_dst_map = find_src_dst_ntypes(self._ntypes, self._graph.metagraph)
@@ -226,8 +230,9 @@ class DGLHeteroGraph(object):
 
         # Handle edge types
         self._etypes = etypes
-        self._canonical_etypes = make_canonical_etypes(
-            self._etypes, self._ntypes, self._graph.metagraph)
+        if self._canonical_etypes is None:
+            self._canonical_etypes = make_canonical_etypes(
+                self._etypes, self._ntypes, self._graph.metagraph)
 
         # An internal map from etype to canonical etype tuple.
         # If two etypes have the same name, an empty tuple is stored instead to indicate
@@ -912,7 +917,7 @@ class DGLHeteroGraph(object):
                 new_ntypes = [srctype]
                 new_nframes = [self._node_frames[stid]]
             else:
-                new_ntypes = [srctype, dsttype]
+                new_ntypes = ([srctype], [dsttype])
                 new_nframes = [self._node_frames[stid], self._node_frames[dtid]]
             new_etypes = [etype]
             new_eframes = [self._edge_frames[etid]]
@@ -4033,18 +4038,12 @@ class DGLHeteroGraph(object):
         --------
         local_var
         """
-        local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
-        local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
-        # Use same per-column initializers and default initializer.
-        # If registered, a column (based on key) initializer will be used first,
-        # otherwise the default initializer will be used.
-        for fr1, fr2 in zip(local_node_frames, self._node_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
-        for fr1, fr2 in zip(local_edge_frames, self._edge_frames):
-            sync_frame_initializer(fr1._frame, fr2._frame)
-        return DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
-                              local_node_frames,
-                              local_edge_frames)
+        local_node_frames = [fr.clone() for fr in self._node_frames]
+        local_edge_frames = [fr.clone() for fr in self._edge_frames]
+        ret = copy.copy(self)
+        ret._node_frames = local_node_frames
+        ret._edge_frames = local_edge_frames
+        return ret
 
     @contextmanager
     def local_scope(self):
@@ -4093,15 +4092,8 @@ class DGLHeteroGraph(object):
         """
         old_nframes = self._node_frames
         old_eframes = self._edge_frames
-        self._node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
-        self._edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
-        # Use same per-column initializers and default initializer.
-        # If registered, a column (based on key) initializer will be used first,
-        # otherwise the default initializer will be used.
-        for fr1, fr2 in zip(self._node_frames, old_nframes):
-            sync_frame_initializer(fr1._frame, fr2._frame)
-        for fr1, fr2 in zip(self._edge_frames, old_eframes):
-            sync_frame_initializer(fr1._frame, fr2._frame)
+        self._node_frames = [fr.clone() for fr in self._node_frames]
+        self._edge_frames = [fr.clone() for fr in self._edge_frames]
         yield
         self._node_frames = old_nframes
         self._edge_frames = old_eframes

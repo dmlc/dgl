@@ -24,7 +24,8 @@ def data_type_dict():
             'int8'    : th.int8,
             'int16'   : th.int16,
             'int32'   : th.int32,
-            'int64'   : th.int64}
+            'int64'   : th.int64,
+            'bool'    : th.bool}
 
 def cpu():
     return th.device('cpu')
@@ -245,6 +246,9 @@ def equal(x, y):
 
 def logical_not(input):
     return ~input
+
+def clone(input):
+    return input.clone()
 
 def unique(input):
     return th.unique(input)

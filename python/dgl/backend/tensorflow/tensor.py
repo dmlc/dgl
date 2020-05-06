@@ -50,7 +50,8 @@ def data_type_dict():
             'int8': tf.int8,
             'int16': tf.int16,
             'int32': tf.int32,
-            'int64': tf.int64}
+            'int64': tf.int64,
+            'bool' : tf.bool}
 
 def cpu():
     return "/cpu:0"
@@ -347,6 +348,9 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def clone(input):
+    # TF tensor is always immutable so returning the input is safe.
+    return input
 
 def unique(input):
     return tf.unique(input).y
