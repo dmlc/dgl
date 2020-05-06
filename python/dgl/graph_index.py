@@ -1025,6 +1025,11 @@ def from_csr(indptr, indices, direction):
     indices : Tensor
         column index array in the CSR format
     direction : str
+
+    Returns
+    ------
+    GraphIndex
+        The graph index
         the edge direction. Either "in" or "out".
     """
     indptr = utils.toindex(indptr)
@@ -1042,6 +1047,11 @@ def from_shared_mem_graph_index(shared_mem_name):
     ----------
     shared_mem_name : string
         the name of shared memory
+
+    Returns
+    ------
+    GraphIndex
+        The graph index
     """
     return _CAPI_DGLGraphCSRCreateMMap(shared_mem_name)
 

@@ -28,6 +28,7 @@ def data_type_dict():
     int16
     int32
     int64
+    bool
 
     This function will be called only *once* during the initialization fo the
     backend module. The returned dictionary will become the attributes of the
@@ -978,6 +979,21 @@ def logical_not(input):
     -------
     Tensor
         The result
+    """
+    pass
+
+def clone(input):
+    """Return a clone of the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        Input tensor.
+
+    Returns
+    -------
+    Tensor
+        A clone tensor.
     """
     pass
 

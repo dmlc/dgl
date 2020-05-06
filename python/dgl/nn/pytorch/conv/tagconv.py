@@ -73,29 +73,29 @@ class TAGConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        assert graph.is_homograph(), 'Graph is not homogeneous'
-        graph = graph.local_var()
+        with graph.local_scope():
+            assert graph.is_homograph(), 'Graph is not homogeneous'
 
-        norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
-        shp = norm.shape + (1,) * (feat.dim() - 1)
-        norm = th.reshape(norm, shp).to(feat.device)
+            norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+            shp = norm.shape + (1,) * (feat.dim() - 1)
+            norm = th.reshape(norm, shp).to(feat.device)
 
-        #D-1/2 A D -1/2 X
-        fstack = [feat]
-        for _ in range(self._k):
+            #D-1/2 A D -1/2 X
+            fstack = [feat]
+            for _ in range(self._k):
 
-            rst = fstack[-1] * norm
-            graph.ndata['h'] = rst
+                rst = fstack[-1] * norm
+                graph.ndata['h'] = rst
 
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.ndata['h']
-            rst = rst * norm
-            fstack.append(rst)
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.ndata['h']
+                rst = rst * norm
+                fstack.append(rst)
 
-        rst = self.lin(th.cat(fstack, dim=-1))
+            rst = self.lin(th.cat(fstack, dim=-1))
 
-        if self._activation is not None:
-            rst = self._activation(rst)
+            if self._activation is not None:
+                rst = self._activation(rst)
 
-        return rst
+            return rst
