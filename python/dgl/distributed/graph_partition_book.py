@@ -8,21 +8,16 @@ from ..base import NID, EID
 from ..data.utils import load_graphs
 
 class GraphPartitionBook:
-    """Partition information.
+    """GraphPartitionBook is used to store parition information.
 
-    Note that, we assume that all partitions exists in local machines for now.
-    Once we have the reshuffle() api we can change that.
+    Parameters
+    ----------
+    partition_config_file : str
+        path of graph partition file.
+    ip_config_file : str
+        path of IP configuration file.
     """
     def __init__(self, partition_config_file, ip_config_file):
-        """Initialization
-
-        Parameters
-        ----------
-        partition_config_file : str
-            path of graph partition file.
-        ip_config_file : str
-            path of IP configuration file.
-        """
         with open(partition_config_file) as conf_f:
             self._part_meta = json.load(conf_f)
         # Read ip list from ip_config_file
