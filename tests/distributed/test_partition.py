@@ -47,7 +47,7 @@ def test_partition():
             assert name in node_feats
             assert node_feats[name].shape[0] == len(local_nodes)
             assert len(local_nodes) == len(node_feats[name])
-            assert np.all(F.asnumpy(g.ndata[name][local_nodes]) == F.asnumpy(node_feats[name]))
+            assert np.all(F.asnumpy(g.ndata[name])[local_nodes] == F.asnumpy(node_feats[name]))
         assert len(edge_feats) == 0
 
 
