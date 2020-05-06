@@ -14,6 +14,7 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_partition():
     g = create_random_graph(10000)
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
