@@ -17,17 +17,20 @@ import dgl.function as fn
 from utils import *
 
 
-''' Build graph, treat all nodes as the same type
-Input
------
-network_data: a dict with keys describing the edge types, values representing edges
-vocab: a dict mapping node IDs to node indices
-
-Output
-------
-graph: a heterogenous graph, with one node type and different edge types
-'''
 def get_graph(network_data, vocab):
+    ''' Build graph, treat all nodes as the same type
+    
+    Parameters
+    ----------
+    network_data: a dict
+        keys describing the edge types, values representing edges
+    vocab: a dict
+        mapping node IDs to node indices
+    Output
+    ------
+    DGLHeteroGraph
+        a heterogenous graph, with one node type and different edge types
+    '''
     graphs = []
     num_nodes = len(vocab)
 
@@ -37,7 +40,7 @@ def get_graph(network_data, vocab):
         for edge in tmp_data:
             edges.append((vocab[edge[0]], vocab[edge[1]]))
             edges.append((vocab[edge[1]], vocab[edge[0]]))
-        g = dgl.graph(edges, 'user', edge_type, num_nodes)
+        g = dgl.graph(edges, etype=edge_type, num_nodes=num_nodes)
         graphs.append(g)
     graph = dgl.hetero_from_relations(graphs)
     
@@ -90,17 +93,17 @@ class DGLGATNE(nn.Module):
     def forward(self, block):
         input_nodes = block.srcdata[dgl.NID]
         output_nodes = block.dstdata[dgl.NID]
-        batch_size = block.number_of_dst_nodes('user')
+        batch_size = block.number_of_dst_nodes()
         node_embed = self.node_embeddings
         node_type_embed = []
 
         with block.local_scope():
             for i in range(self.edge_type_count):
                 edge_type = self.edge_types[i]
-                block.srcnodes['user'].data[edge_type] = self.node_type_embeddings[input_nodes, i]
-                block.dstnodes['user'].data[edge_type] = self.node_type_embeddings[output_nodes, i]
+                block.srcdata[edge_type] = self.node_type_embeddings[input_nodes, i]
+                block.dstdata[edge_type] = self.node_type_embeddings[output_nodes, i]
                 block.update_all(fn.copy_u(edge_type, 'm'), fn.sum('m', edge_type), etype=edge_type)
-                node_type_embed.append(block.dstnodes['user'].data[edge_type])
+                node_type_embed.append(block.dstdata[edge_type])
         
             node_type_embed = torch.stack(node_type_embed, 1)  
             tmp_node_type_embed = node_type_embed.unsqueeze(2).view(-1, 1, self.embedding_u_size)  
@@ -151,7 +154,6 @@ class NSLoss(nn.Module):
         self.weights.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
 
     def forward(self, input, embs, label):
-    # batch_size, batch_size * embedding_size, batch_size
         n = input.shape[0]
         log_target = torch.log(
             torch.sigmoid(torch.sum(torch.mul(embs, self.weights[label]), 1))
