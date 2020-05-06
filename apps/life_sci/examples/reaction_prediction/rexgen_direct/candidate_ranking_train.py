@@ -49,7 +49,7 @@ def main(args, path_to_candidate_bonds):
     acc_sum = 0
     grad_norm_sum = 0
     dur = []
-
+    total_samples = 0
     for epoch in range(args['num_epochs']):
         t0 = time.time()
         model.train()
@@ -83,11 +83,12 @@ def main(args, path_to_candidate_bonds):
 
             loss = criterion(pred, batch_labels)
             grad_norm_sum += optimizer.backward_and_step(loss)
-            total_samples = (batch_id + 1) * args['batch_size']
+            total_samples += args['batch_size']
             if total_samples % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \
                            'accuracy {:.4f} | grad norm {:.4f}'.format(
-                    epoch + 1, args['num_epochs'], total_samples // args['print_every'],
+                    epoch + 1, args['num_epochs'],
+                    (batch_id + 1) * args['batch_size'] // args['print_every'],
                     len(train_set) // args['print_every'],
                     (sum(dur) + time.time() - t0) / total_samples * args['print_every'],
                     acc_sum / args['print_every'],
@@ -104,7 +105,6 @@ def main(args, path_to_candidate_bonds):
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model.pkl')
 
-        optimizer._reset()
         dur.append(time.time() - t0)
         prediction_summary = candidate_ranking_eval(args, model, val_loader)
         prediction_summary = 'Epoch {:d}/{:d}\n'.format(epoch + 1, args['num_epochs']) + \
