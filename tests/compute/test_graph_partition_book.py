@@ -39,7 +39,7 @@ def test_graph_partition_book():
         gpb = GraphPartitionBook(part_id=i,  
                                  partition_meta=meta, 
                                  local_graph=part_g, 
-                                 ip_config_file='ip_config_file.txt')
+                                 ip_config_file='ip_config.txt')
         assert gpb.num_partitions() == num_parts
         gpb_meta = gpb.metadata()
         assert len(gpb_meta) == num_parts
