@@ -48,12 +48,12 @@ class GraphPartitionBook:
         self._meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
         _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
-        for part_id in range(self._num_partitions):
+        for partid in range(self._num_partitions):
             part_info = {}
-            part_info['machine_id'] = part_id
-            part_info['ip'] = self._ip_list[part_id]
-            part_info['num_nodes'] = nid_count[part_id]
-            part_info['num_edges'] = eid_count[part_id]
+            part_info['machine_id'] = partid
+            part_info['ip'] = self._ip_list[partid]
+            part_info['num_nodes'] = nid_count[partid]
+            part_info['num_edges'] = eid_count[partid]
             self._meta_data.append(part_info)
         # Get partid2nids
         self._partid2nids = []
