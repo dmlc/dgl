@@ -44,7 +44,7 @@ class GraphPartitionBook:
         for line in lines:
             ip_addr, _, _ = line.split(' ')
             self._ip_list.append(ip_addr)
-        # Get meta data
+        # Get meta data of GraphPartitionBook
         self._meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
         _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
