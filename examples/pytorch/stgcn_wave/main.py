@@ -17,28 +17,33 @@ parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
 parser.add_argument('--disablecuda', action='store_true', help='Disable CUDA')
 parser.add_argument('--batch_size', type=int, default=50, help='batch size for training and validation (default: 50)')
 parser.add_argument('--epochs', type=int, default=50, help='epochsfor training  (default: 50)')
+parser.add_argument('--num_layers', type=int, default=9, help='number of layers')
+parser.add_argument('--window', type=int, default=144, help='window length')
+parser.add_argument('--sensorsfilepath', type=str, default='./data/sensor_graph/graph_sensor_ids.txt', help='sensors file path for sensors file')
+parser.add_argument('--disfilepath', type=str, default='./data/sensor_graph/distances_la_2012.csv', help='distance file path for sensors file')
+parser.add_argument('--tsfilepath', type=str, default='./data/metr-la.h5', help='ts file path for sensors file')
 args = parser.parse_args()
 
 device = torch.device("cuda") if torch.cuda.is_available() and not args.disablecuda else torch.device("cpu")
 
-with open('./data/sensor_graph/graph_sensor_ids.txt') as f:
+with open(args.sensorsfilepath) as f:
     sensor_ids = f.read().strip().split(',')
 
-distance_df = pd.read_csv('./data/sensor_graph/distances_la_2012.csv', dtype={'from': 'str', 'to': 'str'})
+distance_df = pd.read_csv(args.disfilepath, dtype={'from': 'str', 'to': 'str'})
 
-_, sensor_id_to_ind, adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
+adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
 sp_mx = sp.coo_matrix(adj_mx)
 G = dgl.DGLGraph()
 G.from_scipy_sparse_matrix(sp_mx)
 
 
-df = pd.read_hdf('./data/metr-la.h5')
+df = pd.read_hdf(args.tsfilepath)
 num_samples, num_nodes = df.shape
 
 tsdata = df.to_numpy()
 
 
-n_his = 144
+n_his = args.window
 
 save_path = "save/stgcnwavemodel.pt"
 
@@ -47,10 +52,10 @@ day_slot = 288
 
 
 n_pred = 3
-n_route = 207
+n_route = num_nodes
 blocks = [1, 16, 32, 64, 32, 128]
 drop_prob = 0
-num_layers = 9
+num_layers = args.num_layers
 
 batch_size = args.batch_size
 epochs = args.epochs

@@ -23,7 +23,6 @@ class SpatioConvLayer(nn.Module):
     def __init__(self, c, Lk):
         super(SpatioConvLayer, self).__init__()
         self.g = Lk
-        # print('c :',c)
         self.gc = GraphConv(c, c, activation=F.relu)
         # self.gc = ChebConv(c, c, 3)
 
@@ -65,7 +64,6 @@ class STGCN_WAVE(nn.Module):
     def __init__(self, c, T, n, Lk, p, num_layers):
         super(STGCN_WAVE, self).__init__()
         self.num_layers = num_layers
-        print('T :',T)
         self.layers = []
         cnt = 0
         diapower = 0
@@ -77,8 +75,6 @@ class STGCN_WAVE(nn.Module):
                 self.layers.append(SpatioConvLayer(c[group * 2], Lk))
             
             if ((i + 1) % 4 == 1) or ((i + 1) % 4 == 3):
-                if i == 0:
-                    print('x :',start + id // 2,'y :',start + id // 2 + 1)
                 self.layers.append(TemporalConvLayer(c[start + id // 2], c[start + id // 2 + 1], dia = 2**diapower))
                 diapower += 1
                 cnt += 1
@@ -91,7 +87,6 @@ class STGCN_WAVE(nn.Module):
             layer = layer.cuda()
     def forward(self, x):
         for i in range(self.num_layers):
-            # print('i :', i)
             if (i + 1) % 4 == 2:
                 x = self.layers[i](x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  
             else:

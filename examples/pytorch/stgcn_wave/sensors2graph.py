@@ -4,7 +4,7 @@ def get_adjacency_matrix(distance_df, sensor_ids, normalized_k=0.1):
     :param distance_df: data frame with three columns: [from, to, distance].
     :param sensor_ids: list of sensor ids.
     :param normalized_k: entries that become lower than normalized_k after normalization are set to zero for sparsity.
-    :return:
+    :return: adjacency matrix
     """
     num_sensors = len(sensor_ids)
     dist_mx = np.zeros((num_sensors, num_sensors), dtype=np.float32)
@@ -13,7 +13,6 @@ def get_adjacency_matrix(distance_df, sensor_ids, normalized_k=0.1):
     sensor_id_to_ind = {}
     for i, sensor_id in enumerate(sensor_ids):
         sensor_id_to_ind[sensor_id] = i
-
     # Fills cells in the matrix with distances.
     for row in distance_df.values:
         if row[0] not in sensor_id_to_ind or row[1] not in sensor_id_to_ind:
@@ -29,4 +28,4 @@ def get_adjacency_matrix(distance_df, sensor_ids, normalized_k=0.1):
 
     # Sets entries that lower than a threshold, i.e., k, to zero for sparsity.
     adj_mx[adj_mx < normalized_k] = 0
-    return sensor_ids, sensor_id_to_ind, adj_mx
+    return adj_mx
