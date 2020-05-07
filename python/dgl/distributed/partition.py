@@ -121,6 +121,7 @@ def load_partition(conf_file, part_id):
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'num_parts' in part_metadata, 'num_parts does not exist.'
+    num_parts = part_metadata['num_parts']
     assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
     part_files = part_metadata['part-{}'.format(part_id)]
     assert 'node_feats' in part_files, "the partition does not contain node features."
