@@ -45,7 +45,7 @@ class GraphPartitionBook:
             ip_addr, _, _ = line.split(' ')
             self._ip_list.append(ip_addr)
         # Get meta data of GraphPartitionBook
-        self._meta_data = []
+        self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
         _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
         for partid in range(self._num_partitions):
@@ -54,7 +54,7 @@ class GraphPartitionBook:
             part_info['ip'] = self._ip_list[partid]
             part_info['num_nodes'] = nid_count[partid]
             part_info['num_edges'] = eid_count[partid]
-            self._meta_data.append(part_info)
+            self._partition_meta_data.append(part_info)
         # Get partid2nids
         self._partid2nids = []
         sorted_nid = F.tensor(np.argsort(F.asnumpy(self._nid2partid)))
@@ -119,7 +119,7 @@ class GraphPartitionBook:
         list[dict[str, any]]
             Meta data of each partition.
         """
-        return self._meta_data
+        return self._partition_meta_data
 
 
     def nid2partid(self, nids):
