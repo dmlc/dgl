@@ -21,7 +21,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 
-from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate
+from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate, load_subtensor
 
 def start_server(args):
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
@@ -29,27 +29,12 @@ def start_server(args):
                            args.conf_path)
     serv.start()
 
-def load_subtensor(g, blocks, device):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    # The nodes for input lies at the LHS side of the first block.
-    # The nodes for output lies at the RHS side of the last block.
-    input_nodes = blocks[0].srcdata[dgl.NID]
-    # TODO this is the current way of getting global node Ids.
-    input_nodes = g.g.ndata[dgl.NID][input_nodes]
-    # TODO we should get global node id directly from the sampler.
-    seeds = blocks[-1].dstdata[dgl.NID]
-    seeds = g.g.ndata[dgl.NID][seeds]
-    batch_inputs = g.ndata['features'][input_nodes]
-    batch_labels = g.ndata['labels'][seeds].long()
-    return batch_inputs, batch_labels
-
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, in_feats, n_classes, g = data
     # Create sampler
-    sampler = NeighborSampler(g.g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
+                              dgl.distributed.sample_neighbors)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
