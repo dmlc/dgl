@@ -13,7 +13,6 @@ import torch.nn as nn
 from data import MovieLens
 from model import GNN
 from dataset import MovieLensDataset 
-from model import BiDecoder, GCMCLayer
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
 def evaluate(args, net, dataset, segment='valid'):
@@ -49,7 +48,7 @@ def evaluate(args, net, dataset, segment='valid'):
 
 def train(args):
     print(args)
-    dataset_base = MovieLens(args.data_name, args.device, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+    dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     dataset = MovieLensDataset(dataset_base)
     print("Loading data finished ...\n")
@@ -200,6 +199,18 @@ def config():
     parser.add_argument('--train_decay_patience', type=int, default=50)
     parser.add_argument('--train_early_stopping_patience', type=int, default=100)
     parser.add_argument('--share_param', default=False, action='store_true')
+    # igmc settings
+    parser.add_argument('--hop', default=1, metavar='S', 
+                    help='enclosing subgraph hop number')
+    parser.add_argument('--sample-ratio', type=float, default=1.0, 
+                        help='if < 1, subsample nodes per hop according to the ratio')
+    parser.add_argument('--max-nodes-per-hop', default=10000, 
+                        help='if > 0, upper bound the # nodes per hop by another subsampling')
+    parser.add_argument('--use-features', action='store_true', default=False,
+                        help='whether to use node features (side information)')
+    # edge dropout settings
+    parser.add_argument('--adj-dropout', type=float, default=0.2, 
+                    help='if not 0, random drops edges from adjacency matrix with this prob')
 
     args = parser.parse_args()
     args.device = th.device(args.device) if args.device >= 0 else th.device('cpu')
