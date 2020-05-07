@@ -47,6 +47,10 @@ def test_graph_partition_book():
         assert np.all(F.asnumpy(gpb.eid2partid(F.arange(0, len(edge_map)))) == edge_map)
         assert len(gpb.partid2nids(i)) == gpb_meta[i]['num_nodes']
         assert len(gpb.partid2eids(i)) == gpb_meta[i]['num_edges']
+        local_nid = gpb.nid2localnid(part_g.ndata[dgl.NID])
+        assert np.all(F.asnumpy(local_nid) == F.asnumpy(F.arange(0, len(local_nid))))
+        local_eid = gpb.nid2localnid(part_g.edata[dgl.EID])
+        assert np.all(F.asnumpy(local_eid) == F.asnumpy(F.arange(0, len(local_eid))))
 
 
 if __name__ == '__main__':
