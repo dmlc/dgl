@@ -19,16 +19,17 @@ import traceback
 #### Neighbor sampler
 
 class NeighborSampler(object):
-    def __init__(self, g, fanouts):
+    def __init__(self, g, fanouts, sample_neighbors):
         self.g = g
         self.fanouts = fanouts
+        self.sample_neighbors = sample_neighbors
 
     def sample_blocks(self, seeds):
         seeds = th.LongTensor(np.asarray(seeds))
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
+            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -143,23 +144,24 @@ def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
-def load_subtensor(g, labels, seeds, input_nodes, device):
+def load_subtensor(g, seeds, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
     batch_inputs = g.ndata['features'][input_nodes].to(device)
-    batch_labels = labels[seeds].to(device)
+    batch_labels = g.ndata['labels'][seeds].to(device)
     return batch_inputs, batch_labels
 
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    train_mask, val_mask, in_feats, labels, n_classes, g = data
+    train_mask, val_mask, in_feats, n_classes, g = data
     train_nid = th.LongTensor(np.nonzero(train_mask)[0])
     val_nid = th.LongTensor(np.nonzero(val_mask)[0])
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
+                              dgl.sampling.sample_neighbors)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
@@ -195,7 +197,7 @@ def run(args, device, data):
             seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -218,7 +220,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_nid, args.batch_size, device)
+            eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
@@ -256,8 +258,9 @@ if __name__ == '__main__':
     # Construct graph
     g = dgl.graph(data.graph.all_edges())
     g.ndata['features'] = features
+    g.ndata['labels'] = labels
     prepare_mp(g)
     # Pack data
-    data = train_mask, val_mask, in_feats, labels, n_classes, g
+    data = train_mask, val_mask, in_feats, n_classes, g
 
     run(args, device, data)
