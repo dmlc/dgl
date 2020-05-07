@@ -32,13 +32,17 @@ def test_graph_partition_book():
 
     create_ip_config()
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
-    gpb = GraphPartitionBook('/tmp/test.json', 'ip_config.txt')
-    assert gpb.num_partitions() == num_parts
-    gpb_meta = gpb.metadata()
-    assert len(gpb_meta) == num_parts
+
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
-        num_nodes, num_edges, node_map, edge_map = meta
+        num_nodes, num_edges, node_map, edge_map, num_partitions = meta
+        gpb = GraphPartitionBook(part_id=i,  
+                                 partition_meta=meta, 
+                                 local_graph=part_g, 
+                                 ip_config_file='ip_config_file.txt')
+        assert gpb.num_partitions() == num_parts
+        gpb_meta = gpb.metadata()
+        assert len(gpb_meta) == num_parts
         assert np.all(F.asnumpy(gpb.nid2partid(F.arange(0, len(node_map)))) == node_map)
         assert np.all(F.asnumpy(gpb.eid2partid(F.arange(0, len(edge_map)))) == edge_map)
         assert len(gpb.partid2nids(i)) == gpb_meta[i]['num_nodes']

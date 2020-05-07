@@ -12,38 +12,38 @@ class GraphPartitionBook:
 
     Parameters
     ----------
-    partition_config_file : str
-        path of graph partition file.
+    part_id : int
+        partition id of current GraphPartitionBook
+    partition_meta : tuple
+        partition meta data created by partition_graph() API, including 
+        (num_nodes, num_edges, node_map, edge_map, num_parts)
+    local_graph : DGLGraph
+        The graph partition structure.
     ip_config_file : str
-        path of IP configuration file.
+        path of IP configuration file. The format of configuration file should be:
+
+          [ip] [base_port] [server_count]
+
+          172.31.40.143 30050 2
+          172.31.36.140 30050 2
+          172.31.47.147 30050 2
+          172.31.30.180 30050 2
+
+         we assume that ip is sorted by machine ID in ip_config_file.
     """
-    def __init__(self, partition_config_file, ip_config_file):
-        with open(partition_config_file) as conf_f:
-            self._part_meta = json.load(conf_f)
+    def __init__(self, part_id, partition_meta, local_graph, ip_config_file):
+        assert part_id >= 0, 'part_id cannot be a negative number.'
+        assert len(partition_meta) == 5, \
+        'partition_meta must include: (num_nodes, num_edges, node_map, edge_map, num_parts)'
+        self._part_id = part_id
+        self._graph = local_graph
+        _, _, self._nid2partid, self._eid2partid, self._num_partitions = partition_meta
         # Read ip list from ip_config_file
         self._ip_list = []
         lines = [line.rstrip('\n') for line in open(ip_config_file)]
-        # we assume that ip is sorted by machine ID in ip_config_file
         for line in lines:
             ip_addr, _, _ = line.split(' ')
             self._ip_list.append(ip_addr)
-        # Get number of partitions
-        assert 'num_parts' in self._part_meta, "cannot get the number of partitions."
-        self._num_partitions = self._part_meta['num_parts']
-        assert self._num_partitions > 0, 'num_partitions cannot be a negative number.'
-        # Get part_files
-        self._part_files = []
-        for part_id in range(self._num_partitions):
-            assert 'part-{}'.format(part_id) in self._part_meta, \
-            "part-{} does not exist".format(part_id)
-            part_files = self._part_meta['part-{}'.format(part_id)]
-            self._part_files.append(part_files)
-        # Get nid2partid
-        assert 'node_map' in self._part_meta, "cannot get the node map."
-        self._nid2partid = F.tensor(np.load(self._part_meta['node_map']))
-        # Get eid2partid
-        assert 'edge_map' in self._part_meta, "cannot get the edge map."
-        self._eid2partid = F.tensor(np.load(self._part_meta['edge_map']))
         # Get meta data
         self._meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
@@ -71,27 +71,20 @@ class GraphPartitionBook:
             part_eids = sorted_eid[start:start+offset]
             start += offset
             self._partid2eids.append(part_eids)
-        # Get part_graphs
-        self._part_graphs = []
-        for part_id in range(self._num_partitions):
-            graph = load_graphs(self._part_files[part_id]['part_graph'])[0][0]
-            self._part_graphs.append(graph)
         # Get nidg2l
-        self._nidg2l = []
-        for partid in range(self._num_partitions):
-            global_id = self._part_graphs[partid].ndata[NID]
-            max_global_id = np.amax(F.asnumpy(global_id))
-            g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
-            g2l[global_id] = F.arange(0, len(global_id))
-            self._nidg2l.append(g2l)
+        self._nidg2l = [None] * self._num_partitions
+        global_id = self._graph.ndata[NID]
+        max_global_id = np.amax(F.asnumpy(global_id))
+        g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
+        g2l[global_id] = F.arange(0, len(global_id))
+        self._nidg2l[self._part_id] = g2l
         # Get eidg2l
-        self._eidg2l = []
-        for part_id in range(self._num_partitions):
-            global_id = self._part_graphs[partid].edata[EID]
-            max_global_id = np.amax(F.asnumpy(global_id))
-            g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
-            g2l[global_id] = F.arange(0, len(global_id))
-            self._eidg2l.append(g2l)
+        self._eidg2l = [None] * self._num_partitions
+        global_id = self._graph.edata[EID]
+        max_global_id = np.amax(F.asnumpy(global_id))
+        g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
+        g2l[global_id] = F.arange(0, len(global_id))
+        self._eidg2l[self._part_id] = g2l
 
 
     def num_partitions(self):
@@ -208,6 +201,9 @@ class GraphPartitionBook:
         tensor
              local node IDs
         """
+        if partid != self._part_id:
+            raise RuntimeError('Now GraphPartitionBook does not support getting remote tensor of nid2localnid.')
+
         return self._nidg2l[partid][nids]
 
 
@@ -226,6 +222,9 @@ class GraphPartitionBook:
         tensor
              local edge ids
         """
+        if partid != self._part_id:
+            raise RuntimeError('Now GraphPartitionBook does not support getting remote tensor of eid2localeid.')
+
         return self._eidg2l[partid][eids]
 
 
@@ -242,4 +241,7 @@ class GraphPartitionBook:
         DGLGraph
             The graph of the partition.
         """
-        return self._part_graphs[partid]
+        if partid != self._part_id:
+            raise RuntimeError('Now GraphPartitionBook does not support getting remote partitions.')
+
+        return self._graph
