@@ -1,11 +1,9 @@
 """Define graph partition book."""
 
-import json
 import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID
-from ..data.utils import load_graphs
 
 class GraphPartitionBook:
     """GraphPartitionBook is used to store parition information.
@@ -15,7 +13,7 @@ class GraphPartitionBook:
     part_id : int
         partition id of current GraphPartitionBook
     partition_meta : tuple
-        partition meta data created by partition_graph() API, including 
+        partition meta data created by partition_graph() API, including
         (num_nodes, num_edges, node_map, edge_map, num_parts)
     local_graph : DGLGraph
         The graph partition structure.
@@ -202,7 +200,8 @@ class GraphPartitionBook:
              local node IDs
         """
         if partid != self._part_id:
-            raise RuntimeError('Now GraphPartitionBook does not support getting remote tensor of nid2localnid.')
+            raise RuntimeError('Now GraphPartitionBook does not support \
+                getting remote tensor of nid2localnid.')
 
         return self._nidg2l[partid][nids]
 
@@ -223,7 +222,8 @@ class GraphPartitionBook:
              local edge ids
         """
         if partid != self._part_id:
-            raise RuntimeError('Now GraphPartitionBook does not support getting remote tensor of eid2localeid.')
+            raise RuntimeError('Now GraphPartitionBook does not support \
+                getting remote tensor of eid2localeid.')
 
         return self._eidg2l[partid][eids]
 
@@ -242,6 +242,7 @@ class GraphPartitionBook:
             The graph of the partition.
         """
         if partid != self._part_id:
-            raise RuntimeError('Now GraphPartitionBook does not support getting remote partitions.')
+            raise RuntimeError('Now GraphPartitionBook does not support \
+                getting remote partitions.')
 
         return self._graph
