@@ -36,6 +36,8 @@ class GraphPartitionBook:
         self._part_id = part_id
         self._graph = local_graph
         _, _, self._nid2partid, self._eid2partid, self._num_partitions = partition_meta
+        self._nid2partid = F.tensor(self._nid2partid)
+        self._eid2partid = F.tensor(self._eid2partid)
         # Read ip list from ip_config_file
         self._ip_list = []
         lines = [line.rstrip('\n') for line in open(ip_config_file)]
