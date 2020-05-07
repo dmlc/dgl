@@ -42,7 +42,7 @@ def test_graph_partition_book():
                                  ip_config_file='ip_config.txt')
         assert gpb.num_partitions() == num_parts
         gpb_meta = gpb.metadata()
-        assert len(gpb_meta) == num_parts
+        assert len(gpb_meta) == 1
         assert np.all(F.asnumpy(gpb.nid2partid(F.arange(0, len(node_map)))) == node_map)
         assert np.all(F.asnumpy(gpb.eid2partid(F.arange(0, len(edge_map)))) == edge_map)
         assert len(gpb.partid2nids(i)) == gpb_meta[i]['num_nodes']
