@@ -1,9 +1,12 @@
 """MovieLens dataset"""
-import numpy as np
 import os
 import re
+import time
+import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import scipy.sparse as sp
+import multiprocessing as mp
 import torch as th
 from tqdm import tqdm
 import networkx as nx
@@ -220,7 +223,7 @@ class MovieLens(object):
                 None,
                 None,
                 args.hop*2+1,
-                parallel=False)
+                parallel=True)
 
         def _make_labels(ratings):
             labels = th.LongTensor(np.searchsorted(self.possible_rating_values, ratings)).to(device)
@@ -590,6 +593,8 @@ def links2subgraphs(
     if max_node_label is None:  # if not provided, infer from graphs
         max_n_label = {'max_node_label': 0}
 
+    print ('aa', class_values)
+
     def helper(A, links, g_labels):
         g_list = []
         if not parallel or max_node_label is None:
@@ -601,7 +606,7 @@ def links2subgraphs(
         else:
             start = time.time()
             pool = mp.Pool(mp.cpu_count())
-            results = pool.starmap_async(parallel_worker, [(g_label, (i, j), A, h, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values) for i, j, g_label in zip(links[0], links[1], g_labels)])
+            results = pool.starmap_async(parallel_worker, [(g_label, (i, j), A, h, max_node_label, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values) for i, j, g_label in zip(links[0], links[1], g_labels)])
             remaining = results._number_left
             pbar = tqdm(total=remaining)
             while True:
@@ -609,14 +614,13 @@ def links2subgraphs(
                 if results.ready(): break
                 remaining = results._number_left
                 time.sleep(1)
-            results = results.get()
+            g_list += results.get()
             pool.close()
             pbar.close()
             end = time.time()
             print("Time eplased for subgraph extraction: {}s".format(end-start))
             print("Transforming to pytorch_geometric graphs...".format(end-start))
-            g_list += [nx_to_DGLGraph(g, g_label, n_labels, n_features, max_node_label, class_values) for g_label, g, n_labels, n_features in tqdm(results)]
-            del results
+            print (len(g_list))
             end2 = time.time()
             print("Time eplased for transforming to pytorch_geometric graphs: {}s".format(end2-end))
         return g_list
@@ -629,21 +633,17 @@ def links2subgraphs(
         val_graphs = []
     test_graphs = helper(A, test_indices, test_labels)
 
-    if max_node_label is None:
-        train_graphs = [nx_to_DGLGraph(*x, **max_n_label, class_values=class_values) for x in train_graphs]
-        val_graphs = [nx_to_DGLGraph(*x, **max_n_label, class_values=class_values) for x in val_graphs]
-        test_graphs = [nx_to_DGLGraph(*x, **max_n_label, class_values=class_values) for x in test_graphs]
-    
     return train_graphs, val_graphs, test_graphs
 
 
-def subgraph_extraction_labeling(ind, A, h=1, max_node_label=3, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
+def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
     # extract the h-hop enclosing subgraph around link 'ind'
     dist = 0
     u_nodes, v_nodes = [ind[0]], [ind[1]]
     u_dist, v_dist = [0], [0]
     u_visited, v_visited = set([ind[0]]), set([ind[1]])
     u_fringe, v_fringe = set([ind[0]]), set([ind[1]])
+
     for dist in range(1, h+1):
         v_fringe, u_fringe = neighbors(u_fringe, A, True), neighbors(v_fringe, A, False)
         u_fringe = u_fringe - u_visited
@@ -666,6 +666,7 @@ def subgraph_extraction_labeling(ind, A, h=1, max_node_label=3, sample_ratio=1.0
         v_dist = v_dist + [dist] * len(v_fringe)
 
     subgraph = A[u_nodes, :][:, v_nodes]
+
     # remove link between target nodes
     subgraph[0, 0] = 0
     u, v, r = ssp.find(subgraph)
@@ -675,28 +676,28 @@ def subgraph_extraction_labeling(ind, A, h=1, max_node_label=3, sample_ratio=1.0
     # v nodes start after u
     rating_graphs = []
     num_user, num_movie = A.shape
+    
+    subgraph_info = {'g_label': g_label}
+
     for rating in class_values:
         ridx = np.where(r == rating)
         rrow = u[ridx]
         rcol = v[ridx]
         rating = str(rating).replace('.', '_')
-        bg = dgl.bipartite((rrow, rcol), 'user', rating, 'movie',
-                           num_nodes=(len(u_nodes), len(v_nodes)))
-        rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
-                           num_nodes=(len(v_nodes), len(u_nodes)))
-        rating_graphs.append(bg)
-        rating_graphs.append(rev_bg)
-
-    graph = dgl.hetero_from_relations(rating_graphs)
+        subgraph_info[('user', rating, 'movie')]= (rrow, rcol)
 
     # get structural node labels
+    # NOTE: only use subgraph here
     u_node_labels = [x*2 for x in u_dist]
     v_node_labels = [x*2+1 for x in v_dist]
+    u_x = one_hot(u_node_labels, max_node_label+1)
+    v_x = one_hot(v_node_labels, max_node_label+1)
+ 
+    subgraph_info['u'] = u_x
+    subgraph_info['v'] = v_x
+    return subgraph_info
 
-    # node feature are one_hot subnodeid embedding
-    u_x = th.FloatTensor(one_hot(u_node_labels, max_node_label+1))
-    v_x = th.FloatTensor(one_hot(v_node_labels, max_node_label+1))
-    
+   
     '''
     # get node features
     if u_features is not None:
@@ -723,15 +724,14 @@ def subgraph_extraction_labeling(ind, A, h=1, max_node_label=3, sample_ratio=1.0
         if u_features is not None and v_features is not None:
             node_features = [u_features[0], v_features[0]]
     '''
-    graph.nodes['user'].data['x'] = u_x
-    graph.nodes['movie'].data['x'] = v_x
-
-    return graph
+    #graph.nodes['user'].data['x'] = u_x
+    #graph.nodes['movie'].data['x'] = v_x
 
 
-def parallel_worker(g_label, ind, A, h=1, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
-    g = subgraph_extraction_labeling(ind, A, h, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values)
-    return g_label, g
+
+def parallel_worker(g_label, ind, A, h=1, max_node_label=3, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
+    g = subgraph_extraction_labeling(g_label, ind, A, h, max_node_label, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values)
+    return g
 
 
 def neighbors(fringe, A, row=True):
@@ -741,7 +741,7 @@ def neighbors(fringe, A, row=True):
         if row:
             _, nei, _ = ssp.find(A[node, :])
         else:
-            nei, _, _ = ssp.find(A[:, node])
+            _, nei, _ = ssp.find(A[:, node])
         nei = set(nei)
         res = res.union(nei)
     return res
