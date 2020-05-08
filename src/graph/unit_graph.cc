@@ -645,6 +645,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const override {
     // TODO(minjie): This still assumes the data type and device context
     //   of this graph. Should fix later.
+    CHECK_EQ(NumBits(), 64);
     const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
     const dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
     const dgl_id_t start = indptr_data[vid];
@@ -652,9 +653,20 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return DGLIdIters(indices_data + start, indices_data + end);
   }
 
+  DGLIdIters32 SuccVec32(dgl_type_t etype, dgl_id_t vid) {
+    // TODO(minjie): This still assumes the data type and device context
+    //   of this graph. Should fix later.
+    const int32_t* indptr_data = static_cast<int32_t*>(adj_.indptr->data);
+    const int32_t* indices_data = static_cast<int32_t*>(adj_.indices->data);
+    const int32_t start = indptr_data[vid];
+    const int32_t end = indptr_data[vid + 1];
+    return DGLIdIters32(indices_data + start, indices_data + end);
+  }
+
   DGLIdIters OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const override {
     // TODO(minjie): This still assumes the data type and device context
     //   of this graph. Should fix later.
+    CHECK_EQ(NumBits(), 64);
     const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
     const dgl_id_t* eid_data = static_cast<dgl_id_t*>(adj_.data->data);
     const dgl_id_t start = indptr_data[vid];
@@ -949,6 +961,13 @@ DGLIdIters UnitGraph::SuccVec(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   const auto ptr = GetFormat(fmt);
   return ptr->SuccVec(etype, vid);
+}
+
+DGLIdIters32 UnitGraph::SuccVec32(dgl_type_t etype, dgl_id_t vid) const {
+  SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
+  const auto ptr = std::dynamic_pointer_cast<CSR>(GetFormat(fmt));
+  CHECK_NOTNULL(ptr);
+  return ptr->SuccVec32(etype, vid);
 }
 
 DGLIdIters UnitGraph::OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
