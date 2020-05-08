@@ -24,6 +24,7 @@ namespace dgl {
 
 typedef uint64_t dgl_id_t;
 typedef uint64_t dgl_type_t;
+typedef uint8_t dgl_format_code_t;
 
 using dgl::runtime::NDArray;
 

@@ -914,8 +914,7 @@ class HeteroGraphIndex(ObjectBase):
         -------
         list of string : return all the formats currently in use (could be multiple).
         """
-        ret = _CAPI_DGLHeteroGetFormatInUse(self, etype)
-        return ret
+        return _CAPI_DGLHeteroGetFormatInUse(self, etype)
 
     def restrict_format(self, etype):
         """Return restrict sparse format of the given edge/relation type.
@@ -933,9 +932,10 @@ class HeteroGraphIndex(ObjectBase):
         return ret
 
     def to_format(self, etype):
-        """Return a clone graph but stored in the given sparse format.
+        """Return a clone graph index but stored in the given sparse format.
 
-        If 'any' is given, the restrict formats of the returned graph is relaxed.
+        If 'any' is given, the restrict formats of the returned graph index
+        is relaxed.
 
         Parameters
         ----------
@@ -946,7 +946,7 @@ class HeteroGraphIndex(ObjectBase):
         -------------
         A new graph index.
         """
-        return  _CAPI_DGLHeteroSetSparseFormat(self, etype, 'any')
+        return _CAPI_DGLHeteroGetFormatGraph(self, etype)
 
 
 @register_object('graph.HeteroSubgraph')

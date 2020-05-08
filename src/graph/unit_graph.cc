@@ -1221,7 +1221,7 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
 
 UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
   if (restrict_format_ != SparseFormat::kAny && restrict_format_ != SparseFormat::kCSC)
-    LOG(FATAL) << "The graph have restricted sparse format " << GetSparseFormat() <<
+    LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
       ", cannot create CSC matrix.";
   if (!in_csr_) {
     if (out_csr_) {
@@ -1241,7 +1241,7 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
   if (restrict_format_ != SparseFormat::kAny && restrict_format_ != SparseFormat::kCSR)
-    LOG(FATAL) << "The graph have restricted sparse format " << GetSparseFormat() <<
+    LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
       ", cannot create CSR matrix.";
   if (!out_csr_) {
     if (in_csr_) {
@@ -1259,7 +1259,7 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
 /* !\brief Return coo. If not exist, create from csr.*/
 UnitGraph::COOPtr UnitGraph::GetCOO() const {
   if (restrict_format_ != SparseFormat::kAny && restrict_format_ != SparseFormat::kCOO)
-    LOG(FATAL) << "The graph have restricted sparse format " << GetSparseFormat() <<
+    LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
       ", cannot create COO matrix.";
   if (!coo_) {
     if (in_csr_) {
@@ -1296,11 +1296,22 @@ HeteroGraphPtr UnitGraph::GetAny() const {
   }
 }
 
+dgl_format_code_t UnitGraph::GetFormatInUse() const {
+  dgl_format_code_t ret = 0;
+  if (in_csr_) ret = ret | 1;
+  ret = ret << 1;
+  if (out_csr_) ret = ret | 1;
+  ret = ret << 1;
+  if (coo_) ret = ret | 1;
+  ret = ret << 1;
+  return ret;
+}
+
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
   if (restrict_format_ != SparseFormat::kAny && format != restrict_format_) {
-    LOG(FATAL) << "The graph have sparse format " << GetSparseFormat() <<
+    LOG(FATAL) << "The graph have sparse format " << GetRestrictFormat() <<
       ", different from the requested format " << ToStringSparseFormat(format) <<
-      ". Please try enabling `any` sparse format by calling to_any_sparse_format";
+      ". Please try enabling `any` sparse format by calling to_format";
     return nullptr;
   }
   switch (format) {
