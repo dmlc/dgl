@@ -96,8 +96,8 @@ class GraphPartitionBook:
         Examples
         --------
         >>> print(g.get_partition_book().metadata())
-        >>> [{'machine_id' : 0, 'ip': '192.168.8.12', 'num_nodes' : 3000, 'num_edges' : 5000},
-        ...  {'machine_id' : 1, 'ip': '192.168.8.13', 'num_nodes' : 2000, 'num_edges' : 4888},
+        >>> [{'machine_id' : 0, 'num_nodes' : 3000, 'num_edges' : 5000},
+        ...  {'machine_id' : 1, 'num_nodes' : 2000, 'num_edges' : 4888},
         ...  ...]
 
         Returns
