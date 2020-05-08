@@ -299,55 +299,6 @@ def reaction_center_prediction(device, model, mol_graphs, complete_graphs):
 
     return model(mol_graphs, complete_graphs, node_feats, edge_feats, node_pair_feats)
 
-def reaction_center_rough_eval(complete_graphs, preds, labels, num_correct):
-    batch_size = complete_graphs.batch_size
-    start = 0
-    for i in range(batch_size):
-        end = start + complete_graphs.batch_num_edges[i]
-        preds_i = preds[start:end, :].flatten()
-        labels_i = labels[start:end, :].flatten()
-        for k in num_correct.keys():
-            topk_values, topk_indices = torch.topk(preds_i, k)
-            is_correct = labels_i[topk_indices].sum() == labels_i.sum().float().cpu().data.item()
-            num_correct[k].append(is_correct)
-        start = end
-
-def reaction_center_rough_eval_on_a_loader(args, model, data_loader):
-    """A rough evaluation of model performance in the middle of training.
-
-    For final evaluation, we will eliminate some possibilities based on prior knowledge.
-
-    Parameters
-    ----------
-    args : dict
-        Configurations fot the experiment.
-    model : nn.Module
-        Model for reaction center prediction.
-    data_loader : torch.utils.data.DataLoader
-        Loader for fetching and batching data.
-
-    Returns
-    -------
-    str
-        Message for evluation result.
-    """
-    model.eval()
-    num_correct = {k: [] for k in args['top_ks']}
-    for batch_id, batch_data in enumerate(data_loader):
-        batch_reactions, batch_graph_edits, batch_mol_graphs, \
-        batch_complete_graphs, batch_atom_pair_labels = batch_data
-        with torch.no_grad():
-            pred, biased_pred = reaction_center_prediction(
-                args['device'], model, batch_mol_graphs, batch_complete_graphs)
-        reaction_center_rough_eval(
-            batch_complete_graphs, biased_pred, batch_atom_pair_labels, num_correct)
-
-    msg = '|'
-    for k, correct_count in num_correct.items():
-        msg += ' acc@{:d} {:.4f} |'.format(k, np.mean(correct_count))
-
-    return msg + '\n'
-
 bond_change_to_id = {0.0: 0, 1:1, 2:2, 3:3, 1.5:4}
 id_to_bond_change = {v: k for k, v in bond_change_to_id.items()}
 num_change_types = len(bond_change_to_id)

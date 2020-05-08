@@ -9,7 +9,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from utils import collate_center, reaction_center_prediction, \
-    reaction_center_rough_eval_on_a_loader, mkdir_p, set_seed, synchronize, get_center_subset, \
+    reaction_center_final_eval, mkdir_p, set_seed, synchronize, get_center_subset, \
     count_parameters
 
 def load_dataset(args):
@@ -53,6 +53,7 @@ def main(rank, dev_id, args):
                               node_out_feats=args['node_out_feats'],
                               n_layers=args['n_layers'],
                               n_tasks=args['n_tasks']).to(args['device'])
+    model.train()
     if rank == 0:
         print('# trainable parameters in the model: ', count_parameters(model))
 
@@ -73,7 +74,6 @@ def main(rank, dev_id, args):
     dur = []
 
     for epoch in range(args['num_epochs']):
-        model.train()
         t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += args['num_devices']
@@ -104,14 +104,16 @@ def main(rank, dev_id, args):
                     dur.append(time.time() - t0)
                     print('Training time per {:d} iterations: {:.4f}'.format(
                         rank_iter, np.mean(dur)))
-                prediction_summary = 'Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
-                      reaction_center_rough_eval_on_a_loader(args, model, val_loader)
+                prediction_summary = 'total iter {:d}, (epoch {:d}/{:d}, iter {:d}/{:d}) '.format(
+                    total_iter, epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader)) + \
+                      reaction_center_final_eval(args, model, val_loader, easy=True)
                 print(prediction_summary)
                 with open(args['result_path'] + '/val_eval.txt', 'a') as f:
                     f.write(prediction_summary)
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model_{:d}.pkl'.format(total_iter))
                 t0 = time.time()
+                model.train()
         synchronize(args['num_devices'])
 
 def run(rank, dev_id, args):
