@@ -4102,14 +4102,24 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-    def sparse_format(self, etype=None):
-        """Return sparse format of the given edge/relation type.
+    def format(self, etype=None, return_all=False):
+        """Return the sparse formats in use of the given edge/relation type.
 
-        Parameters
-        ----------
-        etype : str, optional
-            The edge/relation type. Can be omitted if there is only
-            one node type in the graph. (Default: None)
+        Returns
+        -------
+        string or list of string
+            If return_all is True, return all the formats currently in use (could be multiple).
+            Otherwise, return any one that is in use.
+
+        See Also
+        --------
+        restrict_format
+        to_format
+        """
+        return self._graph.format(self.get_etype_id(etype))
+
+    def restrict_format(self, etype=None):
+        """Return the allowed sparse formats of the given edge/relation type.
 
         Returns
         -------
@@ -4117,16 +4127,26 @@ class DGLHeteroGraph(object):
 
         See Also
         --------
-        to_any_sparse_format
+        format
+        to_format
         """
-        return self._graph.sparse_format(self.get_etype_id(etype))
+        return self._graph.restrict_format(self.get_etype_id(etype))
 
-    def to_any_sparse_format(self, etype=None):
-        """Cast the sparse format of this hetero graph index
-        to `any` so that more efficient message-passing would be
-        supported.
+    def to_format(self, format, etype=None):
+        """Return a clone graph but stored in the given sparse format.
+
+        If 'any' is given, the restrict formats of the returned graph is relaxed.
+
+        Parameters
+        -------------
+        A new graph.
+
+        See Also
+        --------
+        format
+        restrict_format
         """
-        self._graph.to_any_sparse_format(self.get_etype_id(etype))
+        pass
 
 ############################################################
 # Internal APIs

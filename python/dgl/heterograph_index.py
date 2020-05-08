@@ -908,8 +908,23 @@ class HeteroGraphIndex(ObjectBase):
         rev_order = rev_csr(2)
         return utils.toindex(order), utils.toindex(rev_order)
 
-    def sparse_format(self, etype):
-        """Return sparse format of the given edge/relation type.
+    def format(self, etype):
+        """Return the sparse formats in use of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+
+        Returns
+        -------
+        list of string : return all the formats currently in use (could be multiple).
+        """
+        ret = _CAPI_DGLHeteroGetFormatInUse(self, etype)
+        return ret
+
+    def restrict_format(self, etype):
+        """Return restrict sparse format of the given edge/relation type.
 
         Parameters
         ----------
@@ -920,18 +935,24 @@ class HeteroGraphIndex(ObjectBase):
         -------
         string : 'any', 'coo', 'csr', or 'csc'
         """
-        ret = _CAPI_DGLHeteroGetSparseFormat(self, etype)
+        ret = _CAPI_DGLHeteroGetRestrictFormat(self, etype)
         return ret
 
-    def to_any_sparse_format(self, etype):
-        """Cast the sparse format of this hetero graph index to `any`.
+    def to_format(self, etype):
+        """Return a clone graph but stored in the given sparse format.
+
+        If 'any' is given, the restrict formats of the returned graph is relaxed.
 
         Parameters
         ----------
         etype : int
             The edge/relation type.
+
+        Parameters
+        -------------
+        A new graph index.
         """
-        _CAPI_DGLHeteroSetSparseFormat(self, etype, 'any')
+        return  _CAPI_DGLHeteroSetSparseFormat(self, etype, 'any')
 
 
 @register_object('graph.HeteroSubgraph')
