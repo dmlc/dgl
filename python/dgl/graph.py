@@ -4144,7 +4144,13 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     unbatch
     """
     if len(graph_list) == 1:
-        return graph_list[0]
+        # Need to deepcopy the node/edge frame of original graph.
+        graph = graph_list[0]
+        return DGLGraph(graph_data=graph._graph,
+                        node_frame=graph._node_frame.deepclone(),
+                        edge_frame=graph._edge_frame.deepclone(),
+                        batch_num_nodes=graph.batch_num_nodes,
+                        batch_num_edges=graph.batch_num_edges)
 
     def _init_attrs(attrs, mode):
         """Collect attributes of given mode (node/edge) from graph_list.
@@ -4263,7 +4269,10 @@ def unbatch(graph):
     batch
     """
     if graph.batch_size == 1:
-        return [graph]
+        # Like dgl.batch, unbatch also deep copies data frame.
+        return [DGLGraph(graph_data=graph._graph,
+                         node_frame=graph._node_frame.deepclone(),
+                         edge_frame=graph._edge_frame.deepclone())]
 
     bsize = graph.batch_size
     bnn = graph.batch_num_nodes
