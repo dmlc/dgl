@@ -350,61 +350,107 @@ def build_heterograph_from_triplets(num_nodes, num_rels, edge_lists, reverse=Tru
     dst = []
     raw_subg = {}
     raw_subg_eset = {}
+    raw_subg_etype = {}
     raw_reverse_sugb = {}
+    raw_reverse_subg_etype = {}
     print(num_rels)
 
     # here there is noly one node type
     s_type = "node"
     d_type = "node"
-    edge_list = np.concatenate(edge_lists)
-    print(len(edge_list))
 
-    for edge in edge_list:
-        s, r, d = edge
-        r_type = str(r)
-        e_type = (s_type, r_type, d_type)
+    setype = 0
+    for edge_list in edge_lists:
+        for edge in edge_list:
+            s, r, d = edge
+            assert r < num_rels
+            r_type = str(r)
+            e_type = (s_type, r_type, d_type)
 
-        if raw_subg.get(e_type, None) is None:
-            raw_subg[e_type] = ([], [])
-        raw_subg[e_type][0].append(s)
-        raw_subg[e_type][1].append(d)
+            if raw_subg.get(e_type, None) is None:
+                raw_subg[e_type] = ([], [])
+                raw_subg_eset[e_type] = []
+                raw_subg_etype[e_type] = []
+            raw_subg[e_type][0].append(s)
+            raw_subg[e_type][1].append(d)
+            raw_subg_eset[e_type].append(setype)
+            raw_subg_etype[e_type].append(r)
 
-        if reverse is True:
-            r_type = str(r + num_rels)
-            re_type = (d_type, r_type, s_type)
-            if raw_reverse_sugb.get(re_type, None) is None:
-                raw_reverse_sugb[re_type] = ([], [])
-            raw_reverse_sugb[re_type][0].append(d)
-            raw_reverse_sugb[re_type][1].append(s)
+            if reverse is True:
+                r_type = str(r + num_rels)
+                re_type = (d_type, r_type, s_type)
+                if raw_reverse_sugb.get(re_type, None) is None:
+                    raw_reverse_sugb[re_type] = ([], [])
+                    raw_reverse_subg_etype[re_type] = []
+                raw_reverse_sugb[re_type][0].append(d)
+                raw_reverse_sugb[re_type][1].append(s)
+                raw_reverse_subg_etype[re_type].append(r + num_rels)
+        setype += 1
 
     subg = []
+    fg_s = []
+    fg_d = []
+    fg_etype = []
+    fg_settype = []
     for e_type, val in raw_subg.items():
-        s_type, r_type, d_type = e_type
         s, d = val
         s = np.asarray(s)
         d = np.asarray(d)
+        etype = raw_subg_etype[e_type]
+        etype = torch.tensor(etype).long()
+        settype = raw_subg_eset[e_type]
+        settype = torch.tensor(settype).long()
 
-        sg = dgl.graph((s, d),
-                        s_type,
-                        r_type,
-                        num_nodes=num_nodes)
-        sg.edata['']
-
-        subg.append(dgl.graph((s, d),
-                              s_type,
-                              r_type,
-                              num_nodes=num_nodes))
+        fg_s.append(s)
+        fg_d.append(d)
+        fg_etype.append(etype)
+        fg_settype.append(settype)
 
     for e_type, val in raw_reverse_sugb.items():
         s_type, r_type, d_type = e_type
         s, d = val
         s = np.asarray(s)
         d = np.asarray(d)
+        etype = raw_reverse_subg_etype[e_type]
+        etype = torch.tensor(etype).long()
+        settype = torch.full((s.shape[0],), -1).long()
 
-        subg.append(dgl.graph((s, d),
-                              s_type,
-                              r_type,
-                              num_nodes=num_nodes))
-    g = dgl.hetero_from_relations(subg)
+        fg_s.append(s)
+        fg_d.append(d)
+        fg_etype.append(etype)
+        fg_settype.append(settype)
 
+    s = np.concatenate(fg_s)
+    d = np.concatenate(fg_d)
+    g = dgl.graph((s, d), num_nodes=num_nodes)
+    g.edata['etype'] = torch.cat(fg_etype)
+    g.edata['set'] = torch.cat(fg_settype)
+    g.ndata['ntype'] = torch.full((num_nodes,), 0)
     return g
+
+# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
+# is necessary to make fork() and openmp work together.
+def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = Queue()
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+    return decorated_function

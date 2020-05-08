@@ -9,6 +9,7 @@ Difference compared to tkipf/relation-gcn
 """
 
 import argparse
+import itertools
 import numpy as np
 import time
 import torch as th
@@ -29,8 +30,8 @@ class LinkPredict(nn.Module):
     def __init__(self,
                  device,
                  h_dim,
-                 num_train_rels,
                  num_rels,
+                 edge_rels,
                  num_bases=-1,
                  num_hidden_layers=1,
                  dropout=0,
@@ -40,6 +41,7 @@ class LinkPredict(nn.Module):
         self.device = device
         self.h_dim = h_dim
         self.num_rels = num_rels
+        self.edge_rels = edge_rels
         self.num_bases = None if num_bases < 0 else num_bases
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
@@ -52,13 +54,13 @@ class LinkPredict(nn.Module):
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConvLayer(
-            self.h_dim, self.h_dim, self.num_rels, "basis",
+            self.h_dim, self.h_dim, self.edge_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
             dropout=self.dropout))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConvLayer(
-                self.h_dim, self.h_dim, self.num_rels, "basis",
+                self.h_dim, self.h_dim, self.edge_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
                 dropout=self.dropout))
 
@@ -76,7 +78,7 @@ class LinkPredict(nn.Module):
         head, tail, eid = p_g.all_edges(form='all')
         p_head_emb = p_h[head]
         p_tail_emb = p_h[tail]
-        rids = p_g.edata[dgl.ETYPE]
+        rids = p_g.edata['etype']
         head, tail = n_g.all_edges()
         n_head_emb = n_h[head]
         n_tail_emb = n_h[tail]
@@ -146,9 +148,10 @@ class LinkPredict(nn.Module):
         return predict_loss + self.regularization_coef * reg_loss
 
 class LinkRankSampler:
-    def __init__(self, g, num_edges, num_neg, fanouts, 
+    def __init__(self, g, neg_edges, num_edges, num_neg, fanouts, 
         is_train=True, keep_pos_edges=False):
         self.g = g
+        self.neg_edges = neg_edges
         self.num_edges = num_edges
         self.num_neg = num_neg
         self.fanouts = fanouts
@@ -160,8 +163,10 @@ class LinkRankSampler:
         bsize = pseeds.shape[0]
         if self.num_neg is not None:
             nseeds = th.randint(self.num_edges, (self.num_neg,))
+            nseeds = self.neg_edges[nseeds]
         else:
             nseeds = th.randint(self.num_edges, (bsize,))
+            nseeds = self.neg_edges[nseeds]
 
         g = self.g
         fanouts = self.fanouts
@@ -171,11 +176,10 @@ class LinkRankSampler:
 
         p_g = dgl.compact_graphs(p_subg)
         n_g = dgl.compact_graphs(n_subg)
-        p_g.edata[dgl.ETYPE] = g.edata[dgl.ETYPE][p_subg.edata[dgl.EID]]
+        p_g.edata['etype'] = g.edata['etype'][p_subg.edata[dgl.EID]]
 
-        assert len(g.ntypes) == 1
-        pg_seed = p_g.ndata[dgl.NID]
-        ng_seed = n_g.ndata[dgl.NID]
+        pg_seed = p_subg.ndata[dgl.NID][p_g.ndata[dgl.NID]]
+        ng_seed = n_subg.ndata[dgl.NID][n_g.ndata[dgl.NID]]
 
         p_blocks = []
         n_blocks = []
@@ -189,20 +193,21 @@ class LinkRankSampler:
                 p_frontier = dgl.sampling.sample_neighbors(g, p_curr, fanout)
                 n_frontier = dgl.sampling.sample_neighbors(g, n_curr, fanout)
 
+            '''
             if self.keep_pos_edges is False and \
                 self.is_train and i == 0:
                 old_frontier = p_frontier
                 p_frontier = dgl.remove_edges(old_frontier, pseeds)
-
-            p_etypes = g.edata[dgl.ETYPE][p_frontier.edata[dgl.EID]]
+            '''
+            p_etypes = g.edata['etype'][p_frontier.edata[dgl.EID]]
             # print(p_etypes)
-            n_etypes = g.edata[dgl.ETYPE][n_frontier.edata[dgl.EID]]
+            n_etypes = g.edata['etype'][n_frontier.edata[dgl.EID]]
             p_norm = g.edata['norm'][p_frontier.edata[dgl.EID]]
             n_norm = g.edata['norm'][n_frontier.edata[dgl.EID]]
             p_block = dgl.to_block(p_frontier, p_curr)
             n_block = dgl.to_block(n_frontier, n_curr)
-            p_block.srcdata[dgl.NTYPE] = g.ndata[dgl.NTYPE][p_block.srcdata[dgl.NID]]
-            n_block.srcdata[dgl.NTYPE] = g.ndata[dgl.NTYPE][n_block.srcdata[dgl.NID]]
+            p_block.srcdata['ntype'] = g.ndata['ntype'][p_block.srcdata[dgl.NID]]
+            n_block.srcdata['ntype'] = g.ndata['ntype'][n_block.srcdata[dgl.NID]]
             p_block.edata['etype'] = p_etypes
             n_block.edata['etype'] = n_etypes
             p_block.edata['norm'] = p_norm
@@ -219,48 +224,49 @@ def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt):
     model.eval()
     t0 = time.time()
 
-    for i, sample_data in enumerate(dataloader):
-        bsize, p_g, n_g, p_blocks, n_blocks = sample_data
-        p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID],
-                              p_blocks[0].srcdata[dgl.NTYPE],
-                              node_feats)
-        n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID],
-                              n_blocks[0].srcdata[dgl.NTYPE],
-                              node_feats)
-        p_head_emb, p_tail_emb, rids, n_head_emb, n_tail_emb = \
-            model(p_blocks, n_blocks, p_feats, n_feats, p_g, n_g)
+    with th.no_grad():
+        for i, sample_data in enumerate(dataloader):
+            bsize, p_g, n_g, p_blocks, n_blocks = sample_data
+            p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID],
+                                p_blocks[0].srcdata['ntype'],
+                                node_feats)
+            n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID],
+                                n_blocks[0].srcdata['ntype'],
+                                node_feats)
+            p_head_emb, p_tail_emb, rids, n_head_emb, n_tail_emb = \
+                model(p_blocks, n_blocks, p_feats, n_feats, p_g, n_g)
 
-        pos_score = model.calc_pos_score(p_head_emb, p_tail_emb, rids)
-        t_neg_score = model.calc_neg_tail_score(p_head_emb,
-                                                n_tail_emb,
-                                                rids,
-                                                1,
-                                                bsize,
-                                                neg_cnt)
-        h_neg_score = model.calc_neg_head_score(n_head_emb,
-                                                p_tail_emb,
-                                                rids,
-                                                1,
-                                                bsize,
-                                                neg_cnt)
-        pos_scores = F.logsigmoid(pos_score).reshape(bsize, -1)
-        t_neg_score = F.logsigmoid(t_neg_score).reshape(bsize, neg_cnt)
-        h_neg_score = F.logsigmoid(h_neg_score).reshape(bsize, neg_cnt)
-        neg_scores = th.cat([h_neg_score, t_neg_score], dim=1)
-        rankings = th.sum(neg_scores >= pos_scores, dim=1) + 1
-        rankings = rankings.cpu().detach().numpy()
-        for idx in range(bsize):
-            ranking = rankings[idx]
-            logs.append({
-                'MRR': 1.0 / ranking,
-                'MR': float(ranking),
-                'HITS@1': 1.0 if ranking <= 1 else 0.0,
-                'HITS@3': 1.0 if ranking <= 3 else 0.0,
-                'HITS@10': 1.0 if ranking <= 10 else 0.0
-            })
-        if i % 100 == 0:
-            t1 = time.time()
-            print("Eval {} samples takes {} seconds".format(i * bsize, t1 - t0))
+            pos_score = model.calc_pos_score(p_head_emb, p_tail_emb, rids)
+            t_neg_score = model.calc_neg_tail_score(p_head_emb,
+                                                    n_tail_emb,
+                                                    rids,
+                                                    1,
+                                                    bsize,
+                                                    neg_cnt)
+            h_neg_score = model.calc_neg_head_score(n_head_emb,
+                                                    p_tail_emb,
+                                                    rids,
+                                                    1,
+                                                    bsize,
+                                                    neg_cnt)
+            pos_scores = F.logsigmoid(pos_score).reshape(bsize, -1)
+            t_neg_score = F.logsigmoid(t_neg_score).reshape(bsize, neg_cnt)
+            h_neg_score = F.logsigmoid(h_neg_score).reshape(bsize, neg_cnt)
+            neg_scores = th.cat([h_neg_score, t_neg_score], dim=1)
+            rankings = th.sum(neg_scores >= pos_scores, dim=1) + 1
+            rankings = rankings.cpu().detach().numpy()
+            for idx in range(bsize):
+                ranking = rankings[idx]
+                logs.append({
+                    'MRR': 1.0 / ranking,
+                    'MR': float(ranking),
+                    'HITS@1': 1.0 if ranking <= 1 else 0.0,
+                    'HITS@3': 1.0 if ranking <= 3 else 0.0,
+                    'HITS@10': 1.0 if ranking <= 10 else 0.0
+                })
+
+    t1 = time.time()
+    print("Eval {} samples takes {} seconds".format(i * bsize, t1 - t0))
 
     metrics = {}
     for metric in logs[0].keys():
@@ -276,17 +282,14 @@ def main(args):
         data = load_data(args.dataset)
         num_nodes = data.num_nodes
         num_rels = data.num_rels
+        edge_rels = num_rels * 2 # we add reverse edges
         train_data = data.train
         valid_data = data.valid
         test_data = data.test
 
-        train_hg = build_heterograph_from_triplets(num_nodes, num_rels, [train_data])
-        valid_hg = build_heterograph_from_triplets(num_nodes, num_rels, [train_data, valid_data])
-        test_hg = build_heterograph_from_triplets(num_nodes, num_rels, [train_data, valid_data, test_data])
-
-        train_data = train_data.transpose()
-        valid_data = valid_data.transpose()
-        test_data = test_data.transpose()
+        train_g = build_heterograph_from_triplets(num_nodes, num_rels, [train_data])
+        valid_g = build_heterograph_from_triplets(num_nodes, num_rels, [train_data, valid_data])
+        test_g = build_heterograph_from_triplets(num_nodes, num_rels, [train_data, valid_data, test_data])
 
     device = th.device(args.gpu) if args.gpu >= 0 else th.device('cpu')
     batch_size = args.batch_size
@@ -294,47 +297,77 @@ def main(args):
     valid_batch_size = args.valid_batch_size
     fanouts = [args.fanout if args.fanout > 0 else None] * args.n_layers
 
-    # As we may add reserve edges, these edges will not be the seeds
-    if len(train_data) == 3:
-
-    # calculate norm for each edge type and store in edge
-    for canonical_etypes in train_hg.canonical_etypes:
-        
-        u, v, eid = train_hg.all_edges(form='all', etype=canonical_etypes)
-        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    u, v, eid = train_g.all_edges(form='all')
+    train_seed_idx = (train_g.edata['set'] == 0)
+    train_seeds = eid[train_seed_idx]
+    train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+    '''
+    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    degrees = count[inverse_index]
+    norm = th.ones(eid.shape[0]) / degrees
+    norm = norm.unsqueeze(1)
+    train_g.edata['norm'] = norm
+    '''
+    for rel_id in range(edge_rels):
+        idx = (train_g.edata['etype'] == rel_id)
+        u_r = u[idx]
+        v_r = v[idx]
+        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        norm = th.ones(eid.shape[0]) / degrees
+        norm = th.ones(v_r.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        train_hg.edges[canonical_etypes].data['norm'] = norm
+        train_g.edata['norm'][idx] = norm
 
-    for canonical_etypes in valid_hg.canonical_etypes:
-        u, v, eid = valid_hg.all_edges(form='all', etype=canonical_etypes)
-        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    u, v, eid = valid_g.all_edges(form='all')
+    valid_seeds = eid[valid_g.edata['set'] == 1]
+    valid_neg_seeds = eid[valid_g.edata['set'] > -1]
+    valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+    '''
+    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    degrees = count[inverse_index]
+    norm = th.ones(eid.shape[0]) / degrees
+    norm = norm.unsqueeze(1)
+    valid_g.edata['norm'] = norm
+    '''
+    for rel_id in range(edge_rels):
+        idx = (valid_g.edata['etype'] == rel_id)
+        u_r = u[idx]
+        v_r = v[idx]
+        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        norm = th.ones(eid.shape[0]) / degrees
+        norm = th.ones(v_r.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        valid_hg.edges[canonical_etypes].data['norm'] = norm
+        valid_g.edata['norm'][idx] = norm
+    
 
-    for canonical_etypes in test_hg.canonical_etypes:
-        u, v, eid = test_hg.all_edges(form='all', etype=canonical_etypes)
-        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    u, v, eid = test_g.all_edges(form='all')
+    test_seeds = eid[test_g.edata['set'] == 2]
+    test_neg_seeds = eid[test_g.edata['set'] > -1]
+    test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+    '''
+    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    degrees = count[inverse_index]
+    norm = th.ones(eid.shape[0]) / degrees
+    norm = norm.unsqueeze(1)
+    test_g.edata['norm'] = norm
+    '''
+    for rel_id in range(edge_rels):
+        idx = (test_g.edata['etype'] == rel_id)
+        u_r = u[idx]
+        v_r = v[idx]
+        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        norm = th.ones(eid.shape[0]) / degrees
+        norm = th.ones(v_r.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        test_hg.edges[canonical_etypes].data['norm'] = norm
-    assert len(train_hg.ntypes) == len(test_hg.ntypes)
-    num_of_ntype = len(test_hg.ntypes)
+        test_g.edata['norm'][idx] = norm
 
-    train_g = dgl.to_homo(train_hg)
-    valid_g = dgl.to_homo(valid_hg)
-    test_g = dgl.to_homo(test_hg)
-    train_u, train_v, train_e = train_g.all_edges(form='all')
-    valid_u, valid_v, valid_e = valid_g.all_edges(form='all')
-    test_u, test_v, test_e = test_g.all_edges(form='all')
-    num_train_edges = train_e.shape[0]
-    num_valid_edges = valid_e.shape[0]
-    num_test_edges = test_e.shape[0]
-    node_tids = test_g.ndata[dgl.NTYPE]
+
+    num_train_edges = train_seeds.shape[0]
+    num_valid_edges = valid_neg_seeds.shape[0]
+    num_test_edges = test_neg_seeds.shape[0]
+    node_tids = test_g.ndata['ntype']
+    num_of_ntype = int(th.max(node_tids).numpy()) + 1
+    print(num_of_ntype)
 
     # check cuda
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
@@ -345,11 +378,8 @@ def main(args):
         valid_g.edata['norm'] = valid_g.edata['norm'].cuda()
         test_g.edata['norm'] = test_g.edata['norm'].cuda()
 
-    train_seeds = th.arange(train_e.shape[0])
-    valid_seeds = th.arange(valid_e.shape[0])
-    test_seeds =  th.arange(test_e.shape[0])
-
     train_sampler = LinkRankSampler(train_g,
+                                    train_seeds,
                                     num_train_edges,
                                     num_neg=None,
                                     fanouts=fanouts)
@@ -361,6 +391,7 @@ def main(args):
                             drop_last=True,
                             num_workers=args.num_workers)
     valid_sampler = LinkRankSampler(valid_g,
+                                    valid_neg_seeds,
                                     num_valid_edges,
                                     num_neg=args.valid_neg_cnt,
                                     fanouts=[None] * args.n_layers,
@@ -380,7 +411,8 @@ def main(args):
     
     model = LinkPredict(device,
                         args.n_hidden,
-                        num_rels * 2,
+                        num_rels,
+                        edge_rels,
                         num_bases=args.n_bases,
                         num_hidden_layers=args.n_layers,
                         dropout=args.dropout,
@@ -391,7 +423,8 @@ def main(args):
         model.cuda(device)
 
     # optimizer
-    optimizer = th.optim.Adam(model.parameters(), lr=args.lr)
+    all_params = itertools.chain(model.parameters(), embed_layer.parameters())
+    optimizer = th.optim.Adam(all_params, lr=args.lr)
     node_feats = [None] * num_of_ntype
 
     print("start training...")
@@ -402,10 +435,10 @@ def main(args):
         for i, sample_data in enumerate(dataloader):
             bsize, p_g, n_g, p_blocks, n_blocks = sample_data
             p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID].to(device),
-                                  p_blocks[0].srcdata[dgl.NTYPE].to(device),
+                                  p_blocks[0].srcdata['ntype'].to(device),
                                   node_feats)
             n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID].to(device),
-                                  n_blocks[0].srcdata[dgl.NTYPE].to(device),
+                                  n_blocks[0].srcdata['ntype'].to(device),
                                   node_feats)
 
             p_head_emb, p_tail_emb, rids, n_head_emb, n_tail_emb = \

@@ -9,6 +9,7 @@ Difference compared to tkipf/relation-gcn
 """
 
 import argparse
+import itertools
 import numpy as np
 import time
 import torch as th
@@ -215,7 +216,8 @@ def main(args):
                              num_workers=0)
 
     # optimizer
-    optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
+    all_params = itertools.chain(model.parameters(), embed_layer.parameters())
+    optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
 
     # training loop
     print("start training...")

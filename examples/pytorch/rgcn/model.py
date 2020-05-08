@@ -263,7 +263,7 @@ class RelGraphEmbedLayer(nn.Module):
         nn.init.xavier_uniform_(none_embed, gain=nn.init.calculate_gain('relu'))
         self.embeds[str(-1)] = none_embed
         for ntype in range(num_of_ntype):
-            if input_size[ntype] is None:
+            if input_size[ntype] is not None:
                 loc = node_tids == ntype
                 input_emb_size = node_tids[loc].shape[0]
                 embed = nn.Parameter(th.Tensor(input_emb_size, self.embed_size))
