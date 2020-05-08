@@ -57,11 +57,11 @@ def train(args):
     print("Loading network finished ...\n")
 
     ### prepare the logger
-    train_loss_logger = MetricLogger(['iter', 'loss', 'rmse'], ['%d', '%.4f', '%.4f'],
+    train_loss_logger = MetricLogger(['epoch', 'iter', 'loss', 'rmse'], ['%d', '%d', '%.4f', '%.4f'],
                                      os.path.join(args.save_dir, 'train_loss%d.csv' % args.save_id))
-    valid_loss_logger = MetricLogger(['iter', 'rmse'], ['%d', '%.4f'],
+    valid_loss_logger = MetricLogger(['epoch', 'rmse'], ['%d', '%.4f'],
                                      os.path.join(args.save_dir, 'valid_loss%d.csv' % args.save_id))
-    test_loss_logger = MetricLogger(['iter', 'rmse'], ['%d', '%.4f'],
+    test_loss_logger = MetricLogger(['epoch', 'rmse'], ['%d', '%.4f'],
                                     os.path.join(args.save_dir, 'test_loss%d.csv' % args.save_id))
 
     ### declare the loss information
@@ -101,7 +101,7 @@ def train(args):
             count_num += pred_ratings.shape[0]
 
             if iter_idx % args.train_log_interval == 0:
-                train_loss_logger.log(iter=iter_idx,
+                train_loss_logger.log(epoch=epoch_idx, iter=iter_idx,
                                       loss=count_loss/(iter_idx+1), rmse=count_rmse/count_num)
                 logging_str = "Iter={}, loss={:.4f}, rmse={:.4f}, time={:.4f}".format(
                     iter_idx, count_loss/count_num, count_rmse/count_num,
@@ -112,12 +112,11 @@ def train(args):
                 count_loss = 0
 
         # save model for each epoch
-        ckpt_path = os.path.join(args.save_dir, 'ckpt_%d.txt' % epoch_idx)
+        ckpt_path = os.path.join(args.save_dir, 'ckpt_%d.pt' % epoch_idx)
         th.save(net.state_dict(), ckpt_path)
 
-
         valid_rmse = evaluate(args=args, net=net, data_iter=val_loader)
-        valid_loss_logger.log(iter = iter_idx, rmse = valid_rmse)
+        valid_loss_logger.log(epoch = epoch_idx, rmse = valid_rmse)
         logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
 
         if valid_rmse < best_valid_rmse:
@@ -126,7 +125,7 @@ def train(args):
             best_iter = iter_idx
             test_rmse = evaluate(args=args, net=net, data_iter=test_loader)
             best_test_rmse = test_rmse
-            test_loss_logger.log(iter=iter_idx, rmse=test_rmse)
+            test_loss_logger.log(epoch=epoch_idx, rmse=test_rmse)
             logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
         else:
             if no_better_valid > args.train_early_stopping_patience\
@@ -171,7 +170,7 @@ def config():
     parser.add_argument('--gcn_out_units', type=int, default=75)
     parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
     parser.add_argument('--train_max_iter', type=int, default=2000)
-    parser.add_argument('--train_log_interval', type=int, default=1)
+    parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--train_valid_interval', type=int, default=1)
     parser.add_argument('--train_optimizer', type=str, default="adam")
     parser.add_argument('--train_grad_clip', type=float, default=1.0)
