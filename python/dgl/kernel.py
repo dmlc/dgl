@@ -136,11 +136,11 @@ def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
         The rows to write to output tensor.
     """
     if A_rows is None:
-        A_rows = nd.NULL
+        A_rows = nd.NULL[G.dtype]
     if B_rows is None:
-        B_rows = nd.NULL
+        B_rows = nd.NULL[G.dtype]
     if out_rows is None:
-        out_rows = nd.NULL
+        out_rows = nd.NULL[G.dtype]
     _CAPI_DGLKernelBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -200,11 +200,11 @@ def backward_lhs_binary_op_reduce(
         The rows written to output tensor.
     """
     if A_rows is None:
-        A_rows = nd.NULL
+        A_rows = nd.NULL[G.dtype]
     if B_rows is None:
-        B_rows = nd.NULL
+        B_rows = nd.NULL[G.dtype]
     if out_rows is None:
-        out_rows = nd.NULL
+        out_rows = nd.NULL[G.dtype]
     _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -265,11 +265,11 @@ def backward_rhs_binary_op_reduce(
         The rows written to output tensor.
     """
     if A_rows is None:
-        A_rows = nd.NULL
+        A_rows = nd.NULL[G.dtype]
     if B_rows is None:
-        B_rows = nd.NULL
+        B_rows = nd.NULL[G.dtype]
     if out_rows is None:
-        out_rows = nd.NULL
+        out_rows = nd.NULL[G.dtype]
     _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -364,9 +364,9 @@ def copy_reduce(reducer, G, target,
         The rows to write to output tensor.
     """
     if X_rows is None:
-        X_rows = nd.NULL
+        X_rows = nd.NULL[G.dtype]
     if out_rows is None:
-        out_rows = nd.NULL
+        out_rows = nd.NULL[G.dtype]
     _CAPI_DGLKernelCopyReduce(
         reducer, G, int(target),
         X, out, X_rows, out_rows)
@@ -406,9 +406,9 @@ def backward_copy_reduce(reducer, G, target,
         The rows written to output tensor.
     """
     if X_rows is None:
-        X_rows = nd.NULL
+        X_rows = nd.NULL[G.dtype]
     if out_rows is None:
-        out_rows = nd.NULL
+        out_rows = nd.NULL[G.dtype]
     _CAPI_DGLKernelBackwardCopyReduce(
         reducer, G, int(target),
         X, out, grad_out, grad_X,
