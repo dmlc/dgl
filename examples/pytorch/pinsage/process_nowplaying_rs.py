@@ -1,5 +1,5 @@
 """
-Script that reads from raw MovieLens-1M data and dumps into a pickle
+Script that reads from raw Nowplaying-RS data and dumps into a pickle
 file a heterogeneous graph with categorical and numeric features.
 """
 
