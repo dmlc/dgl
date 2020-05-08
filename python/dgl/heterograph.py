@@ -1101,7 +1101,7 @@ class DGLHeteroGraph(object):
             th.int32/th.int64 or tf.int32/tf.int64 etc.
         """
         return getattr(F, self._graph.dtype)
-    
+
     @property
     def _idtype_str(self):
         """The dtype of graph index
@@ -1112,7 +1112,7 @@ class DGLHeteroGraph(object):
             th.int32/th.int64 or tf.int32/tf.int64 etc.
         """
         return self._graph.dtype
-    
+
     def has_node(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
 
