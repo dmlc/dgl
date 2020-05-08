@@ -27,7 +27,7 @@ from model import RelGraphEmbedLayer, RelGraphConvLayer
 class EntityClassify(nn.Module):
     def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases,
                  num_hidden_layers=1, dropout=0,
-                 use_self_loop=False, use_cuda=False):
+                 use_self_loop=False):
         super(EntityClassify, self).__init__()
         self.num_nodes = num_nodes
         self.h_dim = h_dim
@@ -37,7 +37,6 @@ class EntityClassify(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_self_loop = use_self_loop
-        self.use_cuda = use_cuda
 
         self.layers = nn.ModuleList()
 
@@ -172,11 +171,11 @@ def main(args):
         node_tids = node_tids.cuda()
         g.edata['norm'] = g.edata['norm'].cuda()
 
-    embed_layer = RelGraphEmbedLayer(g,
-                                    node_tids,
-                                    num_of_ntype,
-                                    [None] * num_of_ntype,
-                                    args.n_hidden)
+    embed_layer = RelGraphEmbedLayer(g.number_of_nodes(),
+                                     node_tids,
+                                     num_of_ntype,
+                                     [None] * num_of_ntype,
+                                     args.n_hidden)
 
     # create model
     model = EntityClassify(g.number_of_nodes(),
@@ -186,8 +185,7 @@ def main(args):
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
-                           use_self_loop=args.use_self_loop,
-                           use_cuda=use_cuda)
+                           use_self_loop=args.use_self_loop)
 
     if use_cuda:
         embed_layer.cuda()

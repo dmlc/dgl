@@ -349,6 +349,8 @@ def build_heterograph_from_triplets(num_nodes, num_rels, edge_lists, reverse=Tru
     rel = []
     dst = []
     raw_subg = {}
+    raw_subg_eset = {}
+    raw_reverse_sugb = {}
     print(num_rels)
 
     # here there is noly one node type
@@ -370,13 +372,30 @@ def build_heterograph_from_triplets(num_nodes, num_rels, edge_lists, reverse=Tru
         if reverse is True:
             r_type = str(r + num_rels)
             re_type = (d_type, r_type, s_type)
-            if raw_subg.get(re_type, None) is None:
-                raw_subg[re_type] = ([], [])
-            raw_subg[re_type][0].append(d)
-            raw_subg[re_type][1].append(s)
+            if raw_reverse_sugb.get(re_type, None) is None:
+                raw_reverse_sugb[re_type] = ([], [])
+            raw_reverse_sugb[re_type][0].append(d)
+            raw_reverse_sugb[re_type][1].append(s)
 
     subg = []
     for e_type, val in raw_subg.items():
+        s_type, r_type, d_type = e_type
+        s, d = val
+        s = np.asarray(s)
+        d = np.asarray(d)
+
+        sg = dgl.graph((s, d),
+                        s_type,
+                        r_type,
+                        num_nodes=num_nodes)
+        sg.edata['']
+
+        subg.append(dgl.graph((s, d),
+                              s_type,
+                              r_type,
+                              num_nodes=num_nodes))
+
+    for e_type, val in raw_reverse_sugb.items():
         s_type, r_type, d_type = e_type
         s, d = val
         s = np.asarray(s)

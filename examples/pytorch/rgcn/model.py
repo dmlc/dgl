@@ -244,26 +244,22 @@ class RelGraphConvLayer(nn.Module):
 class RelGraphEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph."""
     def __init__(self,
-                 g,
+                 num_nodes,
                  node_tids,
                  num_of_ntype,
                  input_size,
                  embed_size,
-                 embed_name='embed',
-                 activation=None,
-                 dropout=0.0):
+                 embed_name='embed'):
         super(RelGraphEmbedLayer, self).__init__()
-        self.g = g
         self.embed_size = embed_size
         self.embed_name = embed_name
-        self.activation = activation
-        self.dropout = nn.Dropout(dropout)
+        self.num_nodes = num_nodes
 
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
         self.num_of_ntype = num_of_ntype
 
-        none_embed = nn.Parameter(th.Tensor(g.number_of_nodes(), self.embed_size))
+        none_embed = nn.Parameter(th.Tensor(num_nodes, self.embed_size))
         nn.init.xavier_uniform_(none_embed, gain=nn.init.calculate_gain('relu'))
         self.embeds[str(-1)] = none_embed
         for ntype in range(num_of_ntype):
@@ -284,7 +280,10 @@ class RelGraphEmbedLayer(nn.Module):
             The block graph fed with embeddings.
         """
         embeds = self.embeds[str(-1)]
-        embeds = embeds[node_ids]
+        # first we get embeddings for transductive nodes
+        tsd_idx = node_ids < embeds.shape[0]
+        tsd_ids = node_ids[tsd_idx]
+        embeds = embeds[tsd_ids]
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
