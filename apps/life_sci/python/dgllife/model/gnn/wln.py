@@ -47,9 +47,7 @@ class WLNLinear(nn.Module):
         stddev = min(1.0 / math.sqrt(self.in_feats), 0.1)
         nn.init.normal_(self.weight, std=stddev)
         if self.bias is not None:
-            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in)
-            nn.init.uniform_(self.bias, -bound, bound)
+            nn.init.constant_(self.bias, 0.0)
 
     def forward(self, feats):
         """Applies the layer.

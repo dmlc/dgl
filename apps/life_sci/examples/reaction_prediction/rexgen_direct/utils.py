@@ -51,6 +51,21 @@ def set_seed(seed=0):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
 
+def count_parameters(model):
+    """Get the number of trainable parameters in the model.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The model
+
+    Returns
+    -------
+    int
+        Number of trainable parameters in the model
+    """
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 def get_center_subset(dataset, subset_id, num_subsets):
     """Get subset for reaction center identification.
 
@@ -331,7 +346,7 @@ def reaction_center_rough_eval_on_a_loader(args, model, data_loader):
     for k, correct_count in num_correct.items():
         msg += ' acc@{:d} {:.4f} |'.format(k, np.mean(correct_count))
 
-    return msg
+    return msg + '\n'
 
 bond_change_to_id = {0.0: 0, 1:1, 2:2, 3:3, 1.5:4}
 id_to_bond_change = {v: k for k, v in bond_change_to_id.items()}

@@ -9,7 +9,8 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from utils import collate_center, reaction_center_prediction, \
-    reaction_center_rough_eval_on_a_loader, mkdir_p, set_seed, synchronize, get_center_subset
+    reaction_center_rough_eval_on_a_loader, mkdir_p, set_seed, synchronize, get_center_subset, \
+    count_parameters
 
 def load_dataset(args):
     if args['train_path'] is None:
@@ -30,7 +31,8 @@ def load_dataset(args):
 def main(rank, dev_id, args):
     set_seed()
     # Remove the line below will result in problems for multiprocess
-    torch.set_num_threads(1)
+    if args['num_devices'] > 1:
+        torch.set_num_threads(1)
     if dev_id == -1:
         args['device'] = torch.device('cpu')
     else:
@@ -51,6 +53,8 @@ def main(rank, dev_id, args):
                               node_out_feats=args['node_out_feats'],
                               n_layers=args['n_layers'],
                               n_tasks=args['n_tasks']).to(args['device'])
+    if rank == 0:
+        print('# trainable parameters in the model: ', count_parameters(model))
 
     criterion = BCEWithLogitsLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
@@ -63,16 +67,17 @@ def main(rank, dev_id, args):
                                           optimizer, max_grad_norm=args['max_norm'])
 
     total_iter = 0
+    rank_iter = 0
     grad_norm_sum = 0
     loss_sum = 0
     dur = []
 
     for epoch in range(args['num_epochs']):
         model.train()
-        if rank == 0 and epoch >= 1:
-            t0 = time.time()
+        t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
-            total_iter += 1
+            total_iter += args['num_devices']
+            rank_iter += 1
 
             batch_reactions, batch_graph_edits, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
@@ -82,10 +87,8 @@ def main(rank, dev_id, args):
             loss = criterion(pred, labels) / len(batch_reactions)
             loss_sum += loss.cpu().detach().data.item()
             grad_norm_sum += optimizer.backward_and_step(loss)
-            if total_iter % (args['decay_every'] // args['num_devices']) == 0:
-                optimizer.decay_lr(args['lr_decay_factor'])
 
-            if total_iter % args['print_every'] == 0 and rank == 0:
+            if rank_iter % args['print_every'] == 0 and rank == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
@@ -94,16 +97,21 @@ def main(rank, dev_id, args):
                 grad_norm_sum = 0
                 loss_sum = 0
 
-            if total_iter % (args['decay_every'] // args['num_devices']) == 0 and rank == 0:
+            if total_iter % args['decay_every'] == 0:
+                optimizer.decay_lr(args['lr_decay_factor'])
+            if total_iter % args['decay_every'] == 0 and rank == 0:
+                if epoch >= 1:
+                    dur.append(time.time() - t0)
+                    print('Training time per {:d} iterations: {:.4f}'.format(
+                        rank_iter, np.mean(dur)))
+                prediction_summary = 'Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
+                      reaction_center_rough_eval_on_a_loader(args, model, val_loader)
+                print(prediction_summary)
+                with open(args['result_path'] + '/val_eval.txt', 'a') as f:
+                    f.write(prediction_summary)
                 torch.save({'model_state_dict': model.state_dict()},
-                           args['result_path'] + '/model.pkl')
-
-        if rank == 0:
-            if epoch >= 1:
-                dur.append(time.time() - t0)
-                print('Training time per epoch: {:.4f}'.format(np.mean(dur)))
-            print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
-                  reaction_center_rough_eval_on_a_loader(args, model, val_loader))
+                           args['result_path'] + '/model_{:d}.pkl'.format(total_iter))
+                t0 = time.time()
         synchronize(args['num_devices'])
 
 def run(rank, dev_id, args):
@@ -112,8 +120,8 @@ def run(rank, dev_id, args):
     torch.distributed.init_process_group(backend="nccl",
                                          init_method=dist_init_method,
                                          world_size=args['num_devices'],
-                                         rank=dev_id)
-    assert torch.distributed.get_rank() == dev_id
+                                         rank=rank)
+    assert torch.distributed.get_rank() == rank
     main(rank, dev_id, args)
 
 if __name__ == '__main__':
