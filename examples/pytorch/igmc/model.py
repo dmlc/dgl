@@ -70,12 +70,15 @@ class IGMC(GNN):
         start = time.time()
         x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
         graph = data.graph
-
+        
+        # Don't drop for now
+        '''
         if self.adj_dropout > 0:
             edge_index, edge_type = dropout_adj(edge_index, edge_type, p=self.adj_dropout, force_undirected=self.force_undirected, num_nodes=len(x), training=self.training)
+        '''
         concat_states = []
         for conv in self.convs:
-            x = torch.tanh(conv(graph, x, dge_type))
+            x = torch.tanh(conv(graph, x, edge_type))
             concat_states.append(x)
         concat_states = torch.cat(concat_states, 1)
 

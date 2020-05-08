@@ -193,10 +193,6 @@ def config():
     parser.add_argument('--train_valid_interval', type=int, default=1)
     parser.add_argument('--train_optimizer', type=str, default="adam")
     parser.add_argument('--train_grad_clip', type=float, default=1.0)
-    parser.add_argument('--train_lr', type=float, default=0.01)
-    parser.add_argument('--train_min_lr', type=float, default=0.001)
-    parser.add_argument('--train_lr_decay_factor', type=float, default=0.5)
-    parser.add_argument('--train_decay_patience', type=int, default=50)
     parser.add_argument('--train_early_stopping_patience', type=int, default=100)
     parser.add_argument('--share_param', default=False, action='store_true')
     # igmc settings
@@ -208,6 +204,12 @@ def config():
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
     parser.add_argument('--use-features', action='store_true', default=False,
                         help='whether to use node features (side information)')
+    parser.add_argument('--train_max_epoch', type=int, default=200)
+    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--train_lr', type=float, default=1e-3)
+    parser.add_argument('--train_min_lr', type=float, default=0.001)
+    parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
+    parser.add_argument('--train_decay_patience', type=int, default=50)
     # edge dropout settings
     parser.add_argument('--adj-dropout', type=float, default=0.2, 
                     help='if not 0, random drops edges from adjacency matrix with this prob')
