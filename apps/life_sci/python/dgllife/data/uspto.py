@@ -492,7 +492,7 @@ class WLNCenterDataset(object):
 
         if num_atoms not in self.complete_graphs:
             self.complete_graphs[num_atoms] = mol_to_complete_graph(
-                mol, add_self_loop=True, canonical_atom_order=True)
+                mol, add_self_loop=True, canonical_atom_order=False)
 
         if self.atom_pair_features[item] is None:
             reactants = self.reactions[item].split('>')[0]
@@ -983,7 +983,7 @@ def get_product_smiles(reactant_mols, edits, product_info):
     return edit_mol(reactant_mols, edits, product_info)
 
 def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_changes,
-                             max_num_change_combos, train_mode):
+                             max_num_change_combos, mode):
     """Pre-process one reaction for candidate ranking.
 
     Parameters
@@ -1006,8 +1006,8 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph.
-    train_mode : bool
-        Whether the dataset is to be used for training.
+    mode : str
+        Whether the dataset is to be used for training, validation or test.
 
     Returns
     -------
@@ -1019,11 +1019,13 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
     reactant_info : dict
         Reaction-related information of reactants.
     """
+    assert mode in ['train', 'val', 'test'], \
+        "Expect mode to be 'train' or 'val' or 'test', got {}".format(mode)
     candidate_bond_changes_, real_bond_changes, reactant_mol, product_mol = info
     candidate_pairs = [(atom1, atom2) for (atom1, atom2, _, _)
                        in candidate_bond_changes_]
     reactant_info = bookkeep_reactant(reactant_mol, candidate_pairs)
-    if train_mode:
+    if mode == 'train':
         product_info = bookkeep_product(product_mol)
 
     # Filter out candidate new bonds already in reactants
@@ -1061,7 +1063,7 @@ def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_chan
             if is_valid_combo(combo_changes, reactant_info):
                 valid_candidate_combos.append(combo_changes)
 
-    if train_mode:
+    if mode == 'train':
         random.shuffle(valid_candidate_combos)
         # Index for the combo of candidate bond changes
         # that is equivalent to the gold combo
@@ -1238,6 +1240,9 @@ class WLNRankDataset(object):
     candidate_bond_path : str
         Path to the candidate bond changes for product enumeration, where each line is
         candidate bond changes for a reaction by a WLN for reaction center prediction.
+    mode : str
+        'train', 'val', or 'test', indicating whether the dataset is used for training,
+        validation or test.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. By default, we consider descriptors including atom type,
@@ -1257,27 +1262,28 @@ class WLNRankDataset(object):
         Default to 16.
     max_num_change_combos_per_reaction : int
         Number of bond change combos to consider for each reaction. Default to 150.
-    train_mode : bool
-        Whether the dataset is to be used for training. Default to True.
     num_processes : int
         Number of processes to use for data pre-processing. Default to 1.
     """
     def __init__(self,
                  raw_file_path,
                  candidate_bond_path,
+                 mode,
                  node_featurizer=default_node_featurizer_rank,
                  edge_featurizer=default_edge_featurizer_rank,
                  size_cutoff=100,
                  max_num_changes_per_reaction=5,
                  num_candidate_bond_changes=16,
                  max_num_change_combos_per_reaction=150,
-                 train_mode=True,
                  num_processes=1):
         super(WLNRankDataset, self).__init__()
 
+        assert mode in ['train', 'val', 'test'], \
+            "Expect mode to be 'train' or 'val' or 'test', got {}".format(mode)
+        self.mode = mode
+
         self.ignore_large_samples = False
         self.size_cutoff = size_cutoff
-        self.train_mode = train_mode
 
         self.reactant_mols, self.product_mols, self.real_bond_changes, \
         self.ids_for_small_samples = self.load_reaction_data(raw_file_path, num_processes)
@@ -1441,7 +1447,7 @@ class WLNRankDataset(object):
                 (raw_candidate_bond_changes, real_bond_changes,
                  reactant_mol, product_mol),
                 self.num_candidate_bond_changes, self.max_num_changes_per_reaction,
-                self.max_num_change_combos_per_reaction, self.train_mode)
+                self.max_num_change_combos_per_reaction, self.mode)
 
         # Construct DGLGraphs and featurize their edges
         g_list = construct_graphs_rank(
@@ -1456,7 +1462,7 @@ class WLNRankDataset(object):
             g.ndata['hv'] = node_feats
 
         batch_size = len(g_list)
-        if self.train_mode:
+        if self.mode == 'train':
             labels = torch.zeros(batch_size - 1, 1).float()
             labels[0] = 1.
             return g_list, candidate_scores, labels
@@ -1517,7 +1523,10 @@ class USPTORank(WLNRankDataset):
         print('Preparing {} subset of USPTO for product candidate ranking.'.format(subset))
         self._subset = subset
         if subset == 'val':
+            mode = 'val'
             subset = 'valid'
+        else:
+            mode = subset
 
         self._url = 'dataset/uspto.zip'
         data_path = get_download_dir() + '/uspto.zip'
@@ -1525,19 +1534,14 @@ class USPTORank(WLNRankDataset):
         download(_get_dgl_url(self._url), path=data_path)
         extract_archive(data_path, extracted_data_path)
 
-        if self.subset == 'train':
-            train_mode = True
-        else:
-            train_mode = False
-
         super(USPTORank, self).__init__(
             raw_file_path=extracted_data_path + '/{}.txt.proc'.format(subset),
             candidate_bond_path=candidate_bond_path,
+            mode=mode,
             size_cutoff=size_cutoff,
             max_num_changes_per_reaction=max_num_changes_per_reaction,
             num_candidate_bond_changes=num_candidate_bond_changes,
             max_num_change_combos_per_reaction=max_num_change_combos_per_reaction,
-            train_mode=train_mode,
             num_processes=num_processes)
 
     @property
