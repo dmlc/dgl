@@ -195,7 +195,8 @@ class MovieLens(object):
         test_rating_pairs, test_rating_values = self._generate_pair_value(self.test_rating_info)
 
         # Create adjacent matrix
-        # TODO: build the same
+        # TODO: we do not +1 and do not create rating map since no need for ml dataset
+        # but might needed for others
         neutral_rating = 0
         rating_mx_train = np.full((self._num_user, self._num_movie), neutral_rating, dtype=np.int32)
         assert 0 not in train_rating_values, '0 should not be a valid rating type'
@@ -205,7 +206,7 @@ class MovieLens(object):
         # adj_train is rating matrix
         # train_indices is our train_raing_pairs
         # train_labels is our train_rating_values
-        # feature is currently None
+        # feature is currently None since we don't use side information
         class_values = np.sort(np.unique(train_rating_values))
 
         self.train_graphs, self.val_graphs, self.test_graphs = links2subgraphs(
@@ -225,51 +226,6 @@ class MovieLens(object):
                 args.hop*2+1,
                 parallel=True)
 
-        def _make_labels(ratings):
-            labels = th.LongTensor(np.searchsorted(self.possible_rating_values, ratings)).to(device)
-            return labels
-
-        self.train_enc_graph = self._generate_enc_graph(train_rating_pairs, train_rating_values, add_support=True)
-        self.train_dec_graph = self._generate_dec_graph(train_rating_pairs)
-        self.train_labels = _make_labels(train_rating_values)
-        self.train_truths = th.FloatTensor(train_rating_values).to(device)
-
-        self.valid_enc_graph = self.train_enc_graph
-        self.valid_dec_graph = self._generate_dec_graph(valid_rating_pairs)
-        self.valid_labels = _make_labels(valid_rating_values)
-        self.valid_truths = th.FloatTensor(valid_rating_values).to(device)
-
-        self.test_enc_graph = self._generate_enc_graph(all_train_rating_pairs, all_train_rating_values, add_support=True)
-        self.test_dec_graph = self._generate_dec_graph(test_rating_pairs)
-        self.test_labels = _make_labels(test_rating_values)
-        self.test_truths = th.FloatTensor(test_rating_values).to(device)
-
-        def _npairs(graph):
-            rst = 0
-            for r in self.possible_rating_values:
-                r = str(r).replace('.', '_')
-                rst += graph.number_of_edges(str(r))
-            return rst
-
-        print("Train enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.train_enc_graph.number_of_nodes('user'), self.train_enc_graph.number_of_nodes('movie'),
-            _npairs(self.train_enc_graph)))
-        print("Train dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.train_dec_graph.number_of_nodes('user'), self.train_dec_graph.number_of_nodes('movie'),
-            self.train_dec_graph.number_of_edges()))
-        print("Valid enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.valid_enc_graph.number_of_nodes('user'), self.valid_enc_graph.number_of_nodes('movie'),
-            _npairs(self.valid_enc_graph)))
-        print("Valid dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.valid_dec_graph.number_of_nodes('user'), self.valid_dec_graph.number_of_nodes('movie'),
-            self.valid_dec_graph.number_of_edges()))
-        print("Test enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.test_enc_graph.number_of_nodes('user'), self.test_enc_graph.number_of_nodes('movie'),
-            _npairs(self.test_enc_graph)))
-        print("Test dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.test_dec_graph.number_of_nodes('user'), self.test_dec_graph.number_of_nodes('movie'),
-            self.test_dec_graph.number_of_edges()))
-
     def _generate_pair_value(self, rating_info):
         rating_pairs = (np.array([self.global_user_id_map[ele] for ele in rating_info["user_id"]],
                                  dtype=np.int64),
@@ -277,69 +233,6 @@ class MovieLens(object):
                                  dtype=np.int64))
         rating_values = rating_info["rating"].values.astype(np.float32)
         return rating_pairs, rating_values
-
-    def _generate_enc_graph(self, rating_pairs, rating_values, add_support=False):
-        user_movie_R = np.zeros((self._num_user, self._num_movie), dtype=np.float32)
-        user_movie_R[rating_pairs] = rating_values
-        movie_user_R = user_movie_R.transpose()
-
-        rating_graphs = []
-        rating_row, rating_col = rating_pairs
-        for rating in self.possible_rating_values:
-            ridx = np.where(rating_values == rating)
-            rrow = rating_row[ridx]
-            rcol = rating_col[ridx]
-            rating = str(rating).replace('.', '_')
-            bg = dgl.bipartite((rrow, rcol), 'user', rating, 'movie',
-                               num_nodes=(self._num_user, self._num_movie))
-            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
-                               num_nodes=(self._num_movie, self._num_user))
-            rating_graphs.append(bg)
-            rating_graphs.append(rev_bg)
-        graph = dgl.hetero_from_relations(rating_graphs)
-
-        # sanity check
-        assert len(rating_pairs[0]) == sum([graph.number_of_edges(et) for et in graph.etypes]) // 2
-
-        if add_support:
-            def _calc_norm(x):
-                x = x.numpy().astype('float32')
-                x[x == 0.] = np.inf
-                x = th.FloatTensor(1. / np.sqrt(x))
-                return x.to(self._device).unsqueeze(1)
-            user_ci = []
-            user_cj = []
-            movie_ci = []
-            movie_cj = []
-            for r in self.possible_rating_values:
-                r = str(r).replace('.', '_')
-                user_ci.append(graph['rev-%s' % r].in_degrees())
-                movie_ci.append(graph[r].in_degrees())
-                if self._symm:
-                    user_cj.append(graph[r].out_degrees())
-                    movie_cj.append(graph['rev-%s' % r].out_degrees())
-                else:
-                    user_cj.append(th.zeros((self.num_user,)))
-                    movie_cj.append(th.zeros((self.num_movie,)))
-            user_ci = _calc_norm(sum(user_ci))
-            movie_ci = _calc_norm(sum(movie_ci))
-            if self._symm:
-                user_cj = _calc_norm(sum(user_cj))
-                movie_cj = _calc_norm(sum(movie_cj))
-            else:
-                user_cj = th.ones(self.num_user,).to(self._device)
-                movie_cj = th.ones(self.num_movie,).to(self._device)
-            graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
-            graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
-
-        return graph
-
-    def _generate_dec_graph(self, rating_pairs):
-        ones = np.ones_like(rating_pairs[0])
-        user_movie_ratings_coo = sp.coo_matrix(
-            (ones, rating_pairs),
-            shape=(self.num_user, self.num_movie), dtype=np.float32)
-        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
 
     @property
     def num_links(self):
@@ -593,8 +486,6 @@ def links2subgraphs(
     if max_node_label is None:  # if not provided, infer from graphs
         max_n_label = {'max_node_label': 0}
 
-    print ('aa', class_values)
-
     def helper(A, links, g_labels):
         g_list = []
         if not parallel or max_node_label is None:
@@ -627,10 +518,7 @@ def links2subgraphs(
 
     print('Enclosing subgraph extraction begins...')
     train_graphs = helper(A, train_indices, train_labels)
-    if not testing:
-        val_graphs = helper(A, val_indices, val_labels)
-    else:
-        val_graphs = []
+    val_graphs = helper(A, val_indices, val_labels)
     test_graphs = helper(A, test_indices, test_labels)
 
     return train_graphs, val_graphs, test_graphs

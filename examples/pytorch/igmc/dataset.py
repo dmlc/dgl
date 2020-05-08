@@ -2,21 +2,22 @@ import os
 import random
 
 class MovieLensDataset(object):
-    def __init__(self, subgraphs):
-        self.subgraphs = subgraphs
+    def __init__(self, subgraphs_info, device):
+        self.subgraphs = subgraphs_info
         order = list(range(len(self.subgraphs)))
     
-    def __call__(self,  mode='train', batch_size=32, k=1):
-        if mode == 'train':
-            random.shuffle(order)
-        
-        batch = []
-        for idx in order:
-            batch.append(self.subgraphs[idx])
-            if len(batch) == batch_size:
-                yield batch
-                batch = []
+    def __len__(self):
+        return len(self.subgraphs)
 
-        if len(batch) != 0:
-            yield batch
+    def create_dgl_graph(self, subgraph):
+        return dgl.heterograph()
+
+    def __getitem__(self, idx):
+        return self.create_dgl_graph(self.subgraphs[idx])
+
+def collate_vertexgraphs(data):
+    g = dgl.batch(g_list)
+    # TODO: will this earase all the feature?
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.set_e_initializer(dgl.init.zero_initializer)
 
