@@ -36,10 +36,11 @@ def test_graph_partition_book():
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
-        gpb = GraphPartitionBook(part_id=i,  
-                                 partition_meta=meta, 
-                                 local_graph=part_g, 
-                                 ip_config_file='ip_config.txt')
+        gpb = GraphPartitionBook(part_id=i, 
+                                 num_parts=num_partitions, 
+                                 node_map=node_map, 
+                                 edge_map=edge_map, 
+                                 part_graph=part_g)
         assert gpb.num_partitions() == num_parts
         gpb_meta = gpb.metadata()
         assert len(gpb_meta) == num_parts
