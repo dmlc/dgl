@@ -4124,8 +4124,8 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
         # Need to deepcopy the node/edge frame of original graph.
         graph = graph_list[0]
         return DGLGraph(graph_data=graph._graph,
-                        node_frame=graph._node_frame.deepcopy(),
-                        edge_frame=graph._edge_frame.deepcopy(),
+                        node_frame=graph._node_frame.deepclone(),
+                        edge_frame=graph._edge_frame.deepclone(),
                         batch_num_nodes=graph.batch_num_nodes,
                         batch_num_edges=graph.batch_num_edges)
 
@@ -4246,10 +4246,10 @@ def unbatch(graph):
     batch
     """
     if graph.batch_size == 1:
-        # Like dgl.batch, unbatch also deepcopies data frame.
+        # Like dgl.batch, unbatch also deep copies data frame.
         return [DGLGraph(graph_data=graph._graph,
-                         node_frame=graph._node_frame.deepcopy(),
-                         edge_frame=graph._edge_frame.deepcopy())]
+                         node_frame=graph._node_frame.deepclone(),
+                         edge_frame=graph._edge_frame.deepclone())]
 
     bsize = graph.batch_size
     bnn = graph.batch_num_nodes
