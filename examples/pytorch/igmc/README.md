@@ -21,7 +21,8 @@ Supported datasets: ml-100k, ml-1m, ml-10m
 ### Train with full-graph
 ml-100k, no feature
 ```bash
-python3 train.py --data_name=ml-100k --use_one_hot_fea --gcn_agg_accum=stack
+python3 train.py --data_name=ml-100k --use_one_hot_fea --gcn_agg_accum=stack --train_max_epoch 80 --max_nodes_per_hop 200 --save_dir /home/ubuntu/logs/igmc_0/ --batch_size 50 --train_decay_epoch 50
+
 ```
 Results: RMSE=0.9088 (0.910 reported)
 Speed: 0.0410s/epoch (vanilla implementation: 0.1008s/epoch)

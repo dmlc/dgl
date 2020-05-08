@@ -95,7 +95,7 @@ def train(args):
             if iter_idx == 1:
                 print("Total #Param of net: %d" % (torch_total_param_num(net)))
                 print(torch_net_info(net, save_path=os.path.join(args.save_dir, 'net%d.txt' % args.save_id)))
-
+            
             rmse = ((pred_ratings - train_gt_labels) ** 2).sum()
             count_rmse += rmse.item()
             count_num += pred_ratings.shape[0]
@@ -110,6 +110,11 @@ def train(args):
                 count_rmse = 0
                 count_num = 0
                 count_loss = 0
+
+        # save model for each epoch
+        ckpt_path = os.path.join(args.save_dir, 'ckpt_%d.txt' % epoch_idx)
+        th.save(net.state_dict(), ckpt_path)
+
 
         valid_rmse = evaluate(args=args, net=net, data_iter=val_loader)
         valid_loss_logger.log(iter = iter_idx, rmse = valid_rmse)
@@ -136,8 +141,6 @@ def train(args):
                 print ("\tChange the LR to %g" % new_lr)
                 for p in optimizer.param_groups:
                     p['lr'] = learning_rate
-
-
 
         print (logging_str)
     print('Best Iter Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
