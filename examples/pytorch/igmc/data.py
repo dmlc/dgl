@@ -141,7 +141,10 @@ class MovieLens(object):
         num_valid = int(np.ceil(self.all_train_rating_info.shape[0] * self._valid_ratio))
         shuffled_idx = np.random.permutation(self.all_train_rating_info.shape[0])
         self.valid_rating_info = self.all_train_rating_info.iloc[shuffled_idx[: num_valid]]
-        self.train_rating_info = self.all_train_rating_info.iloc[shuffled_idx[num_valid: ]]
+        if args.train_val:
+            self.train_rating_info = self.all_train_rating_info.iloc[shuffled_idx[:]]
+        else:
+            self.train_rating_info = self.all_train_rating_info.iloc[shuffled_idx[num_valid: ]]
         self.possible_rating_values = np.unique(self.train_rating_info["rating"].values)
 
         print("All rating pairs : {}".format(self.all_rating_info.shape[0]))
