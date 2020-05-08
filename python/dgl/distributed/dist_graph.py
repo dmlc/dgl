@@ -312,7 +312,7 @@ class DistGraphServer(KVServer):
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
         self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
-        num_nodes, num_edges, node_map, edge_map = self.meta
+        num_nodes, num_edges, node_map, edge_map, _ = self.meta
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
         self.meta = _move_data_to_shared_mem_array(F.tensor([num_nodes, num_edges]),
                                                    _get_ndata_path(graph_name, 'meta'))
@@ -557,3 +557,88 @@ class DistGraph:
                 # Remove the prefix "edge:"
                 edata_names.append(name[5:])
         return edata_names
+
+def node_split(nodes, partition_book, rank):
+    ''' Split nodes and return a subset for the local rank.
+
+    This function splits the input nodes based on the partition book and
+    returns a subset of nodes for the local rank. This method is used for
+    dividing workloads for distributed training.
+
+    The input nodes can be stored as a vector of node Ids or a vector of
+    masks. When it's a vector of masks, the length of the vector should be
+    the same as the number of nodes in a graph and 1 indicates that
+    the vertex in the corresponding location exists.
+
+    Parameters
+    ----------
+    nodes : 1D tensor or DistTensor
+        The input nodes.
+    partition_book : GraphPartitionBook
+        The graph partition book
+    rank : int
+        The rank of the current process
+
+    Returns
+    -------
+    1D-tensor
+        The vector of node Ids that belong to the rank.
+    '''
+    num_nodes = 0
+    for part in partition_book.metadata():
+        num_nodes += part['num_nodes']
+    # Get all nodes that belong to the rank.
+    local_nids = partition_book.partid2nids(rank)
+    # The input node vector is stored as boolean mask.
+    nodes = F.zerocopy_from_numpy(nodes)
+    if F.dtype(nodes) == F.bool:
+        assert len(nodes) == num_nodes
+        masks = nodes[local_nids]
+        return F.boolean_mask(local_nids, masks)
+    else:
+        # We need to move all node Ids to the local machine first.
+        if isinstance(nodes, DistTensor):
+            nodes = nodes[np.arange(len(nodes))]
+        return np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids))
+
+def edge_split(edges, g, rank):
+    ''' Split edges and return a subset for the local rank.
+
+    This function splits the input edges based on the partition book and
+    returns a subset of edges for the local rank. This method is used for
+    dividing workloads for distributed training.
+
+    The input edges can be stored as a vector of edge Ids or a vector of
+    masks. When it's a vector of masks, the length of the vector should be
+    the same as the number of edges in a graph and 1 indicates that
+    the vertex in the corresponding location exists.
+
+    Parameters
+    ----------
+    edges : 1D tensor or DistTensor
+        The input edges.
+    partition_book : GraphPartitionBook
+        The graph partition book
+    rank : int
+        The rank of the current process
+
+    Returns
+    -------
+    1D-tensor
+        The vector of edge Ids that belong to the rank.
+    '''
+    num_edges = 0
+    for part in partition_book.metadata():
+        num_edges += part['num_edges']
+    # Get all edges that belong to the rank.
+    local_eids = partition_book.partid2eids(rank)
+    edges = F.zerocopy_from_numpy(edges)
+    # The input edge vector is stored as boolean mask.
+    if F.dtype(edges) == F.bool:
+        assert len(edges) == num_edges
+        masks = edges[local_eids]
+        return F.boolean_mask(local_eids, masks)
+    else:
+        if isinstance(edges, DistTensor):
+            edges = edges[np.arange(len(edges))]
+        return np.intersect1d(F.asnumpy(edges), F.asnumpy(local_eids))

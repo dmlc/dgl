@@ -11,7 +11,7 @@ import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
-from dgl.distributed import partition_graph
+from dgl.distributed import partition_graph, load_partition, GraphPartitionBook, node_split
 import backend as F
 import unittest
 import pickle
@@ -79,7 +79,7 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     g.shut_down()
     print('end')
 
-def run_server_client():
+def test_server_client():
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -110,5 +110,24 @@ def run_server_client():
         p.join()
     print('clients have terminated')
 
+def test_split():
+    g = create_random_graph(10000)
+    num_parts = 4
+    num_hops = 2
+    partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+
+    data_points = np.random.randint(0, 100, size=10000) > 30
+    for i in range(num_parts):
+        part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
+        num_nodes, num_edges, node_map, edge_map, num_partitions = meta
+        gpb = GraphPartitionBook(part_id=i,
+                                 num_parts=num_partitions,
+                                 node_map=node_map,
+                                 edge_map=edge_map,
+                                 part_graph=part_g)
+        nodes = node_split(data_points, gpb, i)
+        print(nodes)
+
 if __name__ == '__main__':
-    run_server_client()
+    test_split()
+    test_server_client()
