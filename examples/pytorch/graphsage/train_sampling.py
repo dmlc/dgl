@@ -78,7 +78,6 @@ class SAGE(nn.Module):
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
         x : the input of entire node set.
-
         The inference code is written in a fashion that it could handle any number of nodes and
         layers.
         """
@@ -114,7 +113,6 @@ def prepare_mp(g):
     Explicitly materialize the CSR, CSC and COO representation of the given graph
     so that they could be shared via copy-on-write to sampler workers and GPU
     trainers.
-
     This is a workaround before full shared memory support on heterogeneous graphs.
     """
     g.in_degree(0)
