@@ -12,7 +12,8 @@ import torch as th
 import torch.nn as nn
 from data import MovieLens
 from model import GNN
-from dataset import MovieLensDataset 
+from dataset import MovieLensDataset, collate_movielens 
+from torch.utils.data import DataLoader
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
 def evaluate(args, net, dataset, segment='valid'):
@@ -50,8 +51,14 @@ def train(args):
     print(args)
     dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
-    dataset = MovieLensDataset(dataset_base)
+    train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
+    for k, v in enumerate(train_loader):
+        print (k, v)
     print("Loading data finished ...\n")
+
+
+    exit(0)
 
     args.src_in_units = dataset.user_feature_shape[1]
     args.dst_in_units = dataset.movie_feature_shape[1]
@@ -61,7 +68,8 @@ def train(args):
     net = IGMC(args=args)
     net = net.to(args.device)
     nd_possible_rating_values = th.FloatTensor(dataset.possible_rating_values).to(args.device)
-    rating_loss_net = nn.CrossEntropyLoss()
+    #rating_loss_net = nn.CrossEntropyLoss()
+    rating_loss_net = nn.MSELoss()
     learning_rate = args.train_lr
     optimizer = get_optimizer(args.train_optimizer)(net.parameters(), lr=learning_rate)
     print("Loading network finished ...\n")
@@ -86,9 +94,12 @@ def train(args):
     count_num = 0
     count_loss = 0
 
-    train_iter = MovieLensDataset(dataset_base.train_graphs)
-    test_iter = MovieLensDataset(dataset_base.test_graphs)
-    val_iter = MovieLensDataset(dataset_base.val_graphs)
+    train_iter = MovieLensDataset(dataset_base.train_graphs, args.device)
+    test_iter = MovieLensDataset(dataset_base.test_graphs, args.device)
+    val_iter = MovieLensDataset(dataset_base.val_graphs, args.device)
+
+
+    exit(0)
 
     print("Start training ...")
     dur = []
@@ -198,11 +209,11 @@ def config():
     # igmc settings
     parser.add_argument('--hop', default=1, metavar='S', 
                     help='enclosing subgraph hop number')
-    parser.add_argument('--sample-ratio', type=float, default=1.0, 
+    parser.add_argument('--sample_ratio', type=float, default=1.0, 
                         help='if < 1, subsample nodes per hop according to the ratio')
-    parser.add_argument('--max-nodes-per-hop', default=10000, 
+    parser.add_argument('--max_nodes_per_hop', type=int, default=10000, 
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
-    parser.add_argument('--use-features', action='store_true', default=False,
+    parser.add_argument('--use_features', action='store_true', default=False,
                         help='whether to use node features (side information)')
     parser.add_argument('--train_max_epoch', type=int, default=200)
     parser.add_argument('--batch_size', type=int, default=50)
@@ -211,7 +222,7 @@ def config():
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
     parser.add_argument('--train_decay_patience', type=int, default=50)
     # edge dropout settings
-    parser.add_argument('--adj-dropout', type=float, default=0.2, 
+    parser.add_argument('--adj_dropout', type=float, default=0.2, 
                     help='if not 0, random drops edges from adjacency matrix with this prob')
 
     args = parser.parse_args()

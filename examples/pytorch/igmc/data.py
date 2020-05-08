@@ -2,6 +2,7 @@
 import os
 import re
 import time
+import random
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -510,18 +511,14 @@ def links2subgraphs(
             pbar.close()
             end = time.time()
             print("Time eplased for subgraph extraction: {}s".format(end-start))
-            print("Transforming to pytorch_geometric graphs...".format(end-start))
-            print (len(g_list))
-            end2 = time.time()
-            print("Time eplased for transforming to pytorch_geometric graphs: {}s".format(end2-end))
         return g_list
 
     print('Enclosing subgraph extraction begins...')
     train_graphs = helper(A, train_indices, train_labels)
-    val_graphs = helper(A, val_indices, val_labels)
-    test_graphs = helper(A, test_indices, test_labels)
+    #val_graphs = helper(A, val_indices, val_labels)
+    #test_graphs = helper(A, test_indices, test_labels)
 
-    return train_graphs, val_graphs, test_graphs
+    return train_graphs, None, None #val_graphs, test_graphs
 
 
 def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
@@ -571,8 +568,9 @@ def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_
         ridx = np.where(r == rating)
         rrow = u[ridx]
         rcol = v[ridx]
-        rating = str(rating).replace('.', '_')
+        rating = str(int(rating)).replace('.', '_')
         subgraph_info[('user', rating, 'movie')]= (rrow, rcol)
+        subgraph_info[('movie', 'rev_'+rating, 'user')]= (rcol, rrow)
 
     # get structural node labels
     # NOTE: only use subgraph here
