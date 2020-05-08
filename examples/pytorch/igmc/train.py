@@ -27,9 +27,7 @@ def evaluate(args, net, data_iter):
             pred_ratings = net(graph)
         rmse = ((pred_ratings - rating_gt) ** 2.).mean().item()
         rmse = np.sqrt(rmse)
-        res.append(res)
-        if idx % 100:
-            print (idx, rmse)
+        res.append(rmse)
     return np.mean(res)
 
 def train(args):
@@ -113,9 +111,6 @@ def train(args):
                 count_num = 0
                 count_loss = 0
 
-            if iter_idx == 20:
-                break
-
         valid_rmse = evaluate(args=args, net=net, data_iter=val_loader)
         valid_loss_logger.log(iter = iter_idx, rmse = valid_rmse)
         logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
@@ -138,6 +133,7 @@ def train(args):
             if new_lr < learning_rate:
                 learning_rate = new_lr
                 logging.info("\tChange the LR to %g" % new_lr)
+                print ("\tChange the LR to %g" % new_lr)
                 for p in optimizer.param_groups:
                     p['lr'] = learning_rate
 
