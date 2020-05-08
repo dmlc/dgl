@@ -426,11 +426,13 @@ def reaction_center_eval(complete_graphs, preds, reactions,
                 num_correct[k] += 1
         start = end
 
-def reaction_center_final_eval(args, model, data_loader, easy):
+def reaction_center_final_eval(args, top_ks, model, data_loader, easy):
     """Final evaluation of model performance.
 
     args : dict
         Configurations fot the experiment.
+    top_ks : list of int
+        Options for top-k evaluation
     model : nn.Module
         Model for reaction center prediction.
     data_loader : torch.utils.data.DataLoader
@@ -445,7 +447,7 @@ def reaction_center_final_eval(args, model, data_loader, easy):
         Summary of the top-k evaluation.
     """
     model.eval()
-    num_correct = {k: 0 for k in args['top_ks']}
+    num_correct = {k: 0 for k in top_ks}
     for batch_id, batch_data in enumerate(data_loader):
         batch_reactions, batch_graph_edits, batch_mol_graphs, \
         batch_complete_graphs, batch_atom_pair_labels = batch_data

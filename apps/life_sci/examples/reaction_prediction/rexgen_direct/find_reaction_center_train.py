@@ -106,7 +106,7 @@ def main(rank, dev_id, args):
                         rank_iter, np.mean(dur)))
                 prediction_summary = 'total iter {:d}, (epoch {:d}/{:d}, iter {:d}/{:d}) '.format(
                     total_iter, epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader)) + \
-                      reaction_center_final_eval(args, model, val_loader, easy=True)
+                      reaction_center_final_eval(args, args['top_ks_val'], model, val_loader, easy=True)
                 print(prediction_summary)
                 with open(args['result_path'] + '/val_eval.txt', 'a') as f:
                     f.write(prediction_summary)
@@ -152,9 +152,9 @@ if __name__ == '__main__':
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)
 
-    assert args['max_k'] >= max(args['top_ks']), \
+    assert args['max_k'] >= max(args['top_ks_val']), \
         'Expect max_k to be no smaller than the possible options ' \
-        'of top_ks, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks']))
+        'of top_ks, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks_val']))
     mkdir_p(args['result_path'])
 
     devices = list(map(int, args['gpus'].split(',')))

@@ -38,7 +38,8 @@ def main(args):
     model = model.to(args['device'])
 
     print('Evaluation on the test set.')
-    test_result = reaction_center_final_eval(args, model, test_loader, args['easy'])
+    test_result = reaction_center_final_eval(
+        args, args['top_ks_test'], model, test_loader, args['easy'])
     print(test_result)
     with open(args['result_path'] + '/results.txt', 'w') as f:
         f.write(test_result)
@@ -66,7 +67,7 @@ if __name__ == '__main__':
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)
 
-    assert args['max_k'] >= max(args['top_ks']), \
+    assert args['max_k'] >= max(args['top_ks_test']), \
         'Expect max_k to be no smaller than the possible options ' \
-        'of top_ks, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks']))
+        'of top_ks_test, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks_test']))
     main(args)

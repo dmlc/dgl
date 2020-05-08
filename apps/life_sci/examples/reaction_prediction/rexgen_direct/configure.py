@@ -14,7 +14,8 @@ reaction_center_config = {
     'print_every': 50,
     'decay_every': 10000,      # Learning rate decay
     'lr_decay_factor': 0.9,
-    'top_ks': [6, 8, 10],
+    'top_ks_val': [12, 16, 20, 40, 80],
+    'top_ks_test': [6, 8, 10],
     'max_k': 80
 }
 
