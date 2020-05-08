@@ -78,8 +78,10 @@ def sparse_matrix(data, index, shape, force_format=False):
     if fmt != 'coo':
         raise TypeError(
             'Tensorflow backend only supports COO format. But got %s.' % fmt)
-    spmat = tf.SparseTensor(indices=tf.transpose(
-        index[1], (1, 0)), values=data, dense_shape=shape)
+    # tf.SparseTensor only supports int64 indexing,
+    # therefore manually casting to int64 when input in int32
+    spmat = tf.SparseTensor(indices=tf.cast(tf.transpose(
+        index[1], (1, 0)), tf.int64), values=data, dense_shape=shape)
     return spmat, None
 
 
@@ -372,9 +374,9 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop):
+def arange(start, stop, dtype="int64"):
     with tf.device("/cpu:0"):
-        t = tf.range(start, stop, dtype=tf.int64)
+        t = tf.range(start, stop, dtype=data_type_dict()[dtype])
     return t
 
 
