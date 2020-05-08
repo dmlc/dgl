@@ -177,4 +177,7 @@ _init_api("dgl.ndarray")
 
 # An array representing null (no value) that can be safely converted to
 # other backend tensors.
-NULL = array(_np.array([], dtype=_np.int64))
+NULL = {
+    "int64": array(_np.array([], dtype=_np.int64)),
+    "int32": array(_np.array([], dtype=_np.int32))
+}
