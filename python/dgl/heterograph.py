@@ -1091,6 +1091,28 @@ class DGLHeteroGraph(object):
         """
         return self._graph.is_readonly()
 
+    @property
+    def idtype(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        """
+        return getattr(F, self._graph.dtype)
+
+    @property
+    def _idtype_str(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        """
+        return self._graph.dtype
+
     def has_node(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
 
@@ -1148,7 +1170,7 @@ class DGLHeteroGraph(object):
         --------
         has_node
         """
-        vids = utils.toindex(vids)
+        vids = utils.toindex(vids, self._idtype_str)
         rst = self._graph.has_nodes(self.get_ntype_id(ntype), vids)
         return rst.tousertensor()
 
@@ -1214,8 +1236,8 @@ class DGLHeteroGraph(object):
         --------
         has_edge_between
         """
-        u = utils.toindex(u)
-        v = utils.toindex(v)
+        u = utils.toindex(u, self._idtype_str)
+        v = utils.toindex(v, self._idtype_str)
         rst = self._graph.has_edges_between(self.get_etype_id(etype), u, v)
         return rst.tousertensor()
 
@@ -1293,6 +1315,7 @@ class DGLHeteroGraph(object):
         --------
         predecessors
         """
+        check_same_dtype(self._idtype_str, v)
         return self._graph.successors(self.get_etype_id(etype), v).tousertensor()
 
     def edge_id(self, u, v, force_multi=None, return_array=False, etype=None):
@@ -1425,8 +1448,10 @@ class DGLHeteroGraph(object):
         --------
         edge_id
         """
-        u = utils.toindex(u)
-        v = utils.toindex(v)
+        check_same_dtype(self._idtype_str, u)
+        check_same_dtype(self._idtype_str, v)
+        u = utils.toindex(u, self._idtype_str)
+        v = utils.toindex(v, self._idtype_str)
         src, dst, eid = self._graph.edge_ids(self.get_etype_id(etype), u, v)
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
@@ -1471,7 +1496,8 @@ class DGLHeteroGraph(object):
         >>> g.find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 2]))
         """
-        eid = utils.toindex(eid)
+        check_same_dtype(self._idtype_str, eid)
+        eid = utils.toindex(eid, self._idtype_str)
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src.tousertensor(), dst.tousertensor()
 
@@ -1517,7 +1543,8 @@ class DGLHeteroGraph(object):
         >>> g.in_edges([0, 2], form='uv')
         (tensor([0, 1]), tensor([0, 2]))
         """
-        v = utils.toindex(v)
+        check_same_dtype(self._idtype_str, v)
+        v = utils.toindex(v, self._idtype_str)
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
@@ -1568,7 +1595,8 @@ class DGLHeteroGraph(object):
         >>> g.out_edges([0, 1], form='uv')
         (tensor([0, 1, 1]), tensor([0, 1, 2]))
         """
-        u = utils.toindex(u)
+        check_same_dtype(self._idtype_str, u)
+        u = utils.toindex(u, self._idtype_str)
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
@@ -1710,12 +1738,13 @@ class DGLHeteroGraph(object):
         --------
         in_degree
         """
+        check_same_dtype(self._idtype_str, v)
         etid = self.get_etype_id(etype)
         _, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
-            v = utils.toindex(slice(0, self._graph.number_of_nodes(dtid)))
+            v = utils.toindex(slice(0, self._graph.number_of_nodes(dtid)), self._idtype_str)
         else:
-            v = utils.toindex(v)
+            v = utils.toindex(v, self._idtype_str)
         return self._graph.in_degrees(etid, v).tousertensor()
 
     def out_degree(self, u, etype=None):
@@ -1795,12 +1824,13 @@ class DGLHeteroGraph(object):
         --------
         out_degree
         """
+        check_same_dtype(self._idtype_str, u)
         etid = self.get_etype_id(etype)
         stid, _ = self._graph.metagraph.find_edge(etid)
         if is_all(u):
-            u = utils.toindex(slice(0, self._graph.number_of_nodes(stid)))
+            u = utils.toindex(slice(0, self._graph.number_of_nodes(stid)), self._idtype_str)
         else:
-            u = utils.toindex(u)
+            u = utils.toindex(u, self._idtype_str)
         return self._graph.out_degrees(etid, u).tousertensor()
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
@@ -1893,7 +1923,9 @@ class DGLHeteroGraph(object):
         --------
         edge_subgraph
         """
-        induced_nodes = [utils.toindex(nodes.get(ntype, [])) for ntype in self.ntypes]
+        check_same_dtype(self._idtype_str, nodes)
+        induced_nodes = [utils.toindex(nodes.get(ntype, []), self._idtype_str)
+                         for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
         induced_edges = sgi.induced_edges
 
@@ -1974,9 +2006,10 @@ class DGLHeteroGraph(object):
         --------
         subgraph
         """
+        check_idtype_dict(self._idtype_str, edges)
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
-            utils.toindex(edges.get(canonical_etype, []))
+            utils.toindex(edges.get(canonical_etype, []), self._idtype_str)
             for canonical_etype in self.canonical_etypes]
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes)
         induced_nodes = sgi.induced_nodes
@@ -2057,9 +2090,11 @@ class DGLHeteroGraph(object):
                 edge_frames.append(self._edge_frames[i])
 
         metagraph = graph_index.from_edge_list(meta_edges, True)
+        # num_nodes_per_type doesn't need to be int32
         hgidx = heterograph_index.create_heterograph_from_relations(
-            metagraph, rel_graphs, utils.toindex(num_nodes_per_type))
-        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes,
+                            node_frames, edge_frames)
         return hg
 
     def edge_type_subgraph(self, etypes):
@@ -2117,7 +2152,8 @@ class DGLHeteroGraph(object):
         node_type_subgraph
         """
         etype_ids = [self.get_etype_id(etype) for etype in etypes]
-        meta_src, meta_dst, _ = self._graph.metagraph.find_edges(utils.toindex(etype_ids))
+        # meta graph is homograph, still using int64
+        meta_src, meta_dst, _ = self._graph.metagraph.find_edges(utils.toindex(etype_ids, "int64"))
         rel_graphs = [self._graph.get_relation_graph(i) for i in etype_ids]
         meta_src = meta_src.tonumpy()
         meta_dst = meta_dst.tonumpy()
@@ -2131,8 +2167,9 @@ class DGLHeteroGraph(object):
         num_nodes_per_induced_type = [self.number_of_nodes(ntype) for ntype in induced_ntypes]
 
         metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True)
+        # num_nodes_per_type should be int64
         hgidx = heterograph_index.create_heterograph_from_relations(
-            metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type))
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type, "int64"))
         hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
         return hg
 
@@ -2433,7 +2470,7 @@ class DGLHeteroGraph(object):
         if is_all(u):
             num_nodes = self._graph.number_of_nodes(ntid)
         else:
-            u = utils.toindex(u)
+            u = utils.toindex(u, self._idtype_str)
             num_nodes = len(u)
         for key, val in data.items():
             nfeats = F.shape(val)[0]
@@ -2467,7 +2504,7 @@ class DGLHeteroGraph(object):
         if is_all(u):
             return dict(self._node_frames[ntid])
         else:
-            u = utils.toindex(u)
+            u = utils.toindex(u, self._idtype_str)
             return self._node_frames[ntid].select_rows(u)
 
     def _pop_n_repr(self, ntid, key):
@@ -2520,12 +2557,12 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._idtype_str)
+            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             _, _, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._idtype_str)
 
         # sanity check
         if not utils.is_dict_like(data):
@@ -2535,7 +2572,7 @@ class DGLHeteroGraph(object):
         if is_all(eid):
             num_edges = self._graph.number_of_edges(etid)
         else:
-            eid = utils.toindex(eid)
+            eid = utils.toindex(eid, self._idtype_str)
             num_edges = len(eid)
         for key, val in data.items():
             nfeats = F.shape(val)[0]
@@ -2572,17 +2609,17 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._idtype_str)
+            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             _, _, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._idtype_str)
 
         if is_all(eid):
             return dict(self._edge_frames[etid])
         else:
-            eid = utils.toindex(eid)
+            eid = utils.toindex(eid, self._idtype_str)
             return self._edge_frames[etid].select_rows(eid)
 
     def _pop_e_repr(self, etid, key):
@@ -2640,11 +2677,12 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
+        check_same_dtype(self._idtype_str, v)
         ntid = self.get_ntype_id(ntype)
         if is_all(v):
-            v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntype)))
+            v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntype)), self._idtype_str)
         else:
-            v_ntype = utils.toindex(v)
+            v_ntype = utils.toindex(v, self._idtype_str)
         with ir.prog() as prog:
             scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
                                            inplace=inplace, ntype=self._ntypes[ntid])
@@ -2687,19 +2725,20 @@ class DGLHeteroGraph(object):
         apply_nodes
         group_apply_edges
         """
+        check_same_dtype(self._idtype_str, edges)
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
             u, v, _ = self._graph.edges(etid, 'eid')
-            eid = utils.toindex(slice(0, self.number_of_edges(etype)))
+            eid = utils.toindex(slice(0, self.number_of_edges(etype)), self._idtype_str)
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._idtype_str)
+            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
 
         with ir.prog() as prog:
@@ -2748,6 +2787,7 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
+        check_same_dtype(self._idtype_str, edges)
         if group_by not in ('src', 'dst'):
             raise DGLError("Group_by should be either src or dst")
 
@@ -2755,15 +2795,15 @@ class DGLHeteroGraph(object):
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
             u, v, _ = self._graph.edges(etid, 'eid')
-            eid = utils.toindex(slice(0, self.number_of_edges(etype)))
+            eid = utils.toindex(slice(0, self.number_of_edges(etype)), self._idtype_str)
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._idtype_str)
+            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
 
         with ir.prog() as prog:
@@ -2833,21 +2873,22 @@ class DGLHeteroGraph(object):
         >>> # Send the feature of source nodes along multiple edges specified by their end points
         >>> g.send(([0, 1], [1, 2]), fn.copy_src('h', 'm'))
         """
+        check_same_dtype(self._idtype_str, edges)
         assert message_func is not None
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
         if is_all(edges):
-            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
+            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)), self._idtype_str)
             u, v, _ = self._graph.edges(etid, 'eid')
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._idtype_str)
+            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
 
         if len(eid) == 0:
@@ -2932,13 +2973,14 @@ class DGLHeteroGraph(object):
                 [0.],
                 [1.]])
         """
+        check_same_dtype(self._idtype_str, v)
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
-            v = F.arange(0, self.number_of_nodes(dtid))
+            v = F.arange(0, self.number_of_nodes(dtid), self._idtype_str)
         elif isinstance(v, int):
             v = [v]
-        v = utils.toindex(v)
+        v = utils.toindex(v, dtype=self._idtype_str)
         if len(v) == 0:
             # no vertex to be triggered.
             return
@@ -3005,14 +3047,15 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [2.]])
         """
+        check_same_dtype(self._idtype_str, v)
         # infer receive node type
         ntype = infer_ntype_from_dict(self, reducer_dict)
         ntid = self.get_ntype_id_from_dst(ntype)
         if is_all(v):
-            v = F.arange(0, self.number_of_nodes(ntid))
+            v = F.arange(0, self.number_of_nodes(ntid), self._idtype_str)
         elif isinstance(v, int):
             v = [v]
-        v = utils.toindex(v)
+        v = utils.toindex(v, self._idtype_str)
         if len(v) == 0:
             return
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
@@ -3122,12 +3165,12 @@ class DGLHeteroGraph(object):
 
         if isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._idtype_str)
+            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
 
         if len(u) == 0:
@@ -3235,12 +3278,12 @@ class DGLHeteroGraph(object):
                 edges, mfunc, rfunc, afunc = args
                 if isinstance(edges, tuple):
                     u, v = edges
-                    u = utils.toindex(u)
-                    v = utils.toindex(v)
+                    u = utils.toindex(u, self._idtype_str)
+                    v = utils.toindex(v, self._idtype_str)
                     # Rewrite u, v to handle edge broadcasting and multigraph.
                     u, v, eid = self._graph.edge_ids(etid, u, v)
                 else:
-                    eid = utils.toindex(edges)
+                    eid = utils.toindex(edges, self._idtype_str)
                     u, v, _ = self._graph.find_edges(etid, eid)
                 all_vs.append(v)
                 if len(u) == 0:
@@ -3330,11 +3373,12 @@ class DGLHeteroGraph(object):
                 [1.],
                 [1.]])
         """
+        check_same_dtype(self._idtype_str, v)
         # only one type of edges
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
-        v = utils.toindex(v)
+        v = utils.toindex(v, self._idtype_str)
         if len(v) == 0:
             return
         with ir.prog() as prog:
@@ -3403,7 +3447,8 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [3.]])
         """
-        v = utils.toindex(v)
+        check_same_dtype(self._idtype_str, v)
+        v = utils.toindex(v, self._idtype_str)
         if len(v) == 0:
             return
         # infer receive node type
@@ -3495,11 +3540,12 @@ class DGLHeteroGraph(object):
                 [0.],
                 [0.]])
         """
+        check_same_dtype(self._idtype_str, u)
         # only one type of edges
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
-        u = utils.toindex(u)
+        u = utils.toindex(u, self._idtype_str)
         if len(u) == 0:
             return
         with ir.prog() as prog:
@@ -3870,11 +3916,12 @@ class DGLHeteroGraph(object):
         >>> g.filter_nodes(lambda nodes: (nodes.data['h'] == 1.).squeeze(1), ntype='user')
         tensor([1, 2])
         """
+        check_same_dtype(self._idtype_str, nodes)
         ntid = self.get_ntype_id(ntype)
         if is_all(nodes):
-            v = utils.toindex(slice(0, self._graph.number_of_nodes(ntid)))
+            v = utils.toindex(slice(0, self._graph.number_of_nodes(ntid)), self._idtype_str)
         else:
-            v = utils.toindex(nodes)
+            v = utils.toindex(nodes, self._idtype_str)
 
         n_repr = self._get_n_repr(ntid, v)
         nbatch = NodeBatch(v, n_repr, ntype=self.ntypes[ntid])
@@ -3920,19 +3967,20 @@ class DGLHeteroGraph(object):
         >>> g.filter_edges(lambda edges: (edges.data['h'] == 1.).squeeze(1), etype='follows')
         tensor([1, 2])
         """
+        check_same_dtype(self._idtype_str, edges)
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
             u, v, _ = self._graph.edges(etid, 'eid')
-            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
+            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)), self._idtype_str)
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
+            u = utils.toindex(u, self._idtype_str)
+            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
-            eid = utils.toindex(edges)
+            eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
 
         src_data = self._get_n_repr(stid, u)
@@ -4101,6 +4149,54 @@ class DGLHeteroGraph(object):
     def is_homograph(self):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
+
+    def long(self):
+        """Return a heterograph object use int64 as index dtype,
+        with the ndata and edata as the original object
+
+        Returns
+        -------
+        DGLHeteroGraph
+            The graph object
+
+        Examples
+        --------
+
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game',
+        >>>                   index_dtype='int32')
+        >>> g_long = g.long() # Convert g to int64 indexed, not changing the original `g`
+
+        See Also
+        --------
+        int
+        """
+        return DGLHeteroGraph(self._graph.asbits(64), self.ntypes, self.etypes,
+                              self._node_frames,
+                              self._edge_frames)
+
+    def int(self):
+        """Return a heterograph object use int32 as index dtype,
+        with the ndata and edata as the original object
+
+        Returns
+        -------
+        DGLHeteroGraph
+            The graph object
+
+        Examples
+        --------
+
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game',
+        >>>                   index_dtype='int64')
+        >>> g_int = g.int() # Convert g to int32 indexed, not changing the original `g`
+
+        See Also
+        --------
+        long
+        """
+        return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
+                              self._node_frames,
+                              self._edge_frames)
 
 ############################################################
 # Internal APIs
@@ -4425,3 +4521,18 @@ class AdaptedHeteroGraph(GraphAdapter):
     def canonical_etype(self):
         """Canonical edge type."""
         return self.graph.canonical_etypes[self.etid]
+
+
+def check_same_dtype(graph_dtype, tensor):
+    """check whether tensor's dtype is consistent with graph's dtype"""
+    if F.is_tensor(tensor):
+        if graph_dtype != F.reverse_data_type_dict[F.dtype(tensor)]:
+            raise utils.InconsistentDtypeException(
+                "Expect the input tensor to be the same as the graph index dtype({}), but got {}"
+                .format(graph_dtype, F.reverse_data_type_dict[F.dtype(tensor)]))
+
+
+def check_idtype_dict(graph_dtype, tensor_dict):
+    """check whether the dtypes of tensors in dict are consistent with graph's dtype"""
+    for _, v in tensor_dict.items():
+        check_same_dtype(graph_dtype, v)

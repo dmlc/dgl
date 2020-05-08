@@ -115,7 +115,7 @@ template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2) {
   CHECK_EQ(arr1->shape[0], arr2->shape[0]);
   const int64_t L = arr1->shape[0];
-  IdArray ret = NewIdArray(2 * L);
+  IdArray ret = NewIdArray(2 * L, DLContext{kDLCPU, 0}, arr1->dtype.bits);
   const IdType* arr1_data = static_cast<IdType*>(arr1->data);
   const IdType* arr2_data = static_cast<IdType*>(arr2->data);
   IdType* ret_data = static_cast<IdType*>(ret->data);
@@ -173,7 +173,7 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
     }
   }
   // map array
-  IdArray maparr = NewIdArray(newid);
+  IdArray maparr = NewIdArray(newid, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
   IdType* maparr_data = static_cast<IdType*>(maparr->data);
   for (const auto& kv : oldv2newv) {
     maparr_data[kv.second] = kv.first;
