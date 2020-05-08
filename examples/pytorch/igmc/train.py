@@ -11,72 +11,52 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 from data import MovieLens
-from model import GNN
+from model import IGMC
 from dataset import MovieLensDataset, collate_movielens 
 from torch.utils.data import DataLoader
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
-def evaluate(args, net, dataset, segment='valid'):
-    possible_rating_values = dataset.possible_rating_values
-    nd_possible_rating_values = th.FloatTensor(possible_rating_values).to(args.device)
-
-    if segment == "valid":
-        rating_values = dataset.valid_truths
-        enc_graph = dataset.valid_enc_graph
-        dec_graph = dataset.valid_dec_graph
-    elif segment == "test":
-        rating_values = dataset.test_truths
-        enc_graph = dataset.test_enc_graph
-        dec_graph = dataset.test_dec_graph
-    else:
-        raise NotImplementedError
-
-    test_iter = MovieLensDataset(dataset_base)
-    
+def evaluate(args, net, data_iter):
     # Evaluate RMSE
     net.eval()
     res = []
-    for batch in test_iter:
+    for idx, batch in enumerate(data_iter):
+        graph = batch[0]
+        rating_gt = batch[1]
         with th.no_grad():
-            pred_ratings = net(enc_graph, dec_graph,
-                               dataset.user_feature, dataset.movie_feature)
-        real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
-                             nd_possible_rating_values.view(1, -1)).sum(dim=1)
-        rmse = ((real_pred_ratings - rating_values) ** 2.).mean().item()
+            pred_ratings = net(graph)
+        rmse = ((pred_ratings - rating_gt) ** 2.).mean().item()
         rmse = np.sqrt(rmse)
         res.append(res)
+        if idx % 100:
+            print (idx, rmse)
     return np.mean(res)
 
 def train(args):
     print(args)
+
     dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
-    for k, v in enumerate(train_loader):
-        print (k, v)
-    print("Loading data finished ...\n")
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=collate_movielens)
+    test_dataset = MovieLensDataset(dataset_base.test_graphs, args.device)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
+    val_dataset = MovieLensDataset(dataset_base.val_graphs, args.device)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
 
 
-    exit(0)
-
-    args.src_in_units = dataset.user_feature_shape[1]
-    args.dst_in_units = dataset.movie_feature_shape[1]
-    args.rating_vals = dataset.possible_rating_values
 
     ### build the net
-    net = IGMC(args=args)
+    # multiply num_relations by 2 because now we have two types for u-v edge and v-u edge
+    # NOTE: can't remember why we need add 2 for dim, need check
+    net = IGMC(in_dim=args.hop*2+1+1, num_relations=len(dataset_base.class_values), regression=True)
     net = net.to(args.device)
-    nd_possible_rating_values = th.FloatTensor(dataset.possible_rating_values).to(args.device)
+
     #rating_loss_net = nn.CrossEntropyLoss()
     rating_loss_net = nn.MSELoss()
     learning_rate = args.train_lr
     optimizer = get_optimizer(args.train_optimizer)(net.parameters(), lr=learning_rate)
     print("Loading network finished ...\n")
-
-    ### perpare training data
-    train_gt_labels = dataset.train_labels
-    train_gt_ratings = dataset.train_truths
 
     ### prepare the logger
     train_loss_logger = MetricLogger(['iter', 'loss', 'rmse'], ['%d', '%.4f', '%.4f'],
@@ -94,84 +74,77 @@ def train(args):
     count_num = 0
     count_loss = 0
 
-    train_iter = MovieLensDataset(dataset_base.train_graphs, args.device)
-    test_iter = MovieLensDataset(dataset_base.test_graphs, args.device)
-    val_iter = MovieLensDataset(dataset_base.val_graphs, args.device)
-
-
-    exit(0)
-
     print("Start training ...")
     dur = []
-    for iter_idx in range(1, args.train_max_iter):
-        if iter_idx > 3:
-            t0 = time.time()
+    for epoch_idx in range(args.train_max_epoch):
+        for iter_idx, batch in enumerate(train_loader):
+            if iter_idx > 3:
+                t0 = time.time()
 
-        try:
-            train_batch = train_iter.next()
-        except:
-            train_iter = MovieLensDataset(dataset_base.train_graphs)
+            net.train()
+            pred_ratings = net(batch[0])
+            train_gt_labels = batch[1]
+            loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
+            count_loss += loss.item()
+            optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(net.parameters(), args.train_grad_clip)
+            optimizer.step()
+            
+            if iter_idx > 3:
+                dur.append(time.time() - t0)
 
-        net.train()
-        pred_ratings = net(train_batch)
-        loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
-        count_loss += loss.item()
-        optimizer.zero_grad()
-        loss.backward()
-        nn.utils.clip_grad_norm_(net.parameters(), args.train_grad_clip)
-        optimizer.step()
+            if iter_idx == 1:
+                print("Total #Param of net: %d" % (torch_total_param_num(net)))
+                print(torch_net_info(net, save_path=os.path.join(args.save_dir, 'net%d.txt' % args.save_id)))
 
-        if iter_idx > 3:
-            dur.append(time.time() - t0)
+            rmse = ((pred_ratings - train_gt_labels) ** 2).sum()
+            count_rmse += rmse.item()
+            count_num += pred_ratings.shape[0]
 
-        if iter_idx == 1:
-            print("Total #Param of net: %d" % (torch_total_param_num(net)))
-            print(torch_net_info(net, save_path=os.path.join(args.save_dir, 'net%d.txt' % args.save_id)))
+            if iter_idx % args.train_log_interval == 0:
+                train_loss_logger.log(iter=iter_idx,
+                                      loss=count_loss/(iter_idx+1), rmse=count_rmse/count_num)
+                logging_str = "Iter={}, loss={:.4f}, rmse={:.4f}, time={:.4f}".format(
+                    iter_idx, count_loss/count_num, count_rmse/count_num,
+                    np.average(dur))
+                print (logging_str)
+                count_rmse = 0
+                count_num = 0
+                count_loss = 0
 
-        real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
-                             nd_possible_rating_values.view(1, -1)).sum(dim=1)
-        rmse = ((real_pred_ratings - train_gt_ratings) ** 2).sum()
-        count_rmse += rmse.item()
-        count_num += pred_ratings.shape[0]
+            if iter_idx == 20:
+                break
 
-        if iter_idx % args.train_log_interval == 0:
-            train_loss_logger.log(iter=iter_idx,
-                                  loss=count_loss/(iter_idx+1), rmse=count_rmse/count_num)
-            logging_str = "Iter={}, loss={:.4f}, rmse={:.4f}, time={:.4f}".format(
-                iter_idx, count_loss/iter_idx, count_rmse/count_num,
-                np.average(dur))
-            count_rmse = 0
-            count_num = 0
+        valid_rmse = evaluate(args=args, net=net, data_iter=val_loader)
+        valid_loss_logger.log(iter = iter_idx, rmse = valid_rmse)
+        logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
 
-        if iter_idx % args.train_valid_interval == 0:
-            valid_rmse = evaluate(args=args, net=net, dataset=val_dataset, segment='valid')
-            valid_loss_logger.log(iter = iter_idx, rmse = valid_rmse)
-            logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
+        if valid_rmse < best_valid_rmse:
+            best_valid_rmse = valid_rmse
+            no_better_valid = 0
+            best_iter = iter_idx
+            test_rmse = evaluate(args=args, net=net, data_iter=test_loader)
+            best_test_rmse = test_rmse
+            test_loss_logger.log(iter=iter_idx, rmse=test_rmse)
+            logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
+        else:
+            if no_better_valid > args.train_early_stopping_patience\
+                and learning_rate <= args.train_min_lr:
+                logging.info("Early stopping threshold reached. Stop training.")
+                break
+        if epoch_idx + 1 % args.train_decay_epoch == 0:
+            new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
+            if new_lr < learning_rate:
+                learning_rate = new_lr
+                logging.info("\tChange the LR to %g" % new_lr)
+                for p in optimizer.param_groups:
+                    p['lr'] = learning_rate
 
-            if valid_rmse < best_valid_rmse:
-                best_valid_rmse = valid_rmse
-                no_better_valid = 0
-                best_iter = iter_idx
-                test_rmse = evaluate(args=args, net=net, dataset=val_dataset, segment='test')
-                best_test_rmse = test_rmse
-                test_loss_logger.log(iter=iter_idx, rmse=test_rmse)
-                logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
-            else:
-                no_better_valid += 1
-                if no_better_valid > args.train_early_stopping_patience\
-                    and learning_rate <= args.train_min_lr:
-                    logging.info("Early stopping threshold reached. Stop training.")
-                    break
-                if no_better_valid > args.train_decay_patience:
-                    new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
-                    if new_lr < learning_rate:
-                        learning_rate = new_lr
-                        logging.info("\tChange the LR to %g" % new_lr)
-                        for p in optimizer.param_groups:
-                            p['lr'] = learning_rate
-                        no_better_valid = 0
-        if iter_idx  % args.train_log_interval == 0:
-            print(logging_str)
+        # save ckpt for each epoch
+
+
+        print (logging_str)
     print('Best Iter Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
         best_iter, best_valid_rmse, best_test_rmse))
     train_loss_logger.close()
@@ -220,7 +193,7 @@ def config():
     parser.add_argument('--train_lr', type=float, default=1e-3)
     parser.add_argument('--train_min_lr', type=float, default=0.001)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
-    parser.add_argument('--train_decay_patience', type=int, default=50)
+    parser.add_argument('--train_decay_epoch', type=int, default=50)
     # edge dropout settings
     parser.add_argument('--adj_dropout', type=float, default=0.2, 
                     help='if not 0, random drops edges from adjacency matrix with this prob')

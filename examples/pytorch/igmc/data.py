@@ -208,7 +208,7 @@ class MovieLens(object):
         # train_indices is our train_raing_pairs
         # train_labels is our train_rating_values
         # feature is currently None since we don't use side information
-        class_values = np.sort(np.unique(train_rating_values))
+        self.class_values = np.sort(np.unique(train_rating_values))
 
         self.train_graphs, self.val_graphs, self.test_graphs = links2subgraphs(
                 rating_mx_train,
@@ -218,7 +218,7 @@ class MovieLens(object):
                 train_rating_values,
                 valid_rating_values,
                 test_rating_values,
-                class_values, 
+                self.class_values, 
                 args.hop,
                 args.sample_ratio,
                 args.max_nodes_per_hop,
@@ -492,7 +492,7 @@ def links2subgraphs(
         if not parallel or max_node_label is None:
             with tqdm(total=len(links[0])) as pbar:
                 for i, j, g_label in zip(links[0], links[1], g_labels):
-                    g = subgraph_extraction_labeling((i, j), A, h, max_node_label, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values)
+                    g = subgraph_extraction_labeling(g_label, (i, j), A, h, max_node_label, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values)
                     g_list.append(g) 
                     pbar.update(1)
         else:
@@ -515,10 +515,10 @@ def links2subgraphs(
 
     print('Enclosing subgraph extraction begins...')
     train_graphs = helper(A, train_indices, train_labels)
-    #val_graphs = helper(A, val_indices, val_labels)
-    #test_graphs = helper(A, test_indices, test_labels)
+    val_graphs = helper(A, val_indices, val_labels)
+    test_graphs = helper(A, test_indices, test_labels)
 
-    return train_graphs, None, None #val_graphs, test_graphs
+    return train_graphs, val_graphs, test_graphs
 
 
 def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_ratio=1.0, max_nodes_per_hop=None, u_features=None, v_features=None, class_values=None):
@@ -555,6 +555,7 @@ def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_
     # remove link between target nodes
     subgraph[0, 0] = 0
     u, v, r = ssp.find(subgraph)
+    v += len(u_nodes)
     r = r.astype(int)
     
     # Constructing DGL graph
@@ -562,15 +563,12 @@ def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_
     rating_graphs = []
     num_user, num_movie = A.shape
     
-    subgraph_info = {'g_label': g_label}
-
-    for rating in class_values:
-        ridx = np.where(r == rating)
-        rrow = u[ridx]
-        rcol = v[ridx]
-        rating = str(int(rating)).replace('.', '_')
-        subgraph_info[('user', rating, 'movie')]= (rrow, rcol)
-        subgraph_info[('movie', 'rev_'+rating, 'user')]= (rcol, rrow)
+    # Add bidirection link
+    src = np.concatenate([u, v])
+    dst = np.concatenate([v, u])
+    # NOTE: RelGraphConv count relation from 0??
+    bi_r = np.concatenate([r, r]) - 1 
+    subgraph_info = {'g_label': g_label, 'src': src, 'dst': dst, 'etype': bi_r}
 
     # get structural node labels
     # NOTE: only use subgraph here
@@ -579,11 +577,9 @@ def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_
     u_x = one_hot(u_node_labels, max_node_label+1)
     v_x = one_hot(v_node_labels, max_node_label+1)
  
-    subgraph_info['u'] = u_x
-    subgraph_info['v'] = v_x
+    subgraph_info['x'] = np.concatenate([u_x, v_x], axis=0)
     return subgraph_info
-
-   
+ 
     '''
     # get node features
     if u_features is not None:
