@@ -601,7 +601,7 @@ def node_split(nodes, partition_book, rank):
             nodes = nodes[np.arange(len(nodes))]
         return np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids))
 
-def edge_split(edges, g, rank):
+def edge_split(edges, partition_book, rank):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
