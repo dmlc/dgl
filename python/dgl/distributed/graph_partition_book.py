@@ -12,38 +12,23 @@ class GraphPartitionBook:
     ----------
     part_id : int
         partition id of current GraphPartitionBook
-    partition_meta : tuple
-        partition meta data created by partition_graph() API, including
-        (num_nodes, num_edges, node_map, edge_map, num_parts)
-    local_graph : DGLGraph
+    num_parts : int
+        number of total partitions
+    node_map : numpy array
+        global node id mapping to partition id
+    edge_map : numpy array
+        global edge id mapping to partition id
+    part_graph : DGLGraph
         The graph partition structure.
-    ip_config_file : str
-        path of IP configuration file. The format of configuration file should be:
-
-          [ip] [base_port] [server_count]
-
-          172.31.40.143 30050 2
-          172.31.36.140 30050 2
-          172.31.47.147 30050 2
-          172.31.30.180 30050 2
-
-         we assume that ip is sorted by machine ID in ip_config_file.
     """
-    def __init__(self, part_id, partition_meta, local_graph, ip_config_file):
+    def __init__(self, part_id, num_parts, node_map, edge_map, part_graph):
         assert part_id >= 0, 'part_id cannot be a negative number.'
-        assert len(partition_meta) == 5, \
-        'partition_meta must include: (num_nodes, num_edges, node_map, edge_map, num_parts)'
+        assert num_parts > 0, 'num_parts must be greater than zero.'
         self._part_id = part_id
-        self._graph = local_graph
-        _, _, self._nid2partid, self._eid2partid, self._num_partitions = partition_meta
-        self._nid2partid = F.tensor(self._nid2partid)
-        self._eid2partid = F.tensor(self._eid2partid)
-        # Read ip list from ip_config_file
-        self._ip_list = []
-        lines = [line.rstrip('\n') for line in open(ip_config_file)]
-        for line in lines:
-            ip_addr, _, _ = line.split(' ')
-            self._ip_list.append(ip_addr)
+        self._num_partitions = num_parts
+        self._nid2partid = F.zerocopy_from_numpy(node_map)
+        self._eid2partid = F.zerocopy_from_numpy(edge_map)
+        self._graph = part_graph
         # Get meta data of GraphPartitionBook
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
@@ -51,7 +36,6 @@ class GraphPartitionBook:
         for partid in range(self._num_partitions):
             part_info = {}
             part_info['machine_id'] = partid
-            part_info['ip'] = self._ip_list[partid]
             part_info['num_nodes'] = nid_count[partid]
             part_info['num_edges'] = eid_count[partid]
             self._partition_meta_data.append(part_info)
@@ -75,6 +59,7 @@ class GraphPartitionBook:
         self._nidg2l = [None] * self._num_partitions
         global_id = self._graph.ndata[NID]
         max_global_id = np.amax(F.asnumpy(global_id))
+        # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._nidg2l[self._part_id] = g2l
@@ -82,6 +67,7 @@ class GraphPartitionBook:
         self._eidg2l = [None] * self._num_partitions
         global_id = self._graph.edata[EID]
         max_global_id = np.amax(F.asnumpy(global_id))
+        # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
