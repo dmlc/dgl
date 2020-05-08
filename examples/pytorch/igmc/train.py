@@ -137,7 +137,6 @@ def train(args):
                 for p in optimizer.param_groups:
                     p['lr'] = learning_rate
 
-        # save ckpt for each epoch
 
 
         print (logging_str)
