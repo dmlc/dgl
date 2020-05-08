@@ -799,8 +799,20 @@ class DGLBaseGraph(object):
 
         Returns
         ---------
-        dtype: str
-            "int32" or "int64"
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        """
+        return getattr(F, self._graph.dtype)
+    
+
+    @property
+    def _idtype_str(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
         """
         return self._graph.dtype
 

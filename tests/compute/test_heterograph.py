@@ -30,12 +30,12 @@ def create_test_heterograph(index_dtype):
     plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game', index_dtype=index_dtype)
     wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game', index_dtype=index_dtype)
     develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game', index_dtype=index_dtype)
-    assert follows_g.idtype == index_dtype
-    assert plays_g.idtype == index_dtype
-    assert wishes_g.idtype == index_dtype
-    assert develops_g.idtype == index_dtype
+    assert follows_g._idtype_str == index_dtype
+    assert plays_g._idtype_str == index_dtype
+    assert wishes_g._idtype_str == index_dtype
+    assert develops_g._idtype_str == index_dtype
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
-    assert g.idtype == index_dtype
+    assert g._idtype_str == index_dtype
     return g
 
 def create_test_heterograph1(index_dtype):
@@ -796,7 +796,7 @@ def test_convert(index_dtype):
     hg.edges['plays'].data['x'] = F.randn((4, 3))
 
     g = dgl.to_homo(hg)
-    assert g.idtype == index_dtype
+    assert g._idtype_str == index_dtype
     assert F.array_equal(F.cat(hs, dim=0), g.ndata['h'])
     assert 'x' not in g.ndata
     assert F.array_equal(F.cat(ws, dim=0), g.edata['w'])
@@ -842,7 +842,7 @@ def test_convert(index_dtype):
     g.ndata[dgl.NTYPE] = F.tensor([0, 0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0, 1, 2])
     hg = dgl.to_hetero(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
-    assert hg.idtype == index_dtype
+    assert hg._idtype_str == index_dtype
     assert set(hg.canonical_etypes) == set(
         [('l0', 'e0', 'l1'), ('l1', 'e1', 'l2'), ('l0', 'e2', 'l2')])
     assert hg.number_of_nodes('l0') == 2
@@ -861,7 +861,7 @@ def test_convert(index_dtype):
     g.edata[dgl.ETYPE] = F.tensor([0, 0])
     for _mg in [None, mg]:
         hg = dgl.to_hetero(g, ['user', 'TV', 'movie'], ['watches'], metagraph=_mg)
-        assert hg.idtype == index_dtype
+        assert hg._idtype_str == index_dtype
         assert set(hg.canonical_etypes) == set(
             [('user', 'watches', 'movie'), ('user', 'watches', 'TV')])
         assert hg.number_of_nodes('user') == 1
@@ -883,13 +883,13 @@ def test_transform(index_dtype):
     g.nodes['user'].data['h'] = x
 
     new_g = dgl.metapath_reachable_graph(g, ['follows', 'plays'])
-    assert new_g.idtype == index_dtype
+    assert new_g._idtype_str == index_dtype
     assert new_g.ntypes == ['user', 'game']
     assert new_g.number_of_edges() == 3
     assert F.asnumpy(new_g.has_edges_between([0, 0, 1], [0, 1, 1])).all()
 
     new_g = dgl.metapath_reachable_graph(g, ['follows'])
-    assert new_g.idtype == index_dtype
+    assert new_g._idtype_str == index_dtype
     assert new_g.ntypes == ['user']
     assert new_g.number_of_edges() == 2
     assert F.asnumpy(new_g.has_edges_between([0, 1], [1, 2])).all()
@@ -1420,14 +1420,14 @@ def test_empty_heterograph(index_dtype):
     assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
 
     g = dgl.heterograph({('user', 'follows', 'user'): []}, index_dtype=index_dtype)
-    assert g.idtype == index_dtype
+    assert g._idtype_str == index_dtype
     assert g.number_of_nodes('user') == 0
     assert g.number_of_edges('follows') == 0
 
     # empty relation graph with others
     g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [
                         (0, 0), (1, 1)]}, index_dtype=index_dtype)
-    assert g.idtype == index_dtype
+    assert g._idtype_str == index_dtype
     assert g.number_of_nodes('user') == 0
     assert g.number_of_edges('plays') == 0
     assert g.number_of_nodes('game') == 2
@@ -1618,15 +1618,15 @@ def test_bipartite(index_dtype):
 @parametrize_dtype
 def test_dtype_cast(index_dtype):
     g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], index_dtype=index_dtype)
-    assert g.idtype == index_dtype
+    assert g._idtype_str == index_dtype
     g.ndata["feat"] = F.tensor([3, 4, 5])
     g.edata["h"] = F.tensor([3, 4, 5, 6])
     if index_dtype == "int32":
         g_cast = g.long()
-        assert g_cast.idtype == 'int64'
+        assert g_cast._idtype_str == 'int64'
     else:
         g_cast = g.int()
-        assert g_cast.idtype == 'int32'
+        assert g_cast._idtype_str == 'int32'
     assert "feat" in g_cast.ndata
     assert "h" in g_cast.edata
     assert F.array_equal(g.ndata["feat"], g_cast.ndata["feat"])

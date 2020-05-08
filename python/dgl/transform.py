@@ -1027,7 +1027,7 @@ def in_subgraph(g, nodes):
         if ntype in nodes:
             nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
         else:
-            nodes_all_types.append(nd.NULL[g._idtype_str], ctx=nd.cpu())
+            nodes_all_types.append(nd.NULL[g._idtype_str])
 
     subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1064,9 +1064,9 @@ def out_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g.idtype).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
         else:
-            nodes_all_types.append(nd.NULL[g.idtype])
+            nodes_all_types.append(nd.NULL[g._idtype_str])
 
     subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
