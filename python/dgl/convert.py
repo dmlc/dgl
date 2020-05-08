@@ -388,11 +388,11 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         ntypes = list(sorted(num_nodes_per_type.keys()))
         num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes], "int64")
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
-    index_dtype = rel_graphs[0].idtype
+    index_dtype = rel_graphs[0]._idtype_str
     for rgrh in rel_graphs:
-        if rgrh.idtype != index_dtype:
+        if rgrh._idtype_str != index_dtype:
             raise Exception("Expect relation graphs to be {}, but got {}".format(
-                index_dtype, rgrh.idtype))
+                index_dtype, rgrh._idtype_str))
         stype, etype, dtype = rgrh.canonical_etypes[0]
         meta_edges_src.append(ntype_dict[stype])
         meta_edges_dst.append(ntype_dict[dtype])
@@ -597,7 +597,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
                        ' type of nodes and edges.')
 
     num_ntypes = len(ntypes)
-    index_dtype = G.idtype
+    index_dtype = G._idtype_str
 
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
@@ -735,7 +735,7 @@ def to_homo(G):
         num_nodes = G.number_of_nodes(ntype)
         total_num_nodes += num_nodes
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
-        nids.append(F.arange(0, num_nodes, G.idtype))
+        nids.append(F.arange(0, num_nodes, G._idtype_str))
 
     for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
@@ -744,10 +744,10 @@ def to_homo(G):
         srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
         dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
-        eids.append(F.arange(0, num_edges, G.idtype))
+        eids.append(F.arange(0, num_edges, G._idtype_str))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
-                 validate=False, index_dtype=G.idtype)
+                 validate=False, index_dtype=G._idtype_str)
     retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
     retg.ndata[NID] = F.cat(nids, 0)
     retg.edata[ETYPE] = F.cat(etype_ids, 0)

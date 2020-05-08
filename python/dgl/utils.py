@@ -59,7 +59,7 @@ class Index(object):
                                                   F.reverse_data_type_dict[F.dtype(data)]))
             if len(F.shape(data)) > 1:
                 raise InconsistentDtypeException('Index data must be 1D int32/int64 vector,\
-                    but got: %s' % str(F.dtype(data)))
+                    but got shape: %s' % str(F.shape(data)))
             if len(F.shape(data)) == 0:
                 # a tensor of one int
                 self._dispatch(int(data))

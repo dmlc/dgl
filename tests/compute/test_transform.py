@@ -280,7 +280,7 @@ def test_in_subgraph(index_dtype):
     g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', index_dtype=index_dtype)
     hg = dgl.hetero_from_relations([g1, g2, g3, g4])
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg.idtype == index_dtype
+    assert subg._idtype_str == index_dtype
     assert len(subg.ntypes) == 3
     assert len(subg.etypes) == 4
     u, v = subg['follow'].edges()
@@ -306,7 +306,7 @@ def test_out_subgraph(index_dtype):
     g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', index_dtype=index_dtype)
     hg = dgl.hetero_from_relations([g1, g2, g3, g4])
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg.idtype == index_dtype
+    assert subg._idtype_str == index_dtype
     assert len(subg.ntypes) == 3
     assert len(subg.etypes) == 4
     u, v = subg['follow'].edges()
@@ -364,7 +364,7 @@ def test_compact(index_dtype):
     new_g1 = dgl.compact_graphs(g1)
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert new_g1.idtype == index_dtype
+    assert new_g1._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
     assert set(induced_nodes['game']) == set([4, 5, 6])
     _check(g1, new_g1, induced_nodes)
@@ -372,7 +372,7 @@ def test_compact(index_dtype):
     # Test with always_preserve given a dict
     new_g1 = dgl.compact_graphs(
         g1, always_preserve={'game': F.tensor([4, 7], dtype=getattr(F, index_dtype))})
-    assert new_g1.idtype == index_dtype
+    assert new_g1._idtype_str == index_dtype
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
@@ -385,7 +385,7 @@ def test_compact(index_dtype):
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     
-    assert new_g3.idtype == index_dtype
+    assert new_g3._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 7])
     _check(g3, new_g3, induced_nodes)
 
@@ -393,8 +393,8 @@ def test_compact(index_dtype):
     new_g1, new_g2 = dgl.compact_graphs([g1, g2])
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert new_g1.idtype == index_dtype
-    assert new_g2.idtype == index_dtype
+    assert new_g1._idtype_str == index_dtype
+    assert new_g2._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
     assert set(induced_nodes['game']) == set([3, 4, 5, 6])
     _check(g1, new_g1, induced_nodes)
@@ -405,8 +405,8 @@ def test_compact(index_dtype):
         [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=getattr(F, index_dtype))})
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}    
-    assert new_g1.idtype == index_dtype
-    assert new_g2.idtype == index_dtype
+    assert new_g1._idtype_str == index_dtype
+    assert new_g2._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
     assert set(induced_nodes['game']) == set([3, 4, 5, 6, 7])
     _check(g1, new_g1, induced_nodes)
@@ -418,8 +418,8 @@ def test_compact(index_dtype):
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     
-    assert new_g3.idtype == index_dtype
-    assert new_g4.idtype == index_dtype
+    assert new_g3._idtype_str == index_dtype
+    assert new_g4._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 3, 5, 7])
     _check(g3, new_g3, induced_nodes)
     _check(g4, new_g4, induced_nodes)
@@ -513,7 +513,7 @@ def test_to_block(index_dtype):
     g_ab = g['AB']
 
     bg = dgl.to_block(g_ab)
-    assert bg.idtype == index_dtype
+    assert bg._idtype_str == index_dtype
     assert bg.number_of_nodes('SRC/B') == 4
     assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
     assert bg.number_of_nodes('DST/A') == 0

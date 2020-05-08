@@ -463,7 +463,7 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or bipartite graph.
     """
     adj = 1
-    index_dtype = g.idtype
+    index_dtype = g._idtype_str
     for etype in metapath:
         adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
@@ -745,14 +745,14 @@ def compact_graphs(graphs, always_preserve=None):
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
-    graph_dtype = graphs[0].idtype
+    graph_dtype = graphs[0]._idtype_str
     graph_ctx = graphs[0]._graph.ctx()
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
-        assert graph_dtype == g.idtype, "Expect graph data type to be {}, but got {}".format(
-            graph_dtype, g.idtype)
+        assert graph_dtype == g._idtype_str, "Expect graph data type to be {}, but got {}".format(
+            graph_dtype, g._idtype_str)
         assert graph_ctx == g._graph.ctx(), "Expect graph device to be {}, but got {}".format(
             graph_ctx, g._graph.ctx())
 
@@ -922,7 +922,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         if nodes is not None:
             dst_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
         else:
-            dst_nodes_nd.append(nd.NULL[g.idtype])
+            dst_nodes_nd.append(nd.NULL[g._idtype_str])
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_nodes_nd, include_dst_in_src)
@@ -938,7 +938,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
             new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
         else:
             # For empty dst node sets, still create empty mapping arrays.
-            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=getattr(F, g.idtype))
+            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=g.idtype)
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
@@ -973,9 +973,9 @@ def remove_edges(g, edge_ids):
                 "Graph has more than one edge type; specify a dict for edge_id instead.")
         edge_ids = {g.canonical_etypes[0]: edge_ids}
 
-    edge_ids_nd = [nd.NULL[g.idtype]] * len(g.etypes)
+    edge_ids_nd = [nd.NULL[g._idtype_str]] * len(g.etypes)
     for key, value in edge_ids.items():
-        if value.dtype != getattr(F, g.idtype):
+        if value.dtype != g.idtype:
             # if didn't check, this function still works, but returns wrong result
             raise utils.InconsistentDtypeException("Expect edge id tensors({}) to have \
          the same index type as graph({})".format(value.dtype, g.idtype))
@@ -1025,9 +1025,9 @@ def in_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g.idtype).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
         else:
-            nodes_all_types.append(nd.array(np.array([], dtype=g.idtype), ctx=nd.cpu()))
+            nodes_all_types.append(nd.NULL[g._idtype_str], ctx=nd.cpu()))
 
     subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1066,7 +1066,7 @@ def out_subgraph(g, nodes):
         if ntype in nodes:
             nodes_all_types.append(utils.toindex(nodes[ntype], g.idtype).todgltensor())
         else:
-            nodes_all_types.append(nd.array(np.array([], dtype=g.idtype), ctx=nd.cpu()))
+            nodes_all_types.append(nd.NULL[g.idtype])
 
     subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
