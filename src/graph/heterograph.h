@@ -187,6 +187,16 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
   }
 
+  std::string GetRestrictFormat() const override {
+    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
+    return std::string("");
+  }
+
+  dgl_format_code_t GetFormatInUse() const override {
+    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
+    return 0;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(

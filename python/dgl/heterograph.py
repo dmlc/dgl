@@ -4150,15 +4150,13 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-<<<<<<< HEAD
     def format(self, etype=None, return_all=False):
         """Return the sparse formats in use of the given edge/relation type.
 
         Returns
         -------
-        string or list of string
-            If return_all is True, return all the formats currently in use (could be multiple).
-            Otherwise, return any one that is in use.
+        list of string
+            Return all the formats currently in use (could be multiple).
 
         See Also
         --------
@@ -4196,7 +4194,7 @@ class DGLHeteroGraph(object):
         restrict_format
         """
         pass
-=======
+
     def long(self):
         """Return a heterograph object use int64 as index dtype,
         with the ndata and edata as the original object
@@ -4244,7 +4242,6 @@ class DGLHeteroGraph(object):
         return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
                               self._node_frames,
                               self._edge_frames)
->>>>>>> upstream/master
 
 ############################################################
 # Internal APIs

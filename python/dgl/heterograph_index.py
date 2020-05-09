@@ -914,7 +914,17 @@ class HeteroGraphIndex(ObjectBase):
         -------
         list of string : return all the formats currently in use (could be multiple).
         """
-        return _CAPI_DGLHeteroGetFormatInUse(self, etype)
+        format_code = _CAPI_DGLHeteroGetFormatInUse(self, etype)
+        ret = []
+        if format_code & 1:
+            ret.append('coo')
+        format_code >>= 1
+        if format_code & 1:
+            ret.append('csc')
+        format_code >>= 1
+        if format_code & 1:
+            ret.append('csr')
+        return ret
 
     def restrict_format(self, etype):
         """Return restrict sparse format of the given edge/relation type.

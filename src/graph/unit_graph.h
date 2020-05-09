@@ -223,15 +223,17 @@ class UnitGraph : public BaseHeteroGraph {
     return SelectFormat(preferred_format);
   }
 
+  std::string GetRestrictFormat() const override{
+    return ToStringSparseFormat(this->restrict_format_);
+  }
+
+  dgl_format_code_t GetFormatInUse() const override;
+
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
 
   /*! \return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
-
-  std::string GetRestrictFormat() const {
-    return ToStringSparseFormat(this->restrict_format_);
-  }
 
  private:
   friend class Serializer;
@@ -280,19 +282,6 @@ class UnitGraph : public BaseHeteroGraph {
    * \return A graph in the requested format.
    */
   HeteroGraphPtr GetFormat(SparseFormat format) const;
-
-  /*!
-   * \brief Return the sparse format in use for the graph.
-   * 
-   * \return a number of type dgl_format_code_t, whose binary representation indices
-   * which sparse format is in use and which is not.
-   * 
-   * Suppose the binary representation is xyz, then
-   * - x indicates whether csc is in use (1 for true and 0 for false).
-   * - y indicates whether csr is in use.
-   * - z indicates whether coo is in use.
-   */
-  dgl_format_code_t GetFormatInUse() const;
 
   /*!
    * \brief Determine which format to use with a preference.

@@ -371,13 +371,22 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get restrict sparse format of the graph.
    * 
-   * This function is only implemented for UnitGraph.
    * \return a string representing the sparse format: 'coo'/'csr'/'csc'/'any'
    */
-  virtual std::string GetRestrictFormat() const {
-    LOG(FATAL) << "Not implemented.";
-    return "";
-  }
+  virtual std::string GetRestrictFormat() const = 0;
+
+  /*!
+   * \brief Return the sparse format in use for the graph.
+   * 
+   * \return a number of type dgl_format_code_t, whose binary representation indices
+   * which sparse format is in use and which is not.
+   * 
+   * Suppose the binary representation is xyz, then
+   * - x indicates whether csc is in use (1 for true and 0 for false).
+   * - y indicates whether csr is in use.
+   * - z indicates whether coo is in use.
+   */
+  virtual dgl_format_code_t GetFormatInUse() const = 0;
 
   /*!
    * \brief Get adjacency matrix in COO format.
