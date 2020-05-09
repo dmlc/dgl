@@ -12,3 +12,7 @@ def start_server(clients):
         Client information
     """
     pass
+
+def finalize():
+    """Release resources of this server."""
+    pass

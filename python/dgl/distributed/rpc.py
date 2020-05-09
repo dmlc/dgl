@@ -23,7 +23,7 @@ def set_rank(rank):
     int
         Rank value
     """
-    pass
+    _CAPI_DGLRPCSetRank(int(rank))
 
 def get_rank():
     """Get the rank of this process.
@@ -36,7 +36,7 @@ def get_rank():
     int
         Rank value
     """
-    pass
+    return _CAPI_DGLRPCGetRank()
 
 def incr_msg_seq():
     """Increment the message sequence number and return the old one.
@@ -46,7 +46,7 @@ def incr_msg_seq():
     long
         Message sequence number
     """
-    pass
+    return _CAPI_DGLRPCIncrMsgSeq()
 
 def get_msg_seq():
     """Get the current message sequence number.
@@ -56,7 +56,7 @@ def get_msg_seq():
     long
         Message sequence number
     """
-    pass
+    return _CAPI_DGLRPCGetMsgSeq()
 
 def register_service(service_id, req_cls, res_cls=None):
     """Register a service to RPC.
@@ -261,7 +261,7 @@ class RPCMessage(ObjectBase):
     """
     def __init__(self, service_id, msg_seq, client_id, server_id, data, tensors):
         self.__init_handle_by_constructor__(
-            _CAPI_DGLCreateRPCMessage,
+            _CAPI_DGLRPCCreateRPCMessage,
             int(service_id),
             int(msg_seq),
             int(client_id),
@@ -272,7 +272,7 @@ class RPCMessage(ObjectBase):
     @property
     def service_id(self):
         """Get service ID."""
-        return _CAPI_DGLRPCMessageGetReqType(self)
+        return _CAPI_DGLRPCMessageGetServiceId(self)
 
     @property
     def msg_seq(self):
@@ -297,7 +297,7 @@ class RPCMessage(ObjectBase):
     @property
     def tensors(self):
         """Get tensor payloads."""
-        rst = _CAPI_DGLRPCMessageGetData(self)
+        rst = _CAPI_DGLRPCMessageGetTensors(self)
         return [F.zerocopy_from_dgl_ndarray(tsor) for tsor in rst]
 
 def send_request(target, request):
@@ -450,7 +450,8 @@ def send_rpc_message(msg):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    pass
+    status = _CAPI_DGLRPCSendRPCMessage(msg)
+    # TODO: handle status flag
 
 def recv_rpc_message(timeout=0):
     """Receive one message.
@@ -472,6 +473,9 @@ def recv_rpc_message(timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    pass
+    msg = _CAPI_DGLRPCCreateEmptyRPCMessage()
+    status = _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
+    # TODO: handle status flag
+    return msg
 
 _init_api("dgl.distributed.rpc")

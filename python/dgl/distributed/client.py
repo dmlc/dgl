@@ -14,6 +14,10 @@ def connect_to_server(server_namebook):
     """
     pass
 
+def finalize():
+    """Release resources of this client."""
+    pass
+
 def get_server_namebook():
     """Get the servers this client connects to.
 
