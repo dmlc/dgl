@@ -3,7 +3,7 @@ import torch
 
 from dgllife.data import USPTORank, WLNRankDataset
 from dgllife.model import WLNReactionRanking
-from torch.nn import BCEWithLogitsLoss
+from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
@@ -48,7 +48,7 @@ def main(args, path_to_candidate_bonds):
         edge_in_feats=args['edge_in_feats'],
         node_hidden_feats=args['hidden_size'],
         num_encode_gnn_layers=args['num_encode_gnn_layers']).to(args['device'])
-    criterion = BCEWithLogitsLoss(reduction='sum')
+    criterion = CrossEntropyLoss(reduction='sum')
     optimizer = Adam(model.parameters(), lr=args['lr'])
     from utils import Optimizer
     optimizer = Optimizer(model, args['lr'], optimizer, max_grad_norm=args['max_norm'])
@@ -81,18 +81,19 @@ def main(args, path_to_candidate_bonds):
                          batch_num_candidate_products=batch_num_candidate_products)
 
             # Check if the ground truth candidate has the highest score
+            batch_loss = 0
             product_graph_start = 0
             for i in range(len(batch_num_candidate_products)):
                 product_graph_end = product_graph_start + batch_num_candidate_products[i]
                 reaction_pred = pred[product_graph_start:product_graph_end, :]
                 acc_sum += float(reaction_pred.max(dim=0)[1].detach().cpu().data.item() == 0)
+                batch_loss += criterion(reaction_pred.reshape(1, -1), batch_labels[i:i+1, :])
                 product_graph_start = product_graph_end
 
-            loss = criterion(pred, batch_labels)
-            grad_norm_sum += optimizer.backward_and_step(loss)
+            grad_norm_sum += optimizer.backward_and_step(batch_loss)
             total_samples += args['batch_size']
             if total_samples % args['print_every'] == 0:
-                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} |' \
+                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time {:.4f} | ' \
                            'accuracy {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'],
                     (batch_id + 1) * args['batch_size'] // args['print_every'],

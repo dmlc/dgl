@@ -2,7 +2,6 @@
 import errno
 import numpy as np
 import os
-import pickle
 import random
 import torch
 
@@ -1466,8 +1465,7 @@ class WLNRankDataset(object):
 
         batch_size = len(g_list)
         if self.mode == 'train':
-            labels = torch.zeros(batch_size - 1, 1).float()
-            labels[0] = 1.
+            labels = torch.tensor([[0.]])
             return g_list, candidate_scores, labels
         else:
             reactant_mol = self.reactant_mols[item]
