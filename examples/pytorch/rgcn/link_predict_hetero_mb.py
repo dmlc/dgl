@@ -416,7 +416,6 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
                 loc = tail_pos == 1
                 u_ec = su[idx]
                 n_v_ec = n_v[loc]
-
                 false_neg_comp = th.full((n_v_ec.shape[0],), 0, device=device)
                 for idx_ec in range(n_v_ec.shape[0]):
                     sn_v_ec = n_v_ec[idx_ec]
@@ -444,7 +443,7 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
                         false_neg_comp[idx_ec] = pos_score[idx]
                 h_neg_score[idx][loc] += false_neg_comp
 
-            neg_score = th.cat([h_neg_score, t_neg_score], dim = 1)
+            neg_score = th.cat([h_neg_score, t_neg_score], dim=1)
             rankings = th.sum(neg_score >= pos_score, dim=1) + 1
             rankings = rankings.cpu().detach().numpy()
             for ranking in rankings:
