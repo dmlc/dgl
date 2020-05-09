@@ -596,9 +596,9 @@ def collate_rank_train(data):
         DGLGraph for a batch of B candidate products
     combo_scores : float32 tensor of shape (B, 1)
         Scores for candidate products by the model for reaction center prediction.
-    labels : float32 tensor of shape (N, 1)
-        Binary labels for candidate products, where 1 indicates the real product and
-        N indicates the number of reactions.
+    labels : int64 tensor of shape (N, 1)
+        Indices for the true candidate product across reactions, which is always 0
+        with pre-processing. N is for the number of reactions.
     batch_num_candidate_products : list of int
         Number of candidate products for the reactions in this batch.
     """

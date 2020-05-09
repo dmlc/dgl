@@ -1416,8 +1416,8 @@ class WLNRankDataset(object):
             node features in ndata['hv'].
         candidate_scores : float32 tensor of shape (B, 1)
             The sum of scores for bond changes in each combo, where B is the number of combos.
-        labels : float32 tensor of shape (B, 1), optional
-            Binary labels where 1 indicates the ground truth product of the reaction. This is
+        labels : int64 tensor of shape (1, 1), optional
+            Index for the true candidate product, which is always 0 with pre-processing. This is
             returned only when we are not in the training mode.
         valid_candidate_combos : list, optional
             valid_candidate_combos[i] gives a list of tuples, which is the i-th valid combo
@@ -1463,9 +1463,8 @@ class WLNRankDataset(object):
         for g in g_list:
             g.ndata['hv'] = node_feats
 
-        batch_size = len(g_list)
         if self.mode == 'train':
-            labels = torch.tensor([[0.]])
+            labels = torch.zeros(1, 1).long()
             return g_list, candidate_scores, labels
         else:
             reactant_mol = self.reactant_mols[item]

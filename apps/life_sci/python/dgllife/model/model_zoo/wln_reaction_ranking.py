@@ -21,6 +21,17 @@ class WLNReactionRanking(nn.Module):
 
     The model updates representations of nodes in candidate products with WLN and predicts
     the score for candidate products to be the real product.
+
+    Parameters
+    ----------
+    node_in_feats : int
+        Size for the input node features.
+    edge_in_feats : int
+        Size for the input edge features.
+    node_hidden_feats : int
+        Size for the hidden node representations. Default to 500.
+    num_encode_gnn_layers : int
+        Number of WLN layers for updating node representations.
     """
     def __init__(self,
                  node_in_feats,
