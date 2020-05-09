@@ -98,7 +98,9 @@ class Request:
     def __getstate__(self):
         """Get serializable states.
 
-        Must be inherited by subclasses.
+        Must be inherited by subclasses. For array members, return them as
+        individual return values (i.e., do not put them in containers like
+        dictionary or list).
         """
         pass
 
@@ -144,7 +146,9 @@ class Response:
     def __getstate__(self):
         """Get serializable states.
 
-        Must be inherited by subclasses.
+        Must be inherited by subclasses. For array members, return them as
+        individual return values (i.e., do not put them in containers like
+        dictionary or list).
         """
         pass
 

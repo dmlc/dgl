@@ -4,8 +4,8 @@
  * \brief This file provide basic facilities for string
  * to make programming convenient.
  */
-#ifndef DGL_GRAPH_NETWORK_COMMON_H_
-#define DGL_GRAPH_NETWORK_COMMON_H_
+#ifndef DGL_RPC_NETWORK_COMMON_H_
+#define DGL_RPC_NETWORK_COMMON_H_
 
 #include <dmlc/logging.h>
 
@@ -130,4 +130,4 @@ void StringAppendF(std::string* dst, const char* format, ...);
 }  // namespace network
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_NETWORK_COMMON_H_
+#endif  // DGL_RPC_NETWORK_COMMON_H_
