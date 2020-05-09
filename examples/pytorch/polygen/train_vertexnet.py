@@ -89,15 +89,13 @@ def main(dev_id, args):
             with T.set_grad_enabled(True):
                 output = model(train_batch)
                 tgt_y = train_batch.tgt_y
-                print (train_batch.tgt[0].shape, train_batch.tgt[1].shape)
                 n_tokens = train_batch.n_tokens
                 train_loss = train_loss_compute(output, tgt_y, n_tokens)
         train_iter_num += 1
 
         # testing logging
         if train_iter_num % args.log_interval == 0 and dev_rank == 0:
-            '''
-            # train step
+            # test step
             try:
                 test_batch = test_iter.next()
             except:
@@ -109,13 +107,12 @@ def main(dev_id, args):
                     tgt_y = test_batch.tgt_y
                     n_tokens = test_batch.n_tokens
                     test_loss = test_loss_compute(output, tgt_y, n_tokens)
-            '''
             print ('train', train_iter_num, train_loss)
-            #print ('test', train_iter_num, test_loss)
+            print ('test', train_iter_num, test_loss)
             train_info = 'train,'+str(train_iter_num)+','+str(train_loss)
-           # test_info = 'test,'+str(train_iter_num)+','+str(test_loss)
+            test_info = 'test,'+str(train_iter_num)+','+str(test_loss)
             log_f.write(train_info+'\n')
-            #log_f.write(test_info+'\n')
+            log_f.write(test_info+'\n')
             log_f.flush()
  
         if (train_iter_num % args.ckpt_interval == 0 or train_iter_num == args.total_iter) and dev_rank == 0:
