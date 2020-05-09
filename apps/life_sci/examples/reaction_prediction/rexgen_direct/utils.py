@@ -461,7 +461,7 @@ def reaction_center_final_eval(args, top_ks, model, data_loader, easy):
     for k, correct_count in num_correct.items():
         msg += ' acc@{:d} {:.4f} |'.format(k, correct_count / len(data_loader.dataset))
 
-    return msg
+    return msg + '\n'
 
 def output_candidate_bonds_for_a_reaction(info, max_k):
     """Prepare top-k atom pairs for each reaction as candidate bonds

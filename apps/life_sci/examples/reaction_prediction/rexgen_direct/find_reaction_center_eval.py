@@ -33,8 +33,8 @@ def main(args):
                                   node_out_feats=args['node_out_feats'],
                                   n_layers=args['n_layers'],
                                   n_tasks=args['n_tasks'])
-        model.load_state_dict(torch.load(args['result_path'] + '/model.pkl',
-                                         map_location='cpu')['model_state_dict'])
+        model.load_state_dict(torch.load(
+            args['result_path'], map_location='cpu')['model_state_dict'])
     model = model.to(args['device'])
 
     print('Evaluation on the test set.')
