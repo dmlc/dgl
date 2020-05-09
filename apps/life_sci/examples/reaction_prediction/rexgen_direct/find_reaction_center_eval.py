@@ -4,7 +4,7 @@ from dgllife.data import USPTOCenter, WLNCenterDataset
 from dgllife.model import WLNReactionCenter, load_pretrained
 from torch.utils.data import DataLoader
 
-from utils import reaction_center_final_eval, set_seed, collate_center
+from utils import reaction_center_final_eval, set_seed, collate_center, mkdir_p
 
 def main(args):
     set_seed()
@@ -70,4 +70,5 @@ if __name__ == '__main__':
     assert args['max_k'] >= max(args['top_ks_test']), \
         'Expect max_k to be no smaller than the possible options ' \
         'of top_ks_test, got {:d} and {:d}'.format(args['max_k'], max(args['top_ks_test']))
+    mkdir_p(args['result_path'])
     main(args)
