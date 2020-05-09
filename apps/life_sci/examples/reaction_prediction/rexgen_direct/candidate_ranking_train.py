@@ -113,7 +113,7 @@ def main(args, path_to_candidate_bonds):
                 print('Learning rate decayed from {:.4f} to {:.4f}'.format(old_lr, new_lr))
                 torch.save({'model_state_dict': model.state_dict()},
                            args['result_path'] + '/model_{:d}.pkl'.format(
-                               total_samples // args['batch_size']))
+                               total_samples // args['batch_size'] // args['print_every']))
                 prediction_summary = 'total iter {:d}, (epoch {:d}/{:d}, iter {:d}/{:d}) '.format(
                     total_samples // args['batch_size'] // args['print_every'],
                     epoch + 1, args['num_epochs'], (batch_id + 1) * args['batch_size'] // args['print_every'],
