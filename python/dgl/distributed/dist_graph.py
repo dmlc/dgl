@@ -12,6 +12,7 @@ from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition
+from .graph_partition_book import GraphPartitionBook
 from .. import ndarray as nd
 
 def _get_ndata_path(graph_name, ndata_name):
@@ -52,6 +53,7 @@ def _copy_graph_to_shared_mem(g, graph_name):
     return new_g
 
 FIELD_DICT = {'local_node': F.int64,
+              'local_edge': F.int64,
               NID: F.int64,
               EID: F.int64}
 
@@ -116,9 +118,19 @@ def _get_graph_from_shared_mem(graph_name):
 
     g = DGLGraph(gidx)
     g.ndata['local_node'] = _get_shared_mem_ndata(g, graph_name, 'local_node')
+    g.edata['local_edge'] = _get_shared_mem_edata(g, graph_name, 'local_edge')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
     return g
+
+def _move_metadata_to_shared_mam(graph_name, num_nodes, num_edges, part_id,
+                                 num_partitions, node_map, edge_map):
+    meta = _move_data_to_shared_mem_array(F.tensor([num_nodes, num_edges,
+                                                    num_partitions, part_id]),
+                                          _get_ndata_path(graph_name, 'meta'))
+    node_map = _move_data_to_shared_mem_array(node_map, _get_ndata_path(graph_name, 'node_map'))
+    edge_map = _move_data_to_shared_mem_array(edge_map, _get_edata_path(graph_name, 'edge_map'))
+    return meta, node_map, edge_map
 
 def _get_shared_mem_metadata(graph_name):
     ''' Get the metadata of the graph through shared memory.
@@ -126,12 +138,26 @@ def _get_shared_mem_metadata(graph_name):
     The metadata includes the number of nodes and the number of edges. In the future,
     we can add more information, especially for heterograph.
     '''
-    shape = (2,)
+    shape = (4,)
     dtype = F.int64
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
     dlpack = data.to_dlpack()
-    return F.zerocopy_from_dlpack(dlpack)
+    meta = F.zerocopy_from_dlpack(dlpack)
+    num_nodes, num_edges, num_partitions, part_id = F.as_scalar(meta[0]), F.as_scalar(meta[1]), \
+            F.as_scalar(meta[2]), F.as_scalar(meta[3])
+
+    # Load node map
+    data = empty_shared_mem(_get_ndata_path(graph_name, 'node_map'), False, (num_nodes,), dtype)
+    dlpack = data.to_dlpack()
+    node_map = F.zerocopy_from_dlpack(dlpack)
+
+    # Load edge_map
+    data = empty_shared_mem(_get_edata_path(graph_name, 'edge_map'), False, (num_edges,), dtype)
+    dlpack = data.to_dlpack()
+    edge_map = F.zerocopy_from_dlpack(dlpack)
+
+    return num_nodes, num_edges, part_id, num_partitions, node_map, edge_map
 
 class DistTensor:
     ''' Distributed tensor.
@@ -312,10 +338,8 @@ class DistGraphServer(KVServer):
         print('Server {}: host name: {}, ip: {}'.format(server_id, host_name, host_ip))
 
         self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
-        num_nodes, num_edges, node_map, edge_map, _ = self.meta
+        num_nodes, num_edges, node_map, edge_map, num_partitions = self.meta
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
-        self.meta = _move_data_to_shared_mem_array(F.tensor([num_nodes, num_edges]),
-                                                   _get_ndata_path(graph_name, 'meta'))
 
         # Create node global2local map.
         node_g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
@@ -354,6 +378,14 @@ class DistGraphServer(KVServer):
                 self.init_data(name=_get_edata_name(name))
                 self.set_partition_book(name=_get_edata_name(name), partition_book=edge_map)
 
+        # TODO(zhengda) this is temporary solution. We don't need this in the future.
+        self.meta, self.node_map, self.edge_map = _move_metadata_to_shared_mam(graph_name,
+                                                                               num_nodes,
+                                                                               num_edges,
+                                                                               server_id,
+                                                                               num_partitions,
+                                                                               node_map, edge_map)
+
 class DistGraph:
     ''' The DistGraph client.
 
@@ -383,9 +415,10 @@ class DistGraph:
         self._client = KVClient(server_namebook=server_namebook)
         self._client.connect()
 
-        self.g = _get_graph_from_shared_mem(graph_name)
-        self.graph_name = graph_name
-        self.meta = F.asnumpy(_get_shared_mem_metadata(graph_name))
+        self._g = _get_graph_from_shared_mem(graph_name)
+        self._tot_num_nodes, self._tot_num_edges, self._part_id, num_parts, node_map, \
+                edge_map = _get_shared_mem_metadata(graph_name)
+        self._gpb = GraphPartitionBook(self._part_id, num_parts, node_map, edge_map, self._g)
 
         self._client.barrier()
         self._ndata = NodeDataView(self)
@@ -488,11 +521,11 @@ class DistGraph:
 
     def number_of_nodes(self):
         """Return the number of nodes"""
-        return self.meta[0]
+        return self._tot_num_nodes
 
     def number_of_edges(self):
         """Return the number of edges"""
-        return self.meta[1]
+        return self._tot_num_edges
 
     def node_attr_schemes(self):
         """Return the node feature and embedding schemes."""
@@ -516,7 +549,20 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
-        return self._client.get_id()
+        # Here the rank of the client should be the same as the partition Id to ensure
+        # that we always get the local partition.
+        # TODO(zhengda) we need to change this if we support two-level partitioning.
+        return self._part_id
+
+    def get_partition_book(self):
+        """Get the partition information.
+
+        Returns
+        -------
+        GraphPartitionBook
+            Object that stores all kinds of partition information.
+        """
+        return self._gpb
 
     def shut_down(self):
         """Shut down all KVServer nodes.

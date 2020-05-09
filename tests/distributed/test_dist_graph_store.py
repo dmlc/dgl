@@ -76,6 +76,21 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     assert g.node_attr_schemes()['test1'].dtype == F.int32
     assert g.node_attr_schemes()['features'].shape == (1,)
 
+    selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
+    selected_edges = np.random.randint(0, 100, size=g.number_of_edges()) > 30
+    # Test node split
+    local_nids = F.nonzero_1d(g._g.ndata['local_node'])
+    local_nids = g._g.ndata[dgl.NID][local_nids]
+    nodes = node_split(selected_nodes, g.get_partition_book(), g.rank())
+    for n in nodes:
+        assert n in local_nids
+
+    local_eids = F.nonzero_1d(g._g.edata['local_edge'])
+    local_eids = g._g.edata[dgl.EID][local_eids]
+    edges = edge_split(selected_edges, g.get_partition_book(), g.rank())
+    for e in edges:
+        assert e in local_eids
+
     g.shut_down()
     print('end')
 
@@ -116,7 +131,7 @@ def test_split():
     num_hops = 2
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
 
-    selected_nodes = np.random.randint(0, 100, size=10000) > 30
+    selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     selected_edges = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
