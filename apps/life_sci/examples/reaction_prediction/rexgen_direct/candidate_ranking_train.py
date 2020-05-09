@@ -87,7 +87,7 @@ def main(args, path_to_candidate_bonds):
                 product_graph_end = product_graph_start + batch_num_candidate_products[i]
                 reaction_pred = pred[product_graph_start:product_graph_end, :]
                 acc_sum += float(reaction_pred.max(dim=0)[1].detach().cpu().data.item() == 0)
-                batch_loss += criterion(reaction_pred.reshape(1, -1), batch_labels[i:i+1, :])
+                batch_loss += criterion(reaction_pred.reshape(1, -1), batch_labels[i, :])
                 product_graph_start = product_graph_end
 
             grad_norm_sum += optimizer.backward_and_step(batch_loss)
