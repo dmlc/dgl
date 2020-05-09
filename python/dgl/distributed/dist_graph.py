@@ -388,14 +388,6 @@ class DistGraph:
         self.meta = F.asnumpy(_get_shared_mem_metadata(graph_name))
 
         self._client.barrier()
-
-        if self.g is not None:
-            self._local_nids = F.nonzero_1d(self.g.ndata['local_node'])
-            self._local_gnid = self.g.ndata[NID][self._local_nids]
-        else:
-            self._local_nids = None
-            self._local_gnid = None
-
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
 
