@@ -28,7 +28,6 @@ class GraphPartitionBook:
         self._num_partitions = num_parts
         self._nid2partid = F.zerocopy_from_numpy(node_map)
         self._eid2partid = F.zerocopy_from_numpy(edge_map)
-        self._graph = part_graph
         # Get meta data of GraphPartitionBook
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
@@ -57,7 +56,7 @@ class GraphPartitionBook:
             self._partid2eids.append(part_eids)
         # Get nidg2l
         self._nidg2l = [None] * self._num_partitions
-        global_id = self._graph.ndata[NID]
+        global_id = part_graph.ndata[NID]
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
@@ -65,7 +64,7 @@ class GraphPartitionBook:
         self._nidg2l[self._part_id] = g2l
         # Get eidg2l
         self._eidg2l = [None] * self._num_partitions
-        global_id = self._graph.edata[EID]
+        global_id = part_graph.edata[EID]
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
@@ -229,8 +228,4 @@ class GraphPartitionBook:
         DGLGraph
             The graph of the partition.
         """
-        if partid != self._part_id:
-            raise RuntimeError('Now GraphPartitionBook does not support \
-                getting remote partitions.')
-
-        return self._graph
+        return None
