@@ -125,6 +125,10 @@ def _get_graph_from_shared_mem(graph_name):
 
 def _move_metadata_to_shared_mam(graph_name, num_nodes, num_edges, part_id,
                                  num_partitions, node_map, edge_map):
+    ''' Move all metadata to the shared memory.
+
+    We need these metadata to construct graph partition book.
+    '''
     meta = _move_data_to_shared_mem_array(F.tensor([num_nodes, num_edges,
                                                     num_partitions, part_id]),
                                           _get_ndata_path(graph_name, 'meta'))
@@ -637,7 +641,7 @@ def node_split(nodes, partition_book, rank):
         # We need to move all node Ids to the local machine first.
         if isinstance(nodes, DistTensor):
             nodes = nodes[np.arange(len(nodes))]
-        return np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids))
+        return F.zerocopy_from_numpy(np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids)))
 
 def edge_split(edges, partition_book, rank):
     ''' Split edges and return a subset for the local rank.
@@ -679,4 +683,4 @@ def edge_split(edges, partition_book, rank):
     else:
         if isinstance(edges, DistTensor):
             edges = edges[np.arange(len(edges))]
-        return np.intersect1d(F.asnumpy(edges), F.asnumpy(local_eids))
+        return F.zerocopy_from_numpy(np.intersect1d(F.asnumpy(edges), F.asnumpy(local_eids)))
