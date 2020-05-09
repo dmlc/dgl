@@ -982,6 +982,9 @@ def get_product_smiles(reactant_mols, edits, product_info):
         return smiles
     return edit_mol(reactant_mols, edits, product_info)
 
+def generate_valid_candidate_combos():
+    return NotImplementedError
+
 def pre_process_one_reaction(info, num_candidate_bond_changes, max_num_bond_changes,
                              max_num_change_combos, mode):
     """Pre-process one reaction for candidate ranking.

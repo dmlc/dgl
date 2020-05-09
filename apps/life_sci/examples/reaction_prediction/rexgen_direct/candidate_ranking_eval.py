@@ -9,13 +9,16 @@ from utils import mkdir_p, prepare_reaction_center, collate_rank_eval, candidate
 
 def main(args, path_to_candidate_bonds):
     if args['test_path'] is None:
-        test_set = USPTORank(subset='test', candidate_bond_path=path_to_candidate_bonds['test'],
-                             num_processes=args['num_processes'])
+        test_set = USPTORank(
+            subset='test', candidate_bond_path=path_to_candidate_bonds['test'],
+            max_num_change_combos_per_reaction=args['max_num_change_combos_per_reaction_eval'],
+            num_processes=args['num_processes'])
     else:
-        test_set = WLNRankDataset(raw_file_path=args['test_path'],
-                                  candidate_bond_path=path_to_candidate_bonds['test'],
-                                  train_mode=False,
-                                  num_processes=args['num_processes'])
+        test_set = WLNRankDataset(
+            raw_file_path=args['test_path'],
+            candidate_bond_path=path_to_candidate_bonds['test'], mode='test',
+            max_num_change_combos_per_reaction=args['max_num_change_combos_per_reaction_eval'],
+            num_processes=args['num_processes'])
 
     test_loader = DataLoader(test_set, batch_size=1, collate_fn=collate_rank_eval,
                              shuffle=False, num_workers=args['num_workers'])

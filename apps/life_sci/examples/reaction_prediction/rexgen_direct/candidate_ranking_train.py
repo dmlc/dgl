@@ -13,21 +13,28 @@ from utils import prepare_reaction_center, mkdir_p, set_seed, collate_rank_train
 
 def main(args, path_to_candidate_bonds):
     if args['train_path'] is None:
-        train_set = USPTORank(subset='train', candidate_bond_path=path_to_candidate_bonds['train'],
-                              num_processes=args['num_processes'])
+        train_set = USPTORank(
+            subset='train', candidate_bond_path=path_to_candidate_bonds['train'],
+            max_num_change_combos_per_reaction=args['max_num_change_combos_per_reaction_train'],
+            num_processes=args['num_processes'])
     else:
-        train_set = WLNRankDataset(raw_file_path=args['train_path'],
-                                   candidate_bond_path=path_to_candidate_bonds['train'],
-                                   num_processes=args['num_processes'])
+        train_set = WLNRankDataset(
+            raw_file_path=args['train_path'],
+            candidate_bond_path=path_to_candidate_bonds['train'], mode='train',
+            max_num_change_combos_per_reaction=args['max_num_change_combos_per_reaction_train'],
+            num_processes=args['num_processes'])
     train_set.ignore_large()
     if args['val_path'] is None:
-        val_set = USPTORank(subset='val', candidate_bond_path=path_to_candidate_bonds['val'],
-                            num_processes=args['num_processes'])
+        val_set = USPTORank(
+            subset='val', candidate_bond_path=path_to_candidate_bonds['val'],
+            max_num_change_combos_per_reaction=args['max_num_change_combos_per_reaction_eval'],
+            num_processes=args['num_processes'])
     else:
-        val_set = WLNRankDataset(raw_file_path=args['val_path'],
-                                 candidate_bond_path=path_to_candidate_bonds['val'],
-                                 train_mode=False,
-                                 num_processes=args['num_processes'])
+        val_set = WLNRankDataset(
+            raw_file_path=args['val_path'],
+            candidate_bond_path=path_to_candidate_bonds['val'], mode='val',
+            max_num_change_combos_per_reaction=args['max_num_change_combos_per_reaction_eval'],
+            num_processes=args['num_processes'])
 
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate_rank_train,
@@ -98,20 +105,22 @@ def main(args, path_to_candidate_bonds):
                 grad_norm_sum = 0
 
             if total_samples % args['decay_every'] == 0:
+                dur.append(time.time() - t0)
                 old_lr = optimizer.lr
                 optimizer.decay_lr(args['lr_decay_factor'])
                 new_lr = optimizer.lr
                 print('Learning rate decayed from {:.4f} to {:.4f}'.format(old_lr, new_lr))
                 torch.save({'model_state_dict': model.state_dict()},
-                           args['result_path'] + '/model.pkl')
-
-        dur.append(time.time() - t0)
-        prediction_summary = candidate_ranking_eval(args, model, val_loader)
-        prediction_summary = 'Epoch {:d}/{:d}\n'.format(epoch + 1, args['num_epochs']) + \
-                             prediction_summary
-        print(prediction_summary)
-        with open(args['result_path'] + '/val_eval.txt', 'a') as f:
-            f.write(prediction_summary)
+                           args['result_path'] + '/model_{:d}.pkl'.format(
+                               total_samples // args['batch_size']))
+                prediction_summary = 'total iter {:d}, (epoch {:d}/{:d}, iter {:d}/{:d}) '.format(
+                    total_samples // args['batch_size'] // args['print_every'],
+                    epoch + 1, args['num_epochs'], (batch_id + 1) * args['batch_size'] // args['print_every'],
+                    len(train_set) // args['print_every']) + candidate_ranking_eval(args, model, val_loader)
+                print(prediction_summary)
+                with open(args['result_path'] + '/val_eval.txt', 'a') as f:
+                    f.write(prediction_summary)
+                t0 = time.time()
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

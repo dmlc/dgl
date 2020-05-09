@@ -1122,7 +1122,6 @@ def candidate_ranking_eval(args, model, data_loader):
         String summarizing the evaluation results
     """
     model.eval()
-    max_k = max(args['top_ks'])
 
     # Record how many product can be recovered by real graph edits (with/without sanitization)
     found_info_summary = {'ground': 0, 'ground_sanitized': 0}
@@ -1167,7 +1166,7 @@ def candidate_ranking_eval(args, model, data_loader):
             product_mol = batch_product_mols[i]
 
             product_graph_end = product_graph_start + num_candidate_products
-            top_k = min(max_k, num_candidate_products)
+            top_k = min(args['max_k'], num_candidate_products)
             reaction_pred = pred[product_graph_start:product_graph_end, :]
             topk_values, topk_indices = torch.topk(reaction_pred, top_k, dim=0)
 

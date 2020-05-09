@@ -33,6 +33,10 @@ candidate_ranking_config = {
     'decay_every': 100000,
     'lr_decay_factor': 0.9,
     'top_ks': [1, 2, 3, 5],
+    'max_k': 10,
+    'max_num_change_combos_per_reaction_train': 150,
+    'max_num_change_combos_per_reaction_eval': 1500,
+    'num_candidate_bond_changes': 16
 }
 candidate_ranking_config['max_norm'] = candidate_ranking_config['max_norm'] * \
                                        candidate_ranking_config['batch_size']
