@@ -609,8 +609,8 @@ def node_split(nodes, partition_book, rank):
 
     The input nodes can be stored as a vector of node Ids or a vector of
     masks. When it's a vector of masks, the length of the vector should be
-    the same as the number of nodes in a graph and 1 indicates that
-    the vertex in the corresponding location exists.
+    the same as the number of nodes in a graph; the vector has to be a boolean
+    vector, in which 1 indicates that the vertex in the corresponding location exists.
 
     Parameters
     ----------
@@ -652,8 +652,8 @@ def edge_split(edges, partition_book, rank):
 
     The input edges can be stored as a vector of edge Ids or a vector of
     masks. When it's a vector of masks, the length of the vector should be
-    the same as the number of edges in a graph and 1 indicates that
-    the vertex in the corresponding location exists.
+    the same as the number of edges in a graph; the vector has to be a boolean
+    vector, in which and 1 indicates that the edge in the corresponding location exists.
 
     Parameters
     ----------

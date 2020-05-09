@@ -131,8 +131,10 @@ def test_split():
     num_hops = 2
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
 
-    selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
-    selected_edges = np.random.randint(0, 100, size=g.number_of_edges()) > 30
+    node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
+    edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
+    selected_nodes = np.nonzero(node_mask)[0]
+    selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
@@ -143,14 +145,19 @@ def test_split():
                                  part_graph=part_g)
         local_nids = F.nonzero_1d(part_g.ndata['local_node'])
         local_nids = part_g.ndata[dgl.NID][local_nids]
-        nodes = node_split(selected_nodes, gpb, i)
-        for n in nodes:
-            assert n in local_nids
-
         local_eids = F.nonzero_1d(part_g.edata['local_edge'])
         local_eids = part_g.edata[dgl.EID][local_eids]
-        edges = edge_split(selected_edges, gpb, i)
-        for e in edges:
+
+        nodes1 = node_split(selected_nodes, gpb, i)
+        nodes2 = node_split(node_mask, gpb, i)
+        assert np.all(np.sort(F.asnumpy(nodes1)) == np.sort(F.asnumpy(nodes2)))
+        for n in nodes1:
+            assert n in local_nids
+
+        edges1 = edge_split(selected_edges, gpb, i)
+        edges2 = edge_split(edge_mask, gpb, i)
+        assert np.all(np.sort(F.asnumpy(edges1)) == np.sort(F.asnumpy(edges2)))
+        for e in edges1:
             assert e in local_eids
 
 if __name__ == '__main__':
