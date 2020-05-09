@@ -89,12 +89,15 @@ A summary of the model performance is as follows:
 | Item            | Top 6 accuracy | Top 8 accuracy | Top 10 accuracy |
 | --------------- | -------------- | -------------- | --------------- |
 | Paper           | 89.8           | 92.0           | 93.3            |
-| Hard evaluation | 88.8           | 91.6           | 92.9            |
-| Easy evaluation | 91.0           | 93.7           | 94.9            |
+| Hard evaluation from authors' code | 87.7           | 90.6           |  92.1           |
+| Easy evaluation from authors' code | 90.0           | 92.8           |  94.2           |
+| Hard evaluation | 88.8           | 91.7           | 93.1            |
+| Easy evaluation | 91.2           | 93.8           | 95.0            |
 | Hard evaluation for model trained on 8 gpus | 88.0 | 91.0 | 92.5 |
 | Easy evaluation for model trained on 8 gpus | 90.3 | 93.3 | 94.6 |
 
-While multi-gpu training provides a great speedup, the performance with the default hyperparameters drops slightly.
+1. We are able to match the results reported from authors' code for both single-gpu and multi-gpu training
+2. While multi-gpu training provides a great speedup, the performance with the default hyperparameters drops slightly.
 
 ### Data Pre-processing with Multi-Processing
 
