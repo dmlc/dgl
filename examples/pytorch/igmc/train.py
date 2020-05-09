@@ -148,7 +148,6 @@ def train(args):
     valid_loss_logger.close()
     test_loss_logger.close()
 
-
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
     parser.add_argument('--seed', default=123, type=int)
