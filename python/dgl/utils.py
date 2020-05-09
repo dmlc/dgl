@@ -147,6 +147,8 @@ class Index(object):
             return self.tousertensor(), self.dtype
 
     def __setstate__(self, state):
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
         if isinstance(state, tuple) and len(state) == 2:
             # post-0.4.4
             data, self.dtype = state

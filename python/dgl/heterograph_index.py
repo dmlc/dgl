@@ -30,6 +30,8 @@ class HeteroGraphIndex(ObjectBase):
     def __setstate__(self, state):
         self._cache = {}
 
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
         if isinstance(state, HeteroPickleStates):
             # post-0.4.3
             self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
