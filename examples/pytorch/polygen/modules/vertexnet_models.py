@@ -5,7 +5,7 @@ from .viz import *
 from .layers import *
 from .functions import *
 from .embedding import *
-from dataset import *
+from dataset.datasets import VertexDataset
 import threading
 import torch as th
 import dgl.nn as dglnn
@@ -191,9 +191,9 @@ def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, univer
     # coord only have x, y, z
     # According to the paper Child, et 19, learning embedding works well
     coord_embed = Embeddings(3, dim_model)
-    pos_embed = Embeddings(ShapeNetVertexDataset.MAX_VERT_LENGTH+1, dim_model)
+    pos_embed = Embeddings(VertexDataset.MAX_VERT_LENGTH+1, dim_model)
     # Do we need to consider INIT_BIN?
-    tgt_vocab = ShapeNetVertexDataset.COORD_BIN + 3
+    tgt_vocab = VertexDataset.COORD_BIN + 3
     value_embed = Embeddings(tgt_vocab, dim_model)
     decoder = Decoder(DecoderLayer(dim_model, c(attn), None, c(ff), dropout), N)
     generator = VertexGenerator(dim_model, tgt_vocab)
