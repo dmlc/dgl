@@ -30,9 +30,17 @@ def evaluate(args, net, data_iter):
         res.append(rmse)
     return np.mean(res)
 
-def train(args):
-    print(args)
 
+def adj_rating_reg(net):
+    arr_loss = 0
+    for conv in net.convs:
+        weight = conv.weight.view(conv.num_bases, conv.in_feat * conv.out_feat)
+        weight = th.matmul(conv.w_comp, weight).view(conv.num_rels, conv.in_feat, conv.out_feat)
+        arr_loss += th.sum((weight[1:, :, :] - weight[:-1, :, :])**2)
+    return arr_loss
+
+
+def train(args):
     dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device)
@@ -42,12 +50,10 @@ def train(args):
     val_dataset = MovieLensDataset(dataset_base.val_graphs, args.device)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
 
-
-
     ### build the net
     # multiply num_relations by 2 because now we have two types for u-v edge and v-u edge
     # NOTE: can't remember why we need add 2 for dim, need check
-    net = IGMC(in_dim=args.hop*2+1+1, num_relations=len(dataset_base.class_values), regression=True)
+    net = IGMC(in_dim=args.hop*2+1+1, num_relations=len(dataset_base.class_values), num_bases=args.num_igmc_bases, regression=True)
     net = net.to(args.device)
 
     #rating_loss_net = nn.CrossEntropyLoss()
@@ -66,7 +72,6 @@ def train(args):
 
     ### declare the loss information
     best_valid_rmse = np.inf
-    no_better_valid = 0
     best_iter = -1
     count_rmse = 0
     count_num = 0
@@ -82,20 +87,20 @@ def train(args):
             net.train()
             pred_ratings = net(batch[0])
             train_gt_labels = batch[1]
-            loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
+            loss = rating_loss_net(pred_ratings, train_gt_labels).mean() + args.arr_lambda * adj_rating_reg(net)
             count_loss += loss.item()
             optimizer.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(net.parameters(), args.train_grad_clip)
             optimizer.step()
-            
+
             if iter_idx > 3:
                 dur.append(time.time() - t0)
 
             if iter_idx == 1:
                 print("Total #Param of net: %d" % (torch_total_param_num(net)))
                 print(torch_net_info(net, save_path=os.path.join(args.save_dir, 'net%d.txt' % args.save_id)))
-            
+
             rmse = ((pred_ratings - train_gt_labels) ** 2).sum()
             count_rmse += rmse.item()
             count_num += pred_ratings.shape[0]
@@ -121,17 +126,12 @@ def train(args):
 
         if valid_rmse < best_valid_rmse:
             best_valid_rmse = valid_rmse
-            no_better_valid = 0
             best_iter = iter_idx
             test_rmse = evaluate(args=args, net=net, data_iter=test_loader)
             best_test_rmse = test_rmse
             test_loss_logger.log(epoch=epoch_idx, rmse=test_rmse)
             logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
-        else:
-            if no_better_valid > args.train_early_stopping_patience\
-                and learning_rate <= args.train_min_lr:
-                logging.info("Early stopping threshold reached. Stop training.")
-                break
+        
         if epoch_idx + 1 % args.train_decay_epoch == 0:
             new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
             if new_lr < learning_rate:
@@ -179,6 +179,8 @@ def config():
     # igmc settings
     parser.add_argument('--hop', default=1, metavar='S', 
                     help='enclosing subgraph hop number')
+    parser.add_argument('--arr_lambda', type=float, default=0.001)
+    parser.add_argument('--num_igmc_bases', type=int, default=2)
     parser.add_argument('--sample_ratio', type=float, default=1.0, 
                         help='if < 1, subsample nodes per hop according to the ratio')
     parser.add_argument('--max_nodes_per_hop', type=int, default=10000, 
@@ -191,6 +193,7 @@ def config():
     parser.add_argument('--train_min_lr', type=float, default=0.001)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
     parser.add_argument('--train_decay_epoch', type=int, default=50)
+    parser.add_argument('--train_val', action='store_true', default=False)
     # edge dropout settings
     parser.add_argument('--adj_dropout', type=float, default=0.2, 
                     help='if not 0, random drops edges from adjacency matrix with this prob')
