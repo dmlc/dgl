@@ -284,7 +284,8 @@ class DGLHeteroGraph(object):
             # DGL 0.4.2-
             dgl_warning("The object is pickled with DGL version 0.4.2-.  "
                         "Some of the original attributes are ignored.")
-            self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'], state['_edge_frames'])
+            self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
+                       state['_edge_frames'])
         else:
             raise IOError("Unrecognized pickle format.")
 
