@@ -41,7 +41,7 @@ def main(dev_id, args):
     # Config loss
     criterion = torch.nn.NLLLoss()
     # Create model, set the sota setting as the default params
-    model = make_vertex_model(N=args.N, dim_model=dim_model)
+    model = make_vertex_model(N=args.N, dim_model=args.dim_model)
     # Move model to corresponding device
     model, criterion = model.to(device), criterion.to(device)
     # Loss function
@@ -61,7 +61,7 @@ def main(dev_id, args):
             param.data /= ndev
 
     # Optimizer
-    model_opt = NoamOpt(dim_model, 0.1, 4000,
+    model_opt = NoamOpt(args.dim_model, 0.1, 4000,
                         T.optim.Adam(model.parameters(), lr=3e-4,
                                      betas=(0.9, 0.98), eps=1e-9))
     train_loss_compute = loss_compute(opt=model_opt)
@@ -131,7 +131,8 @@ if __name__ == '__main__':
     np.random.seed(1111)
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
-    argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
+    argparser.add_argument('--N', default=18, type=int, help='enc/dec layers')
+    argparser.add_argument('--dim-model', default=256, type=int, help='model dim')
     argparser.add_argument('--dataset', default='file.txt', help='dataset')
     argparser.add_argument('--batch', default=16, type=int, help='batch size')
     argparser.add_argument('--workers-per-loader', default=2, type=int, help='loaders per worker')

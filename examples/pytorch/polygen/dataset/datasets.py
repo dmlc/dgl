@@ -18,7 +18,7 @@ FaceGraph = namedtuple('FaceGraph',
 
 class VertexDataset(Dataset):
     """Vertex Dataset"""
-    COORD_BIN = 32
+    COORD_BIN = 256
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2

@@ -8,6 +8,7 @@ from .embedding import *
 from dataset import *
 import threading
 import torch as th
+import dgl.nn as dglnn
 import dgl.function as fn
 import torch.nn.init as INIT
 
@@ -29,8 +30,8 @@ class Decoder(nn.Module):
     def post_func(self, i):
         layer = self.layers[i]
         def func(nodes):
-            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
-            o = layer.self_attn.get_o(wv / z)
+            x, z = nodes.data['x'], nodes.data['z']
+            o = layer.self_attn.get_o(z)
             x = x + layer.sublayer[0].dropout(o)
             x = layer.sublayer[1](x, layer.feed_forward)
             # We apply norm at the begining for each block. Then output of transformer need an additional norm.
@@ -49,13 +50,27 @@ class Transformer(nn.Module):
         self.att_weight_map = None
 
     def propagate_attention(self, g, eids):
-        # Compute attention score
+        '''
         g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
+        print (g.edata['score'][eids].shape)
         g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
+        print (g.edata['score'][eids].shape, g.ndata['v'].shape)
         # Send weighted values to target nodes
         g.send_and_recv(eids,
                         [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
                         [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+        exit(0)
+        '''
+        # Compute attention score
+        g.apply_edges(fn.u_dot_v('k', 'q', 'score'), eids)
+        #g.edata['score'][eids] = dglnn.edge_softmax(g, g.edata['score'][eids], eids).unsqueeze(-1)
+        g.edata['softmax_score'] = th.zeros_like(g.edata['score'].unsqueeze(-1))
+        g.edata['softmax_score'][eids] = dglnn.edge_softmax(g, g.edata['score'][eids], eids).unsqueeze(-1)
+        # Send weighted values to target nodes
+        #g.apply_edges(fn.u_mul_e('v', 'score', 'z'), eids)
+        g.send_and_recv(eids,
+                        [fn.u_mul_e('v', 'softmax_score', 'z')],
+                        [fn.sum('z', 'z')])
 
     def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."
@@ -74,9 +89,9 @@ class Transformer(nn.Module):
 
         # embed
         coord_embed = self.coord_embed(graph.tgt[1]%3)
-        pos_embed = self.pos_embed(graph.tgt[1]//3) 
+        pos_embed = self.pos_embed(graph.tgt[1]//3)
         value_embed = self.value_embed(graph.tgt[0]) 
-        g.nodes[nids['dec']].data['x'] = self.pos_embed.dropout(coord_embed + pos_embed + value_embed)
+        g.nodes[nids['dec']].data['x'] = coord_embed + pos_embed + value_embed
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
