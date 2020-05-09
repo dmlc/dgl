@@ -50,31 +50,18 @@ class Transformer(nn.Module):
         self.att_weight_map = None
 
     def propagate_attention(self, g, eids):
-        '''
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-        print (g.edata['score'][eids].shape)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
-        print (g.edata['score'][eids].shape, g.ndata['v'].shape)
-        # Send weighted values to target nodes
-        g.send_and_recv(eids,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
-        exit(0)
-        '''
         # Compute attention score
         g.apply_edges(fn.u_dot_v('k', 'q', 'score'), eids)
-        #g.edata['score'][eids] = dglnn.edge_softmax(g, g.edata['score'][eids], eids).unsqueeze(-1)
+        # Softmax
         g.edata['softmax_score'] = th.zeros_like(g.edata['score'].unsqueeze(-1))
         g.edata['softmax_score'][eids] = dglnn.edge_softmax(g, g.edata['score'][eids], eids).unsqueeze(-1)
-        # Send weighted values to target nodes
-        #g.apply_edges(fn.u_mul_e('v', 'score', 'z'), eids)
+        # sum up v
         g.send_and_recv(eids,
                         [fn.u_mul_e('v', 'softmax_score', 'z')],
                         [fn.sum('z', 'z')])
 
     def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."
-
         # Pre-compute queries and key-value pairs.
         for pre_func, nids in pre_pairs:
             g.apply_nodes(pre_func, nids)
