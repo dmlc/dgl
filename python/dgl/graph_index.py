@@ -55,7 +55,7 @@ class GraphIndex(ObjectBase):
         if isinstance(state, tuple) and len(state) == 5:
             dgl_warning("The object is pickled pre-0.4.2.  Multigraph flag is ignored in 0.4.3")
             num_nodes, _, readonly, src, dst = state
-        elif isinstance(state, tuple) and len(state == 4):
+        elif isinstance(state, tuple) and len(state) == 4:
             # post-0.4.3.
             num_nodes, readonly, src, dst = state
         else:
