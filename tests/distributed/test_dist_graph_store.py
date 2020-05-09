@@ -11,7 +11,7 @@ import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
-from dgl.distributed import partition_graph, load_partition, GraphPartitionBook, node_split
+from dgl.distributed import partition_graph, load_partition, GraphPartitionBook, node_split, edge_split
 import backend as F
 import unittest
 import pickle
@@ -116,7 +116,8 @@ def test_split():
     num_hops = 2
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
 
-    data_points = np.random.randint(0, 100, size=10000) > 30
+    selected_nodes = np.random.randint(0, 100, size=10000) > 30
+    selected_edges = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
@@ -125,8 +126,17 @@ def test_split():
                                  node_map=node_map,
                                  edge_map=edge_map,
                                  part_graph=part_g)
-        nodes = node_split(data_points, gpb, i)
-        print(nodes)
+        local_nids = F.nonzero_1d(part_g.ndata['local_node'])
+        local_nids = part_g.ndata[dgl.NID][local_nids]
+        nodes = node_split(selected_nodes, gpb, i)
+        for n in nodes:
+            assert n in local_nids
+
+        local_eids = F.nonzero_1d(part_g.edata['local_edge'])
+        local_eids = part_g.edata[dgl.EID][local_eids]
+        edges = edge_split(selected_edges, gpb, i)
+        for e in edges:
+            assert e in local_eids
 
 if __name__ == '__main__':
     test_split()
