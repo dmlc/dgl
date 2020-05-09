@@ -18,11 +18,11 @@ FaceGraph = namedtuple('FaceGraph',
 
 class VertexDataset(Dataset):
     """Vertex Dataset"""
-    COORD_BIN = 256
+    COORD_BIN = 128
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
-    MAX_VERT_LENGTH = 800
+    MAX_VERT_LENGTH = 400
     MAX_LENGTH = MAX_VERT_LENGTH * 3 + 2
 
     def __init__(self, dataset_list_path, mode, device, dev_rank=0, ndev=1):
@@ -123,16 +123,18 @@ class FaceDataset(object):
     '''
     Dataset class for ShapeNet Vertex.
     '''
-    COORD_BIN = 256
+    COORD_BIN = 128
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
-    MAX_VERT_LENGTH = 800 + 2
+    MAX_VERT_LENGTH = 400 + 2
     START_FACE_VERT_IDX = 0
     NEXT_FACE_VERT_IDX = 1
     STOP_FACE_VERT_IDX = 2
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
-    MAX_FACE_INDICES = 2800
+    MAX_FACE_INDICES = 1400
+    # need to be changed to // 4 after using n-gon since 
+    MAX_FACE_LENGTH = MAX_FACE_INDICES // 3 + 2
 
     def __init__(self, dataset_list_path, mode, device, dev_rank=0, ndev=1):
         dataset_list_dir = '/home/ubuntu/data/ShapeNetCore.v2/'
