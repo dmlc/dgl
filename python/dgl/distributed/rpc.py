@@ -1,4 +1,5 @@
-"""RPC components."""
+"""RPC components. They are typically functions or utilities used by both
+server and clients."""
 import abc
 import pickle
 
@@ -10,6 +11,19 @@ from .. import backend as F
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
+
+def set_rank(rank):
+    """Set the rank of this process.
+
+    If the process is a client, this is equal to client ID. Otherwise, the process
+    is a server and this is equal to server ID.
+
+    Parameters
+    ----------
+    int
+        Rank value
+    """
+    pass
 
 def get_rank():
     """Get the rank of this process.
@@ -26,6 +40,16 @@ def get_rank():
 
 def incr_msg_seq():
     """Increment the message sequence number and return the old one.
+
+    Returns
+    -------
+    long
+        Message sequence number
+    """
+    pass
+
+def get_msg_seq():
+    """Get the current message sequence number.
 
     Returns
     -------
@@ -325,6 +349,8 @@ def recv_response(timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     msg = recv_rpc_message(timeout)
+    if msg is None:
+        return None
     _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
     if res_cls is None:
         raise DGLError('Got response message from service ID {}, '
@@ -334,6 +360,69 @@ def recv_response(timeout=0):
         raise DGLError('Got reponse of request sent by client {}, '
                        'different from my rank {}!'.format(res.client_id, get_rank()))
     return res
+
+def remote_call(target_and_requests, timeout=0):
+    """Invoke registered services on remote servers and collect responses.
+
+    The operation is blocking -- it returns when it receives all responses
+    or it times out.
+
+    If the target server state is available locally, it invokes local computation
+    to calculate the response.
+
+    Parameters
+    ----------
+    target_and_requests : list[(int, Request)]
+        A list of requests and the server they should be sent to.
+    timeout : int, optional
+        The timeout value in milliseconds. If zero, wait indefinitely.
+
+    Returns
+    -------
+    list[Response]
+        Responses for each target-request pair. If the request does not have
+        response, None is placed.
+
+    Raises
+    ------
+    ConnectionError if there is any problem with the connection.
+    """
+    # TODO(minjie): implement local server short-cut
+    all_res = [None] * len(target_and_requests)
+    msgseq2pos = {}
+    num_res = 0
+    myrank = get_rank()
+    for pos, (target, request) in enumerate(target_and_requests):
+        # send request
+        service_id = request.service_id
+        msg_seq = incr_msg_seq()
+        client_id = get_rank()
+        server_id = target
+        data, tensors = serialize_to_payload(request)
+        msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
+        send_rpc_message(msg)
+        # check if has response
+        res_cls = get_service_property(service_id)[1]
+        if res_cls is not None:
+            num_res += 1
+            msgseq2pos[msg_seq] = pos
+    while num_res != 0:
+        # recv response
+        msg = recv_rpc_message(timeout)
+        num_res -= 1
+        if msg is None:
+            continue
+        _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
+        if res_cls is None:
+            raise DGLError('Got response message from service ID {}, '
+                           'but no response class is registered.'.format(msg.service_id))
+        res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
+        if res.client_id != myrank:
+            raise DGLError('Got reponse of request sent by client {}, '
+                           'different from my rank {}!'.format(res.client_id, myrank))
+        # set response
+        all_res[msgseq2pos[msg.msg_seq]] = res
+    return all_res
 
 def send_rpc_message(msg):
     """Send one message to the target server.
