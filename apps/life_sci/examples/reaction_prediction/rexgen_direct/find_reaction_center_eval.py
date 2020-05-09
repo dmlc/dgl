@@ -24,7 +24,7 @@ def main(args):
     test_loader = DataLoader(test_set, batch_size=args['batch_size'],
                              collate_fn=collate_center, shuffle=False)
 
-    if args['pre_trained']:
+    if args['model_path'] is None:
         model = load_pretrained('wln_center_uspto')
     else:
         model = WLNReactionCenter(node_in_feats=args['node_in_feats'],
@@ -50,8 +50,11 @@ if __name__ == '__main__':
     from configure import reaction_center_config
 
     parser = ArgumentParser(description='Reaction Center Identification -- Evaluation')
+    parser.add_argument('--model-path', type=str, default=None,
+                        help='Path to saved model. If None, we will directly evaluate '
+                             'a pretrained model on the test set.')
     parser.add_argument('--result-path', type=str, default='center_results',
-                        help='Path where we saved model training results')
+                        help='Path where we saved model training and evaluation results')
     parser.add_argument('--test-path', type=str, default=None,
                         help='Path to a new test set.'
                              'If None, we will use the default test set in USPTO.')
@@ -59,9 +62,6 @@ if __name__ == '__main__':
                         help='Whether to exclude reactants not contributing heavy atoms to the '
                              'product in top-k atom pair selection, which will make the '
                              'task easier.')
-    parser.add_argument('-p', '--pre-trained', action='store_true', default=False,
-                        help='If true, we will directly evaluate a '
-                             'pretrained model on the test set.')
     parser.add_argument('-np', '--num-processes', type=int, default=32,
                         help='Number of processes to use for data pre-processing')
     args = parser.parse_args().__dict__
