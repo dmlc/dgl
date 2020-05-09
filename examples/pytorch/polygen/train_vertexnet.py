@@ -40,9 +40,7 @@ def main(dev_id, args):
 
     # Config loss
     criterion = torch.nn.NLLLoss()
-    # Build model
-    dim_model = 256
-    # Create model
+    # Create model, set the sota setting as the default params
     model = make_vertex_model(N=args.N, dim_model=dim_model)
     # Move model to corresponding device
     model, criterion = model.to(device), criterion.to(device)

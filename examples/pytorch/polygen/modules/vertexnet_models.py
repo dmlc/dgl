@@ -18,22 +18,22 @@ class Decoder(nn.Module):
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 
-    def pre_func(self, i, fields='qkv', l=0):
+    def pre_func(self, i, fields='qkv'):
         layer = self.layers[i]
         def func(nodes):
             x = nodes.data['x']
-            norm_x = layer.sublayer[l].norm(x) if fields.startswith('q') else x
+            norm_x = layer.sublayer[0].norm(x)
             return layer.self_attn.get(norm_x, fields)
         return func
 
-    def post_func(self, i, l=0):
+    def post_func(self, i):
         layer = self.layers[i]
         def func(nodes):
             x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
             o = layer.self_attn.get_o(wv / z)
-            x = x + layer.sublayer[l].dropout(o)
-            if l == 1:
-                x = layer.sublayer[2](x, layer.feed_forward)
+            x = x + layer.sublayer[0].dropout(o)
+            x = layer.sublayer[1](x, layer.feed_forward)
+            # We apply norm at the begining for each block. Then output of transformer need an additional norm.
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
@@ -83,12 +83,6 @@ class Transformer(nn.Module):
             post_func = self.decoder.post_func(i)
             nodes, edges = nids['dec'], eids['dd']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-
-        # visualize attention
-        """
-            if self.att_weight_map is None:
-                self._register_att_map(g, graph.nid_arr['enc'][VIZ_IDX], graph.nid_arr['dec'][VIZ_IDX])
-        """
 
         return self.generator(g.ndata['x'][nids['dec']])
 
@@ -175,18 +169,18 @@ class Transformer(nn.Module):
         ]
 
 
-def make_vertex_model(N=6, dim_model=256, dim_ff=256, h=8, dropout=0.1, universal=False):
+def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, universal=False):
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)
     # coord only have x, y, z
-    coord_embed = PositionalEncoding(dim_model, dropout, max_len=3)
-    pos_embed = PositionalEncoding(dim_model, dropout, max_len=ShapeNetVertexDataset.MAX_VERT_LENGTH+1)
-
-    decoder = Decoder(DecoderLayer(dim_model, c(attn), None, None, dropout), N)
+    # According to the paper Child, et 19, learning embedding works well
+    coord_embed = Embeddings(3, dim_model)
+    pos_embed = Embeddings(ShapeNetVertexDataset.MAX_VERT_LENGTH+1, dim_model)
     # Do we need to consider INIT_BIN?
     tgt_vocab = ShapeNetVertexDataset.COORD_BIN + 3
     value_embed = Embeddings(tgt_vocab, dim_model)
+    decoder = Decoder(DecoderLayer(dim_model, c(attn), None, c(ff), dropout), N)
     generator = VertexGenerator(dim_model, tgt_vocab)
     model = Transformer(
         decoder, coord_embed, pos_embed, value_embed, generator, h, dim_model // h)
