@@ -43,14 +43,26 @@ Epoch 1/50, iter 8150/20452 | loss 8.4788 | grad norm 12.9927
 Epoch 1/50, iter 8200/20452 | loss 8.6722 | grad norm 14.0833
 ```
 
-After an epoch of training is completed, we evaluate the model on the validation set and 
-print the evaluation results as follows:
+Everytime the learning rate is decayed (specified as `'decay_every'` in `configure.py`), we save a checkpoint of 
+the model and evaluate the model on the validation set. The evaluation result is as follows, where `acc@k` means 
+top-k accuracy:
 
 ```bash
-Epoch 4/50, validation | acc@10 0.8213 | acc@20 0.9016 |
+total iter 40000, (epoch 2/35, iter 2443/2557) | acc@12 0.9278 | acc@16 0.9419 | acc@20 0.9496 | acc@40 0.9596 | acc@80 0.9596 |
 ```
 
-By default, we store the model per 10000 iterations in `center_results`.
+All model check points and evaluation results can be found under `center_results`. `model_x.pkl` stores a model 
+checkpoint after training for `x` iterations, or equivalently `x * batch_size` samples. `val_eval.txt` stores all 
+evaluation results on the validation set as follows:
+
+```bash
+total iter 10000, (epoch 1/35, iter 1250/2557) | acc@12 0.8907 | acc@16 0.9104 | acc@20 0.9227 | acc@40 0.9394 | acc@80 0.9394 |
+total iter 20000, (epoch 1/35, iter 2500/2557) | acc@12 0.9125 | acc@16 0.9287 | acc@20 0.9387 | acc@40 0.9512 | acc@80 0.9512 |
+total iter 30000, (epoch 2/35, iter 1193/2557) | acc@12 0.9218 | acc@16 0.9370 | acc@20 0.9458 | acc@40 0.9563 | acc@80 0.9563 |
+...
+```
+
+You may want to terminate the training process when the validation performance no longer improves for some time.
 
 ### Multi-GPU Training
 
@@ -73,8 +85,11 @@ A summary of the training speedup with the DGL implementation is presented below
 ### Evaluation
 
 ```bash
-python find_reaction_center_eval.py
+python find_reaction_center_eval.py --model-path X
 ```
+
+For example, you can evaluate the model trained for 10000 iterations by setting `X` to be 
+`center_results/model_10000.pkl`. The evaluation results will be stored at `center_results/test_eval.txt`.
 
 For model evaluation, we can choose whether to exclude reactants not contributing heavy atoms to the product 
 (e.g. reagents and solvents) in top-k atom pair selection, which will make the task easier. 
@@ -84,16 +99,16 @@ For the easier evaluation, do
 python find_reaction_center_eval.py --easy
 ```
 
-A summary of the model performance is as follows:
+A summary of the model performance of various settings is as follows:
 
 | Item            | Top 6 accuracy | Top 8 accuracy | Top 10 accuracy |
 | --------------- | -------------- | -------------- | --------------- |
 | Paper           | 89.8           | 92.0           | 93.3            |
 | Hard evaluation from authors' code | 87.7           | 90.6           |  92.1           |
 | Easy evaluation from authors' code | 90.0           | 92.8           |  94.2           |
-| Hard evaluation | 88.8           | 91.7           | 93.1            |
+| Hard evaluation | 88.9           | 91.7           | 93.1            |
 | Easy evaluation | 91.2           | 93.8           | 95.0            |
-| Hard evaluation for model trained on 8 gpus | 88.0 | 91.0 | 92.5 |
+| Hard evaluation for model trained on 8 gpus | 88.1 | 91.0 | 92.5 |
 | Easy evaluation for model trained on 8 gpus | 90.3 | 93.3 | 94.6 |
 
 1. We are able to match the results reported from authors' code for both single-gpu and multi-gpu training
@@ -116,7 +131,7 @@ where `X` is the number of processes that you would like to use.
 We provide a pre-trained model so users do not need to train from scratch. To evaluate the pre-trained model, simply do
 
 ```bash
-python find_reaction_center_eval.py -p
+python find_reaction_center_eval.py
 ```
 
 ### Adapting to a New Dataset

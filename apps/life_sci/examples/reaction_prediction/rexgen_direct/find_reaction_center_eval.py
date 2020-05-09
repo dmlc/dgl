@@ -41,7 +41,7 @@ def main(args):
     test_result = reaction_center_final_eval(
         args, args['top_ks_test'], model, test_loader, args['easy'])
     print(test_result)
-    with open(args['result_path'] + '/results.txt', 'w') as f:
+    with open(args['result_path'] + '/test_eval.txt', 'w') as f:
         f.write(test_result)
 
 if __name__ == '__main__':
