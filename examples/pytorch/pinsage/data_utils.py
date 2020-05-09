@@ -3,6 +3,9 @@ import dgl
 import numpy as np
 import scipy.sparse as ssp
 
+# This is the train-test split method most of the recommender system papers running on MovieLens
+# takes.  It essentially follows the intuition of "training on the past and predict the future".
+# One can also change the threshold to make validation and test set take larger proportions.
 def train_test_split_by_time(g, column, etype, itype):
     n_edges = g.number_of_edges(etype)
     with g.local_scope():
