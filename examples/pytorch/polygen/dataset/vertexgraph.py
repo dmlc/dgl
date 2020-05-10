@@ -30,12 +30,12 @@ class VertexNetGraphPool:
         '''
         Lazy evaluation of the graph[i]
         args:
-            i: decoder size
+            i: number of nodes, should be exact len + 1, the one is for eos token
         '''
         if self.g_pool[i]:
             return self.g_pool[i]
 
-        n_vertex = i + 1
+        n_vertex = i
 
         self.g_pool[i] = dgl.DGLGraph()
         self.g_pool[i].add_nodes(n_vertex)
@@ -48,98 +48,3 @@ class VertexNetGraphPool:
         self.g_pool[i].add_edges(us, vs)
         self.num_edges['dd'][i] = len(us)
         return self.g_pool[i]
-
-    def beam(self, tgt_buf, start_sym, max_len, k, device='cpu'):
-        '''
-        Return a batched graph for beam search during inference of Transformer.
-        args:
-            tgt_buf: a list of input sequence
-            start_sym: the index of start-of-sequence symbol
-            max_len: maximum length for decoding
-            k: beam size
-            device: 'cpu' or 'cuda:*' 
-        '''
-        g_list = []
-        tgt_lens = [max_len] * len(tgt_buf)
-        num_edges = {'dd': []}
-        for tgt_len in tgt_lens:
-            i = tgt_len - 1
-            for _ in range(k):
-                g_list.append(self.g_pool.get_graph_for_size(i))
-            num_edges['dd'].append(int(self.num_edges['dd'][i]))
-
-        g = dgl.batch(g_list)
-        tgt, tgt_y = [], []
-        tgt_pos = []
-        dec_ids = []
-        d2d_eids = []
-        n_nodes, n_edges, n_tokens = 0, 0, 0
-        for tgt_sample, n, n_dd in zip(tgt_buf, tgt_lens, num_edges['dd']):
-            for _ in range(k):
-                tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
-                tgt_seq[0] = start_sym
-                tgt.append(tgt_seq)
-                tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
-                tgt_pos.append(th.arange(n, dtype=th.long, device=device))
-                dec_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
-                d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
-                n_nodes += n
-                n_tokens += n
-                n_edges += n_dd
-
-        g.set_n_initializer(dgl.init.zero_initializer)
-        g.set_e_initializer(dgl.init.zero_initializer)
-
-        return VertexGraph(g=g,
-                     tgt=(th.cat(tgt), th.cat(tgt_pos)),
-                     tgt_y=th.cat(tgt_y),
-                     nids = {'dec': th.cat(dec_ids)},
-                     eids = {'dd': th.cat(d2d_eids)},
-                     nid_arr = {'dec': dec_ids},
-                     n_nodes=n_nodes,
-                     n_edges=n_edges,
-                     n_tokens=n_tokens)
-
-    def __call__(self, tgt_buf, device='cpu'):
-        '''
-        Return a batched graph for the training phase of Transformer.
-        args:
-            tgt_buf: a set of output sequence arrays.
-            device: 'cpu' or 'cuda:*'
-        '''
-        g_list = []
-        tgt_lens = [len(_) - 1 for _ in tgt_buf]
-        num_edges = {'dd': []}
-        for tgt_len in tgt_lens:
-            i = tgt_len - 1
-            g_list.append(self.g_pool.get_graph_for_size(i))
-            num_edges['dd'].append(int(self.num_edges['dd'][i]))
-
-        g = dgl.batch(g_list)
-        tgt, tgt_y = [], []
-        tgt_pos = []
-        dec_ids = []
-        d2d_eids = []
-        n_nodes, n_edges, n_tokens = 0, 0, 0
-        for tgt_sample, n, n_dd in zip(tgt_buf, tgt_lens, num_edges['dd']):
-            tgt.append(th.tensor(tgt_sample[:-1], dtype=th.long, device=device))
-            tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
-            tgt_pos.append(th.arange(n, dtype=th.long, device=device))
-            dec_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
-            d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
-            n_nodes += n
-            n_tokens += n
-            n_edges += n_dd
-
-        g.set_n_initializer(dgl.init.zero_initializer)
-        g.set_e_initializer(dgl.init.zero_initializer)
-
-        return VertexGraph(g=g,
-                     tgt=(th.cat(tgt), th.cat(tgt_pos)),
-                     tgt_y=th.cat(tgt_y),
-                     nids = {'dec': th.cat(dec_ids)},
-                     eids = {'dd': th.cat(d2d_eids)},
-                     nid_arr = {'dec': dec_ids},
-                     n_nodes=n_nodes,
-                     n_edges=n_edges,
-                     n_tokens=n_tokens)

@@ -35,13 +35,14 @@ class FaceGraphPool:
         Lazy evaluation of the graph[i][j]
         args:
             i: encoder size
-            j: decoder size
+            j: decoder size, note it should be exact len seq + 1, the one is for eos token
         '''
         if self.g_pool[i][j]:
             return self.g_pool[i][j]
 
-        src_length = i + 1
-        tgt_length = j + 1
+        src_length = i
+        # Decoder need +1 for the start token
+        tgt_length = j
         
         self.g_pool[i][j] = dgl.DGLGraph()
         self.g_pool[i][j].add_nodes(src_length + tgt_length)
@@ -65,126 +66,3 @@ class FaceGraphPool:
         self.g_pool[i][j].add_edges(us, vs)
         self.num_edges['dd'][i][j] = len(us)
         return self.g_pool[i][j]
-
-
-    def beam(self, src_buf, start_sym, max_len, k, device='cpu'):
-        '''
-        Return a batched graph for beam search during inference of Transformer.
-        args:
-            src_buf: a list of input sequence
-            start_sym: the index of start-of-sequence symbol
-            max_len: maximum length for decoding
-            k: beam size
-            device: 'cpu' or 'cuda:*' 
-        '''
-        g_list = []
-        src_lens = [len(_) for _ in src_buf]
-        tgt_lens = [max_len] * len(src_buf)
-        num_edges = {'ee': [], 'ed': [], 'dd': []}
-        for src_len, tgt_len in zip(src_lens, tgt_lens):
-            i, j = src_len - 1, tgt_len - 1
-            for _ in range(k):
-                g_list.append(self.get_graph_for_size(i, j))
-            for key in ['ee', 'ed', 'dd']:
-                num_edges[key].append(int(self.num_edges[key][i][j]))
-
-        g = dgl.batch(g_list)
-        src, tgt = [], []
-        src_pos, tgt_pos = [], []
-        enc_ids, dec_ids = [], []
-        e2e_eids, e2d_eids, d2d_eids = [], [], []
-        n_nodes, n_edges, n_tokens = 0, 0, 0
-        for src_sample, n, n_ee, n_ed, n_dd in zip(src_buf, src_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
-            for _ in range(k):
-                src.append(th.tensor(src_sample, dtype=th.long, device=device))
-                src_pos.append(th.arange(n, dtype=th.long, device=device))
-                enc_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
-                n_nodes += n
-                e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
-                n_edges += n_ee
-                tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
-                tgt_seq[0] = start_sym
-                tgt.append(tgt_seq)
-                tgt_pos.append(th.arange(max_len, dtype=th.long, device=device))
-
-                dec_ids.append(th.arange(n_nodes, n_nodes + max_len, dtype=th.long, device=device))
-                n_nodes += max_len
-                e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
-                n_edges += n_ed
-                d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
-                n_edges += n_dd
-
-        g.set_n_initializer(dgl.init.zero_initializer)
-        g.set_e_initializer(dgl.init.zero_initializer)
-
-        return FaceGraph(g=g,
-                     src=(th.cat(src), th.cat(src_pos)),
-                     tgt=(th.cat(tgt), th.cat(tgt_pos)),
-                     tgt_y=None,
-                     nids = {'enc': th.cat(enc_ids), 'dec': th.cat(dec_ids)},
-                     eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
-                     nid_arr = {'enc': enc_ids, 'dec': dec_ids},
-                     n_nodes=n_nodes,
-                     n_edges=n_edges,
-                     n_tokens=n_tokens)
-
-    def __call__(self, src_buf, tgt_buf, device='cpu'):
-        '''
-        Return a batched graph for the training phase of Transformer.
-        args:
-            src_buf: a set of input sequence arrays.
-            tgt_buf: a set of output sequence arrays.
-            device: 'cpu' or 'cuda:*'
-        '''
-        g_list = []
-        src_lens = [len(_) for _ in src_buf]
-        tgt_lens = [len(_) - 1 for _ in tgt_buf]
-        num_edges = {'ee': [], 'ed': [], 'dd': []}
-        for src_len, tgt_len in zip(src_lens, tgt_lens):
-            i, j = src_len - 1, tgt_len - 1
-            g_list.append(self.get_graph_for_size(i, j))
-            for key in ['ee', 'ed', 'dd']:
-                num_edges[key].append(int(self.num_edges[key][i][j]))
-
-        g = dgl.batch(g_list)
-        src, tgt, tgt_y = [], [], []
-        src_pos, tgt_pos = [], []
-        enc_ids, dec_ids = [], []
-        e2e_eids, d2d_eids, e2d_eids = [], [], []
-        n_nodes, n_edges, n_tokens = 0, 0, 0
-        n_enc_nodes = 0
-        for src_sample, tgt_sample, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
-            src.append(th.tensor(src_sample, dtype=th.long, device=device))
-            # Add the tgt with current n_node for forward indexing
-            tgt_sample = np.array(tgt_sample)
-            indexed_tgt_sample = tgt_sample + n_enc_nodes
-            n_enc_nodes += n
-            tgt.append(th.tensor(indexed_tgt_sample[:-1], dtype=th.long, device=device))
-            tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
-            src_pos.append(th.arange(n, dtype=th.long, device=device))
-            tgt_pos.append(th.arange(m, dtype=th.long, device=device))
-            enc_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
-            n_nodes += n
-            dec_ids.append(th.arange(n_nodes, n_nodes + m, dtype=th.long, device=device))
-            n_nodes += m
-            e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
-            n_edges += n_ee
-            e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
-            n_edges += n_ed
-            d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
-            n_edges += n_dd
-            n_tokens += m
-
-        g.set_n_initializer(dgl.init.zero_initializer)
-        g.set_e_initializer(dgl.init.zero_initializer)
-
-        return FaceGraph(g=g,
-                     src=(th.cat(src), th.cat(src_pos)),
-                     tgt=(th.cat(tgt), th.cat(tgt_pos)),
-                     tgt_y=th.cat(tgt_y),
-                     nids = {'enc': th.cat(enc_ids), 'dec': th.cat(dec_ids)},
-                     eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
-                     nid_arr = {'enc': enc_ids, 'dec': dec_ids},
-                     n_nodes=n_nodes,
-                     n_edges=n_edges,
-                     n_tokens=n_tokens)

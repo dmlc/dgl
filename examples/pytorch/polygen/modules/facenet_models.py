@@ -8,6 +8,7 @@ from .embedding import *
 from dataset import *
 import threading
 import torch as th
+import dgl.nn as dglnn
 import dgl.function as fn
 import torch.nn as nn
 import torch.nn.init as INIT
@@ -30,11 +31,11 @@ class Encoder(nn.Module):
     def post_func(self, i):
         layer = self.layers[i]
         def func(nodes):
-            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
-            o = layer.self_attn.get_o(wv / z)
+            x, z = nodes.data['x'], nodes.data['z']
+            o = layer.self_attn.get_o(z)
             x = x + layer.sublayer[0].dropout(o)
-            # Not sure whether do we need that
             x = layer.sublayer[1](x, layer.feed_forward)
+            # We apply norm at the begining for each block. Then output of transformer need an additional norm.
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
@@ -45,41 +46,33 @@ class Decoder(nn.Module):
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 
-    def pre_func(self, i, fields='qkv', l=0):
+    def pre_func(self, i, fields='qkv'):
         layer = self.layers[i]
         def func(nodes):
             x = nodes.data['x']
-            norm_x = layer.sublayer[l].norm(x) if fields.startswith('q') else x
-            if fields != 'qkv':
-                return layer.src_attn.get(norm_x, fields)
-            else:
-                return layer.self_attn.get(norm_x, fields)
+            norm_x = layer.sublayer[0].norm(x)
+            return layer.self_attn.get(norm_x, fields)
         return func
 
-    def post_func(self, i, l=0):
+    def post_func(self, i):
         layer = self.layers[i]
         def func(nodes):
-            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
-            o = layer.self_attn.get_o(wv / z)
-            x = x + layer.sublayer[l].dropout(o)
-            if l == 1:
-                x = layer.sublayer[2](x, layer.feed_forward)
+            x, z = nodes.data['x'], nodes.data['z']
+            o = layer.self_attn.get_o(z)
+            x = x + layer.sublayer[0].dropout(o)
+            x = layer.sublayer[1](x, layer.feed_forward)
+            # We apply norm at the begining for each block. Then output of transformer need an additional norm.
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
-# pointer network
-# group message
-def pointer_dot(edges):
-    dot_res = th.bmm(edges.src['x'].unsqueeze(1), edges.dst['x'].unsqueeze(-1))
-    return {'pointer_dot': dot_res.flatten(), 'src_idx': edges.src['idx']}
 # recv fun
 def softmax_and_pad(nodes):
-    max_len = ShapeNetFaceDataset.MAX_VERT_LENGTH+2
+    max_len = FaceDataset.MAX_VERT_LENGTH
     eps = -1e8
-    shape = nodes.mailbox['pointer_dot'].shape
+    shape = nodes.mailbox['pointer_score'].shape
     # reorder based on src idx
-    pointer_dot = nodes.mailbox['pointer_dot']
-    src_idx = nodes.mailbox['src_idx']
+    pointer_dot = nodes.mailbox['pointer_score']
+    src_idx = nodes.mailbox['src_idx'].long()
     ordered_pointer_dot = th.gather(pointer_dot, 1, src_idx)
     # log softmax
     log_softmax_pointer_dot = th.log_softmax(ordered_pointer_dot, dim=-1)
@@ -104,12 +97,14 @@ class Transformer(nn.Module):
 
     def propagate_attention(self, g, eids):
         # Compute attention score
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
-        # Send weighted values to target nodes
+        g.apply_edges(fn.u_dot_v('k', 'q', 'score'), eids)
+        # Softmax
+        g.edata['softmax_score'] = th.zeros_like(g.edata['score'].unsqueeze(-1))
+        g.edata['softmax_score'][eids] = dglnn.edge_softmax(g, g.edata['score'][eids], eids).unsqueeze(-1)
+        # sum up v
         g.send_and_recv(eids,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+                        [fn.u_mul_e('v', 'softmax_score', 'z')],
+                        [fn.sum('z', 'z')])
 
     def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."
@@ -117,7 +112,6 @@ class Transformer(nn.Module):
         # Pre-compute queries and key-value pairs.
         for pre_func, nids in pre_pairs:
             g.apply_nodes(pre_func, nids)
-
         self.propagate_attention(g, eids)
         # Further calculation after attention mechanism
         for post_func, nids in post_pairs:
@@ -126,25 +120,24 @@ class Transformer(nn.Module):
     def forward(self, graph):
         g = graph.g
         nids, eids = graph.nids, graph.eids
-
         # Embed all vertex
         vert_val_embed = self.vert_val_embed(graph.src[0])
         vert_pos_enc = self.vert_pos_enc(graph.src[1])
-        g.nodes[nids['enc']].data['x'] = self.vert_pos_enc.dropout(vert_val_embed + vert_pos_enc)
-        g.nodes[nids['enc']].data['idx'] = graph.src[1]
+        g.nodes[nids['enc']].data['x'] = vert_val_embed + vert_pos_enc
+        g.nodes[nids['enc']].data['idx'] = graph.src[1].float()
+        
         # Run encoder
         for i in range(self.encoder.N):
             pre_func = self.encoder.pre_func(i, 'qkv')
             post_func = self.encoder.post_func(i)
             nodes, edges = nids['enc'], eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-
         # Indexing result
         tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, graph.tgt[0])
         face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
         vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
-        g.nodes[nids['dec']].data['x'] = self.face_pos_enc.dropout(tgt_embed + face_pos_enc + vert_idx_in_face_enc)
-        g.nodes[nids['dec']].data['idx'] = graph.tgt[1]
+        g.nodes[nids['dec']].data['x'] = tgt_embed + face_pos_enc + vert_idx_in_face_enc
+        g.nodes[nids['dec']].data['idx'] = graph.tgt[1].float()
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
@@ -153,10 +146,9 @@ class Transformer(nn.Module):
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
         nodes, edges = nids['dec'], eids['ed']
-        # pointer net
-        g.send(edges=g.find_edges(edges), message_func=pointer_dot)
-        g.recv(v=nodes, reduce_func=softmax_and_pad)
 
+        g.send(edges=g.find_edges(edges), message_func=[fn.u_dot_v('x', 'x', 'pointer_score'), fn.copy_u('idx', 'src_idx')])
+        g.recv(v=nodes, reduce_func=softmax_and_pad)
         return g.ndata['log_softmax_res'][nids['dec']]
 
     def infer(self, graph, max_len, eos_id, k, alpha=1.0):
@@ -217,8 +209,11 @@ class Transformer(nn.Module):
 
             nodes, edges = nids['dec'], eids['ed']
             # pointer net
-            g.send(edges=g.find_edges(edges), message_func=pointer_dot)
-            g.recv(v=nodes, reduce_func=softmax_and_pad)
+            nodes, edges = nids['dec'], eids['ed']
+            # pointer net
+            g.send_and_recv(edges,
+                            [fn.u_dot_v('x', 'x', 'pointer_score'), fn.copy_u('idx', 'src_idx')],
+                            [softmax_and_pad])
 
             frontiers = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
             out = g.nodes[frontiers].data['log_softmax_res']
@@ -262,20 +257,19 @@ class Transformer(nn.Module):
         ]
 
 
-def make_face_model(N=6, dim_model=256, dim_ff=256, h=8, dropout=0.1, universal=False):
+def make_face_model(N=12, dim_model=256, dim_ff=1024, h=8, dropout=0.1):
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)
-    # Number of faces is the max len
-    vert_pos_enc = PositionalEncoding(dim_model, dropout, max_len=ShapeNetFaceDataset.MAX_VERT_LENGTH+2)
-    face_pos_enc = PositionalEncoding(dim_model, dropout, max_len=ShapeNetFaceDataset.MAX_FACE_LENGTH+1)
-    vert_idx_in_face_enc = PositionalEncoding(dim_model, dropout, max_len=3)
+    # Embeddings
+    vert_pos_enc = Embeddings(FaceDataset.MAX_VERT_LENGTH, dim_model)
+    face_pos_enc = Embeddings(FaceDataset.MAX_FACE_LENGTH, dim_model)
+    vert_idx_in_face_enc = Embeddings(3, dim_model)
+    vert_val_vocab = FaceDataset.COORD_BIN + 3
+    vert_val_embed = VertCoordJointEmbeddings(vert_val_vocab, dim_model)
 
     encoder = Encoder(EncoderLayer(dim_model, c(attn), c(ff), dropout), N)
-    decoder = Decoder(DecoderLayer(dim_model, c(attn), None, None, dropout), N)
-     
-    vert_val_vocab = ShapeNetVertexDataset.COORD_BIN + 3
-    vert_val_embed = VertCoordJointEmbeddings(vert_val_vocab, dim_model)
+    decoder = Decoder(DecoderLayer(dim_model, c(attn), None, c(ff), dropout), N)
 
     model = Transformer(
         encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, h, dim_model // h)
