@@ -389,6 +389,13 @@ class BaseHeteroGraph : public runtime::Object {
   virtual dgl_format_code_t GetFormatInUse() const = 0;
 
   /*!
+   * \brief Return the graph in specified restrict format.
+   * 
+   * \return The new graph.
+   */
+  virtual HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const = 0;
+
+  /*!
    * \brief Get adjacency matrix in COO format.
    * \param etype Edge type.
    * \return COO matrix.
