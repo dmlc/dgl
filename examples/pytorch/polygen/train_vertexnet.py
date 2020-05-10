@@ -78,6 +78,7 @@ def main(dev_id, args):
         test_loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)(opt=None)
  
     train_iter_num = 0
+    model.train(True)
     while True:
         # train step
         try:
@@ -95,6 +96,7 @@ def main(dev_id, args):
 
         # testing logging
         if train_iter_num % args.log_interval == 0 and dev_rank == 0:
+            model.eval()
             # test step
             try:
                 test_batch = test_iter.next()
@@ -114,6 +116,7 @@ def main(dev_id, args):
             log_f.write(train_info+'\n')
             log_f.write(test_info+'\n')
             log_f.flush()
+            model.train(True)
  
         if (train_iter_num % args.ckpt_interval == 0 or train_iter_num == args.total_iter) and dev_rank == 0:
             ckpt_path = os.path.join(args.ckpt_dir, 'ckpt.'+str(train_iter_num)+'.pt')
