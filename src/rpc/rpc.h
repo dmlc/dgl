@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include "./network/communicator.h"
+#include "./server_state.h"
 
 namespace dgl {
 namespace rpc {
@@ -34,12 +35,23 @@ struct RPCContext {
   /*!
    * \brief Sender communicator.
    */
-  std::unique_ptr<network::Sender> sender;
+  std::shared_ptr<network::Sender> sender;
 
   /*!
    * \brief Receiver communicator.
    */
-  std::unique_ptr<network::Receiver> receiver;
+  std::shared_ptr<network::Receiver> receiver;
+
+  /*!
+   * \brief Server state data.
+   *
+   * If the process is a server, this stores necessary
+   * server-side data. Otherwise, the process is a client and it stores a cache
+   * of the server co-located with the client (if available). When the client
+   * invokes a RPC to the co-located server, it can thus perform computation
+   * locally without an actual remote call.
+   */
+  std::shared_ptr<ServerState> server_state;
 
   /*! \brief Get the thread-local RPC context structure */
   static RPCContext *ThreadLocal() {

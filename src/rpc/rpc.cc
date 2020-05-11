@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file rpc/rpc.cc
- * \brief Implementation of RPC utilities
+ * \brief Implementation of RPC utilities used by both server and client sides.
  */
 #include "./rpc.h"
 
@@ -45,6 +45,13 @@ DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCIncrMsgSeq")
 DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCGetMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = RPCContext::ThreadLocal()->msg_seq;
+});
+
+DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCGetServerState")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  auto st = RPCContext::ThreadLocal()->server_state;
+  CHECK(st) << "Server state has not been initialized.";
+  *rv = st;
 });
 
 DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCSendRPCMessage")
