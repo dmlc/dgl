@@ -793,6 +793,29 @@ class DGLBaseGraph(object):
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
+    @property
+    def idtype(self):
+        """Return the dtype of the graph index
+
+        Returns
+        ---------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        """
+        return getattr(F, self._graph.dtype)
+
+
+    @property
+    def _idtype_str(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        """
+        return self._graph.dtype
+
 
 def mutation(func):
     """A decorator to decorate functions that might change graph structure."""
@@ -4121,7 +4144,13 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     unbatch
     """
     if len(graph_list) == 1:
-        return graph_list[0]
+        # Need to deepcopy the node/edge frame of original graph.
+        graph = graph_list[0]
+        return DGLGraph(graph_data=graph._graph,
+                        node_frame=graph._node_frame.deepclone(),
+                        edge_frame=graph._edge_frame.deepclone(),
+                        batch_num_nodes=graph.batch_num_nodes,
+                        batch_num_edges=graph.batch_num_edges)
 
     def _init_attrs(attrs, mode):
         """Collect attributes of given mode (node/edge) from graph_list.
@@ -4240,7 +4269,10 @@ def unbatch(graph):
     batch
     """
     if graph.batch_size == 1:
-        return [graph]
+        # Like dgl.batch, unbatch also deep copies data frame.
+        return [DGLGraph(graph_data=graph._graph,
+                         node_frame=graph._node_frame.deepclone(),
+                         edge_frame=graph._edge_frame.deepclone())]
 
     bsize = graph.batch_size
     bnn = graph.batch_num_nodes

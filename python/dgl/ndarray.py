@@ -90,17 +90,6 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
-def null():
-    """Return a ndarray representing null value. It can be safely converted
-    to other backend tensors.
-
-    Returns
-    -------
-    NDArray
-        A null array
-    """
-    return array(_np.array([], dtype=_np.int64))
-
 class SparseFormat:
     """Format code"""
     ANY = 0
@@ -185,3 +174,10 @@ class SparseMatrix(ObjectBase):
 
 _set_class_ndarray(NDArray)
 _init_api("dgl.ndarray")
+
+# An array representing null (no value) that can be safely converted to
+# other backend tensors.
+NULL = {
+    "int64": array(_np.array([], dtype=_np.int64)),
+    "int32": array(_np.array([], dtype=_np.int32))
+}

@@ -2,6 +2,7 @@ import dgl
 import backend as F
 
 from dgl.base import ALL
+from utils import parametrize_dtype
 
 def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=None):
     assert g1.ntypes == g2.ntypes
@@ -32,18 +33,19 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
             for feat_name in edge_attrs[ety]:
                 assert F.allclose(g1.edges[ety].data[feat_name], g2.edges[ety].data[feat_name])
 
-def test_batching_hetero_topology():
+@parametrize_dtype
+def test_batching_hetero_topology(index_dtype):
     """Test batching two DGLHeteroGraphs where some nodes are isolated in some relations"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    })
+    }, index_dtype=index_dtype)
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    })
+    }, index_dtype=index_dtype)
     bg = dgl.batch_hetero([g1, g2])
 
     assert bg.ntypes == g2.ntypes
@@ -90,21 +92,23 @@ def test_batching_hetero_topology():
     check_equivalence_between_heterographs(g1, g3)
     check_equivalence_between_heterographs(g2, g4)
 
-def test_batching_hetero_and_batched_hetero_topology():
+
+@parametrize_dtype
+def test_batching_hetero_and_batched_hetero_topology(index_dtype):
     """Test batching a DGLHeteroGraph and a BatchedDGLHeteroGraph."""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    })
+    }, index_dtype=index_dtype)
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    })
+    }, index_dtype=index_dtype)
     bg1 = dgl.batch_hetero([g1, g2])
     g3 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1)],
         ('user', 'plays', 'game'): [(1, 0)]
-    })
+    }, index_dtype=index_dtype)
     bg2 = dgl.batch_hetero([bg1, g3])
     assert bg2.ntypes == g3.ntypes
     assert bg2.etypes == g3.etypes
@@ -149,12 +153,13 @@ def test_batching_hetero_and_batched_hetero_topology():
     check_equivalence_between_heterographs(g2, g5)
     check_equivalence_between_heterographs(g3, g6)
 
-def test_batched_features():
+@parametrize_dtype
+def test_batched_features(index_dtype):
     """Test the features of batched DGLHeteroGraphs"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    })
+    }, index_dtype=index_dtype)
     g1.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g1.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
     g1.nodes['game'].data['h1'] = F.tensor([[0.]])
@@ -166,7 +171,7 @@ def test_batched_features():
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    })
+    }, index_dtype=index_dtype)
     g2.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g2.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
     g2.nodes['game'].data['h1'] = F.tensor([[0.]])

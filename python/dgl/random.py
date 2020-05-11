@@ -70,7 +70,7 @@ def choice(a, size, replace=True, prob=None):  # pylint: disable=invalid-name
         population = a
 
     if prob is None:
-        prob = nd.null()
+        prob = nd.NULL["int64"]
     else:
         prob = F.zerocopy_to_dgl_ndarray(prob)
 

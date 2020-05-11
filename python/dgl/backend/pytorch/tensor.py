@@ -24,7 +24,8 @@ def data_type_dict():
             'int8'    : th.int8,
             'int16'   : th.int16,
             'int32'   : th.int32,
-            'int64'   : th.int64}
+            'int64'   : th.int64,
+            'bool'    : th.bool}
 
 def cpu():
     return th.device('cpu')
@@ -153,7 +154,7 @@ def repeat(input, repeats, dim):
     return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
 
 def gather_row(data, row_index):
-    return th.index_select(data, 0, row_index)
+    return th.index_select(data, 0, row_index.long())
 
 def slice_axis(data, axis, begin, end):
     return th.narrow(data, axis, begin, end - begin)
@@ -166,7 +167,7 @@ def narrow_row(x, start, stop):
     return x[start:stop]
 
 def scatter_row(data, row_index, value):
-    return data.index_copy(0, row_index, value)
+    return data.index_copy(0, row_index.long(), value)
 
 def scatter_row_inplace(data, row_index, value):
     data[row_index] = value
@@ -246,6 +247,9 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def clone(input):
+    return input.clone()
+
 def unique(input):
     return th.unique(input)
 
@@ -259,8 +263,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop):
-    return th.arange(start, stop, dtype=th.int64)
+def arange(start, stop, dtype="int64"):
+    return th.arange(start, stop, dtype=data_type_dict()[dtype])
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))

@@ -74,11 +74,11 @@ class GINConv(nn.Block):
             If ``apply_func`` is None, :math:`D_{out}` should be the same
             as input dimensionality.
         """
-        graph = graph.local_var()
-        feat_src, feat_dst = expand_as_pair(feat)
-        graph.srcdata['h'] = feat_src
-        graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
-        rst = (1 + self.eps.data(feat_dst.context)) * feat_dst + graph.dstdata['neigh']
-        if self.apply_func is not None:
-            rst = self.apply_func(rst)
-        return rst
+        with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
+            graph.srcdata['h'] = feat_src
+            graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
+            rst = (1 + self.eps.data(feat_dst.context)) * feat_dst + graph.dstdata['neigh']
+            if self.apply_func is not None:
+                rst = self.apply_func(rst)
+            return rst
