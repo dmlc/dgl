@@ -14,7 +14,8 @@ VertexGraph = namedtuple('VertexGraph',
                    ['g', 'tgt', 'tgt_y', 'nids', 'eids',  'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 FaceDataTuple = namedtuple('FaceDataTuple', ['g', 'num_edges_ee', 'num_edges_ed', 'num_edges_dd', 'src', 'tgt', 'mode', 'device'])
 FaceGraph = namedtuple('FaceGraph',
-                   ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
+                   ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens',
+                   'src_lens', 'tgt_lens'])
 
 class VertexDataset(Dataset):
     """Vertex Dataset"""
@@ -131,10 +132,14 @@ class FaceDataset(object):
     # Need to switch to 3 when we use n-gon since we need a next face token
     MAX_VERT_LENGTH = 400 + 2
     START_FACE_VERT_IDX = 0
-    NEXT_FACE_VERT_IDX = 1
-    STOP_FACE_VERT_IDX = 2
+    STOP_FACE_VERT_IDX = 1
+    NEXT_FACE_VERT_IDX = 2
+
+    # NOTE: After introducing n-gon, we should use NEXT_FACE_VERT_IDX + 1
+    # FACE_VERT_OFFSET = NEXT_FACE_VERT_IDX + 1
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
-    MAX_FACE_INDICES = 2800
+
+    MAX_FACE_INDICES = 1400
     # need to be changed to // 4 after using n-gon since 
     MAX_FACE_LENGTH = MAX_FACE_INDICES // 3 + 2
 
@@ -181,12 +186,11 @@ class FaceDataset(object):
         
         faces += self.FACE_VERT_OFFSET
         flattern_faces = [self.START_FACE_VERT_IDX] + faces.flatten().astype(np.int64).tolist() + [self.STOP_FACE_VERT_IDX]
-        # We only filtering by vertex for now to keep vertexnet and facenet train on same data
-        '''
+        # Has to also make face number half, or it will explode
         if len(flattern_faces) > self.MAX_FACE_INDICES + 1:
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
-        '''
+        
         return FaceDataTuple(g=self.graphpool.get_graph_for_size(len(full_verts), len(flattern_faces)-1), 
                  num_edges_ee=self.graphpool.num_edges['ee'][len(full_verts), len(flattern_faces)-1],
                  num_edges_ed=self.graphpool.num_edges['ed'][len(full_verts), len(flattern_faces)-1],
@@ -215,6 +219,7 @@ def collate_facegraphs(data):
     mode = modes[0]
     device = devices[0]
     g = dgl.batch(g_list)
+    print (g.number_of_nodes())
 
     src, tgt, tgt_y = [], [], []
     src_pos, tgt_pos = [], []
@@ -257,4 +262,6 @@ def collate_facegraphs(data):
                  nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                  n_nodes=n_nodes,
                  n_edges=n_edges,
-                 n_tokens=n_tokens)
+                 n_tokens=n_tokens,
+                 src_lens=src_lens,
+                 tgt_lens=tgt_lens)
