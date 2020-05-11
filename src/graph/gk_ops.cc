@@ -119,4 +119,26 @@ GraphPtr GraphOp::ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig) {
 #endif  // !defined(_WIN32)
 }
 
+GraphPtr GraphOp::ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order) {
+#if !defined(_WIN32)
+  // TODO(zhengda) should we get whatever CSR exists in the graph.
+  CSRPtr csr = ig->GetInCSR();
+  gk_csr_t *gk_csr = Convert2GKCsr(csr->ToCSRMatrix(), true);
+  dgl_id_t* new_ids = static_cast<dgl_id_t*>(new_order->data);
+  CHECK_EQ(new_order->shape[0], ig->NumVertices())
+	  << "The new node Id array doesn't match the number of nodes in the graph";
+  std::vector<int32_t> new_ids2(new_ids, new_ids + ig->NumVertices());
+  gk_csr_t *new_gk_csr = gk_csr_ReorderSymmetric(gk_csr, new_ids2.data(), nullptr);
+  auto mat = Convert2DGLCsr(new_gk_csr, true);
+  gk_csr_Free(&gk_csr);
+  gk_csr_Free(&new_gk_csr);
+
+  // This is a symmetric graph now. The in-csr and out-csr are the same.
+  csr = CSRPtr(new CSR(mat.indptr, mat.indices, mat.data));
+  return GraphPtr(new ImmutableGraph(csr, nullptr));
+#else
+  return GraphPtr();
+#endif  // !defined(_WIN32)
+}
+
 }  // namespace dgl
