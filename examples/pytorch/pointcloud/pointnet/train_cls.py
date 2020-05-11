@@ -20,6 +20,7 @@ from pointnet_cls import PointNetCls, compute_loss
 from pointnet2 import PointNet2SSGCls, PointNet2MSGCls
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default='pointnet')
 parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
@@ -115,11 +116,14 @@ def evaluate(net, test_loader, dev):
 
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# dev = "cpu"
 
-# net = PointNetCls(40, input_dims=6)
-# net = PointNet2SSGCls(40, batch_size, input_dims=6)
-net = PointNet2MSGCls(40, batch_size, input_dims=6)
+if args.model == 'pointnet':
+    net = PointNetCls(40, input_dims=6)
+elif args.model == 'pointnet2_ssg':
+    net = PointNet2SSGCls(40, batch_size, input_dims=6)
+elif args.model == 'pointnet2_msg':
+    net = PointNet2MSGCls(40, batch_size, input_dims=6)
+
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
