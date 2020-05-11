@@ -1099,6 +1099,11 @@ class DGLHeteroGraph(object):
         -------
         backend dtype object
             th.int32/th.int64 or tf.int32/tf.int64 etc.
+
+        See Also
+        --------
+        long
+        int
         """
         return getattr(F, self._graph.dtype)
 
@@ -4171,6 +4176,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         string : 'any', 'coo', 'csr', or 'csc'
+            'any' indicates all sparse formats are allowed in .
 
         See Also
         --------
@@ -4180,9 +4186,10 @@ class DGLHeteroGraph(object):
         return self._graph.restrict_format(self.get_etype_id(etype))
 
     def to_format(self, restrict_format):
-        """Return a clone graph but stored in the given sparse format.
+        """Return a cloned graph but stored in the given restrict format.
 
         If 'any' is given, the restrict formats of the returned graph is relaxed.
+        The returned graph share the same node/edge data of the original graph.
 
         Parameters
         ----------
@@ -4221,6 +4228,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         int
+        idtype
         """
         return DGLHeteroGraph(self._graph.asbits(64), self.ntypes, self.etypes,
                               self._node_frames,
@@ -4245,6 +4253,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         long
+        idtype
         """
         return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
                               self._node_frames,
