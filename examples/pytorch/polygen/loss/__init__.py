@@ -63,13 +63,14 @@ class SimpleLossCompute(nn.Module):
     def __call__(self, y_pred, y, norm):
         y_pred = y_pred.contiguous().view(-1, y_pred.shape[-1])
         y = y.contiguous().view(-1)
-        self.loss = self.criterion(y_pred, y) / norm
+        self.loss = self.criterion(y_pred, y)
         if self.opt is not None:
             self.backward_and_step()
         self.n_correct += ((y_pred.max(dim=-1)[1] == y) & (y != self.padding_idx)).sum().item()
         self.acc_loss += self.loss.item() * norm
         self.norm_term += norm
-        return self.loss.item() * norm
+        # When bp, we use mean, when report loss, we multiply by norm
+        return self.loss.item()
 
 class MultiGPULossCompute(SimpleLossCompute):
     def __init__(self, criterion, ndev, grad_accum, model, opt=None):
