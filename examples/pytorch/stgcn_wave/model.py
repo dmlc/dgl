@@ -7,6 +7,19 @@ from dgl.nn.pytorch import GraphConv
 from dgl.nn.pytorch.conv import ChebConv
 
 class TemporalConvLayer(nn.Module):
+    ''' Temporal convolution layer.
+    
+    arguments
+    ---------
+    c_in : int
+        The number of input channels (features)
+    c_out : int
+        The number of output channels (features)
+    dia : int
+        The dilation size
+    act : str
+        The activation
+    '''
     def __init__(self, c_in, c_out, dia = 1,act="relu"):
         super(TemporalConvLayer, self).__init__()
         self.act = act
