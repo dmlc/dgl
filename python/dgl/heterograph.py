@@ -4185,7 +4185,12 @@ class DGLHeteroGraph(object):
         If 'any' is given, the restrict formats of the returned graph is relaxed.
 
         Parameters
-        -------------
+        ----------
+        format : string
+            Desired restrict format ('any', 'coo', 'csr', 'csc').
+
+        Returns
+        -------
         A new graph.
 
         See Also

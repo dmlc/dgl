@@ -949,11 +949,11 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
-        etype : int
-            The edge/relation type.
+        format : string
+            Desired restrict format ('any', 'coo', 'csr', 'csc').
 
-        Parameters
-        -------------
+        Returns
+        -------
         A new graph index.
         """
         return _CAPI_DGLHeteroGetFormatGraph(self, format)
