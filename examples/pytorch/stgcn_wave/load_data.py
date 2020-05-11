@@ -12,12 +12,10 @@ def load_data(file_path, len_train, len_val):
     return train, val, test
 
 
-def data_transform(data, n_his, n_pred, day_slot, device):
+def data_transform(data, n_his, n_pred, device):
     # produce data slices for training and testing
-    n_day = len(data) // day_slot
     n_route = data.shape[1]
     l = len(data)
-    n_slot = day_slot - n_his - n_pred + 1
     num = l-n_his-n_pred
     x = np.zeros([num, 1, n_his, n_route])
     y = np.zeros([num, n_route])

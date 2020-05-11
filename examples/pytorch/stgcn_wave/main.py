@@ -16,12 +16,16 @@ parser = argparse.ArgumentParser(description='STGCN_WAVE')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
 parser.add_argument('--disablecuda', action='store_true', help='Disable CUDA')
 parser.add_argument('--batch_size', type=int, default=50, help='batch size for training and validation (default: 50)')
-parser.add_argument('--epochs', type=int, default=50, help='epochsfor training  (default: 50)')
+parser.add_argument('--epochs', type=int, default=50, help='epochs for training  (default: 50)')
 parser.add_argument('--num_layers', type=int, default=9, help='number of layers')
 parser.add_argument('--window', type=int, default=144, help='window length')
-parser.add_argument('--sensorsfilepath', type=str, default='./data/sensor_graph/graph_sensor_ids.txt', help='sensors file path for sensors file')
-parser.add_argument('--disfilepath', type=str, default='./data/sensor_graph/distances_la_2012.csv', help='distance file path for sensors file')
-parser.add_argument('--tsfilepath', type=str, default='./data/metr-la.h5', help='ts file path for sensors file')
+parser.add_argument('--sensorsfilepath', type=str, default='./data/sensor_graph/graph_sensor_ids.txt', help='sensors file path')
+parser.add_argument('--disfilepath', type=str, default='./data/sensor_graph/distances_la_2012.csv', help='distance file path')
+parser.add_argument('--tsfilepath', type=str, default='./data/metr-la.h5', help='ts file path')
+parser.add_argument('--savemodelpath', type=str, default='./save/stgcnwavemodel.pt', help='save model path')
+parser.add_argument('--prelen', type=int, default=5, help='how many steps away we want to predict')
+parser.add_argument('--control_str', type=str, default='TNTSTNTST', help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
+parser.add_argument('--channels', type=list, default=[1, 16, 32, 64, 32, 128], help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
 args = parser.parse_args()
 
 device = torch.device("cuda") if torch.cuda.is_available() and not args.disablecuda else torch.device("cpu")
@@ -45,15 +49,14 @@ tsdata = df.to_numpy()
 
 n_his = args.window
 
-save_path = "save/stgcnwavemodel.pt"
+save_path = args.savemodelpath
 
 
-day_slot = 288
 
-
-n_pred = 3
+n_pred = args.prelen
 n_route = num_nodes
-blocks = [1, 16, 32, 64, 32, 128]
+blocks = args.channels
+# blocks = [1, 16, 32, 64, 32, 128]
 drop_prob = 0
 num_layers = args.num_layers
 
@@ -75,9 +78,9 @@ val = scaler.transform(val)
 test = scaler.transform(test)
 
 
-x_train, y_train = data_transform(train, n_his, n_pred, day_slot, device)
-x_val, y_val = data_transform(val, n_his, n_pred, day_slot, device)
-x_test, y_test = data_transform(test, n_his, n_pred, day_slot, device)
+x_train, y_train = data_transform(train, n_his, n_pred, device)
+x_val, y_val = data_transform(val, n_his, n_pred, device)
+x_test, y_test = data_transform(test, n_his, n_pred, device)
 
 train_data = torch.utils.data.TensorDataset(x_train, y_train)
 train_iter = torch.utils.data.DataLoader(train_data, batch_size, shuffle=True)
@@ -88,7 +91,7 @@ test_iter = torch.utils.data.DataLoader(test_data, batch_size)
 
 
 loss = nn.MSELoss()
-model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers).to(device)
+model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers, args.control_str).to(device)
 optimizer = torch.optim.RMSprop(model.parameters(), lr=lr)
 
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7)

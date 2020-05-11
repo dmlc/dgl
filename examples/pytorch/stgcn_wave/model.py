@@ -20,7 +20,7 @@ class TemporalConvLayer(nn.Module):
 
 
 class SpatioConvLayer(nn.Module):
-    def __init__(self, c, Lk):
+    def __init__(self, c, Lk): # c : hidden dimension Lk: graph matrix
         super(SpatioConvLayer, self).__init__()
         self.g = Lk
         self.gc = GraphConv(c, c, activation=F.relu)
@@ -61,33 +61,30 @@ class OutputLayer(nn.Module):
         return self.fc(x_t2)
 
 class STGCN_WAVE(nn.Module):
-    def __init__(self, c, T, n, Lk, p, num_layers):
+    def __init__(self, c, T, n, Lk, p, num_layers,control_str = 'TNTSTNTST'):
         super(STGCN_WAVE, self).__init__()
-        self.num_layers = num_layers
+        self.control_str = control_str # model structure controller
+        self.num_layers = len(control_str)
         self.layers = []
         cnt = 0
         diapower = 0
-        for i in range(num_layers):
-            group = i // 4 + 1
-            id = (i + 1) % 4
-            start = group * 2 - 2
-            if (i + 1) % 4 == 0:
-                self.layers.append(SpatioConvLayer(c[group * 2], Lk))
-            
-            if ((i + 1) % 4 == 1) or ((i + 1) % 4 == 3):
-                self.layers.append(TemporalConvLayer(c[start + id // 2], c[start + id // 2 + 1], dia = 2**diapower))
+        for i in range(self.num_layers):
+            i_layer = control_str[i]
+            if i_layer == 'T': # Temporal Layer
+                self.layers.append(TemporalConvLayer(c[cnt], c[cnt + 1], dia = 2**diapower))
                 diapower += 1
                 cnt += 1
-            if (i + 1) % 4 == 2:
-                self.layers.append(nn.LayerNorm([n,c[2*group - 1]]))
-        # print('diapower :',diapower)
-        # print('cnt :',cnt, "2**(diapower) :",2**(diapower))
+            if i_layer == 'S': # Spatio Layer
+                self.layers.append(SpatioConvLayer(c[cnt], Lk))
+            if i_layer == 'N': # Norm Layer
+                self.layers.append(nn.LayerNorm([n,c[cnt]]))
         self.output = OutputLayer(c[cnt], T + 1 - 2**(diapower), n)
         for layer in self.layers:
             layer = layer.cuda()
     def forward(self, x):
         for i in range(self.num_layers):
-            if (i + 1) % 4 == 2:
+            i_layer = self.control_str[i]
+            if i_layer == 'N':
                 x = self.layers[i](x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  
             else:
                 x = self.layers[i](x)
