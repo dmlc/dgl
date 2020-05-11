@@ -26,7 +26,7 @@ parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
 parser.add_argument('--num-workers', type=int, default=8)
-parser.add_argument('--batch-size', type=int, default=12)
+parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
 num_workers = args.num_workers
