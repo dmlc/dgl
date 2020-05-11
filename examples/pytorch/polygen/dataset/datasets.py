@@ -219,7 +219,6 @@ def collate_facegraphs(data):
     mode = modes[0]
     device = devices[0]
     g = dgl.batch(g_list)
-    print (g.number_of_nodes())
 
     src, tgt, tgt_y = [], [], []
     src_pos, tgt_pos = [], []

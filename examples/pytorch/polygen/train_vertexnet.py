@@ -35,7 +35,7 @@ def main(dev_id, args):
     # Considering data paralellism
     train_dataset = VertexDataset(args.dataset, 'train', device, dev_id, args.ngpu)
     # TODO: debugging nan, set shuffle to false
-    train_loader = DataLoader(train_dataset, batch_size=args.batch//args.ngpu, shuffle=False, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
     train_iter = iter(train_loader) 
 
     # Config loss
@@ -73,7 +73,7 @@ def main(dev_id, args):
         print (log_path)
         log_f = open(log_path, 'w')
         test_dataset = VertexDataset(args.dataset, 'test', device)
-        test_loader = DataLoader(test_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch//args.ngpu, shuffle=False, num_workers=args.workers_per_loader, collate_fn=collate_vertexgraphs)
         #test_iter = iter(test_loader)
         test_loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)(opt=None)
  
