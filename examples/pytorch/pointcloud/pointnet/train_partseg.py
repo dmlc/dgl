@@ -13,7 +13,7 @@ import urllib
 import os
 import argparse
 
-from dataset import ShapeNet
+from ShapeNet import ShapeNet
 from pointnet_partseg import PointNetPartSeg, PartSegLoss
 
 parser = argparse.ArgumentParser()
