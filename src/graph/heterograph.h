@@ -202,6 +202,9 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \return Save HeteroGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
+  /*! \brief Convert the graph to use the given number of bits for storage */
+  static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
+
  private:
   // To create empty class
   friend class Serializer;
@@ -214,6 +217,15 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
+
+  /*! \brief template class for Flatten operation
+  * 
+  * \tparam IdType Graph's index data type, can be int32_t or int64_t
+  * \param etypes vector of etypes to be falttened
+  * \return pointer of FlattenedHeteroGraphh
+  */
+  template <class IdType>
+  FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
 };
 
 }  // namespace dgl

@@ -315,7 +315,10 @@ struct CSRMatrix {
         indptr(parr),
         indices(iarr),
         data(darr),
-        sorted(sorted_flag) {}
+        sorted(sorted_flag) {
+    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
+        << "The indptr and indices arrays must have the same data type.";
+  }
 
   /*! \brief constructor from SparseMatrix object */
   explicit CSRMatrix(const SparseMatrix& spmat)
@@ -324,7 +327,10 @@ struct CSRMatrix {
         indptr(spmat.indices[0]),
         indices(spmat.indices[1]),
         data(spmat.indices[2]),
-        sorted(spmat.flags[0]) {}
+        sorted(spmat.flags[0]) {
+    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
+        << "The indptr and indices arrays must have the same data type.";
+  }
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
@@ -394,7 +400,10 @@ struct COOMatrix {
         col(carr),
         data(darr),
         row_sorted(rsorted),
-        col_sorted(csorted) {}
+        col_sorted(csorted) {
+    CHECK_EQ(row->dtype.bits, col->dtype.bits)
+        << "The row and col arrays must have the same data type.";
+  }
 
   /*! \brief constructor from SparseMatrix object */
   explicit COOMatrix(const SparseMatrix& spmat)
@@ -404,7 +413,10 @@ struct COOMatrix {
         col(spmat.indices[1]),
         data(spmat.indices[2]),
         row_sorted(spmat.flags[0]),
-        col_sorted(spmat.flags[1]) {}
+        col_sorted(spmat.flags[1]) {
+    CHECK_EQ(row->dtype.bits, col->dtype.bits)
+        << "The row and col arrays must have the same data type.";
+  }
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
@@ -879,6 +891,29 @@ IdArray VecToIdArray(const std::vector<T>& vec,
     LOG(FATAL) << "ID can only be int32 or int64";            \
   }                                                           \
 } while (0)
+
+/*
+ * Dispatch according to bits (either int32 or int64):
+ *
+ * ATEN_ID_BITS_SWITCH(bits, IdType, {
+ *   // Now IdType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_ID_BITS_SWITCH(bits, IdType, ...)                  \
+  do {                                                          \
+    CHECK((bits) == 32 || (bits) == 64) << "bits must be 32 or 64"; \
+    if ((bits) == 32) {                                           \
+      typedef int32_t IdType;                                   \
+      { __VA_ARGS__ }                                           \
+    } else if ((bits) == 64) {                                    \
+      typedef int64_t IdType;                                   \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "ID can only be int32 or int64";            \
+    }                                                           \
+  } while (0)
 
 /*
  * Dispatch according to float type (either float32 or float64):

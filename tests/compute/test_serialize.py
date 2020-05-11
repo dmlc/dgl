@@ -7,7 +7,8 @@ import os
 
 from dgl import DGLGraph
 import dgl
-from dgl.data.utils import save_graphs, load_graphs, load_labels
+import dgl.ndarray as nd
+from dgl.data.utils import save_graphs, load_graphs, load_labels, save_tensors, load_tensors
 
 np.random.seed(44)
 
@@ -133,7 +134,53 @@ def test_graph_serialize_with_labels():
     os.unlink(path)
 
 
+def test_serialize_tensors():
+    # create a temporary file and immediately release it so DGL can open it.
+    f = tempfile.NamedTemporaryFile(delete=False)
+    path = f.name
+    f.close()
+
+    tensor_dict = {"a": F.tensor(
+        [1, 3, -1, 0], dtype=F.int64), "1@1": F.tensor([1.5, 2], dtype=F.float32)}
+
+    save_tensors(path, tensor_dict)
+
+    load_tensor_dict = load_tensors(path)
+
+    for key in tensor_dict:
+        assert key in load_tensor_dict
+        assert np.array_equal(
+            F.asnumpy(load_tensor_dict[key]), F.asnumpy(tensor_dict[key]))
+
+    load_nd_dict = load_tensors(path, return_dgl_ndarray=True)
+
+    for key in tensor_dict:
+        assert key in load_nd_dict
+        assert isinstance(load_nd_dict[key], nd.NDArray)
+        assert np.array_equal(
+            load_nd_dict[key].asnumpy(), F.asnumpy(tensor_dict[key]))
+
+    os.unlink(path)
+
+def test_serialize_empty_dict():
+    # create a temporary file and immediately release it so DGL can open it.
+    f = tempfile.NamedTemporaryFile(delete=False)
+    path = f.name
+    f.close()
+
+    tensor_dict = {}
+
+    save_tensors(path, tensor_dict)
+
+    load_tensor_dict = load_tensors(path)
+    assert isinstance(load_tensor_dict, dict)
+    assert len(load_tensor_dict) == 0   
+
+    os.unlink(path)
+
 if __name__ == "__main__":
     test_graph_serialize_with_feature()
     test_graph_serialize_without_feature()
     test_graph_serialize_with_labels()
+    test_serialize_tensors()
+    test_serialize_empty_dict()
