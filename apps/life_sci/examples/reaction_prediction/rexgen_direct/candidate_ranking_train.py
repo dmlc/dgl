@@ -122,6 +122,7 @@ def main(args, path_to_candidate_bonds):
                 with open(args['result_path'] + '/val_eval.txt', 'a') as f:
                     f.write(prediction_summary)
                 t0 = time.time()
+                model.train()
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

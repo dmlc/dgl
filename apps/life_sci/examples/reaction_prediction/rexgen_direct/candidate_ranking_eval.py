@@ -29,8 +29,7 @@ def main(args, path_to_candidate_bonds):
         edge_in_feats=args['edge_in_feats'],
         node_hidden_feats=args['hidden_size'],
         num_encode_gnn_layers=args['num_encode_gnn_layers'])
-    model.load_state_dict(torch.load(args['result_path'] + '/model.pkl',
-                                     map_location='cpu')['model_state_dict'])
+    model.load_state_dict(torch.load(args['model_path'], map_location='cpu')['model_state_dict'])
     model = model.to(args['device'])
 
     prediction_summary = candidate_ranking_eval(args, model, test_loader)
@@ -41,6 +40,9 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description='Candidate Ranking')
+    parser.add_argument('--model-path', type=str, default=None,
+                        help='Path to saved model. If None, we will directly evaluate '
+                             'a pretrained model on the test set.')
     parser.add_argument('--result-path', type=str, default='candidate_results',
                         help='Path to save modeling results')
     parser.add_argument('--test-path', type=str, default=None,
