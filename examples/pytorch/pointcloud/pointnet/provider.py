@@ -1,3 +1,6 @@
+'''
+Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch/blob/master/provider.py
+'''
 import numpy as np
 
 def normalize_data(batch_data):
@@ -247,6 +250,3 @@ def random_point_dropout(batch_pc, max_dropout_ratio=0.875):
             dropout_ratio =  np.random.random()*max_dropout_ratio # 0~0.875
             batch_pc[b,drop_idx,:] = batch_pc[b,0,:] # set to the first point
     return batch_pc
-
-
-

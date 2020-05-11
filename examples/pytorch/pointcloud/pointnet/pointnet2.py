@@ -13,6 +13,9 @@ https://github.com/yanx27/Pointnet_Pointnet2_pytorch
 '''
 
 def square_distance(src, dst):
+    '''
+    Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
+    '''
     B, N, _ = src.shape
     _, M, _ = dst.shape
     dist = -2 * torch.matmul(src, dst.permute(0, 2, 1))
@@ -21,6 +24,9 @@ def square_distance(src, dst):
     return dist
 
 def index_points(points, idx):
+    '''
+    Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
+    '''
     device = points.device
     B = points.shape[0]
     view_shape = list(idx.shape)
@@ -32,11 +38,17 @@ def index_points(points, idx):
     return new_points
 
 class FarthestPointSampler(nn.Module):
+    '''
+    Sample the farthest point iteratively
+    '''
     def __init__(self, npoints):
         super(FarthestPointSampler, self).__init__()
         self.npoints = npoints
 
     def forward(self, pos):
+        '''
+        Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
+        '''
         device = pos.device
         B, N, C = pos.shape
         centroids = torch.zeros(B, self.npoints, dtype=torch.long).to(device)
@@ -53,12 +65,18 @@ class FarthestPointSampler(nn.Module):
         return centroids
 
 class FixedRadiusNearNeighbors(nn.Module):
+    '''
+    Find the neighbors with-in a fixed radius
+    '''
     def __init__(self, radius, n_neighbor):
         super(FixedRadiusNearNeighbors, self).__init__()
         self.radius = radius
         self.n_neighbor = n_neighbor
 
     def forward(self, pos, centroids):
+        '''
+        Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
+        '''
         device = pos.device
         B, N, _ = pos.shape
         center_pos = index_points(pos, centroids)
@@ -73,6 +91,9 @@ class FixedRadiusNearNeighbors(nn.Module):
         return group_idx
 
 class FixedRadiusNNGraph(nn.Module):
+    '''
+    Build NN graph
+    '''
     def __init__(self, radius, n_neighbor):
         super(FixedRadiusNNGraph, self).__init__()
         self.radius = radius
@@ -105,6 +126,9 @@ class FixedRadiusNNGraph(nn.Module):
         return bg
 
 class GroupMessage(nn.Module):
+    '''
+    Compute the input feature from neighbors
+    '''
     def __init__(self, n_neighbor):
         super(GroupMessage, self).__init__()
         self.n_neighbor = n_neighbor
@@ -118,6 +142,9 @@ class GroupMessage(nn.Module):
         return {'agg_feat': res}
 
 class PointNetConv(nn.Module):
+    '''
+    Feature aggregation
+    '''
     def __init__(self, sizes, batch_size):
         super(PointNetConv, self).__init__()
         self.batch_size = batch_size
@@ -140,6 +167,9 @@ class PointNetConv(nn.Module):
         return {'new_feat': h}
     
     def group_all(self, pos, feat):
+        '''
+        Feature aggretation and pooling for the non-sampling layer
+        '''
         if feat is not None:
             h = torch.cat([pos, feat], 2)
         else:
