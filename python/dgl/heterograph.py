@@ -4179,7 +4179,7 @@ class DGLHeteroGraph(object):
         """
         return self._graph.restrict_format(self.get_etype_id(etype))
 
-    def to_format(self, format, etype=None):
+    def to_format(self, format):
         """Return a clone graph but stored in the given sparse format.
 
         If 'any' is given, the restrict formats of the returned graph is relaxed.
@@ -4193,7 +4193,9 @@ class DGLHeteroGraph(object):
         format
         restrict_format
         """
-        pass
+        return DGLHeteroGraph(self._graph.to_format(format), self.ntypes, self.etypes,
+                              self._node_frames,
+                              self._edge_frames)
 
     def long(self):
         """Return a heterograph object use int64 as index dtype,

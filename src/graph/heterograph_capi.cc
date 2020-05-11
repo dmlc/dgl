@@ -488,9 +488,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    dgl_type_t etype = args[1];
-    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    // TODO(zihao)
+    const std::string restrict_format = args[1];
+    *rv = hg->GetGraphInFormat(ParseSparseFormat(restrict_format));
 });
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")

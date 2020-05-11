@@ -202,13 +202,13 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
   /*! \return Return the in-edge CSR format. Create from other format if not exist. */
-  CSRPtr GetInCSR() const;
+  CSRPtr GetInCSR(bool inplace = true) const;
 
   /*! \return Return the out-edge CSR format. Create from other format if not exist. */
-  CSRPtr GetOutCSR() const;
+  CSRPtr GetOutCSR(bool inplace = true) const;
 
   /*! \return Return the COO format. Create from other format if not exist. */
-  COOPtr GetCOO() const;
+  COOPtr GetCOO(bool inplace = true) const;
 
   /*! \return Return the COO matrix form */
   aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override;
@@ -228,6 +228,8 @@ class UnitGraph : public BaseHeteroGraph {
   }
 
   dgl_format_code_t GetFormatInUse() const override;
+
+  HeteroGraphPtr GetGraphInFormat(const SparseFormat &restrict_format) const override;
 
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);

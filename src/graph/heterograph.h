@@ -28,22 +28,7 @@ class HeteroGraph : public BaseHeteroGraph {
     CHECK_LT(etype, meta_graph_->NumEdges()) << "Invalid edge type: " << etype;
     return relation_graphs_[etype];
   }
-
-  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override {
-    std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
-    for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
-      auto relgraph = GetRelationGraph(etype);
-      switch (restrict_format)
-      {
-        case SparseFormat::kCOO: break;
-        case SparseFormat::kCSC: break;
-        case SparseFormat::kCSR: break;
-        default: break;
-      }
-    }
-    // TODO(zihao)
-  }
-
+ 
   void AddVertices(dgl_type_t vtype, uint64_t num_vertices) override {
     LOG(FATAL) << "Bipartite graph is not mutable.";
   }
@@ -216,6 +201,8 @@ class HeteroGraph : public BaseHeteroGraph {
 
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
+
+  HeteroGraphPtr GetGraphInFormat(const SparseFormat &restrict_format) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 

@@ -246,6 +246,51 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
+// create metagraph of one node type
+inline GraphPtr CreateUnitGraphMetaGraph1() {
+  // a self-loop edge 0->0
+  std::vector<int64_t> row_vec(1, 0);
+  std::vector<int64_t> col_vec(1, 0);
+  IdArray row = aten::VecToIdArray(row_vec);
+  IdArray col = aten::VecToIdArray(col_vec);
+  GraphPtr g = ImmutableGraph::CreateFromCOO(1, row, col);
+  return g;
+}
+
+// create metagraph of two node types
+inline GraphPtr CreateUnitGraphMetaGraph2() {
+  // an edge 0->1
+  std::vector<int64_t> row_vec(1, 0);
+  std::vector<int64_t> col_vec(1, 1);
+  IdArray row = aten::VecToIdArray(row_vec);
+  IdArray col = aten::VecToIdArray(col_vec);
+  GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
+  return g;
+}
+
+inline GraphPtr CreateUnitGraphMetaGraph(int num_vtypes) {
+  static GraphPtr mg1 = CreateUnitGraphMetaGraph1();
+  static GraphPtr mg2 = CreateUnitGraphMetaGraph2();
+  if (num_vtypes == 1)
+    return mg1;
+  else if (num_vtypes == 2)
+    return mg2;
+  else
+    LOG(FATAL) << "Invalid number of vertex types. Must be 1 or 2.";
+  return {};
+}
+
+HeteroGraphPtr HeteroGraph::GetGraphInFormat(const SparseFormat &restrict_format) const {
+  std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
+    auto relgraph = std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(etype));
+    format_rels[etype] = relgraph->GetGraphInFormat(restrict_format);
+  }
+  return HeteroGraphPtr(new HeteroGraph(
+    meta_graph_, format_rels, NumVerticesPerType()));
+}
+
+
 FlattenedHeteroGraphPtr HeteroGraph::Flatten(
     const std::vector<dgl_type_t>& etypes) const {
   const int64_t bits = NumBits();

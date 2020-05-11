@@ -393,7 +393,7 @@ class BaseHeteroGraph : public runtime::Object {
    * 
    * \return The new graph.
    */
-  virtual HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const = 0;
+  virtual HeteroGraphPtr GetGraphInFormat(const SparseFormat &restrict_format) const = 0;
 
   /*!
    * \brief Get adjacency matrix in COO format.
