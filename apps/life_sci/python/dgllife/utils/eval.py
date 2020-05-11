@@ -1,4 +1,5 @@
 """Evaluation of model performance."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -8,6 +9,7 @@ from sklearn.metrics import roc_auc_score
 
 __all__ = ['Meter']
 
+# pylint: disable=E1101
 class Meter(object):
     """Track and summarize model performance on a dataset for (multi-label) prediction.
 
@@ -17,18 +19,44 @@ class Meter(object):
 
     Currently we support evaluation with 4 metrics:
 
-    * pearson r2
-    * mae
-    * rmse
-    * roc auc score
+    * ``pearson r2``
+    * ``mae``
+    * ``rmse``
+    * ``roc auc score``
 
     Parameters
     ----------
     mean : torch.float32 tensor of shape (T) or None.
-        Mean of existing training labels across tasks if not None. T for the number of tasks.
-        Default to None.
+        Mean of existing training labels across tasks if not ``None``. ``T`` for the
+        number of tasks. Default to ``None`` and we assume no label normalization has been
+        performed.
     std : torch.float32 tensor of shape (T)
-        Std of existing training labels across tasks if not None.
+        Std of existing training labels across tasks if not ``None``. Default to ``None``
+        and we assume no label normalization has been performed.
+
+    Examples
+    --------
+    Below gives a demo for a fake evaluation epoch.
+
+    >>> import torch
+    >>> from dgllife.utils import Meter
+
+    >>> meter = Meter()
+    >>> # Simulate 10 fake mini-batches
+    >>> for batch_id in range(10):
+    >>>     batch_label = torch.randn(3, 3)
+    >>>     batch_pred = torch.randn(3, 3)
+    >>>     meter.update(batch_pred, batch_label)
+
+    >>> # Get MAE for all tasks
+    >>> print(meter.compute_metric('mae'))
+    [1.1325558423995972, 1.0543707609176636, 1.094650149345398]
+    >>> # Get MAE averaged over all tasks
+    >>> print(meter.compute_metric('mae', reduction='mean'))
+    1.0938589175542195
+    >>> # Get the sum of MAE over all tasks
+    >>> print(meter.compute_metric('mae', reduction='sum'))
+    3.2815767526626587
     """
     def __init__(self, mean=None, std=None):
         self.mask = []
@@ -48,13 +76,13 @@ class Meter(object):
         Parameters
         ----------
         y_pred : float32 tensor
-            Predicted labels with shape (B, T),
-            B for number of graphs in the batch and T for the number of tasks
+            Predicted labels with shape ``(B, T)``,
+            ``B`` for number of graphs in the batch and ``T`` for the number of tasks
         y_true : float32 tensor
-            Ground truth labels with shape (B, T)
+            Ground truth labels with shape ``(B, T)``
         mask : None or float32 tensor
             Binary mask indicating the existence of ground truth labels with
-            shape (B, T). If None, we assume that all labels exist and create
+            shape ``(B, T)``. If None, we assume that all labels exist and create
             a one-tensor for placeholder.
         """
         self.y_pred.append(y_pred.detach().cpu())
@@ -235,10 +263,10 @@ class Meter(object):
         ----------
         metric_name : str
 
-            * 'r2': compute squared Pearson correlation coefficient
-            * 'mae': compute mean absolute error
-            * 'rmse': compute root mean square error
-            * 'roc_auc_score': compute roc-auc score
+            * ``'r2'``: compute squared Pearson correlation coefficient
+            * ``'mae'``: compute mean absolute error
+            * ``'rmse'``: compute root mean square error
+            * ``'roc_auc_score'``: compute roc-auc score
 
         reduction : 'none' or 'mean' or 'sum'
             Controls the form of scores for all tasks
@@ -252,12 +280,12 @@ class Meter(object):
         """
         if metric_name == 'r2':
             return self.pearson_r2(reduction)
-
-        if metric_name == 'mae':
+        elif metric_name == 'mae':
             return self.mae(reduction)
-
-        if metric_name == 'rmse':
+        elif metric_name == 'rmse':
             return self.rmse(reduction)
-
-        if metric_name == 'roc_auc_score':
+        elif metric_name == 'roc_auc_score':
             return self.roc_auc_score(reduction)
+        else:
+            raise ValueError('Expect metric_name to be "r2" or "mae" or "rmse" '
+                             'or "roc_auc_score", got {}'.format(metric_name))

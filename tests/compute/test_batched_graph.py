@@ -102,6 +102,43 @@ def test_batch_unbatch1():
     assert F.allclose(t2.ndata['h'], rs2.ndata['h'])
     assert F.allclose(t2.edata['h'], rs2.edata['h'])
 
+def test_batch_unbatch_frame():
+    """Test module of node/edge frames of batched/unbatched DGLGraphs.
+    Also address the bug mentioned in https://github.com/dmlc/dgl/issues/1475.
+    """
+    t1 = tree1()
+    t2 = tree2()
+    N1 = t1.number_of_nodes()
+    E1 = t1.number_of_edges()
+    N2 = t2.number_of_nodes()
+    E2 = t2.number_of_edges()
+    D = 10
+    t1.ndata['h'] = F.randn((N1, D))
+    t1.edata['h'] = F.randn((E1, D))
+    t2.ndata['h'] = F.randn((N2, D))
+    t2.edata['h'] = F.randn((E2, D))
+    
+    if F.backend_name != 'tensorflow':  # tf's tensor is immutable
+        b1 = dgl.batch([t1, t2])
+        b2 = dgl.batch([t2])
+        b1.ndata['h'][:N1] = F.zeros((N1, D))
+        b1.edata['h'][:E1] = F.zeros((E1, D))
+        b2.ndata['h'][:N2] = F.zeros((N2, D))
+        b2.edata['h'][:E2] = F.zeros((E2, D))
+        assert not F.allclose(t1.ndata['h'], F.zeros((N1, D)))
+        assert not F.allclose(t1.edata['h'], F.zeros((E1, D)))
+        assert not F.allclose(t2.ndata['h'], F.zeros((N2, D)))
+        assert not F.allclose(t2.edata['h'], F.zeros((E2, D)))
+
+        g1, g2 = dgl.unbatch(b1)
+        _g2, = dgl.unbatch(b2)
+        assert F.allclose(g1.ndata['h'], F.zeros((N1, D)))
+        assert F.allclose(g1.edata['h'], F.zeros((E1, D)))
+        assert F.allclose(g2.ndata['h'], t2.ndata['h'])
+        assert F.allclose(g2.edata['h'], t2.edata['h'])
+        assert F.allclose(_g2.ndata['h'], F.zeros((N2, D)))
+        assert F.allclose(_g2.edata['h'], F.zeros((E2, D)))
+
 def test_batch_unbatch2():
     # test setting/getting features after batch
     a = dgl.DGLGraph()
@@ -130,8 +167,8 @@ def test_batch_send_then_recv():
     bg.recv([1, 9]) # assuming recv takes in unique nodes
 
     t1, t2 = dgl.unbatch(bg)
-    assert t1.ndata['h'][1] == 7
-    assert t2.ndata['h'][4] == 2
+    assert F.asnumpy(t1.ndata['h'][1]) == 7
+    assert F.asnumpy(t2.ndata['h'][4]) == 2
 
 def test_batch_send_and_recv():
     t1 = tree1()
@@ -146,8 +183,8 @@ def test_batch_send_and_recv():
     bg.send_and_recv((u, v))
 
     t1, t2 = dgl.unbatch(bg)
-    assert t1.ndata['h'][1] == 7
-    assert t2.ndata['h'][4] == 2
+    assert F.asnumpy(t1.ndata['h'][1]) == 7
+    assert F.asnumpy(t2.ndata['h'][4]) == 2
 
 def test_batch_propagate():
     t1 = tree1()
@@ -173,8 +210,8 @@ def test_batch_propagate():
     bg.prop_edges(order)
     t1, t2 = dgl.unbatch(bg)
 
-    assert t1.ndata['h'][0] == 9
-    assert t2.ndata['h'][1] == 5
+    assert F.asnumpy(t1.ndata['h'][0]) == 9
+    assert F.asnumpy(t2.ndata['h'][1]) == 5
 
 def test_batched_edge_ordering():
     g1 = dgl.DGLGraph()
@@ -206,6 +243,7 @@ def test_batch_no_edge():
 if __name__ == '__main__':
     test_batch_unbatch()
     test_batch_unbatch1()
+    test_batch_unbatch_frame()
     #test_batch_unbatch2()
     #test_batched_edge_ordering()
     #test_batch_send_then_recv()

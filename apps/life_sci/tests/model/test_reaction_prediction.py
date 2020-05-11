@@ -65,10 +65,10 @@ def test_wln_reaction_center():
     model = WLNReactionCenter(node_in_feats=1,
                               edge_in_feats=2,
                               node_pair_in_feats=1).to(device)
-    assert model(mol_graph, complete_graph, node_feats, edge_feats, atom_pair_feats).shape == \
+    assert model(mol_graph, complete_graph, node_feats, edge_feats, atom_pair_feats)[0].shape == \
            torch.Size([complete_graph.number_of_edges(), 5])
     assert model(batch_mol_graph, batch_complete_graph, batch_node_feats,
-                 batch_edge_feats, batch_atom_pair_feats).shape == \
+                 batch_edge_feats, batch_atom_pair_feats)[0].shape == \
            torch.Size([batch_complete_graph.number_of_edges(), 5])
 
     # Test configured setting
@@ -78,10 +78,10 @@ def test_wln_reaction_center():
                               node_out_feats=1,
                               n_layers=1,
                               n_tasks=1).to(device)
-    assert model(mol_graph, complete_graph, node_feats, edge_feats, atom_pair_feats).shape == \
+    assert model(mol_graph, complete_graph, node_feats, edge_feats, atom_pair_feats)[0].shape == \
            torch.Size([complete_graph.number_of_edges(), 1])
     assert model(batch_mol_graph, batch_complete_graph, batch_node_feats,
-                 batch_edge_feats, batch_atom_pair_feats).shape == \
+                 batch_edge_feats, batch_atom_pair_feats)[0].shape == \
            torch.Size([batch_complete_graph.number_of_edges(), 1])
 
 if __name__ == '__main__':

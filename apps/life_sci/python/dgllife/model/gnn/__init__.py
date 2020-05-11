@@ -6,3 +6,4 @@ from .mgcn import *
 from .mpnn import *
 from .schnet import *
 from .wln import *
+from .weave import *

@@ -220,7 +220,7 @@ class GINDataset(object):
                     # but usually no features means no labels, fine.
                     g.ndata['label'] = g.in_degrees()
                     # extracting unique node labels
-                    nlabel_set = nlabel_set.union(set(g.ndata['label']))
+                    nlabel_set = nlabel_set.union(set([F.as_scalar(nl) for nl in g.ndata['label']]))
 
                 nlabel_set = list(nlabel_set)
                 # in case the labels/degrees are not continuous number
@@ -237,7 +237,7 @@ class GINDataset(object):
             for g in self.graphs:
                 g.ndata['attr'] = np.zeros((
                     g.number_of_nodes(), len(label2idx)))
-                g.ndata['attr'][:, [label2idx[F.as_scalar(nl)] for nl in g.ndata['label']]] = 1
+                g.ndata['attr'][range(g.number_of_nodes()), [label2idx[F.as_scalar(nl)] for nl in g.ndata['label']]] = 1
 
         # after load, get the #classes and #dim
         self.gclasses = len(self.glabel_dict)

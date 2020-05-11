@@ -20,6 +20,13 @@ from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 __all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
 
+# Dictionary for renaming reserved node/edge type names to the ones
+# that are allowed by nn.Module.
+RENAME_DICT = {
+    'type' : 'rdftype',
+    'rev-type' : 'rev-rdftype',
+}
+
 class Entity:
     """Class for entities
 
@@ -214,6 +221,14 @@ class RDFGraphDataset:
         g.edata[dgl.ETYPE] = F.tensor(etid)
         print('Total #nodes:', g.number_of_nodes())
         print('Total #edges:', g.number_of_edges())
+
+        # rename names such as 'type' so that they an be used as keys
+        # to nn.ModuleDict
+        etypes = [RENAME_DICT.get(ty, ty) for ty in etypes]
+        mg_edges = mg.edges(keys=True)
+        mg = nx.MultiDiGraph()
+        for sty, dty, ety in mg_edges:
+            mg.add_edge(sty, dty, key=RENAME_DICT.get(ety, ety))
 
         # convert to heterograph
         print('Convert to heterograph ...')

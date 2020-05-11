@@ -1,10 +1,12 @@
 """GCN-based model for regression and classification on graphs."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 
 from .mlp_predictor import MLPPredictor
 from ..gnn.gcn import GCN
 from ..readout.weighted_sum_and_max import WeightedSumAndMax
 
+# pylint: disable=W0221
 class GCNPredictor(nn.Module):
     """GCN-based model for regression and classification on graphs.
 

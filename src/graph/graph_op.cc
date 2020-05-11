@@ -325,7 +325,7 @@ GraphPtr GraphOp::ToSimpleGraph(GraphPtr graph) {
     indptr[src+1] = indices.size();
   }
   CSRPtr csr(new CSR(graph->NumVertices(), indices.size(),
-        indptr.begin(), indices.begin(), RangeIter(0), false));
+        indptr.begin(), indices.begin(), RangeIter(0)));
   return std::make_shared<ImmutableGraph>(csr);
 }
 
@@ -397,7 +397,7 @@ GraphPtr GraphOp::ToBidirectedImmutableGraph(GraphPtr g) {
   IdArray srcs_array = aten::VecToIdArray(srcs);
   IdArray dsts_array = aten::VecToIdArray(dsts);
   return ImmutableGraph::CreateFromCOO(
-      g->NumVertices(), srcs_array, dsts_array, g->IsMultigraph());
+      g->NumVertices(), srcs_array, dsts_array);
 }
 
 HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hops) {

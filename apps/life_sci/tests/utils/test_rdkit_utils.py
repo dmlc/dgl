@@ -3,19 +3,19 @@ import os
 import shutil
 
 from dgl.data.utils import download, _get_dgl_url, extract_archive
-from dgllife.utils.rdkit_utils import get_mol_3D_coordinates, load_molecule
+from dgllife.utils.rdkit_utils import get_mol_3d_coordinates, load_molecule
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
 def test_get_mol_3D_coordinates():
     mol = Chem.MolFromSmiles('CCO')
     # Test the case when conformation does not exist
-    assert get_mol_3D_coordinates(mol) is None
+    assert get_mol_3d_coordinates(mol) is None
 
     # Test the case when conformation exists
     AllChem.EmbedMolecule(mol)
     AllChem.MMFFOptimizeMolecule(mol)
-    coords = get_mol_3D_coordinates(mol)
+    coords = get_mol_3d_coordinates(mol)
     assert isinstance(coords, np.ndarray)
     assert coords.shape == (mol.GetNumAtoms(), 3)
 

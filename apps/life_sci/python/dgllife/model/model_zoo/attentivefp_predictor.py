@@ -1,4 +1,5 @@
 """AttentiveFP"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 
 from ..gnn import AttentiveFPGNN
@@ -6,6 +7,7 @@ from ..readout import AttentiveFPReadout
 
 __all__ = ['AttentiveFPPredictor']
 
+# pylint: disable=W0221
 class AttentiveFPPredictor(nn.Module):
     """AttentiveFP for regression and classification on graphs.
 

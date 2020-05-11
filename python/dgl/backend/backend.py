@@ -28,6 +28,7 @@ def data_type_dict():
     int16
     int32
     int64
+    bool
 
     This function will be called only *once* during the initialization fo the
     backend module. The returned dictionary will become the attributes of the
@@ -981,6 +982,21 @@ def logical_not(input):
     """
     pass
 
+def clone(input):
+    """Return a clone of the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        Input tensor.
+
+    Returns
+    -------
+    Tensor
+        A clone tensor.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1057,7 +1073,7 @@ def sort_1d(input):
     """
     pass
 
-def arange(start, stop):
+def arange(start, stop, dtype):
     """Create a 1D range int64 tensor.
 
     Parameters
@@ -1066,6 +1082,8 @@ def arange(start, stop):
         The range start.
     stop : int
         The range stop.
+    dtype: str
+        The dtype of result tensor
 
     Returns
     -------

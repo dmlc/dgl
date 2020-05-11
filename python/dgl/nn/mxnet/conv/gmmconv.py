@@ -7,6 +7,7 @@ from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
+from ....utils import expand_as_pair
 
 
 class GMMConv(nn.Block):
@@ -22,8 +23,13 @@ class GMMConv(nn.Block):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int, or pair of ints
         Number of input features.
+
+        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
     out_feats : int
         Number of output features.
     dim : int
@@ -46,7 +52,8 @@ class GMMConv(nn.Block):
                  residual=False,
                  bias=True):
         super(GMMConv, self).__init__()
-        self._in_feats = in_feats
+
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
@@ -67,12 +74,12 @@ class GMMConv(nn.Block):
                                              shape=(n_kernels, dim),
                                              init=mx.init.Constant(1))
             self.fc = nn.Dense(n_kernels * out_feats,
-                               in_units=in_feats,
+                               in_units=self._in_src_feats,
                                use_bias=False,
                                weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             if residual:
-                if in_feats != out_feats:
-                    self.res_fc = nn.Dense(out_feats, in_units=in_feats, use_bias=False)
+                if self._in_dst_feats != out_feats:
+                    self.res_fc = nn.Dense(out_feats, in_units=self._in_dst_feats, use_bias=False)
                 else:
                     self.res_fc = Identity()
             else:
@@ -93,9 +100,10 @@ class GMMConv(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
-            The input feature of shape :math:`(N, D_{in})` where :math:`N`
-            is the number of nodes of the graph and :math:`D_{in}` is the
-            input feature size.
+            If a single tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tensors are given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
         pseudo : mxnet.NDArray
             The pseudo coordinate tensor of shape :math:`(E, D_{u})` where
             :math:`E` is the number of edges of the graph and :math:`D_{u}`
@@ -107,22 +115,26 @@ class GMMConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = self.fc(feat).reshape(-1, self._n_kernels, self._out_feats)
-        E = graph.number_of_edges()
-        # compute gaussian weight
-        gaussian = -0.5 * ((pseudo.reshape(E, 1, self._dim) -
-                            self.mu.data(feat.context).reshape(1, self._n_kernels, self._dim)) ** 2)
-        gaussian = gaussian *\
-                   (self.inv_sigma.data(feat.context).reshape(1, self._n_kernels, self._dim) ** 2)
-        gaussian = nd.exp(gaussian.sum(axis=-1, keepdims=True)) # (E, K, 1)
-        graph.edata['w'] = gaussian
-        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
-        rst = graph.ndata['h'].sum(1)
-        # residual connection
-        if self.res_fc is not None:
-            rst = rst + self.res_fc(feat)
-        # bias
-        if self.bias is not None:
-            rst = rst + self.bias.data(feat.context)
-        return rst
+        feat_src, feat_dst = expand_as_pair(feat)
+        with graph.local_scope():
+            graph.srcdata['h'] = self.fc(feat_src).reshape(
+                -1, self._n_kernels, self._out_feats)
+            E = graph.number_of_edges()
+            # compute gaussian weight
+            gaussian = -0.5 * ((pseudo.reshape(E, 1, self._dim) -
+                                self.mu.data(feat_src.context)
+                                .reshape(1, self._n_kernels, self._dim)) ** 2)
+            gaussian = gaussian *\
+                       (self.inv_sigma.data(feat_src.context)
+                        .reshape(1, self._n_kernels, self._dim) ** 2)
+            gaussian = nd.exp(gaussian.sum(axis=-1, keepdims=True)) # (E, K, 1)
+            graph.edata['w'] = gaussian
+            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
+            rst = graph.dstdata['h'].sum(1)
+            # residual connection
+            if self.res_fc is not None:
+                rst = rst + self.res_fc(feat_dst)
+            # bias
+            if self.bias is not None:
+                rst = rst + self.bias.data(feat_dst.context)
+            return rst

@@ -1,4 +1,5 @@
 """MGCN"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import dgl.function as fn
 import torch
 import torch.nn as nn
@@ -7,6 +8,7 @@ from .schnet import RBFExpansion
 
 __all__ = ['MGCNGNN']
 
+# pylint: disable=W0221, E1101
 class EdgeEmbedding(nn.Module):
     """Module for embedding edges.
 
@@ -232,7 +234,7 @@ class MGCNGNN(nn.Module):
         self.rbf = RBFExpansion(high=cutoff, gap=gap)
 
         self.gnn_layers = nn.ModuleList()
-        for i in range(n_layers):
+        for _ in range(n_layers):
             self.gnn_layers.append(MultiLevelInteraction(feats, len(self.rbf.centers)))
 
     def forward(self, g, node_types, edge_dists):

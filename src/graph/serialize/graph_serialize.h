@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/graph_serialize.h
+ * \file graph/serialize/graph_serialize.h
  * \brief Graph serialization header
  */
-#ifndef DGL_GRAPH_GRAPH_SERIALIZE_H_
-#define DGL_GRAPH_GRAPH_SERIALIZE_H_
+#ifndef DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
+#define DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
 
 #include <dgl/graph.h>
 #include <dgl/array.h>
@@ -20,7 +20,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
-#include "../c_api_common.h"
+#include "../../c_api_common.h"
 
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
@@ -112,4 +112,4 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 }  // namespace serialize
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_GRAPH_SERIALIZE_H_
+#endif  // DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_

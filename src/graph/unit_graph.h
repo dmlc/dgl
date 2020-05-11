@@ -139,6 +139,9 @@ class UnitGraph : public BaseHeteroGraph {
 
   DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const override;
 
+  // 32bit version functions, patch for SuccVec
+  DGLIdIters32 SuccVec32(dgl_type_t etype, dgl_id_t vid) const;
+
   DGLIdIters OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const override;
 
   DGLIdIters PredVec(dgl_type_t etype, dgl_id_t vid) const override;
@@ -229,6 +232,7 @@ class UnitGraph : public BaseHeteroGraph {
  private:
   friend class Serializer;
   friend class HeteroGraph;
+  friend class ImmutableGraph;
 
   // private empty constructor
   UnitGraph() {}
@@ -242,6 +246,25 @@ class UnitGraph : public BaseHeteroGraph {
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
             SparseFormat restrict_format = SparseFormat::kAny);
+
+  /*!
+   * \brief constructor
+   * \param metagraph metagraph
+   * \param in_csr in edge csr
+   * \param out_csr out edge csr
+   * \param coo coo
+   * \param has_in_csr whether in_csr is valid
+   * \param has_out_csr whether out_csr is valid
+   * \param has_coo whether coo is valid
+   */
+  static HeteroGraphPtr CreateHomographFrom(
+      const aten::CSRMatrix &in_csr,
+      const aten::CSRMatrix &out_csr,
+      const aten::COOMatrix &coo,
+      bool has_in_csr,
+      bool has_out_csr,
+      bool has_coo,
+      SparseFormat restrict_format = SparseFormat::kAny);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
@@ -267,6 +290,8 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
+
+  GraphPtr AsImmutableGraph() const override;
 
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.

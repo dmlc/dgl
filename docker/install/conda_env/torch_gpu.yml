@@ -6,12 +6,12 @@ dependencies:
     - torch
     - torchvision
     - pytest
-  - nose
-  - numpy
-  - cython
-  - scipy
-  - networkx
-  - matplotlib
-  - nltk
-  - requests[security]
-  - tqdm
+    - nose
+    - numpy
+    - cython
+    - scipy
+    - networkx
+    - matplotlib
+    - nltk
+    - requests[security]
+    - tqdm  

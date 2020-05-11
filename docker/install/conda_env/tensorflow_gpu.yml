@@ -1,18 +1,18 @@
-
 name: tensorflow-ci
 dependencies:
   - python=3.6.9
   - pip
   - pip:
-    - tensorflow-gpu==2.1.0rc1
+    - tensorflow==2.2.0rc1
+    # - tf-nightly==2.2.0.dev20200327
     - tfdlpack-gpu
     - pytest
-  - nose
-  - numpy
-  - cython
-  - scipy
-  - networkx
-  - matplotlib
-  - nltk
-  - requests[security]
-  - tqdm
+    - nose
+    - numpy
+    - cython
+    - scipy
+    - networkx
+    - matplotlib
+    - nltk
+    - requests[security]
+    - tqdm

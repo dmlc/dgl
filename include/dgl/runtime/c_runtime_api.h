@@ -474,8 +474,8 @@ DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from,
  * \param out The DLManagedTensor handle.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from,
-                             DLManagedTensor** out);
+DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
+                             int alignment = 0);
 
 /*!
  * \brief Delete (free) a DLManagedTensor's data.

@@ -30,8 +30,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         Node ids to sample neighbors from. The allowed types
         are dictionary of node types to node id tensors, or simply node id tensor if
         the given graph g has only one type of nodes.
-    fanout : int or list[int]
-        The number of sampled neighbors for each node on each edge type. Provide a list
+    fanout : int or dict[etype, int]
+        The number of sampled neighbors for each node on each edge type. Provide a dict
         to specify different fanout values for each edge type.
     edge_dir : str, optional
         Edge direction ('in' or 'out'). If is 'in', sample from in edges. Otherwise,
@@ -60,11 +60,16 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
-    if not isinstance(fanout, list):
-        fanout = [int(fanout)] * len(g.etypes)
-    if len(fanout) != len(g.etypes):
-        raise DGLError('Fan-out must be specified for each edge type '
-                       'if a list is provided.')
+    if not isinstance(fanout, dict):
+        fanout_array = [int(fanout)] * len(g.etypes)
+    else:
+        if len(fanout) != len(g.etypes):
+            raise DGLError('Fan-out must be specified for each edge type '
+                           'if a dict is provided.')
+        fanout_array = [None] * len(g.etypes)
+        for etype, value in fanout.items():
+            fanout_array[g.get_etype_id(etype)] = value
+    fanout_array = utils.toindex(fanout_array).todgltensor()
 
     if prob is None:
         prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
@@ -76,7 +81,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
             else:
                 prob_arrays.append(nd.array([], ctx=nd.cpu()))
 
-    subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout,
+    subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout_array,
                                        edge_dir, prob_arrays, replace)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
@@ -96,7 +101,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     ----------
     g : DGLHeteroGraph
         Full graph structure.
-    k : int
+    k : int or dict[etype, int]
         The K value.
     weight : str
         Feature name of the weights associated with each edge. Its shape should be
@@ -134,11 +139,16 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
-    if not isinstance(k, list):
-        k = [int(k)] * len(g.etypes)
-    if len(k) != len(g.etypes):
-        raise DGLError('K value must be specified for each edge type '
-                       'if a list is provided.')
+    if not isinstance(k, dict):
+        k_array = [int(k)] * len(g.etypes)
+    else:
+        if len(k) != len(g.etypes):
+            raise DGLError('K value must be specified for each edge type '
+                           'if a dict is provided.')
+        k_array = [None] * len(g.etypes)
+        for etype, value in k.items():
+            k_array[g.get_etype_id(etype)] = value
+    k_array = utils.toindex(k_array).todgltensor()
 
     weight_arrays = []
     for etype in g.canonical_etypes:
@@ -149,7 +159,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
                 weight, etype))
 
     subgidx = _CAPI_DGLSampleNeighborsTopk(
-        g._graph, nodes_all_types, k, edge_dir, weight_arrays, bool(ascending))
+        g._graph, nodes_all_types, k_array, edge_dir, weight_arrays, bool(ascending))
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):

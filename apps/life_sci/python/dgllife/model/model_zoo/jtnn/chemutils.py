@@ -1,7 +1,6 @@
-# pylint: disable=C0111, C0103, E1101, W0611, W0612, W0703, C0200, R1710
-import rdkit.Chem as Chem
-
+# pylint: disable=C0111, C0103, E1101, W0611, W0612, W0703, C0200, R1710, I1101, R1721
 from collections import defaultdict
+import rdkit.Chem as Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree

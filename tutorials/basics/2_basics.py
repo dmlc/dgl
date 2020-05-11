@@ -165,10 +165,10 @@ g.edata.pop('w')
 ###############################################################################
 # Working with multigraphs
 # ~~~~~~~~~~~~~~~~~~~~~~~~
-# Many graph applications need parallel edges. To enable this, construct :class:`DGLGraph`
-# with ``multigraph=True``.
+# Many graph applications need parallel edges,
+# which class:DGLGraph supports by default.
 
-g_multi = dgl.DGLGraph(multigraph=True)
+g_multi = dgl.DGLGraph()
 g_multi.add_nodes(10)
 g_multi.ndata['x'] = th.randn(10, 2)
 
@@ -184,7 +184,7 @@ print(g_multi.edges())
 # An edge in multigraph cannot be uniquely identified by using its incident nodes
 # :math:`u` and :math:`v`; query their edge IDs use ``edge_id`` interface.
 
-eid_10 = g_multi.edge_id(1, 0)
+eid_10 = g_multi.edge_id(1, 0, return_array=True)
 g_multi.edges[eid_10].data['w'] = th.ones(len(eid_10), 2)
 print(g_multi.edata['w'])
 

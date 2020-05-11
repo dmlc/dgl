@@ -14,7 +14,7 @@ from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
 if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
-    raise Exception("DGL has to work with MXNet version >= 1.5")
+    raise RuntimeError("DGL requires mxnet >= 1.5")
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
@@ -28,7 +28,8 @@ def data_type_dict():
             'int8'    : np.int8,
             'int16'   : np.int16,
             'int32'   : np.int32,
-            'int64'   : np.int64}
+            'int64'   : np.int64,
+            'bool'    : np.bool}
 
 def cpu():
     return mx.cpu()
@@ -312,6 +313,9 @@ def equal(x, y):
 def logical_not(input):
     return nd.logical_not(input)
 
+def clone(input):
+    return input.copy()
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
@@ -334,11 +338,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop):
+def arange(start, stop, dtype="int64"):
     if start >= stop:
-        return nd.array([], dtype=np.int64)
+        return nd.array([], dtype=data_type_dict()[dtype])
     else:
-        return nd.arange(start, stop, dtype=np.int64)
+        return nd.arange(start, stop, dtype=data_type_dict()[dtype])
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)

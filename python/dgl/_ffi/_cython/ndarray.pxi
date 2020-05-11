@@ -59,9 +59,16 @@ cdef class NDArrayBase:
         if self.c_is_view == 0:
             CALL(DGLArrayFree(self.chandle))
 
-    def to_dlpack(self):
+    def to_dlpack(self, alignment=0):
         """Produce an array from a DLPack Tensor without copying memory
 
+        Args
+        -------
+        alignment: int, default to be 0
+        Indicates the alignment requirement when converting to dlpack. Will copy to a 
+        new tensor if the alignment requirement is not satisfied. 
+        0 means no alignment requirement.
+        
         Returns
         -------
         dlpack : DLPack tensor view of the array data
@@ -69,7 +76,7 @@ cdef class NDArrayBase:
         cdef DLManagedTensor* dltensor
         if self.c_is_view != 0:
             raise ValueError("to_dlpack do not work with memory views")
-        CALL(DGLArrayToDLPack(self.chandle, &dltensor))
+        CALL(DGLArrayToDLPack(self.chandle, &dltensor, alignment))
         return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, _c_dlpack_deleter)
 
 

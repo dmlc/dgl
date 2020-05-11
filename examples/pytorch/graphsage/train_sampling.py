@@ -28,7 +28,7 @@ class NeighborSampler(object):
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
+            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -78,7 +78,6 @@ class SAGE(nn.Module):
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
         x : the input of entire node set.
-
         The inference code is written in a fashion that it could handle any number of nodes and
         layers.
         """
@@ -114,7 +113,6 @@ def prepare_mp(g):
     Explicitly materialize the CSR, CSC and COO representation of the given graph
     so that they could be shared via copy-on-write to sampler workers and GPU
     trainers.
-
     This is a workaround before full shared memory support on heterogeneous graphs.
     """
     g.in_degree(0)

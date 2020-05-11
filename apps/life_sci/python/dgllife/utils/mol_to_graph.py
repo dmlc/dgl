@@ -1,8 +1,9 @@
 """Convert molecules into DGLGraphs."""
+# pylint: disable= no-member, arguments-differ, invalid-name
+from functools import partial
 import torch
 
 from dgl import DGLGraph
-from functools import partial
 from rdkit import Chem
 from rdkit.Chem import rdmolfiles, rdmolops
 from sklearn.neighbors import NearestNeighbors
@@ -16,8 +17,12 @@ __all__ = ['mol_to_graph',
            'mol_to_nearest_neighbor_graph',
            'smiles_to_nearest_neighbor_graph']
 
+# pylint: disable=I1101
 def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer, canonical_atom_order):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.
+
+    This function can be used to construct any arbitrary ``DGLGraph`` from an
+    RDKit molecule instance.
 
     Parameters
     ----------
@@ -39,6 +44,12 @@ def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer, canon
     -------
     g : DGLGraph
         Converted DGLGraph for the molecule
+
+    See Also
+    --------
+    mol_to_bigraph
+    mol_to_complete_graph
+    mol_to_nearest_neighbor_graph
     """
     if canonical_atom_order:
         new_order = rdmolfiles.CanonicalRankAtoms(mol)
@@ -130,6 +141,57 @@ def mol_to_bigraph(mol, add_self_loop=False,
     -------
     g : DGLGraph
         Bi-directed DGLGraph for the molecule
+
+    Examples
+    --------
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import mol_to_bigraph
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> g = mol_to_bigraph(mol)
+    >>> print(g)
+    DGLGraph(num_nodes=3, num_edges=4,
+             ndata_schemes={}
+             edata_schemes={})
+
+    We can also initialize node/edge features when constructing graphs.
+
+    >>> import torch
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import mol_to_bigraph
+
+    >>> def featurize_atoms(mol):
+    >>>     feats = []
+    >>>     for atom in mol.GetAtoms():
+    >>>         feats.append(atom.GetAtomicNum())
+    >>>     return {'atomic': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> def featurize_bonds(mol):
+    >>>     feats = []
+    >>>     bond_types = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
+    >>>                   Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC]
+    >>>     for bond in mol.GetBonds():
+    >>>         btype = bond_types.index(bond.GetBondType())
+    >>>         # One bond between atom u and v corresponds to two edges (u, v) and (v, u)
+    >>>         feats.extend([btype, btype])
+    >>>     return {'type': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> g = mol_to_bigraph(mol, node_featurizer=featurize_atoms,
+    >>>                    edge_featurizer=featurize_bonds)
+    >>> print(g.ndata['atomic'])
+    tensor([[6.],
+            [8.],
+            [6.]])
+    >>> print(g.edata['type'])
+    tensor([[0.],
+            [0.],
+            [0.],
+            [0.]])
+
+    See Also
+    --------
+    smiles_to_bigraph
     """
     return mol_to_graph(mol, partial(construct_bigraph_from_mol, add_self_loop=add_self_loop),
                         node_featurizer, edge_featurizer, canonical_atom_order)
@@ -161,6 +223,54 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
     -------
     g : DGLGraph
         Bi-directed DGLGraph for the molecule
+
+    Examples
+    --------
+    >>> from dgllife.utils import smiles_to_bigraph
+
+    >>> g = smiles_to_bigraph('CCO')
+    >>> print(g)
+    DGLGraph(num_nodes=3, num_edges=4,
+             ndata_schemes={}
+             edata_schemes={})
+
+    We can also initialize node/edge features when constructing graphs.
+
+    >>> import torch
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import smiles_to_bigraph
+
+    >>> def featurize_atoms(mol):
+    >>>     feats = []
+    >>>     for atom in mol.GetAtoms():
+    >>>         feats.append(atom.GetAtomicNum())
+    >>>     return {'atomic': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> def featurize_bonds(mol):
+    >>>     feats = []
+    >>>     bond_types = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
+    >>>                   Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC]
+    >>>     for bond in mol.GetBonds():
+    >>>         btype = bond_types.index(bond.GetBondType())
+    >>>         # One bond between atom u and v corresponds to two edges (u, v) and (v, u)
+    >>>         feats.extend([btype, btype])
+    >>>     return {'type': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> g = smiles_to_bigraph('CCO', node_featurizer=featurize_atoms,
+    >>>                       edge_featurizer=featurize_bonds)
+    >>> print(g.ndata['atomic'])
+    tensor([[6.],
+            [8.],
+            [6.]])
+    >>> print(g.edata['type'])
+    tensor([[0.],
+            [0.],
+            [0.],
+            [0.]])
+
+    See Also
+    --------
+    mol_to_bigraph
     """
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_bigraph(mol, add_self_loop, node_featurizer,
@@ -224,8 +334,69 @@ def mol_to_complete_graph(mol, add_self_loop=False,
     -------
     g : DGLGraph
         Complete DGLGraph for the molecule
+
+    Examples
+    --------
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import mol_to_complete_graph
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> g = mol_to_complete_graph(mol)
+    >>> print(g)
+    DGLGraph(num_nodes=3, num_edges=6,
+             ndata_schemes={}
+             edata_schemes={})
+
+    We can also initialize node/edge features when constructing graphs.
+
+    >>> import torch
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import mol_to_complete_graph
+    >>> from functools import partial
+
+    >>> def featurize_atoms(mol):
+    >>>     feats = []
+    >>>     for atom in mol.GetAtoms():
+    >>>         feats.append(atom.GetAtomicNum())
+    >>>     return {'atomic': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> def featurize_edges(mol, add_self_loop=False):
+    >>>     feats = []
+    >>>     num_atoms = mol.GetNumAtoms()
+    >>>     atoms = list(mol.GetAtoms())
+    >>>     distance_matrix = Chem.GetDistanceMatrix(mol)
+    >>>     for i in range(num_atoms):
+    >>>         for j in range(num_atoms):
+    >>>             if i != j or add_self_loop:
+    >>>                 feats.append(float(distance_matrix[i, j]))
+    >>>     return {'dist': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> add_self_loop = True
+    >>> g = mol_to_complete_graph(
+    >>>         mol, add_self_loop=add_self_loop, node_featurizer=featurize_atoms,
+    >>>         edge_featurizer=partial(featurize_edges, add_self_loop=add_self_loop))
+    >>> print(g.ndata['atomic'])
+    tensor([[6.],
+            [8.],
+            [6.]])
+    >>> print(g.edata['dist'])
+    tensor([[0.],
+            [2.],
+            [1.],
+            [2.],
+            [0.],
+            [1.],
+            [1.],
+            [1.],
+            [0.]])
+
+    See Also
+    --------
+    smiles_to_complete_graph
     """
-    return mol_to_graph(mol, partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
+    return mol_to_graph(mol,
+                        partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
                         node_featurizer, edge_featurizer, canonical_atom_order)
 
 def smiles_to_complete_graph(smiles, add_self_loop=False,
@@ -255,6 +426,63 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
     -------
     g : DGLGraph
         Complete DGLGraph for the molecule
+
+    Examples
+    --------
+    >>> from dgllife.utils import smiles_to_complete_graph
+
+    >>> g = smiles_to_complete_graph('CCO')
+    >>> print(g)
+    DGLGraph(num_nodes=3, num_edges=6,
+             ndata_schemes={}
+             edata_schemes={})
+
+    We can also initialize node/edge features when constructing graphs.
+
+    >>> import torch
+    >>> from rdkit import Chem
+    >>> from dgllife.utils import smiles_to_complete_graph
+    >>> from functools import partial
+
+    >>> def featurize_atoms(mol):
+    >>>     feats = []
+    >>>     for atom in mol.GetAtoms():
+    >>>         feats.append(atom.GetAtomicNum())
+    >>>     return {'atomic': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> def featurize_edges(mol, add_self_loop=False):
+    >>>     feats = []
+    >>>     num_atoms = mol.GetNumAtoms()
+    >>>     atoms = list(mol.GetAtoms())
+    >>>     distance_matrix = Chem.GetDistanceMatrix(mol)
+    >>>     for i in range(num_atoms):
+    >>>         for j in range(num_atoms):
+    >>>             if i != j or add_self_loop:
+    >>>                 feats.append(float(distance_matrix[i, j]))
+    >>>     return {'dist': torch.tensor(feats).reshape(-1, 1).float()}
+
+    >>> add_self_loop = True
+    >>> g = smiles_to_complete_graph(
+    >>>         'CCO', add_self_loop=add_self_loop, node_featurizer=featurize_atoms,
+    >>>         edge_featurizer=partial(featurize_edges, add_self_loop=add_self_loop))
+    >>> print(g.ndata['atomic'])
+    tensor([[6.],
+            [8.],
+            [6.]])
+    >>> print(g.edata['dist'])
+    tensor([[0.],
+            [2.],
+            [1.],
+            [2.],
+            [0.],
+            [1.],
+            [1.],
+            [1.],
+            [0.]])
+
+    See Also
+    --------
+    mol_to_complete_graph
     """
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_complete_graph(mol, add_self_loop, node_featurizer,
@@ -294,6 +522,31 @@ def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors=None,
         Destination nodes, corresponding to ``srcs``.
     distances : list of float
         Distances between the end nodes, corresponding to ``srcs`` and ``dsts``.
+
+    Examples
+    --------
+    >>> from dgllife.utils import get_mol_3d_coordinates, k_nearest_neighbors
+    >>> from rdkit import Chem
+    >>> from rdkit.Chem import AllChem
+
+    >>> mol = Chem.MolFromSmiles('CC1(C(N2C(S1)C(C2=O)NC(=O)CC3=CC=CC=C3)C(=O)O)C')
+    >>> AllChem.EmbedMolecule(mol)
+    >>> AllChem.MMFFOptimizeMolecule(mol)
+    >>> coords = get_mol_3d_coordinates(mol)
+    >>> srcs, dsts, dists = k_nearest_neighbors(coords, neighbor_cutoff=1.25)
+    >>> print(srcs)
+    [8, 7, 11, 10, 20, 19]
+    >>> print(dsts)
+    [7, 8, 10, 11, 19, 20]
+    >>> print(dists)
+    [1.2084666104583117, 1.2084666104583117, 1.226457824344217,
+     1.226457824344217, 1.2230522248065987, 1.2230522248065987]
+
+    See Also
+    --------
+    get_mol_3d_coordinates
+    mol_to_nearest_neighbor_graph
+    smiles_to_nearest_neighbor_graph
     """
     num_atoms = coordinates.shape[0]
     model = NearestNeighbors(radius=neighbor_cutoff, p=p_distance)
@@ -321,6 +574,7 @@ def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors=None,
 
     return srcs, dsts, dists
 
+# pylint: disable=E1102
 def mol_to_nearest_neighbor_graph(mol,
                                   coordinates,
                                   neighbor_cutoff,
@@ -374,6 +628,45 @@ def mol_to_nearest_neighbor_graph(mol,
     dist_field : str
         Field for storing distance between neighboring atoms in ``edata``. This comes
         into effect only when ``keep_dists=True``. Default to ``'dist'``.
+
+    Returns
+    -------
+    g : DGLGraph
+        Nearest neighbor DGLGraph for the molecule
+
+    Examples
+    --------
+    >>> from dgllife.utils import mol_to_nearest_neighbor_graph
+    >>> from rdkit import Chem
+    >>> from rdkit.Chem import AllChem
+
+    >>> mol = Chem.MolFromSmiles('CC1(C(N2C(S1)C(C2=O)NC(=O)CC3=CC=CC=C3)C(=O)O)C')
+    >>> AllChem.EmbedMolecule(mol)
+    >>> AllChem.MMFFOptimizeMolecule(mol)
+    >>> coords = get_mol_3d_coordinates(mol)
+    >>> g = mol_to_nearest_neighbor_graph(mol, coords, neighbor_cutoff=1.25)
+    >>> print(g)
+    DGLGraph(num_nodes=23, num_edges=6,
+             ndata_schemes={}
+             edata_schemes={})
+
+    Quite often we will want to use the distance between end atoms of edges, this can be
+    achieved with
+
+    >>> g = mol_to_nearest_neighbor_graph(mol, coords, neighbor_cutoff=1.25, keep_dists=True)
+    >>> print(g.edata['dist'])
+    tensor([[1.2024],
+            [1.2024],
+            [1.2270],
+            [1.2270],
+            [1.2259],
+            [1.2259]])
+
+    See Also
+    --------
+    get_mol_3d_coordinates
+    k_nearest_neighbors
+    smiles_to_nearest_neighbor_graph
     """
     if canonical_atom_order:
         new_order = rdmolfiles.CanonicalRankAtoms(mol)
@@ -459,6 +752,46 @@ def smiles_to_nearest_neighbor_graph(smiles,
     dist_field : str
         Field for storing distance between neighboring atoms in ``edata``. This comes
         into effect only when ``keep_dists=True``. Default to ``'dist'``.
+
+    Returns
+    -------
+    g : DGLGraph
+        Nearest neighbor DGLGraph for the molecule
+
+    Examples
+    --------
+    >>> from dgllife.utils import smiles_to_nearest_neighbor_graph
+    >>> from rdkit import Chem
+    >>> from rdkit.Chem import AllChem
+
+    >>> smiles = 'CC1(C(N2C(S1)C(C2=O)NC(=O)CC3=CC=CC=C3)C(=O)O)C'
+    >>> mol = Chem.MolFromSmiles(smiles)
+    >>> AllChem.EmbedMolecule(mol)
+    >>> AllChem.MMFFOptimizeMolecule(mol)
+    >>> coords = get_mol_3d_coordinates(mol)
+    >>> g = mol_to_nearest_neighbor_graph(mol, coords, neighbor_cutoff=1.25)
+    >>> print(g)
+    DGLGraph(num_nodes=23, num_edges=6,
+             ndata_schemes={}
+             edata_schemes={})
+
+    Quite often we will want to use the distance between end atoms of edges, this can be
+    achieved with
+
+    >>> g = smiles_to_nearest_neighbor_graph(smiles, coords, neighbor_cutoff=1.25, keep_dists=True)
+    >>> print(g.edata['dist'])
+    tensor([[1.2024],
+            [1.2024],
+            [1.2270],
+            [1.2270],
+            [1.2259],
+            [1.2259]])
+
+    See Also
+    --------
+    get_mol_3d_coordinates
+    k_nearest_neighbors
+    mol_to_nearest_neighbor_graph
     """
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_nearest_neighbor_graph(

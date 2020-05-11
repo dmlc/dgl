@@ -3,10 +3,12 @@
  * \file graph/heterograph_capi.cc
  * \brief Heterograph CAPI bindings.
  */
-#include "./heterograph.h"
+#include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+
 #include "../c_api_common.h"
+#include "./heterograph.h"
 
 using namespace dgl::runtime;
 
@@ -409,7 +411,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAsNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     int bits = args[1];
-    HeteroGraphPtr hg_new = UnitGraph::AsNumBits(hg.sptr(), bits);
+    HeteroGraphPtr bhg_ptr = hg.sptr();
+    auto hg_ptr = std::dynamic_pointer_cast<HeteroGraph>(bhg_ptr);
+    HeteroGraphPtr hg_new;
+    if (hg_ptr) {
+      hg_new = HeteroGraph::AsNumBits(hg_ptr, bits);
+    } else {
+      hg_new = UnitGraph::AsNumBits(bhg_ptr, bits);
+    }
     *rv = HeteroGraphRef(hg_new);
   });
 
@@ -429,13 +438,22 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef meta_graph = args[0];
     List<HeteroGraphRef> component_graphs = args[1];
+    CHECK(component_graphs.size() > 0)
+      << "Expect graph list has at least one graph";
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
+    const int64_t bits = component_graphs[0]->NumBits();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
+      CHECK_EQ(component->NumBits(), bits)
+        << "Expect graphs to batch have the same index dtype(int" << bits
+        << "), but got int" << component->NumBits();
     }
-    auto hgptr = DisjointUnionHeteroGraph(meta_graph.sptr(), component_ptrs);
-    *rv = HeteroGraphRef(hgptr);
+    ATEN_ID_BITS_SWITCH(bits, IdType, {
+      auto hgptr =
+        DisjointUnionHeteroGraph<IdType>(meta_graph.sptr(), component_ptrs);
+      *rv = HeteroGraphRef(hgptr);
+    });
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
@@ -443,8 +461,12 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     HeteroGraphRef hg = args[0];
     const IdArray vertex_sizes = args[1];
     const IdArray edge_sizes = args[2];
-    const auto& ret = DisjointPartitionHeteroBySizes(
-      hg->meta_graph(), hg.sptr(), vertex_sizes, edge_sizes);
+    const int64_t bits = hg->NumBits();
+    std::vector<HeteroGraphPtr> ret;
+    ATEN_ID_BITS_SWITCH(bits, IdType, {
+      ret = DisjointPartitionHeteroBySizes<IdType>(hg->meta_graph(), hg.sptr(),
+                                                   vertex_sizes, edge_sizes);
+    });
     List<HeteroGraphRef> ret_list;
     for (HeteroGraphPtr hgptr : ret) {
       ret_list.push_back(HeteroGraphRef(hgptr));
@@ -468,6 +490,12 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLOutSubgraph")
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
     *ret = OutEdgeGraph(hg.sptr(), nodes);
     *rv = HeteroGraphRef(ret);
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    *rv = GraphRef(hg->AsImmutableGraph());
   });
 
 }  // namespace dgl

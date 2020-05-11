@@ -1,4 +1,5 @@
 """SchNet"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 
 from dgl.nn.pytorch.conv.cfconv import ShiftedSoftplus
@@ -8,6 +9,7 @@ from ..readout import MLPNodeReadout
 
 __all__ = ['SchNetPredictor']
 
+# pylint: disable=W0221
 class SchNetPredictor(nn.Module):
     """SchNet for regression and classification on graphs.
 

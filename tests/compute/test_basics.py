@@ -177,7 +177,7 @@ def test_nx_conversion():
     n3 = F.randn((5, 4))
     e1 = F.randn((4, 5))
     e2 = F.randn((4, 7))
-    g = DGLGraph(multigraph=True)
+    g = DGLGraph()
     g.add_nodes(5)
     g.add_edges([0,1,3,4], [2,4,0,3])
     g.ndata.update({'n1': n1, 'n2': n2, 'n3': n3})
@@ -225,7 +225,7 @@ def test_nx_conversion():
     for _, _, attr in nxg.edges(data=True):
         attr.pop('id')
     # test with a new graph
-    g = DGLGraph(multigraph=True)
+    g = DGLGraph()
     g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
     # check graph size
     assert g.number_of_nodes() == 7
@@ -512,7 +512,7 @@ def test_pull_0deg():
     assert F.allclose(new[1], old[1])
 
 def test_send_multigraph():
-    g = DGLGraph(multigraph=True)
+    g = DGLGraph()
     g.add_nodes(3)
     g.add_edge(0, 1)
     g.add_edge(0, 1)

@@ -1,5 +1,7 @@
 import dgl
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 from dgl import DGLGraph
 
@@ -65,7 +67,7 @@ def test_gcn_predictor():
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
 
     # Test default setting
-    gcn_predictor = GCNPredictor(in_feats=1)
+    gcn_predictor = GCNPredictor(in_feats=1).to(device)
     gcn_predictor.eval()
     assert gcn_predictor(g, node_feats).shape == torch.Size([1, 1])
     gcn_predictor.train()
@@ -213,7 +215,7 @@ def test_mpnn_predictor():
 
     # Test default setting
     mpnn_predictor = MPNNPredictor(node_in_feats=1,
-                                   edge_in_feats=2)
+                                   edge_in_feats=2).to(device)
     assert mpnn_predictor(g, node_feats, edge_feats).shape == torch.Size([1, 1])
     assert mpnn_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
            torch.Size([2, 1])
@@ -226,9 +228,39 @@ def test_mpnn_predictor():
                                    n_tasks=2,
                                    num_step_message_passing=2,
                                    num_step_set2set=2,
-                                   num_layer_set2set=2)
+                                   num_layer_set2set=2).to(device)
     assert mpnn_predictor(g, node_feats, edge_feats).shape == torch.Size([1, 2])
     assert mpnn_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
+           torch.Size([2, 2])
+
+def test_weave_predictor():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
+    bg, batch_node_feats, batch_edge_feats = test_graph4()
+    bg, batch_node_feats, batch_edge_feats = bg.to(device), batch_node_feats.to(device), \
+                                             batch_edge_feats.to(device)
+
+    # Test default setting
+    weave_predictor = WeavePredictor(node_in_feats=1,
+                                     edge_in_feats=2).to(device)
+    assert weave_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
+           torch.Size([2, 1])
+
+    # Test configured setting
+    weave_predictor = WeavePredictor(node_in_feats=1,
+                                     edge_in_feats=2,
+                                     num_gnn_layers=2,
+                                     gnn_hidden_feats=10,
+                                     gnn_activation=F.relu,
+                                     graph_feats=128,
+                                     gaussian_expand=True,
+                                     gaussian_memberships=None,
+                                     readout_activation=nn.Tanh(),
+                                     n_tasks=2).to(device)
+    assert weave_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
            torch.Size([2, 2])
 
 if __name__ == '__main__':
@@ -239,3 +271,4 @@ if __name__ == '__main__':
     test_schnet_predictor()
     test_mgcn_predictor()
     test_mpnn_predictor()
+    test_weave_predictor()

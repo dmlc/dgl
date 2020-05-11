@@ -6,6 +6,7 @@ from torch.nn import init
 
 from .... import function as fn
 from ..utils import Identity
+from ....utils import expand_as_pair
 
 
 class GMMConv(nn.Module):
@@ -45,7 +46,7 @@ class GMMConv(nn.Module):
                  residual=False,
                  bias=True):
         super(GMMConv, self).__init__()
-        self._in_feats = in_feats
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
@@ -60,10 +61,10 @@ class GMMConv(nn.Module):
 
         self.mu = nn.Parameter(th.Tensor(n_kernels, dim))
         self.inv_sigma = nn.Parameter(th.Tensor(n_kernels, dim))
-        self.fc = nn.Linear(in_feats, n_kernels * out_feats, bias=False)
+        self.fc = nn.Linear(self._in_src_feats, n_kernels * out_feats, bias=False)
         if residual:
-            if in_feats != out_feats:
-                self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+            if self._in_dst_feats != out_feats:
+                self.res_fc = nn.Linear(self._in_dst_feats, out_feats, bias=False)
             else:
                 self.res_fc = Identity()
         else:
@@ -94,9 +95,10 @@ class GMMConv(nn.Module):
         graph : DGLGraph
             The graph.
         feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`N`
-            is the number of nodes of the graph and :math:`D_{in}` is the
-            input feature size.
+            If a single tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tensors are given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
         pseudo : torch.Tensor
             The pseudo coordinate tensor of shape :math:`(E, D_{u})` where
             :math:`E` is the number of edges of the graph and :math:`D_{u}`
@@ -108,21 +110,22 @@ class GMMConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = self.fc(feat).view(-1, self._n_kernels, self._out_feats)
-        E = graph.number_of_edges()
-        # compute gaussian weight
-        gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) -
-                            self.mu.view(1, self._n_kernels, self._dim)) ** 2)
-        gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2)
-        gaussian = th.exp(gaussian.sum(dim=-1, keepdim=True)) # (E, K, 1)
-        graph.edata['w'] = gaussian
-        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
-        rst = graph.ndata['h'].sum(1)
-        # residual connection
-        if self.res_fc is not None:
-            rst = rst + self.res_fc(feat)
-        # bias
-        if self.bias is not None:
-            rst = rst + self.bias
-        return rst
+        with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
+            graph.srcdata['h'] = self.fc(feat_src).view(-1, self._n_kernels, self._out_feats)
+            E = graph.number_of_edges()
+            # compute gaussian weight
+            gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) -
+                                self.mu.view(1, self._n_kernels, self._dim)) ** 2)
+            gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2)
+            gaussian = th.exp(gaussian.sum(dim=-1, keepdim=True)) # (E, K, 1)
+            graph.edata['w'] = gaussian
+            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
+            rst = graph.dstdata['h'].sum(1)
+            # residual connection
+            if self.res_fc is not None:
+                rst = rst + self.res_fc(feat_dst)
+            # bias
+            if self.bias is not None:
+                rst = rst + self.bias
+            return rst
