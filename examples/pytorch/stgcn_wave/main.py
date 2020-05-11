@@ -23,7 +23,7 @@ parser.add_argument('--sensorsfilepath', type=str, default='./data/sensor_graph/
 parser.add_argument('--disfilepath', type=str, default='./data/sensor_graph/distances_la_2012.csv', help='distance file path')
 parser.add_argument('--tsfilepath', type=str, default='./data/metr-la.h5', help='ts file path')
 parser.add_argument('--savemodelpath', type=str, default='./save/stgcnwavemodel.pt', help='save model path')
-parser.add_argument('--prelen', type=int, default=5, help='how many steps away we want to predict')
+parser.add_argument('--pred_len', type=int, default=5, help='how many steps away we want to predict')
 parser.add_argument('--control_str', type=str, default='TNTSTNTST', help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
 parser.add_argument('--channels', type=int, nargs='+', default=[1, 16, 32, 64, 32, 128], help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
 args = parser.parse_args()
@@ -53,7 +53,7 @@ save_path = args.savemodelpath
 
 
 
-n_pred = args.prelen
+n_pred = args.pred_len
 n_route = num_nodes
 blocks = args.channels
 # blocks = [1, 16, 32, 64, 32, 128]
