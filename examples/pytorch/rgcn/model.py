@@ -109,6 +109,7 @@ class RelGraphConvLayer(nn.Module):
                  bias=True,
                  activation=None,
                  self_loop=False,
+                 low_mem=False,
                  dropout=0.0):
         super(RelGraphConvLayer, self).__init__()
         self.in_feat = in_feat
@@ -121,6 +122,7 @@ class RelGraphConvLayer(nn.Module):
         self.bias = bias
         self.activation = activation
         self.self_loop = self_loop
+        self.low_mem = low_mem
 
         if regularizer == "basis":
             # add basis weights
@@ -177,8 +179,20 @@ class RelGraphConvLayer(nn.Module):
         else:
             weight = self.weight
 
-        w = weight.index_select(0, edges.data['etype'])
-        msg = th.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
+        # hack something here to make it more memory effcient.
+        if self.low_mem:
+            etypes = th.unique(edges.data['etype'])
+            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
+                        device=edges.src['h'].device)
+            for etype in etypes:
+                loc = edges.data['etype'] == etype
+                w = weight[etype]
+                src = edges.src['h'][loc]
+                sub_msg = th.matmul(src, w)
+                msg[loc] = sub_msg
+        else:
+            w = weight.index_select(0, edges.data['etype'])
+            msg = th.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
@@ -187,10 +201,23 @@ class RelGraphConvLayer(nn.Module):
         """Message function for block-diagonal-decomposition regularizer"""
         if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
-        weight = self.weight.index_select(0, edges.data['etype']).view(
-            -1, self.submat_in, self.submat_out)
-        node = edges.src['h'].view(-1, 1, self.submat_in)
-        msg = th.bmm(node, weight).view(-1, self.out_feat)
+
+        # hack something here to make it more memory effcient.
+        if self.low_mem:
+            etypes = th.unique(edges.data['etype'])
+            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
+                        device=edges.src['h'].device)
+            for etype in etypes:
+                loc = edges.data['etype'] == etype
+                w = weight[etype].view(-1, self.submat_in, self.submat_out)
+                src = edges.src['h'][loc].view(-1, self.num_bases, self.submat_in)
+                sub_msg = th.matmul(src, w).view(-1, self.out_feat)
+                msg[loc] = sub_msg
+        else:
+            weight = self.weight.index_select(0, edges.data['etype']).view(
+                -1, self.submat_in, self.submat_out)
+            node = edges.src['h'].view(-1, 1, self.submat_in)
+            msg = th.bmm(node, weight).view(-1, self.out_feat)
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}

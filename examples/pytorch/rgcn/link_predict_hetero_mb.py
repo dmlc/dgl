@@ -36,6 +36,7 @@ class LinkPredict(nn.Module):
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False,
+                 low_mem=False,
                  regularization_coef=0):
         super(LinkPredict, self).__init__()
         self.device = device
@@ -56,13 +57,13 @@ class LinkPredict(nn.Module):
         self.layers.append(RelGraphConvLayer(
             self.h_dim, self.h_dim, self.edge_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout))
+            low_mem=low_mem, dropout=self.dropout))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConvLayer(
                 self.h_dim, self.h_dim, self.edge_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout))
+                low_mem=low_mem, dropout=self.dropout))
 
     def forward_full(self, blocks, feats):
         h = feats
@@ -594,6 +595,7 @@ def main(args):
                         num_hidden_layers=args.n_layers,
                         dropout=args.dropout,
                         use_self_loop=args.use_self_loop,
+                        low_mem=args.low_mem,
                         regularization_coef=args.regularization_coef)
     if args.mix_cpu_gpu is False and args.gpu >= 0:
         embed_layer.cuda()
@@ -700,6 +702,8 @@ if __name__ == '__main__':
             help="Use sample based evalution method or full-graph based evalution method")
     parser.add_argument("--num-workers", type=int, default=0,
             help="Number of workers for dataloader.")
+    parser.add_argument("--low-mem", default=False, action='store_true',
+            help="Whether use low mem RelGraphCov")
 
     args = parser.parse_args()
     print(args)
