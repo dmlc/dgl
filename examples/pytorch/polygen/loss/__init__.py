@@ -48,6 +48,11 @@ class SimpleLossCompute(nn.Module):
     def accuracy(self):
         return (self.n_correct + self.eps) / (self.norm_term + self.eps)
 
+    def reset_meter(self):
+        self.n_correct = 0
+        self.acc_loss = 0
+        self.norm_term = 0
+
     def step(self):
         self.opt.step()
         self.opt.optimizer.zero_grad()
