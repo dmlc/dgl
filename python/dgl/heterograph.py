@@ -4150,7 +4150,7 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-    def format(self, etype=None, return_all=False):
+    def format_in_use(self, etype=None, return_all=False):
         """Return the sparse formats in use of the given edge/relation type.
 
         Returns
@@ -4163,7 +4163,7 @@ class DGLHeteroGraph(object):
         restrict_format
         to_format
         """
-        return self._graph.format(self.get_etype_id(etype))
+        return self._graph.format_in_use(self.get_etype_id(etype))
 
     def restrict_format(self, etype=None):
         """Return the allowed sparse formats of the given edge/relation type.
@@ -4174,7 +4174,7 @@ class DGLHeteroGraph(object):
 
         See Also
         --------
-        format
+        format_in_use
         to_format
         """
         return self._graph.restrict_format(self.get_etype_id(etype))
@@ -4195,7 +4195,7 @@ class DGLHeteroGraph(object):
 
         See Also
         --------
-        format
+        format_in_use
         restrict_format
         """
         return DGLHeteroGraph(self._graph.to_format(format), self.ntypes, self.etypes,

@@ -902,7 +902,7 @@ class HeteroGraphIndex(ObjectBase):
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
 
-    def format(self, etype):
+    def format_in_use(self, etype):
         """Return the sparse formats in use of the given edge/relation type.
 
         Parameters
