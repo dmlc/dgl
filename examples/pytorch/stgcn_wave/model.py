@@ -7,9 +7,8 @@ from dgl.nn.pytorch import GraphConv
 from dgl.nn.pytorch.conv import ChebConv
 
 class TemporalConvLayer(nn.Module):
-    def __init__(self, c_in, c_out, dia = 1,act="relu"):
+    def __init__(self, c_in, c_out, dia = 1):
         super(TemporalConvLayer, self).__init__()
-        self.act = act
         self.c_out = c_out
         self.c_in = c_in
         self.conv = nn.Conv2d(c_in, c_out, (2, 1), 1, dilation = dia, padding = (0,0))

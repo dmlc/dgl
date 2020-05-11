@@ -25,7 +25,7 @@ parser.add_argument('--tsfilepath', type=str, default='./data/metr-la.h5', help=
 parser.add_argument('--savemodelpath', type=str, default='./save/stgcnwavemodel.pt', help='save model path')
 parser.add_argument('--prelen', type=int, default=5, help='how many steps away we want to predict')
 parser.add_argument('--control_str', type=str, default='TNTSTNTST', help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
-parser.add_argument('--channels', type=list, default=[1, 16, 32, 64, 32, 128], help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
+parser.add_argument('--channels', type=int, nargs='+', default=[1, 16, 32, 64, 32, 128], help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
 args = parser.parse_args()
 
 device = torch.device("cuda") if torch.cuda.is_available() and not args.disablecuda else torch.device("cpu")
