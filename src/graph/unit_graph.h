@@ -223,7 +223,7 @@ class UnitGraph : public BaseHeteroGraph {
     return SelectFormat(preferred_format);
   }
 
-  std::string GetRestrictFormat() const override{
+  std::string GetRestrictFormat() const override {
     return ToStringSparseFormat(this->restrict_format_);
   }
 

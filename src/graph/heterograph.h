@@ -28,7 +28,7 @@ class HeteroGraph : public BaseHeteroGraph {
     CHECK_LT(etype, meta_graph_->NumEdges()) << "Invalid edge type: " << etype;
     return relation_graphs_[etype];
   }
- 
+
   void AddVertices(dgl_type_t vtype, uint64_t num_vertices) override {
     LOG(FATAL) << "Bipartite graph is not mutable.";
   }

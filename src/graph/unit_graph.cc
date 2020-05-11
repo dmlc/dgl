@@ -1375,19 +1375,16 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 
 HeteroGraphPtr UnitGraph::GetGraphInFormat(const SparseFormat &restrict_format) const {
     int64_t num_vtypes = NumVertexTypes();
-    switch(restrict_format) {
+    switch (restrict_format) {
     case SparseFormat::kCOO:
       return CreateFromCOO(
-        num_vtypes, GetCOO(false)->adj(), restrict_format
-      ); 
+        num_vtypes, GetCOO(false)->adj(), restrict_format);
     case SparseFormat::kCSC:
       return CreateFromCSC(
-        num_vtypes, GetInCSR(false)->adj(), restrict_format
-      );
+        num_vtypes, GetInCSR(false)->adj(), restrict_format);
     case SparseFormat::kCSR:
       return CreateFromCSR(
-        num_vtypes, GetOutCSR(false)->adj(), restrict_format
-      );
+        num_vtypes, GetOutCSR(false)->adj(), restrict_format);
     default:  // SparseFormat::kAny
       return HeteroGraphPtr(
         new UnitGraph(meta_graph_, in_csr_, out_csr_, coo_, restrict_format));
