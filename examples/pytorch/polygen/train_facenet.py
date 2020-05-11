@@ -35,11 +35,12 @@ def main(dev_id, args):
     # Considering data paralellism
     train_dataset = FaceDataset(args.dataset, 'train', device, dev_id, args.ngpu)
     # TODO: debugging nan, set shuffle to false
-    train_loader = DataLoader(train_dataset, batch_size=args.batch//args.ngpu, shuffle=False, num_workers=args.workers_per_loader, collate_fn=collate_facegraphs)
-    train_iter = iter(train_loader) 
+    train_loader = DataLoader(train_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_facegraphs)
+    train_iter = iter(train_loader)
 
     # Config loss
     criterion = torch.nn.NLLLoss()
+    #criterion = torch.nn.NLLLoss()
     # Create model, set the sota setting as the default params
     model = make_face_model(N=args.N, dim_model=args.dim_model)
     # Move model to corresponding device
@@ -73,7 +74,7 @@ def main(dev_id, args):
         print (log_path)
         log_f = open(log_path, 'w')
         test_dataset = FaceDataset(args.dataset, 'test', device)
-        test_loader = DataLoader(test_dataset, batch_size=args.batch//args.ngpu, shuffle=True, num_workers=args.workers_per_loader, collate_fn=collate_facegraphs)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch//args.ngpu, shuffle=False, num_workers=args.workers_per_loader, collate_fn=collate_facegraphs)
         #test_iter = iter(test_loader)
         test_loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)(opt=None)
  

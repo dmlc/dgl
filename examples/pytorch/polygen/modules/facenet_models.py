@@ -76,6 +76,8 @@ def softmax_and_pad(nodes):
     ordered_pointer_dot = th.gather(pointer_dot, 1, src_idx)
     # log softmax
     log_softmax_pointer_dot = th.log_softmax(ordered_pointer_dot, dim=-1)
+    softmax_pointer_dot = th.softmax(ordered_pointer_dot, dim=-1)
+
     pad_num = max_len - shape[1]
     if pad_num:
         pad_tensor = th.ones([shape[0], pad_num], dtype=log_softmax_pointer_dot.dtype, device=log_softmax_pointer_dot.device)*eps
@@ -132,24 +134,44 @@ class Transformer(nn.Module):
             post_func = self.encoder.post_func(i)
             nodes, edges = nids['enc'], eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
+        
         # Indexing result
         tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, graph.tgt[0])
         face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
         vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
         g.nodes[nids['dec']].data['x'] = tgt_embed + face_pos_enc + vert_idx_in_face_enc
         g.nodes[nids['dec']].data['idx'] = graph.tgt[1].float()
-
+        
+        # Run decoder
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
             post_func = self.decoder.post_func(i)
             nodes, edges = nids['dec'], eids['dd']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-
+        
         nodes, edges = nids['dec'], eids['ed']
 
+        # Numerical stable since we use log_softmax
         g.send(edges=g.find_edges(edges), message_func=[fn.u_dot_v('x', 'x', 'pointer_score'), fn.copy_u('idx', 'src_idx')])
         g.recv(v=nodes, reduce_func=softmax_and_pad)
         return g.ndata['log_softmax_res'][nids['dec']]
+        '''
+        # Pointer network
+        # numerical unstable
+        g.apply_edges(fn.u_dot_v('x', 'x', 'pointer_score'), edges)
+        pointer_softmax = th.log(dglnn.edge_softmax(g, g.edata['pointer_score'][edges], edges)+1e-6)
+        src_lens, tgt_lens = graph.src_lens, graph.tgt_lens
+        log_softmax_res = th.zeros([np.sum(tgt_lens), FaceDataset.MAX_VERT_LENGTH], dtype=th.float,        device=pointer_softmax.device)
+        # pad softmax res
+        cur_idx = 0
+        cur_tgt_head = 0
+        for n_dec, n_enc in zip(tgt_lens, src_lens):
+            log_softmax_res[cur_tgt_head:cur_tgt_head+n_dec, :n_enc] = th.transpose(pointer_softmax[cur_idx:cur_idx+n_enc*n_dec].reshape([n_enc, n_dec]),0,1)
+            cur_idx += n_enc * n_dec
+            cur_tgt_head += n_dec
+        return log_softmax_res
+        '''
+
 
     def infer(self, graph, max_len, eos_id, k, alpha=1.0):
         '''
@@ -207,8 +229,6 @@ class Transformer(nn.Module):
                 nodes, edges = nodes_d, edges_dd
                 self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
-            nodes, edges = nids['dec'], eids['ed']
-            # pointer net
             nodes, edges = nids['dec'], eids['ed']
             # pointer net
             g.send_and_recv(edges,
