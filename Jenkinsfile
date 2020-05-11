@@ -101,7 +101,8 @@ pipeline {
       agent { 
         docker {
           label "linux-c52x-node"
-          image "dgllib/dgl-ci-lint" 
+          image "dgllib/dgl-ci-lint"  
+          alwayspull true
         }
       }
       steps {
@@ -121,6 +122,7 @@ pipeline {
             docker {
               label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwayspull true
             }
           }
           steps {
@@ -138,6 +140,7 @@ pipeline {
               label "linux-c52x-node"
               image "dgllib/dgl-ci-gpu:conda"
               args "-u root"
+              alwayspull true
             }
           }
           steps {
@@ -173,6 +176,7 @@ pipeline {
             docker { 
               label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda"
+              alwayspull true
             }
           }
           steps {
@@ -200,6 +204,7 @@ pipeline {
             docker {
               label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwayspull true
             }
           }
           stages {
@@ -221,6 +226,7 @@ pipeline {
               label "linux-gpu-node"
               image "dgllib/dgl-ci-gpu:conda" 
               args "--runtime nvidia"
+              alwayspull true
             }
           }
           stages {
@@ -241,6 +247,7 @@ pipeline {
             docker {
               label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwayspull true
             }
           }
           stages {
@@ -292,6 +299,7 @@ pipeline {
               label "linux-gpu-node"
               image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
+              alwayspull true
             }
           }
           stages {
@@ -318,6 +326,7 @@ pipeline {
             docker {
               label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwayspull true
             }
           }
           stages {
@@ -344,6 +353,7 @@ pipeline {
               label "linux-gpu-node" 
               image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
+              alwayspull true
             }
           }
           stages {
