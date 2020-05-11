@@ -26,41 +26,41 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
 
 //////////////////////////// C APIs ////////////////////////////
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCSetRank")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const int32_t rank = args[0];
   RPCContext::ThreadLocal()->rank = rank;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCGetRank")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetRank")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = RPCContext::ThreadLocal()->rank;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCIncrMsgSeq")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCIncrMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = (RPCContext::ThreadLocal()->msg_seq)++;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCGetMsgSeq")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = RPCContext::ThreadLocal()->msg_seq;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCGetServerState")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetServerState")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   auto st = RPCContext::ThreadLocal()->server_state;
   CHECK(st) << "Server state has not been initialized.";
   *rv = st;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCSendRPCMessage")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSendRPCMessage")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   RPCMessageRef msg = args[0];
   *rv = SendRPCMessage(*(msg.sptr()));
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCRecvRPCMessage")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCRecvRPCMessage")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   int32_t timeout = args[0];
   RPCMessageRef msg = args[1];
@@ -69,13 +69,13 @@ DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCRecvRPCMessage")
 
 //////////////////////////// RPCMessage ////////////////////////////
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCCreateEmptyRPCMessage")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateEmptyRPCMessage")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   std::shared_ptr<RPCMessage> rst(new RPCMessage);
   *rv = rst;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCCreateRPCMessage")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateRPCMessage")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   std::shared_ptr<RPCMessage> rst(new RPCMessage);
   rst->service_id = args[0];
@@ -88,37 +88,38 @@ DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCCreateRPCMessage")
   *rv = rst;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCMessageGetServiceId")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetServiceId")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->service_id;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCMessageGetMsgSeq")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->msg_seq;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCMessageGetClientId")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetClientId")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->client_id;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCMessageGetServerId")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetServerId")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->server_id;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCMessageGetData")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetData")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
-  *rv = msg->data;
+  DGLByteArray barr{msg->data.c_str(), msg->data.size()};
+  *rv = barr;
 });
 
-DGL_REGISTER_GLOBAL("rpc._CAPI_DGLRPCMessageGetTensors")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   List<Value> ret;

@@ -8,6 +8,8 @@ from .._ffi.function import _init_api
 from ..base import DGLError, dgl_warning
 from .. import backend as F
 
+__all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service']
+
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
@@ -234,7 +236,7 @@ def deserialize_from_payload(cls, data, tensors):
         state = state[0]
     else:
         state = tuple(state)
-    obj = cls.__new__()
+    obj = cls.__new__(cls)
     obj.__setstate__(state)
     return obj
 
@@ -290,6 +292,10 @@ class RPCMessage(ObjectBase):
         return _CAPI_DGLRPCMessageGetServerId(self)
 
     @property
+    def xxx(self):
+        return 1
+
+    @property
     def data(self):
         """Get payload buffer."""
         return _CAPI_DGLRPCMessageGetData(self)
@@ -298,7 +304,7 @@ class RPCMessage(ObjectBase):
     def tensors(self):
         """Get tensor payloads."""
         rst = _CAPI_DGLRPCMessageGetTensors(self)
-        return [F.zerocopy_from_dgl_ndarray(tsor) for tsor in rst]
+        return [F.zerocopy_from_dgl_ndarray(tsor.data) for tsor in rst]
 
 def send_request(target, request):
     """Send one request to the target server.
