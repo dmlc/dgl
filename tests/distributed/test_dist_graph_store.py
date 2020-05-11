@@ -82,14 +82,10 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     local_nids = F.nonzero_1d(g._g.ndata['local_node'])
     local_nids = g._g.ndata[dgl.NID][local_nids]
     nodes = node_split(selected_nodes, g.get_partition_book(), g.rank())
+    nodes = F.asnumpy(nodes)
+    local_nids = F.asnumpy(local_nids)
     for n in nodes:
         assert n in local_nids
-
-    local_eids = F.nonzero_1d(g._g.edata['local_edge'])
-    local_eids = g._g.edata[dgl.EID][local_eids]
-    edges = edge_split(selected_edges, g.get_partition_book(), g.rank())
-    for e in edges:
-        assert e in local_eids
 
     g.shut_down()
     print('end')
