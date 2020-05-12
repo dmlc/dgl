@@ -919,10 +919,10 @@ class HeteroGraphIndex(ObjectBase):
             ret.append('coo')
         format_code >>= 1
         if format_code & 1:
-            ret.append('csc')
+            ret.append('csr')
         format_code >>= 1
         if format_code & 1:
-            ret.append('csr')
+            ret.append('csc')
         return ret
 
     def restrict_format(self, etype):
