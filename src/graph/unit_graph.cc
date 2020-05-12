@@ -1213,6 +1213,8 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
                      SparseFormat restrict_format)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
   restrict_format_ = restrict_format;
+  std::cout << (in_csr_ == nullptr) << " " << (out_csr_ == nullptr) << " " << (coo_ == nullptr) << std::endl;
+
 
   // If the graph is hypersparse and in COO format, switch the restricted format to COO.
   // If the graph is given as CSR, the indptr array is already materialized so we don't
@@ -1349,6 +1351,7 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 
 dgl_format_code_t UnitGraph::GetFormatInUse() const {
   dgl_format_code_t ret = 0;
+  std::cout << (in_csr_ == nullptr) << " " << (out_csr_ == nullptr) << " " << (coo_ == nullptr) << std::endl;
   if (in_csr_) ret = ret | 1;
   ret = ret << 1;
   if (out_csr_) ret = ret | 1;

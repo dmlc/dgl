@@ -1654,6 +1654,7 @@ def test_format():
     assert g.restrict_format() == 'coo'
     assert g.format_in_use() == ['coo']
 
+    # multiple relation
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
