@@ -147,9 +147,8 @@ def _get_shared_mem_metadata(graph_name):
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
     dlpack = data.to_dlpack()
-    meta = F.zerocopy_from_dlpack(dlpack)
-    num_nodes, num_edges, num_partitions, part_id = F.as_scalar(meta[0]), F.as_scalar(meta[1]), \
-            F.as_scalar(meta[2]), F.as_scalar(meta[3])
+    meta = F.asnumpy(F.zerocopy_from_dlpack(dlpack))
+    num_nodes, num_edges, num_partitions, part_id = meta[0], meta[1], meta[2], meta[3]
 
     # Load node map
     data = empty_shared_mem(_get_ndata_path(graph_name, 'node_map'), False, (num_nodes,), dtype)
@@ -349,7 +348,7 @@ class DistGraphServer(KVServer):
         node_g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
         # The nodes that belong to this partition.
         local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
-        nids = self.client_g.ndata[NID][local_nids]
+        nids = F.asnumpy(self.client_g.ndata[NID][local_nids])
         assert np.all(node_map[nids] == server_id), 'Load a wrong partition'
         F.scatter_row_inplace(node_g2l, nids, F.arange(0, len(nids)))
 
@@ -357,7 +356,7 @@ class DistGraphServer(KVServer):
         if len(edge_feats) > 0:
             edge_g2l = F.zeros((num_edges), dtype=F.int64, ctx=F.cpu()) - 1
             local_eids = F.nonzero_1d(self.client_g.edata['local_edge'])
-            eids = self.client_g.edata[EID][local_eids]
+            eids = F.asnumpy(self.client_g.edata[EID][local_eids])
             assert np.all(edge_map[eids] == server_id), 'Load a wrong partition'
             F.scatter_row_inplace(edge_g2l, eids, F.arange(0, len(eids)))
 
