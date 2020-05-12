@@ -1214,6 +1214,7 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
   restrict_format_ = restrict_format;
 
+  /* TODO(zihao): move it elsewhere.
   // If the graph is hypersparse and in COO format, switch the restricted format to COO.
   // If the graph is given as CSR, the indptr array is already materialized so we don't
   // care about restricting conversion anyway (even if it is hypersparse).
@@ -1221,6 +1222,7 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
     if (coo && coo->IsHypersparse())
       restrict_format_ = SparseFormat::kCOO;
   }
+  */
 
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
