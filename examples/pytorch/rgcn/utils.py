@@ -6,9 +6,14 @@ https://github.com/MichSchli/RelationPrediction
 """
 
 import os
+import traceback
+from _thread import start_new_thread
+from functools import wraps
+
 import numpy as np
 import pandas as pd
 import torch
+from torch.multiprocessing import Queue
 import dgl
 
 from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
@@ -446,7 +451,7 @@ class DrkgDataset(object):
         self.rel_map = relation_dict
         self.entity_map = entity_dict
         self.entity_type_dict = entity_type_dict
-        self.all_rels = list(graph_relations)
+        self.num_rels = list(graph_relations)
         self.num_nodes = len(entity_dict)
 
 def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, edge_lists, reverse=True):

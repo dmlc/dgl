@@ -172,7 +172,8 @@ def main(args):
         node_tids = node_tids.cuda()
         g.edata['norm'] = g.edata['norm'].cuda()
 
-    embed_layer = RelGraphEmbedLayer(g.number_of_nodes(),
+    embed_layer = RelGraphEmbedLayer(args.gpu,
+                                     g.number_of_nodes(),
                                      node_tids,
                                      num_of_ntype,
                                      [None] * num_of_ntype,

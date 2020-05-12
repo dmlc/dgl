@@ -15,6 +15,9 @@ import time, gc
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.multiprocessing import Queue
+from torch.nn.parallel import DistributedDataParallel
+from _thread import start_new_thread
 from torch.utils.data import DataLoader
 import dgl
 import dgl.function as fn
@@ -24,7 +27,8 @@ from functools import partial
 
 from dgl.contrib.data import load_data
 from model import RelGraphEmbedLayer, RelGraphConvLayer
-from utils import build_heterograph_in_homogeneous_from_triplets
+from utils import build_heterograph_in_homogeneous_from_triplets, build_multi_ntype_heterograph_in_homogeneous_from_triplets
+from utils import thread_wrapped_func
 
 class LinkPredict(nn.Module):
     def __init__(self,
@@ -39,7 +43,7 @@ class LinkPredict(nn.Module):
                  low_mem=False,
                  regularization_coef=0):
         super(LinkPredict, self).__init__()
-        self.device = device
+        self.device = th.device(device if device >= 0 else 'cpu')
         self.h_dim = h_dim
         self.num_rels = num_rels
         self.edge_rels = edge_rels
@@ -463,75 +467,17 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
     t1 = time.time()
     print("Full eval {} exmpales takes {} seconds".format(pos_eids.shape[0], t1 - t0))
 
-def main(args):
-    if args.dataset == "drkg":
-        drkg_dataset = DrkgDataset()
-        drkg_dataset.load_data()
-        
-    else:
-        data = load_data(args.dataset)
-        num_nodes = data.num_nodes
-        num_rels = data.num_rels
-        edge_rels = num_rels * 2 # we add reverse edges
-        train_data = data.train
-        valid_data = data.valid
-        test_data = data.test
+@thread_wrapped_func
+def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds):
+    dev_id = devices[proc_id]
+    train_g, valid_g, test_g, num_rels, edge_rels = dataset
+    train_seeds, valid_seeds, test_seeds = pos_seeds
+    train_neg_seeds, valid_neg_seeds, test_neg_seeds = neg_seeds
 
-        train_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data])
-        valid_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data])
-        test_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data, test_data])
-
-    device = th.device(args.gpu) if args.gpu >= 0 else th.device('cpu')
     batch_size = args.batch_size
     chunk_size = args.chunk_size
     valid_batch_size = args.valid_batch_size
     fanouts = [args.fanout if args.fanout > 0 else None] * args.n_layers
-
-    u, v, eid = train_g.all_edges(form='all')
-    train_seed_idx = (train_g.edata['set'] == 0)
-    train_seeds = eid[train_seed_idx]
-    train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
-
-    for rel_id in range(edge_rels):
-        idx = (train_g.edata['etype'] == rel_id)
-        u_r = u[idx]
-        v_r = v[idx]
-        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = th.ones(v_r.shape[0]) / degrees
-        norm = norm.unsqueeze(1)
-        train_g.edata['norm'][idx] = norm
-
-    u, v, eid = valid_g.all_edges(form='all')
-    valid_seeds = eid[valid_g.edata['set'] == 1]
-    valid_neg_seeds = eid[valid_g.edata['set'] > -1]
-    valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
-
-    for rel_id in range(edge_rels):
-        idx = (valid_g.edata['etype'] == rel_id)
-        u_r = u[idx]
-        v_r = v[idx]
-        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = th.ones(v_r.shape[0]) / degrees
-        norm = norm.unsqueeze(1)
-        valid_g.edata['norm'][idx] = norm
-    
-
-    u, v, eid = test_g.all_edges(form='all')
-    test_seeds = eid[test_g.edata['set'] == 2]
-    test_neg_seeds = eid[test_g.edata['set'] > -1]
-    test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
-
-    for rel_id in range(edge_rels):
-        idx = (test_g.edata['etype'] == rel_id)
-        u_r = u[idx]
-        v_r = v[idx]
-        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = th.ones(v_r.shape[0]) / degrees
-        norm = norm.unsqueeze(1)
-        test_g.edata['norm'][idx] = norm
 
     num_train_edges = train_seeds.shape[0]
     num_valid_edges = valid_neg_seeds.shape[0]
@@ -540,13 +486,10 @@ def main(args):
     num_of_ntype = int(th.max(node_tids).numpy()) + 1
 
     # check cuda
-    use_cuda = args.gpu >= 0 and th.cuda.is_available()
+    use_cuda = dev_id >= 0
     if use_cuda:
-        th.cuda.set_device(args.gpu)
-        node_tids = node_tids.cuda()
-        train_g.edata['norm'] = train_g.edata['norm'].cuda()
-        valid_g.edata['norm'] = valid_g.edata['norm'].cuda()
-        test_g.edata['norm'] = test_g.edata['norm'].cuda()
+        th.cuda.set_device(dev_id)
+        node_tids = node_tids.to(dev_id)
 
     train_sampler = LinkRankSampler(train_g,
                                     train_seeds,
@@ -560,34 +503,46 @@ def main(args):
                             pin_memory=True,
                             drop_last=True,
                             num_workers=args.num_workers)
-    valid_sampler = LinkRankSampler(valid_g,
-                                    valid_neg_seeds,
-                                    num_valid_edges,
-                                    num_neg=args.valid_neg_cnt,
-                                    fanouts=[None] * args.n_layers,
-                                    is_train=False)
-    valid_dataloader = DataLoader(dataset=valid_seeds,
-                                  batch_size=args.valid_batch_size,
-                                  collate_fn=valid_sampler.sample_blocks,
-                                  shuffle=False,
-                                  pin_memory=True,
-                                  drop_last=False,
-                                  num_workers=args.num_workers)
-    test_sampler = NodeSampler(test_g, fanouts=[None] * args.n_layers)
-    test_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
-                                 batch_size=4 * 1024,
-                                 collate_fn=test_sampler.sample_nodes,
-                                 shuffle=False,
-                                 pin_memory=True,
-                                 drop_last=False,
-                                 num_workers=args.num_workers)
-    embed_layer = RelGraphEmbedLayer(test_g.number_of_nodes(),
+    if proc_id == 0:
+        valid_sampler = LinkRankSampler(valid_g,
+                                        valid_neg_seeds,
+                                        num_valid_edges,
+                                        num_neg=args.valid_neg_cnt,
+                                        fanouts=[None] * args.n_layers,
+                                        is_train=False)
+        valid_dataloader = DataLoader(dataset=valid_seeds,
+                                    batch_size=args.valid_batch_size,
+                                    collate_fn=valid_sampler.sample_blocks,
+                                    shuffle=False,
+                                    pin_memory=True,
+                                    drop_last=False,
+                                    num_workers=args.num_workers)
+        test_sampler = NodeSampler(test_g, fanouts=[None] * args.n_layers)
+        test_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
+                                    batch_size=4 * 1024,
+                                    collate_fn=test_sampler.sample_nodes,
+                                    shuffle=False,
+                                    pin_memory=True,
+                                    drop_last=False,
+                                    num_workers=args.num_workers)
+    
+    if n_gpus > 1:
+        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+            master_ip='127.0.0.1', master_port='12345')
+        world_size = n_gpus
+        th.distributed.init_process_group(backend="nccl",
+                                          init_method=dist_init_method,
+                                          world_size=world_size,
+                                          rank=dev_id)
+
+    embed_layer = RelGraphEmbedLayer(dev_id,
+                                     test_g.number_of_nodes(),
                                      node_tids,
                                      num_of_ntype,
                                      [None] * num_of_ntype,
                                      args.n_hidden)
     
-    model = LinkPredict(device,
+    model = LinkPredict(dev_id,
                         args.n_hidden,
                         num_rels,
                         edge_rels,
@@ -597,9 +552,14 @@ def main(args):
                         use_self_loop=args.use_self_loop,
                         low_mem=args.low_mem,
                         regularization_coef=args.regularization_coef)
-    if args.mix_cpu_gpu is False and args.gpu >= 0:
-        embed_layer.cuda()
-        model.cuda(device)
+    if dev_id >= 0:
+        model.cuda(dev_id)
+        if args.mix_cpu_gpu is False:
+            embed_layer.cuda(dev_id)
+
+    if n_gpus > 1:
+        embed_layer = DistributedDataParallel(embed_layer)
+        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -613,11 +573,11 @@ def main(args):
             t0 = time.time()
         for i, sample_data in enumerate(dataloader):
             bsize, p_g, n_g, p_blocks, n_blocks = sample_data
-            p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID].to(device),
-                                  p_blocks[0].srcdata['ntype'].to(device),
+            p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID].to(dev_id),
+                                  p_blocks[0].srcdata['ntype'].to(dev_id),
                                   node_feats)
-            n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID].to(device),
-                                  n_blocks[0].srcdata['ntype'].to(device),
+            n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID].to(dev_id),
+                                  n_blocks[0].srcdata['ntype'].to(dev_id),
                                   node_feats)
 
             p_head_emb, p_tail_emb, rids, n_head_emb, n_tail_emb = \
@@ -653,21 +613,19 @@ def main(args):
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
-    fullgraph_eval(test_g, embed_layer, model, device, node_feats, args.n_hidden,
+    fullgraph_eval(test_g, embed_layer, model, dev_id, node_feats, args.n_hidden,
         test_dataloader, test_seeds, test_neg_seeds, args.test_neg_cnt)
 
-if __name__ == '__main__':
+def config():
     parser = argparse.ArgumentParser(description='RGCN')
     parser.add_argument("--dropout", type=float, default=0.2,
             help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=200,
             help="number of hidden units")
-    parser.add_argument("--gpu", type=int, default=-1,
+    parser.add_argument("--gpu", type=str, default='0',
             help="gpu")
     parser.add_argument("--keep_pos_edges", default=False, action='store_true',
             help="Whether delete positive edges during training in case of linkage leakage")
-    parser.add_argument("--mix_cpu_gpu", default=False, action='store_true',
-            help="Mix CPU and GPU training")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
     parser.add_argument("--n-bases", type=int, default=10,
@@ -704,9 +662,143 @@ if __name__ == '__main__':
             help="Number of workers for dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
             help="Whether use low mem RelGraphCov")
+    parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
+            help="Whether store node embeddins in cpu")
 
     args = parser.parse_args()
+
+    return args
+
+def prepare_mp(g):
+    """
+    Explicitly materialize the CSR, CSC and COO representation of the given graph
+    so that they could be shared via copy-on-write to sampler workers and GPU
+    trainers.
+    This is a workaround before full shared memory support on heterogeneous graphs.
+    """
+    for etype in g.canonical_etypes:
+        g.in_degree(0, etype=etype)
+        g.out_degree(0, etype=etype)
+        g.find_edges([0], etype=etype)
+
+def main(args, devices):
+    if args.dataset == "drkg":
+        drkg_dataset = DrkgDataset()
+        drkg_dataset.load_data()
+
+        num_nodes = drkg_dataset.num_nodes
+        num_rels = drkg_dataset.num_rels
+        edge_rels = num_rels * 2 # we add reverse edges
+        train_data = drkg_dataset.train
+        valid_data = drkg_dataset.valid
+        test_data = drkg_dataset.test
+
+        train_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data])
+        valid_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data])
+        test_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data, test_data])
+    else:
+        data = load_data(args.dataset)
+        num_nodes = data.num_nodes
+        num_rels = data.num_rels
+        edge_rels = num_rels * 2 # we add reverse edges
+        train_data = data.train
+        valid_data = data.valid
+        test_data = data.test
+
+        train_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data])
+        valid_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data])
+        test_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data, test_data])
+
+    u, v, eid = train_g.all_edges(form='all')
+    train_seed_idx = (train_g.edata['set'] == 0)
+    train_seeds = eid[train_seed_idx]
+    train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+
+    for rel_id in range(edge_rels):
+        idx = (train_g.edata['etype'] == rel_id)
+        u_r = u[idx]
+        v_r = v[idx]
+        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        norm = th.ones(v_r.shape[0]) / degrees
+        norm = norm.unsqueeze(1)
+        train_g.edata['norm'][idx] = norm
+    train_g.edata['norm'].share_memory_()
+    train_g.edata['etype'].share_memory_()
+    train_g.ndata['ntype'].share_memory_()
+    train_g.edata.pop('set')
+
+    u, v, eid = valid_g.all_edges(form='all')
+    valid_seeds = eid[valid_g.edata['set'] == 1]
+    valid_neg_seeds = eid[valid_g.edata['set'] > -1]
+    valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+
+    for rel_id in range(edge_rels):
+        idx = (valid_g.edata['etype'] == rel_id)
+        u_r = u[idx]
+        v_r = v[idx]
+        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        norm = th.ones(v_r.shape[0]) / degrees
+        norm = norm.unsqueeze(1)
+        valid_g.edata['norm'][idx] = norm
+    valid_g.edata['norm'].share_memory_()
+    valid_g.edata['etype'].share_memory_()
+    valid_g.ndata['ntype'].share_memory_()
+    valid_g.edata.pop('set')
+
+    u, v, eid = test_g.all_edges(form='all')
+    test_seeds = eid[test_g.edata['set'] == 2]
+    test_neg_seeds = eid[test_g.edata['set'] > -1]
+    test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+
+    for rel_id in range(edge_rels):
+        idx = (test_g.edata['etype'] == rel_id)
+        u_r = u[idx]
+        v_r = v[idx]
+        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        norm = th.ones(v_r.shape[0]) / degrees
+        norm = norm.unsqueeze(1)
+        test_g.edata['norm'][idx] = norm
+    test_g.edata['norm'].share_memory_()
+    test_g.edata['etype'].share_memory_()
+    test_g.ndata['ntype'].share_memory_()
+    test_g.edata.pop('set')
+
+    n_gpus = len(devices)
+    # cpu
+    if devices[0] == -1:
+        run(0, 0, args, ['cpu'], (train_g, valid_g, test_g, num_rels, edge_rels),
+            (train_seeds, valid_seeds, test_seeds),
+            (train_seeds, valid_neg_seeds, test_neg_seeds))
+    # gpu
+    elif n_gpus == 1:
+        run(0, n_gpus, args, devices, (train_g, valid_g, test_g, num_rels, edge_rels),
+            (train_seeds, valid_seeds, test_seeds),
+            (train_seeds, valid_neg_seeds, test_neg_seeds))
+    # multi gpu
+    else:
+        prepare_mp(train_g)
+        prepare_mp(valid_g)
+        prepare_mp(test_g)
+        procs = []
+        for proc_id in range(n_gpus):
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices,
+                           (train_g, valid_g, test_g, num_rels, edge_rels),
+                           (train_seeds, valid_seeds, test_seeds),
+                           (train_seeds, valid_neg_seeds, test_neg_seeds)))
+            p.start()
+            procs.append(p)
+        for p in procs:
+            p.join()
+
+if __name__ == '__main__':
+    args = config()
+
+    devices = list(map(int, args.gpu.split(',')))
+
     print(args)
     assert args.batch_size > 0
     assert args.valid_batch_size > 0
-    main(args)
+    main(args, devices)

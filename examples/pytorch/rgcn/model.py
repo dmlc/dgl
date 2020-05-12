@@ -271,6 +271,7 @@ class RelGraphConvLayer(nn.Module):
 class RelGraphEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph."""
     def __init__(self,
+                 dev_id,
                  num_nodes,
                  node_tids,
                  num_of_ntype,
@@ -278,6 +279,7 @@ class RelGraphEmbedLayer(nn.Module):
                  embed_size,
                  embed_name='embed'):
         super(RelGraphEmbedLayer, self).__init__()
+        self.dev_id = dev_id
         self.embed_size = embed_size
         self.embed_name = embed_name
         self.num_nodes = num_nodes
@@ -316,4 +318,4 @@ class RelGraphEmbedLayer(nn.Module):
                 loc = node_tids == ntype
                 embeds[loc] = features[ntype] @ self.embeds[str(ntype)]
 
-        return embeds
+        return embeds.to(self.dev_id)
