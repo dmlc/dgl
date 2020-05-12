@@ -147,12 +147,16 @@ def test_split():
         nodes1 = node_split(selected_nodes, gpb, i)
         nodes2 = node_split(node_mask, gpb, i)
         assert np.all(np.sort(F.asnumpy(nodes1)) == np.sort(F.asnumpy(nodes2)))
+        local_nids = F.asnumpy(local_nids)
+        nodes1 = F.asnumpy(nodes1)
         for n in nodes1:
             assert n in local_nids
 
         edges1 = edge_split(selected_edges, gpb, i)
         edges2 = edge_split(edge_mask, gpb, i)
         assert np.all(np.sort(F.asnumpy(edges1)) == np.sort(F.asnumpy(edges2)))
+        local_eids = F.asnumpy(local_eids)
+        edges1 = F.asnumpy(edges1)
         for e in edges1:
             assert e in local_eids
 
