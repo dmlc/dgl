@@ -140,9 +140,9 @@ def test_split():
                                  edge_map=edge_map,
                                  part_graph=part_g)
         local_nids = F.nonzero_1d(part_g.ndata['local_node'])
-        local_nids = part_g.ndata[dgl.NID][local_nids]
+        local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         local_eids = F.nonzero_1d(part_g.edata['local_edge'])
-        local_eids = part_g.edata[dgl.EID][local_eids]
+        local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
 
         nodes1 = node_split(selected_nodes, gpb, i)
         nodes2 = node_split(node_mask, gpb, i)

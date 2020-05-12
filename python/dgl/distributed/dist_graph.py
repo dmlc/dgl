@@ -614,7 +614,7 @@ def _get_part(elements, local_ids):
         return F.zerocopy_from_numpy(np.intersect1d(elements.tonumpy(), F.asnumpy(local_ids)))
     elif _is_bool(elements):
         elements = utils.toindex(elements)
-        masks = elements.tousertensor()[local_ids]
+        masks = F.gather_row(elements.tousertensor(), local_ids)
         return F.boolean_mask(local_ids, masks)
     else:
         elements = utils.toindex(elements)
