@@ -14,6 +14,7 @@ from ..frame import infer_scheme
 from .partition import load_partition
 from .graph_partition_book import GraphPartitionBook
 from .. import ndarray as nd
+from .. import utils
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name
@@ -599,6 +600,26 @@ class DistGraph:
                 edata_names.append(name[5:])
         return edata_names
 
+def _is_bool(arr):
+    return 'bool' in str(F.dtype(arr))
+
+def _get_part(elements, local_ids):
+    if isinstance(elements, DistTensor) and _is_bool(elements):
+        masks = elements[local_ids]
+        return F.boolean_mask(local_ids, masks)
+    elif isinstance(elements, DistTensor):
+        # We need to move all node Ids to the local machine first.
+        elements = elements[np.arange(len(elements))]
+        elements = utils.toindex(elements)
+        return F.zerocopy_from_numpy(np.intersect1d(elements.tonumpy(), F.asnumpy(local_ids)))
+    elif _is_bool(elements):
+        elements = utils.toindex(elements)
+        masks = elements.tousertensor()[local_ids]
+        return F.boolean_mask(local_ids, masks)
+    else:
+        elements = utils.toindex(elements)
+        return F.zerocopy_from_numpy(np.intersect1d(elements.tonumpy(), F.asnumpy(local_ids)))
+
 def node_split(nodes, partition_book, rank):
     ''' Split nodes and return a subset for the local rank.
 
@@ -630,17 +651,7 @@ def node_split(nodes, partition_book, rank):
         num_nodes += part['num_nodes']
     # Get all nodes that belong to the rank.
     local_nids = partition_book.partid2nids(rank)
-    # The input node vector is stored as boolean mask.
-    nodes = F.zerocopy_from_numpy(nodes)
-    if F.dtype(nodes) == F.bool:
-        assert len(nodes) == num_nodes
-        masks = nodes[local_nids]
-        return F.boolean_mask(local_nids, masks)
-    else:
-        # We need to move all node Ids to the local machine first.
-        if isinstance(nodes, DistTensor):
-            nodes = nodes[np.arange(len(nodes))]
-        return F.zerocopy_from_numpy(np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids)))
+    return _get_part(nodes, local_nids)
 
 def edge_split(edges, partition_book, rank):
     ''' Split edges and return a subset for the local rank.
@@ -673,13 +684,4 @@ def edge_split(edges, partition_book, rank):
         num_edges += part['num_edges']
     # Get all edges that belong to the rank.
     local_eids = partition_book.partid2eids(rank)
-    edges = F.zerocopy_from_numpy(edges)
-    # The input edge vector is stored as boolean mask.
-    if F.dtype(edges) == F.bool:
-        assert len(edges) == num_edges
-        masks = edges[local_eids]
-        return F.boolean_mask(local_eids, masks)
-    else:
-        if isinstance(edges, DistTensor):
-            edges = edges[np.arange(len(edges))]
-        return F.zerocopy_from_numpy(np.intersect1d(F.asnumpy(edges), F.asnumpy(local_eids)))
+    return _get_part(edges, local_eids)
