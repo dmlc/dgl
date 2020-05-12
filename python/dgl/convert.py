@@ -296,8 +296,8 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', num_nodes=None, card=Non
         return create_from_scipy(
             data, utype, etype, vtype, restrict_format=restrict_format, index_dtype=index_dtype)
     elif isinstance(data, nx.Graph):
-        return create_from_networkx_bipartite(data, utype, etype,
-                                              vtype, restrict_format=restrict_format,
+        return create_from_networkx_bipartite(data, utype, etype, vtype,
+                                              restrict_format=restrict_format,
                                               index_dtype=index_dtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
