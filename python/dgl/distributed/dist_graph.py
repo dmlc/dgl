@@ -349,7 +349,7 @@ class DistGraphServer(KVServer):
         node_g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
         # The nodes that belong to this partition.
         local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
-        nids = F.asnumpy(self.client_g.ndata[NID][local_nids])
+        nids = F.asnumpy(F.gather_row(self.client_g.ndata[NID], local_nids))
         assert np.all(node_map[nids] == server_id), 'Load a wrong partition'
         F.scatter_row_inplace(node_g2l, nids, F.arange(0, len(nids)))
 
@@ -357,7 +357,7 @@ class DistGraphServer(KVServer):
         if len(edge_feats) > 0:
             edge_g2l = F.zeros((num_edges), dtype=F.int64, ctx=F.cpu()) - 1
             local_eids = F.nonzero_1d(self.client_g.edata['local_edge'])
-            eids = F.asnumpy(self.client_g.edata[EID][local_eids])
+            eids = F.asnumpy(F.gather_row(self.client_g.edata[EID], local_eids))
             assert np.all(edge_map[eids] == server_id), 'Load a wrong partition'
             F.scatter_row_inplace(edge_g2l, eids, F.arange(0, len(eids)))
 
