@@ -14,6 +14,109 @@ REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
 
+def create_sender(msg_queue_size, net_type):
+    """Create rpc sender of this process.
+
+    Parameters
+    ----------
+    msg_queue_size : int
+        Size (bytes) of network queue buffer.
+    net_type : str
+        networking type, e.g., 'socket' or 'mpi' (do not support yet).
+
+    Returns
+    -------
+    c handler
+        sender handler
+    """
+    return _CAPI_DGLRPCCreateSender(int(msg_queue_size), net_type)
+
+def create_receiver(msg_queue_size, network_type):
+    """Create rpc receiver of this process.
+
+    Parameters
+    ----------
+    msg_queue_size : int
+        Size (bytes) of network queue buffer.
+    net_type : str
+        networking type, e.g., 'socket' or 'mpi' (do not support yet).
+
+    Returns
+    -------
+    c handler
+        receiver handler
+    """
+    return _CAPI_DGLRPCCreateReceiver(int(msg_queue_size), net_type)
+
+def get_sender():
+    """Get rpc sender of this process.
+
+    Returns
+    -------
+    c handler
+        sender handler
+    """
+    return _CAPI_DGLRPCGetSender()
+
+def get_receiver():
+    """Get rpc receiver of this process.
+
+    Returns
+    -------
+    c handler
+        receiver handler
+    """
+    return _CAPI_DGLRPCGetReceiver()
+
+def finalize_sender():
+    """Finalize rpc sender of this process.
+    """
+    _CAPI_DGLRPCFinalizeSender()
+    
+def finalize_receiver():
+    """Finalize rpc receiver of this process.
+    """
+    _CAPI_DGLRPCFinalizeReceiver()
+
+def receiver_wait(ip_addr, port, num_senders):
+    """Wait all of the senders' connections.
+
+    This api will be blocked until all the senders connect to the server.
+
+    Parameters
+    ----------
+    ip_addr : str
+        receiver's IP address, e,g, '192.168.8.12'
+    port : int
+        receiver's listening port
+    num_senders : int
+        total number of senders
+    """
+    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders))
+
+def add_receiver_addr(ip_addr, port, recv_id):
+    """Add Receiver's IP address to sender's namebook.
+
+    Parameters
+    ----------
+    ip_addr : str
+        receiver's IP address, e,g, '192.168.8.12'
+    port : int
+        receiver's listening port
+    recv_id : int
+        receiver's ID
+    """
+    _CAPI_DGLRPCAddReceiver(ip_addr, int(port), int(recv_id))
+
+
+def sender_connect():
+    """Connect to all the Receivers.
+    
+    This api must be invoked after using add_receiver_addr()
+    """
+    _CAPI_DGLRPCSenderConnect()
+
+
 def set_rank(rank):
     """Set the rank of this process.
 

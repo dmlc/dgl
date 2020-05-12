@@ -12,10 +12,16 @@
 #include <cstdint>
 #include <memory>
 #include "./network/communicator.h"
+#include "./network/socket_communicator.h"
+#include "./network/msg_queue.h"
+#include "./network/common.h"
 #include "./server_state.h"
 
 namespace dgl {
 namespace rpc {
+
+// Communicator handler type
+typedef void* CommunicatorHandle;
 
 /*! \brief Context information for RPC communication */
 struct RPCContext {

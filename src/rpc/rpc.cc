@@ -9,6 +9,7 @@
 #include <dgl/packed_func_ext.h>
 #include "../c_api_common.h"
 
+using dgl::network::StringPrintf;
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -25,6 +26,88 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
 }
 
 //////////////////////////// C APIs ////////////////////////////
+
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  int64_t msg_queue_size = args[0];
+  std::string type = args[1];
+  if (type == 'socket') {
+    RPCContext::ThreadLocal()->sender = std::make_shared<network::Sender>(msg_queue_size);
+  } else {
+    LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type; 
+  }
+  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->sender.get());
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  int64_t msg_queue_size = args[0];
+  std::string type = args[1];
+  if (type == 'socket') {
+    RPCContext::ThreadLocal()->receiver = std::make_shared<network::Receiver>(msg_queue_size);
+  } else {
+    LOG(FATAL) << "Unknown communicator type for rpc sender: " << type; 
+  }
+  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->receiver.get());
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetSender")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->sender.get());
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetReceiver")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->receiver.get());
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  RPCContext::ThreadLocal()->sender->Finalize();
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeReceiver")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  RPCContext::ThreadLocal()->receiver->Finalize();
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  std::string ip = args[0];
+  int port = args[1];
+  int num_sender = args[2];
+  std::string addr;
+  if (RPCContext::ThreadLocal()->receiver->Type() == "socket") {
+    addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
+  } else {
+    LOG(FATAL) << "Unknown communicator type: " << RPCContext::ThreadLocal()->receiver->Type();
+  }
+  if (RPCContext::ThreadLocal()->receiver->Wait(addr.c_str(), num_sender) == false) {
+    LOG(FATAL) << "Wait sender socket failed.";
+  }
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCAddReceiver")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  std::string ip = args[0];
+  int port = args[1];
+  int recv_id = args[2];
+  std::string addr;
+  if (RPCContext::ThreadLocal()->sender->Type() == "socket") {
+    addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
+  } else {
+    LOG(FATAL) << "Unknown communicator type: " << sender->Type();
+  }
+  RPCContext::ThreadLocal()->sender->AddReceiver(addr.c_str(), recv_id);
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSenderConnect")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  if (RPCContext::ThreadLocal()->sender->Connect() == false) {
+    LOG(FATAL) << "Sender connection failed.";
+  }
+});
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
