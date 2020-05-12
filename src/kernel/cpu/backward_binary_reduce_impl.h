@@ -51,7 +51,8 @@ struct BackwardBinaryReduce {
       DType grad_out = Functors::Read(gradoutoff + tx);
       DType e = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
-
+      if (0 == grad_e)
+        continue;
       DType* lhs_base = lhsoff + tx * len;
       DType* rhs_base = rhsoff + tx * len;
       if (Mode == binary_op::kGradBoth) {
