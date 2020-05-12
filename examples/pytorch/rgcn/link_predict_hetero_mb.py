@@ -15,6 +15,7 @@ import time, gc
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.multiprocessing as mp
 from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
 from _thread import start_new_thread
@@ -77,13 +78,16 @@ class LinkPredict(nn.Module):
 
         return h
 
-    def forward(self, p_blocks, n_blocks, p_feats, n_feats, p_g, n_g):
+    def forward(self, p_blocks, p_feats, n_blocks=None, n_feats=None, p_g=None, n_g=None):
         p_h = p_feats
-        n_h = n_feats
         for layer, block in zip(self.layers, p_blocks):
             block = block.to(self.device)
             p_h = layer(block, p_h)
 
+        if n_blocks is None:
+            return p_h
+
+        n_h = n_feats
         for layer, block in zip(self.layers, n_blocks):
             block = block.to(self.device)
             n_h = layer(block, n_h)
@@ -92,73 +96,74 @@ class LinkPredict(nn.Module):
         p_head_emb = p_h[head]
         p_tail_emb = p_h[tail]
         rids = p_g.edata['etype']
+        r_emb = self.w_relation[rids]
         head, tail = n_g.all_edges()
         n_head_emb = n_h[head]
         n_tail_emb = n_h[tail]
-        return p_head_emb, p_tail_emb, rids, n_head_emb, n_tail_emb
+        return (p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb)
 
-    def regularization_loss(self, h_emb, t_emb, nh_emb, nt_emb):
-        return th.mean(h_emb.pow(2)) + \
-               th.mean(t_emb.pow(2)) + \
-               th.mean(nh_emb.pow(2)) + \
-               th.mean(nt_emb.pow(2)) + \
-               th.mean(self.w_relation.pow(2))
+def regularization_loss(h_emb, t_emb, r_emb, nh_emb, nt_emb):
+    return th.mean(h_emb.pow(2)) + \
+            th.mean(t_emb.pow(2)) + \
+            th.mean(nh_emb.pow(2)) + \
+            th.mean(nt_emb.pow(2)) + \
+            th.mean(r_emb.pow(2))
 
-    def calc_pos_score(self, h_emb, t_emb, rids):
-        # DistMult
-        r = self.w_relation[rids]
-        score = th.sum(h_emb * r * t_emb, dim=-1)
-        return score
+def calc_pos_score(h_emb, t_emb, r_emb):
+    # DistMult
+    score = th.sum(h_emb * r_emb * t_emb, dim=-1)
+    return score
 
-    def calc_neg_tail_score(self, heads, tails, rids, num_chunks, chunk_size, neg_sample_size, device=None):
-        hidden_dim = heads.shape[1]
-        r = self.w_relation[rids]
+def calc_neg_tail_score(heads, tails, r_emb, num_chunks, chunk_size, neg_sample_size, device=None):
+    hidden_dim = heads.shape[1]
+    r = r_emb
 
-        if device is not None:
-            r = r.to(device)
-            heads = heads.to(device)
-            tails = tails.to(device)
-        tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-        tails = th.transpose(tails, 1, 2)
-        tmp = (heads * r).reshape(num_chunks, chunk_size, hidden_dim)
-        return th.bmm(tmp, tails)
+    if device is not None:
+        r = r.to(device)
+        heads = heads.to(device)
+        tails = tails.to(device)
+    tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
+    tails = th.transpose(tails, 1, 2)
+    tmp = (heads * r).reshape(num_chunks, chunk_size, hidden_dim)
+    return th.bmm(tmp, tails)
 
-    def calc_neg_head_score(self, heads, tails, rids, num_chunks, chunk_size, neg_sample_size, device=None):
-        hidden_dim = tails.shape[1]
-        r = self.w_relation[rids]
-        if device is not None:
-            r = r.to(device)
-            heads = heads.to(device)
-            tails = tails.to(device)
-        heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
-        heads = th.transpose(heads, 1, 2)
-        tmp = (tails * r).reshape(num_chunks, chunk_size, hidden_dim)
-        return th.bmm(tmp, heads)
+def calc_neg_head_score(heads, tails, r_emb, num_chunks, chunk_size, neg_sample_size, device=None):
+    hidden_dim = tails.shape[1]
+    r = r_emb
+    if device is not None:
+        r = r.to(device)
+        heads = heads.to(device)
+        tails = tails.to(device)
+    heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
+    heads = th.transpose(heads, 1, 2)
+    tmp = (tails * r).reshape(num_chunks, chunk_size, hidden_dim)
+    return th.bmm(tmp, heads)
 
-    def get_loss(self, h_emb, t_emb, nh_emb, nt_emb, rids, num_chunks, chunk_size, neg_sample_size):
-        # triplets is a list of data samples (positive and negative)
-        # each row in the triplets is a 3-tuple of (source, relation, destination)
-        pos_score = self.calc_pos_score(h_emb, t_emb, rids)
-        t_neg_score = self.calc_neg_tail_score(h_emb, nt_emb, rids, num_chunks, chunk_size, neg_sample_size)
-        h_neg_score = self.calc_neg_head_score(nh_emb, t_emb, rids, num_chunks, chunk_size, neg_sample_size)
-        pos_score = F.logsigmoid(pos_score)
-        h_neg_score = h_neg_score.reshape(-1, neg_sample_size)
-        t_neg_score = t_neg_score.reshape(-1, neg_sample_size)
-        h_neg_score = F.logsigmoid(-h_neg_score).mean(dim=1)
-        t_neg_score = F.logsigmoid(-t_neg_score).mean(dim=1)
+def get_loss(h_emb, t_emb, nh_emb, nt_emb, r_emb,
+    num_chunks, chunk_size, neg_sample_size, regularization_coef):
+    # triplets is a list of data samples (positive and negative)
+    # each row in the triplets is a 3-tuple of (source, relation, destination)
+    pos_score = calc_pos_score(h_emb, t_emb, r_emb)
+    t_neg_score = calc_neg_tail_score(h_emb, nt_emb, r_emb, num_chunks, chunk_size, neg_sample_size)
+    h_neg_score = calc_neg_head_score(nh_emb, t_emb, r_emb, num_chunks, chunk_size, neg_sample_size)
+    pos_score = F.logsigmoid(pos_score)
+    h_neg_score = h_neg_score.reshape(-1, neg_sample_size)
+    t_neg_score = t_neg_score.reshape(-1, neg_sample_size)
+    h_neg_score = F.logsigmoid(-h_neg_score).mean(dim=1)
+    t_neg_score = F.logsigmoid(-t_neg_score).mean(dim=1)
 
-        pos_score = pos_score.mean()
-        h_neg_score = h_neg_score.mean()
-        t_neg_score = t_neg_score.mean()
-        predict_loss = -(2 * pos_score + h_neg_score + t_neg_score)
+    pos_score = pos_score.mean()
+    h_neg_score = h_neg_score.mean()
+    t_neg_score = t_neg_score.mean()
+    predict_loss = -(2 * pos_score + h_neg_score + t_neg_score)
 
-        reg_loss = self.regularization_loss(h_emb, t_emb, nh_emb, nt_emb)
+    reg_loss = regularization_loss(h_emb, t_emb, r_emb, nh_emb, nt_emb)
 
-        print("pos loss {}, neg loss {}|{}, reg_loss {}".format(pos_score.detach(),
-                                                                h_neg_score.detach(),
-                                                                t_neg_score.detach(),
-                                                                self.regularization_coef * reg_loss.detach()))
-        return predict_loss + self.regularization_coef * reg_loss
+    print("pos loss {}, neg loss {}|{}, reg_loss {}".format(pos_score.detach(),
+                                                            h_neg_score.detach(),
+                                                            t_neg_score.detach(),
+                                                            regularization_coef * reg_loss.detach()))
+    return predict_loss + regularization_coef * reg_loss
 
 class NodeSampler:
     def __init__(self, g, fanouts):
@@ -259,7 +264,7 @@ class LinkRankSampler:
 
         return (bsize, p_g, n_g, p_blocks, n_blocks)
 
-def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt):
+def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt, queue):
     logs = []
     model.eval()
     t0 = time.time()
@@ -273,30 +278,29 @@ def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt):
             n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID],
                                 n_blocks[0].srcdata['ntype'],
                                 node_feats)
-            p_head_emb, p_tail_emb, rids, n_head_emb, n_tail_emb = \
-                model(p_blocks, n_blocks, p_feats, n_feats, p_g, n_g)
+            p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb = \
+                model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
 
-            pos_score = model.calc_pos_score(p_head_emb, p_tail_emb, rids)
-            t_neg_score = model.calc_neg_tail_score(p_head_emb,
-                                                    n_tail_emb,
-                                                    rids,
-                                                    1,
-                                                    bsize,
-                                                    neg_cnt)
-            h_neg_score = model.calc_neg_head_score(n_head_emb,
-                                                    p_tail_emb,
-                                                    rids,
-                                                    1,
-                                                    bsize,
-                                                    neg_cnt)
+            pos_score = calc_pos_score(p_head_emb, p_tail_emb, r_emb)
+            t_neg_score = calc_neg_tail_score(p_head_emb,
+                                              n_tail_emb,
+                                              r_emb,
+                                              1,
+                                              bsize,
+                                              neg_cnt)
+            h_neg_score = calc_neg_head_score(n_head_emb,
+                                              p_tail_emb,
+                                              r_emb,
+                                              1,
+                                              bsize,
+                                              neg_cnt)
             pos_scores = F.logsigmoid(pos_score).reshape(bsize, -1)
             t_neg_score = F.logsigmoid(t_neg_score).reshape(bsize, neg_cnt)
             h_neg_score = F.logsigmoid(h_neg_score).reshape(bsize, neg_cnt)
             neg_scores = th.cat([h_neg_score, t_neg_score], dim=1)
             rankings = th.sum(neg_scores >= pos_scores, dim=1) + 1
             rankings = rankings.cpu().detach().numpy()
-            for idx in range(bsize):
-                ranking = rankings[idx]
+            for ranking in rankings:
                 logs.append({
                     'MRR': 1.0 / ranking,
                     'MR': float(ranking),
@@ -309,24 +313,28 @@ def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt):
     print("Eval {} samples takes {} seconds".format(i * bsize, t1 - t0))
 
     metrics = {}
-    for metric in logs[0].keys():
-        metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-
-    for k, v in metrics.items():
-        print('Test average {}: {}'.format(k, v))
+    if len(logs) > 0:
+        for metric in logs[0].keys():
+            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+    if queue is not None:
+        queue.put(logs)
+    else:
+        for k, v in metrics.items():
+            print('[{}]{} average {}: {}'.format(rank, mode, k, v))
 
 def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
-    minibatch_blocks, pos_eids, neg_eids, neg_cnt):
+    minibatch_blocks, pos_eids, neg_eids, neg_cnt, queue):
     model.eval()
     t0 = time.time()
 
+    logs = []
     embs = th.empty(g.number_of_nodes(), dim_size)
     with th.no_grad():
         for i, blocks in enumerate(minibatch_blocks):
             in_feats = embed_layer(blocks[0].srcdata[dgl.NID].to(device),
                                    blocks[0].srcdata['ntype'].to(device),
                                    node_feats)
-            mb_feats = model.forward_full(blocks, in_feats)
+            mb_feats = model(blocks, in_feats)
             embs[blocks[-1].dstdata[dgl.NID]] = mb_feats.cpu()
 
         mrr = 0
@@ -369,8 +377,9 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
             eids_t = g.edata['etype'][eids].to(device)
             phead_emb = embs[su].to(device)
             ptail_emb = embs[sv].to(device)
+            rel_emb = model.module.w_relation[eids_t]
 
-            pos_score = model.calc_pos_score(phead_emb, ptail_emb, eids_t)
+            pos_score = calc_pos_score(phead_emb, ptail_emb, rel_emb)
             pos_score = F.logsigmoid(pos_score).reshape(phead_emb.shape[0], -1)
 
             if neg_cnt > 0:
@@ -388,12 +397,12 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
                            if (n_i + 1) * neg_batch_size < head_neg_cnt
                            else head_neg_cnt]
                 nhead_emb = embs[sn_u].to(device)
-                h_neg_score.append(model.calc_neg_head_score(nhead_emb,
-                                                             ptail_emb,
-                                                             eids_t,
-                                                             1,
-                                                             ptail_emb.shape[0],
-                                                             nhead_emb.shape[0]).reshape(-1, nhead_emb.shape[0]))
+                h_neg_score.append(calc_neg_head_score(nhead_emb,
+                                                       ptail_emb,
+                                                       rel_emb,
+                                                       1,
+                                                       ptail_emb.shape[0],
+                                                       nhead_emb.shape[0]).reshape(-1, nhead_emb.shape[0]))
 
             for n_i in range(int((tail_neg_cnt + neg_batch_size - 1)//neg_batch_size)):
                 sn_v = n_v[n_i * neg_batch_size : \
@@ -401,12 +410,12 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
                            if (n_i + 1) * neg_batch_size < tail_neg_cnt
                            else tail_neg_cnt]
                 ntail_emb = embs[sn_v].to(device)
-                t_neg_score.append(model.calc_neg_tail_score(phead_emb,
-                                                             ntail_emb,
-                                                             eids_t,
-                                                             1,
-                                                             phead_emb.shape[0],
-                                                             ntail_emb.shape[0]).reshape(-1, ntail_emb.shape[0]))
+                t_neg_score.append(calc_neg_tail_score(phead_emb,
+                                                       ntail_emb,
+                                                       rel_emb,
+                                                       1,
+                                                       phead_emb.shape[0],
+                                                       ntail_emb.shape[0]).reshape(-1, ntail_emb.shape[0]))
             t_neg_score = th.cat(t_neg_score, dim=1)
             h_neg_score = th.cat(h_neg_score, dim=1)
             t_neg_score = F.logsigmoid(t_neg_score)
@@ -452,23 +461,28 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
             rankings = th.sum(neg_score >= pos_score, dim=1) + 1
             rankings = rankings.cpu().detach().numpy()
             for ranking in rankings:
-                mrr += 1.0 / ranking
-                mr += float(ranking)
-                hit1 += 1.0 if ranking <= 1 else 0.0
-                hit3 +=  1.0 if ranking <= 3 else 0.0
-                hit10 += 1.0 if ranking <= 10 else 0.0
-                total_cnt += 1
+                logs.append({
+                    'MRR': 1.0 / ranking,
+                    'MR': float(ranking),
+                    'HITS@1': 1.0 if ranking <= 1 else 0.0,
+                    'HITS@3': 1.0 if ranking <= 3 else 0.0,
+                    'HITS@10': 1.0 if ranking <= 10 else 0.0
+                })
 
-    print("MRR {}\nMR {}\nHITS@1 {}\nHITS@3 {}\nHITS@10 {}".format(mrr/total_cnt,
-                                                                   mr/total_cnt,
-                                                                   hit1/total_cnt,
-                                                                   hit3/total_cnt,
-                                                                   hit10/total_cnt))
+    metrics = {}
+    if len(logs) > 0:
+        for metric in logs[0].keys():
+            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+    if queue is not None:
+        queue.put(logs)
+    else:
+        for k, v in metrics.items():
+            print('[{}]{} average {}: {}'.format(rank, mode, k, v))
     t1 = time.time()
     print("Full eval {} exmpales takes {} seconds".format(pos_eids.shape[0], t1 - t0))
 
 @thread_wrapped_func
-def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds):
+def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=None):
     dev_id = devices[proc_id]
     train_g, valid_g, test_g, num_rels, edge_rels = dataset
     train_seeds, valid_seeds, test_seeds = pos_seeds
@@ -503,28 +517,27 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds):
                             pin_memory=True,
                             drop_last=True,
                             num_workers=args.num_workers)
-    if proc_id == 0:
-        valid_sampler = LinkRankSampler(valid_g,
-                                        valid_neg_seeds,
-                                        num_valid_edges,
-                                        num_neg=args.valid_neg_cnt,
-                                        fanouts=[None] * args.n_layers,
-                                        is_train=False)
-        valid_dataloader = DataLoader(dataset=valid_seeds,
-                                    batch_size=args.valid_batch_size,
-                                    collate_fn=valid_sampler.sample_blocks,
-                                    shuffle=False,
-                                    pin_memory=True,
-                                    drop_last=False,
-                                    num_workers=args.num_workers)
-        test_sampler = NodeSampler(test_g, fanouts=[None] * args.n_layers)
-        test_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
-                                    batch_size=4 * 1024,
-                                    collate_fn=test_sampler.sample_nodes,
-                                    shuffle=False,
-                                    pin_memory=True,
-                                    drop_last=False,
-                                    num_workers=args.num_workers)
+    valid_sampler = LinkRankSampler(valid_g,
+                                    valid_neg_seeds,
+                                    num_valid_edges,
+                                    num_neg=args.valid_neg_cnt,
+                                    fanouts=[None] * args.n_layers,
+                                    is_train=False)
+    valid_dataloader = DataLoader(dataset=valid_seeds,
+                                  batch_size=args.valid_batch_size,
+                                  collate_fn=valid_sampler.sample_blocks,
+                                  shuffle=False,
+                                  pin_memory=True,
+                                  drop_last=False,
+                                  num_workers=args.num_workers)
+    test_sampler = NodeSampler(test_g, fanouts=[None] * args.n_layers)
+    test_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
+                                 batch_size=4 * 1024,
+                                 collate_fn=test_sampler.sample_nodes,
+                                 shuffle=False,
+                                 pin_memory=True,
+                                 drop_last=False,
+                                 num_workers=args.num_workers)
     
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
@@ -558,8 +571,8 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds):
             embed_layer.cuda(dev_id)
 
     if n_gpus > 1:
-        embed_layer = DistributedDataParallel(embed_layer)
-        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+        embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
+        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id, find_unused_parameters=True)
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -580,24 +593,25 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds):
                                   n_blocks[0].srcdata['ntype'].to(dev_id),
                                   node_feats)
 
-            p_head_emb, p_tail_emb, rids, n_head_emb, n_tail_emb = \
-                model(p_blocks, n_blocks, p_feats, n_feats, p_g, n_g)
+            p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb = \
+                model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
 
             n_shuffle_seed = th.randperm(n_head_emb.shape[0])
             n_head_emb = n_head_emb[n_shuffle_seed]
             n_tail_emb = n_tail_emb[n_shuffle_seed]
 
-            loss = model.get_loss(p_head_emb,
-                                  p_tail_emb,
-                                  n_head_emb,
-                                  n_tail_emb,
-                                  rids,
-                                  int(batch_size / chunk_size),
-                                  chunk_size,
-                                  chunk_size)
+            loss = get_loss(p_head_emb,
+                            p_tail_emb,
+                            n_head_emb,
+                            n_tail_emb,
+                            r_emb,
+                            int(batch_size / chunk_size),
+                            chunk_size,
+                            chunk_size,
+                            args.regularization_coef)
             loss.backward()
-            optimizer.step()
             th.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
+            optimizer.step()
             t1 = time.time()
 
             print("Epoch {}, Iter {}, Loss:{}".format(epoch, i, loss.detach()))
@@ -606,68 +620,57 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds):
             dur = t1 - t0
             print("Epoch {} takes {} seconds".format(epoch, dur))
 
-        evaluate(embed_layer, model, valid_dataloader, node_feats, args.valid_batch_size, args.valid_neg_cnt)
-        gc.collect()
+        evaluate(embed_layer,
+                 model,
+                 valid_dataloader,
+                 node_feats,
+                 args.valid_batch_size,
+                 args.valid_neg_cnt,
+                 queue)
+        if proc_id == 0 and queue is not None:
+            logs = []
+            for i in range(n_gpus):
+                log = queue.get()
+                logs = logs + log
+            
+            metrics = {}
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+            print("-------------- Eval result --------------")
+            for k, v in metrics.items():
+                print('Eval average {} : {}'.format(k, v))
+            print("-----------------------------------------")
+
+        if n_gpus > 1:
+            th.distributed.barrier()
 
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
-    fullgraph_eval(test_g, embed_layer, model, dev_id, node_feats, args.n_hidden,
-        test_dataloader, test_seeds, test_neg_seeds, args.test_neg_cnt)
-
-def config():
-    parser = argparse.ArgumentParser(description='RGCN')
-    parser.add_argument("--dropout", type=float, default=0.2,
-            help="dropout probability")
-    parser.add_argument("--n-hidden", type=int, default=200,
-            help="number of hidden units")
-    parser.add_argument("--gpu", type=str, default='0',
-            help="gpu")
-    parser.add_argument("--keep_pos_edges", default=False, action='store_true',
-            help="Whether delete positive edges during training in case of linkage leakage")
-    parser.add_argument("--lr", type=float, default=1e-2,
-            help="learning rate")
-    parser.add_argument("--n-bases", type=int, default=10,
-            help="number of filter weight matrices, default: -1 [use all]")
-    parser.add_argument("--n-layers", type=int, default=1,
-            help="number of propagation rounds")
-    parser.add_argument("-e", "--n-epochs", type=int, default=20,
-            help="number of training epochs")
-    parser.add_argument("-d", "--dataset", type=str, required=True,
-            help="dataset to use")
-    parser.add_argument("--model_path", type=str, default=None,
-            help='path for save the model')
-    parser.add_argument("--use-self-loop", default=False, action='store_true',
-            help="include self feature as a special relation")
-    parser.add_argument("--batch-size", type=int, default=1024,
-            help="Mini-batch size.")
-    parser.add_argument("--chunk-size", type=int, default=32,
-            help="Negative sample chunk size. In each chunk, positive pairs will share negative edges")
-    parser.add_argument("--valid-batch-size", type=int, default=8,
-            help="Mini-batch size for validation and test.")
-    parser.add_argument("--fanout", type=int, default=10,
-            help="Fan-out of neighbor sampling.")
-    parser.add_argument("--regularization-coef", type=float, default=0.001,
-            help="Regularization Coeffiency.")
-    parser.add_argument("--grad-norm", type=float, default=1.0,
-            help="norm to clip gradient to")
-    parser.add_argument("--valid-neg-cnt", type=int, default=1000,
-            help="Validation negative sample cnt.")
-    parser.add_argument("--test-neg-cnt", type=int, default=-1,
-            help="Test negative sample cnt.")
-    parser.add_argument("--sample-based-eval", default=False, action='store_true',
-            help="Use sample based evalution method or full-graph based evalution method")
-    parser.add_argument("--num-workers", type=int, default=0,
-            help="Number of workers for dataloader.")
-    parser.add_argument("--low-mem", default=False, action='store_true',
-            help="Whether use low mem RelGraphCov")
-    parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
-            help="Whether store node embeddins in cpu")
-
-    args = parser.parse_args()
-
-    return args
+    fullgraph_eval(test_g,
+                   embed_layer,
+                   model,
+                   dev_id,
+                   node_feats,
+                   args.n_hidden,
+                   test_dataloader,
+                   test_seeds,
+                   test_neg_seeds,
+                   args.test_neg_cnt,
+                   queue)
+    if proc_id == 0 and queue is not None:
+        logs = []
+        for i in range(n_gpus):
+            log = queue.get()
+            logs = logs + log
+            
+        for metric in logs[0].keys():
+            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+        print("-------------- Test result --------------")
+        for k, v in metrics.items():
+            print('Test average {} : {}'.format(k, v))
+        print("-----------------------------------------")
 
 def prepare_mp(g):
     """
@@ -782,22 +785,93 @@ def main(args, devices):
         prepare_mp(train_g)
         prepare_mp(valid_g)
         prepare_mp(test_g)
+        queue = mp.Queue(n_gpus)
         procs = []
+        num_train_seeds = train_seeds.shape[0]
+        num_valid_seeds = valid_seeds.shape[0]
+        num_test_seeds = test_seeds.shape[0]
+        tseeds_per_proc = num_train_seeds // n_gpus
+        vseeds_per_proc = num_valid_seeds // n_gpus
+        tstseeds_per_proc = num_test_seeds // n_gpus
         for proc_id in range(n_gpus):
+            proc_train_seeds = train_seeds[proc_id * tseeds_per_proc :
+                                           (proc_id + 1) * tseeds_per_proc \
+                                           if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
+                                           else num_train_seeds]
+            proc_valid_seeds = valid_seeds[proc_id * vseeds_per_proc :
+                                           (proc_id + 1) * vseeds_per_proc \
+                                           if (proc_id + 1) * vseeds_per_proc < num_train_seeds \
+                                           else num_valid_seeds]
+            proc_test_seeds = test_seeds[proc_id * tstseeds_per_proc :
+                                         (proc_id + 1) * tstseeds_per_proc \
+                                         if (proc_id + 1) * tstseeds_per_proc < num_train_seeds \
+                                         else num_test_seeds]
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices,
                            (train_g, valid_g, test_g, num_rels, edge_rels),
-                           (train_seeds, valid_seeds, test_seeds),
-                           (train_seeds, valid_neg_seeds, test_neg_seeds)))
+                           (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
+                           (train_seeds, valid_neg_seeds, test_neg_seeds),
+                           queue))
             p.start()
             procs.append(p)
         for p in procs:
             p.join()
 
+def config():
+    parser = argparse.ArgumentParser(description='RGCN')
+    parser.add_argument("--dropout", type=float, default=0.2,
+            help="dropout probability")
+    parser.add_argument("--n-hidden", type=int, default=200,
+            help="number of hidden units")
+    parser.add_argument("--gpu", type=str, default='0',
+            help="gpu")
+    parser.add_argument("--keep_pos_edges", default=False, action='store_true',
+            help="Whether delete positive edges during training in case of linkage leakage")
+    parser.add_argument("--lr", type=float, default=1e-2,
+            help="learning rate")
+    parser.add_argument("--n-bases", type=int, default=10,
+            help="number of filter weight matrices, default: -1 [use all]")
+    parser.add_argument("--n-layers", type=int, default=1,
+            help="number of propagation rounds")
+    parser.add_argument("-e", "--n-epochs", type=int, default=20,
+            help="number of training epochs")
+    parser.add_argument("-d", "--dataset", type=str, required=True,
+            help="dataset to use")
+    parser.add_argument("--model_path", type=str, default=None,
+            help='path for save the model')
+    parser.add_argument("--use-self-loop", default=False, action='store_true',
+            help="include self feature as a special relation")
+    parser.add_argument("--batch-size", type=int, default=1024,
+            help="Mini-batch size.")
+    parser.add_argument("--chunk-size", type=int, default=32,
+            help="Negative sample chunk size. In each chunk, positive pairs will share negative edges")
+    parser.add_argument("--valid-batch-size", type=int, default=8,
+            help="Mini-batch size for validation and test.")
+    parser.add_argument("--fanout", type=int, default=10,
+            help="Fan-out of neighbor sampling.")
+    parser.add_argument("--regularization-coef", type=float, default=0.001,
+            help="Regularization Coeffiency.")
+    parser.add_argument("--grad-norm", type=float, default=1.0,
+            help="norm to clip gradient to")
+    parser.add_argument("--valid-neg-cnt", type=int, default=1000,
+            help="Validation negative sample cnt.")
+    parser.add_argument("--test-neg-cnt", type=int, default=-1,
+            help="Test negative sample cnt.")
+    parser.add_argument("--sample-based-eval", default=False, action='store_true',
+            help="Use sample based evalution method or full-graph based evalution method")
+    parser.add_argument("--num-workers", type=int, default=0,
+            help="Number of workers for dataloader.")
+    parser.add_argument("--low-mem", default=False, action='store_true',
+            help="Whether use low mem RelGraphCov")
+    parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
+            help="Whether store node embeddins in cpu")
+
+    args = parser.parse_args()
+
+    return args
+
 if __name__ == '__main__':
     args = config()
-
     devices = list(map(int, args.gpu.split(',')))
-
     print(args)
     assert args.batch_size > 0
     assert args.valid_batch_size > 0
