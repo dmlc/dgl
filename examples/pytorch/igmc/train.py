@@ -43,11 +43,11 @@ def adj_rating_reg(net):
 def train(args):
     dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
-    train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device)
+    train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device, mode='train', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=collate_movielens)
-    test_dataset = MovieLensDataset(dataset_base.test_graphs, args.device)
+    test_dataset = MovieLensDataset(dataset_base.test_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
-    val_dataset = MovieLensDataset(dataset_base.val_graphs, args.device)
+    val_dataset = MovieLensDataset(dataset_base.val_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
 
     ### build the net
@@ -192,6 +192,8 @@ def config():
     parser.add_argument('--train_min_lr', type=float, default=0.001)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
     parser.add_argument('--train_decay_epoch', type=int, default=50)
+    parser.add_argument('--link-dropout', type=float, default=0.2, help='link dropout rate')
+    parser.add_argument('--force-undirected', action='store_true', default=False, help='in edge dropout, force (x, y) and (y, x) to be dropped together')
     parser.add_argument('--train_val', action='store_true', default=False)
     # edge dropout settings
     parser.add_argument('--adj_dropout', type=float, default=0.2, 

@@ -520,7 +520,6 @@ def links2subgraphs(
     train_graphs = helper(A, train_indices, train_labels)
     val_graphs = helper(A, val_indices, val_labels)
     test_graphs = helper(A, test_indices, test_labels)
-
     return train_graphs, val_graphs, test_graphs
 
 
