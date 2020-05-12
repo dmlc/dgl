@@ -90,6 +90,7 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     g.shut_down()
     print('end')
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
     g = create_random_graph(10000)
 
