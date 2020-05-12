@@ -642,6 +642,15 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
     *rv = GraphOp::ToBidirectedMutableGraph(g.sptr());
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLReorderGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+	const IdArray new_order = args[1];
+    auto gptr = g.sptr();
+    auto immutable_g = std::dynamic_pointer_cast<ImmutableGraph>(gptr);
+    *rv = GraphOp::ReorderImmutableGraph(immutable_g, new_order);
+  });
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];

@@ -549,6 +549,13 @@ def remove_self_loop(g):
     new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
     return new_g
 
+def reorder_nodes(g, new_node_ids):
+    assert len(new_node_ids) == g.number_of_nodes(), \
+            "The number of new node ids must match #nodes in the graph."
+    new_node_ids = utils.toindex(new_node_ids)
+    new_gidx = _CAPI_DGLReorderGraph(g._graph, new_node_ids.todgltensor())
+    return DGLGraph(new_gidx)
+
 def partition_graph_with_halo(g, node_part, num_hops):
     ''' This is to partition a graph. Each partition contains HALO nodes
     so that we can generate NodeFlow in each partition correctly.
