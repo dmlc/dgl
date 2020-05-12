@@ -26,9 +26,8 @@ def evaluate(args, net, data_iter):
         with th.no_grad():
             pred_ratings = net(graph)
         rmse = ((pred_ratings - rating_gt) ** 2.).mean().item()
-        rmse = np.sqrt(rmse)
         res.append(rmse)
-    return np.mean(res)
+    return np.sqrt(np.mean(res))
 
 
 def adj_rating_reg(net):
@@ -107,7 +106,7 @@ def train(args):
 
             if iter_idx % args.train_log_interval == 0:
                 train_loss_logger.log(epoch=epoch_idx, iter=iter_idx,
-                                      loss=count_loss/(iter_idx+1), rmse=count_rmse/count_num)
+                                      loss=count_loss/(count_num), rmse=np.sqrt(count_rmse/count_num))
                 logging_str = "Iter={}, loss={:.4f}, rmse={:.4f}, time={:.4f}".format(
                     iter_idx, count_loss/count_num, count_rmse/count_num,
                     np.average(dur))
