@@ -15,6 +15,9 @@ import time
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.multiprocessing as mp
+from torch.multiprocessing import Queue
+from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
 from dgl import DGLGraph
@@ -24,12 +27,20 @@ from functools import partial
 from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 
 from model import RelGraphEmbedLayer, RelGraphConvLayer
+from utils import thread_wrapped_func
 
 class EntityClassify(nn.Module):
-    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases,
+    def __init__(self,
+                 device,
+                 num_nodes,
+                 h_dim, out_dim,
+                 num_rels,
+                 num_bases,
                  num_hidden_layers=1, dropout=0,
-                 use_self_loop=False):
+                 use_self_loop=False,
+                 low_mem=False):
         super(EntityClassify, self).__init__()
+        self.device = th.device(device if device >= 0 else 'cpu')
         self.num_nodes = num_nodes
         self.h_dim = h_dim
         self.out_dim = out_dim
@@ -45,18 +56,19 @@ class EntityClassify(nn.Module):
         self.layers.append(RelGraphConvLayer(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout))
+            low_mem=low_mem, dropout=self.dropout))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConvLayer(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout))
+                low_mem=low_mem, dropout=self.dropout))
         # h2o
         self.layers.append(RelGraphConvLayer(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
-            self_loop=self.use_self_loop))
+            self_loop=self.use_self_loop,
+            low_mem=low_mem))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -64,6 +76,7 @@ class EntityClassify(nn.Module):
             blocks = [self.g] * len(self.layers)
         h = feats
         for layer, block in zip(self.layers, blocks):
+            block = block.to(self.device)
             h = layer(block, h)
         return h
 
@@ -82,7 +95,7 @@ class NeighborSampler:
         self.g = g
         self.target_idx = target_idx
         self.fanouts = fanouts
-        self.device = device
+        self.device = th.device(device if device >= 0 else 'cpu')
 
     def sample_blocks(self, seeds):
         blocks = []
@@ -96,83 +109,64 @@ class NeighborSampler:
                 frontier = dgl.in_subgraph(self.g, cur)
             else:
                 frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
-            etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]].to(self.device)
-            norm = self.g.edata['norm'][frontier.edata[dgl.EID]].to(self.device)
+            etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]]
+            norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
             block = dgl.to_block(frontier, cur)
-            block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]].to(self.device)
+            block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
             block.edata['etype'] = etypes
             block.edata['norm'] = norm
             cur = block.srcdata[dgl.NID]
             blocks.insert(0, block)
         return seeds, blocks
 
-def main(args):
-    # load graph data
-    if args.dataset == 'aifb':
-        dataset = AIFB()
-    elif args.dataset == 'mutag':
-        dataset = MUTAG()
-    elif args.dataset == 'bgs':
-        dataset = BGS()
-    elif args.dataset == 'am':
-        dataset = AM()
-    else:
-        raise ValueError()
+@thread_wrapped_func
+def run(proc_id, n_gpus, args, devices, dataset):
+    dev_id = devices[proc_id]
+    g, num_of_ntype, num_classes, num_rels, target_idx, \
+        train_idx, val_idx, test_idx, labels = dataset
 
-    # Load from hetero-graph
-    hg = dataset.graph
-    category = dataset.predict_category
-    num_classes = dataset.num_classes
-    train_idx = dataset.train_idx
-    test_idx = dataset.test_idx
-    labels = dataset.labels
-
-    # split dataset into train, validate, test
-    if args.validation:
-        val_idx = train_idx[:len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5:]
-    else:
-        val_idx = train_idx
-
-    num_rels = len(hg.canonical_etypes)
-    num_of_ntype = len(hg.ntypes)
-
-    # calculate norm for each edge type and store in edge
-    for canonical_etypes in hg.canonical_etypes:
-        u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
-        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = th.ones(eid.shape[0]) / degrees
-        norm = norm.unsqueeze(1)
-        hg.edges[canonical_etypes].data['norm'] = norm
-    
-    # get target category id
-    category_id = len(hg.ntypes)
-    for i, ntype in enumerate(hg.ntypes):
-        if ntype == category:
-            category_id = hg.nodes[ntype].data[dgl.NTYPE][0]
-
-    g = dgl.to_homo(hg)
-    node_ids = th.arange(g.number_of_nodes())
-
-    # edge type and normalization factor
-    edge_type = g.edata[dgl.ETYPE]
     node_tids = g.ndata[dgl.NTYPE]
-    loc = (node_tids == category_id)
-    target_idx = node_ids[loc]
-    print(th.max(edge_type))
-
     # check cuda
-    use_cuda = args.gpu >= 0 and th.cuda.is_available()
+    use_cuda = dev_id >= 0
     if use_cuda:
-        th.cuda.set_device(args.gpu)
-        node_ids = node_ids.cuda()
-        edge_type = edge_type.cuda()
-        labels = labels.cuda()
-        node_tids = node_tids.cuda()
-        g.edata['norm'] = g.edata['norm'].cuda()
+        th.cuda.set_device(dev_id)
+        labels = labels.to(dev_id)
+        node_tids = node_tids.to(dev_id)
+        g.edata['norm'] = g.edata['norm'].to(dev_id)
 
-    embed_layer = RelGraphEmbedLayer(args.gpu,
+    sampler = NeighborSampler(g, target_idx, [args.fanout] * args.n_layers, dev_id)
+    loader = DataLoader(dataset=train_idx.numpy(),
+                        batch_size=args.batch_size,
+                        collate_fn=sampler.sample_blocks,
+                        shuffle=True,
+                        num_workers=args.num_workers)
+
+    # validation sampler
+    val_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers, dev_id)
+    val_loader = DataLoader(dataset=val_idx.numpy(),
+                            batch_size=args.batch_size,
+                            collate_fn=val_sampler.sample_blocks,
+                            shuffle=False,
+                            num_workers=args.num_workers)
+
+    # validation sampler
+    test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers, dev_id)
+    test_loader = DataLoader(dataset=test_idx.numpy(),
+                             batch_size=args.batch_size,
+                             collate_fn=test_sampler.sample_blocks,
+                             shuffle=False,
+                             num_workers=args.num_workers)
+
+    if n_gpus > 1:
+        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+            master_ip='127.0.0.1', master_port='12345')
+        world_size = n_gpus
+        th.distributed.init_process_group(backend="nccl",
+                                          init_method=dist_init_method,
+                                          world_size=world_size,
+                                          rank=dev_id)
+
+    embed_layer = RelGraphEmbedLayer(dev_id,
                                      g.number_of_nodes(),
                                      node_tids,
                                      num_of_ntype,
@@ -180,41 +174,25 @@ def main(args):
                                      args.n_hidden)
 
     # create model
-    model = EntityClassify(g.number_of_nodes(),
+    model = EntityClassify(dev_id,
+                           g.number_of_nodes(),
                            args.n_hidden,
                            num_classes,
                            num_rels,
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
-                           use_self_loop=args.use_self_loop)
+                           use_self_loop=args.use_self_loop,
+                           low_mem=args.low_mem)
 
-    if use_cuda:
-        embed_layer.cuda()
-        model.cuda()
+    if dev_id >= 0:
+        model.cuda(dev_id)
+        if args.mix_cpu_gpu is False:
+            embed_layer.cuda(dev_id)
 
-    sampler = NeighborSampler(g, target_idx, [args.fanout] * args.n_layers, args.gpu)
-    loader = DataLoader(dataset=train_idx.numpy(),
-                        batch_size=args.batch_size,
-                        collate_fn=sampler.sample_blocks,
-                        shuffle=True,
-                        num_workers=0)
-
-    # validation sampler
-    val_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers, args.gpu)
-    val_loader = DataLoader(dataset=val_idx.numpy(),
-                            batch_size=args.batch_size,
-                            collate_fn=val_sampler.sample_blocks,
-                            shuffle=False,
-                            num_workers=0)
-
-    # validation sampler
-    test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers, args.gpu)
-    test_loader = DataLoader(dataset=test_idx.numpy(),
-                             batch_size=args.batch_size,
-                             collate_fn=test_sampler.sample_blocks,
-                             shuffle=False,
-                             num_workers=0)
+    if n_gpus > 1:
+        embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
+        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -229,10 +207,11 @@ def main(args):
         model.train()
         optimizer.zero_grad()
 
-        for i, (seeds, blocks) in enumerate(loader):
+        for i, sample_data in enumerate(loader):
+            seeds, blocks = sample_data
             t0 = time.time()
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
+            feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
+                                blocks[0].srcdata[dgl.NTYPE].to(dev_id),
                                 [None] * num_of_ntype)
             logits = model(blocks, feats)
 
@@ -250,52 +229,145 @@ def main(args):
             print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                   format(train_acc, loss.item()))
 
-        model.eval()
-        eval_logtis = []
-        eval_seeds = []
-        for i, (seeds, blocks) in enumerate(val_loader):
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
-                                [None] * num_of_ntype)
-            logits = model(blocks, feats)
-            eval_logtis.append(logits)
-            eval_seeds.append(seeds)
-        eval_logtis = th.cat(eval_logtis)
-        eval_seeds = th.cat(eval_seeds)
-        val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds])
-        val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds]).item() / len(eval_seeds)
-        print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
-                  format(val_acc, val_loss.item()))
+        if proc_id == 0:
+            model.eval()
+            eval_logtis = []
+            eval_seeds = []
+            for i, sample_data in enumerate(val_loader):
+                seeds, blocks = sample_data
+                feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
+                                    blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                                    [None] * num_of_ntype)
+                logits = model(blocks, feats)
+                eval_logtis.append(logits)
+                eval_seeds.append(seeds)
+            eval_logtis = th.cat(eval_logtis)
+            eval_seeds = th.cat(eval_seeds)
+            val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds])
+            val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds]).item() / len(eval_seeds)
+            print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
+                    format(val_acc, val_loss.item()))
+        if n_gpus > 1:
+            th.distributed.barrier()
     print()
 
-    model.eval()
-    test_logtis = []
-    test_seeds = []
-    for i, (seeds, blocks) in enumerate(test_loader):
-        feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                            blocks[0].srcdata[dgl.NTYPE],
-                            [None] * num_of_ntype)
-        logits = model(blocks, feats)
-        test_logtis.append(logits)
-        test_seeds.append(seeds)
-    test_logtis = th.cat(test_logtis)
-    test_seeds = th.cat(test_seeds)
-    test_loss = F.cross_entropy(test_logtis, labels[test_seeds])
-    test_acc = th.sum(test_logtis.argmax(dim=1) == labels[test_seeds]).item() / len(test_seeds)
-    print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
-    print()
+    if proc_id == 0:
+        model.eval()
+        test_logtis = []
+        test_seeds = []
+        for i, sample_data in enumerate(test_loader):
+            seeds, blocks = sample_data
+            feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
+                                blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                                [None] * num_of_ntype)
+            logits = model(blocks, feats)
+            test_logtis.append(logits)
+            test_seeds.append(seeds)
+        test_logtis = th.cat(test_logtis)
+        test_seeds = th.cat(test_seeds)
+        test_loss = F.cross_entropy(test_logtis, labels[test_seeds])
+        test_acc = th.sum(test_logtis.argmax(dim=1) == labels[test_seeds]).item() / len(test_seeds)
+        print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+        print()
 
     print("Mean forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
     print("Mean backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
 
+def main(args, devices):
+    # load graph data
+    if args.dataset == 'aifb':
+        dataset = AIFB()
+    elif args.dataset == 'mutag':
+        dataset = MUTAG()
+    elif args.dataset == 'bgs':
+        dataset = BGS()
+    elif args.dataset == 'am':
+        dataset = AM()
+    else:
+        raise ValueError()
 
-if __name__ == '__main__':
+    # Load from hetero-graph
+    hg = dataset.graph
+
+    num_rels = len(hg.canonical_etypes)
+    num_of_ntype = len(hg.ntypes)
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    train_idx = dataset.train_idx
+    test_idx = dataset.test_idx
+    labels = dataset.labels
+
+    # split dataset into train, validate, test
+    if args.validation:
+        val_idx = train_idx[:len(train_idx) // 5]
+        train_idx = train_idx[len(train_idx) // 5:]
+    else:
+        val_idx = train_idx
+
+        # calculate norm for each edge type and store in edge
+    for canonical_etypes in hg.canonical_etypes:
+        u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
+        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        norm = th.ones(eid.shape[0]) / degrees
+        norm = norm.unsqueeze(1)
+        hg.edges[canonical_etypes].data['norm'] = norm
+    
+    # get target category id
+    category_id = len(hg.ntypes)
+    for i, ntype in enumerate(hg.ntypes):
+        if ntype == category:
+            category_id = hg.nodes[ntype].data[dgl.NTYPE][0]
+
+    g = dgl.to_homo(hg)
+    g.ndata[dgl.NTYPE].share_memory_()
+    g.edata[dgl.ETYPE].share_memory_()
+    g.edata['norm'].share_memory_()
+    node_ids = th.arange(g.number_of_nodes())
+
+    # edge type and normalization factor
+    node_tids = g.ndata[dgl.NTYPE]
+    loc = (node_tids == category_id)
+    target_idx = node_ids[loc]
+    target_idx.share_memory_()
+
+    n_gpus = len(devices)
+    # cpu
+    if devices[0] == -1:
+        run(0, 0, args, ['cpu'], 
+            (g, num_of_ntype, num_classes, num_rels, target_idx,
+             train_idx, val_idx, test_idx, labels))
+    # gpu
+    elif n_gpus == 1:
+        run(0, n_gpus, args, devices,
+            (g, num_of_ntype, num_classes, num_rels, target_idx,
+            train_idx, val_idx, test_idx, labels))
+    # multi gpu
+    else:
+        procs = []
+        num_train_seeds = train_idx.shape[0]
+        tseeds_per_proc = num_train_seeds // n_gpus
+        for proc_id in range(n_gpus):
+            proc_train_seeds = train_idx[proc_id * tseeds_per_proc :
+                                         (proc_id + 1) * tseeds_per_proc \
+                                         if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
+                                         else num_train_seeds]
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices,
+                                             (g, num_of_ntype, num_classes, num_rels, target_idx,
+                                             proc_train_seeds, val_idx, test_idx, labels)))
+            p.start()
+            procs.append(p)
+        for p in procs:
+            p.join()
+
+
+def config():
     parser = argparse.ArgumentParser(description='RGCN')
     parser.add_argument("--dropout", type=float, default=0,
             help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden units")
-    parser.add_argument("--gpu", type=int, default=-1,
+    parser.add_argument("--gpu", type=str, default='0',
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
@@ -320,9 +392,19 @@ if __name__ == '__main__':
     fp.add_argument('--testing', dest='validation', action='store_false')
     parser.add_argument("--batch-size", type=int, default=100,
             help="Mini-batch size. ")
+    parser.add_argument("--num-workers", type=int, default=0,
+            help="Number of workers for dataloader.")
+    parser.add_argument("--low-mem", default=False, action='store_true',
+            help="Whether use low mem RelGraphCov")
+    parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
+            help="Whether store node embeddins in cpu")
     parser.set_defaults(validation=True)
-
     args = parser.parse_args()
+    return args
+
+if __name__ == '__main__':
+    args = config()
+    devices = list(map(int, args.gpu.split(',')))
     print(args)
     args.bfs_level = args.n_layers + 1 # pruning used nodes for memory
-    main(args)
+    main(args, devices)

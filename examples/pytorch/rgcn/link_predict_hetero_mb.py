@@ -582,6 +582,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
     print("start training...")
     for epoch in range(args.n_epochs):
         model.train()
+        optimizer.zero_grad()
         if epoch > 1:
             t0 = time.time()
         for i, sample_data in enumerate(dataloader):
