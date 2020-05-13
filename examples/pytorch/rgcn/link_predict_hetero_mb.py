@@ -517,10 +517,15 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                             pin_memory=True,
                             drop_last=True,
                             num_workers=args.num_workers)
-    valid_sampler = NodeSampler(valid_g, fanouts=[None] * args.n_layers)
-    valid_dataloader = DataLoader(dataset=th.arange(valid_g.number_of_nodes()),
-                                  batch_size=4 * 1024,
-                                  collate_fn=valid_sampler.sample_nodes,
+    valid_sampler = LinkRankSampler(valid_g,
+                                    valid_neg_seeds,
+                                    num_valid_edges,
+                                    num_neg=args.valid_neg_cnt,
+                                    fanouts=[None] * args.n_layers,
+                                    is_train=False)
+    valid_dataloader = DataLoader(dataset=valid_seeds,
+                                  batch_size=args.valid_batch_size,
+                                  collate_fn=valid_sampler.sample_blocks,
                                   shuffle=False,
                                   pin_memory=True,
                                   drop_last=False,
@@ -616,18 +621,13 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
             dur = t1 - t0
             print("Epoch {} takes {} seconds".format(epoch, dur))
 
-        fullgraph_eval(valid_g,
-                       embed_layer,
-                       model,
-                       dev_id,
-                       node_feats,
-                       args.n_hidden,
-                       valid_dataloader,
-                       valid_seeds,
-                       valid_neg_seeds,
-                       args.valid_neg_cnt,
-                       queue)
-
+        evaluate(embed_layer,
+                 model,
+                 valid_dataloader,
+                 node_feats,
+                 args.valid_batch_size,
+                 args.valid_neg_cnt,
+                 queue)
         if proc_id == 0 and queue is not None:
             logs = []
             for i in range(n_gpus):
