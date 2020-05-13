@@ -1,5 +1,6 @@
 """Functions used by client."""
 
+import os
 import socket
 if os.name != 'nt':
     import fcntl
