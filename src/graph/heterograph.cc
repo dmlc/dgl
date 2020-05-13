@@ -246,7 +246,7 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::GetGraphInFormat(const SparseFormat &restrict_format) const {
+HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {
   std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
     auto relgraph = std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(etype));

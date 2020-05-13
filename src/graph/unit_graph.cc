@@ -385,7 +385,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return subg;
   }
 
-  HeteroGraphPtr GetGraphInFormat(const SparseFormat &restrict_format) const override {
+  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override {
     LOG(FATAL) << "Not enabled for COO graph.";
     return nullptr;
   }
@@ -755,7 +755,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  HeteroGraphPtr GetGraphInFormat(const SparseFormat &restrict_format) const override {
+  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return nullptr;
   }
@@ -1126,6 +1126,7 @@ HeteroGraphPtr UnitGraph::CreateFromCOO(
     CHECK_EQ(mat.num_rows, mat.num_cols);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, mat));
+
   return HeteroGraphPtr(
       new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
 }
@@ -1212,7 +1213,7 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
                      SparseFormat restrict_format)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
-  restrict_format_ = restrict_format;
+  restrict_format_ = AutoDetectFormat(in_csr, out_csr, coo, restrict_format);
   switch (restrict_format) {
   case SparseFormat::kCSC:
     in_csr_ = GetInCSR();
@@ -1232,15 +1233,6 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   default:
     break;
   }
-  /* TODO(zihao): move it elsewhere.
-  // If the graph is hypersparse and in COO format, switch the restricted format to COO.
-  // If the graph is given as CSR, the indptr array is already materialized so we don't
-  // care about restricting conversion anyway (even if it is hypersparse).
-  if (restrict_format == SparseFormat::kAny) {
-    if (coo && coo->IsHypersparse())
-      restrict_format_ = SparseFormat::kCOO;
-  }
-  */
 
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
@@ -1387,13 +1379,13 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
     return GetCOO();
   case SparseFormat::kAny:
     return GetAny();
-  default:
-    LOG(FATAL) << "unsupported format code";
+  default:  // SparseFormat::kAuto
+    LOG(FATAL) << "Must specify a restrict format.";
     return nullptr;
   }
 }
 
-HeteroGraphPtr UnitGraph::GetGraphInFormat(const SparseFormat &restrict_format) const {
+HeteroGraphPtr UnitGraph::GetGraphInFormat(SparseFormat restrict_format) const {
     int64_t num_vtypes = NumVertexTypes();
     switch (restrict_format) {
     case SparseFormat::kCOO:
@@ -1405,10 +1397,21 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(const SparseFormat &restrict_format) 
     case SparseFormat::kCSR:
       return CreateFromCSR(
         num_vtypes, GetOutCSR(false)->adj(), restrict_format);
-    default:  // SparseFormat::kAny
+    case SparseFormat::kAny:
       return HeteroGraphPtr(
         new UnitGraph(meta_graph_, in_csr_, out_csr_, coo_, restrict_format));
+    default:  // SparseFormat::kAuto
+      LOG(FATAL) << "Must specify a restrict format.";
+      return nullptr;
   }
+}
+
+SparseFormat UnitGraph::AutoDetectFormat(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
+  if (restrict_format != SparseFormat::kAuto)
+    return restrict_format;
+  if (coo && coo->IsHypersparse())
+    return SparseFormat::kCOO;
+  return SparseFormat::kAny;
 }
 
 SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {

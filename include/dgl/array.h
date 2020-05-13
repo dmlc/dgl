@@ -42,7 +42,8 @@ enum class SparseFormat {
   kAny = 0,
   kCOO = 1,
   kCSR = 2,
-  kCSC = 3
+  kCSC = 3,
+  kAuto = 4 // kAuto is a placeholder that indicates it would be materialized later.
 };
 
 // Parse sparse format from string.
@@ -53,8 +54,12 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
     return SparseFormat::kCSR;
   else if (name == "csc")
     return SparseFormat::kCSC;
-  else
+  else if (name == "any")
     return SparseFormat::kAny;
+  else if (name == "auto")
+    return SparseFormat::kAuto;
+  else
+    LOG(FATAL) << "Sparse format not recognized";
 }
 
 // Create string from sparse format.
@@ -65,8 +70,10 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
     return std::string("csr");
   else if (sparse_format == SparseFormat::kCSC)
     return std::string("csc");
-  else
+  else if (sparse_format == SparseFormat::kAny)
     return std::string("any");
+  else
+    return std::string("auto");
 }
 
 // Sparse matrix object that is exposed to python API.
