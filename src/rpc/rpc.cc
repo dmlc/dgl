@@ -27,7 +27,6 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
 
 //////////////////////////// C APIs ////////////////////////////
 
-
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
@@ -35,7 +34,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
   if (type.compare("socket") == 0) {
     RPCContext::ThreadLocal()->sender = std::make_shared<network::SocketSender>(msg_queue_size);
   } else {
-    LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type; 
+    LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
   }
   *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->sender.get());
 });
@@ -47,7 +46,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   if (type.compare("socket") == 0) {
     RPCContext::ThreadLocal()->receiver = std::make_shared<network::SocketReceiver>(msg_queue_size);
   } else {
-    LOG(FATAL) << "Unknown communicator type for rpc sender: " << type; 
+    LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
   }
   *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->receiver.get());
 });

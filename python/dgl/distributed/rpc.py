@@ -108,14 +108,12 @@ def add_receiver_addr(ip_addr, port, recv_id):
     """
     _CAPI_DGLRPCAddReceiver(ip_addr, int(port), int(recv_id))
 
-
 def sender_connect():
     """Connect to all the Receivers.
     
     This api must be invoked after using add_receiver_addr()
     """
     _CAPI_DGLRPCSenderConnect()
-
 
 def set_rank(rank):
     """Set the rank of this process.

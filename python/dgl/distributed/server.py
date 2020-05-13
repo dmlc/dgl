@@ -73,7 +73,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
         Note that, we do not support dynamic connection for now.
     queue_size : int
         Size (bytes) of server queue buffer (~20 GB on default).
-        Note that the 20 GB is just an upper-bound value and DGL uses zero-copy mechansim and 
+        Note that the 20 GB is just an upper-bound and DGL uses zero-copy and 
         it will not allocate 20GB memory at once.
     net_type : str
         networking type, e.g., 'socket' (on default) or 'mpi' (do not support yet).
