@@ -94,17 +94,8 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
 
 def finalize():
     """Release resources of this client."""
-    pass
-
-def get_server_namebook():
-    """Get the servers this client connects to.
-
-    Returns
-    -------
-    server_namebook : ...
-        Server names.
-    """
-    pass
+    rpc.finalize_sender()
+    rpc.finalize_receiver()
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
