@@ -600,25 +600,14 @@ class DistGraph:
                 edata_names.append(name[5:])
         return edata_names
 
-def _is_bool(arr):
-    return 'bool' in str(F.dtype(arr))
-
 def _get_part(elements, local_ids):
-    if isinstance(elements, DistTensor) and _is_bool(elements):
+    if isinstance(elements, DistTensor):
         masks = elements[local_ids]
-        return F.boolean_mask(local_ids, masks)
-    elif isinstance(elements, DistTensor):
-        # We need to move all node Ids to the local machine first.
-        elements = elements[np.arange(len(elements))]
-        elements = utils.toindex(elements)
-        return F.zerocopy_from_numpy(np.intersect1d(elements.tonumpy(), F.asnumpy(local_ids)))
-    elif _is_bool(elements):
-        elements = utils.toindex(elements)
-        masks = F.gather_row(elements.tousertensor(), local_ids)
         return F.boolean_mask(local_ids, masks)
     else:
         elements = utils.toindex(elements)
-        return F.zerocopy_from_numpy(np.intersect1d(elements.tonumpy(), F.asnumpy(local_ids)))
+        masks = F.gather_row(elements.tousertensor(), local_ids)
+        return F.boolean_mask(local_ids, masks)
 
 def node_split(nodes, partition_book, rank):
     ''' Split nodes and return a subset for the local rank.
@@ -627,15 +616,14 @@ def node_split(nodes, partition_book, rank):
     returns a subset of nodes for the local rank. This method is used for
     dividing workloads for distributed training.
 
-    The input nodes can be stored as a vector of node Ids or a vector of
-    masks. When it's a vector of masks, the length of the vector should be
-    the same as the number of nodes in a graph; the vector has to be a boolean
-    vector, in which 1 indicates that the vertex in the corresponding location exists.
+    The input nodes can be stored as a vector of masks. The length of the vector is
+    the same as the number of nodes in a graph; 1 indicates that the vertex in
+    the corresponding location exists.
 
     Parameters
     ----------
     nodes : 1D tensor or DistTensor
-        The input nodes.
+        A boolean mask vector that indicates input nodes.
     partition_book : GraphPartitionBook
         The graph partition book
     rank : int
@@ -649,6 +637,8 @@ def node_split(nodes, partition_book, rank):
     num_nodes = 0
     for part in partition_book.metadata():
         num_nodes += part['num_nodes']
+    assert len(nodes) == num_nodes, \
+            'The length of boolean mask vector should be the number of nodes in the graph.'
     # Get all nodes that belong to the rank.
     local_nids = partition_book.partid2nids(rank)
     return _get_part(nodes, local_nids)
@@ -660,15 +650,14 @@ def edge_split(edges, partition_book, rank):
     returns a subset of edges for the local rank. This method is used for
     dividing workloads for distributed training.
 
-    The input edges can be stored as a vector of edge Ids or a vector of
-    masks. When it's a vector of masks, the length of the vector should be
-    the same as the number of edges in a graph; the vector has to be a boolean
-    vector, in which and 1 indicates that the edge in the corresponding location exists.
+    The input edges can be stored as a vector of masks. The length of the vector is
+    the same as the number of edges in a graph; 1 indicates that the edge in
+    the corresponding location exists.
 
     Parameters
     ----------
     edges : 1D tensor or DistTensor
-        The input edges.
+        A boolean mask vector that indicates input nodes.
     partition_book : GraphPartitionBook
         The graph partition book
     rank : int
@@ -682,6 +671,8 @@ def edge_split(edges, partition_book, rank):
     num_edges = 0
     for part in partition_book.metadata():
         num_edges += part['num_edges']
+    assert len(edges) == num_edges, \
+            'The length of boolean mask vector should be the number of edges in the graph.'
     # Get all edges that belong to the rank.
     local_eids = partition_book.partid2eids(rank)
     return _get_part(edges, local_eids)

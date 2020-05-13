@@ -77,7 +77,6 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     assert g.node_attr_schemes()['features'].shape == (1,)
 
     selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
-    selected_edges = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     # Test node split
     local_nids = F.nonzero_1d(g._g.ndata['local_node'])
     local_nids = g._g.ndata[dgl.NID][local_nids]
@@ -145,19 +144,21 @@ def test_split():
         local_eids = F.nonzero_1d(part_g.edata['local_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
 
-        nodes1 = node_split(selected_nodes, gpb, i)
+        local_nids = F.nonzero_1d(part_g.ndata['local_node'])
+        local_nids = part_g.ndata[dgl.NID][local_nids]
+        nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
         nodes2 = node_split(node_mask, gpb, i)
-        assert np.all(np.sort(F.asnumpy(nodes1)) == np.sort(F.asnumpy(nodes2)))
+        assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes2)))
         local_nids = F.asnumpy(local_nids)
-        nodes1 = F.asnumpy(nodes1)
         for n in nodes1:
             assert n in local_nids
 
-        edges1 = edge_split(selected_edges, gpb, i)
+        local_eids = F.nonzero_1d(part_g.edata['local_edge'])
+        local_eids = part_g.edata[dgl.EID][local_eids]
+        edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
         edges2 = edge_split(edge_mask, gpb, i)
-        assert np.all(np.sort(F.asnumpy(edges1)) == np.sort(F.asnumpy(edges2)))
+        assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges2)))
         local_eids = F.asnumpy(local_eids)
-        edges1 = F.asnumpy(edges1)
         for e in edges1:
             assert e in local_eids
 
