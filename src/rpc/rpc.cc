@@ -36,7 +36,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
   }
-  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->sender.get());
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
@@ -48,7 +47,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
   }
-  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->receiver.get());
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetSender")

@@ -10,11 +10,65 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'get_sender', 'get_receiver', 'finalize_sender', \
-'finalize_receiver', 'receiver_wait', 'add_receiver_addr', 'sender_connect']
+'finalize_receiver', 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
+
+def read_ip_config(filename):
+    """Read network configuration information of server from file.
+
+    The format of configuration file should be:
+
+        [ip] [base_port] [server_count]
+
+        172.31.40.143 30050 2
+        172.31.36.140 30050 2
+        172.31.47.147 30050 2
+        172.31.30.180 30050 2
+
+    Note that, DGL server supports backup servers that can share data with each others
+    on the same machine via shared memory. So the server_count should be >= 1. For example, 
+    if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
+    current machine. Note that, the count of server on each machine can be different.
+
+    Parameters
+    ----------
+    filename : str
+        name of configuration file.
+
+    Returns
+    -------
+    dict
+        server namebook. e.g.,
+
+        [server_id]:[machine_id, ip, port, group_count]
+
+          {0:[0, '172.31.40.143', 30050, 2],
+           1:[0, '172.31.40.143', 30051, 2],
+           2:[1, '172.31.36.140', 30050, 2],
+           3:[1, '172.31.36.140', 30051, 2],
+           4:[2, '172.31.47.147', 30050, 2],
+           5:[2, '172.31.47.147', 30051, 2],
+           6:[3, '172.31.30.180', 30050, 2],
+           7:[3, '172.31.30.180', 30051, 2]}
+    """
+    assert len(filename) > 0, 'filename cannot be empty.'
+    server_namebook = {}
+    try:
+        server_id = 0
+        machine_id = 0
+        lines = [line.rstrip('\n') for line in open(filename)]
+        for line in lines:
+            ip, port, server_count = line.split(' ')
+            for s_count in range(int(server_count)):
+                server_namebook[server_id] = [int(machine_id), ip, int(port)+s_count, int(server_count)]
+                server_id += 1
+            machine_id += 1
+    except:
+        print("Error: data format on each line should be: [ip] [base_port] [server_count]")
+    return server_namebook
 
 def create_sender(msg_queue_size, net_type):
     """Create rpc sender of this process.
@@ -25,13 +79,8 @@ def create_sender(msg_queue_size, net_type):
         Size (bytes) of network queue buffer.
     net_type : str
         networking type, e.g., 'socket' or 'mpi' (do not support yet).
-
-    Returns
-    -------
-    c handler
-        sender handler
     """
-    return _CAPI_DGLRPCCreateSender(int(msg_queue_size), net_type)
+    _CAPI_DGLRPCCreateSender(int(msg_queue_size), net_type)
 
 def create_receiver(msg_queue_size, net_type):
     """Create rpc receiver of this process.
@@ -42,13 +91,8 @@ def create_receiver(msg_queue_size, net_type):
         Size (bytes) of network queue buffer.
     net_type : str
         networking type, e.g., 'socket' or 'mpi' (do not support yet).
-
-    Returns
-    -------
-    c handler
-        receiver handler
     """
-    return _CAPI_DGLRPCCreateReceiver(int(msg_queue_size), net_type)
+    _CAPI_DGLRPCCreateReceiver(int(msg_queue_size), net_type)
 
 def get_sender():
     """Get rpc sender of this process.
