@@ -82,21 +82,19 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket', 'mpi'), 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
-    self._server_id = server_id
-    rpc.set_rank(self._server_id)
-    self._server_namebook = read_ip_config(ip_config)
-    self._num_clients = num_clients
-    self._machine_id = server_namebook[server_id][0]
-    self._ip = server_namebook[server_id][1]
-    self._port = server_namebook[server_id][2]
+    rpc.set_rank(server_id)
+    server_namebook = read_ip_config(ip_config)
+    machine_id = server_namebook[server_id][0]
+    ip = server_namebook[server_id][1]
+    port = server_namebook[server_id][2]
     # group_count means the total number of server on each machine
-    self._group_count = server_namebook[server_id][3]
-    self._sender = rpc.create_rpc_sender(queue_size, net_type)
-    self._receiver = rpc.create_rpc_receiver(queue_size, net_type)
+    group_count = server_namebook[server_id][3]
+    rpc_sender = rpc.create_rpc_sender(queue_size, net_type)
+    rpc_receiver = rpc.create_rpc_receiver(queue_size, net_type)
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not accept new sender's connection
     print("Wait connections ...")
-    rpc.receiver_wait(self._receiver, self._ip, self._port, self._num_clients)
+    rpc.receiver_wait(receiver, ip, port, num_clients)
 
 
 def finalize():
