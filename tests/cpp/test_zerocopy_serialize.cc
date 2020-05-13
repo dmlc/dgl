@@ -1,4 +1,5 @@
 #include <dgl/array.h>
+#include <dgl/immutable_graph.h>
 #include <dgl/zerocopy_serializer.h>
 #include <dmlc/memory_io.h>
 #include <gtest/gtest.h>
@@ -7,6 +8,8 @@
 #include <iostream>
 #include <vector>
 
+#include "../../src/graph/heterograph.h"
+#include "../../src/graph/unit_graph.h"
 #include "./common.h"
 
 using namespace dgl;
@@ -19,12 +22,12 @@ std::string IdArrayToStr(IdArray arr) {
   std::ostringstream oss;
   oss << "(" << len << ")[";
   if (arr->dtype.bits == 32) {
-    int32_t* data = static_cast<int32_t*>(arr->data);
+    int32_t *data = static_cast<int32_t *>(arr->data);
     for (int64_t i = 0; i < len; ++i) {
       oss << data[i] << " ";
     }
   } else {
-    int64_t* data = static_cast<int64_t*>(arr->data);
+    int64_t *data = static_cast<int64_t *>(arr->data);
     for (int64_t i = 0; i < len; ++i) {
       oss << data[i] << " ";
     }
@@ -32,7 +35,6 @@ std::string IdArrayToStr(IdArray arr) {
   oss << "]";
   return oss.str();
 }
-
 
 TEST(ZeroCopySerialize, NDArray) {
   auto tensor1 = VecToIdArray<int64_t>({1, 2, 5, 3});
@@ -64,21 +66,15 @@ TEST(ZeroCopySerialize, NDArray) {
   ZeroCopyStream zc_read_strm(&zerocopy_blob, &new_ptr_list, false);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor1);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor2);
-
-//   auto ptr_list = zc_strm;
-
-
-
-  //   dmlc::MemoryStringStream ofs(&blob);
 }
 
-
-TEST(ZeroCopySerialize, SharedMem) {  
+TEST(ZeroCopySerialize, SharedMem) {
   auto tensor1 = VecToIdArray<int64_t>({1, 2, 5, 3});
   DLDataType dtype = {kDLInt, 64, 1};
-  std::vector<int64_t> shape {4};
+  std::vector<int64_t> shape{4};
   DLContext cpu_ctx = {kDLCPU, 0};
-  auto shared_tensor = NDArray::EmptyShared("test", shape, dtype, cpu_ctx, true);
+  auto shared_tensor =
+    NDArray::EmptyShared("test", shape, dtype, cpu_ctx, true);
   shared_tensor.CopyFrom(tensor1);
 
   std::string nonzerocopy_blob;
@@ -96,5 +92,47 @@ TEST(ZeroCopySerialize, SharedMem) {
   NDArray loadtensor1, loadtensor2;
   ZeroCopyStream zc_read_strm(&zerocopy_blob, nullptr, true);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor1);
+}
 
+TEST(ZeroCopySerialize, HeteroGraph) {
+  auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
+  auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
+  auto mg1 = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst);
+  src = VecToIdArray<int64_t>({6, 2, 5, 1, 8});
+  dst = VecToIdArray<int64_t>({5, 2, 4, 8, 0});
+  auto mg2 = dgl::UnitGraph::CreateFromCOO(1, 9, 9, src, dst);
+  std::vector<HeteroGraphPtr> relgraphs;
+  relgraphs.push_back(mg1);
+  relgraphs.push_back(mg2);
+  src = VecToIdArray<int64_t>({0, 0});
+  dst = VecToIdArray<int64_t>({1, 0});
+  auto meta_gptr = ImmutableGraph::CreateFromCOO(3, src, dst);
+  auto hrptr = std::make_shared<HeteroGraph>(meta_gptr, relgraphs);
+
+  std::string nonzerocopy_blob;
+  dmlc::MemoryStringStream ifs(&nonzerocopy_blob);
+  static_cast<dmlc::Stream *>(&ifs)->Write(hrptr);
+
+  std::string zerocopy_blob;
+  std::vector<Ptr_pair> ptr_list;
+  ZeroCopyStream zc_write_strm(&zerocopy_blob, &ptr_list);
+  static_cast<dmlc::Stream *>(&zc_write_strm)->Write(hrptr);
+
+  LOG(INFO) << "Non zerocopy size: " << nonzerocopy_blob.size() << std::endl;
+  LOG(INFO) << "Zerocopy size: " << zerocopy_blob.size() << std::endl;
+
+  std::vector<Ptr_pair> new_ptr_list;
+  // Use memcpy to mimic remote machine reconstruction
+  for (Ptr_pair ptr : ptr_list) {
+    auto new_ptr = malloc(ptr.second);
+    memcpy(new_ptr, ptr.first, ptr.second);
+    new_ptr_list.emplace_back(new_ptr, ptr.second);
+  }
+
+  auto gptr = dgl::Serializer::make_shared<HeteroGraph>();
+  ZeroCopyStream zc_read_strm(&zerocopy_blob, &new_ptr_list, false);
+  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&gptr);
+
+  EXPECT_EQ(gptr->NumVertices(0), 9);
+  EXPECT_EQ(gptr->NumVertices(1), 8);
 }
