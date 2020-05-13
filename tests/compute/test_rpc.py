@@ -73,3 +73,4 @@ def test_rpc_msg():
     assert len(rpcmsg.data) == len(data)
     assert len(rpcmsg.tensors) == 1
     assert F.array_equal(rpcmsg.tensors[0], req.z)
+

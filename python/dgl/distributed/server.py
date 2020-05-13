@@ -95,6 +95,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     self._receiver = rpc.create_rpc_receiver(queue_size, net_type)
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not accept new sender's connection
+    print("Wait connections ...")
     rpc.receiver_wait(self._receiver, self._ip, self._port, self._num_clients)
 
 
