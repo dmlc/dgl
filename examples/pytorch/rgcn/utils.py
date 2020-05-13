@@ -353,16 +353,15 @@ class DrkgDataset(object):
         self.name = name
         self.dir = get_download_dir()
         _downlaod_prefix = 'https://dgl-data.s3-us-west-2.amazonaws.com/dataset/DRKG/'
-        tgz_path = os.path.join(self.dir, '{}.tgz'.format(self.name))
-        download(_downlaod_prefix + '{}.tgz'.format(self.name), tgz_path)
+        tgz_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
+        download(_downlaod_prefix + '{}.tar.gz'.format(self.name), tgz_path)
         self.dir = os.path.join(self.dir, self.name)
         extract_archive(tgz_path, self.dir)
 
     def load_data(self):
-        raw_file = os.path.join(self.dir, 'drkg.tsv')
-        drkg_triplets = pd.read_csv(raw_file, sep='\t').values.tolist()
-
-        np.random.seed(0)
+        raw_file = os.path.join(self.dir, 'drkg/drkg.tsv')
+        drkg_triplets = pd.read_csv(raw_file, sep='\t').values
+        np.random.seed(42) # ensure each time the split is same
         num_of_triplets = len(drkg_triplets)
         train_ratio = 0.9
         valid_ratio = 0.05
@@ -399,6 +398,7 @@ class DrkgDataset(object):
         entity_type_dict = {}
         entity_dict = {}
         relation_dict = {}
+        node_types = []
         graph_relations = set()
         def handle_triples(triplets):
             heads = []
@@ -414,13 +414,19 @@ class DrkgDataset(object):
                 if tail_type is None:
                     continue
                 # here the rel type is already (h, r, t)
-                rel_type = (triplet[0], triplet[1], triplet[2])
+                rel_type = (head_type, triplet[1], tail_type)
 
                 rel_id = get_id(relation_dict, rel_type)
+                ed_len = len(entity_dict)
                 head_id = get_id(entity_dict, triplet[0])
                 head_type_id = get_id(entity_type_dict, head_type)
+                if len(entity_dict) > ed_len:
+                    node_types.append(head_type_id)
+                ed_len = len(entity_dict)
                 tail_id = get_id(entity_dict, triplet[2])
                 tail_type_id = get_id(entity_type_dict, tail_type)
+                if len(entity_dict) > ed_len:
+                    node_types.append(tail_type_id)
 
                 heads.append(head_id)
                 head_types.append(head_type_id)
@@ -451,10 +457,11 @@ class DrkgDataset(object):
         self.rel_map = relation_dict
         self.entity_map = entity_dict
         self.entity_type_dict = entity_type_dict
-        self.num_rels = list(graph_relations)
+        self.num_rels = len(list(graph_relations))
         self.num_nodes = len(entity_dict)
+        self.node_types = np.asarray(node_types)
 
-def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, edge_lists, reverse=True):
+def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, node_types, edge_lists, reverse=True):
     """ Create a DGL homogeneous graph with heterograph info stored as node or edge features.
     """
     src = []
@@ -462,19 +469,20 @@ def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_re
     dst = []
     raw_subg = {}
     raw_subg_eset = {}
-    raw_subg_stype = {}
-    raw_subg_dtype = {}
     raw_subg_etype = {}
     raw_reverse_sugb = {}
-    raw_reverse_stype = {}
-    raw_reverse_dtype = {}
     raw_reverse_subg_etype = {}
     print(num_rels)
 
     settype = 0
     for edge_list in edge_lists:
-        for edge in edge_lists:
-            s, r, d, st, dt = edge
+        s_l, d_l, st_l, r_l, dt_l = edge_list
+        for i in range(s_l.shape[0]):
+            s = s_l[i]
+            d = d_l[i]
+            st = st_l[i]
+            r = r_l[i]
+            dt = dt_l[i]
             assert r < num_rels
             s_type = str(st)
             d_type = str(dt)
@@ -483,15 +491,11 @@ def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_re
 
             if raw_subg.get(e_type, None) is None:
                 raw_subg[e_type] = ([], [])
-                raw_subg_stype[e_type] = []
-                raw_subg_dtype[e_type] = []
                 raw_subg_eset[e_type] = []
                 raw_subg_etype[e_type] = []
             raw_subg[e_type][0].append(s)
             raw_subg[e_type][1].append(d)
-            raw_subg_stype[e_type] = st
-            raw_subg_dtype[e_type] = dt
-            raw_subg_eset[e_type].append(setype)
+            raw_subg_eset[e_type].append(settype)
             raw_subg_etype[e_type].append(r)
 
             if reverse is True:
@@ -499,29 +503,21 @@ def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_re
                 re_type = (d_type, r_type, s_type)
                 if raw_reverse_sugb.get(re_type, None) is None:
                     raw_reverse_sugb[re_type] = ([], [])
-                    raw_reverse_stype[re_type] = []
-                    raw_reverse_dtype[re_type] = []
                     raw_reverse_subg_etype[re_type] = []
                 raw_reverse_sugb[re_type][0].append(d)
                 raw_reverse_sugb[re_type][1].append(s)
-                raw_reverse_stype[re_type] = dt
-                raw_reverse_dtype[re_type] = st
                 raw_reverse_subg_etype[re_type].append(r + num_rels)
-        setype += 1
+        settype += 1
 
     subg = []
     fg_s = []
     fg_d = []
-    fg_st = []
-    fg_dt = []
     fg_etype = []
     fg_settype = []
     for e_type, val in raw_subg.items():
         s, d = val
         s = np.asarray(s)
         d = np.asarray(d)
-        st = np.asarray(raw_subg_stype[e_type])
-        dt = np.asarray(raw_subg_dtype[e_type])
         etype = raw_subg_etype[e_type]
         etype = torch.tensor(etype).long()
         settype = raw_subg_eset[e_type]
@@ -529,8 +525,6 @@ def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_re
 
         fg_s.append(s)
         fg_d.append(d)
-        fg_st.append(st)
-        fg_dt.append(dt)
         fg_etype.append(etype)
         fg_settype.append(settype)
 
@@ -538,36 +532,21 @@ def build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_re
         s, d = val
         s = np.asarray(s)
         d = np.asarray(d)
-        st = np.asarray(raw_reverse_stype[e_type])
-        dt = np.asarray(raw_reverse_dtype[e_type])
         etype = raw_reverse_subg_etype[e_type]
         etype = torch.tensor(etype).long()
         settype = torch.full((s.shape[0],), -1).long()
 
         fg_s.append(s)
         fg_d.append(d)
-        fg_st.append(st)
-        fg_dt.append(dt)
         fg_etype.append(etype)
         fg_settype.append(settype)
 
     s = np.concatenate(fg_s)
     d = np.concatenate(fg_d)
-    st = np.concatenate(fg_st)
-    dt = np.concatenate(fg_dt)
     g = dgl.graph((s, d), num_nodes=num_nodes)
     g.edata['etype'] = torch.cat(fg_etype)
     g.edata['set'] = torch.cat(fg_settype)
-    
-    s, indices = np.unique(s, return_index=True)
-    st = st[indices]
-    d, indices = np.unique(s, return_index=True)
-    dt = dt[indices]
-    n = np.concatenate([s, d])
-    nt = np.concatenate([st, dt])
-    n, indices = np.unique(n, return_index=True)
-    nt = nt[indices]
-    g.ndata['ntype'] = torch.from_numpy(nt).long()
+    g.ndata['ntype'] = torch.from_numpy(node_types).long()
 
     return g
 
