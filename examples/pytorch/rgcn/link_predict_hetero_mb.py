@@ -18,7 +18,6 @@ import torch.nn.functional as F
 import torch.multiprocessing as mp
 from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
-from _thread import start_new_thread
 from torch.utils.data import DataLoader
 import dgl
 import dgl.function as fn
@@ -30,6 +29,7 @@ from dgl.contrib.data import load_data
 from model import RelGraphEmbedLayer, RelGraphConvLayer
 from utils import build_heterograph_in_homogeneous_from_triplets, build_multi_ntype_heterograph_in_homogeneous_from_triplets
 from utils import thread_wrapped_func
+from utils import DrkgDataset
 
 class LinkPredict(nn.Module):
     def __init__(self,
@@ -696,10 +696,11 @@ def main(args, devices):
         train_data = drkg_dataset.train
         valid_data = drkg_dataset.valid
         test_data = drkg_dataset.test
+        node_types = drkg_dataset.node_types
 
-        train_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data])
-        valid_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data])
-        test_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data, test_data])
+        train_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, node_types, [train_data])
+        valid_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, node_types, [train_data, valid_data])
+        test_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, node_types, [train_data, valid_data, test_data])
     else:
         data = load_data(args.dataset)
         num_nodes = data.num_nodes
