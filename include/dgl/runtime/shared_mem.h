@@ -35,7 +35,7 @@ class SharedMemory {
   /* \brief the size of the shared memory. */
   size_t size;
 
- public: 
+ public:
   /*
    * \brief the name of the object.
    *

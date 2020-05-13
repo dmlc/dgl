@@ -3,8 +3,8 @@
  * \file rpc/shared_mem_serializer.h
  * \brief headers for serializer.
  */
-#ifndef DGL_RPC_SHARED_MEM_SERIALIZER_H_
-#define DGL_RPC_SHARED_MEM_SERIALIZER_H_
+#ifndef DGL_ZEROCOPY_SERIALIZER_H_
+#define DGL_ZEROCOPY_SERIALIZER_H_
 
 // #include <dgl/runtime/ndarray.h>
 #include <dmlc/io.h>
@@ -15,6 +15,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <utility>
 
 // #include <dgl/array.h>
 
@@ -55,4 +56,4 @@ class ZeroCopyStream : public MemoryStringStream {
 
 }  // namespace dgl
 
-#endif  // DGL_RPC_SHARED_MEM_SERIALIZER_H_
+#endif  // DGL_ZEROCOPY_SERIALIZER_H_
