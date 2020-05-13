@@ -220,7 +220,8 @@ class UnitGraph : public BaseHeteroGraph {
   aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override;
 
   /*! \brief some heuristic rules to determine the restrict format. */
-  SparseFormat AutoDetectFormat(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const;
+  SparseFormat AutoDetectFormat(
+    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const;
 
   SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
     return SelectFormat(preferred_format);

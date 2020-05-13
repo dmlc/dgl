@@ -43,7 +43,7 @@ enum class SparseFormat {
   kCOO = 1,
   kCSR = 2,
   kCSC = 3,
-  kAuto = 4 // kAuto is a placeholder that indicates it would be materialized later.
+  kAuto = 4   // kAuto is a placeholder that indicates it would be materialized later.
 };
 
 // Parse sparse format from string.

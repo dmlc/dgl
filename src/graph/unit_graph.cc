@@ -1406,7 +1406,8 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(SparseFormat restrict_format) const {
   }
 }
 
-SparseFormat UnitGraph::AutoDetectFormat(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
+SparseFormat UnitGraph::AutoDetectFormat(
+    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
   if (restrict_format != SparseFormat::kAuto)
     return restrict_format;
   if (coo && coo->IsHypersparse())
