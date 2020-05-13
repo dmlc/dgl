@@ -1676,8 +1676,8 @@ def test_format():
     for rel_type in ['follows', 'plays', 'develops']:
         assert g1.restrict_format(rel_type) == 'csc'
         assert g1.format_in_use(rel_type) == ['csc']
-        assert g.restrict_format(rel_type) == 'coo'
-        assert g.restrict_format(rel_type) == ['coo']
+        assert g.restrict_format(rel_type) == 'csr'
+        assert g.format_in_use(rel_type) == ['csr']
 
 if __name__ == '__main__':
     # test_create()
@@ -1703,5 +1703,5 @@ if __name__ == '__main__':
     # test_stack_reduce()
     # test_isolated_ntype()
     # test_bipartite()
-    test_dtype_cast()
+    # test_dtype_cast()
     test_format()
