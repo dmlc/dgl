@@ -89,8 +89,8 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     port = server_namebook[server_id][2]
     # group_count means the total number of server on each machine
     group_count = server_namebook[server_id][3]
-    rpc_sender = dgl.distributed.create_rpc_sender(queue_size, net_type)
-    rpc_receiver = dgl.distributed.create_rpc_receiver(queue_size, net_type)
+    rpc_sender = dgl.distributed.create_sender(queue_size, net_type)
+    rpc_receiver = dgl.distributed.create_receiver(queue_size, net_type)
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not accept new sender's connection
     print("Wait connections ...")
