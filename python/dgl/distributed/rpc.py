@@ -31,7 +31,7 @@ def create_sender(msg_queue_size, net_type):
     """
     return _CAPI_DGLRPCCreateSender(int(msg_queue_size), net_type)
 
-def create_receiver(msg_queue_size, network_type):
+def create_receiver(msg_queue_size, net_type):
     """Create rpc receiver of this process.
 
     Parameters
