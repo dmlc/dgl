@@ -517,6 +517,12 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
 }
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCSR(const std::string &name) {
+  // If the shared memory graph index doesn't exist, we return null directly.
+#ifndef _WIN32
+  if (!SharedMemory::Exist(GetSharedMemName(name, "meta"))) {
+    return nullptr;
+  }
+#endif  // _WIN32
   GraphIndexMetadata meta = DeserializeMetadata(GetSharedMemName(name, "meta"));
   CSRPtr in_csr, out_csr;
   if (meta.has_in_csr) {

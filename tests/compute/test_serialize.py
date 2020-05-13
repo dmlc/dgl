@@ -162,9 +162,25 @@ def test_serialize_tensors():
 
     os.unlink(path)
 
+def test_serialize_empty_dict():
+    # create a temporary file and immediately release it so DGL can open it.
+    f = tempfile.NamedTemporaryFile(delete=False)
+    path = f.name
+    f.close()
+
+    tensor_dict = {}
+
+    save_tensors(path, tensor_dict)
+
+    load_tensor_dict = load_tensors(path)
+    assert isinstance(load_tensor_dict, dict)
+    assert len(load_tensor_dict) == 0   
+
+    os.unlink(path)
 
 if __name__ == "__main__":
     test_graph_serialize_with_feature()
     test_graph_serialize_without_feature()
     test_graph_serialize_with_labels()
     test_serialize_tensors()
+    test_serialize_empty_dict()
