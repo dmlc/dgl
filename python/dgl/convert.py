@@ -448,15 +448,19 @@ def heterograph(data_dict, num_nodes_dict=None, index_dtype='int64'):
         num_nodes_dict = defaultdict(int)
         for (srctype, etype, dsttype), data in data_dict.items():
             if isinstance(data, tuple):
-                nsrc = (max(data[0]) + 1) if len(data[0]) > 0 else 0
-                ndst = (max(data[1]) + 1) if len(data[1]) > 0 else 0
+                src = utils.toindex(data[0]).tonumpy()
+                dst = utils.toindex(data[1]).tonumpy()
+                nsrc = (src.max() + 1) if len(src) > 0 else 0
+                ndst = (dst.max() + 1) if len(dst) > 0 else 0
             elif isinstance(data, list):
                 if len(data) == 0:
                     nsrc = ndst = 0
                 else:
                     src, dst = zip(*data)
-                    nsrc = max(src) + 1
-                    ndst = max(dst) + 1
+                    src = utils.toindex(src).tonumpy()
+                    dst = utils.toindex(dst).tonumpy()
+                    nsrc = src.max() + 1
+                    ndst = dst.max() + 1
             elif isinstance(data, sp.sparse.spmatrix):
                 nsrc = data.shape[0]
                 ndst = data.shape[1]
