@@ -1,6 +1,6 @@
 """Functions used by server."""
 
-import dgl
+from . import rpc
 
 def read_ip_config(filename):
     """Read network configuration information of server from file.
@@ -82,19 +82,20 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket', 'mpi'), 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
-    dgl.distributed.set_rank(server_id)
+    rpc.set_rank(server_id)
     server_namebook = read_ip_config(ip_config)
     machine_id = server_namebook[server_id][0]
     ip = server_namebook[server_id][1]
     port = server_namebook[server_id][2]
     # group_count means the total number of server on each machine
     group_count = server_namebook[server_id][3]
-    sender = dgl.distributed.create_sender(queue_size, net_type)
-    receiver = dgl.distributed.create_receiver(queue_size, net_type)
+    sender = rpc.create_sender(queue_size, net_type)
+    receiver = rpc.create_receiver(queue_size, net_type)
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not accept new sender's connection
     print("Wait connections ...")
-    dgl.distributed.receiver_wait(ip, port, num_clients)
+    rpc.receiver_wait(ip, port, num_clients)
+    print("%d clients connected!" % num_clients)
 
 
 def finalize():

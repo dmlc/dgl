@@ -1,5 +1,7 @@
 """Functions used by client."""
 
+import dgl
+
 def connect_to_server(server_namebook):
     """Connect this client to server.
 
