@@ -6,11 +6,15 @@
 #ifndef DGL_RUNTIME_NDARRAY_H_
 #define DGL_RUNTIME_NDARRAY_H_
 
-#include <string>
+#include <dgl/zerocopy_serializer.h>
+
 #include <atomic>
-#include <vector>
+#include <string>
 #include <utility>
+#include <vector>
+
 #include "c_runtime_api.h"
+#include "dlpack/dlpack.h"
 #include "serializer.h"
 #include "shared_mem.h"
 
@@ -263,6 +267,11 @@ class NDArray {
  * \param tensor The tensor to be saved.
  */
 inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
+NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm);
+void ZeroCopySaveDLTensor(ZeroCopyStream* zc_strm, DLTensor* tensor,
+                                 std::shared_ptr<SharedMemory> mem);
+NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
+                                 DLContext ctx, void* raw);
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
@@ -457,10 +466,20 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
 }
 
 inline void NDArray::Save(dmlc::Stream* strm) const {
+  auto zc_strm = dynamic_cast<ZeroCopyStream*>(strm);
+  if (zc_strm) {
+    ZeroCopySaveDLTensor(zc_strm, const_cast<DLTensor*>(operator->()), this->data_->mem);
+    return;
+  }
   SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
 }
 
 inline bool NDArray::Load(dmlc::Stream* strm) {
+  auto zc_strm = dynamic_cast<ZeroCopyStream*>(strm);
+  if (zc_strm) {
+    *this = ZeroCopyLoadDLTensor(zc_strm);
+    return true;
+  }
   uint64_t header, reserved;
   CHECK(strm->Read(&header))
       << "Invalid DLTensor file format";
