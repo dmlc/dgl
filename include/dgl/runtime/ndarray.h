@@ -270,8 +270,6 @@ inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
 NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm);
 void ZeroCopySaveDLTensor(ZeroCopyStream* zc_strm, DLTensor* tensor,
                                  std::shared_ptr<SharedMemory> mem);
-NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
-                                 DLContext ctx, void* raw);
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
