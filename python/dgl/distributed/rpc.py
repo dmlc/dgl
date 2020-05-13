@@ -9,7 +9,7 @@ from ..base import DGLError, dgl_warning
 from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
-'create_sender', 'create_receiver', 'get_sender', 'get_receiver', 'finalize_sender'\
+'create_sender', 'create_receiver', 'get_sender', 'get_receiver', 'finalize_sender', \
 'finalize_receiver', 'receiver_wait', 'add_receiver_addr', 'sender_connect']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
