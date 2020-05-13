@@ -79,7 +79,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
         networking type, e.g., 'socket' (on default) or 'mpi' (do not support yet).
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
-    assert num_client >= 0, 'num_client (%d) cannot be a negative number.' % num_client
+    assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket', 'mpi'), 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
     self._server_id = server_id
