@@ -1,5 +1,7 @@
 """Functions used by server."""
 
+import time
+
 from . import rpc
 
 def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024, net_type='socket'):
