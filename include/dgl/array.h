@@ -58,10 +58,9 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
     return SparseFormat::kAny;
   else if (name == "auto")
     return SparseFormat::kAuto;
-  else {
+  else
     LOG(FATAL) << "Sparse format not recognized";
-    return SparseFormat::kAny;
-  }
+  return SparseFormat::kAny;
 }
 
 // Create string from sparse format.
