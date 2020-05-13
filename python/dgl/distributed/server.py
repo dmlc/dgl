@@ -94,7 +94,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not accept new sender's connection
     print("Wait connections ...")
-    dgl.distributed.receiver_wait(receiver, ip, port, num_clients)
+    dgl.distributed.receiver_wait(ip, port, num_clients)
 
 
 def finalize():
