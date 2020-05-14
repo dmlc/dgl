@@ -103,7 +103,7 @@ def test_batch_unbatch1():
     assert F.allclose(t2.ndata['h'], rs2.ndata['h'])
     assert F.allclose(t2.edata['h'], rs2.edata['h'])
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")1
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_batch_unbatch_frame():
     """Test module of node/edge frames of batched/unbatched DGLGraphs.
     Also address the bug mentioned in https://github.com/dmlc/dgl/issues/1475.

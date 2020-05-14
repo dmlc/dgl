@@ -203,13 +203,25 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
-  /*! \return Return the in-edge CSR format. Create from other format if not exist. */
+  /*! 
+   * \brief Create in-edge CSR format of the unit graph.
+   * \param inplace indicates whether change the in_csr_ field or not.
+   * \return Return the in-edge CSR format. Create from other format if not exist.
+   */
   CSRPtr GetInCSR(bool inplace = true) const;
 
-  /*! \return Return the out-edge CSR format. Create from other format if not exist. */
+  /*! 
+   * \brief Create out-edge CSR format of the unit graph.
+   * \param inplace indicates whether change the out_csr_ field or not.
+   * \return Return the out-edge CSR format. Create from other format if not exist.
+   */
   CSRPtr GetOutCSR(bool inplace = true) const;
 
-  /*! \return Return the COO format. Create from other format if not exist. */
+  /*!
+   * \brief Create COO format of the unit graph.
+   * \param inplace indicates whether change the coo_ field or not.
+   * \return Return the COO format. Create from other format if not exist.
+   */
   COOPtr GetCOO(bool inplace = true) const;
 
   /*! \return Return the COO matrix form */

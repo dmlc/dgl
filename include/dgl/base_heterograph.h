@@ -378,13 +378,7 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Return the sparse format in use for the graph.
    * 
-   * \return a number of type dgl_format_code_t, whose binary representation indices
-   * which sparse format is in use and which is not.
-   * 
-   * Suppose the binary representation is xyz, then
-   * - x indicates whether csc is in use (1 for true and 0 for false).
-   * - y indicates whether csr is in use.
-   * - z indicates whether coo is in use.
+   * \return a number of type dgl_format_code_t. 
    */
   virtual dgl_format_code_t GetFormatInUse() const = 0;
 
