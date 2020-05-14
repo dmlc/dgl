@@ -178,6 +178,9 @@ def test_serialize_empty_dict():
 
     os.unlink(path)
 
+def test_load_old_files():    
+    g = DGLGraph([(0, 1), (1, 2), (1, 3), (1, 4)])
+
 if __name__ == "__main__":
     test_graph_serialize_with_feature()
     test_graph_serialize_without_feature()
