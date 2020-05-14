@@ -145,7 +145,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     rpc.sender_connect()
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr()
-    client_ip, client_port = addr.split(':')
+    client_ip, client_port = ip_addr.split(':')
     # Register client on server
     print("111")
     register_req = ClientRegisterReuqest(ip_addr)
