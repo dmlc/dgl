@@ -275,7 +275,19 @@ class DGLHeteroGraph(object):
         return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
 
     def __setstate__(self, state):
-        self._init(*state)
+        # Compatibility check
+        # TODO: version the storage
+        if isinstance(state, tuple) and len(state) == 5:
+            # DGL 0.4.3+
+            self._init(*state)
+        elif isinstance(state, dict):
+            # DGL 0.4.2-
+            dgl_warning("The object is pickled with DGL version 0.4.2-.  "
+                        "Some of the original attributes are ignored.")
+            self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
+                       state['_edge_frames'])
+        else:
+            raise IOError("Unrecognized pickle format.")
 
     def _get_msg_index(self, etid):
         """Internal function for getting the message index array of the given edge type id."""
@@ -1099,6 +1111,11 @@ class DGLHeteroGraph(object):
         -------
         backend dtype object
             th.int32/th.int64 or tf.int32/tf.int64 etc.
+
+        See Also
+        --------
+        long
+        int
         """
         return getattr(F, self._graph.dtype)
 
@@ -4150,6 +4167,60 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
+    def format_in_use(self, etype=None, return_all=False):
+        """Return the sparse formats in use of the given edge/relation type.
+
+        Returns
+        -------
+        list of string
+            Return all the formats currently in use (could be multiple).
+
+        See Also
+        --------
+        restrict_format
+        to_format
+        """
+        return self._graph.format_in_use(self.get_etype_id(etype))
+
+    def restrict_format(self, etype=None):
+        """Return the allowed sparse formats of the given edge/relation type.
+
+        Returns
+        -------
+        string : 'any', 'coo', 'csr', or 'csc'
+            'any' indicates all sparse formats are allowed in .
+
+        See Also
+        --------
+        format_in_use
+        to_format
+        """
+        return self._graph.restrict_format(self.get_etype_id(etype))
+
+    def to_format(self, restrict_format):
+        """Return a cloned graph but stored in the given restrict format.
+
+        If 'any' is given, the restrict formats of the returned graph is relaxed.
+        The returned graph share the same node/edge data of the original graph.
+
+        Parameters
+        ----------
+        restrict_format : string
+            Desired restrict format ('any', 'coo', 'csr', 'csc').
+
+        Returns
+        -------
+        A new graph.
+
+        See Also
+        --------
+        format_in_use
+        restrict_format
+        """
+        return DGLHeteroGraph(self._graph.to_format(restrict_format), self.ntypes, self.etypes,
+                              self._node_frames,
+                              self._edge_frames)
+
     def long(self):
         """Return a heterograph object use int64 as index dtype,
         with the ndata and edata as the original object
@@ -4169,6 +4240,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         int
+        idtype
         """
         return DGLHeteroGraph(self._graph.asbits(64), self.ntypes, self.etypes,
                               self._node_frames,
@@ -4193,6 +4265,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         long
+        idtype
         """
         return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
                               self._node_frames,

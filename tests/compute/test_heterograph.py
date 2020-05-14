@@ -1632,6 +1632,58 @@ def test_dtype_cast(index_dtype):
     assert F.array_equal(g.ndata["feat"], g_cast.ndata["feat"])
     assert F.array_equal(g.edata["h"], g_cast.edata["h"])
 
+def test_format():
+    # single relation
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], restrict_format='coo')
+    assert g.restrict_format() == 'coo'
+    assert g.format_in_use() == ['coo']
+    
+    try:
+        spmat = g.adjacency_matrix(scipy_fmt="csr")
+    except:
+        print('test passed, graph with restrict_format coo should not create csr matrix.')
+    else:
+        assert False, 'cannot create csr when restrict_format is coo'
+    
+    g1 = g.to_format('any')
+    assert g1.restrict_format() == 'any'
+    spmat = g1.adjacency_matrix(scipy_fmt='coo')
+    spmat = g1.adjacency_matrix(scipy_fmt='csr')
+    spmat = g1.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    assert len(g1.restrict_format()) == 3
+    assert g.restrict_format() == 'coo'
+    assert g.format_in_use() == ['coo']
+
+    # multiple relation
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+        ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
+        ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+        }, restrict_format='csr')
+    user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
+    g['follows'].srcdata['h'] = user_feat
+    for rel_type in ['follows', 'plays', 'develops']:
+        assert g.restrict_format(rel_type) == 'csr'
+        print(g.format_in_use(rel_type), g.restrict_format(rel_type))
+        assert g.format_in_use(rel_type) == ['csr']
+    
+        try:
+            spmat = g[rel_type].adjacency_matrix(scipy_fmt='coo')
+        except:
+            print('test passed, graph with restrict_format csr should not create coo matrix')
+        else:
+            assert False, 'cannot create coo when restrict_ormat is csr'
+
+    g1 = g.to_format('csc')
+    # test frame
+    assert F.array_equal(g1['follows'].srcdata['h'], user_feat)
+    # test each relation graph
+    for rel_type in ['follows', 'plays', 'develops']:
+        assert g1.restrict_format(rel_type) == 'csc'
+        assert g1.format_in_use(rel_type) == ['csc']
+        assert g.restrict_format(rel_type) == 'csr'
+        assert g.format_in_use(rel_type) == ['csr']
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -1656,4 +1708,5 @@ if __name__ == '__main__':
     # test_stack_reduce()
     # test_isolated_ntype()
     # test_bipartite()
-    test_dtype_cast()
+    # test_dtype_cast()
+    test_format()
