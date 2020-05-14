@@ -1299,13 +1299,13 @@ class DGLGraph(DGLBaseGraph):
         num_edges = len(sgi.induced_edges)
         if isinstance(self._node_frame, FrameRef):
             self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes],
-                num_rows=num_nodes))
+                                              num_rows=num_nodes))
         else:
             self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
 
         if isinstance(self._edge_frame, FrameRef):
             self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges],
-                num_rows=num_nodes))
+                                              num_rows=num_edges))
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
@@ -1366,13 +1366,13 @@ class DGLGraph(DGLBaseGraph):
         num_edges = len(sgi.induced_edges)
         if isinstance(self._node_frame, FrameRef):
             self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes],
-                num_rows=num_nodes))
+                                              num_rows=num_nodes))
         else:
             self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
 
         if isinstance(self._edge_frame, FrameRef):
             self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges],
-                num_rows=num_edges))
+                                              num_rows=num_edges))
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
