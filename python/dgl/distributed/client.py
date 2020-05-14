@@ -79,7 +79,7 @@ def get_local_machine_id(server_namebook):
             break
     return res
 
-def _get_local_usable_addr():
+def get_local_usable_addr():
     """Get local usable IP and port
 
     Returns
