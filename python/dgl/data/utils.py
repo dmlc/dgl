@@ -78,7 +78,7 @@ def split_dataset(dataset, frac_list=None, shuffle=False, random_state=None):
     return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(accumulate(lengths), lengths)]
 
 
-def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_ssl=True, log=True):
+def download(url, path=None, overwrite=True, sha1_hash=None, retries=5, verify_ssl=True, log=True):
     """Download a given URL.
 
     Codes borrowed from mxnet/gluon/utils.py
@@ -92,6 +92,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_
         current directory with the same name as in url.
     overwrite : bool, optional
         Whether to overwrite the destination file if it already exists.
+        By default always overwrites the downloaded file.
     sha1_hash : str, optional
         Expected sha1 hash in hexadecimal digits. Will ignore existing file when hash is specified
         but doesn't match.
@@ -197,8 +198,9 @@ def extract_archive(file, target_dir, overwrite=False):
         Absolute path of the archive file.
     target_dir : str
         Target directory of the archive to be uncompressed.
-    overwrite : bool, default False
+    overwrite : bool, default True
         Whether to overwrite the contents inside the directory.
+        By default always overwrites.
     """
     if os.path.exists(target_dir) and not overwrite:
         return

@@ -35,8 +35,8 @@ class BitcoinOTC(object):
         self._load(self.path)
 
     def _download_and_extract(self):
-        download(self._url, path=self.zip_path, overwrite=True)
-        extract_archive(self.zip_path, os.path.join(self.dir, 'bitcoin'), overwrite=True)
+        download(self._url, path=self.zip_path)
+        extract_archive(self.zip_path, os.path.join(self.dir, 'bitcoin'))
 
     @retry_method_with_fix(_download_and_extract)
     def _load(self, filename):
