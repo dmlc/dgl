@@ -52,7 +52,7 @@ class BaseRGCN(nn.Module):
         return h
 
 class RelGraphConvLayer(nn.Module):
-    r"""Relational graph convolution layer.
+    r"""Relational graph convolution layer implemented using homogeneous API.
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
@@ -97,6 +97,9 @@ class RelGraphConvLayer(nn.Module):
         Activation function. Default: None
     self_loop : bool, optional
         True to include self loop message. Default: False
+    low_mem : bool, optional
+        True to use low memory implementation of relation message passing function
+        trade speed with memory consumption
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
@@ -179,7 +182,7 @@ class RelGraphConvLayer(nn.Module):
         else:
             weight = self.weight
 
-        # hack something here to make it more memory effcient.
+        # calculate msg @ W_r before put msg into edge
         if self.low_mem:
             etypes = th.unique(edges.data['etype'])
             msg = th.empty((edges.src['h'].shape[0], self.out_feat),
@@ -191,6 +194,7 @@ class RelGraphConvLayer(nn.Module):
                 sub_msg = th.matmul(src, w)
                 msg[loc] = sub_msg
         else:
+            # put W_r into edges then do msg @ W_r
             w = weight.index_select(0, edges.data['etype'])
             msg = th.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
         if 'norm' in edges.data:
@@ -202,7 +206,7 @@ class RelGraphConvLayer(nn.Module):
         if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
 
-        # hack something here to make it more memory effcient.
+         # calculate msg @ W_r before put msg into edge
         if self.low_mem:
             etypes = th.unique(edges.data['etype'])
             msg = th.empty((edges.src['h'].shape[0], self.out_feat),
@@ -214,6 +218,7 @@ class RelGraphConvLayer(nn.Module):
                 sub_msg = th.matmul(src, w).view(-1, self.out_feat)
                 msg[loc] = sub_msg
         else:
+            # put W_r into edges then do msg @ W_r
             weight = self.weight.index_select(0, edges.data['etype']).view(
                 -1, self.submat_in, self.submat_out)
             node = edges.src['h'].view(-1, 1, self.submat_in)
@@ -227,17 +232,17 @@ class RelGraphConvLayer(nn.Module):
 
         Parameters
         ----------
-        g : DGLGraph
-            The graph.
+        block : DGLHeterograph
+                The block.
         x : torch.Tensor
-            Input node features. Could be either
+            Input node features. 
                 * :math:`(|V|, D)` dense tensor
-                * :math:`(|V|,)` int64 vector, representing the categorical values of each
-                  node. We then treat the input feature as an one-hot encoding feature.
         etypes : torch.Tensor
-            Edge type tensor. Shape: :math:`(|E|,)`
+            Optional edge type tensor. Shape: :math:`(|E|,)`
+                edge type can also be stored in block.edata['etype']
         norm : torch.Tensor
             Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
+                edge normalizer can also be stored in block.edata['norm']
 
         Returns
         -------
@@ -269,7 +274,26 @@ class RelGraphConvLayer(nn.Module):
             return node_repr
 
 class RelGraphEmbedLayer(nn.Module):
-    r"""Embedding layer for featureless heterograph."""
+    r"""Embedding layer for featureless heterograph.
+
+    Parameters
+    ----------
+    dev_id : int
+        Device to run the layer.
+    num_nodes : int
+        Number of nodes.
+    node_tides : tensor
+        Storing the node type id for each node starting from 0
+    num_of_ntype : int
+        Number of node types
+    input_size : list of int
+        A list of input feature size for each node type. If None, we then 
+        treat certain input feature as an one-hot encoding feature.
+    embed_size : int
+        Output embed size
+    embed_name : str, optional
+        Embed name
+    """
     def __init__(self,
                  dev_id,
                  num_nodes,
@@ -303,10 +327,22 @@ class RelGraphEmbedLayer(nn.Module):
     def forward(self, node_ids, node_tids, features):
         """Forward computation
 
+        Parameters
+        ----------
+        node_ids : tensor
+            node ids to generate embedding for.
+        node_ids : tensor
+            node type ids
+        features : list of features
+            list of initial features for nodes belong to different node type.
+            If None, the corresponding features is an one-hot encoding feature,
+            else use the features directly as input feature and matmul a 
+            projection matrix.
+
         Returns
         -------
-        DGLHeteroGraph
-            The block graph fed with embeddings.
+        tensor
+            embeddings as the input of the next layer
         """
         embeds = self.embeds[str(-1)]
         # first we get embeddings for transductive nodes

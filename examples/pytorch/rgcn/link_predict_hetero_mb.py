@@ -55,7 +55,7 @@ class LinkPredict(nn.Module):
         self.regularization_coef = regularization_coef
 
         self.w_relation = nn.Parameter(th.Tensor(num_rels, h_dim).to(self.device))
-        nn.init.xavier_uniform_(self.w_relation)
+        nn.init.xavier_uniform_(self.w_relation) 
         
         self.layers = nn.ModuleList()
         # i2h
@@ -323,7 +323,7 @@ def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt, queue):
             print('[{}]{} average {}: {}'.format(rank, mode, k, v))
 
 def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
-    minibatch_blocks, pos_eids, neg_eids, neg_cnt, queue):
+    minibatch_blocks, pos_eids, neg_eids, neg_cnt, queue, filterred_test):
     model.eval()
     t0 = time.time()
 
@@ -421,41 +421,42 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
             t_neg_score = F.logsigmoid(t_neg_score)
             h_neg_score = F.logsigmoid(h_neg_score)
 
-            # exclude false neg edges
-            for idx in range(eids.shape[0]):
-                tail_pos = g.has_edges_between(th.full((n_v.shape[0],), su[idx], dtype=th.long), n_v)
-                head_pos = g.has_edges_between(n_u, th.full((n_u.shape[0],), sv[idx], dtype=th.long))
-                etype = g.edata['etype'][eids[idx]]
+            if filterred_test:
+                # exclude false neg edges
+                for idx in range(eids.shape[0]):
+                    tail_pos = g.has_edges_between(th.full((n_v.shape[0],), su[idx], dtype=th.long), n_v)
+                    head_pos = g.has_edges_between(n_u, th.full((n_u.shape[0],), sv[idx], dtype=th.long))
+                    etype = g.edata['etype'][eids[idx]]
 
-                loc = tail_pos == 1
-                u_ec = su[idx]
-                n_v_ec = n_v[loc]
-                false_neg_comp = th.full((n_v_ec.shape[0],), 0, device=device)
-                for idx_ec in range(n_v_ec.shape[0]):
-                    sn_v_ec = n_v_ec[idx_ec]
-                    eid_ec = g.edge_id(u_ec, sn_v_ec, return_array=True)
-                    etype_ec = g.edata['etype'][eid_ec]
-                    loc_ec = etype_ec == etype
-                    eid_ec = eid_ec[loc_ec]
-                    # has edge
-                    if eid_ec.shape[0] > 0:
-                        false_neg_comp[idx_ec] = pos_score[idx]
-                t_neg_score[idx][loc] += false_neg_comp
+                    loc = tail_pos == 1
+                    u_ec = su[idx]
+                    n_v_ec = n_v[loc]
+                    false_neg_comp = th.full((n_v_ec.shape[0],), 0, device=device)
+                    for idx_ec in range(n_v_ec.shape[0]):
+                        sn_v_ec = n_v_ec[idx_ec]
+                        eid_ec = g.edge_id(u_ec, sn_v_ec, return_array=True)
+                        etype_ec = g.edata['etype'][eid_ec]
+                        loc_ec = etype_ec == etype
+                        eid_ec = eid_ec[loc_ec]
+                        # has edge
+                        if eid_ec.shape[0] > 0:
+                            false_neg_comp[idx_ec] = pos_score[idx]
+                    t_neg_score[idx][loc] += false_neg_comp
 
-                loc = head_pos == 1
-                n_u_ec = n_u[loc]
-                v_ec = sv[idx]
-                false_neg_comp = th.full((n_u_ec.shape[0],), 0, device=device)
-                for idx_ec in range(n_u_ec.shape[0]):
-                    sn_u_ec = n_u_ec[idx_ec]
-                    eid_ec = g.edge_id(sn_u_ec, v_ec, return_array=True)
-                    etype_ec = g.edata['etype'][eid_ec]
-                    loc_ec = etype_ec == etype
-                    eid_ec = eid_ec[loc_ec]
-                    # has edge
-                    if eid_ec.shape[0] > 0:
-                        false_neg_comp[idx_ec] = pos_score[idx]
-                h_neg_score[idx][loc] += false_neg_comp
+                    loc = head_pos == 1
+                    n_u_ec = n_u[loc]
+                    v_ec = sv[idx]
+                    false_neg_comp = th.full((n_u_ec.shape[0],), 0, device=device)
+                    for idx_ec in range(n_u_ec.shape[0]):
+                        sn_u_ec = n_u_ec[idx_ec]
+                        eid_ec = g.edge_id(sn_u_ec, v_ec, return_array=True)
+                        etype_ec = g.edata['etype'][eid_ec]
+                        loc_ec = etype_ec == etype
+                        eid_ec = eid_ec[loc_ec]
+                        # has edge
+                        if eid_ec.shape[0] > 0:
+                            false_neg_comp[idx_ec] = pos_score[idx]
+                    h_neg_score[idx][loc] += false_neg_comp
 
             neg_score = th.cat([h_neg_score, t_neg_score], dim=1)
             rankings = th.sum(neg_score >= pos_score, dim=1) + 1
@@ -505,6 +506,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         th.cuda.set_device(dev_id)
         node_tids = node_tids.to(dev_id)
 
+    # build dataloader for training, validation
     train_sampler = LinkRankSampler(train_g,
                                     train_seeds,
                                     num_train_edges,
@@ -530,6 +532,9 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                                   pin_memory=True,
                                   drop_last=False,
                                   num_workers=args.num_workers)
+    
+    # for the test, we first calculate embeddings for all nodes
+    # and then calculate mrr, mr, etc.
     test_sampler = NodeSampler(test_g, fanouts=[None] * args.n_layers)
     test_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
                                  batch_size=4 * 1024,
@@ -621,6 +626,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
             dur = t1 - t0
             print("Epoch {} takes {} seconds".format(epoch, dur))
 
+        # We use multi-gpu evaluation to speed things up
         evaluate(embed_layer,
                  model,
                  valid_dataloader,
@@ -649,6 +655,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
+    # We use multi-gpu testing to speed things up
     fullgraph_eval(test_g,
                    embed_layer,
                    model,
@@ -659,7 +666,8 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                    test_seeds,
                    test_neg_seeds,
                    args.test_neg_cnt,
-                   queue)
+                   queue,
+                   not args.no_test_filter)
     if proc_id == 0 and queue is not None:
         logs = []
         for i in range(n_gpus):
@@ -686,6 +694,7 @@ def prepare_mp(g):
         g.find_edges([0], etype=etype)
 
 def main(args, devices):
+    # DRKG dataset
     if args.dataset == "drkg":
         drkg_dataset = DrkgDataset()
         drkg_dataset.load_data()
@@ -701,6 +710,7 @@ def main(args, devices):
         train_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, node_types, [train_data])
         valid_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, node_types, [train_data, valid_data])
         test_g = build_multi_ntype_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, node_types, [train_data, valid_data, test_data])
+    # Other builtin dataset e.g., wn18, FB15k-237
     else:
         data = load_data(args.dataset)
         num_nodes = data.num_nodes
@@ -714,58 +724,83 @@ def main(args, devices):
         valid_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data])
         test_g = build_heterograph_in_homogeneous_from_triplets(num_nodes, num_rels, [train_data, valid_data, test_data])
 
+    # the g.edata['set'] tells which set the edge belongs to
+    # 0 for train set, 1 for valid set and 2 for test set
     u, v, eid = train_g.all_edges(form='all')
     train_seed_idx = (train_g.edata['set'] == 0)
     train_seeds = eid[train_seed_idx]
-    train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
-
-    for rel_id in range(edge_rels):
-        idx = (train_g.edata['etype'] == rel_id)
-        u_r = u[idx]
-        v_r = v[idx]
-        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+    # calculate norm for each edge type and store in edge
+    if args.global_norm:
+        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        norm = th.ones(v_r.shape[0]) / degrees
+        norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        train_g.edata['norm'][idx] = norm
+        train_g.edata['norm'] = norm
+    else:
+        train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        for rel_id in range(edge_rels):
+            idx = (train_g.edata['etype'] == rel_id)
+            u_r = u[idx]
+            v_r = v[idx]
+            _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+            degrees = count[inverse_index]
+            norm = th.ones(v_r.shape[0]) / degrees
+            norm = norm.unsqueeze(1)
+            train_g.edata['norm'][idx] = norm
     train_g.edata['norm'].share_memory_()
     train_g.edata['etype'].share_memory_()
     train_g.ndata['ntype'].share_memory_()
     train_g.edata.pop('set')
 
+    # get valid set
     u, v, eid = valid_g.all_edges(form='all')
     valid_seeds = eid[valid_g.edata['set'] == 1]
     valid_neg_seeds = eid[valid_g.edata['set'] > -1]
-    valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
-
-    for rel_id in range(edge_rels):
-        idx = (valid_g.edata['etype'] == rel_id)
-        u_r = u[idx]
-        v_r = v[idx]
-        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+    # calculate norm for each edge type and store in edge
+    if args.global_norm:
+        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        norm = th.ones(v_r.shape[0]) / degrees
+        norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        valid_g.edata['norm'][idx] = norm
+        valid_g.edata['norm'] = norm
+    else:
+        valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        for rel_id in range(edge_rels):
+            idx = (valid_g.edata['etype'] == rel_id)
+            u_r = u[idx]
+            v_r = v[idx]
+            _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+            degrees = count[inverse_index]
+            norm = th.ones(v_r.shape[0]) / degrees
+            norm = norm.unsqueeze(1)
+            valid_g.edata['norm'][idx] = norm
     valid_g.edata['norm'].share_memory_()
     valid_g.edata['etype'].share_memory_()
     valid_g.ndata['ntype'].share_memory_()
     valid_g.edata.pop('set')
 
+    # get test set
     u, v, eid = test_g.all_edges(form='all')
     test_seeds = eid[test_g.edata['set'] == 2]
     test_neg_seeds = eid[test_g.edata['set'] > -1]
-    test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
-
-    for rel_id in range(edge_rels):
-        idx = (test_g.edata['etype'] == rel_id)
-        u_r = u[idx]
-        v_r = v[idx]
-        _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+    # calculate norm for each edge type and store in edge
+    if args.global_norm:
+        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        norm = th.ones(v_r.shape[0]) / degrees
+        norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        test_g.edata['norm'][idx] = norm
+        test_g.edata['norm'] = norm
+    else:
+        test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        for rel_id in range(edge_rels):
+            idx = (test_g.edata['etype'] == rel_id)
+            u_r = u[idx]
+            v_r = v[idx]
+            _, inverse_index, count = th.unique(v_r, return_inverse=True, return_counts=True)
+            degrees = count[inverse_index]
+            norm = th.ones(v_r.shape[0]) / degrees
+            norm = norm.unsqueeze(1)
+            test_g.edata['norm'][idx] = norm
     test_g.edata['norm'].share_memory_()
     test_g.edata['etype'].share_memory_()
     test_g.ndata['ntype'].share_memory_()
@@ -784,9 +819,6 @@ def main(args, devices):
             (train_seeds, valid_neg_seeds, test_neg_seeds))
     # multi gpu
     else:
-        prepare_mp(train_g)
-        prepare_mp(valid_g)
-        prepare_mp(test_g)
         queue = mp.Queue(n_gpus)
         procs = []
         num_train_seeds = train_seeds.shape[0]
@@ -796,6 +828,8 @@ def main(args, devices):
         vseeds_per_proc = num_valid_seeds // n_gpus
         tstseeds_per_proc = num_test_seeds // n_gpus
         for proc_id in range(n_gpus):
+            # we have multi-gpu for training, evaluation and testing
+            # so split trian set, valid set and test set into num-of-gpu parts.
             proc_train_seeds = train_seeds[proc_id * tseeds_per_proc :
                                            (proc_id + 1) * tseeds_per_proc \
                                            if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
@@ -850,6 +884,8 @@ def config():
             help="Mini-batch size for validation and test.")
     parser.add_argument("--fanout", type=int, default=10,
             help="Fan-out of neighbor sampling.")
+    parser.add_argument("--global-norm", default=False, action='store_true',
+            help="Whether we use normalization of global graph or bipartite relation graph")
     parser.add_argument("--regularization-coef", type=float, default=0.001,
             help="Regularization Coeffiency.")
     parser.add_argument("--grad-norm", type=float, default=1.0,
@@ -866,6 +902,8 @@ def config():
             help="Whether use low mem RelGraphCov")
     parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
             help="Whether store node embeddins in cpu")
+    parser.add_argument("--no-test-filter", default=False, action='store_true',
+            help="Whether we do filterred evaluation in test")
 
     args = parser.parse_args()
 

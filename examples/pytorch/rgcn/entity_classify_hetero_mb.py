@@ -30,13 +30,41 @@ from model import RelGraphEmbedLayer, RelGraphConvLayer
 from utils import thread_wrapped_func
 
 class EntityClassify(nn.Module):
+    """ Entity classification class for RGCN
+
+    Parameters
+    ----------
+    device : int
+        Device to run the layer.
+    num_nodes : int
+        Number of nodes.
+    h_dim : int
+        Hidden dim size.
+    out_dim : int
+        Output dim size.
+    num_rels : int
+        Numer of relation types.
+    num_bases : int
+        Number of bases. If is none, use number of relations.
+    num_hidden_layers : int
+        Number of hidden RelGraphConv Layer
+    dropout : float
+        Dropout
+    use_self_loop : bool
+        Use self loop if True, default False.
+    low_mem : bool
+        True to use low memory implementation of relation message passing function
+        trade speed with memory consumption
+    """
     def __init__(self,
                  device,
                  num_nodes,
-                 h_dim, out_dim,
+                 h_dim,
+                 out_dim,
                  num_rels,
-                 num_bases,
-                 num_hidden_layers=1, dropout=0,
+                 num_bases=None,
+                 num_hidden_layers=1,
+                 dropout=0,
                  use_self_loop=False,
                  low_mem=False):
         super(EntityClassify, self).__init__()
@@ -51,7 +79,6 @@ class EntityClassify(nn.Module):
         self.use_self_loop = use_self_loop
 
         self.layers = nn.ModuleList()
-
         # i2h
         self.layers.append(RelGraphConvLayer(
             self.h_dim, self.h_dim, self.num_rels, "basis",
@@ -85,18 +112,33 @@ class NeighborSampler:
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLHeterograph
         Full graph
+    target_idx : tensor
+        The target training node IDs in g
     fanouts : list of int
         Fanout of each hop starting from the seed nodes. If a fanout is None,
         sample full neighbors.
     """
-    def __init__(self, g, target_idx, fanouts, device):
+    def __init__(self, g, target_idx, fanouts):
         self.g = g
         self.target_idx = target_idx
         self.fanouts = fanouts
-        self.device = th.device(device if device >= 0 else 'cpu')
 
+    """Do neighbor sample
+
+    Parameters
+    ----------
+    seeds :
+        Seed nodes
+
+    Returns
+    -------
+    tensor
+        Seed nodes, also known as target nodes
+    blocks
+        Sampled subgraphs
+    """
     def sample_blocks(self, seeds):
         blocks = []
         etypes = []
@@ -134,7 +176,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         node_tids = node_tids.to(dev_id)
         g.edata['norm'] = g.edata['norm'].to(dev_id)
 
-    sampler = NeighborSampler(g, target_idx, [args.fanout] * args.n_layers, dev_id)
+    sampler = NeighborSampler(g, target_idx, [args.fanout] * args.n_layers)
     loader = DataLoader(dataset=train_idx.numpy(),
                         batch_size=args.batch_size,
                         collate_fn=sampler.sample_blocks,
@@ -142,7 +184,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
                         num_workers=args.num_workers)
 
     # validation sampler
-    val_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers, dev_id)
+    val_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
     val_loader = DataLoader(dataset=val_idx.numpy(),
                             batch_size=args.batch_size,
                             collate_fn=val_sampler.sample_blocks,
@@ -150,7 +192,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
                             num_workers=args.num_workers)
 
     # validation sampler
-    test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers, dev_id)
+    test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
     test_loader = DataLoader(dataset=test_idx.numpy(),
                              batch_size=args.batch_size,
                              collate_fn=test_sampler.sample_blocks,
@@ -229,6 +271,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                   format(train_acc, loss.item()))
 
+        # only process 0 will do the evaluation
         if proc_id == 0:
             model.eval()
             eval_logtis = []
@@ -251,6 +294,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             th.distributed.barrier()
     print()
 
+    # only process 0 will do the testing
     if proc_id == 0:
         model.eval()
         test_logtis = []
@@ -304,7 +348,7 @@ def main(args, devices):
     else:
         val_idx = train_idx
 
-        # calculate norm for each edge type and store in edge
+    # calculate norm for each edge type and store in edge
     for canonical_etypes in hg.canonical_etypes:
         u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
         _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
@@ -325,7 +369,7 @@ def main(args, devices):
     g.edata['norm'].share_memory_()
     node_ids = th.arange(g.number_of_nodes())
 
-    # edge type and normalization factor
+    # find out the target node ids
     node_tids = g.ndata[dgl.NTYPE]
     loc = (node_tids == category_id)
     target_idx = node_ids[loc]
