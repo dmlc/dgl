@@ -45,10 +45,10 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     rpc.receiver_wait(ip, port, num_clients)
     print("%d clients connected!" % num_clients)
     # Recv all the client's IP
-    for i in range(num_clients):
-        msg = recv_rpc_message()
-        res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-        
+    #for i in range(num_clients):
+    #    msg = recv_rpc_message()
+    #    res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
+
 
     while True:
         print("Recv...")
