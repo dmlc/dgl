@@ -12,6 +12,7 @@ from collections import defaultdict
 from ..utils import mol_to_complete_graph, atom_type_one_hot, \
     atom_hybridization_one_hot, atom_is_aromatic
 from ...utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
+from ....utils import retry_method_with_fix
 from .... import backend as F
 from ....contrib.deprecation import deprecated
 
@@ -199,18 +200,26 @@ class TencentAlchemyDataset(object):
         else:
             file_name = "%s_single_sdf" % (mode)
 
+        self._file_dir = file_dir
         self.file_dir = pathlib.Path(file_dir, file_name)
 
         self._url = 'dataset/alchemy/'
         self.zip_file_path = pathlib.Path(file_dir, file_name + '.zip')
-        download(_get_dgl_url(self._url + file_name + '.zip'), path=str(self.zip_file_path))
-        if not os.path.exists(str(self.file_dir)):
-            archive = zipfile.ZipFile(self.zip_file_path)
-            archive.extractall(file_dir)
-            archive.close()
+        self._file_name = file_name
 
         self._load(mol_to_graph, node_featurizer, edge_featurizer)
 
+    def _download_and_extract(self):
+        download(
+            _get_dgl_url(self._url + self._file_name + '.zip'),
+            path=str(self.zip_file_path),
+            overwrite=True)
+        if not os.path.exists(str(self.file_dir)):
+            archive = zipfile.ZipFile(self.zip_file_path)
+            archive.extractall(self._file_dir)
+            archive.close()
+
+    @retry_method_with_fix(_download_and_extract)
     def _load(self, mol_to_graph, node_featurizer, edge_featurizer):
         if self.load:
             self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode))

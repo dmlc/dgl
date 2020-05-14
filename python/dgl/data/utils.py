@@ -5,8 +5,6 @@ import os
 import sys
 import hashlib
 import warnings
-import zipfile
-import tarfile
 import numpy as np
 import warnings
 import requests
@@ -190,7 +188,7 @@ def check_sha1(filename, sha1_hash):
     return sha1.hexdigest() == sha1_hash
 
 
-def extract_archive(file, target_dir):
+def extract_archive(file, target_dir, overwrite=False):
     """Extract archive file.
 
     Parameters
@@ -199,18 +197,28 @@ def extract_archive(file, target_dir):
         Absolute path of the archive file.
     target_dir : str
         Target directory of the archive to be uncompressed.
+    overwrite : bool, default False
+        Whether to overwrite the contents inside the directory.
     """
-    if os.path.exists(target_dir):
+    if os.path.exists(target_dir) and not overwrite:
         return
-    if file.endswith('.gz') or file.endswith('.tar') or file.endswith('.tgz'):
-        archive = tarfile.open(file, 'r')
+    print('Extracting file to {}'.format(target_dir))
+    if file.endswith('.tar.gz') or file.endswith('.tar') or file.endswith('.tgz'):
+        import tarfile
+        with tarfile.open(file, 'r') as archive:
+            archive.extractall(path=target_dir)
+    elif file.endswith('.gz'):
+        import gzip
+        import shutil
+        with gzip.open(file, 'rb') as f_in:
+            with open(file[:-3], 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
     elif file.endswith('.zip'):
-        archive = zipfile.ZipFile(file, 'r')
+        import zipfile
+        with zipfile.ZipFile(file, 'r') as archive:
+            archive.extractall(path=target_dir)
     else:
         raise Exception('Unrecognized file type: ' + file)
-    print('Extracting file to {}'.format(target_dir))
-    archive.extractall(path=target_dir)
-    archive.close()
 
 
 def get_download_dir():
