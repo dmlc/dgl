@@ -329,8 +329,9 @@ void ZeroCopySaveDLTensor(ZeroCopyStream* zc_strm, DLTensor* tensor,
     strm->Write<bool>(true);
     strm->Write(mem->name);
   } else {
-    if (!zc_strm->is_local){
-      LOG(FATAL) << "Serializing a non-shared-memory tensor to a local ZeroCopyStream is not supported.";
+    if (!zc_strm->is_local) {
+      LOG(FATAL) << "Serializing a non-shared-memory tensor to a local "
+                    "ZeroCopyStream is not supported.";
     }
     strm->Write<bool>(false);
   }
