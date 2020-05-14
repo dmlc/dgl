@@ -901,6 +901,62 @@ class HeteroGraphIndex(ObjectBase):
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
+    def format_in_use(self, etype):
+        """Return the sparse formats in use of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+
+        Returns
+        -------
+        list of string : return all the formats currently in use (could be multiple).
+        """
+        format_code = _CAPI_DGLHeteroGetFormatInUse(self, etype)
+        ret = []
+        if format_code & 1:
+            ret.append('coo')
+        format_code >>= 1
+        if format_code & 1:
+            ret.append('csr')
+        format_code >>= 1
+        if format_code & 1:
+            ret.append('csc')
+        return ret
+
+    def restrict_format(self, etype):
+        """Return restrict sparse format of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+
+        Returns
+        -------
+        string : 'any', 'coo', 'csr', or 'csc'
+        """
+        ret = _CAPI_DGLHeteroGetRestrictFormat(self, etype)
+        return ret
+
+    def to_format(self, restrict_format):
+        """Return a clone graph index but stored in the given sparse format.
+
+        If 'any' is given, the restrict formats of the returned graph index
+        is relaxed.
+
+        Parameters
+        ----------
+        restrict_format : string
+            Desired restrict format ('any', 'coo', 'csr', 'csc').
+
+        Returns
+        -------
+        A new graph index.
+        """
+        return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
+
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):
@@ -941,6 +997,7 @@ class HeteroSubgraphIndex(ObjectBase):
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
         return [utils.toindex(v.data, self.graph.dtype) for v in ret]
+
 
 #################################################################
 # Creators
