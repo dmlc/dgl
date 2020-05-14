@@ -325,11 +325,13 @@ void ZeroCopySaveDLTensor(ZeroCopyStream* zc_strm, DLTensor* tensor,
     num_elems *= tensor->shape[i];
   }
   int64_t data_byte_size = type_bytes * num_elems;
-  strm->Write(data_byte_size);
   if (mem) {
     strm->Write<bool>(true);
     strm->Write(mem->name);
   } else {
+    if (!zc_strm->is_local){
+      LOG(FATAL) << "Serializing a non-shared-memory tensor to a local ZeroCopyStream is not supported.";
+    }
     strm->Write<bool>(false);
   }
   zc_strm->push_buffer(tensor->data, data_byte_size);
@@ -347,8 +349,6 @@ NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm) {
   if (ndim != 0) {
     CHECK(strm->ReadArray(&shape[0], ndim)) << "Invalid DLTensor file format";
   }
-  int64_t data_byte_size;
-  CHECK(strm->Read(&data_byte_size)) << "Invalid DLTensor file format";
 
   DLContext cpu_ctx;
   cpu_ctx.device_type = kDLCPU;

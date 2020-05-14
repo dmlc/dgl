@@ -465,6 +465,7 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
 
 inline void NDArray::Save(dmlc::Stream* strm) const {
   auto zc_strm = dynamic_cast<ZeroCopyStream*>(strm);
+  // Use ZeroCopySaveDLTensor when stream is a ZeroCopyStream
   if (zc_strm) {
     ZeroCopySaveDLTensor(zc_strm, const_cast<DLTensor*>(operator->()), this->data_->mem);
     return;
@@ -474,6 +475,7 @@ inline void NDArray::Save(dmlc::Stream* strm) const {
 
 inline bool NDArray::Load(dmlc::Stream* strm) {
   auto zc_strm = dynamic_cast<ZeroCopyStream*>(strm);
+  // Use ZeroCopyLoadDLTensor when stream is a ZeroCopyStream
   if (zc_strm) {
     *this = ZeroCopyLoadDLTensor(zc_strm);
     return true;
