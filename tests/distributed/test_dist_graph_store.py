@@ -78,11 +78,10 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
 
     selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     # Test node split
-    local_nids = F.nonzero_1d(g._g.ndata['local_node'])
-    local_nids = g._g.ndata[dgl.NID][local_nids]
     nodes = node_split(selected_nodes, g.get_partition_book(), g.rank())
     nodes = F.asnumpy(nodes)
-    local_nids = F.asnumpy(local_nids)
+    # We only have one partition, so the local nodes are basically all nodes in the graph.
+    local_nids = np.arange(g.number_of_nodes())
     for n in nodes:
         assert n in local_nids
 
