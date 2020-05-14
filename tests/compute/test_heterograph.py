@@ -1676,7 +1676,7 @@ def test_format():
 
     g1 = g.to_format('csc')
     # test frame
-    assert g1['follows'].srcdata['h'] == user_feat
+    assert F.array_equal(g1['follows'].srcdata['h'], user_feat)
     # test each relation graph
     for rel_type in ['follows', 'plays', 'develops']:
         assert g1.restrict_format(rel_type) == 'csc'
