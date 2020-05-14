@@ -13,7 +13,7 @@ from ... import ndarray as nd
 from ... import kernel as K
 from ...function.base import TargetCode
 
-if os.getenv("USE_OFFICIAL_TFDLPACK", False):
+if not os.getenv("USE_TFDLPACK", False):
     if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
         raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
 
@@ -21,7 +21,7 @@ if os.getenv("USE_OFFICIAL_TFDLPACK", False):
         return tf.experimental.dlpack.to_dlpack(input)
 
     def zerocopy_from_dlpack(dlpack_tensor):
-        # TODO(Jinjing): Tensorflow requires memory to be 64-bit aligned. We check the
+        # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
         #   alignment and make a copy if needed. The functionality is better in TF's main repo.
         aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
         return tf.experimental.dlpack.from_dlpack(aligned)
