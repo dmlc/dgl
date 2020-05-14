@@ -217,6 +217,9 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
+  /*! \brief Copy the data to another context */
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
+
  private:
   // To create empty class
   friend class Serializer;
