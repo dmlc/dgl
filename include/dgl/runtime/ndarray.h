@@ -271,8 +271,8 @@ inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
 #ifndef _WIN32
 NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm);
 void ZeroCopySaveDLTensor(ZeroCopyStream* zc_strm, DLTensor* tensor,
-                                 std::shared_ptr<SharedMemory> mem);
-#endif // _WIN32
+                          std::shared_ptr<SharedMemory> mem);
+#endif  // _WIN32
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
