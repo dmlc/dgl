@@ -4,6 +4,7 @@ import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID
+from .. import utils
 
 class GraphPartitionBook:
     """GraphPartitionBook is used to store parition information.
@@ -14,9 +15,9 @@ class GraphPartitionBook:
         partition id of current GraphPartitionBook
     num_parts : int
         number of total partitions
-    node_map : numpy array
+    node_map : tensor
         global node id mapping to partition id
-    edge_map : numpy array
+    edge_map : tensor
         global edge id mapping to partition id
     part_graph : DGLGraph
         The graph partition structure.
@@ -26,8 +27,10 @@ class GraphPartitionBook:
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._part_id = part_id
         self._num_partitions = num_parts
-        self._nid2partid = F.zerocopy_from_numpy(node_map)
-        self._eid2partid = F.zerocopy_from_numpy(edge_map)
+        node_map = utils.toindex(node_map)
+        self._nid2partid = node_map.tousertensor()
+        edge_map = utils.toindex(edge_map)
+        self._eid2partid = edge_map.tousertensor()
         self._graph = part_graph
         # Get meta data of GraphPartitionBook
         self._partition_meta_data = []
