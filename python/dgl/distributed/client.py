@@ -8,6 +8,31 @@ if os.name != 'nt':
 
 from . import rpc
 
+CLIENT_REGISTER = 32451
+SHUT_DOWN_SERVER = 32452
+
+class ClientRegisterReuqest(rpc.Request):
+    """Register client to specified server node.
+
+    This request will send client's ip to server.
+
+    Parameters
+    ----------
+    ip_addr : str
+        client's IP address
+    """
+    def __init__(self, ip_addr):
+        self._ip_addr = ip_addr
+
+    def __getstate__(self):
+        return self._ip_addr
+
+    def __setstate__(self, state):
+        self._ip_addr = state
+
+    def process_request(self, server_state):
+        return # do nothing
+
 def local_ip4_addr_list():
     """Return a set of IPv4 address
     """
@@ -54,6 +79,32 @@ def get_local_machine_id(server_namebook):
             break
     return res
 
+def _get_local_usable_addr():
+    """Get local usable IP and port
+
+    Returns
+    -------
+    str
+        IP address, e.g., '192.168.8.12:50051'
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+        
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("",0))
+    s.listen(1)
+    port = s.getsockname()[1]
+    s.close()
+
+    return IP + ':' + str(port)
+
 def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'):
     """Connect this client to server.
 
@@ -92,6 +143,23 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
         server_port = addr[2]
         rpc.add_receiver_addr(server_ip, server_port, ID)
     rpc.sender_connect()
+    # Get local usable IP address and port
+    ip_addr = get_local_usable_addr()
+    client_ip, client_port = addr.split(':')
+    # Register client on server
+    register_req = ClientRegisterReuqest(ip_addr)
+    msg_seq = rpc.incr_msg_seq()
+    data, _ = rpc.serialize_to_payload(register_req)
+    for server_id in range(num_servers):
+        # client_id = 0 is temp ID because we don't assign client ID yet
+        msg = rpc.RPCMessage(service_id=CLIENT_REGISTER, 
+                             msg_seq=msg_seq, 
+                             client_id=0, 
+                             server_id=server_id,
+                             data=data, 
+                             tensors=None)
+        #rpc.send_rpc_message(msg)
+
 
 def finalize():
     """Release resources of this client."""
@@ -105,4 +173,5 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    pass
+    req = ShutDownRequest()
+

@@ -567,8 +567,6 @@ def remote_call(target_and_requests, timeout=0):
         # recv response
         msg = recv_rpc_message(timeout)
         num_res -= 1
-        if msg is None:
-            continue
         _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
         if res_cls is None:
             raise DGLError('Got response message from service ID {}, '
