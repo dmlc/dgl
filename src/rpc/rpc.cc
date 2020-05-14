@@ -165,6 +165,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateRPCMessage")
   const std::string data = args[4];  // directly assigning string value raises errors :(
   rst->data = data;
   rst->tensors = ListValueToVector<NDArray>(args[5]);
+  std::cout << "size: " << rst->tensors.size() << std::endl;
   *rv = rst;
 });
 

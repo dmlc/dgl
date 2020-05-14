@@ -161,7 +161,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
                              client_id=0, 
                              server_id=server_id,
                              data=data, 
-                             tensors=None)
+                             tensors=[])
     print("555")
         #rpc.send_rpc_message(msg)
 
