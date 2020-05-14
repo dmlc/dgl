@@ -1660,6 +1660,8 @@ def test_format():
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
         ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
         }, restrict_format='csr')
+    user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
+    g['follows'].srcdata['h'] = user_feat
     for rel_type in ['follows', 'plays', 'develops']:
         assert g.restrict_format(rel_type) == 'csr'
         print(g.format_in_use(rel_type), g.restrict_format(rel_type))
@@ -1673,6 +1675,9 @@ def test_format():
             assert False, 'cannot create coo when restrict_ormat is csr'
 
     g1 = g.to_format('csc')
+    # test frame
+    assert g1['follows'].srcdata['h'] == user_feat
+    # test each relation graph
     for rel_type in ['follows', 'plays', 'develops']:
         assert g1.restrict_format(rel_type) == 'csc'
         assert g1.format_in_use(rel_type) == ['csc']
