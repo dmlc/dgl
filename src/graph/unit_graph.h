@@ -205,21 +205,24 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
-   * \param inplace indicates whether change the in_csr_ field or not.
+   * \param inplace if true and the in-edge CSR format does not exist, the created
+   *                format will be cached in this object unless the format is restricted.
    * \return Return the in-edge CSR format. Create from other format if not exist.
    */
   CSRPtr GetInCSR(bool inplace = true) const;
 
   /*! 
    * \brief Create out-edge CSR format of the unit graph.
-   * \param inplace indicates whether change the out_csr_ field or not.
+   * \param inplace if true and the out-edge CSR format does not exist, the created
+   *                format will be cached in this object unless the format is restricted.
    * \return Return the out-edge CSR format. Create from other format if not exist.
    */
   CSRPtr GetOutCSR(bool inplace = true) const;
 
   /*!
    * \brief Create COO format of the unit graph.
-   * \param inplace indicates whether change the coo_ field or not.
+   * \param inplace if true and the COO format does not exist, the created
+   *                format will be cached in this object unless the format is restricted.
    * \return Return the COO format. Create from other format if not exist.
    */
   COOPtr GetCOO(bool inplace = true) const;
