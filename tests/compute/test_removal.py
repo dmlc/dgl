@@ -170,16 +170,16 @@ def test_frame_size():
     g.add_nodes(5)
     g.add_edges([0, 2, 3, 1, 1], [1, 0, 3, 1, 0])
     g.remove_nodes([0, 1])
-    g.ndata['feats'] = F.ones((3, 6))
-    g.edata['feats'] = F.ones((1, 6))
+    assert g._node_frame.num_rows == 3
+    assert g._edge_frame.num_rows == 1
 
     # remove edges 
     g = dgl.DGLGraph()
     g.add_nodes(5)
     g.add_edges([0, 2, 3, 1, 1], [1, 0, 3, 1, 0])
     g.remove_edges([0, 1])
-    g.ndata['feats'] = F.ones((5, 6)) 
-    g.edata['feats'] = F.ones((3, 6))
+    assert g._node_frame.num_rows == 5
+    assert g._edge_frame.num_rows == 3
 
 if __name__ == '__main__':
     test_node_removal()
