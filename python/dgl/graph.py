@@ -1052,6 +1052,15 @@ class DGLGraph(DGLBaseGraph):
         # set parent if the graph is a subgraph.
         self._parent = parent
 
+    def __setstate__(self, state):
+        # Compatibility with pickles from DGL 0.4.2-
+        if '_batch_num_nodes' not in state:
+            state = state.copy()
+            state.setdefault('_batch_num_nodes', None)
+            state.setdefault('_batch_num_edges', None)
+            state.setdefault('_parent', None)
+        self.__dict__.update(state)
+
     def _create_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph from index."""
         subg = DGLGraph(graph_data=sgi.graph,

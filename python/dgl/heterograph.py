@@ -275,7 +275,19 @@ class DGLHeteroGraph(object):
         return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
 
     def __setstate__(self, state):
-        self._init(*state)
+        # Compatibility check
+        # TODO: version the storage
+        if isinstance(state, tuple) and len(state) == 5:
+            # DGL 0.4.3+
+            self._init(*state)
+        elif isinstance(state, dict):
+            # DGL 0.4.2-
+            dgl_warning("The object is pickled with DGL version 0.4.2-.  "
+                        "Some of the original attributes are ignored.")
+            self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
+                       state['_edge_frames'])
+        else:
+            raise IOError("Unrecognized pickle format.")
 
     def _get_msg_index(self, etid):
         """Internal function for getting the message index array of the given edge type id."""
