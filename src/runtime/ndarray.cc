@@ -374,7 +374,7 @@ NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm) {
   }
 }
 
-#endif // _WIN32
+#endif  // _WIN32
 
 }  // namespace runtime
 }  // namespace dgl
