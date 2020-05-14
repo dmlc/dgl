@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 """Functions used by client."""
 
 def connect_to_server(server_namebook):
