@@ -8,6 +8,7 @@
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/shared_mem.h>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
