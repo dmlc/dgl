@@ -12,6 +12,8 @@
 #include "../../src/graph/unit_graph.h"
 #include "./common.h"
 
+#ifndef _WIN32
+
 using namespace dgl;
 using namespace dgl::aten;
 using namespace dmlc;
@@ -136,3 +138,5 @@ TEST(ZeroCopySerialize, HeteroGraph) {
   EXPECT_EQ(gptr->NumVertices(0), 9);
   EXPECT_EQ(gptr->NumVertices(1), 8);
 }
+
+#endif  // _WIN32
