@@ -600,14 +600,32 @@ class DistGraph:
                 edata_names.append(name[5:])
         return edata_names
 
-def _get_part(elements, local_ids):
-    if isinstance(elements, DistTensor):
-        masks = elements[local_ids]
-        return F.boolean_mask(local_ids, masks)
+def _get_overlap(mask_arr, ids):
+    """ Select the Ids given a boolean mask array.
+
+    The boolean mask array indicates all of the Ids to be selected. We want to
+    find the overlap between the Ids selected by the boolean mask array and
+    the Id array.
+
+    Parameters
+    ----------
+    mask_arr : 1D tensor
+        A boolean mask array.
+    ids : 1D tensor
+        A vector with Ids.
+
+    Returns
+    -------
+    1D tensor
+        The selected Ids.
+    """
+    if isinstance(mask_arr, DistTensor):
+        masks = mask_arr[ids]
+        return F.boolean_mask(ids, masks)
     else:
-        elements = utils.toindex(elements)
-        masks = F.gather_row(elements.tousertensor(), local_ids)
-        return F.boolean_mask(local_ids, masks)
+        mask_arr = utils.toindex(mask_arr)
+        masks = F.gather_row(mask_arr.tousertensor(), ids)
+        return F.boolean_mask(ids, masks)
 
 def node_split(nodes, partition_book, rank):
     ''' Split nodes and return a subset for the local rank.
@@ -641,7 +659,7 @@ def node_split(nodes, partition_book, rank):
             'The length of boolean mask vector should be the number of nodes in the graph.'
     # Get all nodes that belong to the rank.
     local_nids = partition_book.partid2nids(rank)
-    return _get_part(nodes, local_nids)
+    return _get_overlap(nodes, local_nids)
 
 def edge_split(edges, partition_book, rank):
     ''' Split edges and return a subset for the local rank.
@@ -675,4 +693,4 @@ def edge_split(edges, partition_book, rank):
             'The length of boolean mask vector should be the number of edges in the graph.'
     # Get all edges that belong to the rank.
     local_eids = partition_book.partid2eids(rank)
-    return _get_part(edges, local_eids)
+    return _get_overlap(edges, local_eids)
