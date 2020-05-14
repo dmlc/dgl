@@ -280,6 +280,7 @@ template std::vector<float> NDArray::ToVector<float>() const;
 template std::vector<double> NDArray::ToVector<double>() const;
 
 
+#ifndef _WIN32
 struct RawDataTensorCtx {
   std::vector<int64_t> shape;
   std::vector<int64_t> stride;
@@ -372,6 +373,8 @@ NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm) {
     return CreateNDArrayFromRawData(shape, dtype, cpu_ctx, ptr_pair.first);
   }
 }
+
+#endif // _WIN32
 
 }  // namespace runtime
 }  // namespace dgl

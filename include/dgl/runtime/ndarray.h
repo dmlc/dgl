@@ -267,9 +267,12 @@ class NDArray {
  * \param tensor The tensor to be saved.
  */
 inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
+
+#ifndef _WIN32
 NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm);
 void ZeroCopySaveDLTensor(ZeroCopyStream* zc_strm, DLTensor* tensor,
                                  std::shared_ptr<SharedMemory> mem);
+#endif // _WIN32
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
@@ -467,7 +470,12 @@ inline void NDArray::Save(dmlc::Stream* strm) const {
   auto zc_strm = dynamic_cast<ZeroCopyStream*>(strm);
   // Use ZeroCopySaveDLTensor when stream is a ZeroCopyStream
   if (zc_strm) {
-    ZeroCopySaveDLTensor(zc_strm, const_cast<DLTensor*>(operator->()), this->data_->mem);
+#ifndef _WIN32
+    ZeroCopySaveDLTensor(zc_strm, const_cast<DLTensor*>(operator->()),
+                         this->data_->mem);
+#else
+    LOG(FATAL) << "ZeroCopyStream is not supported on windows";
+#endif  // _WIN32
     return;
   }
   SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
@@ -477,8 +485,12 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
   auto zc_strm = dynamic_cast<ZeroCopyStream*>(strm);
   // Use ZeroCopyLoadDLTensor when stream is a ZeroCopyStream
   if (zc_strm) {
+#ifndef _WIN32
     *this = ZeroCopyLoadDLTensor(zc_strm);
     return true;
+#else
+    LOG(FATAL) << "ZeroCopyStream is not supported on windows";
+#endif  // _WIN32
   }
   uint64_t header, reserved;
   CHECK(strm->Read(&header))
