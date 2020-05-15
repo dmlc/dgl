@@ -62,11 +62,6 @@ DMLC_DECLARE_TRAITS(has_saveload, GraphDataObject, true);
 namespace dgl {
 namespace serialize {
 
-enum GraphType {
-  kMutableGraph = 0ull,
-  kImmutableGraph = 1ull
-};
-
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_MakeGraphData")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphRef gptr = args[0];
@@ -132,7 +127,6 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataEdgeTensors")
 });
 
 
-constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
 
 bool SaveDGLGraphs(std::string filename,
                    List<GraphData> graph_data,
@@ -145,7 +139,7 @@ bool SaveDGLGraphs(std::string filename,
   const uint64_t kVersion = 1;
   fs->Write(kDGLSerializeMagic);
   fs->Write(kVersion);
-  fs->Write(kImmutableGraph);
+  fs->Write(GraphType::kImmutableGraph);
   fs->Seek(4096);
 
   // Write Graph Meta Data
@@ -176,10 +170,6 @@ bool SaveDGLGraphs(std::string filename,
 
   fs->Seek(indices_start_ptr);
   fs->Write(graph_indices);
-
-  std::vector<dgl_id_t> test;
-  fs->Seek(indices_start_ptr);
-  fs->Read(&test);
 
   delete fs;
   return true;

@@ -4,6 +4,7 @@ from ..graph import DGLGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
 from .. import backend as F
+from .heterograph_serialize import *
 
 _init_api("dgl.data.graph_serialize")
 

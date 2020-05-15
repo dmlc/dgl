@@ -29,6 +29,16 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace serialize {
 
+
+enum GraphType {
+  kMutableGraph = 0ull,
+  kImmutableGraph = 1ull,
+  kHeteroGraph = 2ull
+};
+
+
+constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
+
 typedef std::pair<std::string, NDArray> NamedTensor;
 
 class GraphDataObject : public runtime::Object {
