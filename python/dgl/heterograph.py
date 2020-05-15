@@ -3576,8 +3576,7 @@ class DGLHeteroGraph(object):
                    message_func,
                    reduce_func,
                    apply_node_func=None,
-                   etype=None,
-                   reduce_by='dst'):
+                   etype=None):
         """Send messages through all edges and update all nodes.
 
         Optionally, apply a function to update the node features after receive.
@@ -3606,8 +3605,6 @@ class DGLHeteroGraph(object):
         etype : str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
-        reduce_by : str, optional
-            Specify how to reduce messages. Expected to be either ``'src'`` or ``'dst'``
 
         Examples
         --------
