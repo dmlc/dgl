@@ -28,6 +28,54 @@ class NegativeSampler(object):
         return self.weights.multinomial(num_samples, replacement=True)
 
 #### Neighbor sampler
+class SelfNegSampler(object):
+    def __init__(self, g, fanouts, num_negs):
+        self.g = g
+        self.fanouts = fanouts
+        self.num_negs = num_negs
+
+    def sample_blocks(self, seed_edges):
+        n_edges = len(seed_edges)
+        assert n_edges > self.num_negs
+        seed_edges = th.LongTensor(np.asarray(seed_edges))
+        heads, tails = self.g.find_edges(seed_edges)
+        neg_tails = []
+        for i in range(self.num_negs):
+            neg_tails.append(tails[th.randperm(n_edges)])
+        neg_tails = th.cat(neg_tails)
+        neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
+
+        # Maintain the correspondence between heads, tails and negative tails as two
+        # graphs.
+        # pos_graph contains the correspondence between each head and its positive tail.
+        # neg_graph contains the correspondence between each head and its negative tails.
+        # Both pos_graph and neg_graph are first constructed with the same node space as
+        # the original graph.  Then they are compacted together with dgl.compact_graphs.
+        pos_graph = dgl.graph((heads, tails), num_nodes=self.g.number_of_nodes())
+        neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
+        [pos_graph, neg_graph] = dgl.compact_graphs([pos_graph, neg_graph])
+
+        # Obtain the node IDs being used in either pos_graph or neg_graph.  Since they
+        # are compacted together, pos_graph and neg_graph share the same compacted node
+        # space.
+        seeds = pos_graph.ndata[dgl.NID]
+        blocks = []
+        for fanout in self.fanouts:
+            # For each seed node, sample ``fanout`` neighbors.
+            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
+            # Remove all edges between heads and tails, as well as heads and neg_tails.
+            _, _, edge_ids = frontier.edge_ids(
+                th.cat([heads, tails]),
+                th.cat([tails, heads]),
+                return_uv=True)
+            frontier = dgl.remove_edges(frontier, edge_ids)
+            # Then we compact the frontier into a bipartite graph for message passing.
+            block = dgl.to_block(frontier, seeds)
+            # Obtain the seed nodes for next layer.
+            seeds = block.srcdata[dgl.NID]
+
+            blocks.insert(0, block)
+        return pos_graph, neg_graph, blocks
 
 class NeighborSampler(object):
     def __init__(self, g, fanouts, num_negs):
@@ -69,10 +117,13 @@ class NeighborSampler(object):
             frontier = dgl.remove_edges(frontier, edge_ids)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
+            block.out_degree(0)
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
             blocks.insert(0, block)
+        pos_graph.out_degree(0)
+        neg_graph.out_degree(0)
         return pos_graph, neg_graph, blocks
 
 class SAGE(nn.Module):
@@ -148,7 +199,7 @@ class SAGE(nn.Module):
         return y
 
 class CrossEntropyLoss(nn.Module):
-    def forward(self, block_outputs, pos_graph, neg_graph):
+    def forward(self, block_outputs, pos_graph, neg_graph, self_neg=False, num_negs=1):
         with pos_graph.local_scope():
             pos_graph.ndata['h'] = block_outputs
             pos_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
@@ -232,7 +283,10 @@ def run(args, device, data):
     test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
+    if args.self_neg:
+        sampler = SelfNegSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
+    else:
+        sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
@@ -260,9 +314,9 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            tic_step = time.time()
 
+        tic_step = time.time()
+        for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             input_nodes = blocks[0].srcdata[dgl.NID]
@@ -279,11 +333,12 @@ def run(args, device, data):
             optimizer.step()
 
             iter_tput.append(len(seeds) / (time.time() - tic_step))
+            tic_step = time.time()
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
                     epoch, step, loss.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
-
+            '''
             if step % args.eval_every == 0:
                 eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
@@ -291,6 +346,7 @@ def run(args, device, data):
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
+            '''
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
@@ -310,6 +366,7 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--self_neg',default=False, action='store_true')
     args = argparser.parse_args()
     
     if args.gpu >= 0:
