@@ -72,11 +72,11 @@ def test_wln_reaction():
             # simulate fake candidate bond changes
             candidate_string = ''
             for i in range(2):
-                candidate_string += '{}-{}-{:.1f}-{:.3f};'.format(i+1, i+2, 0.0, 0.234)
+                candidate_string += '{} {} {:.1f} {:.3f};'.format(i+1, i+2, 0.0, 0.234)
             candidate_string += '\n'
             f.write(candidate_string)
 
-    dataset = WLNRankDataset('test.txt.proc', 'test_candidate_bond_changes.txt', 'test_graphs.bin')
+    dataset = WLNRankDataset('test.txt.proc', 'test_candidate_bond_changes.txt', 'train')
     remove_file('test.txt')
     remove_file('test.txt.proc')
     remove_file('test_graphs.bin')

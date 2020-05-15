@@ -253,7 +253,7 @@ def process_line(line):
 
     return formatted_reaction
 
-def process_file(path, num_processes):
+def process_file(path, num_processes=1):
     """Pre-process a file of reactions for working with WLN.
 
     Parameters
@@ -261,7 +261,7 @@ def process_file(path, num_processes):
     path : str
         Path to the file of reactions
     num_processes : int
-        Number of processes to use for data pre-processing.
+        Number of processes to use for data pre-processing. Default to 1.
     """
     with open(path, 'r') as input_file:
         lines = input_file.readlines()
@@ -1237,8 +1237,7 @@ class WLNRankDataset(object):
     Parameters
     ----------
     raw_file_path : str
-        Path to the raw reaction file, where each line is the SMILES for a reaction and
-        the corresponding graph edits.
+        Path to the raw reaction file, where each line is the SMILES for a reaction.
     candidate_bond_path : str
         Path to the candidate bond changes for product enumeration, where each line is
         candidate bond changes for a reaction by a WLN for reaction center prediction.
@@ -1287,8 +1286,13 @@ class WLNRankDataset(object):
         self.ignore_large_samples = False
         self.size_cutoff = size_cutoff
 
+        path_to_reaction_file = raw_file_path + '.proc'
+        if not os.path.isfile(path_to_reaction_file):
+            print('Pre-processing graph edits from reaction data')
+            process_file(raw_file_path, num_processes)
+
         self.reactant_mols, self.product_mols, self.real_bond_changes, \
-        self.ids_for_small_samples = self.load_reaction_data(raw_file_path, num_processes)
+        self.ids_for_small_samples = self.load_reaction_data(path_to_reaction_file, num_processes)
         self.candidate_bond_changes = self.load_candidate_bond_changes(candidate_bond_path)
 
         self.num_candidate_bond_changes = num_candidate_bond_changes
@@ -1535,7 +1539,7 @@ class USPTORank(WLNRankDataset):
         extract_archive(data_path, extracted_data_path)
 
         super(USPTORank, self).__init__(
-            raw_file_path=extracted_data_path + '/{}.txt.proc'.format(subset),
+            raw_file_path=extracted_data_path + '/{}.txt'.format(subset),
             candidate_bond_path=candidate_bond_path,
             mode=mode,
             size_cutoff=size_cutoff,
