@@ -939,7 +939,7 @@ class ImmutableGraph: public GraphInterface {
   /*! \return Save ImmutableGraph to stream, using out csr */
   void Save(dmlc::Stream* fs) const;
 
-  void SortCSR() {
+  void SortCSR() override {
     GetInCSR()->SortCSR();
     GetOutCSR()->SortCSR();
   }
