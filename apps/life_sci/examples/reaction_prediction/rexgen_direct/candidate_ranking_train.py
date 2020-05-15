@@ -112,11 +112,10 @@ def main(args, path_to_candidate_bonds):
                 new_lr = optimizer.lr
                 print('Learning rate decayed from {:.4f} to {:.4f}'.format(old_lr, new_lr))
                 torch.save({'model_state_dict': model.state_dict()},
-                           args['result_path'] + '/model_{:d}.pkl'.format(
-                               total_samples // args['batch_size'] // args['print_every']))
-                prediction_summary = 'total iter {:d}, (epoch {:d}/{:d}, iter {:d}/{:d}) '.format(
-                    total_samples // args['batch_size'] // args['print_every'],
-                    epoch + 1, args['num_epochs'], (batch_id + 1) * args['batch_size'] // args['print_every'],
+                           args['result_path'] + '/model_{:d}.pkl'.format(total_samples))
+                prediction_summary = 'total samples {:d}, (epoch {:d}/{:d}, iter {:d}/{:d})\n'.format(
+                    total_samples, epoch + 1, args['num_epochs'],
+                    (batch_id + 1) * args['batch_size'] // args['print_every'],
                     len(train_set) // args['print_every']) + candidate_ranking_eval(args, model, val_loader)
                 print(prediction_summary)
                 with open(args['result_path'] + '/val_eval.txt', 'a') as f:

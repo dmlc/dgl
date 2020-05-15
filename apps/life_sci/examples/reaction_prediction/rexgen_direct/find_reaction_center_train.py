@@ -37,8 +37,8 @@ def main(rank, dev_id, args):
         args['device'] = torch.device('cpu')
     else:
         args['device'] = torch.device('cuda:{}'.format(dev_id))
-    # Set current device
-    torch.cuda.set_device(args['device'])
+        # Set current device
+        torch.cuda.set_device(args['device'])
 
     train_set, val_set = load_dataset(args)
     get_center_subset(train_set, rank, args['num_devices'])
@@ -104,14 +104,15 @@ def main(rank, dev_id, args):
                     dur.append(time.time() - t0)
                     print('Training time per {:d} iterations: {:.4f}'.format(
                         rank_iter, np.mean(dur)))
-                prediction_summary = 'total iter {:d}, (epoch {:d}/{:d}, iter {:d}/{:d}) '.format(
-                    total_iter, epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader)) + \
+                total_samples = total_iter * args['batch_size']
+                prediction_summary = 'total samples {:d}, (epoch {:d}/{:d}, iter {:d}/{:d}) '.format(
+                    total_samples, epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader)) + \
                       reaction_center_final_eval(args, args['top_ks_val'], model, val_loader, easy=True)
                 print(prediction_summary)
                 with open(args['result_path'] + '/val_eval.txt', 'a') as f:
                     f.write(prediction_summary)
                 torch.save({'model_state_dict': model.state_dict()},
-                           args['result_path'] + '/model_{:d}.pkl'.format(total_iter))
+                           args['result_path'] + '/model_{:d}.pkl'.format(total_samples))
                 t0 = time.time()
                 model.train()
         synchronize(args['num_devices'])

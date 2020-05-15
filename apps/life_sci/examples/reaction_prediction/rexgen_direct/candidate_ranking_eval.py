@@ -1,7 +1,7 @@
 import torch
 
 from dgllife.data import USPTORank, WLNRankDataset
-from dgllife.model import WLNReactionRanking
+from dgllife.model import WLNReactionRanking, load_pretrained
 from torch.utils.data import DataLoader
 
 from configure import candidate_ranking_config, reaction_center_config
@@ -23,13 +23,16 @@ def main(args, path_to_candidate_bonds):
     test_loader = DataLoader(test_set, batch_size=1, collate_fn=collate_rank_eval,
                              shuffle=False, num_workers=args['num_workers'])
 
-    # Todo: load from a pre-trained model
-    model = WLNReactionRanking(
-        node_in_feats=args['node_in_feats'],
-        edge_in_feats=args['edge_in_feats'],
-        node_hidden_feats=args['hidden_size'],
-        num_encode_gnn_layers=args['num_encode_gnn_layers'])
-    model.load_state_dict(torch.load(args['model_path'], map_location='cpu')['model_state_dict'])
+    if args['model_path'] is None:
+        model = load_pretrained('wln_rank_uspto')
+    else:
+        model = WLNReactionRanking(
+            node_in_feats=args['node_in_feats'],
+            edge_in_feats=args['edge_in_feats'],
+            node_hidden_feats=args['hidden_size'],
+            num_encode_gnn_layers=args['num_encode_gnn_layers'])
+        model.load_state_dict(torch.load(
+            args['model_path'], map_location='cpu')['model_state_dict'])
     model = model.to(args['device'])
 
     prediction_summary = candidate_ranking_eval(args, model, test_loader)

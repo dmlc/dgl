@@ -8,7 +8,7 @@ from dgl.data.utils import _get_dgl_url, download, get_download_dir, extract_arc
 from rdkit import Chem
 
 from ..model import GCNPredictor, GATPredictor, AttentiveFPPredictor, DGMG, DGLJTNNVAE, \
-    WLNReactionCenter
+    WLNReactionCenter, WLNReactionRanking
 
 __all__ = ['load_pretrained']
 
@@ -21,7 +21,8 @@ URL = {
     'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
     'DGMG_ZINC_random': 'pre_trained/dgmg_ZINC_random.pth',
     'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth',
-    'wln_center_uspto': 'dgllife/pre_trained/wln_center_uspto_v3.pth'
+    'wln_center_uspto': 'dgllife/pre_trained/wln_center_uspto_v3.pth',
+    'wln_rank_uspto': 'dgllife/pre_trained/wln_rank_uspto.pth',
 }
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
@@ -151,5 +152,11 @@ def load_pretrained(model_name, log=True):
                                   node_out_feats=300,
                                   n_layers=3,
                                   n_tasks=5)
+
+    elif model_name == 'wln_rank_uspto':
+        model = WLNReactionRanking(node_in_feats=89,
+                                   edge_in_feats=5,
+                                   node_hidden_feats=500,
+                                   num_encode_gnn_layers=3)
 
     return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)

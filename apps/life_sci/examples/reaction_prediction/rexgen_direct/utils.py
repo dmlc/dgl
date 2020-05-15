@@ -471,6 +471,8 @@ def output_candidate_bonds_for_a_reaction(info, max_k):
     info : 3-tuple for a reaction
         Consists of the reaction, the scores for atom-pairs in reactants
         and the number of nodes in reactants.
+    max_k : int
+        Maximum number of atom pairs to be selected.
 
     Returns
     -------
