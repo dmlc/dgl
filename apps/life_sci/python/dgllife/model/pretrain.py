@@ -83,6 +83,7 @@ def load_pretrained(model_name, log=True):
           with a random atom order
         * ``'JTNN_ZINC'``: A JTNN model pre-trained on ZINC for molecule generation
         * ``'wln_center_uspto'``: A WLN model pre-trained on USPTO for reaction prediction
+        * ``'wln_rank_uspto'``: A WLN model pre-trained on USPTO for candidate product ranking
 
     log : bool
         Whether to print progress for model loading

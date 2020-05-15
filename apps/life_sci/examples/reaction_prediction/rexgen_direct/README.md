@@ -9,7 +9,13 @@ slight difference in modeling.
 
 This work proposes a template-free approach for reaction prediction with 2 stages: 
 1) Identify reaction center (pairs of atoms that will lose a bond or form a bond)
-2) Enumerate the possible combinations of bond changes
+2) Enumerate the possible combinations of bond changes and rank the corresponding candidate products
+
+We provide a jupyter notebook for walking through a demonstration with our pre-trained models. You can 
+download it with `wget https://data.dgl.ai/dgllife/reaction_prediction_pretrained.ipynb` and you need to put it 
+in this directory. Below we visualize a reaction prediction by the model:
+
+![](https://data.dgl.ai/dgllife/wln_reaction.png)
 
 ## Dataset
 

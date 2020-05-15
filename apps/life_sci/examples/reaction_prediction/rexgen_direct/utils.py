@@ -771,14 +771,17 @@ clean_rxns_postsani = [
     AllChem.ReactionFromSmarts('[N;H0;-1:1]([C:2])[C:3]>>[N;H1;+0:1]([*:2])[*:3]'),
 ]
 
-def edit_mol(rmol, bond_changes):
+def edit_mol(rmol, bond_changes, keep_atom_map=False):
     """Simulate reaction via graph editing
 
     Parameters
     ----------
     rmol : rdkit.Chem.rdchem.Mol
         RDKit molecule instance for the reactants
-    bond_changes
+    bond_changes : list of 3-tuples
+        Each tuple is of form (atom1, atom2, change_type)
+    keep_atom_map : bool
+        Whether to keep atom mapping number. Default to False.
 
     Returns
     -------
@@ -869,7 +872,8 @@ def edit_mol(rmol, bond_changes):
     # Clear formal charges to make molecules valid
     # Note: because S and P (among others) can change valence, be more flexible
     for atom in pred_mol.GetAtoms():
-        atom.ClearProp('molAtomMapNumber')
+        if not keep_atom_map:
+            atom.ClearProp('molAtomMapNumber')
         if atom.GetSymbol() == 'N' and atom.GetFormalCharge() == 1:
             # exclude negatively-charged azide
             bond_vals = sum([bond.GetBondTypeAsDouble() for bond in atom.GetBonds()])
@@ -971,6 +975,8 @@ def examine_topk_candidate_product(topks, topk_combos, reactant_mol,
         a single, double, triple, and aromatic bond.
     product_mol : rdkit.Chem.rdchem.Mol
         RDKit molecule instance for the product.
+    get_smiles : bool
+        Whether to get the SMILES of candidate products.
 
     Returns
     -------
