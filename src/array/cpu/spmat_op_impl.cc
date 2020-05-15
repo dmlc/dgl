@@ -556,6 +556,8 @@ template CSRMatrix CSRSliceMatrix<kDLCPU, int32_t>(
 template CSRMatrix CSRSliceMatrix<kDLCPU, int64_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
+///////////////////////////// CSRSort /////////////////////////////
+
 template <DLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr) {
   typedef std::pair<IdType, IdType> ShufflePair;
@@ -596,6 +598,67 @@ void CSRSort_(CSRMatrix* csr) {
 
 template void CSRSort_<kDLCPU, int64_t>(CSRMatrix* csr);
 template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
+
+///////////////////////////// CSRReorder /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRReoder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::NDArray new_col_id_arr) {
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  CHECK_SAME_DTYPE(csr.indices, cols);
+
+  // Input CSR
+  const IdType* in_indptr = static_cast<IdType*>(csr.indptr->data);
+  const IdType* in_indices = static_cast<IdType*>(csr.indices->data);
+  const IdType* in_data = static_cast<IdType*>(csr.data->data);
+  int64_t num_rows = csr.num_rows;
+  int64_t num_cols = csr.num_cols;
+  int64_t nnz = csr.indices->shape[0];
+  CHECK_EQ(num_rows, new_row_id_arr->shape[0])
+      << "The new row Id array needs to be the same as the number of rows of CSR";
+  CHECK_EQ(num_cols, new_col_id_arr->shape[0])
+      << "The new col Id array needs to be the same as the number of cols of CSR";
+
+  // New row/col Ids.
+  const IdType* new_row_ids = static_cast<IdType*>(new_row_id_arr->data);
+  const IdType* new_col_ids = static_cast<IdType*>(new_col_id_arr->data);
+
+  // Output CSR
+  NDArray out_indptr_arr = NDArray::Empty({num_rows}, csr.indptr->dtype, csr.indptr->ctx);
+  NDArray out_indices_arr = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
+  NDArray out_data_arr = NDArray::Empty({nnz}, csr.data->dtype, csr.data->ctx);
+  IdType *out_indptr = static_cast<IdType*>(out_indptr_arr->data);
+  IdType *out_indices = static_cast<IdType*>(out_indices_arr->data);
+  IdType *out_data = static_cast<IdType*>(out_data_arr->data);
+
+  // Compute the length of rows for the new matrix.
+  std::vector<IdType> new_row_lens(num_rows);
+  for (int64_t i = 0; i < num_rows; i++) {
+    int64_t new_row_id = new_row_ids[i];
+    new_row_lens[new_row_id] = in_indptr[i + 1] - in_indptr[i];
+  }
+  // Compute the starting location of each row in the new matrix.
+  for (int64_t i = 0; i < num_rows; i++) {
+    out_indptr[i + 1] = out_indptr[i] + new_row_lens[i];
+  }
+  // Copy indieces and data with the new order.
+  // Here I iterate rows in the order of the old matrix.
+  for (int64_t i = 0; i < num_rows; i++) {
+    int64_t new_row_id = new_row_ids[i];
+    IdType *out_row = out_indices + out_indptr[new_row_id];
+    IdType *out_row_data = out_data + out_indptr[new_row_id];
+    // Here I iterate col indices in a row in the order of the old matrix.
+    for (int64_t j = 0; j < row_len; j++) {
+      out_row[j] = new_col_ids[in_row[j]];
+      out_row_data[j] = in_row_data[j];
+    }
+    // TODO(zhengda) maybe we should sort the column indices.
+  }
+  return CSRMatrix{num_rows, num_cols,
+    out_indptr_arr, out_indices_arr, out_data_arr};
+}
+
+template void CSRReorder<kDLCPU, int64_t>(CSRMatrix* csr);
+template void CSRReorder<kDLCPU, int32_t>(CSRMatrix* csr);
 
 }  // namespace impl
 }  // namespace aten

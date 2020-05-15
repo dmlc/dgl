@@ -561,6 +561,14 @@ bool CSRHasDuplicate(CSRMatrix csr);
 void CSRSort_(CSRMatrix* csr);
 
 /*!
+ * \brief Reorder the rows and colmns according to the new row and column order.
+ * \param csr The input csr matrix.
+ * \param new_row_ids the new row Ids (the index is the old row Id)
+ * \param new_col_ids the new column Ids (the index is the old col Id).
+ */
+CSRMatrix CSRReoder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+/*!
  * \brief Remove entries from CSR matrix by entry indices (data indices)
  * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
  *         entries.

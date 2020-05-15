@@ -508,6 +508,15 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   return halo_subg;
 }
 
+GraphPtr GraphOp::ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order) {
+  // TODO(zhengda) should we get whatever CSR exists in the graph.
+  CSRPtr csr = ig->GetInCSR();
+  auto csrmat = csr->ToCSRMatrix();
+  auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
+  csr = CSRPtr(new CSR(new_csrmat.indptr, new_csrmat.indices, new_csrmat.data));
+  return GraphPtr(new ImmutableGraph(csr, nullptr));
+}
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef graph = args[0];
@@ -537,6 +546,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
       part_nodes.push_back(it->second);
     }
     auto graph_ptr = std::dynamic_pointer_cast<ImmutableGraph>(graph.sptr());
+    CHECK(graph_ptr) << "The input graph has to be an immutable graph";
     // When we construct subgraphs, we only access in-edges.
     // We need to make sure the in-CSR exists. Otherwise, we'll
     // try to construct in-CSR in openmp for loop, which will lead
@@ -573,6 +583,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerNodes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   SubgraphRef g = args[0];
   auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
+  CHECK(gptr) << "The input graph has to be immutable graph";
   *rv = gptr->inner_nodes;
 });
 
@@ -580,6 +591,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   SubgraphRef g = args[0];
   auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
+  CHECK(gptr) << "The input graph has to be immutable graph";
   *rv = gptr->inner_edges;
 });
 
@@ -645,10 +657,10 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLReorderGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
-	const IdArray new_order = args[1];
-    auto gptr = g.sptr();
-    auto immutable_g = std::dynamic_pointer_cast<ImmutableGraph>(gptr);
-    *rv = GraphOp::ReorderImmutableGraph(immutable_g, new_order);
+    const IdArray new_order = args[1];
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(gptr) << "The input graph has to be immutable graph";
+    *rv = GraphOp::ReorderImmutableGraph(gptr, new_order);
   });
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")

@@ -434,6 +434,12 @@ void CSRSort_(CSRMatrix* csr) {
   });
 }
 
+CSRMatrix CSRReoder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+    impl::CSRReorder<XPU, IdType>(csr, new_row_ids, new_col_ids);
+  });
+}
+
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, {
