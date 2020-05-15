@@ -4309,10 +4309,10 @@ class DGLHeteroGraph(object):
         to_format
         """
         if self.restrict_format(etype) != 'any':
-            return KeyError("request_format is only available for"
+            raise KeyError("request_format is only available for"
                             " graph whose restrict_format is 'any'")
         if not sparse_format in ['coo', 'csr', 'csc']:
-            return KeyError("can only request coo/csr/csr.")
+            raise KeyError("can only request coo/csr/csr.")
         return self._graph.request_format(sparse_format, self.get_etype_id(etype))
 
 
