@@ -270,8 +270,13 @@ def load_subtensor(g, seeds, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    batch_inputs = g.ndata['features'][input_nodes].to(device)
-    return batch_inputs
+    t = time.time()
+    batch_inputs = g.ndata['features'][input_nodes]
+    t_slice = time.time()
+    batch_inputs = batch_inputs.to(device)
+    print(batch_inputs.numel())
+    t_td = time.time()
+    return batch_inputs, (t_slice - t), (t_td - t_slice)
 
 #### Entry point
 def run(args, device, data):
@@ -307,6 +312,10 @@ def run(args, device, data):
     # Training loop
     avg = 0
     iter_tput = []
+    iter_d = []
+    iter_slice = []
+    iter_td = []
+    iter_t = []
     best_eval_acc = 0
     best_test_acc = 0
     for epoch in range(args.num_epochs):
@@ -319,11 +328,15 @@ def run(args, device, data):
         for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
+            d_step = time.time()
             input_nodes = blocks[0].srcdata[dgl.NID]
             seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
-            batch_inputs = load_subtensor(g, seeds, input_nodes, device)
+            batch_inputs, t_slice, t_td = load_subtensor(g, seeds, input_nodes, device)
+            iter_slice.append(t_slice)
+            iter_td.append(t_td)
+            d_copy = time.time()
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -332,12 +345,15 @@ def run(args, device, data):
             loss.backward()
             optimizer.step()
 
-            iter_tput.append(len(seeds) / (time.time() - tic_step))
-            tic_step = time.time()
+            t = time.time()
+            iter_tput.append(len(seeds) / (t - tic_step))
+            iter_d.append(d_step - tic_step)
+            iter_t.append(t - d_copy)
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
-                    epoch, step, loss.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| Slice {:.4f} | toGPU {:.4f} | train {:.4f} | GPU {:.1f} MiB'.format(
+                    epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_slice[3:]), np.mean(iter_td[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
+            tic_step = time.time()
             '''
             if step % args.eval_every == 0:
                 eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
