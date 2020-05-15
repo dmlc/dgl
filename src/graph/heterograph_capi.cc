@@ -489,6 +489,16 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")
     *rv = hg->GetRelationGraph(etype)->GetFormatInUse();
 });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroRequestFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    const std::string sparse_format = args[1];
+    dgl_type_t etype = args[2];
+    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
+    bg->GetFormat(ParseSparseFormat(sparse_format));
+});
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
