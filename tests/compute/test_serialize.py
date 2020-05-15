@@ -113,7 +113,6 @@ def test_graph_serialize_with_labels():
     path = f.name
     f.close()
 
-    path = "./data/2.bin"
     save_graphs(path, g_list, labels)
 
     idx_list = np.random.permutation(np.arange(num_graphs)).tolist()
