@@ -4301,7 +4301,7 @@ class DGLHeteroGraph(object):
         >>> g['plays'].request_format('csr')
         >>> g['plays'].format_in_use()
         ['coo', 'csr']
-    
+
         See Also
         --------
         format_in_use
@@ -4314,7 +4314,7 @@ class DGLHeteroGraph(object):
         if not sparse_format in ['coo', 'csr', 'csc']:
             return KeyError("can only request coo/csr/csr.")
         return self._graph.request_format(sparse_format, self.get_etype_id(etype))
-        
+
 
     def to_format(self, restrict_format):
         """Return a cloned graph but stored in the given restrict format.
@@ -4346,7 +4346,7 @@ class DGLHeteroGraph(object):
                 [1., 1., 1.]])}
         >>> g1.restrict_format()
         'coo'
-        
+
         For a graph with multiple edge types:
 
         >>> g = dgl.heterograph({
