@@ -113,6 +113,7 @@ def test_graph_serialize_with_labels():
     path = f.name
     f.close()
 
+    path = "./data/2.bin"
     save_graphs(path, g_list, labels)
 
     idx_list = np.random.permutation(np.arange(num_graphs)).tolist()
@@ -178,8 +179,31 @@ def test_serialize_empty_dict():
 
     os.unlink(path)
 
-def test_load_old_files():    
-    g = DGLGraph([(0, 1), (1, 2), (1, 3), (1, 4)])
+def test_load_old_files1():    
+    loadg_list, _ = load_graphs("./data/1.bin")
+    idx, num_nodes, edge0, edge1, edata_e1, edata_e2, ndata_n1= np.load("./data/1.npy", allow_pickle=True)
+
+    load_g = loadg_list[idx]
+    load_edges = load_g.all_edges('uv', 'eid')
+    
+    assert np.allclose(F.asnumpy(load_edges[0]), edge0)
+    assert np.allclose(F.asnumpy(load_edges[1]), edge1)
+    assert np.allclose(F.asnumpy(load_g.edata['e1']), edata_e1)
+    assert np.allclose(F.asnumpy(load_g.edata['e2']), edata_e2)
+    assert np.allclose(F.asnumpy(load_g.ndata['n1']), ndata_n1)
+    
+
+def test_load_old_files2():    
+    loadg_list, labels0 = load_graphs("./data/2.bin")
+    labels1 = load_labels("./data/2.bin")
+    idx, edges0, edges1, np_labels = np.load("./data/2.npy", allow_pickle=True)
+    assert np.allclose(F.asnumpy(labels0['label']), np_labels)
+    assert np.allclose(F.asnumpy(labels1['label']), np_labels)
+
+    load_g = loadg_list[idx]
+    load_edges = load_g.all_edges('uv', 'eid')
+    assert np.allclose(F.asnumpy(load_edges[0]), edges0)
+    assert np.allclose(F.asnumpy(load_edges[1]), edges1)
 
 if __name__ == "__main__":
     test_graph_serialize_with_feature()
@@ -187,3 +211,5 @@ if __name__ == "__main__":
     test_graph_serialize_with_labels()
     test_serialize_tensors()
     test_serialize_empty_dict()
+    test_load_old_files1()
+    test_load_old_files2()
