@@ -220,6 +220,18 @@ def khop_graph(g, k):
     Examples
     --------
 
+    Below gives an easy example:
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(3)
+    >>> g.add_edges([0, 1], [1, 2])
+    >>> g_2 = dgl.transform.khop_graph(g, 2)
+    >>> print(g_2.edges())
+    (tensor([0]), tensor([2]))
+
+    A more complicated example:
+
     >>> import dgl
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(5)
@@ -234,7 +246,7 @@ def khop_graph(g, k):
              edata_schemes={})
     """
     n = g.number_of_nodes()
-    adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
+    adj_k = g.adjacency_matrix_scipy(transpose=True, return_edge_ids=False) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)
@@ -451,6 +463,7 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or bipartite graph.
     """
     adj = 1
+    index_dtype = g._idtype_str
     for etype in metapath:
         adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
@@ -459,9 +472,9 @@ def metapath_reachable_graph(g, metapath):
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     if srctype == dsttype:
         assert adj.shape[0] == adj.shape[1]
-        new_g = graph(adj, ntype=srctype)
+        new_g = graph(adj, ntype=srctype, index_dtype=index_dtype)
     else:
-        new_g = bipartite(adj, utype=srctype, vtype=dsttype)
+        new_g = bipartite(adj, utype=srctype, vtype=dsttype, index_dtype=index_dtype)
 
     for key, value in g.nodes[srctype].data.items():
         new_g.nodes[srctype].data[key] = value
@@ -537,8 +550,7 @@ def remove_self_loop(g):
     return new_g
 
 def partition_graph_with_halo(g, node_part, num_hops):
-    '''
-    This is to partition a graph. Each partition contains HALO nodes
+    ''' This is to partition a graph. Each partition contains HALO nodes
     so that we can generate NodeFlow in each partition correctly.
 
     Parameters
@@ -574,9 +586,35 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
-def metis_partition(g, k, extra_cached_hops=0):
+def metis_partition_assignment(g, k):
+    ''' This assigns nodes to different partitions with Metis partitioning algorithm.
+
+    After the partition assignment, we construct partitions.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph to be partitioned
+    k : int
+        The number of partitions.
+
+    Returns
+    -------
+    a 1-D tensor
+        A vector with each element that indicates the partition Id of a vertex.
     '''
-    This is to partition a graph with Metis partitioning.
+    # METIS works only on symmetric graphs.
+    # The METIS runs on the symmetric graph to generate the node assignment to partitions.
+    sym_g = to_bidirected(g, readonly=True)
+    node_part = _CAPI_DGLMetisPartition(sym_g._graph, k)
+    if len(node_part) == 0:
+        return None
+    else:
+        node_part = utils.toindex(node_part)
+        return node_part.tousertensor()
+
+def metis_partition(g, k, extra_cached_hops=0):
+    ''' This is to partition a graph with Metis partitioning.
 
     Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
     to the partitions and their incoming edges.
@@ -707,14 +745,16 @@ def compact_graphs(graphs, always_preserve=None):
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
-    graph_dtype = graphs[0]._graph.dtype()
+    graph_dtype = graphs[0]._idtype_str
     graph_ctx = graphs[0]._graph.ctx()
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
-        assert graph_dtype == g._graph.dtype(), "Graph data type mismatch"
-        assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
+        assert graph_dtype == g._idtype_str, "Expect graph data type to be {}, but got {}".format(
+            graph_dtype, g._idtype_str)
+        assert graph_ctx == g._graph.ctx(), "Expect graph device to be {}, but got {}".format(
+            graph_ctx, g._graph.ctx())
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:
@@ -882,12 +922,10 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         if nodes is not None:
             dst_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
         else:
-            dst_nodes_nd.append(nd.null())
+            dst_nodes_nd.append(nd.NULL[g._idtype_str])
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_nodes_nd, include_dst_in_src)
-    src_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in src_nodes_nd]
-    dst_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd) for nodes_nd in dst_nodes_nd]
 
     # The new graph duplicates the original node types to SRC and DST sets.
     new_ntypes = ([ntype for ntype in g.ntypes], [ntype for ntype in g.ntypes])
@@ -895,8 +933,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     assert new_graph.is_unibipartite  # sanity check
 
     for i, ntype in enumerate(g.ntypes):
-        new_graph.srcnodes[ntype].data[NID] = src_nodes[i]
-        new_graph.dstnodes[ntype].data[NID] = dst_nodes[i]
+        new_graph.srcnodes[ntype].data[NID] = F.zerocopy_from_dgl_ndarray(src_nodes_nd[i].data)
+        if ntype in dst_nodes:
+            new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
+        else:
+            # For empty dst node sets, still create empty mapping arrays.
+            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=g.idtype)
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
@@ -910,6 +952,10 @@ def remove_edges(g, edge_ids):
     """Return a new graph with given edge IDs removed.
 
     The nodes are preserved.
+
+    Note: `remove_edges` is slow especially when removing a small number of edges from
+    a large graph. It creates a new graph with all remaining edges and return the new graph.
+    Please use it with caution especially when using it in mini-batch training.
 
     Parameters
     ----------
@@ -931,8 +977,12 @@ def remove_edges(g, edge_ids):
                 "Graph has more than one edge type; specify a dict for edge_id instead.")
         edge_ids = {g.canonical_etypes[0]: edge_ids}
 
-    edge_ids_nd = [nd.null()] * len(g.etypes)
+    edge_ids_nd = [nd.NULL[g._idtype_str]] * len(g.etypes)
     for key, value in edge_ids.items():
+        if value.dtype != g.idtype:
+            # if didn't check, this function still works, but returns wrong result
+            raise utils.InconsistentDtypeException("Expect edge id tensors({}) to have \
+         the same index type as graph({})".format(value.dtype, g.idtype))
         edge_ids_nd[g.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
     new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(g._graph, edge_ids_nd)
 
@@ -979,9 +1029,9 @@ def in_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
         else:
-            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+            nodes_all_types.append(nd.NULL[g._idtype_str])
 
     subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1018,9 +1068,9 @@ def out_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
         else:
-            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+            nodes_all_types.append(nd.NULL[g._idtype_str])
 
     subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
@@ -1096,7 +1146,7 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
 
-    Node and edge features are preserved.
+    Node and edge features are preserved. Returns 64 bits graph
 
     Parameters
     ----------

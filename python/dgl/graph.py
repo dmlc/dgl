@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from collections import defaultdict
 from contextlib import contextmanager
 from typing import Iterable
+from functools import wraps
 import networkx as nx
 
 import dgl
@@ -793,9 +794,33 @@ class DGLBaseGraph(object):
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
+    @property
+    def idtype(self):
+        """Return the dtype of the graph index
+
+        Returns
+        ---------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        """
+        return getattr(F, self._graph.dtype)
+
+
+    @property
+    def _idtype_str(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        """
+        return self._graph.dtype
+
 
 def mutation(func):
     """A decorator to decorate functions that might change graph structure."""
+    @wraps(func)
     def inner(g, *args, **kwargs):
         if g.is_readonly:
             raise DGLError("Readonly graph. Mutation is not allowed.")
@@ -1026,6 +1051,15 @@ class DGLGraph(DGLBaseGraph):
 
         # set parent if the graph is a subgraph.
         self._parent = parent
+
+    def __setstate__(self, state):
+        # Compatibility with pickles from DGL 0.4.2-
+        if '_batch_num_nodes' not in state:
+            state = state.copy()
+            state.setdefault('_batch_num_nodes', None)
+            state.setdefault('_batch_num_edges', None)
+            state.setdefault('_parent', None)
+        self.__dict__.update(state)
 
     def _create_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph from index."""
@@ -1270,13 +1304,17 @@ class DGLGraph(DGLBaseGraph):
         induced_nodes = utils.set_diff(utils.toindex(self.nodes()), utils.toindex(vids))
         sgi = self._graph.node_subgraph(induced_nodes)
 
+        num_nodes = len(sgi.induced_nodes)
+        num_edges = len(sgi.induced_edges)
         if isinstance(self._node_frame, FrameRef):
-            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes]))
+            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes],
+                                              num_rows=num_nodes))
         else:
             self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
 
         if isinstance(self._edge_frame, FrameRef):
-            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges]))
+            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges],
+                                              num_rows=num_edges))
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
@@ -1333,13 +1371,17 @@ class DGLGraph(DGLBaseGraph):
             utils.toindex(range(self.number_of_edges())), utils.toindex(eids))
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=True)
 
+        num_nodes = len(sgi.induced_nodes)
+        num_edges = len(sgi.induced_edges)
         if isinstance(self._node_frame, FrameRef):
-            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes]))
+            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes],
+                                              num_rows=num_nodes))
         else:
             self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
 
         if isinstance(self._edge_frame, FrameRef):
-            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges]))
+            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges],
+                                              num_rows=num_edges))
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
@@ -4121,7 +4163,13 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     unbatch
     """
     if len(graph_list) == 1:
-        return graph_list[0]
+        # Need to deepcopy the node/edge frame of original graph.
+        graph = graph_list[0]
+        return DGLGraph(graph_data=graph._graph,
+                        node_frame=graph._node_frame.deepclone(),
+                        edge_frame=graph._edge_frame.deepclone(),
+                        batch_num_nodes=graph.batch_num_nodes,
+                        batch_num_edges=graph.batch_num_edges)
 
     def _init_attrs(attrs, mode):
         """Collect attributes of given mode (node/edge) from graph_list.
@@ -4240,7 +4288,10 @@ def unbatch(graph):
     batch
     """
     if graph.batch_size == 1:
-        return [graph]
+        # Like dgl.batch, unbatch also deep copies data frame.
+        return [DGLGraph(graph_data=graph._graph,
+                         node_frame=graph._node_frame.deepclone(),
+                         edge_frame=graph._edge_frame.deepclone())]
 
     bsize = graph.batch_size
     bnn = graph.batch_num_nodes

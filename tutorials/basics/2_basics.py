@@ -192,7 +192,6 @@ print(g_multi.edata['w'])
 ###############################################################################
 # .. note::
 #
-#    * Nodes and edges can be added but not removed.
 #    * Updating a feature of different schemes raises the risk of error on individual nodes (or
 #      node subset).
 

@@ -11,3 +11,4 @@ from .mpnn_predictor import *
 from .acnn import *
 from .wln_reaction_center import *
 from .wln_reaction_ranking import *
+from .weave_predictor import *

@@ -12,6 +12,9 @@ We provide various examples across 3 applications -- property prediction, genera
 
 ## Property Prediction
 
+- Molecular graph convolutions: moving beyond fingerprints (Weave) [[paper]](https://arxiv.org/abs/1603.00856), [[github]](https://github.com/deepchem/deepchem)
+    - [Weave Predictor with DGL](../python/dgllife/model/model_zoo/weave_predictor.py)
+    - [Example for Molecule Classification](property_prediction/classification.py)
 - Semi-Supervised Classification with Graph Convolutional Networks (GCN) [[paper]](https://arxiv.org/abs/1609.02907), [[github]](https://github.com/tkipf/gcn)
     - [GCN-Based Predictor with DGL](../python/dgllife/model/model_zoo/gcn_predictor.py)
     - [Example for Molecule Classification](property_prediction/classification.py)

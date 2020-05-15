@@ -12,6 +12,8 @@ with graph neural networks.
 We provide various functionalities, including but not limited to methods for graph construction, 
 featurization, and evaluation, model architectures, training scripts and pre-trained models.
 
+For a list of community contributors, see [here](CONTRIBUTORS.md).
+
 **For a full list of work implemented in DGL-LifeSci, see [here](examples/README.md).**
 
 ## Installation
@@ -64,7 +66,7 @@ Once you have installed the package, you can verify the success of installation 
 import dgllife
 
 print(dgllife.__version__)
-# 0.2.1
+# 0.2.2
 ```
 
 If you are new to DGL, the first time you import dgl a message will pop up as below:
