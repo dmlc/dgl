@@ -478,6 +478,11 @@ void _TestCOOSort() {
   ASSERT_TRUE(ArrayEQ<IDX>(src_coo.data, sort_col_data));
 }
 
+TEST(SpmatTest, TestCOOSort) {
+  _TestCOOSort<int32_t>();
+  _TestCOOSort<int64_t>();
+}
+
 template <typename IDX>
 void _TestCSRReorder() {
   auto csr = CSR2<IDX>();
@@ -490,12 +495,24 @@ void _TestCSRReorder() {
   ASSERT_EQ(new_csr.num_cols, csr.num_cols);
 }
 
-TEST(SpmatTest, TestCOOSort) {
-  _TestCOOSort<int32_t>();
-  _TestCOOSort<int64_t>();
-}
-
 TEST(SpmatTest, TestCSRReorder) {
   _TestCSRReorder<int32_t>();
   _TestCSRReorder<int64_t>();
+}
+
+template <typename IDX>
+void _TestCOOReorder() {
+  auto coo = COO2<IDX>();
+  auto new_row = aten::VecToIdArray(
+    std::vector<IDX>({2, 0, 3, 1}), sizeof(IDX)*8, CTX);
+  auto new_col = aten::VecToIdArray(
+    std::vector<IDX>({2, 0, 4, 3, 1}), sizeof(IDX)*8, CTX);
+  auto new_coo = COOReorder(coo, new_row, new_col);
+  ASSERT_EQ(new_coo.num_rows, coo.num_rows);
+  ASSERT_EQ(new_coo.num_cols, coo.num_cols);
+}
+
+TEST(SpmatTest, TestCOOReorder) {
+  _TestCOOReorder<int32_t>();
+  _TestCOOReorder<int64_t>();
 }

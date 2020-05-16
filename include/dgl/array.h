@@ -758,6 +758,14 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 /*!
+ * \brief Reorder the rows and colmns according to the new row and column order.
+ * \param csr The input coo matrix.
+ * \param new_row_ids the new row Ids (the index is the old row Id)
+ * \param new_col_ids the new column Ids (the index is the old col Id).
+ */
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+/*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.

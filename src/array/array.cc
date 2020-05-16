@@ -442,6 +442,14 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArr
   return ret;
 }
 
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, {
+    ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
+  });
+  return ret;
+}
+
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, {
