@@ -431,7 +431,8 @@ template COOMatrix COOSliceMatrix<kDLCPU, int64_t>(
 ///////////////////////////// COOReorder /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr, runtime::NDArray new_col_id_arr) {
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
+                     runtime::NDArray new_col_id_arr) {
   CHECK_SAME_DTYPE(coo.row, new_row_id_arr);
   CHECK_SAME_DTYPE(coo.col, new_col_id_arr);
 

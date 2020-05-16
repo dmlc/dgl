@@ -602,7 +602,8 @@ template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
 ///////////////////////////// CSRReorder /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::NDArray new_col_id_arr) {
+CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr,
+                     runtime::NDArray new_col_id_arr) {
   CHECK_SAME_DTYPE(csr.indices, new_row_id_arr);
   CHECK_SAME_DTYPE(csr.indices, new_col_id_arr);
 
@@ -642,7 +643,7 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::ND
   out_indptr[0] = 0;
   // This is sequential. It should be pretty fast.
   for (int64_t i = 0; i < num_rows; i++) {
-    CHECK(new_row_lens[i] >= 0);
+    CHECK_GE(new_row_lens[i], 0);
     out_indptr[i + 1] = out_indptr[i] + new_row_lens[i];
   }
   CHECK_EQ(out_indptr[num_rows], nnz);
