@@ -623,7 +623,7 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::ND
   const IdType* new_col_ids = static_cast<IdType*>(new_col_id_arr->data);
 
   // Output CSR
-  NDArray out_indptr_arr = NDArray::Empty({num_rows}, csr.indptr->dtype, csr.indptr->ctx);
+  NDArray out_indptr_arr = NDArray::Empty({num_rows + 1}, csr.indptr->dtype, csr.indptr->ctx);
   NDArray out_indices_arr = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   NDArray out_data_arr = NDArray::Empty({nnz}, csr.data->dtype, csr.data->ctx);
   IdType *out_indptr = static_cast<IdType*>(out_indptr_arr->data);
@@ -658,8 +658,8 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::ND
     }
     // TODO(zhengda) maybe we should sort the column indices.
   }
-  return CSRMatrix{num_rows, num_cols,
-    out_indptr_arr, out_indices_arr, out_data_arr};
+  return CSRMatrix(num_rows, num_cols,
+    out_indptr_arr, out_indices_arr, out_data_arr);
 }
 
 template CSRMatrix CSRReorder<kDLCPU, int64_t>(CSRMatrix csr, runtime::NDArray new_row_ids,
