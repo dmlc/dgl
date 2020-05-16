@@ -493,5 +493,9 @@ void _TestCSRReorder() {
 TEST(SpmatTest, TestCOOSort) {
   _TestCOOSort<int32_t>();
   _TestCOOSort<int64_t>();
+}
+
+TEST(SpmatTest, TestCSRReorder) {
   _TestCSRReorder<int32_t>();
+  _TestCSRReorder<int64_t>();
 }

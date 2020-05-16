@@ -274,13 +274,11 @@ def test_metis_partition():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="It doesn't support GPU")
 def test_reorder_nodes():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
-    print(g)
     new_nids = np.random.permutation(g.number_of_nodes())
-    print(new_nids)
     new_g = dgl.transform.reorder_nodes(g, new_nids)
     new_in_deg = new_g.in_degrees()
     in_deg = g.in_degrees()
-    new_in_deg1 = in_deg[new_nids]
+    new_in_deg1 = F.gather_row(in_deg, new_nids)
     assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
@@ -627,9 +625,7 @@ def test_cast():
     assert F.array_equal(g2dst, gdst)
 
 if __name__ == '__main__':
-    print('test1')
     test_reorder_nodes()
-    print('test2')
     test_line_graph()
     test_no_backtracking()
     test_reverse()
