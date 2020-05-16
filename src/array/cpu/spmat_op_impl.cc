@@ -613,6 +613,7 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::ND
   int64_t num_rows = csr.num_rows;
   int64_t num_cols = csr.num_cols;
   int64_t nnz = csr.indices->shape[0];
+  CHECK_EQ(nnz, in_indptr[num_rows]);
   CHECK_EQ(num_rows, new_row_id_arr->shape[0])
       << "The new row Id array needs to be the same as the number of rows of CSR";
   CHECK_EQ(num_cols, new_col_id_arr->shape[0])
@@ -631,15 +632,19 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::ND
   IdType *out_data = static_cast<IdType*>(out_data_arr->data);
 
   // Compute the length of rows for the new matrix.
-  std::vector<IdType> new_row_lens(num_rows);
+  std::vector<IdType> new_row_lens(num_rows, -1);
   for (int64_t i = 0; i < num_rows; i++) {
     int64_t new_row_id = new_row_ids[i];
+    CHECK_EQ(new_row_lens[new_row_id], -1);
     new_row_lens[new_row_id] = in_indptr[i + 1] - in_indptr[i];
   }
   // Compute the starting location of each row in the new matrix.
+  out_indptr[0] = 0;
   for (int64_t i = 0; i < num_rows; i++) {
+    CHECK(new_row_lens[i] >= 0);
     out_indptr[i + 1] = out_indptr[i] + new_row_lens[i];
   }
+  CHECK_EQ(out_indptr[num_rows], nnz);
   // Copy indieces and data with the new order.
   // Here I iterate rows in the order of the old matrix.
   for (int64_t i = 0; i < num_rows; i++) {
