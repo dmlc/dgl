@@ -86,11 +86,9 @@ class MemCopySampler(object):
         pos_graph, neg_graph, blocks = next(self.loader)
         input_nodes = blocks[0].srcdata[dgl.NID]
         batch_inputs = g.ndata['features'][input_nodes]
-        seeds = blocks[-1].dstdata[dgl.NID]
         batch_inputs = batch_inputs.to(self.device, non_blocking=True)
 
-        return pos_graph, neg_graph, blocks, batch_inputs, len(seeds)
-
+        return pos_graph, neg_graph, blocks, batch_inputs, 0
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -285,8 +283,6 @@ def run(args, device, data):
     avg = 0
     iter_tput = []
     iter_d = []
-    iter_slice = []
-    iter_td = []
     iter_t = []
     best_eval_acc = 0
     best_test_acc = 0
@@ -301,6 +297,7 @@ def run(args, device, data):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             d_step = time.time()
+            seeds = blocks[-1].dstdata[dgl.NID]
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -310,15 +307,14 @@ def run(args, device, data):
             optimizer.step()
 
             t = time.time()
-            iter_tput.append(seed_len / (t - tic_step))
+            iter_tput.append(len(seeds) / (t - tic_step))
             iter_d.append(d_step - tic_step)
             iter_t.append(t - d_step)
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| Slice {:.4f} | toGPU {:.4f} | train {:.4f} | GPU {:.1f} MiB'.format(
-                    epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_slice[3:]), np.mean(iter_td[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
+                    epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
-            '''
             if step % args.eval_every == 0:
                 eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
@@ -326,7 +322,6 @@ def run(args, device, data):
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
-            '''
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
