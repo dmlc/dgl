@@ -245,7 +245,8 @@ def test_partition_with_halo():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
-    subgs = dgl.transform.metis_partition(g, 4, 0)
+    # partitions without HALO nodes
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=0)
     num_inner_nodes = 0
     num_inner_edges = 0
     if subgs is not None:
@@ -258,7 +259,8 @@ def test_metis_partition():
         assert num_inner_nodes == g.number_of_nodes()
         print(g.number_of_edges() - num_inner_edges)
 
-    subgs = dgl.transform.metis_partition(g, 4, 1)
+    # partitions with 1-hop HALO nodes
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1)
     num_inner_nodes = 0
     num_inner_edges = 0
     if subgs is not None:
@@ -271,9 +273,35 @@ def test_metis_partition():
         assert num_inner_nodes == g.number_of_nodes()
         print(g.number_of_edges() - num_inner_edges)
 
+    # partitions with 1-hop HALO nodes and reshuffling nodes
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1, reshuffle=True)
+    num_inner_nodes = 0
+    num_inner_edges = 0
+    if subgs is not None:
+        for part_id, subg in subgs.items():
+            lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+            ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
+            num_inner_nodes += len(lnode_ids)
+            num_inner_edges += len(ledge_ids)
+            assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
+            nids = F.asnumpy(subg.ndata[dgl.NID])
+            # TODO(zhengda) I need to ensure the local node Ids are contiguous.
+            orig_ids = subg.ndata['orig_id']
+            for nid in range(subg.number_of_nodes()):
+                neighs = subg.predecessors(nid)
+                old_neighs1 = F.gather_row(orig_ids, neighs)
+                old_nid = orig_ids[nid]
+                old_neighs2 = g.predecessors(old_nid)
+                # If this is an inner node, it should have the full neighborhood.
+                if subg.ndata['inner_node'][nid]:
+                    assert np.all(np.sort(F.asnumpy(old_neighs1)) == np.sort(F.asnumpy(old_neighs2)))
+
+        assert num_inner_nodes == g.number_of_nodes()
+        print(g.number_of_edges() - num_inner_edges)
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="It doesn't support GPU")
 def test_reorder_nodes():
-    g = dgl.DGLGraph(create_large_graph_index(10), readonly=True)
+    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
     new_nids = np.random.permutation(g.number_of_nodes())
     new_g = dgl.transform.reorder_nodes(g, new_nids)
     new_in_deg = new_g.in_degrees()
@@ -655,7 +683,7 @@ if __name__ == '__main__':
     # test_remove_self_loop()
     # test_add_self_loop()
     # test_partition_with_halo()
-    # test_metis_partition()
+    test_metis_partition()
     # test_compact()
     # test_to_simple()
     # test_in_subgraph("int32")

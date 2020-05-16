@@ -568,18 +568,21 @@ def reorder_nodes(g, new_node_ids):
     """
     assert len(new_node_ids) == g.number_of_nodes(), \
             "The number of new node ids must match #nodes in the graph."
-    sorted_ids, idx = F.sort_1d(new_node_ids)
+    new_node_ids = utils.toindex(new_node_ids)
+    sorted_ids, idx = F.sort_1d(new_node_ids.tousertensor())
     assert sorted_ids[0] == 0 and sorted_ids[-1] == g.number_of_nodes() - 1, \
             "The new node Ids are incorrect."
-    new_node_ids = utils.toindex(new_node_ids)
     new_gidx = _CAPI_DGLReorderGraph(g._graph, new_node_ids.todgltensor())
     new_g = DGLGraph(new_gidx)
     new_g.ndata['orig_id'] = idx
     return new_g
 
-def partition_graph_with_halo(g, node_part, num_hops):
+def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     ''' This is to partition a graph. Each partition contains HALO nodes
     so that we can generate NodeFlow in each partition correctly.
+
+    If `reshuffle` is turned on, a partitioend graph has node data 'orig_id',
+    which stores the node Ids in the original input graph.
 
     Parameters
     ------------
@@ -591,8 +594,11 @@ def partition_graph_with_halo(g, node_part, num_hops):
         needs to be the same as the number of nodes of the graph. Each element
         indicates the partition Id of a node.
 
-    num_hops: int
+    extra_cached_hops: int
         The number of hops a HALO node can be accessed.
+
+    reshuffle : bool
+        Resuffle nodes so that nodes in the same partition are in the same Id range.
 
     Returns
     --------
@@ -601,14 +607,25 @@ def partition_graph_with_halo(g, node_part, num_hops):
     '''
     assert len(node_part) == g.number_of_nodes()
     node_part = utils.toindex(node_part)
-    subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), num_hops)
+    if reshuffle:
+        node_part = node_part.tousertensor()
+        sorted_part, new2old_map = F.sort_1d(node_part)
+        new_node_ids = F.gather_row(F.arange(0, g.number_of_nodes()), new2old_map)
+        g = reorder_nodes(g, new_node_ids)
+        node_part = utils.toindex(sorted_part)
+
+    subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), extra_cached_hops)
     subg_dict = {}
+    node_part = node_part.tousertensor()
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
         inner_edge = _get_halo_subgraph_inner_edge(subg)
         subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
         subg.ndata['inner_node'] = inner_node
+        subg.ndata['part_id'] = F.gather_row(node_part, subg.parent_nid)
+        if reshuffle:
+            subg.ndata['orig_id'] = F.gather_row(g.ndata['orig_id'], subg.ndata[NID])
         inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
@@ -641,14 +658,16 @@ def metis_partition_assignment(g, k):
         node_part = utils.toindex(node_part)
         return node_part.tousertensor()
 
-def metis_partition(g, k, extra_cached_hops=0):
+def metis_partition(g, k, extra_cached_hops=0, reshuffle=False):
     ''' This is to partition a graph with Metis partitioning.
 
     Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
     to the partitions and their incoming edges.
 
     The partitioned graph is stored in DGLGraph. The DGLGraph has the `part_id`
-    node data that indicates the partition a node belongs to.
+    node data that indicates the partition a node belongs to. If `reshuffle` is turned
+    on, a partitioend graph has node data 'orig_id', which stores the node Ids in the original
+    input graph.
 
     Parameters
     ------------
@@ -660,6 +679,9 @@ def metis_partition(g, k, extra_cached_hops=0):
 
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
+
+    reshuffle : bool
+        Resuffle nodes so that nodes in the same partition are in the same Id range.
 
     Returns
     --------
@@ -673,14 +695,8 @@ def metis_partition(g, k, extra_cached_hops=0):
     if len(node_part) == 0:
         return None
 
-    node_part = utils.toindex(node_part)
     # Then we split the original graph into parts based on the METIS partitioning results.
-    parts = partition_graph_with_halo(g, node_part, extra_cached_hops)
-    node_part = node_part.tousertensor()
-    for part_id in parts:
-        part = parts[part_id]
-        part.ndata['part_id'] = F.gather_row(node_part, part.parent_nid)
-    return parts
+    return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)
 
 def compact_graphs(graphs, always_preserve=None):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
