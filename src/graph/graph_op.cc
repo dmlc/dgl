@@ -509,12 +509,29 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
 }
 
 GraphPtr GraphOp::ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order) {
-  // TODO(zhengda) should we get whatever CSR exists in the graph.
-  CSRPtr csr = ig->GetInCSR();
-  auto csrmat = csr->ToCSRMatrix();
-  auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
-  csr = CSRPtr(new CSR(new_csrmat.indptr, new_csrmat.indices, new_csrmat.data));
-  return GraphPtr(new ImmutableGraph(csr, nullptr));
+  CSRPtr in_csr, out_csr;
+  COOPtr coo;
+  // We only need to reorder one of the graph structure.
+  if (ig->HasInCSR()) {
+    in_csr = ig->GetInCSR();
+    auto csrmat = in_csr->ToCSRMatrix();
+    auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
+    in_csr = CSRPtr(new CSR(new_csrmat.indptr, new_csrmat.indices, new_csrmat.data));
+  } else if (ig->HasOutCSR()) {
+    out_csr = ig->GetOutCSR();
+    auto csrmat = out_csr->ToCSRMatrix();
+    auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
+    out_csr = CSRPtr(new CSR(new_csrmat.indptr, new_csrmat.indices, new_csrmat.data));
+  } else {
+    coo = ig->GetCOO();
+    auto coomat = coo->ToCOOMatrix();
+    auto new_coomat = aten::COOReorder(coomat, new_order, new_order);
+    coo = COOPtr(new COO(ig->NumVertices(), new_coomat.row, new_coomat.col));
+  }
+  if (in_csr || out_csr)
+    return GraphPtr(new ImmutableGraph(in_csr, out_csr));
+  else
+    return GraphPtr(new ImmutableGraph(coo));
 }
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
