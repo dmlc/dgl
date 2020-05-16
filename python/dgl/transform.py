@@ -997,6 +997,10 @@ def remove_edges(g, edge_ids):
 
     The nodes are preserved.
 
+    Note: `remove_edges` is slow especially when removing a small number of edges from
+    a large graph. It creates a new graph with all remaining edges and return the new graph.
+    Please use it with caution especially when using it in mini-batch training.
+
     Parameters
     ----------
     graph : DGLHeteroGraph

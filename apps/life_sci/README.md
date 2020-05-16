@@ -180,9 +180,10 @@ SVG(Draw.MolsToGridImage(mols, molsPerRow=4, subImgSize=(180, 150), useSVG=True)
 
 Below we provide some reference numbers to show how DGL improves the speed of training models per epoch in seconds.
 
-| Model                              | Original Implementation | DGL Implementation | Improvement |
-| ---------------------------------- | ----------------------- | ------------------ | ----------- |
-| GCN on Tox21                       | 5.5 (DeepChem)          | 1.0                | 5.5x        |
-| AttentiveFP on Aromaticity         | 6.0                     | 1.2                | 5x          |
-| JTNN on ZINC                       | 1826                    | 743                | 2.5x        |
-| WLN for reaction center prediction | 11657                   | 5095               | 2.3x        |                                                           |
+| Model                              | Original Implementation | DGL Implementation         | Improvement                  |
+| ---------------------------------- | ----------------------- | -------------------------- | ---------------------------- |
+| GCN on Tox21                       | 5.5 (DeepChem)          | 1.0                        | 5.5x                         |
+| AttentiveFP on Aromaticity         | 6.0                     | 1.2                        | 5x                           |
+| JTNN on ZINC                       | 1826                    | 743                        | 2.5x                         |
+| WLN for reaction center prediction | 11657                   | 858 (1 GPU) / 134 (8 GPUs) | 13.6x (1GPU) / 87.0x (8GPUs) |
+| WLN for candidate ranking          | 40122                   | 22268                      | 1.8x                         |

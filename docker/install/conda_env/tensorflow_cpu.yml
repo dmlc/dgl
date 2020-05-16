@@ -3,8 +3,7 @@ dependencies:
   - python=3.6.9
   - pip
   - pip:
-    - tensorflow==2.2.0rc1
-    # - tf-nightly==2.2.0.dev20200327
+    - tensorflow==2.2.0
     - tfdlpack
     - pytest
     - nose

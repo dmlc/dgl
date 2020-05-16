@@ -85,12 +85,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    // Test if the heterograph is a unit graph.  If so, return itself.
-    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg.sptr());
-    if (bg != nullptr)
-      *rv = bg;
-    else
-      *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
+    auto unit_graph = hg->GetRelationGraph(etype);
+    auto meta_graph = unit_graph->meta_graph();
+    auto hgptr = CreateHeteroGraph(
+        meta_graph, {unit_graph}, unit_graph->NumVerticesPerType());
+    *rv = HeteroGraphRef(hgptr);
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFlattenedGraph")
@@ -430,7 +429,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     DLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
-    HeteroGraphPtr hg_new = UnitGraph::CopyTo(hg.sptr(), ctx);
+    HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
     *rv = HeteroGraphRef(hg_new);
   });
 
@@ -472,6 +471,40 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
       ret_list.push_back(HeteroGraphRef(hgptr));
     }
     *rv = ret_list;
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRestrictFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
+    *rv = hg->GetRelationGraph(etype)->GetRestrictFormat();
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
+    *rv = hg->GetRelationGraph(etype)->GetFormatInUse();
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroRequestFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    const std::string sparse_format = args[1];
+    dgl_type_t etype = args[2];
+    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
+    bg->GetFormat(ParseSparseFormat(sparse_format));
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    const std::string restrict_format = args[1];
+    auto hgptr = hg->GetGraphInFormat(ParseSparseFormat(restrict_format));
+    *rv = HeteroGraphRef(hgptr);
 });
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")
