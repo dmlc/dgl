@@ -155,7 +155,7 @@ def get_loss(h_emb, t_emb, nh_emb, nt_emb, r_emb,
     pos_score = pos_score.mean()
     h_neg_score = h_neg_score.mean()
     t_neg_score = t_neg_score.mean()
-    predict_loss = -(2 * pos_score + h_neg_score + t_neg_score)
+    predict_loss = -(2 * pos_score + h_neg_score + t_neg_score) / 2
 
     reg_loss = regularization_loss(h_emb, t_emb, r_emb, nh_emb, nt_emb)
 
@@ -587,7 +587,6 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
     print("start training...")
     for epoch in range(args.n_epochs):
         model.train()
-        optimizer.zero_grad()
         if epoch > 1:
             t0 = time.time()
         for i, sample_data in enumerate(dataloader):
@@ -615,8 +614,10 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                             chunk_size,
                             chunk_size,
                             args.regularization_coef)
+            optimizer.zero_grad()
             loss.backward()
             th.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
+            th.nn.utils.clip_grad_norm_(embed_layer.parameters(), args.grad_norm)
             optimizer.step()
             t1 = time.time()
 
@@ -894,8 +895,6 @@ def config():
             help="Validation negative sample cnt.")
     parser.add_argument("--test-neg-cnt", type=int, default=-1,
             help="Test negative sample cnt.")
-    parser.add_argument("--sample-based-eval", default=False, action='store_true',
-            help="Use sample based evalution method or full-graph based evalution method")
     parser.add_argument("--num-workers", type=int, default=0,
             help="Number of workers for dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',

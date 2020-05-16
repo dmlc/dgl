@@ -311,10 +311,8 @@ class RelGraphEmbedLayer(nn.Module):
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
         self.num_of_ntype = num_of_ntype
+        self.idmap = th.empty(num_nodes).long()
 
-        none_embed = nn.Parameter(th.Tensor(num_nodes, self.embed_size))
-        nn.init.xavier_uniform_(none_embed, gain=nn.init.calculate_gain('relu'))
-        self.embeds[str(-1)] = none_embed
         for ntype in range(num_of_ntype):
             if input_size[ntype] is not None:
                 loc = node_tids == ntype
@@ -322,7 +320,13 @@ class RelGraphEmbedLayer(nn.Module):
                 embed = nn.Parameter(th.Tensor(input_emb_size, self.embed_size))
                 nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
                 self.embeds[str(ntype)] = embed
-            # else, it is none_embed          
+            else:
+                loc = node_tids == ntype
+                num_subnodes = node_tids[loc].shape[0]
+                self.idmap[loc] = th.arange(num_subnodes)
+                none_embed = nn.Parameter(th.Tensor(num_subnodes, self.embed_size))
+                nn.init.xavier_uniform_(none_embed, gain=nn.init.calculate_gain('relu'))
+                self.embeds[str(ntype)] = none_embed
 
     def forward(self, node_ids, node_tids, features):
         """Forward computation
@@ -344,14 +348,20 @@ class RelGraphEmbedLayer(nn.Module):
         tensor
             embeddings as the input of the next layer
         """
-        embeds = self.embeds[str(-1)]
+        #embeds = self.embeds[str(-1)]
         # first we get embeddings for transductive nodes
-        tsd_idx = node_ids < embeds.shape[0]
-        tsd_ids = node_ids[tsd_idx]
-        embeds = embeds[tsd_ids]
+        #tsd_idx = node_ids < embeds.shape[0]
+        #tsd_ids = node_ids[tsd_idx]
+        #embeds = embeds[tsd_ids]
+        embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.dev_id)
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
                 embeds[loc] = features[ntype] @ self.embeds[str(ntype)]
+            else:
+                loc = node_tids == ntype
+                sub_nodes = node_ids[loc]
+                if sub_nodes.shape[0] > 0:
+                    embeds[loc] = self.embeds[str(ntype)][self.idmap[sub_nodes]]
 
         return embeds.to(self.dev_id)
