@@ -280,8 +280,8 @@ def test_reorder_nodes():
     new_out_deg = new_g.out_degrees()
     in_deg = g.in_degrees()
     out_deg = g.out_degrees()
-    new_in_deg1 = F.scatter_row(in_deg, new_nids, in_deg)
-    new_out_deg1 = F.scatter_row(out_deg, new_nids, out_deg)
+    new_in_deg1 = F.scatter_row(in_deg, F.tensor(new_nids), in_deg)
+    new_out_deg1 = F.scatter_row(out_deg, F.tensor(new_nids), out_deg)
     assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
     assert np.all(F.asnumpy(new_out_deg == new_out_deg1))
 
