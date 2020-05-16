@@ -301,14 +301,6 @@ def run(args, device, data):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             d_step = time.time()
-            #input_nodes = blocks[0].srcdata[dgl.NID]
-            #seeds = blocks[-1].dstdata[dgl.NID]
-
-            # Load the input features as well as output labels
-            #batch_inputs, t_slice, t_td = load_subtensor(g, seeds, input_nodes, device)
-            #iter_slice.append(t_slice)
-            #iter_td.append(t_td)
-            #d_copy = time.time()
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -354,7 +346,6 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
-    argparser.add_argument('--self_neg',default=False, action='store_true')
     args = argparser.parse_args()
     
     if args.gpu >= 0:
