@@ -322,7 +322,7 @@ def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt, queue):
         queue.put(logs)
     else:
         for k, v in metrics.items():
-            print('[{}]{} average {}: {}'.format(rank, mode, k, v))
+            print('average {}: {}'.format(k, v))
 
 def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
     minibatch_blocks, pos_eids, neg_eids, neg_cnt, queue, filterred_test):
