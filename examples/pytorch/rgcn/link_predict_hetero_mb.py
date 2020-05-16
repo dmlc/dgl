@@ -42,6 +42,7 @@ class LinkPredict(nn.Module):
                  dropout=0,
                  use_self_loop=False,
                  low_mem=False,
+                 relation_regularizer = "basis",
                  regularization_coef=0):
         super(LinkPredict, self).__init__()
         self.device = th.device(device if device >= 0 else 'cpu')
@@ -52,6 +53,7 @@ class LinkPredict(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_self_loop = use_self_loop
+        self.relation_regularizer = relation_regularizer
         self.regularization_coef = regularization_coef
 
         self.w_relation = nn.Parameter(th.Tensor(num_rels, h_dim).to(self.device))
@@ -60,13 +62,13 @@ class LinkPredict(nn.Module):
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConvLayer(
-            self.h_dim, self.h_dim, self.edge_rels, "basis",
+            self.h_dim, self.h_dim, self.edge_rels, self.relation_regularizer,
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
             low_mem=low_mem, dropout=self.dropout))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConvLayer(
-                self.h_dim, self.h_dim, self.edge_rels, "basis",
+                self.h_dim, self.h_dim, self.edge_rels, self.relation_regularizer,
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
                 low_mem=low_mem, dropout=self.dropout))
 
@@ -377,7 +379,10 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
             eids_t = g.edata['etype'][eids].to(device)
             phead_emb = embs[su].to(device)
             ptail_emb = embs[sv].to(device)
-            rel_emb = model.module.w_relation[eids_t]
+            if queue is None:
+                rel_emb = model.w_relation[eids_t]
+            else:
+                rel_emb = model.module.w_relation[eids_t]
 
             pos_score = calc_pos_score(phead_emb, ptail_emb, rel_emb)
             pos_score = F.logsigmoid(pos_score).reshape(phead_emb.shape[0], -1)
@@ -478,7 +483,7 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
         queue.put(logs)
     else:
         for k, v in metrics.items():
-            print('[{}]{} average {}: {}'.format(rank, mode, k, v))
+            print('Average {}: {}'.format(k, v))
     t1 = time.time()
     print("Full eval {} exmpales takes {} seconds".format(pos_eids.shape[0], t1 - t0))
 
@@ -569,6 +574,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                         dropout=args.dropout,
                         use_self_loop=args.use_self_loop,
                         low_mem=args.low_mem,
+                        relation_regularizer=args.relation_regularizer,
                         regularization_coef=args.regularization_coef)
     if dev_id >= 0:
         model.cuda(dev_id)
@@ -903,6 +909,8 @@ def config():
             help="Whether store node embeddins in cpu")
     parser.add_argument("--no-test-filter", default=False, action='store_true',
             help="Whether we do filterred evaluation in test")
+    parser.add_argument("--relation-regularizer", default='basis',
+            help="Relation weight regularizer")
 
     args = parser.parse_args()
 

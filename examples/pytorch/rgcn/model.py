@@ -148,7 +148,8 @@ class RelGraphConvLayer(nn.Module):
             # add block diagonal weights
             self.submat_in = in_feat // self.num_bases
             self.submat_out = out_feat // self.num_bases
-
+            print(self.submat_in)
+            print(self.submat_out)
             # assuming in_feat and out_feat are both divisible by num_bases
             self.weight = nn.Parameter(th.Tensor(
                 self.num_rels, self.num_bases * self.submat_in * self.submat_out))
@@ -213,8 +214,8 @@ class RelGraphConvLayer(nn.Module):
                         device=edges.src['h'].device)
             for etype in etypes:
                 loc = edges.data['etype'] == etype
-                w = weight[etype].view(-1, self.submat_in, self.submat_out)
-                src = edges.src['h'][loc].view(-1, self.num_bases, self.submat_in)
+                w = self.weight[etype].view(self.num_bases, self.submat_in, self.submat_out)
+                src = edges.src['h'][loc].view(self.num_bases, -1, self.submat_in)
                 sub_msg = th.matmul(src, w).view(-1, self.out_feat)
                 msg[loc] = sub_msg
         else:
