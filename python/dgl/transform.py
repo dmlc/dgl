@@ -550,6 +550,22 @@ def remove_self_loop(g):
     return new_g
 
 def reorder_nodes(g, new_node_ids):
+    """ Generate a new graph with new node Ids.
+
+    We assign each node in the input graph with a new node Id. This results in
+    a new graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph
+    new_node_ids : a tensor
+        The new node Ids
+    Returns
+    -------
+    DGLGraph
+        The graph with new node Ids.
+    """
     assert len(new_node_ids) == g.number_of_nodes(), \
             "The number of new node ids must match #nodes in the graph."
     new_node_ids = utils.toindex(new_node_ids)
