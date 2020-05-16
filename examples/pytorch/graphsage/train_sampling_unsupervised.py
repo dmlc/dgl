@@ -27,56 +27,6 @@ class NegativeSampler(object):
     def __call__(self, num_samples):
         return self.weights.multinomial(num_samples, replacement=True)
 
-#### Neighbor sampler
-class SelfNegSampler(object):
-    def __init__(self, g, fanouts, num_negs):
-        self.g = g
-        self.fanouts = fanouts
-        self.num_negs = num_negs
-
-    def sample_blocks(self, seed_edges):
-        n_edges = len(seed_edges)
-        assert n_edges > self.num_negs
-        seed_edges = th.LongTensor(np.asarray(seed_edges))
-        heads, tails = self.g.find_edges(seed_edges)
-        neg_tails = []
-        for i in range(self.num_negs):
-            neg_tails.append(tails[th.randperm(n_edges)])
-        neg_tails = th.cat(neg_tails)
-        neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
-
-        # Maintain the correspondence between heads, tails and negative tails as two
-        # graphs.
-        # pos_graph contains the correspondence between each head and its positive tail.
-        # neg_graph contains the correspondence between each head and its negative tails.
-        # Both pos_graph and neg_graph are first constructed with the same node space as
-        # the original graph.  Then they are compacted together with dgl.compact_graphs.
-        pos_graph = dgl.graph((heads, tails), num_nodes=self.g.number_of_nodes())
-        neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
-        [pos_graph, neg_graph] = dgl.compact_graphs([pos_graph, neg_graph])
-
-        # Obtain the node IDs being used in either pos_graph or neg_graph.  Since they
-        # are compacted together, pos_graph and neg_graph share the same compacted node
-        # space.
-        seeds = pos_graph.ndata[dgl.NID]
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
-            # Remove all edges between heads and tails, as well as heads and neg_tails.
-            _, _, edge_ids = frontier.edge_ids(
-                th.cat([heads, tails]),
-                th.cat([tails, heads]),
-                return_uv=True)
-            frontier = dgl.remove_edges(frontier, edge_ids)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return pos_graph, neg_graph, blocks
-
 class NeighborSampler(object):
     def __init__(self, g, fanouts, num_negs):
         self.g = g
@@ -125,6 +75,22 @@ class NeighborSampler(object):
         pos_graph.out_degree(0)
         neg_graph.out_degree(0)
         return pos_graph, neg_graph, blocks
+
+class MemCopySampler(object):
+    def __init__(self, g, device, loader):
+        self.g = g
+        self.loader = iter(loader)
+        self.device = device
+
+    def sample_data(self, seeds):
+        pos_graph, neg_graph, blocks = next(self.loader)
+        input_nodes = blocks[0].srcdata[dgl.NID]
+        batch_inputs = g.ndata['features'][input_nodes]
+        seeds = blocks[-1].dstdata[dgl.NID]
+        batch_inputs = batch_inputs.to(self.device, non_blocking=True)
+
+        return pos_graph, neg_graph, blocks, batch_inputs, len(seeds)
+
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -273,8 +239,7 @@ def load_subtensor(g, seeds, input_nodes, device):
     t = time.time()
     batch_inputs = g.ndata['features'][input_nodes]
     t_slice = time.time()
-    batch_inputs = batch_inputs.to(device)
-    print(batch_inputs.numel())
+    batch_inputs = batch_inputs.to(device, non_blocking=True)
     t_td = time.time()
     return batch_inputs, (t_slice - t), (t_td - t_slice)
 
@@ -288,19 +253,26 @@ def run(args, device, data):
     test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
     # Create sampler
-    if args.self_neg:
-        sampler = SelfNegSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
-    else:
-        sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
+    nb_dataloader = DataLoader(
         dataset=np.arange(g.number_of_edges()),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
+        pin_memory=True,
         num_workers=args.num_workers)
+
+    cp_sampler = MemCopySampler(g, device, nb_dataloader)
+    dataloader = DataLoader(
+        dataset=np.arange(g.number_of_edges()),
+        batch_size=args.batch_size,
+        collate_fn=cp_sampler.sample_data,
+        shuffle=True,
+        drop_last=False,
+        num_workers=0)
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
@@ -325,18 +297,18 @@ def run(args, device, data):
         # blocks.
 
         tic_step = time.time()
-        for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
+        for step, (pos_graph, neg_graph, blocks, batch_inputs, seed_len) in enumerate(dataloader):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             d_step = time.time()
-            input_nodes = blocks[0].srcdata[dgl.NID]
-            seeds = blocks[-1].dstdata[dgl.NID]
+            #input_nodes = blocks[0].srcdata[dgl.NID]
+            #seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
-            batch_inputs, t_slice, t_td = load_subtensor(g, seeds, input_nodes, device)
-            iter_slice.append(t_slice)
-            iter_td.append(t_td)
-            d_copy = time.time()
+            #batch_inputs, t_slice, t_td = load_subtensor(g, seeds, input_nodes, device)
+            #iter_slice.append(t_slice)
+            #iter_td.append(t_td)
+            #d_copy = time.time()
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -346,9 +318,9 @@ def run(args, device, data):
             optimizer.step()
 
             t = time.time()
-            iter_tput.append(len(seeds) / (t - tic_step))
+            iter_tput.append(seed_len / (t - tic_step))
             iter_d.append(d_step - tic_step)
-            iter_t.append(t - d_copy)
+            iter_t.append(t - d_step)
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| Slice {:.4f} | toGPU {:.4f} | train {:.4f} | GPU {:.1f} MiB'.format(
@@ -386,7 +358,7 @@ if __name__ == '__main__':
     args = argparser.parse_args()
     
     if args.gpu >= 0:
-        device = th.device('cuda:%d' % args.gpu)
+        device = args.gpu #th.device('cuda:%d' % args.gpu)
     else:
         device = th.device('cpu')
 
