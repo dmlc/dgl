@@ -458,7 +458,7 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr, runtime::ND
                                                           coo.data->ctx) : NullArray();
   IdType *out_row = static_cast<IdType*>(out_row_arr->data);
   IdType *out_col = static_cast<IdType*>(out_col_arr->data);
-  IdType *out_data = static_cast<IdType*>(out_data_arr->data);
+  IdType *out_data = COOHasData(coo) ? static_cast<IdType*>(out_data_arr->data) : nullptr;
 
 #pragma omp parallel for
   for (int64_t i = 0; i < nnz; i++) {
