@@ -602,9 +602,9 @@ template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
 ///////////////////////////// CSRReorder /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-CSRMatrix CSRReoder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::NDArray new_col_id_arr) {
-  CHECK_SAME_DTYPE(csr.indices, rows);
-  CHECK_SAME_DTYPE(csr.indices, cols);
+CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::NDArray new_col_id_arr) {
+  CHECK_SAME_DTYPE(csr.indices, new_row_id_arr);
+  CHECK_SAME_DTYPE(csr.indices, new_col_id_arr);
 
   // Input CSR
   const IdType* in_indptr = static_cast<IdType*>(csr.indptr->data);
@@ -643,9 +643,14 @@ CSRMatrix CSRReoder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::NDA
   // Copy indieces and data with the new order.
   // Here I iterate rows in the order of the old matrix.
   for (int64_t i = 0; i < num_rows; i++) {
+    const IdType *in_row = in_indices + in_indptr[i];
+    const IdType *in_row_data = in_data + in_indptr[i];
+
     int64_t new_row_id = new_row_ids[i];
     IdType *out_row = out_indices + out_indptr[new_row_id];
     IdType *out_row_data = out_data + out_indptr[new_row_id];
+
+    int64_t row_len = new_row_lens[new_row_id];
     // Here I iterate col indices in a row in the order of the old matrix.
     for (int64_t j = 0; j < row_len; j++) {
       out_row[j] = new_col_ids[in_row[j]];
@@ -657,8 +662,10 @@ CSRMatrix CSRReoder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::NDA
     out_indptr_arr, out_indices_arr, out_data_arr};
 }
 
-template void CSRReorder<kDLCPU, int64_t>(CSRMatrix* csr);
-template void CSRReorder<kDLCPU, int32_t>(CSRMatrix* csr);
+template CSRMatrix CSRReorder<kDLCPU, int64_t>(CSRMatrix csr, runtime::NDArray new_row_ids,
+                                               runtime::NDArray new_col_ids);
+template CSRMatrix CSRReorder<kDLCPU, int32_t>(CSRMatrix csr, runtime::NDArray new_row_ids,
+                                               runtime::NDArray new_col_ids);
 
 }  // namespace impl
 }  // namespace aten

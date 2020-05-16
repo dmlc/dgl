@@ -566,7 +566,7 @@ void CSRSort_(CSRMatrix* csr);
  * \param new_row_ids the new row Ids (the index is the old row Id)
  * \param new_col_ids the new column Ids (the index is the old col Id).
  */
-CSRMatrix CSRReoder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
 
 /*!
  * \brief Remove entries from CSR matrix by entry indices (data indices)
