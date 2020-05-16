@@ -27,6 +27,8 @@ class NegativeSampler(object):
     def __call__(self, num_samples):
         return self.weights.multinomial(num_samples, replacement=True)
 
+#### Neighbor sampler
+
 class NeighborSampler(object):
     def __init__(self, g, fanouts, num_negs):
         self.g = g
@@ -76,6 +78,8 @@ class NeighborSampler(object):
         neg_graph.out_degree(0)
         return pos_graph, neg_graph, blocks
 
+#### CopySampler
+
 class MemCopySampler(object):
     def __init__(self, g, device, loader):
         self.g = g
@@ -88,7 +92,7 @@ class MemCopySampler(object):
         batch_inputs = g.ndata['features'][input_nodes]
         batch_inputs = batch_inputs.to(self.device, non_blocking=True)
 
-        return pos_graph, neg_graph, blocks, batch_inputs, 0
+        return pos_graph, neg_graph, blocks, batch_inputs
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -163,7 +167,7 @@ class SAGE(nn.Module):
         return y
 
 class CrossEntropyLoss(nn.Module):
-    def forward(self, block_outputs, pos_graph, neg_graph, self_neg=False, num_negs=1):
+    def forward(self, block_outputs, pos_graph, neg_graph):
         with pos_graph.local_scope():
             pos_graph.ndata['h'] = block_outputs
             pos_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
@@ -230,17 +234,6 @@ def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_si
     model.train()
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
-def load_subtensor(g, seeds, input_nodes, device):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    t = time.time()
-    batch_inputs = g.ndata['features'][input_nodes]
-    t_slice = time.time()
-    batch_inputs = batch_inputs.to(device, non_blocking=True)
-    t_td = time.time()
-    return batch_inputs, (t_slice - t), (t_td - t_slice)
-
 #### Entry point
 def run(args, device, data):
     # Unpack data
@@ -263,12 +256,13 @@ def run(args, device, data):
         pin_memory=True,
         num_workers=args.num_workers)
 
+    # Create PyTorch DataLoader for copy data into GPU
     cp_sampler = MemCopySampler(g, device, nb_dataloader)
     dataloader = DataLoader(
         dataset=np.arange(g.number_of_edges()),
         batch_size=args.batch_size,
         collate_fn=cp_sampler.sample_data,
-        shuffle=True,
+        shuffle=False,
         drop_last=False,
         num_workers=0)
 
@@ -293,7 +287,7 @@ def run(args, device, data):
         # blocks.
 
         tic_step = time.time()
-        for step, (pos_graph, neg_graph, blocks, batch_inputs, seed_len) in enumerate(dataloader):
+        for step, (pos_graph, neg_graph, blocks, batch_inputs) in enumerate(dataloader):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             d_step = time.time()
@@ -344,7 +338,7 @@ if __name__ == '__main__':
     args = argparser.parse_args()
     
     if args.gpu >= 0:
-        device = args.gpu #th.device('cuda:%d' % args.gpu)
+        device = th.device('cuda:%d' % args.gpu)
     else:
         device = th.device('cpu')
 
