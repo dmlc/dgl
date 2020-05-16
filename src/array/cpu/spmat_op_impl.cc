@@ -633,13 +633,14 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::ND
 
   // Compute the length of rows for the new matrix.
   std::vector<IdType> new_row_lens(num_rows, -1);
+#pragma omp parallel for
   for (int64_t i = 0; i < num_rows; i++) {
     int64_t new_row_id = new_row_ids[i];
-    CHECK_EQ(new_row_lens[new_row_id], -1);
     new_row_lens[new_row_id] = in_indptr[i + 1] - in_indptr[i];
   }
   // Compute the starting location of each row in the new matrix.
   out_indptr[0] = 0;
+  // This is sequential. It should be pretty fast.
   for (int64_t i = 0; i < num_rows; i++) {
     CHECK(new_row_lens[i] >= 0);
     out_indptr[i + 1] = out_indptr[i] + new_row_lens[i];
@@ -647,6 +648,7 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr, runtime::ND
   CHECK_EQ(out_indptr[num_rows], nnz);
   // Copy indieces and data with the new order.
   // Here I iterate rows in the order of the old matrix.
+#pragma omp parallel for
   for (int64_t i = 0; i < num_rows; i++) {
     const IdType *in_row = in_indices + in_indptr[i];
     const IdType *in_row_data = in_data + in_indptr[i];

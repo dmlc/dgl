@@ -277,10 +277,13 @@ def test_reorder_nodes():
     new_nids = np.random.permutation(g.number_of_nodes())
     new_g = dgl.transform.reorder_nodes(g, new_nids)
     new_in_deg = new_g.in_degrees()
+    new_out_deg = new_g.out_degrees()
     in_deg = g.in_degrees()
+    out_deg = g.out_degrees()
     new_in_deg1 = F.scatter_row(in_deg, new_nids, in_deg)
-    #new_in_deg1 = F.gather_row(in_deg, new_nids)
+    new_out_deg1 = F.scatter_row(out_deg, new_nids, out_deg)
     assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
+    assert np.all(F.asnumpy(new_out_deg == new_out_deg1))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
