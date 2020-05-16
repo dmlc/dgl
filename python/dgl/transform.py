@@ -568,9 +568,14 @@ def reorder_nodes(g, new_node_ids):
     """
     assert len(new_node_ids) == g.number_of_nodes(), \
             "The number of new node ids must match #nodes in the graph."
+    sorted_ids, idx = F.sort_1d(new_node_ids)
+    assert sorted_ids[0] == 0 and sorted_ids[-1] == g.number_of_nodes() - 1, \
+            "The new node Ids are incorrect."
     new_node_ids = utils.toindex(new_node_ids)
     new_gidx = _CAPI_DGLReorderGraph(g._graph, new_node_ids.todgltensor())
-    return DGLGraph(new_gidx)
+    new_g = DGLGraph(new_gidx)
+    new_g.ndata['orig_id'] = idx
+    return new_g
 
 def partition_graph_with_halo(g, node_part, num_hops):
     ''' This is to partition a graph. Each partition contains HALO nodes
