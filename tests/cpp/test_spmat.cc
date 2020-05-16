@@ -478,7 +478,20 @@ void _TestCOOSort() {
   ASSERT_TRUE(ArrayEQ<IDX>(src_coo.data, sort_col_data));
 }
 
+template <typename IDX>
+void _TestCSRReorder() {
+  auto csr = CSR2<IDX>();
+  auto new_row = aten::VecToIdArray(
+    std::vector<IDX>({2, 0, 3, 1}), sizeof(IDX)*8, CTX);
+  auto new_col = aten::VecToIdArray(
+    std::vector<IDX>({2, 0, 4, 3, 1}), sizeof(IDX)*8, CTX);
+  auto new_csr = CSRReorder(csr, new_row, new_col);
+  ASSERT_EQ(new_csr.num_rows, csr.num_rows);
+  ASSERT_EQ(new_csr.num_cols, csr.num_cols);
+}
+
 TEST(SpmatTest, TestCOOSort) {
   _TestCOOSort<int32_t>();
   _TestCOOSort<int64_t>();
+  _TestCSRReorder<int32_t>();
 }
