@@ -55,7 +55,7 @@ char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size) {
   return buffer;
 }
 
-bool DeserializeRPCMessage(RPCMessage* msg, const char* buffer, const int64_t size) {
+bool DeserializeRPCMessage(RPCMessage* msg, char* buffer, int64_t size) {
   int64_t total_size = 0;
   // read service_id
   msg->service_id = *(reinterpret_cast<int32_t*>(buffer));

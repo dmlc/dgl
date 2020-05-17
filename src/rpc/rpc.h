@@ -131,7 +131,7 @@ char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size);
  * \param size buffer size
  * \return has_tensor
  */
-bool DeserializeRPCMessage(RPCMessage* msg, const char* buffer, const int64_t size);
+bool DeserializeRPCMessage(RPCMessage* msg, char* buffer, int64_t size);
 
 /*!
  * \brief Send out one RPC message.
