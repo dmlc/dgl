@@ -99,7 +99,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   network::Message raw_msg;
   raw_msg.data = rpc_meta_buffer;
   raw_msg.size = rpc_meta_size;
-  send_kv_msg.deallocator = network::DefaultMessageDeleter;
+  raw_msg.deallocator = network::DefaultMessageDeleter;
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
     raw_msg, msg.server_id), 
     network::ADD_SUCCESS);
