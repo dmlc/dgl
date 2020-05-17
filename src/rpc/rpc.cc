@@ -24,7 +24,7 @@ char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size) {
   total_size += sizeof(int64_t);  // data_size
   total_size += msg.data.size();
   total_size += sizeof(int8_t);   // has_tensor
-  buffer = new char[total_size];
+  char* buffer = new char[total_size];
   char* pointer = buffer;
   // write service_id
   *(reinterpret_cast<int32_t*>(pointer)) = msg.service_id;
@@ -42,7 +42,7 @@ char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size) {
   *(reinterpret_cast<int64_t*>(pointer)) = msg.data.size();
   pointer += sizeof(int64_t);
   // write data
-  memcpy(pointer, reinterpret_cast<char*>(msg.data.data()), msg.data.size());
+  memcpy(pointer, msg.data.data(), msg.data.size());
   pointer += msg.data.size();
   // write hash_tensor
   if (msg.tensors.size() > 0) {
