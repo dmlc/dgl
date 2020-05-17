@@ -47,7 +47,6 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     # Recv all the client's IP
     for i in range(num_clients):
         msg = rpc.recv_rpc_message()
-        
 
     while True:
         print("Recv...")
