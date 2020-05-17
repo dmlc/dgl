@@ -16,28 +16,6 @@ REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
 
-class ClientRegisterReuqest(Request):
-    """Register client to specified server node.
-
-    This request will send client's ip to server.
-
-    Parameters
-    ----------
-    ip_addr : str
-        client's IP address
-    """
-    def __init__(self, ip_addr):
-        self._ip_addr = ip_addr
-
-    def __getstate__(self):
-        return self._ip_addr
-
-    def __setstate__(self, state):
-        self._ip_addr = state
-
-    def process_request(self, server_state):
-        return # do nothing
-
 def read_ip_config(filename):
     """Read network configuration information of server from file.
 
@@ -650,5 +628,48 @@ def recv_rpc_message(timeout=0):
     status = _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
     # TODO: handle status flag
     return msg
+
+
+############################### All the services will be defined here ############################
+
+CLIENT_REGISTER = 32451
+SHUT_DOWN_SERVER = 32452
+
+class ClientRegisterReuqest(Request):
+    """This request will send client's ip to server.
+
+    Parameters
+    ----------
+    ip_addr : str
+        client's IP address
+    """
+    def __init__(self, ip_addr):
+        self._ip_addr = ip_addr
+
+    def __getstate__(self):
+        return self._ip_addr
+
+    def __setstate__(self, state):
+        self._ip_addr = state
+
+    def process_request(self, server_state):
+        return # do nothing
+
+class ClientRegisterResponse(Response):
+    """This response will send assigned ID to client.
+
+    Parameters
+    ----------
+    ID : int
+        client's ID
+    """
+    def __init__(self, ID):
+        self._ID = ID
+
+    def __getstate__(self):
+        return self._ID
+
+    def __setstate__(self, state):
+        self._ID = state
 
 _init_api("dgl.distributed.rpc")

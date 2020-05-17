@@ -30,6 +30,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket', 'mpi'), 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
+    rpc.register_service(rpc.CLIENT_REGISTER, rpc.ClientRegisterReuqest, rpc.ClientRegisterResponse)
     rpc.set_rank(server_id)
     server_namebook = rpc.read_ip_config(ip_config)
     machine_id = server_namebook[server_id][0]

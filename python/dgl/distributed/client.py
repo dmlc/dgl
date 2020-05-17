@@ -10,9 +10,6 @@ if os.name != 'nt':
 
 from . import rpc
 
-CLIENT_REGISTER = 32451
-SHUT_DOWN_SERVER = 32452
-
 def local_ip4_addr_list():
     """Return a set of IPv4 address
     """
@@ -105,6 +102,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     """
     assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket', 'mpi'), 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
+    rpc.register_service(rpc.CLIENT_REGISTER, rpc.ClientRegisterReuqest, rpc.ClientRegisterResponse)
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
     group_count = []
@@ -129,7 +127,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     # Register client on server
     # a temp ID because we don't assign client ID yet
     rpc.set_rank(0)
-    register_req = ClientRegisterReuqest(ip_addr)
+    register_req = rpc.ClientRegisterReuqest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
 
