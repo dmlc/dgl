@@ -102,7 +102,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   raw_msg.deallocator = network::DefaultMessageDeleter;
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
     raw_msg, msg.server_id), 
-    network::ADD_SUCCESS);
+    ADD_SUCCESS);
   if (msg.tensors.size() > 0) {
     // has tensor: need JJ's serialize/deserialize code
     return kRPCSuccess;
