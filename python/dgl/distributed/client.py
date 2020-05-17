@@ -147,13 +147,9 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     ip_addr = get_local_usable_addr()
     client_ip, client_port = ip_addr.split(':')
     # Register client on server
-    print("111")
     register_req = ClientRegisterReuqest(ip_addr)
-    print("222")
     msg_seq = rpc.incr_msg_seq()
-    print("333")
     data, _ = rpc.serialize_to_payload(register_req)
-    print("444")
     for server_id in range(num_servers):
         # client_id = 0 is temp ID because we don't assign client ID yet
         msg = rpc.RPCMessage(service_id=CLIENT_REGISTER, 
@@ -162,8 +158,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
                              server_id=server_id,
                              data=data, 
                              tensors=[])
-    print("555")
-        #rpc.send_rpc_message(msg)
+        rpc.send_rpc_message(msg)
 
 
 def finalize():

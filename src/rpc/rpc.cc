@@ -15,13 +15,113 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace rpc {
 
+char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size) {
+  int64_t total_size = 0;
+  total_size += sizeof(msg.service_id);
+  total_size += sizeof(msg.msg_seq);
+  total_size += sizeof(msg.client_id);
+  total_size += sizeof(msg.server_id);
+  total_size += sizeof(int64_t);  // data_size
+  total_size += msg.data.size();
+  total_size += sizeof(int8_t);   // has_tensor
+  buffer = new char[total_size];
+  char* pointer = buffer;
+  // write service_id
+  *(reinterpret_cast<int32_t*>(pointer)) = msg.service_id;
+  pointer += sizeof(msg.service_id);
+  // write msg_seq
+  *(reinterpret_cast<int64_t*>(pointer)) = msg.msg_seq;
+  pointer += sizeof(msg.msg_seq);
+  // write client_id
+  *(reinterpret_cast<int32_t*>(pointer)) = msg.client_id;
+  pointer += sizeof(msg.client_id);
+  // write server_id
+  *(reinterpret_cast<int32_t*>(pointer)) = msg.server_id;
+  pointer += sizeof(msg.server_id);
+  // write data size
+  *(reinterpret_cast<int64_t*>(pointer)) = msg.data.size();
+  pointer += sizeof(int64_t);
+  // write data
+  memcpy(pointer, reinterpret_cast<char*>(msg.data.data()), msg.data.size());
+  pointer += msg.data.size();
+  // write hash_tensor
+  if (msg.tensors.size() > 0) {
+    *(reinterpret_cast<int8_t*>(pointer)) = 1;
+  } else {
+    *(reinterpret_cast<int8_t*>(pointer)) = 0;
+  }
+  pointer += sizeof(int8_t);
+  *size = total_size;
+  return buffer;
+}
+
+bool DeserializeRPCMessage(RPCMessage* msg, const char* buffer, const int64_t size) {
+  int64_t total_size = 0;
+  // read service_id
+  msg->service_id = *(reinterpret_cast<int32_t*>(buffer));
+  buffer += sizeof(msg->service_id);
+  total_size += sizeof(msg->service_id);
+  // read msg_seq
+  msg->msg_seq = *(reinterpret_cast<int64_t*>(buffer));
+  buffer += sizeof(msg->msg_seq);
+  total_size += sizeof(msg->msg_seq);
+  // read client_id
+  msg->client_id = *(reinterpret_cast<int32_t*>(buffer));
+  buffer += sizeof(msg->client_id);
+  total_size += sizeof(msg->client_id);
+  // read server_id
+  msg->server_id = *(reinterpret_cast<int32_t*>(buffer));
+  buffer += sizeof(msg->msg->server_id);
+  total_size += sizeof(msg->server_id);
+  // read data size
+  int64_t data_size = *(reinterpret_cast<int64_t*>(buffer));
+  buffer += sizeof(int64_t);
+  total_size += sizeof(int64_t);
+  // read data
+  msg->data.resize(data_size);
+  memcpy(reinterpret_cast<char*>(msg->data.data()), buffer, data_size);
+  buffer += data_size;
+  total_size += data_size;
+  // read has_tensor
+  int8_t has_tensor = *(reinterpret_cast<int8_t*>(buffer));
+  buffer += sizeof(int8_t);
+  total_size += sizeof(int8_t);
+  CHECK_EQ(total_size, size);
+  if (has_tensor) {
+    return true;
+  }
+  return false;
+}
+
 RPCStatus SendRPCMessage(const RPCMessage& msg) {
-  // TODO
+  int64_t rpc_meta_size = 0;
+  char* rpc_meta_buffer = SerializeRPCMessage(msg, &rpc_meta_size);
+  network::Message raw_msg;
+  raw_msg.data = rpc_meta_buffer;
+  raw_msg.size = rpc_meta_size;
+  send_kv_msg.deallocator = network::DefaultMessageDeleter;
+  CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
+    raw_msg, msg.server_id), 
+    network::ADD_SUCCESS);
+  if (msg.tensors.size() > 0) {
+    // has tensor: need JJ's serialize/deserialize code
+    return kRPCSuccess;
+  }
   return kRPCSuccess;
 }
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
-  // TODO
+  // ignore timeout now
+  network::Message raw_msg;
+  int send_id;
+  CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
+    &raw_msg, &send_id), 
+    REMOVE_SUCCESS);
+  bool has_tensor = DeserializeRPCMessage(msg, raw_msg.data, raw_msg.size);
+  if (has_tensor) {
+    // has tensor: need JJ's serialize/deserialize code
+    return kRPCSuccess;
+  }
   return kRPCSuccess;
 }
 
@@ -165,7 +265,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateRPCMessage")
   const std::string data = args[4];  // directly assigning string value raises errors :(
   rst->data = data;
   rst->tensors = ListValueToVector<NDArray>(args[5]);
-  std::cout << "size: " << rst->tensors.size() << std::endl;
   *rv = rst;
 });
 

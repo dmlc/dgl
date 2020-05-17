@@ -102,6 +102,38 @@ enum RPCStatus {
 };
 
 /*!
+ * \brief Serialize one RPCMessage to data buffer.
+ *
+ * The serialized data format is:
+ * 
+ * |service_id| -> int32_t
+ * |msg_seq   | -> int64_t
+ * |client_id | -> int32_t
+ * |server_id | -> int32_t
+ * |data_size | -> int64_t
+ * |data      | -> string
+ * |has_tensor| -> int8_t 1 for true and 0 for false
+ *
+ * Note: The real data of tensor will not be serialized to buffer, and
+ * the the memory management of data buffer should be done by user.
+ *
+ * \param msg RPC message to serilaize
+ * \param size the total size of serialized data
+ * \return data buffer
+ */
+char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size);
+
+/*!
+ * \brief Deserialize one RPCMessage from data buffer
+ *
+ * \param msg RPC message to deserilaize
+ * \param buffer buffer holding the serialized data
+ * \param size buffer size
+ * \return has_tensor
+ */
+bool DeserializeRPCMessage(RPCMessage* msg, const char* buffer, const int64_t size);
+
+/*!
  * \brief Send out one RPC message.
  *
  * The operation is non-blocking -- it does not guarantee the payloads have
