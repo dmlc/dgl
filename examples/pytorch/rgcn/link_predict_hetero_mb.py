@@ -499,7 +499,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
     valid_batch_size = args.valid_batch_size
     fanouts = [args.fanout if args.fanout > 0 else None] * args.n_layers
 
-    num_train_edges = train_seeds.shape[0]
+    num_train_edges = train_neg_seeds.shape[0]
     num_valid_edges = valid_neg_seeds.shape[0]
     num_test_edges = test_neg_seeds.shape[0]
     node_tids = test_g.ndata['ntype']
@@ -513,7 +513,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
 
     # build dataloader for training, validation
     train_sampler = LinkRankSampler(train_g,
-                                    train_seeds,
+                                    train_neg_seeds,
                                     num_train_edges,
                                     num_neg=None,
                                     fanouts=fanouts)
