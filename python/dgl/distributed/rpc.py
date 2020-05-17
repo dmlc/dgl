@@ -16,7 +16,7 @@ REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
 
-class ClientRegisterReuqest(rpc.Request):
+class ClientRegisterReuqest(Request):
     """Register client to specified server node.
 
     This request will send client's ip to server.
