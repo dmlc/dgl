@@ -403,7 +403,13 @@ GraphPtr GraphOp::ToBidirectedImmutableGraph(GraphPtr g) {
 HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hops) {
   const dgl_id_t *nid = static_cast<dgl_id_t *>(nodes->data);
   const auto id_len = nodes->shape[0];
+  // A map contains all nodes in the subgraph.
+  // The key is the old node Ids, the value indicates whether a node is a inner
+  // node.
   std::unordered_map<dgl_id_t, bool> all_nodes;
+  // The old Ids of all nodes. We want to preserve the order of the nodes in the
+  // vector. The first few nodes are the inner nodes in the subgraph.
+  std::vector<dgl_id_t> old_node_ids(nid, nid + id_len);
   std::vector<std::vector<dgl_id_t>> outer_nodes(num_hops);
   for (int64_t i = 0; i < id_len; i++)
     all_nodes[nid[i]] = true;
@@ -436,6 +442,7 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
     auto it = all_nodes.find(src_data[i]);
     if (it == all_nodes.end() && num_hops > 0) {
       all_nodes[src_data[i]] = false;
+      old_node_ids.push_back(src_data[i]);
       outer_nodes[0].push_back(src_data[i]);
     }
   }
@@ -461,22 +468,14 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
       auto it = all_nodes.find(src_data[i]);
       if (it == all_nodes.end()) {
         all_nodes[src_data[i]] = false;
+        old_node_ids.push_back(src_data[i]);
         outer_nodes[k].push_back(src_data[i]);
       }
     }
   }
 
-  // We assign new Ids to the nodes in the subgraph. We ensure that nodes
-  // with smaller Ids in the original graph will also get smaller Ids in
-  // the subgraph.
-
-  // Move all nodes to a vector.
-  std::vector<dgl_id_t> old_node_ids;
-  old_node_ids.reserve(all_nodes.size());
-  for (auto it = all_nodes.begin(); it != all_nodes.end(); it++) {
-    old_node_ids.push_back(it->first);
-  }
-  std::sort(old_node_ids.begin(), old_node_ids.end());
+  // We assign new Ids to the nodes in the subgraph. We ensure that the HALO
+  // nodes are behind the input nodes.
   std::unordered_map<dgl_id_t, dgl_id_t> old2new;
   for (size_t i = 0; i < old_node_ids.size(); i++) {
     old2new[old_node_ids[i]] = i;

@@ -285,7 +285,13 @@ def test_metis_partition():
             num_inner_edges += len(ledge_ids)
             assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
             nids = F.asnumpy(subg.ndata[dgl.NID])
-            # TODO(zhengda) I need to ensure the local node Ids are contiguous.
+
+            # ensure the local node Ids are contiguous.
+            assert np.all(F.asnumpy(subg.ndata['inner_node'])[lnode_ids] == 1)
+            parent_ids = F.asnumpy(subg.ndata[dgl.NID])
+            parent_ids = parent_ids[:len(lnode_ids)]
+            assert np.all(parent_ids == np.arange(parent_ids[0], parent_ids[-1] + 1))
+
             orig_ids = subg.ndata['orig_id']
             for nid in range(subg.number_of_nodes()):
                 neighs = subg.predecessors(nid)
