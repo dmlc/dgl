@@ -13,28 +13,6 @@ from . import rpc
 CLIENT_REGISTER = 32451
 SHUT_DOWN_SERVER = 32452
 
-class ClientRegisterReuqest(rpc.Request):
-    """Register client to specified server node.
-
-    This request will send client's ip to server.
-
-    Parameters
-    ----------
-    ip_addr : str
-        client's IP address
-    """
-    def __init__(self, ip_addr):
-        self._ip_addr = ip_addr
-
-    def __getstate__(self):
-        return self._ip_addr
-
-    def __setstate__(self, state):
-        self._ip_addr = state
-
-    def process_request(self, server_state):
-        return # do nothing
-
 def local_ip4_addr_list():
     """Return a set of IPv4 address
     """
@@ -149,18 +127,11 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     ip_addr = get_local_usable_addr()
     client_ip, client_port = ip_addr.split(':')
     # Register client on server
+    # a temp ID because we don't assign client ID yet
+    rpc.set_rank(0)
     register_req = ClientRegisterReuqest(ip_addr)
-    msg_seq = rpc.incr_msg_seq()
-    data, _ = rpc.serialize_to_payload(register_req)
     for server_id in range(num_servers):
-        # client_id = 0 is a temp ID because we don't assign client ID yet
-        msg = rpc.RPCMessage(service_id=CLIENT_REGISTER, 
-                             msg_seq=msg_seq, 
-                             client_id=0, 
-                             server_id=server_id,
-                             data=data, 
-                             tensors=[])
-        rpc.send_rpc_message(msg)
+        rpc.send_request(server_id, register_req)
 
     while True:
         time.sleep(1)

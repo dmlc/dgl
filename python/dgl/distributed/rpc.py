@@ -16,6 +16,28 @@ REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
 
+class ClientRegisterReuqest(rpc.Request):
+    """Register client to specified server node.
+
+    This request will send client's ip to server.
+
+    Parameters
+    ----------
+    ip_addr : str
+        client's IP address
+    """
+    def __init__(self, ip_addr):
+        self._ip_addr = ip_addr
+
+    def __getstate__(self):
+        return self._ip_addr
+
+    def __setstate__(self, state):
+        self._ip_addr = state
+
+    def process_request(self, server_state):
+        return # do nothing
+
 def read_ip_config(filename):
     """Read network configuration information of server from file.
 
