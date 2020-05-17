@@ -512,11 +512,11 @@ def recv_response(timeout=0):
     if res_cls is None:
         raise DGLError('Got response message from service ID {}, '
                        'but no response class is registered.'.format(msg.service_id))
-    res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-    if res.client_id != get_rank():
+    response = deserialize_from_payload(res_cls, msg.data, msg.tensors)
+    if msg.server_id != get_rank():
         raise DGLError('Got reponse of request sent by client {}, '
-                       'different from my rank {}!'.format(res.client_id, get_rank()))
-    return res
+                       'different from my rank {}!'.format(msg.server_id, get_rank()))
+    return response
 
 def remote_call(target_and_requests, timeout=0):
     """Invoke registered services on remote servers and collect responses.
