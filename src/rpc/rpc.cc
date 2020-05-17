@@ -71,7 +71,7 @@ bool DeserializeRPCMessage(RPCMessage* msg, char* buffer, int64_t size) {
   total_size += sizeof(msg->client_id);
   // read server_id
   msg->server_id = *(reinterpret_cast<int32_t*>(buffer));
-  buffer += sizeof(msg->msg->server_id);
+  buffer += sizeof(msg->server_id);
   total_size += sizeof(msg->server_id);
   // read data size
   int64_t data_size = *(reinterpret_cast<int64_t*>(buffer));
@@ -79,7 +79,7 @@ bool DeserializeRPCMessage(RPCMessage* msg, char* buffer, int64_t size) {
   total_size += sizeof(int64_t);
   // read data
   msg->data.resize(data_size);
-  memcpy(reinterpret_cast<char*>(msg->data.data()), buffer, data_size);
+  memcpy(const_cast<char*>(msg->data.data()), buffer, data_size);
   buffer += data_size;
   total_size += data_size;
   // read has_tensor
