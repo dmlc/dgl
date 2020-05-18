@@ -22,8 +22,13 @@
 
 namespace dgl {
 
-// StringStreamWithBuffer is backed up by a string. It stores the data pointer
-// seperately instead of directly write in to the stream.
+// StringStreamWithBuffer is backed up by a string. This class supports
+// serializing and deserializing NDArrays stored in shared memory. If the stream
+// is created for sending/recving data through network, the data pointer of the
+// NDArray will be transmitted directly without and copy. Otherwise, the stream
+// is for sending/recving data to another process on the same machine, so if an
+// NDArray is stored in shared memory, it will just record the shared memory
+// name instead of the actual data buffer.
 class StringStreamWithBuffer : public dmlc::MemoryStringStream {
  public:
   // Buffer type. Storing NDArray to maintain the reference counting to ensure
