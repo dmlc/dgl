@@ -10,7 +10,7 @@ from pytorch3d.io.obj_io import load_obj as load_3d_obj
 
 
 def preprocess(obj_file, bin_num):
-    verts, faces, aux = load_3d_obj(obj_file)
+    verts, faces, _ = load_3d_obj(obj_file)
     
     # Quantilization
     quant_verts = np.clip((verts.data.numpy()+0.5) * (bin_num-1), 0, (bin_num-1)).astype(np.int64).astype(np.float32)
@@ -72,7 +72,7 @@ if __name__ == '__main__':
             subdirs = [os.path.join(class_dir, f) for f in os.listdir(class_dir) if os.path.isdir(os.path.join(class_dir, f))]
             for each_dir in subdirs:
                 obj_file = os.path.join(each_dir, "models/model_normalized.obj")
-                verts, faces = preprocess(obj_file)
+                verts, faces = preprocess(obj_file, 128)
                 if verts.shape[0] < 800 and faces.shape[0] < 2800:
                     print (obj_file)
                     lf.write(obj_file + '\n')
