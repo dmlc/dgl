@@ -35,7 +35,6 @@ class SharedMemory {
   /* \brief the size of the shared memory. */
   size_t size;
 
- public:
   /*
    * \brief the name of the object.
    *
@@ -43,6 +42,11 @@ class SharedMemory {
    * the file name that identifies the shared memory.
    */
   std::string name;
+
+ public:
+  /* \brief Get the filename of shared memory file
+   */
+  std::string GetName() const { return name; }
 
   /*
    * \brief constructor of the shared memory.

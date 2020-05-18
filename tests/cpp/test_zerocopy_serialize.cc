@@ -48,24 +48,23 @@ TEST(ZeroCopySerialize, NDArray) {
   static_cast<dmlc::Stream *>(&ifs)->Write(tensor2);
 
   std::string zerocopy_blob;
-  std::vector<Ptr_pair> ptr_list;
-  ZeroCopyStream zc_write_strm(&zerocopy_blob, &ptr_list);
+  StringStreamWithBuffer zc_write_strm(&zerocopy_blob);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(tensor1);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(tensor2);
 
   LOG(INFO) << nonzerocopy_blob.size() << std::endl;
   LOG(INFO) << zerocopy_blob.size() << std::endl;
 
-  std::vector<Ptr_pair> new_ptr_list;
+  std::vector<void*> new_ptr_list;
   // Use memcpy to mimic remote machine reconstruction
-  for (Ptr_pair ptr : ptr_list) {
-    auto new_ptr = malloc(ptr.second);
-    memcpy(new_ptr, ptr.first, ptr.second);
-    new_ptr_list.emplace_back(new_ptr, ptr.second);
+  for (auto ptr : zc_write_strm.buffer_list()) {
+    auto new_ptr = malloc(ptr.size);
+    memcpy(new_ptr, ptr.data, ptr.size);
+    new_ptr_list.emplace_back(new_ptr);
   }
 
   NDArray loadtensor1, loadtensor2;
-  ZeroCopyStream zc_read_strm(&zerocopy_blob, &new_ptr_list, false);
+  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, new_ptr_list);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor1);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor2);
 }
@@ -84,15 +83,14 @@ TEST(ZeroCopySerialize, SharedMem) {
   static_cast<dmlc::Stream *>(&ifs)->Write(shared_tensor);
 
   std::string zerocopy_blob;
-  std::vector<Ptr_pair> ptr_list;
-  ZeroCopyStream zc_write_strm(&zerocopy_blob, &ptr_list);
+  StringStreamWithBuffer zc_write_strm(&zerocopy_blob, false);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(shared_tensor);
 
   LOG(INFO) << nonzerocopy_blob.size();
   LOG(INFO) << zerocopy_blob.size();
 
   NDArray loadtensor1, loadtensor2;
-  ZeroCopyStream zc_read_strm(&zerocopy_blob, nullptr, true);
+  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, false);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor1);
 }
 
@@ -116,23 +114,22 @@ TEST(ZeroCopySerialize, HeteroGraph) {
   static_cast<dmlc::Stream *>(&ifs)->Write(hrptr);
 
   std::string zerocopy_blob;
-  std::vector<Ptr_pair> ptr_list;
-  ZeroCopyStream zc_write_strm(&zerocopy_blob, &ptr_list);
+  StringStreamWithBuffer zc_write_strm(&zerocopy_blob, true);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(hrptr);
 
   LOG(INFO) << "Non zerocopy size: " << nonzerocopy_blob.size() << std::endl;
   LOG(INFO) << "Zerocopy size: " << zerocopy_blob.size() << std::endl;
 
-  std::vector<Ptr_pair> new_ptr_list;
+  std::vector<void*> new_ptr_list;
   // Use memcpy to mimic remote machine reconstruction
-  for (Ptr_pair ptr : ptr_list) {
-    auto new_ptr = malloc(ptr.second);
-    memcpy(new_ptr, ptr.first, ptr.second);
-    new_ptr_list.emplace_back(new_ptr, ptr.second);
+  for (auto ptr : zc_write_strm.buffer_list()) {
+    auto new_ptr = malloc(ptr.size);
+    memcpy(new_ptr, ptr.data, ptr.size);
+    new_ptr_list.emplace_back(new_ptr);
   }
 
   auto gptr = dgl::Serializer::make_shared<HeteroGraph>();
-  ZeroCopyStream zc_read_strm(&zerocopy_blob, &new_ptr_list, false);
+  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, new_ptr_list);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&gptr);
 
   EXPECT_EQ(gptr->NumVertices(0), 9);

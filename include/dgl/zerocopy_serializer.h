@@ -6,7 +6,7 @@
 #ifndef DGL_ZEROCOPY_SERIALIZER_H_
 #define DGL_ZEROCOPY_SERIALIZER_H_
 
-// #include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/ndarray.h>
 #include <dmlc/io.h>
 #include <dmlc/memory_io.h>
 #include <dmlc/serializer.h>
@@ -15,59 +15,71 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <deque>
 #include <vector>
 
-// #include <dgl/array.h>
+#include "dmlc/logging.h"
 
 namespace dgl {
 
-typedef std::pair<void*, int64_t> Ptr_pair;
-
-using dmlc::MemoryStringStream;
-
-class ZeroCopyStream : public MemoryStringStream {
+class StringStreamWithBuffer : public dmlc::MemoryStringStream {
  public:
+  struct Buffer {
+    dgl::runtime::NDArray tensor;
+    void* data;
+    int64_t size;
+
+    Buffer(const dgl::runtime::NDArray& tensor, void* data, int64_t data_size)
+        : tensor(tensor), data(data), size(data_size) {}
+
+    explicit Buffer(void* data) : data(data) {}
+  };
+
   /*!
-   * \brief constructor of the ZeroCopyStream. ZeroCopyStream is backed up by a
-   * string. It stores the data pointer seperately instead of directly write in
-   * to the stream.
-   * \param metadata_ptr The string to write/load from
-   * \param ptr_list Store the zerocopy pointer information for zerocopy
-   * write/load
-   * \param is_local Means whether the write/load operation is for
-   * the same-machine operation. For write scenario, if it's true, the write
-   * process will raise error if the NDArray is not in shared memory. For load
-   * scenario, if it's true, the NDArray will load from shared memory. If it's
-   * false, the NDArray will load from the pointer in ptr_list.
+   * \brief Constructor of the StringStreamWithBuffer. StringStreamWithBuffer is
+   * backed up by a string. It stores the data pointer seperately instead of
+   * directly write in to the stream. \param metadata_ptr The string to
+   * write/load from \param ptr_list Store the zerocopy pointer information for
+   * zerocopy write/load \param send_to_remote Means whether the write/load
+   * operation is for the same-machine operation. For write scenario, if it's
+   * true, the write process will raise error if the NDArray is not in shared
+   * memory. For load scenario, if it's true, the NDArray will load from shared
+   * memory. If it's false, the NDArray will load from the pointer in ptr_list.
    */
-  explicit ZeroCopyStream(std::string* metadata_ptr,
-                          std::vector<Ptr_pair>* ptr_list, bool is_local = true)
+  explicit StringStreamWithBuffer(std::string* metadata_ptr,
+                                  bool send_to_remote = true)
       : MemoryStringStream(metadata_ptr),
-        is_local(is_local),
-        _ptr_list(ptr_list),
-        idx(0) {}
+        buffer_list_(),
+        send_to_remote_(send_to_remote),
+        head_(0) {}
+
+  StringStreamWithBuffer(std::string* metadata_ptr,
+                         std::vector<void*> data_ptr_list)
+      : MemoryStringStream(metadata_ptr), send_to_remote_(true) {
+    for (void* data : data_ptr_list) {
+      buffer_list_.emplace_back(data);
+    }
+  }
+
   /*!
    * \brief push pointer in to the ptr_list
    */
-  void push_buffer(void* data, int64_t data_byte_size) {
-    _ptr_list->emplace_back(data, data_byte_size);
-  }
+  void push_NDArray(const runtime::NDArray& tensor);
 
   /*!
    * \brief get pointer in to the ptr_list
    */
-  Ptr_pair pop_buffer() {
-    auto ret = _ptr_list->at(idx);
-    idx++;
-    return ret;
-  }
+  dgl::runtime::NDArray pop_NDArray();
 
-  bool is_local;
+  const bool& send_to_remote() const { return send_to_remote_; }
+
+  const std::deque<Buffer>& buffer_list() const { return buffer_list_; }
 
  private:
-  std::vector<Ptr_pair>* _ptr_list;
-  int64_t idx;
-};
+  std::deque<Buffer> buffer_list_;
+  bool send_to_remote_;
+  int64_t head_;
+};  // namespace dgl
 
 }  // namespace dgl
 

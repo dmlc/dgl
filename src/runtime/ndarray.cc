@@ -9,6 +9,7 @@
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/shared_mem.h>
+#include <dgl/zerocopy_serializer.h>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -279,102 +280,75 @@ template std::vector<uint64_t> NDArray::ToVector<uint64_t>() const;
 template std::vector<float> NDArray::ToVector<float>() const;
 template std::vector<double> NDArray::ToVector<double>() const;
 
-
 #ifndef _WIN32
-struct RawDataTensorCtx {
-  std::vector<int64_t> shape;
-  std::vector<int64_t> stride;
-  DLManagedTensor tensor;
-};
+std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
+  return this->data_->mem;
+}
+#endif  // _WIN32
 
-void RawDataTensoDLPackDeleter(DLManagedTensor* tensor) {
-  auto ctx = static_cast<RawDataTensorCtx*>(tensor->manager_ctx);
-  free(ctx->tensor.dl_tensor.data);
-  delete ctx;
+
+void NDArray::Save(dmlc::Stream* strm) const {
+  auto zc_strm = dynamic_cast<StringStreamWithBuffer*>(strm);
+  if (zc_strm) {
+    zc_strm->push_NDArray(*this);
+    return;
+  }
+  SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
 }
 
-NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
-                             DLContext ctx, void* raw) {
-  auto dlm_tensor_ctx = new RawDataTensorCtx();
-  DLManagedTensor* dlm_tensor = &dlm_tensor_ctx->tensor;
-  dlm_tensor_ctx->shape = shape;
-  dlm_tensor->manager_ctx = dlm_tensor_ctx;
-  dlm_tensor->dl_tensor.shape = dmlc::BeginPtr(dlm_tensor_ctx->shape);
-  dlm_tensor->dl_tensor.ctx = ctx;
-  dlm_tensor->dl_tensor.ndim = static_cast<int>(shape.size());
-  dlm_tensor->dl_tensor.dtype = dtype;
-
-  dlm_tensor_ctx->stride.resize(dlm_tensor->dl_tensor.ndim, 1);
-  for (int i = dlm_tensor->dl_tensor.ndim - 2; i >= 0; --i) {
-    dlm_tensor_ctx->stride[i] = dlm_tensor_ctx->shape[i+1] * dlm_tensor_ctx->stride[i+1];
+bool NDArray::Load(dmlc::Stream* strm) {
+  auto zc_strm = dynamic_cast<StringStreamWithBuffer*>(strm);
+  if (zc_strm) {
+    *this = zc_strm->pop_NDArray();
+    return true;
   }
-  dlm_tensor->dl_tensor.strides = dmlc::BeginPtr(dlm_tensor_ctx->stride);
-  dlm_tensor->dl_tensor.data = raw;
-  dlm_tensor->deleter = RawDataTensoDLPackDeleter;
-  return NDArray::FromDLPack(dlm_tensor);
-}
-
-void ZeroCopySaveDLTensor(ZeroCopyStream* zc_strm, DLTensor* tensor,
-                                 std::shared_ptr<SharedMemory> mem) {
-  auto strm = static_cast<dmlc::Stream*>(zc_strm);
-  strm->Write(tensor->ndim);
-  strm->Write(tensor->dtype);
-  int ndim = tensor->ndim;
-  strm->WriteArray(tensor->shape, ndim);
-  int type_bytes = tensor->dtype.bits / 8;
-  int64_t num_elems = 1;
-  for (int i = 0; i < ndim; ++i) {
-    num_elems *= tensor->shape[i];
-  }
-  int64_t data_byte_size = type_bytes * num_elems;
-  if (mem) {
-    strm->Write<bool>(true);
-    strm->Write(mem->name);
-  } else {
-    if (!zc_strm->is_local) {
-      LOG(FATAL) << "Serializing a non-shared-memory tensor to a local "
-                    "ZeroCopyStream is not supported.";
-    }
-    strm->Write<bool>(false);
-  }
-  zc_strm->push_buffer(tensor->data, data_byte_size);
-}
-
-NDArray ZeroCopyLoadDLTensor(ZeroCopyStream* zc_strm) {
-  auto strm = static_cast<dmlc::Stream*>(zc_strm);
+  uint64_t header, reserved;
+  CHECK(strm->Read(&header))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&reserved))
+      << "Invalid DLTensor file format";
+  CHECK(header == kDGLNDArrayMagic)
+      << "Invalid DLTensor file format";
+  DLContext ctx;
   int ndim;
   DLDataType dtype;
-
-  CHECK(strm->Read(&ndim)) << "Invalid DLTensor file format";
-  CHECK(strm->Read(&dtype)) << "Invalid DLTensor file format";
-
+  CHECK(strm->Read(&ctx))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&ndim))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&dtype))
+      << "Invalid DLTensor file format";
+  CHECK_EQ(ctx.device_type, kDLCPU)
+      << "Invalid DLTensor context: can only save as CPU tensor";
   std::vector<int64_t> shape(ndim);
   if (ndim != 0) {
-    CHECK(strm->ReadArray(&shape[0], ndim)) << "Invalid DLTensor file format";
+    CHECK(strm->ReadArray(&shape[0], ndim))
+        << "Invalid DLTensor file format";
   }
-
-  DLContext cpu_ctx;
-  cpu_ctx.device_type = kDLCPU;
-  cpu_ctx.device_id = 0;
-
-  bool is_shared_mem;
-  CHECK(strm->Read(&is_shared_mem)) << "Invalid stream read";
-  std::string sharedmem_name;
-  if (zc_strm->is_local) {
-    if (is_shared_mem) {
-      CHECK(strm->Read(&sharedmem_name)) << "Invalid stream read";
-      return NDArray::EmptyShared(sharedmem_name, shape, dtype, cpu_ctx, false);
-    } else {
-      LOG(FATAL)
-        << "Unsupport non-shared memory deserialization on the same machine";
-    }
-  } else {
-    Ptr_pair ptr_pair = zc_strm->pop_buffer();
-    return CreateNDArrayFromRawData(shape, dtype, cpu_ctx, ptr_pair.first);
+  NDArray ret = NDArray::Empty(shape, dtype, ctx);
+  int64_t num_elems = 1;
+  int elem_bytes = (ret->dtype.bits + 7) / 8;
+  for (int i = 0; i < ret->ndim; ++i) {
+    num_elems *= ret->shape[i];
   }
+  int64_t data_byte_size;
+  CHECK(strm->Read(&data_byte_size))
+      << "Invalid DLTensor file format";
+  CHECK(data_byte_size == num_elems * elem_bytes)
+      << "Invalid DLTensor file format";
+  if (data_byte_size != 0)  {
+    // strm->Read will return the total number of elements successfully read.
+    // Therefore if data_byte_size is zero, the CHECK below would fail.
+    CHECK(strm->Read(ret->data, data_byte_size))
+        << "Invalid DLTensor file format";
+  }
+  if (!DMLC_IO_NO_ENDIAN_SWAP) {
+    dmlc::ByteSwap(ret->data, elem_bytes, num_elems);
+  }
+  *this = ret;
+  return true;
 }
 
-#endif  // _WIN32
 
 }  // namespace runtime
 }  // namespace dgl
