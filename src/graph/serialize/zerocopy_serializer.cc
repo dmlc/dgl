@@ -5,6 +5,7 @@
  */
 
 #include <dgl/zerocopy_serializer.h>
+
 #include "dgl/runtime/ndarray.h"
 
 namespace dgl {
@@ -45,13 +46,17 @@ NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
   return NDArray::FromDLPack(dlm_tensor);
 }
 
-void StringStreamWithBuffer::push_NDArray(const NDArray& tensor) {
+void StringStreamWithBuffer::PushNDArray(const NDArray& tensor) {
 #ifndef _WIN32
   auto strm = static_cast<dmlc::Stream*>(this);
   strm->Write(tensor->ndim);
   strm->Write(tensor->dtype);
   int ndim = tensor->ndim;
   strm->WriteArray(tensor->shape, ndim);
+  CHECK(tensor.IsContiguous())
+    << "StringStreamWithBuffer only supports contiguous tensor";
+  CHECK_EQ(tensor->byte_offset, 0)
+    << "StringStreamWithBuffer only supports zero byte offset tensor";
   int type_bytes = tensor->dtype.bits / 8;
   int64_t num_elems = 1;
   for (int i = 0; i < ndim; ++i) {
@@ -74,10 +79,11 @@ void StringStreamWithBuffer::push_NDArray(const NDArray& tensor) {
   }
 #else
   LOG(FATAL) << "StringStreamWithBuffer is not supported on windows";
+  return;
 #endif  // _WIN32
 }
 
-NDArray StringStreamWithBuffer::pop_NDArray() {
+NDArray StringStreamWithBuffer::PopNDArray() {
 #ifndef _WIN32
   auto strm = static_cast<dmlc::Stream*>(this);
   int ndim;
@@ -98,10 +104,14 @@ NDArray StringStreamWithBuffer::pop_NDArray() {
   bool is_shared_mem;
   CHECK(strm->Read(&is_shared_mem)) << "Invalid stream read";
   std::string sharedmem_name;
-  if (!send_to_remote_ && is_shared_mem) {
+  if (is_shared_mem) {
+    CHECK(!send_to_remote_) << "Invalid attempt to deserialize from shared "
+                               "memory with send_to_remote=true";
     CHECK(strm->Read(&sharedmem_name)) << "Invalid stream read";
     return NDArray::EmptyShared(sharedmem_name, shape, dtype, cpu_ctx, false);
   } else {
+    CHECK(send_to_remote_) << "Invalid attempt to deserialize from raw data "
+                              "pointer with send_to_remote=false";
     auto ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx,
                                         buffer_list_.front().data);
     buffer_list_.pop_front();
@@ -109,6 +119,7 @@ NDArray StringStreamWithBuffer::pop_NDArray() {
   }
 #else
   LOG(FATAL) << "StringStreamWithBuffer is not supported on windows";
+  return;
 #endif  // _WIN32
 }
 

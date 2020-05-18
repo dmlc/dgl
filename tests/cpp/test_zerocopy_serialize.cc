@@ -52,10 +52,10 @@ TEST(ZeroCopySerialize, NDArray) {
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(tensor1);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(tensor2);
 
-  LOG(INFO) << nonzerocopy_blob.size() << std::endl;
-  LOG(INFO) << zerocopy_blob.size() << std::endl;
+  EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 126)
+    << "Invalid save";
 
-  std::vector<void*> new_ptr_list;
+  std::vector<void *> new_ptr_list;
   // Use memcpy to mimic remote machine reconstruction
   for (auto ptr : zc_write_strm.buffer_list()) {
     auto new_ptr = malloc(ptr.size);
@@ -86,8 +86,8 @@ TEST(ZeroCopySerialize, SharedMem) {
   StringStreamWithBuffer zc_write_strm(&zerocopy_blob, false);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(shared_tensor);
 
-  LOG(INFO) << nonzerocopy_blob.size();
-  LOG(INFO) << zerocopy_blob.size();
+  EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 51)
+    << "Invalid save";
 
   NDArray loadtensor1, loadtensor2;
   StringStreamWithBuffer zc_read_strm(&zerocopy_blob, false);
@@ -117,10 +117,10 @@ TEST(ZeroCopySerialize, HeteroGraph) {
   StringStreamWithBuffer zc_write_strm(&zerocopy_blob, true);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(hrptr);
 
-  LOG(INFO) << "Non zerocopy size: " << nonzerocopy_blob.size() << std::endl;
-  LOG(INFO) << "Zerocopy size: " << zerocopy_blob.size() << std::endl;
+  EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 745)
+    << "Invalid save";
 
-  std::vector<void*> new_ptr_list;
+  std::vector<void *> new_ptr_list;
   // Use memcpy to mimic remote machine reconstruction
   for (auto ptr : zc_write_strm.buffer_list()) {
     auto new_ptr = malloc(ptr.size);

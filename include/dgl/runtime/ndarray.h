@@ -241,7 +241,6 @@ class NDArray {
   std::vector<T> ToVector() const;
 
 #ifndef _WIN32
-  // static std::shared_ptr<SharedMemory> GetSharedMem(const NDArray& tensor);
   std::shared_ptr<SharedMemory> GetSharedMem() const;
 #endif  // _WIN32
 

@@ -29,9 +29,9 @@ class StringStreamWithBuffer : public dmlc::MemoryStringStream {
   // Buffer type. Storing NDArray to maintain the reference counting to ensure
   // the liveness of data pointer
   struct Buffer {
-    dgl::runtime::NDArray tensor;
-    void* data;
-    int64_t size;
+    dgl::runtime::NDArray tensor = dgl::runtime::NDArray();
+    void* data = nullptr;
+    int64_t size = 0;
 
     Buffer(const dgl::runtime::NDArray& tensor, void* data, int64_t data_size)
         : tensor(tensor), data(data), size(data_size) {}
@@ -75,7 +75,7 @@ class StringStreamWithBuffer : public dmlc::MemoryStringStream {
    * StringStreamWithBuffer buf_strm(&blob, data_ptr_list)
    */
   StringStreamWithBuffer(std::string* metadata_ptr,
-                         std::vector<void*> data_ptr_list)
+                         const std::vector<void*>& data_ptr_list)
       : MemoryStringStream(metadata_ptr), send_to_remote_(true) {
     for (void* data : data_ptr_list) {
       buffer_list_.emplace_back(data);
@@ -83,19 +83,24 @@ class StringStreamWithBuffer : public dmlc::MemoryStringStream {
   }
 
   /*!
-   * \brief push NDArray in underlying buffer
+   * \brief push NDArray into stream
+   * If send_to_remote=true, the NDArray will be saved to the buffer list
+   * If send_to_remote=false, the NDArray will be saved to the backedup string
    */
-  void push_NDArray(const runtime::NDArray& tensor);
+  void PushNDArray(const runtime::NDArray& tensor);
 
   /*!
-   * \brief pop NDArray from underlying buffer
+   * \brief pop NDArray from stream
+   * If send_to_remote=true, the NDArray will be reconstructed from buffer list
+   * If send_to_remote=false, the NDArray will be reconstructed from shared
+   * memory
    */
-  dgl::runtime::NDArray pop_NDArray();
+  dgl::runtime::NDArray PopNDArray();
 
   /*!
    * \brief Get whether this stream is for remote usage
    */
-  const bool& send_to_remote() const { return send_to_remote_; }
+  bool send_to_remote() { return send_to_remote_; }
 
   /*!
    * \brief Get underlying buffer list

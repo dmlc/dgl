@@ -290,7 +290,7 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
 void NDArray::Save(dmlc::Stream* strm) const {
   auto zc_strm = dynamic_cast<StringStreamWithBuffer*>(strm);
   if (zc_strm) {
-    zc_strm->push_NDArray(*this);
+    zc_strm->PushNDArray(*this);
     return;
   }
   SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
@@ -299,7 +299,7 @@ void NDArray::Save(dmlc::Stream* strm) const {
 bool NDArray::Load(dmlc::Stream* strm) {
   auto zc_strm = dynamic_cast<StringStreamWithBuffer*>(strm);
   if (zc_strm) {
-    *this = zc_strm->pop_NDArray();
+    *this = zc_strm->PopNDArray();
     return true;
   }
   uint64_t header, reserved;
