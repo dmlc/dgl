@@ -130,6 +130,12 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     register_req = rpc.ClientRegisterReuqest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
+    # wait server connect back
+    rpc.receiver_wait(client_ip, client_port, num_servers)
+    # recv client ID from server
+    res = rpc.recv_response()
+    print("response id: " + str(res._ID))
+    rpc.set_rank(res._ID)
 
     while True:
         time.sleep(1)
