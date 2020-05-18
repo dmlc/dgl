@@ -743,7 +743,7 @@ def recv_rpc_message(timeout=0):
     return msg
 
 
-############################### Some basic services are be defined here ############################
+############################### Some basic services will be defined here ############################
 
 CLIENT_REGISTER = 32451
 
