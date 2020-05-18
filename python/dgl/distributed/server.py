@@ -70,8 +70,8 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
             rpc.send_response(ID, register_res)
     # service loop
     while True:
-        
-        
+        print("recv...")
+        time.sleep(1)
 
     finalize()
 
