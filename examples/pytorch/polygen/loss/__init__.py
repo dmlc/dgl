@@ -44,6 +44,10 @@ class SimpleLossCompute(nn.Module):
         return (self.acc_loss + self.eps) / (self.norm_term + self.eps)
 
     @property
+    def bits_per_pixel(self):
+        return self.avg_loss() / np.log(2.)
+
+    @property
     def accuracy(self):
         return (self.n_correct + self.eps) / (self.norm_term + self.eps)
 

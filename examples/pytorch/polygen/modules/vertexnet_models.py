@@ -1,9 +1,5 @@
-from .config import *
-from .act import *
 from .attention import *
-from .viz import *
 from .layers import *
-from .functions import *
 from .embedding import *
 from dataset.datasets import VertexDataset
 import threading
@@ -14,6 +10,10 @@ import torch.nn.init as INIT
 
 class Decoder(nn.Module):
     def __init__(self, layer, N):
+        '''
+        args:
+            N: number of blocks.
+        '''
         super(Decoder, self).__init__()
         self.N = N
         self.layers = clones(layer, N)
@@ -40,6 +40,16 @@ class Decoder(nn.Module):
 
 class Transformer(nn.Module):
     def __init__(self, decoder, coord_embed, pos_embed, value_embed, generator, h, d_k):
+        '''
+        args:
+            decoder: decoder module
+            coord_embed: coordinate embedding module
+            pos_embed: position encoding module
+            value_embed: value embedding module
+            generator: generate next token from representation
+            h: number of heads
+            d_k: dim per head
+        '''
         super(Transformer, self).__init__()
         self.decoder = decoder
         self.coord_embed = coord_embed
@@ -88,15 +98,13 @@ class Transformer(nn.Module):
 
         return self.generator(g.ndata['x'][nids['dec']])
 
-    def infer(self, graph, max_len, eos_id, k, alpha=1.0):
+    def infer(self, graph, max_len, eos_id):
         '''
-        This function implements Beam Search in DGL, which is required in inference phase.
-        Length normalization is given by (5 + len) ^ alpha / 6 ^ alpha. Please refer to https://arxiv.org/pdf/1609.08144.pdf.
+        This function implements nucleus sampling in DGL, which is required in inference phase.
         args:
             graph: a `Graph` object defined in `dgl.contrib.transformer.graph`.
             max_len: the maximum length of decoding.
             eos_id: the index of end-of-sequence symbol.
-            k: beam size
         return:
             ret: a list of index array correspond to the input sequence specified by `graph``.
         '''
@@ -172,6 +180,14 @@ class Transformer(nn.Module):
 
 
 def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, universal=False):
+    '''
+    args:
+        N: transformer block number.
+        dim_model: hidden layer dimention of transformer.
+        dim_ff: feedforward layer dimention.
+        h: number of head for multihead attention
+        dropout: dropout rate
+    '''
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)

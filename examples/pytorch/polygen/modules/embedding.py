@@ -37,8 +37,9 @@ class VertCoordJointEmbeddings(nn.Module):
     def __init__(self, vocab_size, dim_model):
         super(VertCoordJointEmbeddings, self).__init__()
         self.dim_model = dim_model
-        self.luts = clones(Embeddings(vocab_size, dim_model), 3) 
-        self.linear = nn.Linear(dim_model*3, dim_model) 
+        self.num_coords = 3
+        self.luts = clones(Embeddings(vocab_size, dim_model), self.num_coords) 
+        self.linear = nn.Linear(dim_model*self.num_coords, dim_model) 
 
     def forward(self, x):
         return self.linear(th.cat((self.luts[0](x[:, 0]), self.luts[1](x[:, 1]), self.luts[2](x[:, 2])), 1))

@@ -1,9 +1,5 @@
-from .config import *
-from .act import *
 from .attention import *
-from .viz import *
 from .layers import *
-from .functions import *
 from .embedding import *
 from dataset import *
 import threading
@@ -15,6 +11,10 @@ import torch.nn.init as INIT
 
 class Encoder(nn.Module):
     def __init__(self, layer, N):
+        '''
+        args:
+            N: number of blocks.
+        '''
         super(Encoder, self).__init__()
         self.N = N
         self.layers = clones(layer, N)
@@ -41,6 +41,10 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, layer, N):
+        '''
+        args:
+            N: number of blocks.
+        '''
         super(Decoder, self).__init__()
         self.N = N
         self.layers = clones(layer, N)
@@ -65,29 +69,19 @@ class Decoder(nn.Module):
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
-# recv fun
-def softmax_and_pad(nodes):
-    max_len = FaceDataset.MAX_VERT_LENGTH
-    eps = -1e8
-    shape = nodes.mailbox['pointer_score'].shape
-    # reorder based on src idx
-    pointer_dot = nodes.mailbox['pointer_score']
-    src_idx = nodes.mailbox['src_idx'].long()
-    ordered_pointer_dot = th.gather(pointer_dot, 1, src_idx)
-    # log softmax
-    log_softmax_pointer_dot = th.log_softmax(ordered_pointer_dot, dim=-1)
-    softmax_pointer_dot = th.softmax(ordered_pointer_dot, dim=-1)
-
-    pad_num = max_len - shape[1]
-    if pad_num:
-        pad_tensor = th.ones([shape[0], pad_num], dtype=log_softmax_pointer_dot.dtype, device=log_softmax_pointer_dot.device)*eps
-        padded_res = th.cat([log_softmax_pointer_dot, pad_tensor], axis=1)
-        return {'log_softmax_res': padded_res}
-    else:
-        return {'log_softmax_res': log_softmax_pointer_dot}
-
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, h, d_k):
+        '''
+        args:
+            encoder: encoder module
+            decoder: decoder module
+            vert_val_embed: vertex value embedding module
+            vert_pos_enc: vertex position encoding module
+            face_pos_enc: face position encoding module
+            vert_idx_in_face_enc: vertex idx in face encoding module
+            h: number of heads
+            d_k: dim per head
+        '''
         super(Transformer, self).__init__()
         self.encoder,  self.decoder = encoder, decoder
         self.vert_val_embed = vert_val_embed
@@ -135,8 +129,10 @@ class Transformer(nn.Module):
             nodes, edges = nids['enc'], eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
         
-        # Indexing result
+        # Indexing encoder results
         tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, graph.tgt[0])
+        
+        # Embed face position
         face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
         vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
         g.nodes[nids['dec']].data['x'] = tgt_embed + face_pos_enc + vert_idx_in_face_enc
@@ -151,12 +147,6 @@ class Transformer(nn.Module):
         
         nodes, edges = nids['dec'], eids['ed']
 
-        '''
-        # Numerical stable since we use log_softmax
-        g.send(edges=g.find_edges(edges), message_func=[fn.u_dot_v('x', 'x', 'pointer_score'), fn.copy_u('idx', 'src_idx')])
-        g.recv(v=nodes, reduce_func=softmax_and_pad)
-        return g.ndata['log_softmax_res'][nids['dec']]
-        '''
         # Pointer network
         # log(softmax) is not numerical stable.
         # We will only output the dot_product result and use CrossEntropyLoss
@@ -175,15 +165,13 @@ class Transformer(nn.Module):
         return pointer_score_padded
 
 
-    def infer(self, graph, max_len, eos_id, k, alpha=1.0):
+    def infer(self, graph, max_len, eos_id):
         '''
         This function implements Beam Search in DGL, which is required in inference phase.
-        Length normalization is given by (5 + len) ^ alpha / 6 ^ alpha. Please refer to https://arxiv.org/pdf/1609.08144.pdf.
         args:
             graph: a `Graph` object defined in `dgl.contrib.transformer.graph`.
             max_len: the maximum length of decoding.
             eos_id: the index of end-of-sequence symbol.
-            k: beam size
         return:
             ret: a list of index array correspond to the input sequence specified by `graph``.
         '''
@@ -280,6 +268,14 @@ class Transformer(nn.Module):
 
 
 def make_face_model(N=12, dim_model=256, dim_ff=1024, h=8, dropout=0.1):
+    '''
+    args:
+        N: transformer block number.
+        dim_model: hidden layer dimention of transformer.
+        dim_ff: feedforward layer dimention.
+        h: number of head for multihead attention
+        dropout: dropout rate
+    '''
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
     ff = PositionwiseFeedForward(dim_model, dim_ff)

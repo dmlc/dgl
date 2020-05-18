@@ -5,9 +5,6 @@ import itertools
 import time
 from collections import *
 
-VertexGraph = namedtuple('Graph',
-                   ['g', 'tgt', 'tgt_y', 'nids', 'eids',  'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
-
 class VertexNetGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
     def __init__(self, n=400):
