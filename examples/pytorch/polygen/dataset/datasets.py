@@ -145,7 +145,7 @@ class FaceDataset(object):
     # FACE_VERT_OFFSET = NEXT_FACE_VERT_IDX + 1
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
 
-    MAX_FACE_INDICES = 1000
+    MAX_FACE_INDICES = 800
     # NOTE: Need to be changed to // 4 after using n-gon since 
     MAX_FACE_LENGTH = MAX_FACE_INDICES // 3 + 2
 

@@ -118,7 +118,7 @@ class Transformer(nn.Module):
         g.ndata['mask'] = th.zeros(N, dtype=th.bool, device=device)
         g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
         coord_embed = self.coord_embed(graph.tgt[1]%3)
-        pos_embed = self.pos_embed(graph.tgt[1]//3) 
+        pos_embed = self.pos_embed(graph.tgt[1]//3)
         res = graph.tgt_y
 
         # decode
