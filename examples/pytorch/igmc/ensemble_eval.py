@@ -18,6 +18,15 @@ from utils import get_activation, get_optimizer, torch_total_param_num, torch_ne
 
 def ensemble_evaluate(args, net, ckpts_path):
     # Evaluate RMSE
+    # recreate dataset everytime
+    dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+                            test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
+
+    test_dataset = MovieLensDataset(dataset_base.test_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
+
+    data_iter = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
+
+
     net.eval()
     preds = []
     ys = []
@@ -26,16 +35,6 @@ def ensemble_evaluate(args, net, ckpts_path):
         print (ckpt)
         pred = []
         res = []
-
-        # recreate dataset everytime
-        dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
-                            test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
-
-        test_dataset = MovieLensDataset(dataset_base.test_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
-
-        data_iter = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
-
-
         for idx, batch in enumerate(data_iter):
             graph = batch[0]
             rating_gt = batch[1]

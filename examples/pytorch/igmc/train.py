@@ -40,19 +40,17 @@ def adj_rating_reg(net):
 
 
 def train(args):
-    dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
-                        test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
-    train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device, mode='train', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=collate_movielens)
-    test_dataset = MovieLensDataset(dataset_base.test_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
-    val_dataset = MovieLensDataset(dataset_base.val_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
-
     ### build the net
+    dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+                            test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     # multiply num_relations by 2 because now we have two types for u-v edge and v-u edge
     # NOTE: can't remember why we need add 2 for dim, need check
-    net = IGMC(in_dim=args.hop*2+1+1, num_relations=len(dataset_base.class_values), num_bases=args.num_igmc_bases, regression=True)
+    if len(args.latent_dim):
+        latent_dim = list(map(int, args.latent_dim.split(',')))
+    else:
+        latent_dim = [32,32,32,32]
+
+    net = IGMC(in_dim=args.hop*2+1+1, num_relations=len(dataset_base.class_values), num_bases=args.num_igmc_bases, regression=True, latent_dim=latent_dim)
     net = net.to(args.device)
 
     #rating_loss_net = nn.CrossEntropyLoss()
@@ -79,6 +77,17 @@ def train(args):
     print("Start training ...")
     dur = []
     for epoch_idx in range(args.train_max_epoch):
+        print ('Epoch', epoch_idx)
+        # Rebuild subgraph for each epoch to force 
+        dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+                            test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
+        train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device, mode='train', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=collate_movielens)
+        test_dataset = MovieLensDataset(dataset_base.test_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
+        val_dataset = MovieLensDataset(dataset_base.val_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
+
         for iter_idx, batch in enumerate(train_loader):
             if iter_idx > 3:
                 t0 = time.time()
@@ -87,10 +96,9 @@ def train(args):
             pred_ratings = net(batch[0])
             train_gt_labels = batch[1]
             loss = rating_loss_net(pred_ratings, train_gt_labels).mean() + args.arr_lambda * adj_rating_reg(net)
-            count_loss += loss.item()
+            count_loss += loss.item() * pred_ratings.shape[0]
             optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(net.parameters(), args.train_grad_clip)
             optimizer.step()
 
             if iter_idx > 3:
@@ -123,7 +131,7 @@ def train(args):
         valid_loss_logger.log(epoch = epoch_idx, rmse = valid_rmse)
         logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
 
-        if valid_rmse < best_valid_rmse:
+        if True:
             best_valid_rmse = valid_rmse
             best_iter = iter_idx
             test_rmse = evaluate(args=args, net=net, data_iter=test_loader)
@@ -132,13 +140,8 @@ def train(args):
             logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
         
         if epoch_idx + 1 % args.train_decay_epoch == 0:
-            new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
-            if new_lr < learning_rate:
-                learning_rate = new_lr
-                logging.info("\tChange the LR to %g" % new_lr)
-                print ("\tChange the LR to %g" % new_lr)
-                for p in optimizer.param_groups:
-                    p['lr'] = learning_rate
+            for p in optimizer.param_groups:
+                p['lr'] = args.train_lr_decay_factor * p['lr']
 
         print (logging_str)
     print('Best Iter Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
@@ -194,6 +197,7 @@ def config():
     parser.add_argument('--link-dropout', type=float, default=0.2, help='link dropout rate')
     parser.add_argument('--force-undirected', action='store_true', default=False, help='in edge dropout, force (x, y) and (y, x) to be dropped together')
     parser.add_argument('--train_val', action='store_true', default=False)
+    parser.add_argument('--latent_dim', default='', type=str, help='IGMC dims')
     # edge dropout settings
     parser.add_argument('--adj_dropout', type=float, default=0.2, 
                     help='if not 0, random drops edges from adjacency matrix with this prob')
