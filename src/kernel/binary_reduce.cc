@@ -11,7 +11,7 @@
 #include "./utils.h"
 #include "../c_api_common.h"
 #include "../graph/unit_graph.h"
-#include "./csr_interface.h"
+#include "./spmat_interface.h"
 
 using namespace dgl::runtime;
 
@@ -218,9 +218,9 @@ inline bool NeedSwitchOrder(const std::string& op,
     && lhs > rhs;
 }
 
-class ImmutableGraphCSRWrapper : public CSRWrapper {
+class ImmutableGraphSparseMatrixWrapper : public SparseMatrixWrapper {
  public:
-  explicit ImmutableGraphCSRWrapper(const ImmutableGraph* graph) :
+  explicit ImmutableGraphSparseMatrixWrapper(const ImmutableGraph* graph) :
     gptr_(graph) { }
 
   aten::CSRMatrix GetInCSRMatrix() const override {
@@ -229,6 +229,10 @@ class ImmutableGraphCSRWrapper : public CSRWrapper {
 
   aten::CSRMatrix GetOutCSRMatrix() const override {
     return gptr_->GetOutCSR()->ToCSRMatrix();
+  }
+
+  aten::COOMatrix GetCOOMatrix() const override {
+    return gptr_->GetCOO()->ToCOOMatrix();
   }
 
   DGLContext Context() const override {
@@ -243,9 +247,9 @@ class ImmutableGraphCSRWrapper : public CSRWrapper {
   const ImmutableGraph* gptr_;
 };
 
-class UnitGraphCSRWrapper : public CSRWrapper {
+class UnitGraphSparseMatrixWrapper : public SparseMatrixWrapper {
  public:
-  explicit UnitGraphCSRWrapper(const UnitGraph* graph) :
+  explicit UnitGraphSparseMatrixWrapper(const UnitGraph* graph) :
     gptr_(graph) { }
 
   aten::CSRMatrix GetInCSRMatrix() const override {
@@ -343,13 +347,13 @@ void csrwrapper_switch(DGLArgValue argval,
     GraphRef g = argval;
     auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK_NOTNULL(igptr);
-    ImmutableGraphCSRWrapper wrapper(igptr.get());
+    ImmutableGraphSparseMatrixWrapper wrapper(igptr.get());
     fn(wrapper);
   } else if (argval.IsObjectType<HeteroGraphRef>()) {
     HeteroGraphRef g = argval;
     auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g->GetRelationGraph(0));
     CHECK_NOTNULL(bgptr);
-    UnitGraphCSRWrapper wrapper(bgptr.get());
+    UnitGraphSparseMatrixWrapper wrapper(bgptr.get());
     fn(wrapper);
   }
 }

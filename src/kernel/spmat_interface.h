@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file kernel/csr_interface.h
+ * \file kernel/spmat_interface.h
  * \brief Kernel common utilities
  */
 
@@ -20,10 +20,11 @@ namespace kernel {
  * \note This is an ugly temporary solution, and shall be removed after
  * refactoring ImmutableGraph and Bipartite to use the same data structure.
  */
-class CSRWrapper {
+class SparseMatrixWrapper {
  public:
   virtual aten::CSRMatrix GetInCSRMatrix() const = 0;
   virtual aten::CSRMatrix GetOutCSRMatrix() const = 0;
+  virtual aten::COOMatrix GetCOOMatrix() const = 0;
   virtual DGLContext Context() const = 0;
   virtual int NumBits() const = 0;
 };

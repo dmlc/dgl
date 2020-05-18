@@ -12,7 +12,7 @@
 #include <string>
 
 #include "./binary_reduce_common.h"
-#include "./csr_interface.h"
+#include "./spmat_interface.h"
 
 namespace dgl {
 namespace kernel {
@@ -85,7 +85,7 @@ std::vector<int64_t> InferBinaryFeatureShape(
 void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_data,
@@ -128,7 +128,7 @@ void BinaryOpReduce(
 void BackwardLhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
     runtime::NDArray rhs_mapping,
@@ -175,7 +175,7 @@ void BackwardLhsBinaryOpReduce(
 void BackwardRhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
     runtime::NDArray rhs_mapping,
@@ -215,7 +215,7 @@ void BackwardRhsBinaryOpReduce(
  */
 void CopyReduce(
     const std::string& reducer,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target target,
     runtime::NDArray in_data, runtime::NDArray out_data,
     runtime::NDArray in_mapping, runtime::NDArray out_mapping);

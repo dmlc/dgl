@@ -13,7 +13,7 @@
 #include "../binary_reduce_impl_decl.h"
 #include "../utils.h"
 #include "./functor.h"
-#include "../csr_interface.h"
+#include "../spmat_interface.h"
 
 namespace dgl {
 namespace kernel {
@@ -145,7 +145,7 @@ template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
-                      const CSRWrapper& graph,
+                      const SparseMatrixWrapper& graph,
                       GData<Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
@@ -178,7 +178,7 @@ template <int XPU, int NDim, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
   const minigun::advance::RuntimeConfig& rtcfg,
-  const CSRWrapper& graph,
+  const SparseMatrixWrapper& graph,
   BcastGData<NDim, Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
@@ -212,7 +212,7 @@ void CallBinaryReduceBcast(
   template void CallBinaryReduce<XPU, IDX,                      \
         dtype, lhs_tgt, rhs_tgt, op<dtype>, REDUCER<XPU, dtype>>(  \
       const minigun::advance::RuntimeConfig& rtcfg,                \
-      const CSRWrapper& graph,                                     \
+      const SparseMatrixWrapper& graph,                                     \
       GData<IDX, dtype>* gdata);
 
 #define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)         \

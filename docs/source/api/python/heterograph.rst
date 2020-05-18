@@ -74,6 +74,7 @@ Querying and manipulating sparse format
 
     DGLHeteroGraph.format_in_use
     DGLHeteroGraph.restrict_format
+    DGLHeteroGraph.request_format
     DGLHeteroGraph.to_format
 
 Querying and manipulating index data type

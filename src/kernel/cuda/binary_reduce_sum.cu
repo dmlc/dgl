@@ -9,7 +9,7 @@
 #include "./binary_reduce_impl.cuh"
 #include "./backward_binary_reduce_impl.cuh"
 #include "../utils.h"
-#include "../csr_interface.h"
+#include "../spmat_interface.h"
 
 using minigun::advance::RuntimeConfig;
 
@@ -147,7 +147,7 @@ void CusparseCsrmm2(
 template <typename DType>
 void FallbackCallBinaryReduce(
     const RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     GData<int32_t, DType>* gdata) {
   constexpr int XPU = kDLGPU;
   typedef int32_t Idx;
@@ -183,7 +183,7 @@ void FallbackCallBinaryReduce(
 template <typename DType>
 void FallbackCallBackwardBinaryReduce(
     const RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     BackwardGData<int32_t, DType>* gdata) {
   constexpr int XPU = kDLGPU;
   constexpr int Mode = binary_op::kGradLhs;
@@ -229,7 +229,7 @@ template <>
 void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectNone,
                       BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     GData<int32_t, float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
     cuda::FallbackCallBinaryReduce<float>(rtcfg, graph, gdata);
@@ -245,7 +245,7 @@ template <>
 void CallBinaryReduce<kDLGPU, int32_t, double, SelectSrc, SelectNone,
                       BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     GData<int32_t, double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
     cuda::FallbackCallBinaryReduce<double>(rtcfg, graph, gdata);
@@ -264,7 +264,7 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, float,
                               SelectSrc, SelectNone,
                               BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     BackwardGData<int32_t, float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
     cuda::FallbackCallBackwardBinaryReduce<float>(rtcfg, graph, gdata);
@@ -280,7 +280,7 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, double,
                               SelectSrc, SelectNone,
                               BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     BackwardGData<int32_t, double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
     cuda::FallbackCallBackwardBinaryReduce<double>(rtcfg, graph, gdata);

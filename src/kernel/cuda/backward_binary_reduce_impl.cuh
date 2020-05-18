@@ -11,7 +11,7 @@
 #include "../binary_reduce_impl_decl.h"
 #include "../utils.h"
 #include "./functor.cuh"
-#include "../csr_interface.h"
+#include "../spmat_interface.h"
 
 namespace dgl {
 namespace kernel {
@@ -214,7 +214,7 @@ template <int XPU, int Mode, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     BackwardGData<Idx, DType>* gdata) {
   // For backward computation, we use reverse csr and switch dst and src.
   // This benefits the most common src_op_edge or copy_src case, because the
@@ -255,7 +255,7 @@ void CallBackwardBinaryReduce(
                     lhs_tgt, rhs_tgt,                           \
                     op<dtype>, REDUCER<XPU, dtype>>(            \
       const minigun::advance::RuntimeConfig& rtcfg,             \
-      const CSRWrapper& graph,                                  \
+      const SparseMatrixWrapper& graph,                                  \
       BackwardGData<IDX, dtype>* gdata);
 
 // Template implementation of BackwardBinaryReduce with broadcasting operator.
@@ -264,7 +264,7 @@ template <int XPU, int Mode, int NDim, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata) {
   // For backward computation, we use reverse csr and switch dst and src.
   // This benefits the most common src_op_edge or copy_src case, because the
@@ -306,7 +306,7 @@ void CallBackwardBinaryReduceBcast(
                     lhs_tgt, rhs_tgt,                                       \
                     op<dtype>, REDUCER<XPU, dtype>>(                        \
       const minigun::advance::RuntimeConfig& rtcfg,                         \
-      const CSRWrapper& graph,                                              \
+      const SparseMatrixWrapper& graph,                                              \
       BackwardBcastGData<ndim, IDX, dtype>* gdata);
 
 }  // namespace kernel
