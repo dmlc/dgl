@@ -39,8 +39,7 @@ def main(dev_id, args):
     train_iter = iter(train_loader)
 
     # Config loss
-    criterion = torch.nn.NLLLoss()
-    #criterion = torch.nn.NLLLoss()
+    criterion = torch.nn.CrossEntropyLoss()
     # Create model, set the sota setting as the default params
     model = make_face_model(N=args.N, dim_model=args.dim_model)
     # Move model to corresponding device

@@ -151,26 +151,28 @@ class Transformer(nn.Module):
         
         nodes, edges = nids['dec'], eids['ed']
 
+        '''
         # Numerical stable since we use log_softmax
         g.send(edges=g.find_edges(edges), message_func=[fn.u_dot_v('x', 'x', 'pointer_score'), fn.copy_u('idx', 'src_idx')])
         g.recv(v=nodes, reduce_func=softmax_and_pad)
         return g.ndata['log_softmax_res'][nids['dec']]
         '''
         # Pointer network
-        # numerical unstable
+        # log(softmax) is not numerical stable.
+        # We will only output the dot_product result and use CrossEntropyLoss
+        # which combines log_softmax and nllloss
         g.apply_edges(fn.u_dot_v('x', 'x', 'pointer_score'), edges)
-        pointer_softmax = th.log(dglnn.edge_softmax(g, g.edata['pointer_score'][edges], edges)+1e-6)
+        pointer_score_flat = g.edata['pointer_score'][edges]
         src_lens, tgt_lens = graph.src_lens, graph.tgt_lens
-        log_softmax_res = th.zeros([np.sum(tgt_lens), FaceDataset.MAX_VERT_LENGTH], dtype=th.float,        device=pointer_softmax.device)
+        pointer_score_padded = th.zeros([np.sum(tgt_lens), FaceDataset.MAX_VERT_LENGTH], dtype=th.float, device=tgt_embed.device)
         # pad softmax res
         cur_idx = 0
         cur_tgt_head = 0
         for n_dec, n_enc in zip(tgt_lens, src_lens):
-            log_softmax_res[cur_tgt_head:cur_tgt_head+n_dec, :n_enc] = th.transpose(pointer_softmax[cur_idx:cur_idx+n_enc*n_dec].reshape([n_enc, n_dec]),0,1)
+            pointer_score_padded[cur_tgt_head:cur_tgt_head+n_dec, :n_enc] = th.transpose(pointer_score_flat[cur_idx:cur_idx+n_enc*n_dec].reshape([n_enc, n_dec]),0,1)
             cur_idx += n_enc * n_dec
             cur_tgt_head += n_dec
-        return log_softmax_res
-        '''
+        return pointer_score_padded
 
 
     def infer(self, graph, max_len, eos_id, k, alpha=1.0):
