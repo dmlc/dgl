@@ -554,7 +554,7 @@ def recv_request(timeout=0):
     msg = recv_rpc_message(timeout)
     if msg is None:
         return None
-    _, req_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
+    req_cls, _ = SERVICE_ID_TO_PROPERTY[msg.service_id]
     if req_cls is None:
         raise DGLError('Got request message from service ID {}, '
                        'but no request class is registered.'.format(msg.service_id))
