@@ -187,10 +187,22 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
   }
 
+  std::string GetRestrictFormat() const override {
+    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
+    return std::string("");
+  }
+
+  dgl_format_code_t GetFormatInUse() const override {
+    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
+    return 0;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
+
+  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
@@ -204,6 +216,9 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
+
+  /*! \brief Copy the data to another context */
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
  private:
   // To create empty class
