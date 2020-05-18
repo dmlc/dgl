@@ -50,7 +50,16 @@ class GraphIndex(ObjectBase):
         """The pickle state of GraphIndex is defined as a triplet
         (number_of_nodes, readonly, src_nodes, dst_nodes)
         """
-        num_nodes, readonly, src, dst = state
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
+        if isinstance(state, tuple) and len(state) == 5:
+            dgl_warning("The object is pickled pre-0.4.2.  Multigraph flag is ignored in 0.4.3")
+            num_nodes, _, readonly, src, dst = state
+        elif isinstance(state, tuple) and len(state) == 4:
+            # post-0.4.3.
+            num_nodes, readonly, src, dst = state
+        else:
+            raise IOError('Unrecognized storage format.')
 
         self._cache = {}
         self._readonly = readonly
@@ -864,6 +873,21 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLGraphContext(self)
 
+    @property
+    def dtype(self):
+        """Return the index dtype
+
+        Returns
+        ----------
+        str
+            The dtype of graph index
+        """
+        bits = self.nbits()
+        if bits == 32:
+            return "int32"
+        else:
+            return "int64"
+
     def copy_to(self, ctx):
         """Copy this immutable graph index to the given device context.
 
@@ -881,15 +905,13 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLImmutableGraphCopyTo(self, ctx.device_type, ctx.device_id)
 
-    def copyto_shared_mem(self, edge_dir, shared_mem_name):
+    def copyto_shared_mem(self, shared_mem_name):
         """Copy this immutable graph index to shared memory.
 
         NOTE: this method only works for immutable graph index
 
         Parameters
         ----------
-        edge_dir : string
-            Indicate which CSR should copy ("in", "out", "both").
         shared_mem_name : string
             The name of the shared memory.
 
@@ -898,7 +920,7 @@ class GraphIndex(ObjectBase):
         GraphIndex
             The graph index on the given device context.
         """
-        return _CAPI_DGLImmutableGraphCopyToSharedMem(self, edge_dir, shared_mem_name)
+        return _CAPI_DGLImmutableGraphCopyToSharedMem(self, shared_mem_name)
 
     def nbits(self):
         """Return the number of integer bits used in the storage (32 or 64).
@@ -1017,8 +1039,7 @@ def from_coo(num_nodes, src, dst, readonly):
         gidx.add_edges(src, dst)
     return gidx
 
-def from_csr(indptr, indices,
-             direction, shared_mem_name=""):
+def from_csr(indptr, indices, direction):
     """Load a graph from CSR arrays.
 
     Parameters
@@ -1028,39 +1049,35 @@ def from_csr(indptr, indices,
     indices : Tensor
         column index array in the CSR format
     direction : str
+
+    Returns
+    ------
+    GraphIndex
+        The graph index
         the edge direction. Either "in" or "out".
-    shared_mem_name : str
-        the name of shared memory
     """
     indptr = utils.toindex(indptr)
     indices = utils.toindex(indices)
     gidx = _CAPI_DGLGraphCSRCreate(
         indptr.todgltensor(),
         indices.todgltensor(),
-        shared_mem_name,
         direction)
     return gidx
 
-def from_shared_mem_csr_matrix(shared_mem_name,
-                               num_nodes, num_edges, edge_dir):
-    """Load a graph from the shared memory in the CSR format.
+def from_shared_mem_graph_index(shared_mem_name):
+    """Load a graph index from the shared memory.
 
     Parameters
     ----------
     shared_mem_name : string
         the name of shared memory
-    num_nodes : int
-        the number of nodes
-    num_edges : int
-        the number of edges
-    edge_dir : string
-        the edge direction. The supported option is "in" and "out".
+
+    Returns
+    ------
+    GraphIndex
+        The graph index
     """
-    gidx = _CAPI_DGLGraphCSRCreateMMap(
-        shared_mem_name,
-        int(num_nodes), int(num_edges),
-        edge_dir)
-    return gidx
+    return _CAPI_DGLGraphCSRCreateMMap(shared_mem_name)
 
 def from_networkx(nx_graph, readonly):
     """Convert from networkx graph.

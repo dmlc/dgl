@@ -29,7 +29,7 @@ class NeighborSampler(object):
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
+            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -197,7 +197,7 @@ def run(proc_id, n_gpus, args, devices, data):
         th.distributed.init_process_group(backend="nccl",
                                           init_method=dist_init_method,
                                           world_size=world_size,
-                                          rank=dev_id)
+                                          rank=proc_id)
     th.cuda.set_device(dev_id)
 
     # Unpack data
@@ -208,7 +208,7 @@ def run(proc_id, n_gpus, args, devices, data):
     val_mask = th.BoolTensor(val_mask)
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
+    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
@@ -282,9 +282,9 @@ def run(proc_id, n_gpus, args, devices, data):
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
-                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
+                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
                 else:
-                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
+                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
 
 

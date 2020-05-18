@@ -8,19 +8,19 @@
     "project_url": "https://github.com/dmlc/dgl",
     // The URL or local path of the source code repository for the
     // project being benchmarked
-    "repo": "https://github.com/dmlc/dgl.git",
+    "repo": ".",
     // The Python project's subdirectory in your repo.  If missing or
     // the empty string, the project is assumed to be located at the root
     // of the repository.
-    // "repo_subdir": "",
+    // "repo_subdir": "python",
     // Customizable commands for building, installing, and
     // uninstalling the project. See asv.conf.json documentation.
     //
     "install_command": [
-        "in-dir={env_dir} python -m pip install numpy"
+        "/bin/bash {build_dir}/tests/regression/install_dgl_asv.sh"
     ],
     "build_command": [
-        "python -c \"print('skip')\""
+        "/bin/bash {build_dir}/tests/regression/build_dgl_asv.sh"
     ],
     "uninstall_command": [
         "return-code=any python -mpip uninstall -y dgl"
@@ -31,7 +31,7 @@
     // ],
     // List of branches to benchmark. If not provided, defaults to "master"
     // (for git) or "default" (for mercurial).
-    // "branches": ["master"], // for git
+    "branches": ["master"], // for git
     // "branches": ["default"],    // for mercurial
     // The DVCS being used.  If not set, it will be automatically
     // determined from "repo" by looking at the protocol in the URL
@@ -107,7 +107,7 @@
     "benchmark_dir": "tests/regression",
     // The directory (relative to the current directory) to cache the Python
     // environments in.  If not provided, defaults to "env"
-    // "env_dir": "env",
+    "env_dir": ".asv/env",
     // The directory (relative to the current directory) that raw benchmark
     // results are stored in.  If not provided, defaults to "results".
     "results_dir": "asv/results",

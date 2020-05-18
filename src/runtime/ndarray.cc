@@ -167,9 +167,9 @@ NDArray NDArray::EmptyShared(const std::string &name,
 #ifndef _WIN32
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
-    ret.data_->dl_tensor.data = mem->create_new(size);
+    ret.data_->dl_tensor.data = mem->CreateNew(size);
   } else {
-    ret.data_->dl_tensor.data = mem->open(size);
+    ret.data_->dl_tensor.data = mem->Open(size);
   }
 
   ret.data_->mem = mem;
