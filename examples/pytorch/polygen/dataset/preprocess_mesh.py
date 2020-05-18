@@ -11,22 +11,25 @@ from pytorch3d.io.obj_io import load_obj as load_3d_obj
 
 def preprocess(obj_file, bin_num):
     verts, faces, aux = load_3d_obj(obj_file)
+    
     # Quantilization
     quant_verts = np.clip((verts.data.numpy()+0.5) * (bin_num-1), 0, (bin_num-1)).astype(np.int64).astype(np.float32)
+
     # Sorting, first Y(up), then X(front), then Z(right)
     vert_val = quant_verts[:,1]*bin_num*bin_num + quant_verts[:,0]*bin_num + quant_verts[:,2]
 
     # Unique on vertex
-    uni_val, uni_val_idx = np.unique(vert_val, return_index=True)
+    _, uni_val_idx = np.unique(vert_val, return_index=True)
     _, uni_val_inverse_idx = np.unique(vert_val, return_inverse=True)
     uni_new_verts = quant_verts[uni_val_idx, :]
 
-    # Unique on faces
+    # Remap vertex id for a face to new unique vertex id
     face_verts_idx = deepcopy(faces[0].data.numpy())
-    face_verts_idx[:,0] = uni_val_inverse_idx[face_verts_idx[:, 0]]
-    face_verts_idx[:,1] = uni_val_inverse_idx[face_verts_idx[:, 1]]
-    face_verts_idx[:,2] = uni_val_inverse_idx[face_verts_idx[:, 2]]
+    face_verts_idx = uni_val_inverse_idx[face_verts_idx]
+
+    # Unique on faces
     uni_face_verts_idx = np.unique(face_verts_idx, axis=0)
+
     # If in one face, two vertexs are the same, remove that face
     same_vert_0_1 = uni_face_verts_idx[:,0] == uni_face_verts_idx[:,1]
     same_vert_0_2 = uni_face_verts_idx[:,0] == uni_face_verts_idx[:,2]
@@ -39,9 +42,7 @@ def preprocess(obj_file, bin_num):
     sort_idx = np.argsort(sort_val)
     processed_verts = uni_new_verts[sort_idx]
     processed_face_verts_idx = deepcopy(uni_face_verts_idx_within_face)
-    processed_face_verts_idx[:,0] = sort_idx[processed_face_verts_idx[:,0]]
-    processed_face_verts_idx[:,1] = sort_idx[processed_face_verts_idx[:,1]]
-    processed_face_verts_idx[:,2] = sort_idx[processed_face_verts_idx[:,2]]
+    processed_face_verts_idx = sort_idx[processed_face_verts_idx]
 
     # Also sort vertex idx within face
     # TODO: this seems changing the rendering result?
