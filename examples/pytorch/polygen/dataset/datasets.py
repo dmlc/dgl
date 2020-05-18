@@ -9,16 +9,17 @@ from .vertexgraph import *
 from .facegraph import *
 from .preprocess_mesh import preprocess as preprocess_mesh_obj
 
-VertexDataTuple = namedtuple('VertexDataTuple', ['g', 'num_edges_dd', 'tgt', 'mode', 'device'])
+VertexDataTuple = namedtuple('VertexDataTuple', ['g', 'num_edges_dd', 'tgt', 'device'])
 VertexGraph = namedtuple('VertexGraph',
                    ['g', 'tgt', 'tgt_y', 'nids', 'eids',  'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
-FaceDataTuple = namedtuple('FaceDataTuple', ['g', 'num_edges_ee', 'num_edges_ed', 'num_edges_dd', 'src', 'tgt', 'mode', 'device'])
+FaceDataTuple = namedtuple('FaceDataTuple', ['g', 'num_edges_ee', 'num_edges_ed', 'num_edges_dd', 'src', 'tgt', 'device'])
 FaceGraph = namedtuple('FaceGraph',
                    ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens',
                    'src_lens', 'tgt_lens'])
 
 class VertexDataset(Dataset):
     """Vertex Dataset"""
+    # Mesh resolution
     COORD_BIN = 128
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
@@ -27,8 +28,14 @@ class VertexDataset(Dataset):
     MAX_LENGTH = MAX_VERT_LENGTH * 3 + 2
 
     def __init__(self, dataset_list_path, mode, device, dev_rank=0, ndev=1):
-        dataset_list_dir = '/home/ubuntu/data/ShapeNetCore.v2/'
-        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path+'.'+mode)
+        '''
+        args:
+            dataset_list_path: file path for the samples.
+            mode: 'train', 'val', 'test'.
+            device: which device will this sample go to.
+            dev_rank: which rank this dataset is serving.
+            ndev: number of ranks.
+        '''
         self.mode = mode
         with open(dataset_list_path, 'r') as f:
             self.whole_dataset_list = f.readlines()
@@ -41,7 +48,8 @@ class VertexDataset(Dataset):
  
     @property
     def vocab_size(self):
-        return self.COORD_BIN+3 
+        # Here 3 is for INIT_BIN, EOS_BIN and PAD_BIN
+        return self.COORD_BIN+3
 
     def __len__(self):
         return len(self.dataset_list)
@@ -59,18 +67,16 @@ class VertexDataset(Dataset):
             return self.__getitem__(to_try)
  
         # Flattern verts, order Y(up), X(front), Z(right)
-        reordered_verts = np.zeros_like(verts)
-        reordered_verts[:,0] = verts[:,1]
-        reordered_verts[:,1] = verts[:,0]
-        reordered_verts[:,2] = verts[:,2]
+        reordered_verts = verts[:, (1, 0, 2)]
         flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
-        # exp
+        
+        # Filter out long sequence for memory and speed tuning
         if len(flattern_verts) > self.MAX_LENGTH:
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
         return VertexDataTuple(g=self.graphpool.get_graph_for_size(len(flattern_verts)-1),
                 num_edges_dd=self.graphpool.num_edges['dd'][len(flattern_verts)-1],
-                tgt=flattern_verts, mode=self.mode, device=self.device)
+                tgt=flattern_verts, device=self.device)
 
 # different collate function for infer and train?
 def collate_vertexgraphs(data):
@@ -83,12 +89,11 @@ def collate_vertexgraphs(data):
     -------
     g : tuple of batched DGLGraph and input tensors
     """
-    assert len(data[0]) == 5, \
-            'Expect the tuple to be of length 5, got {:d}'.format(len(data[0]))
-    g_list, num_edges_dd, tgt_buf, modes, devices = map(list, zip(*data))
+    assert len(data[0]) == 4, \
+            'Expect the tuple to be of length 4, got {:d}'.format(len(data[0]))
+    g_list, num_edges_dd, tgt_buf, devices = map(list, zip(*data))
     num_edges = {'dd': num_edges_dd}
     tgt_lens = [len(_) - 1 for _ in tgt_buf]
-    mode = modes[0]
     device = devices[0]
 
     g = dgl.batch(g_list)
@@ -123,13 +128,14 @@ def collate_vertexgraphs(data):
 
 class FaceDataset(object):
     '''
-    Dataset class for ShapeNet Vertex.
+    Dataset class for ShapeNet face.
     '''
+    # Mesh resolution
     COORD_BIN = 128
     INIT_BIN = COORD_BIN
     EOS_BIN = COORD_BIN + 1
     PAD_BIN = COORD_BIN + 2
-    # Need to switch to 3 when we use n-gon since we need a next face token
+    # NOTE: Need to switch to 3 when we use n-gon since we need a next face token
     MAX_VERT_LENGTH = 400 + 2
     START_FACE_VERT_IDX = 0
     STOP_FACE_VERT_IDX = 1
@@ -139,13 +145,19 @@ class FaceDataset(object):
     # FACE_VERT_OFFSET = NEXT_FACE_VERT_IDX + 1
     FACE_VERT_OFFSET = STOP_FACE_VERT_IDX + 1
 
-    MAX_FACE_INDICES = 1400
-    # need to be changed to // 4 after using n-gon since 
+    MAX_FACE_INDICES = 800
+    # NOTE: Need to be changed to // 4 after using n-gon since 
     MAX_FACE_LENGTH = MAX_FACE_INDICES // 3 + 2
 
     def __init__(self, dataset_list_path, mode, device, dev_rank=0, ndev=1):
-        dataset_list_dir = '/home/ubuntu/data/ShapeNetCore.v2/'
-        dataset_list_path = os.path.join(dataset_list_dir, dataset_list_path+'.'+mode)
+        '''
+        args:
+            dataset_list_path: file path for the samples.
+            mode: 'train', 'val', 'test'.
+            device: which device will this sample go to.
+            dev_rank: which rank this dataset is serving.
+            ndev: number of ranks.
+        '''
         self.mode = mode
         with open(dataset_list_path, 'r') as f:
             self.whole_dataset_list = f.readlines()
@@ -172,10 +184,7 @@ class FaceDataset(object):
             return self.__getitem__(to_try)
  
         # Flattern verts, order Y(up), X(front), Z(right)
-        reordered_verts = np.zeros_like(verts)
-        reordered_verts[:,0] = verts[:,1]
-        reordered_verts[:,1] = verts[:,0]
-        reordered_verts[:,2] = verts[:,2]
+        reordered_verts = verts[:, (1, 0, 2)]
         # pad start and end bin at the front
         st_end_verts = np.array([[self.INIT_BIN] * 3, [self.EOS_BIN] * 3])
         full_verts = np.concatenate([st_end_verts, reordered_verts], axis=0).astype(np.int64)
@@ -184,6 +193,7 @@ class FaceDataset(object):
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
         
+        # Real vertex index starts from FACE_VERT_OFFSET
         faces += self.FACE_VERT_OFFSET
         flattern_faces = [self.START_FACE_VERT_IDX] + faces.flatten().astype(np.int64).tolist() + [self.STOP_FACE_VERT_IDX]
         # Has to also make face number half, or it will explode
@@ -195,7 +205,7 @@ class FaceDataset(object):
                  num_edges_ee=self.graphpool.num_edges['ee'][len(full_verts), len(flattern_faces)-1],
                  num_edges_ed=self.graphpool.num_edges['ed'][len(full_verts), len(flattern_faces)-1],
                  num_edges_dd=self.graphpool.num_edges['dd'][len(full_verts), len(flattern_faces)-1],
-                 src=full_verts, tgt=flattern_faces, mode=self.mode, device=self.device)
+                 src=full_verts, tgt=flattern_faces, device=self.device)
 
 
 # different collate function for infer and train?
@@ -203,20 +213,19 @@ def collate_facegraphs(data):
     """Batching a list of datapoints for dataloader.
     Parameters
     ----------
-    data : list of 8-tuples.
+    data : list of 7-tuples.
        Each tuples contains a graph, num_edges_ee, num_edges_ed, num_edges_dd,
-       src sequence, tgt sequence, mode, device 
+       src sequence, tgt sequence, device 
     Returns
     -------
     g : tuple of batched DGLGraph and input tensors
     """
-    assert len(data[0]) == 8, \
+    assert len(data[0]) == 7, \
             'Expect the tuple to be of length 5, got {:d}'.format(len(data[0]))
-    g_list, num_edges_ee, num_edges_ed, num_edges_dd, src_buf, tgt_buf, modes, devices = map(list, zip(*data))
+    g_list, num_edges_ee, num_edges_ed, num_edges_dd, src_buf, tgt_buf, devices = map(list, zip(*data))
     num_edges = {'ee': num_edges_ee, 'ed': num_edges_ed, 'dd': num_edges_dd}
     src_lens = [len(_) for _ in src_buf]
     tgt_lens = [len(_) - 1 for _ in tgt_buf]
-    mode = modes[0]
     device = devices[0]
     g = dgl.batch(g_list)
 

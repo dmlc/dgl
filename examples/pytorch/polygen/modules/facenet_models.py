@@ -164,7 +164,7 @@ class Transformer(nn.Module):
         g.apply_edges(fn.u_dot_v('x', 'x', 'pointer_score'), edges)
         pointer_score_flat = g.edata['pointer_score'][edges]
         src_lens, tgt_lens = graph.src_lens, graph.tgt_lens
-        pointer_score_padded = th.zeros([np.sum(tgt_lens), FaceDataset.MAX_VERT_LENGTH], dtype=th.float, device=tgt_embed.device)
+        pointer_score_padded = -1e8 * th.ones([np.sum(tgt_lens), FaceDataset.MAX_VERT_LENGTH], dtype=th.float, device=tgt_embed.device)
         # pad softmax res
         cur_idx = 0
         cur_tgt_head = 0

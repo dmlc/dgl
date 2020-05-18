@@ -5,9 +5,6 @@ import itertools
 import time
 from collections import *
 
-FaceGraph = namedtuple('Graph',
-                   ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
-
 class FaceGraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
     def __init__(self, n=100, m=800):

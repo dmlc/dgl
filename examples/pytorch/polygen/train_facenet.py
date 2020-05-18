@@ -74,7 +74,6 @@ def main(dev_id, args):
         log_f = open(log_path, 'w')
         test_dataset = FaceDataset(args.dataset, 'test', device)
         test_loader = DataLoader(test_dataset, batch_size=args.batch//args.ngpu, shuffle=False, num_workers=args.workers_per_loader, collate_fn=collate_facegraphs)
-        #test_iter = iter(test_loader)
         test_loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)(opt=None)
  
     train_iter_num = 0
