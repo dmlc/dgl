@@ -58,7 +58,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     for ID in range(len(addr_list)):
       client_namebook[ID] = addr_list[ID]
     # Connect back to clients
-    time.sleep(WAIT_SEC)
+    #time.sleep(WAIT_SEC)
     for ID, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
         rpc.add_receiver_addr(client_ip, client_port, ID)
@@ -68,10 +68,10 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
         for ID, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(ID)
             rpc.send_response(ID, register_res)
-
+    # service loop
     while True:
-        print("Recv...")
-        time.sleep(1)
+        
+        
 
     finalize()
 
