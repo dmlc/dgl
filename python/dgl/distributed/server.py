@@ -67,7 +67,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     if rpc.get_rank() == 0:
         for ID, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(ID)
-            rpc.send_repsonse(ID, register_res)
+            rpc.send_response(ID, register_res)
 
     while True:
         print("Recv...")
