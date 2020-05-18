@@ -143,8 +143,7 @@ class HeteroGraphData : public runtime::ObjectRef {
   }
 };
 
-bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
-                      std::vector<NamedTensor> labels_list) {
+bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
   auto *fs =
     dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w", true));
   CHECK(fs) << "File name is not a valid local file name";
@@ -166,7 +165,7 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
   fs->Write(num_graph);
   dgl_id_t indices_start_ptr = fs->Tell();
   fs->Write(graph_indices);
-  fs->Write(labels_list);
+  // fs->Write(labels_list);
 
   // Write HeteroGraphData
   for (uint64_t i = 0; i < num_graph; ++i) {
@@ -197,17 +196,17 @@ DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_SaveHeteroGraphData")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<HeteroGraphData> hgdata = args[1];
-    Map<std::string, Value> labels = args[2];
+    // Map<std::string, Value> labels = args[2];
 
-    std::vector<NamedTensor> labels_list;
-    for (auto kv : labels) {
-      std::string name = kv.first;
-      Value v = kv.second;
-      NDArray ndarray = v->data;
-      labels_list.emplace_back(name, ndarray);
-    }
+    // std::vector<NamedTensor> labels_list;
+    // for (auto kv : labels) {
+    //   std::string name = kv.first;
+    //   Value v = kv.second;
+    //   NDArray ndarray = v->data;
+    //   labels_list.emplace_back(name, ndarray);
+    // }
 
-    *rv = dgl::serialize::SaveHeteroGraphs(filename, hgdata, labels_list);
+    *rv = dgl::serialize::SaveHeteroGraphs(filename, hgdata);
   });
 
 }  // namespace serialize
