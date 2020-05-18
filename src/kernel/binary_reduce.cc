@@ -260,6 +260,10 @@ class UnitGraphSparseMatrixWrapper : public SparseMatrixWrapper {
     return gptr_->GetCSRMatrix(0);
   }
 
+  aten::COOMatrix GetCOOMatrix() const override {
+    return gptr_->GetCOOMatrix(0);
+  }
+
   DGLContext Context() const override {
     return gptr_->Context();
   }
@@ -299,7 +303,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
 void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_data, NDArray rhs_data,
     NDArray out_data,
@@ -341,7 +345,7 @@ void BinaryOpReduce(
 
 
 void csrwrapper_switch(DGLArgValue argval,
-                       std::function<void(const CSRWrapper&)> fn) {
+                       std::function<void(const SparseMatrixWrapper&)> fn) {
   DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);
   if (argval.IsObjectType<GraphRef>()) {
     GraphRef g = argval;
@@ -373,7 +377,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
 
     auto f = [&reducer, &op, &lhs, &rhs, &lhs_data, &rhs_data, &out_data,
               &lhs_mapping, &rhs_mapping,
-              &out_mapping](const CSRWrapper& wrapper) {
+              &out_mapping](const SparseMatrixWrapper& wrapper) {
       BinaryOpReduce(reducer, op, wrapper, static_cast<binary_op::Target>(lhs),
                      static_cast<binary_op::Target>(rhs), lhs_data, rhs_data,
                      out_data, lhs_mapping, rhs_mapping, out_mapping);
@@ -384,7 +388,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
 void BackwardLhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_mapping,
     NDArray rhs_mapping,
@@ -448,7 +452,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 
     auto f = [&reducer, &op, &lhs, &rhs, &lhs_mapping, &rhs_mapping,
               &out_mapping, &lhs_data, &rhs_data, &out_data, &grad_out_data,
-              &grad_lhs_data](const CSRWrapper& wrapper) {
+              &grad_lhs_data](const SparseMatrixWrapper& wrapper) {
       BackwardLhsBinaryOpReduce(
           reducer, op, wrapper, static_cast<binary_op::Target>(lhs),
           static_cast<binary_op::Target>(rhs), lhs_mapping, rhs_mapping,
@@ -461,7 +465,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 void BackwardRhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_mapping,
     NDArray rhs_mapping,
@@ -524,7 +528,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 
     auto f = [&reducer, &op, &lhs, &rhs, &lhs_mapping, &rhs_mapping,
               &out_mapping, &lhs_data, &rhs_data, out_data, &grad_out_data,
-              &grad_rhs_data](const CSRWrapper& wrapper) {
+              &grad_rhs_data](const SparseMatrixWrapper& wrapper) {
       BackwardRhsBinaryOpReduce(
           reducer, op, wrapper, static_cast<binary_op::Target>(lhs),
           static_cast<binary_op::Target>(rhs), lhs_mapping, rhs_mapping,
@@ -537,7 +541,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 
 void CopyReduce(
     const std::string& reducer,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target target,
     NDArray in_data, NDArray out_data,
     NDArray in_mapping, NDArray out_mapping) {
@@ -566,7 +570,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
     NDArray out_mapping = args[6];
 
     auto f = [&reducer, &target, &in_data, &out_data, &in_mapping,
-              &out_mapping](const CSRWrapper& wrapper) {
+              &out_mapping](const SparseMatrixWrapper& wrapper) {
       CopyReduce(reducer, wrapper, static_cast<binary_op::Target>(target),
                  in_data, out_data, in_mapping, out_mapping);
     };
@@ -576,7 +580,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
 
 void BackwardCopyReduce(
     const std::string& reducer,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target target,
     NDArray in_mapping,
     NDArray out_mapping,
@@ -616,7 +620,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
     NDArray out_mapping = args[8];
 
     auto f = [&reducer, &target, &in_mapping, &out_mapping, &in_data, &out_data,
-              &grad_out_data, &grad_in_data](const CSRWrapper& wrapper) {
+              &grad_out_data, &grad_in_data](const SparseMatrixWrapper& wrapper) {
       BackwardCopyReduce(
           reducer, wrapper, static_cast<binary_op::Target>(target), in_mapping,
           out_mapping, in_data, out_data, grad_out_data, grad_in_data);

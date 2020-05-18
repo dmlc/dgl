@@ -212,7 +212,7 @@ void CallBinaryReduceBcast(
   template void CallBinaryReduce<XPU, IDX,                      \
         dtype, lhs_tgt, rhs_tgt, op<dtype>, REDUCER<XPU, dtype>>(  \
       const minigun::advance::RuntimeConfig& rtcfg,                \
-      const SparseMatrixWrapper& graph,                                     \
+      const SparseMatrixWrapper& graph,                            \
       GData<IDX, dtype>* gdata);
 
 #define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)         \
@@ -220,7 +220,7 @@ void CallBinaryReduceBcast(
                                  lhs_tgt, rhs_tgt,                  \
                                  op<dtype>, REDUCER<XPU, dtype>>(   \
       const minigun::advance::RuntimeConfig& rtcfg,                 \
-      const CSRWrapper& graph,                                      \
+      const SparseMatrixWrapper& graph,                             \
       BcastGData<ndim, IDX, dtype>* gdata);
 
 #define EVAL(F, ...) MSVC_EXPAND(F(__VA_ARGS__))

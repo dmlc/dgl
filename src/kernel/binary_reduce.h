@@ -238,7 +238,7 @@ void CopyReduce(
  */
 void BackwardCopyReduce(
     const std::string& reducer,
-    const CSRWrapper& graph,
+    const SparseMatrixWrapper& graph,
     binary_op::Target target,
     runtime::NDArray in_mapping,
     runtime::NDArray out_mapping,
