@@ -334,6 +334,16 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return SparseFormat::kAny;
   }
 
+  std::string GetRestrictFormat() const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return std::string("");
+  }
+
+  dgl_format_code_t GetFormatInUse() const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return 0;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -373,6 +383,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
       subg.induced_edges = eids;
     }
     return subg;
+  }
+
+  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override {
+    LOG(FATAL) << "Not enabled for COO graph.";
+    return nullptr;
   }
 
   aten::COOMatrix adj() const {
@@ -645,6 +660,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const override {
     // TODO(minjie): This still assumes the data type and device context
     //   of this graph. Should fix later.
+    CHECK_EQ(NumBits(), 64);
     const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
     const dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
     const dgl_id_t start = indptr_data[vid];
@@ -652,9 +668,20 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return DGLIdIters(indices_data + start, indices_data + end);
   }
 
+  DGLIdIters32 SuccVec32(dgl_type_t etype, dgl_id_t vid) {
+    // TODO(minjie): This still assumes the data type and device context
+    //   of this graph. Should fix later.
+    const int32_t* indptr_data = static_cast<int32_t*>(adj_.indptr->data);
+    const int32_t* indices_data = static_cast<int32_t*>(adj_.indices->data);
+    const int32_t start = indptr_data[vid];
+    const int32_t end = indptr_data[vid + 1];
+    return DGLIdIters32(indices_data + start, indices_data + end);
+  }
+
   DGLIdIters OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const override {
     // TODO(minjie): This still assumes the data type and device context
     //   of this graph. Should fix later.
+    CHECK_EQ(NumBits(), 64);
     const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
     const dgl_id_t* eid_data = static_cast<dgl_id_t*>(adj_.data->data);
     const dgl_id_t start = indptr_data[vid];
@@ -697,6 +724,16 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return SparseFormat::kAny;
   }
 
+  std::string GetRestrictFormat() const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return std::string("");
+  }
+
+  dgl_format_code_t GetFormatInUse() const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return 0;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -716,6 +753,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
+  }
+
+  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override {
+    LOG(FATAL) << "Not enabled for CSR graph.";
+    return nullptr;
   }
 
   aten::CSRMatrix adj() const {
@@ -829,7 +871,7 @@ IdArray UnitGraph::Successors(dgl_type_t etype, dgl_id_t src) const {
 }
 
 IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  const SparseFormat fmt = SelectFormat(SparseFormat::kAny);
+  const SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->EdgeId(etype, dst, src);
@@ -838,7 +880,7 @@ IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
 }
 
 EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
-  const SparseFormat fmt = SelectFormat(SparseFormat::kAny);
+  const SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
     EdgeArray edges = ptr->EdgeIds(etype, dst, src);
@@ -949,6 +991,13 @@ DGLIdIters UnitGraph::SuccVec(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   const auto ptr = GetFormat(fmt);
   return ptr->SuccVec(etype, vid);
+}
+
+DGLIdIters32 UnitGraph::SuccVec32(dgl_type_t etype, dgl_id_t vid) const {
+  SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
+  const auto ptr = std::dynamic_pointer_cast<CSR>(GetFormat(fmt));
+  CHECK_NOTNULL(ptr);
+  return ptr->SuccVec32(etype, vid);
 }
 
 DGLIdIters UnitGraph::OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
@@ -1077,6 +1126,7 @@ HeteroGraphPtr UnitGraph::CreateFromCOO(
     CHECK_EQ(mat.num_rows, mat.num_cols);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, mat));
+
   return HeteroGraphPtr(
       new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
 }
@@ -1163,14 +1213,25 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
                      SparseFormat restrict_format)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
-  restrict_format_ = restrict_format;
-
-  // If the graph is hypersparse and in COO format, switch the restricted format to COO.
-  // If the graph is given as CSR, the indptr array is already materialized so we don't
-  // care about restricting conversion anyway (even if it is hypersparse).
-  if (restrict_format == SparseFormat::kAny) {
-    if (coo && coo->IsHypersparse())
-      restrict_format_ = SparseFormat::kCOO;
+  restrict_format_ = AutoDetectFormat(in_csr, out_csr, coo, restrict_format);
+  switch (restrict_format) {
+  case SparseFormat::kCSC:
+    in_csr_ = GetInCSR();
+    coo_ = nullptr;
+    out_csr_ = nullptr;
+    break;
+  case SparseFormat::kCSR:
+    out_csr_ = GetOutCSR();
+    coo_ = nullptr;
+    in_csr_ = nullptr;
+    break;
+  case SparseFormat::kCOO:
+    coo_ = GetCOO();
+    in_csr_ = nullptr;
+    out_csr_ = nullptr;
+    break;
+  default:
+    break;
   }
 
   CHECK(GetAny()) << "At least one graph structure should exist.";
@@ -1200,50 +1261,80 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
   return HeteroGraphPtr(new UnitGraph(mg, in_csr_ptr, out_csr_ptr, coo_ptr, restrict_format));
 }
 
-UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
+UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
+  if (inplace)
+    if (restrict_format_ != SparseFormat::kAny &&
+        restrict_format_ != SparseFormat::kCSC)
+      LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
+        ", cannot create CSC matrix.";
+  CSRPtr ret = in_csr_;
   if (!in_csr_) {
     if (out_csr_) {
       const auto& newadj = aten::CSRTranspose(out_csr_->adj());
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      ret = std::make_shared<CSR>(meta_graph(), newadj);
+      if (inplace)
+        const_cast<UnitGraph*>(this)->in_csr_ = ret;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& adj = coo_->adj();
       const auto& newadj = aten::COOToCSR(
           aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      ret = std::make_shared<CSR>(meta_graph(), newadj);
+      if (inplace)
+        const_cast<UnitGraph*>(this)->in_csr_ = ret;
     }
   }
-  return in_csr_;
+  return ret;
 }
 
 /* !\brief Return out csr. If not exist, transpose the other one.*/
-UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
+UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
+  if (inplace)
+    if (restrict_format_ != SparseFormat::kAny &&
+        restrict_format_ != SparseFormat::kCSR)
+      LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
+        ", cannot create CSR matrix.";
+  CSRPtr ret = out_csr_;
   if (!out_csr_) {
     if (in_csr_) {
       const auto& newadj = aten::CSRTranspose(in_csr_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      ret = std::make_shared<CSR>(meta_graph(), newadj);
+      if (inplace)
+        const_cast<UnitGraph*>(this)->out_csr_ = ret;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& newadj = aten::COOToCSR(coo_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      ret = std::make_shared<CSR>(meta_graph(), newadj);
+      if (inplace)
+        const_cast<UnitGraph*>(this)->out_csr_ = ret;
     }
   }
-  return out_csr_;
+  return ret;
 }
 
 /* !\brief Return coo. If not exist, create from csr.*/
-UnitGraph::COOPtr UnitGraph::GetCOO() const {
+UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
+  if (inplace)
+    if (restrict_format_ != SparseFormat::kAny &&
+        restrict_format_ != SparseFormat::kCOO)
+      LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
+        ", cannot create COO matrix.";
+  COOPtr ret = coo_;
   if (!coo_) {
     if (in_csr_) {
       const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
-      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(meta_graph(), newadj);
+      ret = std::make_shared<COO>(meta_graph(), newadj);
+      if (inplace)
+        const_cast<UnitGraph*>(this)->coo_ = ret;
     } else {
       CHECK(out_csr_) << "Both CSR are missing.";
       const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
-      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(meta_graph(), newadj);
+      ret = std::make_shared<COO>(meta_graph(), newadj);
+      if (inplace)
+        const_cast<UnitGraph*>(this)->coo_ = ret;
     }
   }
-  return coo_;
+  return ret;
 }
 
 aten::CSRMatrix UnitGraph::GetCSCMatrix(dgl_type_t etype) const {
@@ -1268,6 +1359,16 @@ HeteroGraphPtr UnitGraph::GetAny() const {
   }
 }
 
+dgl_format_code_t UnitGraph::GetFormatInUse() const {
+  dgl_format_code_t ret = 0;
+  if (in_csr_) ret = ret | 1;
+  ret = ret << 1;
+  if (out_csr_) ret = ret | 1;
+  ret = ret << 1;
+  if (coo_) ret = ret | 1;
+  return ret;
+}
+
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
   switch (format) {
   case SparseFormat::kCSR:
@@ -1278,15 +1379,45 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
     return GetCOO();
   case SparseFormat::kAny:
     return GetAny();
-  default:
-    LOG(FATAL) << "unsupported format code";
+  default:  // SparseFormat::kAuto
+    LOG(FATAL) << "Must specify a restrict format.";
     return nullptr;
   }
 }
 
+HeteroGraphPtr UnitGraph::GetGraphInFormat(SparseFormat restrict_format) const {
+    int64_t num_vtypes = NumVertexTypes();
+    switch (restrict_format) {
+    case SparseFormat::kCOO:
+      return CreateFromCOO(
+        num_vtypes, GetCOO(false)->adj(), restrict_format);
+    case SparseFormat::kCSC:
+      return CreateFromCSC(
+        num_vtypes, GetInCSR(false)->adj(), restrict_format);
+    case SparseFormat::kCSR:
+      return CreateFromCSR(
+        num_vtypes, GetOutCSR(false)->adj(), restrict_format);
+    case SparseFormat::kAny:
+      return HeteroGraphPtr(
+        new UnitGraph(meta_graph_, in_csr_, out_csr_, coo_, restrict_format));
+    default:  // SparseFormat::kAuto
+      LOG(FATAL) << "Must specify a restrict format.";
+      return nullptr;
+  }
+}
+
+SparseFormat UnitGraph::AutoDetectFormat(
+    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
+  if (restrict_format != SparseFormat::kAuto)
+    return restrict_format;
+  if (coo && coo->IsHypersparse())
+    return SparseFormat::kCOO;
+  return SparseFormat::kAny;
+}
+
 SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
   if (restrict_format_ != SparseFormat::kAny)
-    return restrict_format_;
+    return restrict_format_;  // force to select the restricted format
   else if (preferred_format != SparseFormat::kAny)
     return preferred_format;
   else if (in_csr_)

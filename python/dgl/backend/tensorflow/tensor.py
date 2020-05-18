@@ -13,7 +13,7 @@ from ... import ndarray as nd
 from ... import kernel as K
 from ...function.base import TargetCode
 
-if os.getenv("USE_OFFICIAL_TFDLPACK", False):
+if not os.getenv("USE_TFDLPACK", False):
     if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
         raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
 
@@ -21,7 +21,7 @@ if os.getenv("USE_OFFICIAL_TFDLPACK", False):
         return tf.experimental.dlpack.to_dlpack(input)
 
     def zerocopy_from_dlpack(dlpack_tensor):
-        # TODO(Jinjing): Tensorflow requires memory to be 64-bit aligned. We check the
+        # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
         #   alignment and make a copy if needed. The functionality is better in TF's main repo.
         aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
         return tf.experimental.dlpack.from_dlpack(aligned)
@@ -50,7 +50,8 @@ def data_type_dict():
             'int8': tf.int8,
             'int16': tf.int16,
             'int32': tf.int32,
-            'int64': tf.int64}
+            'int64': tf.int64,
+            'bool' : tf.bool}
 
 def cpu():
     return "/cpu:0"
@@ -77,8 +78,10 @@ def sparse_matrix(data, index, shape, force_format=False):
     if fmt != 'coo':
         raise TypeError(
             'Tensorflow backend only supports COO format. But got %s.' % fmt)
-    spmat = tf.SparseTensor(indices=tf.transpose(
-        index[1], (1, 0)), values=data, dense_shape=shape)
+    # tf.SparseTensor only supports int64 indexing,
+    # therefore manually casting to int64 when input in int32
+    spmat = tf.SparseTensor(indices=tf.cast(tf.transpose(
+        index[1], (1, 0)), tf.int64), values=data, dense_shape=shape)
     return spmat, None
 
 
@@ -347,6 +350,9 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def clone(input):
+    # TF tensor is always immutable so returning the input is safe.
+    return input
 
 def unique(input):
     return tf.unique(input).y
@@ -368,9 +374,9 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop):
+def arange(start, stop, dtype="int64"):
     with tf.device("/cpu:0"):
-        t = tf.range(start, stop, dtype=tf.int64)
+        t = tf.range(start, stop, dtype=data_type_dict()[dtype])
     return t
 
 

@@ -90,8 +90,8 @@ class CFConv(nn.Module):
         float32 tensor of shape (V, out_feats)
             Updated node representations.
         """
-        g = g.local_var()
-        g.ndata['hv'] = self.project_node(node_feats)
-        g.edata['he'] = self.project_edge(edge_feats)
-        g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h'))
-        return self.project_out(g.ndata['h'])
+        with g.local_scope():
+            g.ndata['hv'] = self.project_node(node_feats)
+            g.edata['he'] = self.project_edge(edge_feats)
+            g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h'))
+            return self.project_out(g.ndata['h'])

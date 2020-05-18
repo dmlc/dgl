@@ -150,3 +150,10 @@ cscope.*
 
 # parameters
 *.params
+
+# vscode 
+.clangd
+.vscode
+
+# asv
+.asv
