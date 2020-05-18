@@ -314,7 +314,7 @@ class Request:
         self._server_id = server_id
 
     @client_id.setter
-    def client_id(self):
+    def client_id(self, client_id):
         """Set client ID"""
         self._client_id = client_id
 
@@ -364,7 +364,7 @@ class Response:
         self._server_id = server_id
 
     @client_id.setter
-    def client_id(self):
+    def client_id(self, client_id):
         """Set client ID"""
         self._client_id = client_id
 
