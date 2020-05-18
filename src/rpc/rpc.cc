@@ -222,6 +222,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCIncrMsgSeq")
   *rv = (RPCContext::ThreadLocal()->msg_seq)++;
 });
 
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  int64_t msg_seq = args[0];
+  RPCContext::ThreadLocal()->msg_seq = msg_seq;
+});
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = RPCContext::ThreadLocal()->msg_seq;
