@@ -46,9 +46,13 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     rpc.receiver_wait(ip, port, num_clients)
     print("%d clients connected!" % num_clients)
     # Recv all the client's IP
+    addr_list = []
     for i in range(num_clients):
         req = rpc.recv_request()
-        print(req)
+        addr_list.append(req._ip_addr)
+    addr_list.sort()
+
+    print(addr_list)
 
     while True:
         print("Recv...")
