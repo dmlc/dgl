@@ -2,8 +2,6 @@ from modules import *
 from loss import *
 from optims import *
 from dataset import *
-from modules.config import *
-#from modules.viz import *
 import numpy as np
 import argparse
 import torch
@@ -159,12 +157,17 @@ if __name__ == '__main__':
         args.ngpu = 0 if devices[0] < 0 else 1
         main(devices[0], args)
     else:
-        args.ngpu = len(devices)
-        mp = torch.multiprocessing.get_context('spawn')
-        procs = []
-        for dev_id in devices:
-            procs.append(mp.Process(target=run, args=(dev_id, args),
-                                    daemon=False))
-            procs[-1].start()
-        for p in procs:
-            p.join()
+        try:
+            args.ngpu = len(devices)
+            mp = torch.multiprocessing.get_context('spawn')
+            procs = []
+            for dev_id in devices:
+                procs.append(mp.Process(target=run, args=(dev_id, args),
+                                        daemon=False))
+                procs[-1].start()
+            for p in procs:
+                p.join()
+        except KeyboardInterrupt:
+            for p in procs:
+                p.terminate()
+                p.join()   
