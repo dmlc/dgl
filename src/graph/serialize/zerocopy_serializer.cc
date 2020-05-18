@@ -79,7 +79,7 @@ void StringStreamWithBuffer::PushNDArray(const NDArray& tensor) {
   }
 #else
   LOG(FATAL) << "StringStreamWithBuffer is not supported on windows";
-  return;
+  return nullptr;
 #endif  // _WIN32
 }
 
@@ -119,7 +119,7 @@ NDArray StringStreamWithBuffer::PopNDArray() {
   }
 #else
   LOG(FATAL) << "StringStreamWithBuffer is not supported on windows";
-  return;
+  return nullptr;
 #endif  // _WIN32
 }
 
