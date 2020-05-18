@@ -679,6 +679,33 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLReorderGraph")
     *rv = GraphOp::ReorderImmutableGraph(gptr, new_order);
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLReassignEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef graph = args[0];
+    bool is_incsr = args[1];
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(graph.sptr());
+    CHECK(gptr) << "We can only reassign edge Ids on immutable graphs";
+    CSRPtr csr = is_incsr ? gptr->GetInCSR() : gptr->GetOutCSR();
+    auto csrmat = csr->ToCSRMatrix();
+    int64_t num_edges = csrmat.data->shape[0];
+    IdArray new_data = IdArray::Empty({num_edges}, csrmat.data->dtype, csrmat.data->ctx);
+    // Return the original edge Ids.
+    *rv = new_data;
+    // TODO I need to invalidate out-CSR and COO.
+
+    // Generate new edge Ids.
+    // TODO(zhengda) after assignment, we actually don't need to store them
+    // physically.
+    ATEN_ID_TYPE_SWITCH(new_data->dtype, IdType, {
+      IdType *typed_new_data = static_cast<IdType*>(new_data->data);
+      IdType *typed_data = static_cast<IdType*>(csrmat.data->data);
+      for (int64_t i = 0; i < num_edges; i++) {
+        typed_new_data[i] = typed_data[i];
+        typed_data[i] = i;
+      }
+    });
+  });
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];

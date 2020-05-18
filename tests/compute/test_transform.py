@@ -244,6 +244,7 @@ def test_partition_with_halo():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
+    # TODO(zhengda) Metis fails to partition a small graph.
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
     # partitions without HALO nodes
     subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=0)
@@ -290,6 +291,11 @@ def test_metis_partition():
             assert np.all(F.asnumpy(subg.ndata['inner_node'])[lnode_ids] == 1)
             parent_ids = F.asnumpy(subg.ndata[dgl.NID])
             parent_ids = parent_ids[:len(lnode_ids)]
+            assert np.all(parent_ids == np.arange(parent_ids[0], parent_ids[-1] + 1))
+
+            # ensure the local edge Ids are contiguous
+            assert np.all(F.asnumpy(subg.edata['inner_edge'])[ledge_ids] == 1)
+            parent_ids = F.asnumpy(subg.edata[dgl.EID])
             assert np.all(parent_ids == np.arange(parent_ids[0], parent_ids[-1] + 1))
 
             orig_ids = subg.ndata['orig_id']

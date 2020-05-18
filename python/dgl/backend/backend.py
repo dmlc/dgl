@@ -982,6 +982,9 @@ def logical_not(input):
     """
     pass
 
+def logical_and(input1, input2):
+    pass
+
 def clone(input):
     """Return a clone of the input tensor.
 

@@ -613,6 +613,11 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         new_node_ids = F.gather_row(F.arange(0, g.number_of_nodes()), new2old_map)
         g = reorder_nodes(g, new_node_ids)
         node_part = utils.toindex(sorted_part)
+        # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
+        # that all edges in a partition are in the contiguous Id space.
+        orig_eids = _CAPI_DGLReassignEdges(g._graph, True)
+        orig_eids = utils.toindex(orig_eids)
+        g.edata['orig_id'] = orig_eids.tousertensor()
 
     subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), extra_cached_hops)
     subg_dict = {}
@@ -626,6 +631,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         subg.ndata['part_id'] = F.gather_row(node_part, subg.parent_nid)
         if reshuffle:
             subg.ndata['orig_id'] = F.gather_row(g.ndata['orig_id'], subg.ndata[NID])
+            subg.edata['orig_id'] = F.gather_row(g.edata['orig_id'], subg.edata[EID])
         inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
@@ -996,10 +1002,6 @@ def remove_edges(g, edge_ids):
     """Return a new graph with given edge IDs removed.
 
     The nodes are preserved.
-
-    Note: `remove_edges` is slow especially when removing a small number of edges from
-    a large graph. It creates a new graph with all remaining edges and return the new graph.
-    Please use it with caution especially when using it in mini-batch training.
 
     Parameters
     ----------
