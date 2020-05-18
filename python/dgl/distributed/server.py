@@ -4,8 +4,6 @@ import time
 
 from . import rpc
 
-WAIT_SEC = 3
-
 def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024, net_type='socket'):
     """Start server.
 
@@ -43,7 +41,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     rpc.create_sender(queue_size, net_type)
     rpc.create_receiver(queue_size, net_type)
     # wait all the senders connect to server.
-    # Once all the senders connect to server, server will not 
+    # Once all the senders connect to server, server will not
     # accept new sender's connection
     print("Wait connections ...")
     rpc.receiver_wait(ip, port, num_clients)
@@ -58,7 +56,6 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
     for ID in range(len(addr_list)):
       client_namebook[ID] = addr_list[ID]
     # Connect back to clients
-    #time.sleep(WAIT_SEC)
     for ID, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
         rpc.add_receiver_addr(client_ip, client_port, ID)
@@ -70,8 +67,9 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
             rpc.send_response(ID, register_res)
     # service loop
     while True:
-        print("recv...")
-        time.sleep(1)
+        req = rpc.recv_request()
+        res = req.process_request(server_state)
+        rpc.send_response(res.client_id, res)
 
     finalize()
 

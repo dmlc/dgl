@@ -28,22 +28,22 @@ def read_ip_config(filename):
         172.31.47.147 30050 2
         172.31.30.180 30050 2
 
-    Note that, DGL server supports backup servers that can share data with each others
-    on the same machine via shared memory. So the server_count should be >= 1. For example, 
+    Note that, DGL supports multiple backup servers that shares data with each others
+    on the same machine via shared-memory tensor. The server_count should be >= 1. For example, 
     if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
     current machine. Note that, the count of server on each machine can be different.
 
     Parameters
     ----------
     filename : str
-        name of configuration file.
+        Path of IP configuration file.
 
     Returns
     -------
     dict
-        server namebook. e.g.,
+        server namebook. The format is: {[server_id]:[machine_id, ip, port, group_count]}
 
-        [server_id]:[machine_id, ip, port, group_count]
+        e.g.,
 
           {0:[0, '172.31.40.143', 30050, 2],
            1:[0, '172.31.40.143', 30051, 2],
