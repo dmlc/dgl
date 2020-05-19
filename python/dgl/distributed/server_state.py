@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 """Server data"""
 
 from .._ffi.object import register_object, ObjectBase

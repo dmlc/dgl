@@ -11,13 +11,17 @@
 #include <dmlc/thread_local.h>
 #include <cstdint>
 #include <memory>
-#include <string>
-#include <vector>
 #include "./network/communicator.h"
+#include "./network/socket_communicator.h"
+#include "./network/msg_queue.h"
+#include "./network/common.h"
 #include "./server_state.h"
 
 namespace dgl {
 namespace rpc {
+
+// Communicator handler type
+typedef void* CommunicatorHandle;
 
 /*! \brief Context information for RPC communication */
 struct RPCContext {
@@ -33,6 +37,11 @@ struct RPCContext {
    * \brief Message sequence number.
    */
   int64_t msg_seq = 0;
+
+  /*!
+   * \brief Total number of server.
+   */
+  int32_t num_servers = 0;
 
   /*!
    * \brief Sender communicator.
@@ -96,6 +105,38 @@ enum RPCStatus {
   kRPCSuccess = 0,
   kRPCTimeOut,
 };
+
+/*!
+ * \brief Serialize one meta of RPCMessage to data buffer.
+ *
+ * The serialized data format is:
+ * 
+ * |service_id| -> int32_t
+ * |msg_seq   | -> int64_t
+ * |client_id | -> int32_t
+ * |server_id | -> int32_t
+ * |data_size | -> int64_t
+ * |data      | -> string
+ * |has_tensor| -> int8_t 1 for true and 0 for false
+ *
+ * Note: The real data of tensor will not be serialized to buffer, and
+ * the the memory management of data buffer should be done by user.
+ *
+ * \param msg RPC message to serilaize
+ * \param size the total size of serialized data
+ * \return data buffer
+ */
+char* SerializeRPCMeta(const RPCMessage& msg, int64_t* size);
+
+/*!
+ * \brief Deserialize one meta of RPCMessage from data buffer
+ *
+ * \param msg RPC message to deserilaize
+ * \param buffer buffer holding the serialized data
+ * \param size buffer size
+ * \return has_tensor
+ */
+bool DeserializeRPCMeta(RPCMessage* msg, char* buffer, int64_t size);
 
 /*!
  * \brief Send out one RPC message.

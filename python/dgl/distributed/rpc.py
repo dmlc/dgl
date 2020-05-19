@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 """RPC components. They are typically functions or utilities used by both
 server and clients."""
 import abc
@@ -10,11 +8,156 @@ from .._ffi.function import _init_api
 from ..base import DGLError, dgl_warning
 from .. import backend as F
 
-__all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service']
+__all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
+'create_sender', 'create_receiver', 'get_sender', 'get_receiver', 'finalize_sender', \
+'finalize_receiver', 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
+
+def read_ip_config(filename):
+    """Read network configuration information of server from file.
+
+    The format of configuration file should be:
+
+        [ip] [base_port] [server_count]
+
+        172.31.40.143 30050 2
+        172.31.36.140 30050 2
+        172.31.47.147 30050 2
+        172.31.30.180 30050 2
+
+    Note that, DGL supports multiple backup servers that shares data with each others
+    on the same machine via shared-memory tensor. The server_count should be >= 1. For example, 
+    if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
+    current machine. Note that, the count of server on each machine can be different.
+
+    Parameters
+    ----------
+    filename : str
+        Path of IP configuration file.
+
+    Returns
+    -------
+    dict
+        server namebook. The format is: {[server_id]:[machine_id, ip, port, group_count]}
+
+        e.g.,
+
+          {0:[0, '172.31.40.143', 30050, 2],
+           1:[0, '172.31.40.143', 30051, 2],
+           2:[1, '172.31.36.140', 30050, 2],
+           3:[1, '172.31.36.140', 30051, 2],
+           4:[2, '172.31.47.147', 30050, 2],
+           5:[2, '172.31.47.147', 30051, 2],
+           6:[3, '172.31.30.180', 30050, 2],
+           7:[3, '172.31.30.180', 30051, 2]}
+    """
+    assert len(filename) > 0, 'filename cannot be empty.'
+    server_namebook = {}
+    try:
+        server_id = 0
+        machine_id = 0
+        lines = [line.rstrip('\n') for line in open(filename)]
+        for line in lines:
+            ip, port, server_count = line.split(' ')
+            for s_count in range(int(server_count)):
+                server_namebook[server_id] = [int(machine_id), ip, int(port)+s_count, int(server_count)]
+                server_id += 1
+            machine_id += 1
+    except:
+        print("Error: data format on each line should be: [ip] [base_port] [server_count]")
+    return server_namebook
+
+def create_sender(msg_queue_size, net_type):
+    """Create rpc sender of this process.
+
+    Parameters
+    ----------
+    msg_queue_size : int
+        Size (bytes) of network queue buffer.
+    net_type : str
+        networking type, e.g., 'socket' or 'mpi' (do not support yet).
+    """
+    _CAPI_DGLRPCCreateSender(int(msg_queue_size), net_type)
+
+def create_receiver(msg_queue_size, net_type):
+    """Create rpc receiver of this process.
+
+    Parameters
+    ----------
+    msg_queue_size : int
+        Size (bytes) of network queue buffer.
+    net_type : str
+        networking type, e.g., 'socket' or 'mpi' (do not support yet).
+    """
+    _CAPI_DGLRPCCreateReceiver(int(msg_queue_size), net_type)
+
+def get_sender():
+    """Get rpc sender of this process.
+
+    Returns
+    -------
+    c handler
+        sender handler
+    """
+    return _CAPI_DGLRPCGetSender()
+
+def get_receiver():
+    """Get rpc receiver of this process.
+
+    Returns
+    -------
+    c handler
+        receiver handler
+    """
+    return _CAPI_DGLRPCGetReceiver()
+
+def finalize_sender():
+    """Finalize rpc sender of this process.
+    """
+    _CAPI_DGLRPCFinalizeSender()
+    
+def finalize_receiver():
+    """Finalize rpc receiver of this process.
+    """
+    _CAPI_DGLRPCFinalizeReceiver()
+
+def receiver_wait(ip_addr, port, num_senders):
+    """Wait all of the senders' connections.
+
+    This api will be blocked until all the senders connect to the receiver.
+
+    Parameters
+    ----------
+    ip_addr : str
+        receiver's IP address, e,g, '192.168.8.12'
+    port : int
+        receiver's port
+    num_senders : int
+        total number of senders
+    """
+    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders))
+
+def add_receiver_addr(ip_addr, port, recv_id):
+    """Add Receiver's IP address to sender's namebook.
+
+    Parameters
+    ----------
+    ip_addr : str
+        receiver's IP address, e,g, '192.168.8.12'
+    port : int
+        receiver's listening port
+    recv_id : int
+        receiver's ID
+    """
+    _CAPI_DGLRPCAddReceiver(ip_addr, int(port), int(recv_id))
+
+def sender_connect():
+    """Connect to all the receivers.
+    """
+    _CAPI_DGLRPCSenderConnect()
 
 def set_rank(rank):
     """Set the rank of this process.
@@ -24,7 +167,7 @@ def set_rank(rank):
 
     Parameters
     ----------
-    int
+    rank : int
         Rank value
     """
     _CAPI_DGLRPCSetRank(int(rank))
@@ -41,6 +184,16 @@ def get_rank():
         Rank value
     """
     return _CAPI_DGLRPCGetRank()
+
+def set_num_server(num_server):
+    """Set the total number of server.
+    """
+    _CAPI_DGLRPCSetNumServer(int(num_server))
+
+def get_num_server():
+    """Get the total number of server.
+    """
+    return _CAPI_DGLRPCGetNumServer()
 
 def incr_msg_seq():
     """Increment the message sequence number and return the old one.
@@ -78,7 +231,6 @@ def register_service(service_id, req_cls, res_cls=None):
     if res_cls is not None:
         RESPONSE_CLASS_TO_SERVICE_ID[res_cls] = service_id
     SERVICE_ID_TO_PROPERTY[service_id] = (req_cls, res_cls)
-    # TODO: C registry
 
 def get_service_property(service_id):
     """Get service property.
@@ -143,8 +295,38 @@ class Request:
             raise DGLError('Request class {} has not been registered as a service.'.format(cls))
         return sid
 
+    @property
+    def server_id(self):
+        """Get server ID"""
+        return self._server_id
+
+    @property
+    def client_id(self):
+        """Get client ID"""
+        return self._client_id
+
+    @property
+    def msg_seq(self):
+        """Get msg_seq"""
+        return self._msg_seq
+
+    @server_id.setter
+    def server_id(self, server_id):
+        """Set server ID"""
+        self._server_id = server_id
+
+    @client_id.setter
+    def client_id(self, client_id):
+        """Set client ID"""
+        self._client_id = client_id
+    
+    @msg_seq.setter
+    def msg_seq(self, msg_seq):
+        """Set msg_seq"""
+        self._msg_seq = msg_seq
+
 class Response:
-    """Base response class."""
+    """Base response class"""
 
     @abc.abstractmethod
     def __getstate__(self):
@@ -172,6 +354,36 @@ class Response:
         if sid is None:
             raise DGLError('Response class {} has not been registered as a service.'.format(cls))
         return sid
+
+    @property
+    def server_id(self):
+        """Get server ID"""
+        return self._server_id
+
+    @property
+    def client_id(self):
+        """Get client ID"""
+        return self._client_id
+
+    @property
+    def msg_seq(self):
+        """Get msg_seq"""
+        return self._msg_seq
+
+    @server_id.setter
+    def server_id(self, server_id):
+        """Set server ID"""
+        self._server_id = server_id
+
+    @client_id.setter
+    def client_id(self, client_id):
+        """Set client ID"""
+        self._client_id = client_id
+    
+    @msg_seq.setter
+    def msg_seq(self, msg_seq):
+        """Set msg_seq"""
+        self._msg_seq = msg_seq
 
 def serialize_to_payload(serializable):
     """Serialize an object to payloads.
@@ -294,10 +506,6 @@ class RPCMessage(ObjectBase):
         return _CAPI_DGLRPCMessageGetServerId(self)
 
     @property
-    def xxx(self):
-        return 1
-
-    @property
     def data(self):
         """Get payload buffer."""
         return _CAPI_DGLRPCMessageGetData(self)
@@ -322,7 +530,7 @@ def send_request(target, request):
     Parameters
     ----------
     target : int
-        The server ID.
+        ID of target server.
     request : Request
         The request to send.
 
@@ -335,6 +543,73 @@ def send_request(target, request):
     client_id = get_rank()
     server_id = target
     data, tensors = serialize_to_payload(request)
+    msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
+    send_rpc_message(msg)
+
+def recv_request(timeout=0):
+    """Receive one request.
+
+    Receive one :class:`RPCMessage` and de-serialize it into a proper Request object.
+
+    The operation is blocking -- it returns when it receives any message
+    or it times out.
+
+    Parameters
+    ----------
+    timeout : int, optional
+        The timeout value in milliseconds. If zero, wait indefinitely.
+
+    Returns
+    -------
+    req : request
+        One request received from the target, or None if it times out.
+
+    Raises
+    ------
+    ConnectionError if there is any problem with the connection.
+    """
+    # TODO(chao): handle timeout
+    msg = recv_rpc_message(timeout)
+    if msg is None:
+        return None
+    req_cls, _ = SERVICE_ID_TO_PROPERTY[msg.service_id]
+    if req_cls is None:
+        raise DGLError('Got request message from service ID {}, '
+                       'but no request class is registered.'.format(msg.service_id))
+    req = deserialize_from_payload(req_cls, msg.data, msg.tensors)
+    req.server_id = msg.server_id
+    req.client_id = msg.client_id
+    req.msg_seq = msg.msg_seq
+    if msg.server_id != get_rank():
+        raise DGLError('Got request sent to server {}, '
+                       'different from my rank {}!'.format(msg.server_id, get_rank()))
+    return req
+
+def send_response(target, msg_seq, response):
+    """Send one response to the target client.
+
+    Serilaize the given response object to an :class`RPCMessage` and send it
+    reached the target or even have left the sender process. However,
+    all the payloads (i.e., data and arrays) can be safely freed after this
+    function returns.
+
+    Parameters
+    ----------
+    target : int
+        ID of target client.
+    msg_seq : int
+        Number of message sequence.
+    response : Response
+        The response to send.
+
+    Raises
+    ------
+    ConnectionError if there is any problem with the connection.
+    """
+    service_id = response.service_id
+    client_id = target
+    server_id = get_rank()
+    data, tensors = serialize_to_payload(response)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
     send_rpc_message(msg)
 
@@ -360,6 +635,7 @@ def recv_response(timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
+    # TODO(chao): handle timeout
     msg = recv_rpc_message(timeout)
     if msg is None:
         return None
@@ -368,9 +644,12 @@ def recv_response(timeout=0):
         raise DGLError('Got response message from service ID {}, '
                        'but no response class is registered.'.format(msg.service_id))
     res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-    if res.client_id != get_rank():
+    res.client_id = msg.client_id
+    res.server_id = msg.server_id
+    res.msg_seq = msg.msg_seq
+    if msg.client_id != get_rank():
         raise DGLError('Got reponse of request sent by client {}, '
-                       'different from my rank {}!'.format(res.client_id, get_rank()))
+                       'different from my rank {}!'.format(msg.client_id, get_rank()))
     return res
 
 def remote_call(target_and_requests, timeout=0):
@@ -400,6 +679,7 @@ def remote_call(target_and_requests, timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     # TODO(minjie): implement local server short-cut
+    # TODO(chao): handle timeout
     all_res = [None] * len(target_and_requests)
     msgseq2pos = {}
     num_res = 0
@@ -422,16 +702,16 @@ def remote_call(target_and_requests, timeout=0):
         # recv response
         msg = recv_rpc_message(timeout)
         num_res -= 1
-        if msg is None:
-            continue
         _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
         if res_cls is None:
             raise DGLError('Got response message from service ID {}, '
                            'but no response class is registered.'.format(msg.service_id))
         res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-        if res.client_id != myrank:
+        res.client_id = msg.client_id
+        res.server_id = msg.server_id
+        if msg.client_id != myrank:
             raise DGLError('Got reponse of request sent by client {}, '
-                           'different from my rank {}!'.format(res.client_id, myrank))
+                           'different from my rank {}!'.format(msg.client_id, myrank))
         # set response
         all_res[msgseq2pos[msg.msg_seq]] = res
     return all_res
@@ -485,5 +765,81 @@ def recv_rpc_message(timeout=0):
     status = _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
     # TODO: handle status flag
     return msg
+
+def finalize_server():
+    """Finalize resources of current server
+    """
+    finalize_sender()
+    finalize_receiver()
+    print("Server (%d) shutdown." % get_rank())
+
+############################### Some basic services will be defined here ############################
+
+CLIENT_REGISTER = 22451
+
+class ClientRegisterReuqest(Request):
+    """This request will send client's ip to server.
+
+    Parameters
+    ----------
+    ip_addr : str
+        client's IP address
+    """
+    def __init__(self, ip_addr):
+        self.ip_addr = ip_addr
+
+    def __getstate__(self):
+        return self.ip_addr
+
+    def __setstate__(self, state):
+        self.ip_addr = state
+
+    def process_request(self, server_state):
+        return None # do nothing
+
+class ClientRegisterResponse(Response):
+    """This response will send assigned ID to client.
+
+    Parameters
+    ----------
+    ID : int
+        client's ID
+    """
+    def __init__(self, ID):
+        self.ID = ID
+
+    def __getstate__(self):
+        return self.ID
+
+    def __setstate__(self, state):
+        self.ID = state
+
+
+SHUT_DOWN_SERVER = 22452
+
+class ShutDownRequest(Request):
+    """Client send this request to shut-down a server.
+
+    This request has no response.
+
+    Parameters
+    ----------
+    ID : int
+        client's ID
+    """
+    def __init__(self, ID):
+        self.ID = ID
+
+    def __getstate__(self):
+        return self.ID
+
+    def __setstate__(self, state):
+        self.ID = state
+
+    def process_request(self, server_state):
+        assert self.ID == 0
+        finalize_server()
+        exit()
+
 
 _init_api("dgl.distributed.rpc")
