@@ -410,11 +410,11 @@ def serialize_to_payload(serializable):
     nonarray_pos = []
     nonarray_state = []
     array_state = []
-    for i, state in enumerate(state):
-        if F.is_tensor(state):
-            array_state.append(state)
+    for i, arr_state in enumerate(state):
+        if F.is_tensor(arr_state):
+            array_state.append(arr_state)
         else:
-            nonarray_state.append(state)
+            nonarray_state.append(arr_state)
             nonarray_pos.append(i)
     data = bytearray(pickle.dumps((nonarray_pos, nonarray_state)))
     return data, array_state
@@ -440,8 +440,8 @@ def deserialize_from_payload(cls, data, tensors):
     """
     pos, nonarray_state = pickle.loads(data)
     state = [None] * (len(nonarray_state) + len(tensors))
-    for i, st in zip(pos, nonarray_state):
-        state[i] = st
+    for i, no_state in zip(pos, nonarray_state):
+        state[i] = no_state
     if len(tensors) != 0:
         j = 0
         for i in range(len(state)):
