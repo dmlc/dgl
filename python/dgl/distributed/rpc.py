@@ -185,6 +185,16 @@ def get_rank():
     """
     return _CAPI_DGLRPCGetRank()
 
+def set_num_server(num_server):
+    """Set the total number of server.
+    """
+    _CAPI_DGLRPCSetNumServer(int(num_server))
+
+def get_num_server():
+    """Get the total number of server.
+    """
+    return _CAPI_DGLRPCGetNumServer()
+
 def incr_msg_seq():
     """Increment the message sequence number and return the old one.
 
@@ -756,10 +766,16 @@ def recv_rpc_message(timeout=0):
     # TODO: handle status flag
     return msg
 
+def finalize_server():
+    """Finalize resources of current server
+    """
+    finalize_sender()
+    finalize_receiver()
+    print("Server (%d) shutdown." % get_rank())
 
 ############################### Some basic services will be defined here ############################
 
-CLIENT_REGISTER = 32451
+CLIENT_REGISTER = 22451
 
 class ClientRegisterReuqest(Request):
     """This request will send client's ip to server.
@@ -779,7 +795,7 @@ class ClientRegisterReuqest(Request):
         self.ip_addr = state
 
     def process_request(self, server_state):
-        return # do nothing
+        return None # do nothing
 
 class ClientRegisterResponse(Response):
     """This response will send assigned ID to client.
@@ -797,5 +813,33 @@ class ClientRegisterResponse(Response):
 
     def __setstate__(self, state):
         self.ID = state
+
+
+SHUT_DOWN_SERVER = 22452
+
+class ShutDownRequest(Request):
+    """Client send this request to shut-down a server.
+
+    This request has no response.
+
+    Parameters
+    ----------
+    ID : int
+        client's ID
+    """
+    def __init__(self, ID):
+        self.ID = ID
+
+    def __getstate__(self):
+        return self.ID
+
+    def __setstate__(self, state):
+        self.ID = state
+
+    def process_request(self, server_state):
+        assert self.ID == 0
+        finalize_server()
+        return None
+
 
 _init_api("dgl.distributed.rpc")

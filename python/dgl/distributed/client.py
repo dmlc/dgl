@@ -102,7 +102,13 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     """
     assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket', 'mpi'), 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
-    rpc.register_service(rpc.CLIENT_REGISTER, rpc.ClientRegisterReuqest, rpc.ClientRegisterResponse)
+    # Register some basic service
+    rpc.register_service(rpc.CLIENT_REGISTER,
+                         rpc.ClientRegisterReuqest,
+                         rpc.ClientRegisterResponse)
+    rpc.register_service(rpc.SHUT_DOWN_SERVER,
+                         rpc.ShutDownRequest,
+                         None)
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
     group_count = []
@@ -149,5 +155,7 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    req = ShutDownRequest()
-
+    if rpc.get_rank() == 0: # Only client_0 issue this command
+        req = rpc.ShutDownRequest(get_rank())
+        for server_id in range(rpc.get_num_server()):
+            rpc.send_request(server_id, req)

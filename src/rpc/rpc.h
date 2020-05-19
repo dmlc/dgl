@@ -39,6 +39,11 @@ struct RPCContext {
   int64_t msg_seq = 0;
 
   /*!
+   * \brief Total number of server.
+   */
+  int32_t num_servers = 0;
+
+  /*!
    * \brief Sender communicator.
    */
   std::shared_ptr<network::Sender> sender;
