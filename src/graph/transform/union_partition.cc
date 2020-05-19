@@ -8,6 +8,7 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
+template <class IdType>
 HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
   CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";
@@ -19,16 +20,16 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
-    dgl_id_t src_offset = 0, dst_offset = 0;
-    std::vector<dgl_id_t> result_src, result_dst;
+    IdType src_offset = 0, dst_offset = 0;
+    std::vector<IdType> result_src, result_dst;
 
     // Loop over all graphs
     for (size_t i = 0; i < component_graphs.size(); ++i) {
       const auto& cg = component_graphs[i];
       EdgeArray edges = cg->Edges(etype);
       size_t num_edges = cg->NumEdges(etype);
-      const dgl_id_t* edges_src_data = static_cast<const dgl_id_t*>(edges.src->data);
-      const dgl_id_t* edges_dst_data = static_cast<const dgl_id_t*>(edges.dst->data);
+      const IdType* edges_src_data = static_cast<const IdType*>(edges.src->data);
+      const IdType* edges_dst_data = static_cast<const IdType*>(edges.dst->data);
 
       // Loop over all edges
       for (size_t j = 0; j < num_edges; ++j) {
@@ -41,11 +42,9 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
       dst_offset += cg->NumVertices(dst_vtype);
     }
     HeteroGraphPtr rgptr = UnitGraph::CreateFromCOO(
-      (src_vtype == dst_vtype)? 1 : 2,
-      src_offset,
-      dst_offset,
-      aten::VecToIdArray(result_src),
-      aten::VecToIdArray(result_dst));
+        (src_vtype == dst_vtype) ? 1 : 2, src_offset, dst_offset,
+        aten::VecToIdArray(result_src, sizeof(IdType) * 8),
+        aten::VecToIdArray(result_dst, sizeof(IdType) * 8));
     rel_graphs[etype] = rgptr;
     num_nodes_per_type[src_vtype] = src_offset;
     num_nodes_per_type[dst_vtype] = dst_offset;
@@ -53,6 +52,13 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
   return CreateHeteroGraph(meta_graph, rel_graphs, std::move(num_nodes_per_type));
 }
 
+template HeteroGraphPtr DisjointUnionHeteroGraph<int32_t>(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+template HeteroGraphPtr DisjointUnionHeteroGraph<int64_t>(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray vertex_sizes, IdArray edge_sizes) {
   // Sanity check for vertex sizes
@@ -102,11 +108,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
     EdgeArray edges = batched_graph->Edges(etype);
-    const dgl_id_t* edges_src_data = static_cast<const dgl_id_t*>(edges.src->data);
-    const dgl_id_t* edges_dst_data = static_cast<const dgl_id_t*>(edges.dst->data);
+    const IdType* edges_src_data = static_cast<const IdType*>(edges.src->data);
+    const IdType* edges_dst_data = static_cast<const IdType*>(edges.dst->data);
     // Loop over all graphs to be unbatched
     for (uint64_t g = 0; g < batch_size; ++g) {
-      std::vector<dgl_id_t> result_src, result_dst;
+      std::vector<IdType> result_src, result_dst;
       // Loop over the chunk of edges for the specified graph and edge type
       for (uint64_t e = edge_cumsum[etype][g]; e < edge_cumsum[etype][g + 1]; ++e) {
         // TODO(mufei): Should use array operations to implement this.
@@ -114,11 +120,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
         result_dst.push_back(edges_dst_data[e] - vertex_cumsum[dst_vtype][g]);
       }
       HeteroGraphPtr rgptr = UnitGraph::CreateFromCOO(
-        (src_vtype == dst_vtype)? 1 : 2,
-        vertex_sizes_data[src_vtype * batch_size + g],
-        vertex_sizes_data[dst_vtype * batch_size + g],
-        aten::VecToIdArray(result_src),
-        aten::VecToIdArray(result_dst));
+          (src_vtype == dst_vtype) ? 1 : 2,
+          vertex_sizes_data[src_vtype * batch_size + g],
+          vertex_sizes_data[dst_vtype * batch_size + g],
+          aten::VecToIdArray(result_src, sizeof(IdType) * 8),
+          aten::VecToIdArray(result_dst, sizeof(IdType) * 8));
       rel_graphs[g].push_back(rgptr);
     }
   }
@@ -132,5 +138,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
   }
   return rst;
 }
+
+template std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes<int32_t>(
+    GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray vertex_sizes, IdArray edge_sizes);
+
+template std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes<int64_t>(
+    GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray vertex_sizes, IdArray edge_sizes);
 
 }  // namespace dgl

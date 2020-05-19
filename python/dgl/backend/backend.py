@@ -1073,7 +1073,7 @@ def sort_1d(input):
     """
     pass
 
-def arange(start, stop):
+def arange(start, stop, dtype):
     """Create a 1D range int64 tensor.
 
     Parameters
@@ -1082,6 +1082,8 @@ def arange(start, stop):
         The range start.
     stop : int
         The range stop.
+    dtype: str
+        The dtype of result tensor
 
     Returns
     -------

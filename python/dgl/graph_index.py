@@ -50,7 +50,16 @@ class GraphIndex(ObjectBase):
         """The pickle state of GraphIndex is defined as a triplet
         (number_of_nodes, readonly, src_nodes, dst_nodes)
         """
-        num_nodes, readonly, src, dst = state
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
+        if isinstance(state, tuple) and len(state) == 5:
+            dgl_warning("The object is pickled pre-0.4.2.  Multigraph flag is ignored in 0.4.3")
+            num_nodes, _, readonly, src, dst = state
+        elif isinstance(state, tuple) and len(state) == 4:
+            # post-0.4.3.
+            num_nodes, readonly, src, dst = state
+        else:
+            raise IOError('Unrecognized storage format.')
 
         self._cache = {}
         self._readonly = readonly
@@ -863,6 +872,21 @@ class GraphIndex(ObjectBase):
             The context of the graph.
         """
         return _CAPI_DGLGraphContext(self)
+
+    @property
+    def dtype(self):
+        """Return the index dtype
+
+        Returns
+        ----------
+        str
+            The dtype of graph index
+        """
+        bits = self.nbits()
+        if bits == 32:
+            return "int32"
+        else:
+            return "int64"
 
     def copy_to(self, ctx):
         """Copy this immutable graph index to the given device context.

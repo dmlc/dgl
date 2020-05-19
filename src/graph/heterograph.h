@@ -187,10 +187,22 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
   }
 
+  std::string GetRestrictFormat() const override {
+    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
+    return std::string("");
+  }
+
+  dgl_format_code_t GetFormatInUse() const override {
+    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
+    return 0;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
+
+  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
@@ -201,6 +213,12 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \return Save HeteroGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
+
+  /*! \brief Convert the graph to use the given number of bits for storage */
+  static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
+
+  /*! \brief Copy the data to another context */
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
  private:
   // To create empty class
@@ -214,6 +232,15 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
+
+  /*! \brief template class for Flatten operation
+  * 
+  * \tparam IdType Graph's index data type, can be int32_t or int64_t
+  * \param etypes vector of etypes to be falttened
+  * \return pointer of FlattenedHeteroGraphh
+  */
+  template <class IdType>
+  FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
 };
 
 }  // namespace dgl

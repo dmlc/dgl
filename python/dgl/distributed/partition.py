@@ -25,7 +25,7 @@ the configuration file will look like the following:
 {
   "graph_name" : "test",
   "part_method" : "metis",
-  "num_parts" : 2
+  "num_parts" : 2,
   "halo_hops" : 1,
   "node_map" : "data_root_dir/node_map.npy",
   "edge_map" : "data_root_dir/edge_map.npy"
@@ -120,6 +120,8 @@ def load_partition(conf_file, part_id):
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
+    assert 'num_parts' in part_metadata, 'num_parts does not exist.'
+    num_parts = part_metadata['num_parts']
     assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
     part_files = part_metadata['part-{}'.format(part_id)]
     assert 'node_feats' in part_files, "the partition does not contain node features."
@@ -134,7 +136,7 @@ def load_partition(conf_file, part_id):
     assert 'edge_map' in part_metadata, "cannot get the edge map."
     node_map = np.load(part_metadata['node_map'])
     edge_map = np.load(part_metadata['edge_map'])
-    meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map, edge_map)
+    meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map, edge_map, num_parts)
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 

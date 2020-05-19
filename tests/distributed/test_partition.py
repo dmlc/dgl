@@ -24,11 +24,12 @@ def test_partition():
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
-        num_nodes, num_edges, node_map, edge_map = meta
+        num_nodes, num_edges, node_map, edge_map, num_partitions = meta
 
         # Check the metadata
         assert num_nodes == g.number_of_nodes()
         assert num_edges == g.number_of_edges()
+        assert num_partitions == num_parts
 
         # Check the node map.
         local_nodes = np.nonzero(node_map == i)[0]
