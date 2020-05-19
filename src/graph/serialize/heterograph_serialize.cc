@@ -152,6 +152,14 @@ DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_GetGindexFromHeteroGraphDa
     *rv = HeteroGraphRef(hdata->gptr);
   });
 
+
+DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_GetNDataFromHeteroGraphData")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphData hdata = args[0];
+    // for 
+    // *rv = List<Map<std::string, Value>>(hdata->node_tensors);
+  });
+
 void StorageMetaDataObject::SetHeteroGraphData(
   std::vector<HeteroGraphData> gdata) {
   this->heterograph_data = List<HeteroGraphData>(gdata);
