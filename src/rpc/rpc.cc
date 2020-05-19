@@ -225,13 +225,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMsgSeq")
   *rv = RPCContext::ThreadLocal()->msg_seq;
 });
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetServerState")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  auto st = RPCContext::ThreadLocal()->server_state;
-  CHECK(st) << "Server state has not been initialized.";
-  *rv = st;
-});
-
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSendRPCMessage")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   RPCMessageRef msg = args[0];
@@ -305,6 +298,15 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
     ret.push_back(Value(MakeValue(msg->tensors[i])));
   }
   *rv = ret;
+});
+
+//////////////////////////// ServerState ////////////////////////////
+
+DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  auto st = RPCContext::ThreadLocal()->server_state;
+  CHECK(st) << "Server state has not been initialized.";
+  *rv = st;
 });
 
 }  // namespace rpc
