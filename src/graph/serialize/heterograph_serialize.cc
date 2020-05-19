@@ -49,99 +49,9 @@
 
 namespace dgl {
 namespace serialize {
-class HeteroGraphDataObject;
-}
-}  // namespace dgl
-
-namespace dmlc {
-DMLC_DECLARE_TRAITS(has_saveload, dgl::serialize::HeteroGraphDataObject, true);
-}
-
-namespace dgl {
-namespace serialize {
 
 using namespace dgl::runtime;
 using dmlc::SeekStream;
-
-class HeteroGraphDataObject : public runtime::Object {
- public:
-  std::shared_ptr<HeteroGraph> gptr;
-  std::vector<std::vector<NamedTensor>> node_tensors;
-  std::vector<std::vector<NamedTensor>> edge_tensors;
-  std::vector<std::string> etype_names;
-  std::vector<std::string> ntype_names;
-
-  static constexpr const char *_type_key =
-    "heterograph_serialize.HeteroGraphData";
-
-  HeteroGraphDataObject(HeteroGraphPtr gptr,
-                        List<Map<std::string, Value>> ndata,
-                        List<Map<std::string, Value>> edata,
-                        List<Value> ntype_names, List<Value> etype_names) {
-    this->gptr = std::dynamic_pointer_cast<HeteroGraph>(gptr);
-    CHECK_NOTNULL(this->gptr);
-    for (auto nd_dict : ndata) {
-      node_tensors.emplace_back();
-      for (auto kv : nd_dict) {
-        auto last = &node_tensors.back();
-        NDArray ndarray = kv.second->data;
-        last->emplace_back(kv.first, ndarray);
-      }
-    }
-    for (auto nd_dict : edata) {
-      edge_tensors.emplace_back();
-      for (auto kv : nd_dict) {
-        auto last = &edge_tensors.back();
-        NDArray ndarray = kv.second->data;
-        last->emplace_back(kv.first, ndarray);
-      }
-    }
-    for (auto v : ntype_names) {
-      std::string name = v->data;
-      this->ntype_names.push_back(name);
-    }
-
-    for (auto v : etype_names) {
-      std::string name = v->data;
-      this->etype_names.push_back(name);
-    }
-  }
-
-  void Save(dmlc::Stream *fs) const {
-    fs->Write(gptr);
-    fs->Write(node_tensors);
-    fs->Write(edge_tensors);
-    fs->Write(ntype_names);
-    fs->Write(etype_names);
-  }
-
-  bool Load(dmlc::Stream *fs) {
-    fs->Read(&gptr);
-    fs->Read(&node_tensors);
-    fs->Read(&edge_tensors);
-    fs->Read(&ntype_names);
-    fs->Read(&etype_names);
-    return true;
-  }
-
-  DGL_DECLARE_OBJECT_TYPE_INFO(HeteroGraphDataObject, runtime::Object);
-};
-
-class HeteroGraphData : public runtime::ObjectRef {
- public:
-  DGL_DEFINE_OBJECT_REF_METHODS(HeteroGraphData, runtime::ObjectRef,
-                                HeteroGraphDataObject);
-
-  /*! \brief create a new GraphData reference */
-  static HeteroGraphData Create(HeteroGraphPtr gptr,
-                                List<Map<std::string, Value>> node_tensors,
-                                List<Map<std::string, Value>> edge_tensors,
-                                List<Value> ntype_names,
-                                List<Value> etype_names) {
-    return HeteroGraphData(std::make_shared<HeteroGraphDataObject>(
-      gptr, node_tensors, edge_tensors, ntype_names, etype_names));
-  }
-};
 
 bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
   auto *fs =
@@ -179,6 +89,45 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
   return true;
 }
 
+StorageMetaData LoadHeteroGraphs(dmlc::SeekStream *fs,
+                                 std::vector<dgl_id_t> idx_list) {
+  uint64_t num_graph;
+  CHECK(fs->Read(&num_graph)) << "Invalid num of graph";
+  std::vector<uint64_t> graph_indices(num_graph);
+  CHECK(fs->Read(&graph_indices)) << "Invalid graph indices";
+
+  StorageMetaData metadata = StorageMetaData::Create();
+
+  std::vector<HeteroGraphData> gdata_refs;
+  if (idx_list.empty()) {
+    // Read All Graphs
+    gdata_refs.reserve(num_graph);
+    for (uint64_t i = 0; i < num_graph; ++i) {
+      HeteroGraphData gdata = HeteroGraphData::Create();
+      auto hetero_data = gdata.sptr();
+      fs->Read(&hetero_data);
+      gdata_refs.push_back(gdata);
+    }
+  } else {
+    // Read Selected Graphss
+    gdata_refs.reserve(idx_list.size());
+    // Would be better if idx_list is sorted. However the returned the graphs
+    // should be the same order as the idx_list
+    for (uint64_t i = 0; i < idx_list.size(); ++i) {
+      fs->Seek(graph_indices[idx_list[i]]);
+      HeteroGraphData gdata = HeteroGraphData::Create();
+      auto hetero_data = gdata.sptr();
+      fs->Read(&hetero_data);
+      gdata_refs.push_back(gdata);
+    }
+  }
+
+  metadata->SetHeteroGraphData(gdata_refs);
+
+  delete fs;
+  return metadata;
+}
+
 DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_MakeHeteroGraphData")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
@@ -194,18 +143,19 @@ DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_SaveHeteroGraphData")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<HeteroGraphData> hgdata = args[1];
-    // Map<std::string, Value> labels = args[2];
-
-    // std::vector<NamedTensor> labels_list;
-    // for (auto kv : labels) {
-    //   std::string name = kv.first;
-    //   Value v = kv.second;
-    //   NDArray ndarray = v->data;
-    //   labels_list.emplace_back(name, ndarray);
-    // }
-
     *rv = dgl::serialize::SaveHeteroGraphs(filename, hgdata);
   });
+
+DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_GetGindexFromHeteroGraphData")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphData hdata = args[0];
+    *rv = HeteroGraphRef(hdata->gptr);
+  });
+
+void StorageMetaDataObject::SetHeteroGraphData(
+  std::vector<HeteroGraphData> gdata) {
+  this->heterograph_data = List<HeteroGraphData>(gdata);
+}
 
 }  // namespace serialize
 }  // namespace dgl

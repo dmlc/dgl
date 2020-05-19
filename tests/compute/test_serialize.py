@@ -179,8 +179,8 @@ def test_serialize_empty_dict():
     os.unlink(path)
 
 def test_load_old_files1():    
-    loadg_list, _ = load_graphs("./data/1.bin")
-    idx, num_nodes, edge0, edge1, edata_e1, edata_e2, ndata_n1= np.load("./data/1.npy", allow_pickle=True)
+    loadg_list, _ = load_graphs(os.path.join(os.path.dirname(__file__), "data/1.bin"))
+    idx, num_nodes, edge0, edge1, edata_e1, edata_e2, ndata_n1= np.load(os.path.join(os.path.dirname(__file__), "data/1.npy"), allow_pickle=True)
 
     load_g = loadg_list[idx]
     load_edges = load_g.all_edges('uv', 'eid')
@@ -193,9 +193,9 @@ def test_load_old_files1():
     
 
 def test_load_old_files2():    
-    loadg_list, labels0 = load_graphs("./data/2.bin")
-    labels1 = load_labels("./data/2.bin")
-    idx, edges0, edges1, np_labels = np.load("./data/2.npy", allow_pickle=True)
+    loadg_list, labels0 = load_graphs(os.path.join(os.path.dirname(__file__), "data/2.bin"))
+    labels1 = load_labels(os.path.join(os.path.dirname(__file__), "data/2.bin"))
+    idx, edges0, edges1, np_labels = np.load(os.path.join(os.path.dirname(__file__), "data/2.npy"), allow_pickle=True)
     assert np.allclose(F.asnumpy(labels0['label']), np_labels)
     assert np.allclose(F.asnumpy(labels1['label']), np_labels)
 
