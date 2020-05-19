@@ -30,8 +30,9 @@ def get_local_machine_id(server_namebook):
     Parameters
     ----------
     server_namebook: dict
-        IP address namebook of server nodes, where key is the server's ID 
-        (start from 0) and value is the server's machine_id, IP address, port, and group_count, e.g.,
+        IP address namebook of server nodes, where key is the server's ID
+        (start from 0) and value is the server's machine_id, IP address,
+        port, and group_count, e.g.,
 
           {0:'[0, 172.31.40.143, 30050, 2],
            1:'[0, 172.31.40.143, 30051, 2],
@@ -101,7 +102,8 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     ConnectionError : If anything wrong with the connection.
     """
     assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
-    assert net_type in ('socket', 'mpi'), 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
+    assert net_type in ('socket', 'mpi'), \
+    'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
     # Register some basic service
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterReuqest,
