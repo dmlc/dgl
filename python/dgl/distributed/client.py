@@ -143,7 +143,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     rpc.receiver_wait(client_ip, client_port, num_servers)
     # recv client ID from server
     res = rpc.recv_response()
-    rpc.set_rank(res.ID)
+    rpc.set_rank(res.client_id)
     print("Client (%d) connect to server successfuly!" % rpc.get_rank())
 
 def finalize_client():
