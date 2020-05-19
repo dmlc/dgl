@@ -16,9 +16,9 @@ def local_ip4_addr_list():
     nic = set()
     for if_nidx in socket.if_nameindex():
         name = if_nidx[1]
-        socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         ip_addr = socket.inet_ntoa(fcntl.ioctl(
-            socket.fileno(),
+            sock.fileno(),
             0x8915,  # SIOCGIFADDR
             struct.pack('256s', name[:15].encode("UTF-8")))[20:24])
         nic.add(ip_addr)
