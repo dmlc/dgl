@@ -839,7 +839,7 @@ class ShutDownRequest(Request):
     def process_request(self, server_state):
         assert self.ID == 0
         finalize_server()
-        return None
+        exit()
 
 
 _init_api("dgl.distributed.rpc")
