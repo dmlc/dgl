@@ -156,6 +156,6 @@ def shutdown_servers():
     ConnectionError : If anything wrong with the connection.
     """
     if rpc.get_rank() == 0: # Only client_0 issue this command
-        req = rpc.ShutDownRequest(get_rank())
+        req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
