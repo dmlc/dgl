@@ -13,14 +13,21 @@ The folder contains training module and inferencing module (nucleus sampling) fo
 - For single-gpu training:
 
     ```
+    python examples/pytorch/polygen/train_vertexnet.py --gpus 0 --dataset /home/ubuntu/data/ShapeNetCore.v2/all_file_list_filtered.txt --batch 2 --ckpt-dir /home/ubuntu/logs/
+    
+
     python examples/pytorch/polygen/train_facenet.py --gpus 0 --dataset /home/ubuntu/data/ShapeNetCore.v2/all_file_list_filtered.txt --batch 2 --ckpt-dir /home/ubuntu/logs/
+
     ```
 
 - For multi-gpu training:
 
     ```
+    python examples/pytorch/polygen/train_vertexnet.py --gpus 0,1,2,3,4,5,6,7 --dataset /home/ubuntu/data/ShapeNetCore.v2/all_file_list_filtered.txt --batch 16 --ckpt-dir /home/ubuntu/logs/
+    
     python examples/pytorch/polygen/train_facenet.py --gpus 0,1,2,3,4,5,6,7 --dataset /home/ubuntu/data/ShapeNetCore.v2/all_file_list_filtered.txt --batch 16 --ckpt-dir /home/ubuntu/logs/
     ```
+
 
 ## TODOs
 - Training Speed Tuning
