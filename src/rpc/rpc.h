@@ -11,6 +11,8 @@
 #include <dmlc/thread_local.h>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <vector>
 #include "./network/communicator.h"
 #include "./server_state.h"
 

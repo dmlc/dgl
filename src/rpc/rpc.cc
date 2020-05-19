@@ -15,12 +15,12 @@ namespace dgl {
 namespace rpc {
 
 RPCStatus SendRPCMessage(const RPCMessage& msg) {
-  // TODO
+  // TODO(???): Implement
   return kRPCSuccess;
 }
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
-  // TODO
+  // TODO(???): Implement
   return kRPCSuccess;
 }
 

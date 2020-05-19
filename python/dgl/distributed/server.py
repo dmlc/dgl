@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 """Functions used by server."""
 
 def start_server(clients):

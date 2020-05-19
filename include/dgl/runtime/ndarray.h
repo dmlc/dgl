@@ -6,11 +6,14 @@
 #ifndef DGL_RUNTIME_NDARRAY_H_
 #define DGL_RUNTIME_NDARRAY_H_
 
-#include <string>
+
 #include <atomic>
-#include <vector>
+#include <string>
 #include <utility>
+#include <vector>
+
 #include "c_runtime_api.h"
+#include "dlpack/dlpack.h"
 #include "serializer.h"
 #include "shared_mem.h"
 
@@ -158,12 +161,12 @@ class NDArray {
    * \param stream The input data stream
    * \return Whether load is successful
    */
-  inline bool Load(dmlc::Stream* stream);
+  bool Load(dmlc::Stream* stream);
   /*!
    * \brief Save NDArray to stream
    * \param stream The output data stream
    */
-  inline void Save(dmlc::Stream* stream) const;
+  void Save(dmlc::Stream* stream) const;
   /*!
    * \brief Create a NDArray that shares the data memory with the current one.
    * \param shape The shape of the new array.
@@ -237,6 +240,10 @@ class NDArray {
   template<typename T>
   std::vector<T> ToVector() const;
 
+#ifndef _WIN32
+  std::shared_ptr<SharedMemory> GetSharedMem() const;
+#endif  // _WIN32
+
   /*!
    * \brief Function to copy data from one array to another.
    * \param from The source array.
@@ -263,6 +270,7 @@ class NDArray {
  * \param tensor The tensor to be saved.
  */
 inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
+
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
@@ -456,57 +464,6 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
   return true;
 }
 
-inline void NDArray::Save(dmlc::Stream* strm) const {
-  SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
-}
-
-inline bool NDArray::Load(dmlc::Stream* strm) {
-  uint64_t header, reserved;
-  CHECK(strm->Read(&header))
-      << "Invalid DLTensor file format";
-  CHECK(strm->Read(&reserved))
-      << "Invalid DLTensor file format";
-  CHECK(header == kDGLNDArrayMagic)
-      << "Invalid DLTensor file format";
-  DLContext ctx;
-  int ndim;
-  DLDataType dtype;
-  CHECK(strm->Read(&ctx))
-      << "Invalid DLTensor file format";
-  CHECK(strm->Read(&ndim))
-      << "Invalid DLTensor file format";
-  CHECK(strm->Read(&dtype))
-      << "Invalid DLTensor file format";
-  CHECK_EQ(ctx.device_type, kDLCPU)
-      << "Invalid DLTensor context: can only save as CPU tensor";
-  std::vector<int64_t> shape(ndim);
-  if (ndim != 0) {
-    CHECK(strm->ReadArray(&shape[0], ndim))
-        << "Invalid DLTensor file format";
-  }
-  NDArray ret = NDArray::Empty(shape, dtype, ctx);
-  int64_t num_elems = 1;
-  int elem_bytes = (ret->dtype.bits + 7) / 8;
-  for (int i = 0; i < ret->ndim; ++i) {
-    num_elems *= ret->shape[i];
-  }
-  int64_t data_byte_size;
-  CHECK(strm->Read(&data_byte_size))
-      << "Invalid DLTensor file format";
-  CHECK(data_byte_size == num_elems * elem_bytes)
-      << "Invalid DLTensor file format";
-  if (data_byte_size != 0)  {
-    // strm->Read will return the total number of elements successfully read.
-    // Therefore if data_byte_size is zero, the CHECK below would fail.
-    CHECK(strm->Read(ret->data, data_byte_size))
-        << "Invalid DLTensor file format";
-  }
-  if (!DMLC_IO_NO_ENDIAN_SWAP) {
-    dmlc::ByteSwap(ret->data, elem_bytes, num_elems);
-  }
-  *this = ret;
-  return true;
-}
 
 }  // namespace runtime
 }  // namespace dgl
