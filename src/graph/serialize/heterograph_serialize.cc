@@ -156,14 +156,12 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
   fs->Seek(4096);
 
   // Write Graph Meta Data
-  dgl_id_t num_graph = hdata.size();
+  uint64_t num_graph = hdata.size();
 
-  std::vector<dgl_id_t> graph_indices(num_graph);
-  std::vector<int64_t> nodes_num_list(num_graph);
-  std::vector<int64_t> edges_num_list(num_graph);
+  std::vector<uint64_t> graph_indices(num_graph);
 
   fs->Write(num_graph);
-  dgl_id_t indices_start_ptr = fs->Tell();
+  uint64_t indices_start_ptr = fs->Tell();
   fs->Write(graph_indices);
   // fs->Write(labels_list);
 

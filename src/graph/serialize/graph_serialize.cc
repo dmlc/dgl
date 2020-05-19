@@ -175,6 +175,7 @@ bool SaveDGLGraphs(std::string filename,
   return true;
 }
 
+// ReadDGLMetaData(Stream* )
 
 StorageMetaData LoadDGLGraphs(const std::string &filename,
                               std::vector<dgl_id_t> idx_list,
