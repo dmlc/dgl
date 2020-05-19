@@ -241,7 +241,7 @@ def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_si
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.module.inference(g, inputs, batch_size, device)
     model.train()
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
@@ -267,8 +267,16 @@ def run(proc_id, n_gpus, args, devices, data):
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs, args.neg_share)
 
     # Create PyTorch DataLoader for constructing blocks
+    train_seeds = np.arange(g.number_of_edges())
+    if n_gpus > 0:
+        num_per_gpu = (train_seeds.shape[0] + n_gpus -1) // n_gpus
+        train_seeds = train_seeds[proc_id * num_per_gpu :
+                                  (proc_id + 1) * num_per_gpu \
+                                  if (proc_id + 1) * num_per_gpu < train_seeds.shape[0]
+                                  else train_seeds.shape[0]]
+
     nb_dataloader = DataLoader(
-        dataset=np.arange(g.number_of_edges()),
+        dataset=train_seeds,
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
@@ -328,8 +336,8 @@ def run(proc_id, n_gpus, args, devices, data):
             iter_t.append(t - d_step)
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
-                    epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
+                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
+                    proc_id, epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
             if step % args.eval_every == 0 and proc_id == 0:
