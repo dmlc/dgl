@@ -123,6 +123,8 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
     ndarray_count_msg.data = ndarray_count;
     ndarray_count_msg.size = sizeof(int32_t);
     ndarray_count_msg.deallocator = network::DefaultMessageDeleter;
+    CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
+      ndarray_count_msg, msg.server_id), ADD_SUCCESS);
     // send real ndarray data
     for (auto ptr : zc_write_strm.buffer_list()) {
       network::Message ndarray_data_msg;
@@ -130,6 +132,8 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
       ndarray_data_msg.size = ptr.size;
       NDArray tensor = ptr.tensor;
       ndarray_data_msg.deallocator = [tensor](network::Message*) {};
+      CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
+        ndarray_data_msg, msg.server_id), ADD_SUCCESS);
     }
   }
   return kRPCSuccess;
