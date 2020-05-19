@@ -153,8 +153,8 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
       &ndarray_meta_msg, send_id), REMOVE_SUCCESS);
     std::string zerocopy_blob;
     zerocopy_blob.resize(ndarray_meta_msg.size);
-    memcpy(const_cast<char*>(zerocopy_blob.data()), 
-           ndarray_meta_msg.data, 
+    memcpy(const_cast<char*>(zerocopy_blob.data()),
+           ndarray_meta_msg.data,
            ndarray_meta_msg.size);
     ndarray_meta_msg.deallocator(&ndarray_meta_msg);
     // Recv ndarray count

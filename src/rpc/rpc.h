@@ -11,6 +11,8 @@
 #include <dmlc/thread_local.h>
 #include <cstdint>
 #include <memory>
+#include <vector>
+#include <string>
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
 #include "./network/msg_queue.h"
