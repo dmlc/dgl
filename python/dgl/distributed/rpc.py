@@ -30,7 +30,7 @@ def read_ip_config(filename):
         172.31.30.180 30050 2
 
     Note that, DGL supports multiple backup servers that shares data with each others
-    on the same machine via shared-memory tensor. The server_count should be >= 1. For example, 
+    on the same machine via shared-memory tensor. The server_count should be >= 1. For example,
     if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
     current machine. Note that, the count of server on each machine can be different.
 
@@ -62,9 +62,10 @@ def read_ip_config(filename):
         machine_id = 0
         lines = [line.rstrip('\n') for line in open(filename)]
         for line in lines:
-            ip, port, server_count = line.split(' ')
+            ip_addr, port, server_count = line.split(' ')
             for s_count in range(int(server_count)):
-                server_namebook[server_id] = [int(machine_id), ip, int(port)+s_count, int(server_count)]
+                server_namebook[server_id] = \
+                [int(machine_id), ip_addr, int(port)+s_count, int(server_count)]
                 server_id += 1
             machine_id += 1
     except:
@@ -119,7 +120,7 @@ def finalize_sender():
     """Finalize rpc sender of this process.
     """
     _CAPI_DGLRPCFinalizeSender()
-    
+
 def finalize_receiver():
     """Finalize rpc receiver of this process.
     """
@@ -320,7 +321,7 @@ class Request:
     def client_id(self, client_id):
         """Set client ID"""
         self._client_id = client_id
-    
+
     @msg_seq.setter
     def msg_seq(self, msg_seq):
         """Set msg_seq"""
@@ -380,7 +381,7 @@ class Response:
     def client_id(self, client_id):
         """Set client ID"""
         self._client_id = client_id
-    
+
     @msg_seq.setter
     def msg_seq(self, msg_seq):
         """Set msg_seq"""
@@ -393,7 +394,7 @@ def serialize_to_payload(serializable):
 
     Parameters
     ----------
-    serializable : object 
+    serializable : object
         Any serializable object.
 
     Returns
@@ -409,11 +410,11 @@ def serialize_to_payload(serializable):
     nonarray_pos = []
     nonarray_state = []
     array_state = []
-    for i, st in enumerate(state):
-        if F.is_tensor(st):
-            array_state.append(st)
+    for i, state in enumerate(state):
+        if F.is_tensor(state):
+            array_state.append(state)
         else:
-            nonarray_state.append(st)
+            nonarray_state.append(state)
             nonarray_pos.append(i)
     data = bytearray(pickle.dumps((nonarray_pos, nonarray_state)))
     return data, array_state
@@ -739,8 +740,7 @@ def send_rpc_message(msg):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    status = _CAPI_DGLRPCSendRPCMessage(msg)
-    # TODO: handle status flag
+    _CAPI_DGLRPCSendRPCMessage(msg)
 
 def recv_rpc_message(timeout=0):
     """Receive one message.
@@ -763,8 +763,7 @@ def recv_rpc_message(timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     msg = _CAPI_DGLRPCCreateEmptyRPCMessage()
-    status = _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
-    # TODO: handle status flag
+    _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
     return msg
 
 def finalize_server():
@@ -774,7 +773,7 @@ def finalize_server():
     finalize_receiver()
     print("Server (%d) shutdown." % get_rank())
 
-############################### Some basic services will be defined here ############################
+############### Some basic services will be defined here #############
 
 CLIENT_REGISTER = 22451
 
@@ -806,14 +805,14 @@ class ClientRegisterResponse(Response):
     ID : int
         client's ID
     """
-    def __init__(self, ID):
-        self.ID = ID
+    def __init__(self, client_id):
+        self.client_id = client_id
 
     def __getstate__(self):
-        return self.ID
+        return self.client_id
 
     def __setstate__(self, state):
-        self.ID = state
+        self.client_id = state
 
 
 SHUT_DOWN_SERVER = 22452

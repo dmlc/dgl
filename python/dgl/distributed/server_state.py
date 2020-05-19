@@ -6,18 +6,18 @@ from .._ffi.function import _init_api
 @register_object('server_state.ServerState')
 class ServerState(ObjectBase):
     """Data stored in one DGL server.
-    
+
     In a distributed setting, DGL partitions all data associated with the graph
     (e.g., node and edge features, graph structure, etc.) to multiple partitions,
     each handled by one DGL server. Hence, the ServerState class includes all
     the data associated with a graph partition.
-    
+
     Under some setup, users may want to deploy servers in a heterogeneous way
     -- servers are further divided into special groups for fetching/updating
     node/edge data and for sampling/querying on graph structure respectively.
     In this case, the ServerState can be configured to include only node/edge
     data or graph structure.
-    
+
     Each machine can have multiple server and client processes, but only one
     server is the *master* server while all the others are backup servers. All
     clients and backup servers share the state of the master server via shared
