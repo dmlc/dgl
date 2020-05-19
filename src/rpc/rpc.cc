@@ -128,8 +128,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
       network::Message ndarray_data_msg;
       ndarray_data_msg.data = reinterpret_cast<char*>(ptr.data);
       ndarray_data_msg.size = ptr.size;
-      NDArray tensor = ptr.tensor;
-      ndarray_data_msg.deallocator = [tensor](network::Message*) {}
+      ndarray_data_msg.deallocator = [ptr.tensor](network::Message*) {};
     }
   }
   return kRPCSuccess;
