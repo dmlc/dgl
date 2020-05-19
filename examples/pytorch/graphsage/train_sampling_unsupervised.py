@@ -13,10 +13,13 @@ import argparse
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
+from torch.nn.parallel import DistributedDataParallel
 import tqdm
 import traceback
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
+
+from utils import thread_wrapped_func
 
 #### Negative sampler
 
@@ -60,7 +63,7 @@ class NeighborSampler(object):
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
+            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
             # Remove all edges between heads and tails, as well as heads and neg_tails.
             _, _, edge_ids = frontier.edge_ids(
                 th.cat([heads, tails, neg_heads, neg_tails]),
@@ -89,7 +92,7 @@ class MemCopySampler(object):
     def sample_data(self, seeds):
         pos_graph, neg_graph, blocks = next(self.loader)
         input_nodes = blocks[0].srcdata[dgl.NID]
-        batch_inputs = g.ndata['features'][input_nodes]
+        batch_inputs = self.g.ndata['features'][input_nodes]
         batch_inputs = batch_inputs.to(self.device, non_blocking=True)
 
         return pos_graph, neg_graph, blocks, batch_inputs
@@ -235,8 +238,17 @@ def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_si
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
 #### Entry point
-def run(args, device, data):
+def run(proc_id, n_gpus, args, devices, data):
     # Unpack data
+    device = devices[proc_id]
+    if n_gpus > 1:
+        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+            master_ip='127.0.0.1', master_port='12345')
+        world_size = n_gpus
+        th.distributed.init_process_group(backend="nccl",
+                                          init_method=dist_init_method,
+                                          world_size=world_size,
+                                          rank=proc_id)
     train_mask, val_mask, test_mask, in_feats, labels, n_classes, g = data
 
     train_nid = th.LongTensor(np.nonzero(train_mask)[0])
@@ -269,6 +281,8 @@ def run(args, device, data):
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
+    if n_gpus > 1:
+        model = DistributedDataParallel(model, device_ids=[device], output_device=device)
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -309,39 +323,22 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
                     epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
-            if step % args.eval_every == 0:
+
+            '''
+            if step % args.eval_every == 0 and proc_id == 0:
                 eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
                 if eval_acc > best_eval_acc:
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
+            '''
 
+        if n_gpus > 1:
+            th.distributed.barrier()
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
-if __name__ == '__main__':
-    argparser = argparse.ArgumentParser("multi-gpu training")
-    argparser.add_argument('--gpu', type=int, default=0,
-        help="GPU device ID. Use -1 for CPU training")
-    argparser.add_argument('--num-epochs', type=int, default=20)
-    argparser.add_argument('--num-hidden', type=int, default=16)
-    argparser.add_argument('--num-layers', type=int, default=2)
-    argparser.add_argument('--num-negs', type=int, default=1)
-    argparser.add_argument('--fan-out', type=str, default='10,25')
-    argparser.add_argument('--batch-size', type=int, default=10000)
-    argparser.add_argument('--log-every', type=int, default=20)
-    argparser.add_argument('--eval-every', type=int, default=1000)
-    argparser.add_argument('--lr', type=float, default=0.003)
-    argparser.add_argument('--dropout', type=float, default=0.5)
-    argparser.add_argument('--num-workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
-    args = argparser.parse_args()
-    
-    if args.gpu >= 0:
-        device = th.device('cuda:%d' % args.gpu)
-    else:
-        device = th.device('cpu')
-
+def main(args, devices):
     # load reddit data
     data = RedditDataset(self_loop=True)
     train_mask = data.train_mask
@@ -358,4 +355,42 @@ if __name__ == '__main__':
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
 
+    n_gpus = len(devices)
+    if devices[0] == -1:
+        run(0, 0, args, ['cpu'], data)
+    if n_gpus == 1:
+        run(0, n_gpus, args, devices, data)
+    else:
+        procs = []
+        for proc_id in range(n_gpus):
+            p = mp.Process(target=thread_wrapped_func(run),
+                           args=(proc_id, n_gpus, args, devices, data))
+            p.start()
+            procs.append(p)
+        for p in procs:
+            p.join()
+
     run(args, device, data)
+
+
+if __name__ == '__main__':
+    argparser = argparse.ArgumentParser("multi-gpu training")
+    argparser.add_argument("--gpu", type=str, default='0',
+            help="GPU, can be a list of gpus for multi-gpu trianing, e.g., 0,1,2,3; -1 for CPU")
+    argparser.add_argument('--num-epochs', type=int, default=20)
+    argparser.add_argument('--num-hidden', type=int, default=16)
+    argparser.add_argument('--num-layers', type=int, default=2)
+    argparser.add_argument('--num-negs', type=int, default=1)
+    argparser.add_argument('--fan-out', type=str, default='10,25')
+    argparser.add_argument('--batch-size', type=int, default=10000)
+    argparser.add_argument('--log-every', type=int, default=20)
+    argparser.add_argument('--eval-every', type=int, default=1000)
+    argparser.add_argument('--lr', type=float, default=0.003)
+    argparser.add_argument('--dropout', type=float, default=0.5)
+    argparser.add_argument('--num-workers', type=int, default=0,
+        help="Number of sampling processes. Use 0 for no extra process.")
+    args = argparser.parse_args()
+    
+    devices = list(map(int, args.gpu.split(',')))
+
+    main(args, devices)
