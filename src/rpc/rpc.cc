@@ -217,13 +217,13 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetRank")
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumServer")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-  const int32_t num_server = args[0];
-  *rv = RPCContext::ThreadLocal()->num_server = num_server;
+  const int32_t num_servers = args[0];
+  *rv = RPCContext::ThreadLocal()->num_servers = num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumServer")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_server;
+  *rv = RPCContext::ThreadLocal()->num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCIncrMsgSeq")
