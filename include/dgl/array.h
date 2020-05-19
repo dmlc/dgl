@@ -24,6 +24,15 @@ namespace dgl {
 
 typedef uint64_t dgl_id_t;
 typedef uint64_t dgl_type_t;
+/*! \brief Type for dgl fomrat code, whose binary representation indices
+ * which sparse format is in use and which is not.
+ * 
+ * Suppose the binary representation is xyz, then
+ * - x indicates whether csc is in use (1 for true and 0 for false).
+ * - y indicates whether csr is in use.
+ * - z indicates whether coo is in use.
+ */
+typedef uint8_t dgl_format_code_t;
 
 using dgl::runtime::NDArray;
 
@@ -41,7 +50,8 @@ enum class SparseFormat {
   kAny = 0,
   kCOO = 1,
   kCSR = 2,
-  kCSC = 3
+  kCSC = 3,
+  kAuto = 4   // kAuto is a placeholder that indicates it would be materialized later.
 };
 
 // Parse sparse format from string.
@@ -52,8 +62,27 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
     return SparseFormat::kCSR;
   else if (name == "csc")
     return SparseFormat::kCSC;
-  else
+  else if (name == "any")
     return SparseFormat::kAny;
+  else if (name == "auto")
+    return SparseFormat::kAuto;
+  else
+    LOG(FATAL) << "Sparse format not recognized";
+  return SparseFormat::kAny;
+}
+
+// Create string from sparse format.
+inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
+  if (sparse_format == SparseFormat::kCOO)
+    return std::string("coo");
+  else if (sparse_format == SparseFormat::kCSR)
+    return std::string("csr");
+  else if (sparse_format == SparseFormat::kCSC)
+    return std::string("csc");
+  else if (sparse_format == SparseFormat::kAny)
+    return std::string("any");
+  else
+    return std::string("auto");
 }
 
 // Sparse matrix object that is exposed to python API.
@@ -315,7 +344,10 @@ struct CSRMatrix {
         indptr(parr),
         indices(iarr),
         data(darr),
-        sorted(sorted_flag) {}
+        sorted(sorted_flag) {
+    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
+        << "The indptr and indices arrays must have the same data type.";
+  }
 
   /*! \brief constructor from SparseMatrix object */
   explicit CSRMatrix(const SparseMatrix& spmat)
@@ -324,7 +356,10 @@ struct CSRMatrix {
         indptr(spmat.indices[0]),
         indices(spmat.indices[1]),
         data(spmat.indices[2]),
-        sorted(spmat.flags[0]) {}
+        sorted(spmat.flags[0]) {
+    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
+        << "The indptr and indices arrays must have the same data type.";
+  }
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
@@ -394,7 +429,10 @@ struct COOMatrix {
         col(carr),
         data(darr),
         row_sorted(rsorted),
-        col_sorted(csorted) {}
+        col_sorted(csorted) {
+    CHECK_EQ(row->dtype.bits, col->dtype.bits)
+        << "The row and col arrays must have the same data type.";
+  }
 
   /*! \brief constructor from SparseMatrix object */
   explicit COOMatrix(const SparseMatrix& spmat)
@@ -404,7 +442,10 @@ struct COOMatrix {
         col(spmat.indices[1]),
         data(spmat.indices[2]),
         row_sorted(spmat.flags[0]),
-        col_sorted(spmat.flags[1]) {}
+        col_sorted(spmat.flags[1]) {
+    CHECK_EQ(row->dtype.bits, col->dtype.bits)
+        << "The row and col arrays must have the same data type.";
+  }
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
@@ -648,7 +689,7 @@ bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
  * \brief Batched implementation of COOIsNonZero.
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
-runtime::NDArray COOIsNonZero(COOMatrix, runtime::NDArray row, runtime::NDArray col);
+runtime::NDArray COOIsNonZero(COOMatrix , runtime::NDArray row, runtime::NDArray col);
 
 /*! \brief Return the nnz of the given row */
 int64_t COOGetRowNNZ(COOMatrix , int64_t row);
@@ -879,6 +920,29 @@ IdArray VecToIdArray(const std::vector<T>& vec,
     LOG(FATAL) << "ID can only be int32 or int64";            \
   }                                                           \
 } while (0)
+
+/*
+ * Dispatch according to bits (either int32 or int64):
+ *
+ * ATEN_ID_BITS_SWITCH(bits, IdType, {
+ *   // Now IdType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_ID_BITS_SWITCH(bits, IdType, ...)                  \
+  do {                                                          \
+    CHECK((bits) == 32 || (bits) == 64) << "bits must be 32 or 64"; \
+    if ((bits) == 32) {                                           \
+      typedef int32_t IdType;                                   \
+      { __VA_ARGS__ }                                           \
+    } else if ((bits) == 64) {                                    \
+      typedef int64_t IdType;                                   \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "ID can only be int32 or int64";            \
+    }                                                           \
+  } while (0)
 
 /*
  * Dispatch according to float type (either float32 or float64):

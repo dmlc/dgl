@@ -1,6 +1,8 @@
 """MLP for prediction on the output of readout."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
 
+# pylint: disable=W0221
 class MLPPredictor(nn.Module):
     """Two-layer MLP for regression or soft classification
     over multiple tasks from graph representations.

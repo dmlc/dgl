@@ -1,11 +1,12 @@
 """GAT-based model for regression and classification on graphs."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch.nn as nn
-import torch.nn.functional as F
 
 from .mlp_predictor import MLPPredictor
 from ..gnn.gat import GAT
 from ..readout.weighted_sum_and_max import WeightedSumAndMax
 
+# pylint: disable=W0221
 class GATPredictor(nn.Module):
     r"""GAT-based model for regression and classification on graphs.
 
@@ -65,8 +66,8 @@ class GATPredictor(nn.Module):
     n_tasks : int
         Number of tasks, which is also the output size. Default to 1.
     """
-    def __init__(self, in_feats, hidden_feats=None, num_heads=None, feat_drops=None, attn_drops=None,
-                 alphas=None, residuals=None, agg_modes=None, activations=None,
+    def __init__(self, in_feats, hidden_feats=None, num_heads=None, feat_drops=None,
+                 attn_drops=None, alphas=None, residuals=None, agg_modes=None, activations=None,
                  classifier_hidden_feats=128, classifier_dropout=0., n_tasks=1):
         super(GATPredictor, self).__init__()
 

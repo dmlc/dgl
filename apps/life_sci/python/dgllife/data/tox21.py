@@ -21,7 +21,6 @@ class Tox21(MoleculeCSVDataset):
     A common issue for multi-task prediction is that some datapoints are not labeled for
     all tasks. This is also the case for Tox21. In data pre-processing, we set non-existing
     labels to be 0 so that they can be placed in tensors and used for masking in loss computation.
-    See examples below for more details.
 
     All molecules are converted into DGLGraphs. After the first-time construction,
     the DGLGraphs will be saved for reloading so that we do not need to reconstruct them everytime.
@@ -87,9 +86,18 @@ class Tox21(MoleculeCSVDataset):
     def task_pos_weights(self):
         """Get weights for positive samples on each task
 
+        It's quite common that the number of positive samples and the
+        number of negative samples are significantly different. To compensate
+        for the class imbalance issue, we can weight each datapoint in
+        loss computation.
+
+        In particular, for each task we will set the weight of negative samples
+        to be 1 and the weight of positive samples to be the number of negative
+        samples divided by the number of positive samples.
+
         Returns
         -------
-        numpy.ndarray
-            numpy array gives the weight of positive samples on all tasks
+        Tensor of dtype float32 and shape (T)
+            Weight of positive samples on all tasks
         """
         return self._task_pos_weights

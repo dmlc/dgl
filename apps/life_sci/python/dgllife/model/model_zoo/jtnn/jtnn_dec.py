@@ -1,4 +1,4 @@
-# pylint: disable=C0111, C0103, E1101, W0611, W0612
+# pylint: disable=C0111, C0103, E1101, W0611, W0612, W0221, E1102
 import numpy as np
 import torch
 import torch.nn as nn

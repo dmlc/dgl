@@ -37,8 +37,8 @@ def test_acnn_graph_construction_and_featurization():
                                                   pocket_mol,
                                                   ligand_coords,
                                                   pocket_coords)
-    assert g.ntypes == ['protein_atom', 'ligand_atom']
-    assert g.etypes == ['protein', 'ligand', 'complex', 'complex', 'complex', 'complex']
+    assert set(g.ntypes) == set(['protein_atom', 'ligand_atom'])
+    assert set(g.etypes) == set(['protein', 'ligand', 'complex', 'complex', 'complex', 'complex'])
     assert g.number_of_nodes('protein_atom') == 286
     assert g.number_of_nodes('ligand_atom') == 21
 

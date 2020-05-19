@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-# pylint: disable=C0103, C0111, W0621
+# pylint: disable=C0103, C0111, W0621, W0221, E1102, E1101
 """SchNet"""
 import numpy as np
 import torch
@@ -10,7 +10,7 @@ from dgl.nn.pytorch import CFConv
 __all__ = ['SchNetGNN']
 
 class RBFExpansion(nn.Module):
-    """Expand distances between nodes by radial basis functions.
+    r"""Expand distances between nodes by radial basis functions.
 
     .. math::
         \exp(- \gamma * ||d - \mu||^2)

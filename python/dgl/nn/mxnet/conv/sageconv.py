@@ -97,46 +97,45 @@ class SAGEConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        graph = graph.local_var()
+        with graph.local_scope():
+            if isinstance(feat, tuple):
+                feat_src = self.feat_drop(feat[0])
+                feat_dst = self.feat_drop(feat[1])
+            else:
+                feat_src = feat_dst = self.feat_drop(feat)
 
-        if isinstance(feat, tuple):
-            feat_src = self.feat_drop(feat[0])
-            feat_dst = self.feat_drop(feat[1])
-        else:
-            feat_src = feat_dst = self.feat_drop(feat)
+            h_self = feat_dst
 
-        h_self = feat_dst
+            if self._aggre_type == 'mean':
+                graph.srcdata['h'] = feat_src
+                graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
+                h_neigh = graph.dstdata['neigh']
+            elif self._aggre_type == 'gcn':
+                check_eq_shape(feat)
+                graph.srcdata['h'] = feat_src
+                graph.dstdata['h'] = feat_dst   # same as above if homogeneous
+                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
+                # divide in degrees
+                degs = graph.in_degrees().astype(feat_dst.dtype)
+                degs = degs.as_in_context(feat_dst.context)
+                h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.expand_dims(-1) + 1)
+            elif self._aggre_type == 'pool':
+                graph.srcdata['h'] = nd.relu(self.fc_pool(feat_src))
+                graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
+                h_neigh = graph.dstdata['neigh']
+            elif self._aggre_type == 'lstm':
+                raise NotImplementedError
+            else:
+                raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
 
-        if self._aggre_type == 'mean':
-            graph.srcdata['h'] = feat_src
-            graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
-            h_neigh = graph.dstdata['neigh']
-        elif self._aggre_type == 'gcn':
-            check_eq_shape(feat)
-            graph.srcdata['h'] = feat_src
-            graph.dstdata['h'] = feat_dst   # saame as above if homogeneous
-            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
-            # divide in degrees
-            degs = graph.in_degrees().astype(feat_dst.dtype)
-            degs = degs.as_in_context(feat_dst.context)
-            h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.expand_dims(-1) + 1)
-        elif self._aggre_type == 'pool':
-            graph.srcdata['h'] = nd.relu(self.fc_pool(feat_src))
-            graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
-            h_neigh = graph.dstdata['neigh']
-        elif self._aggre_type == 'lstm':
-            raise NotImplementedError
-        else:
-            raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
-
-        if self._aggre_type == 'gcn':
-            rst = self.fc_neigh(h_neigh)
-        else:
-            rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
-        # activation
-        if self.activation is not None:
-            rst = self.activation(rst)
-        # normalization
-        if self.norm is not None:
-            rst = self.norm(rst)
-        return rst
+            if self._aggre_type == 'gcn':
+                rst = self.fc_neigh(h_neigh)
+            else:
+                rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
+            # activation
+            if self.activation is not None:
+                rst = self.activation(rst)
+            # normalization
+            if self.norm is not None:
+                rst = self.norm(rst)
+            return rst
