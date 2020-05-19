@@ -736,6 +736,9 @@ def main(args, devices):
     u, v, eid = train_g.all_edges(form='all')
     train_seed_idx = (train_g.edata['set'] == 0)
     train_seeds = eid[train_seed_idx]
+    train_shuffle = th.randperm(train_seeds.shape[0])
+    train_seeds = train_seeds[train_shuffle]
+
     # calculate norm for each edge type and store in edge
     if args.global_norm:
         _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)

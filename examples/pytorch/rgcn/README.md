@@ -76,11 +76,11 @@ python3 link_predict.py -d FB15k-237 --gpu 0 --filtered
 
 #### Link Prediction with minibatch
 wn18:
-Average MRR: 0.6548580399573246
-Average MR: 92.5784
-Average HITS@1: 0.4874
-Average HITS@3: 0.7998
-Average HITS@10: 0.952
+Average MRR: 0.7117648039149959
+Average MR: 164.2678
+Average HITS@1: 0.5758
+Average HITS@3: 0.8338
+Average HITS@10: 0.9526
 '''
-python3 link_predict_hetero_mb.py --low-mem --lr 0.00165 --n-bases 2 --n-layers 1 --n-epochs 50 --fanout -1 --batch-size 512 --regularization-coef 2e-6 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 200 --dropout 0.2 --dataset wn18
+python3 link_predict_hetero_mb.py --low-mem --lr 0.00165 --n-bases 2 --n-layers 1 --n-epochs 50 --fanout -1 --batch-size 512 --regularization-coef 2e-6 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 200 --dropout 0.2 --dataset wn18 --global-norm --gpu 0
 '''
