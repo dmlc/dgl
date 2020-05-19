@@ -111,6 +111,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
                          None)
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
+    rpc.set_num_server(num_servers)
     group_count = []
     max_machine_id = 0
     for server_info in server_namebook.values():
@@ -156,10 +157,6 @@ def shutdown_servers():
     ConnectionError : If anything wrong with the connection.
     """
     if rpc.get_rank() == 0: # Only client_0 issue this command
-        print("0000")
         req = rpc.ShutDownRequest(rpc.get_rank())
-        print("1111")
         for server_id in range(rpc.get_num_server()):
-            print("2222")
             rpc.send_request(server_id, req)
-        print("3333")
