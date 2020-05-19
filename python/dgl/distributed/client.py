@@ -1,5 +1,7 @@
 """Functions used by client."""
 
+from . import rpc
+
 import os
 import time
 import socket
@@ -8,17 +10,15 @@ if os.name != 'nt':
     import fcntl
     import struct
 
-from . import rpc
-
 def local_ip4_addr_list():
     """Return a set of IPv4 address
     """
     nic = set()
-    for ix in socket.if_nameindex():
-        name = ix[1]
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    for if_nidx in socket.if_nameindex():
+        name = if_nidx[1]
+        socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         ip_addr = socket.inet_ntoa(fcntl.ioctl(
-            s.fileno(),
+            socket.fileno(),
             0x8915,  # SIOCGIFADDR
             struct.pack('256s', name[:15].encode("UTF-8")))[20:24])
         nic.add(ip_addr)
@@ -74,9 +74,8 @@ def get_local_usable_addr():
         ip_addr = '127.0.0.1'
     finally:
         s.close()
-        
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("",0))
+    s.bind(("", 0))
     s.listen(1)
     port = s.getsockname()[1]
     s.close()
@@ -92,7 +91,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
         Path of server IP configuration file.
     queue_size : int
         Size (bytes) of client queue buffer (~20 GB on default).
-        Note that the 20 GB is just an upper-bound and DGL uses zero-copy and 
+        Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
         networking type, e.g., 'socket' (on default) or 'mpi' (do not support yet).
@@ -125,10 +124,10 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     rpc.create_sender(queue_size, net_type)
     rpc.create_receiver(queue_size, net_type)
     # Get connected with all server nodes
-    for ID, addr in server_namebook.items():
+    for server_id, addr in server_namebook.items():
         server_ip = addr[1]
         server_port = addr[2]
-        rpc.add_receiver_addr(server_ip, server_port, ID)
+        rpc.add_receiver_addr(server_ip, server_port, server_id)
     rpc.sender_connect()
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr()
