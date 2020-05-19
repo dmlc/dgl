@@ -793,7 +793,7 @@ class ClientRegisterResponse(Response):
         self.ID = ID
 
     def __getstate__(self):
-        return self._ID
+        return self.ID
 
     def __setstate__(self, state):
         self.ID = state
