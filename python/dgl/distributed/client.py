@@ -17,11 +17,11 @@ def local_ip4_addr_list():
     for ix in socket.if_nameindex():
         name = ix[1]
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        ip = socket.inet_ntoa(fcntl.ioctl(
+        ip_addr = socket.inet_ntoa(fcntl.ioctl(
             s.fileno(),
             0x8915,  # SIOCGIFADDR
             struct.pack('256s', name[:15].encode("UTF-8")))[20:24])
-        nic.add(ip)
+        nic.add(ip_addr)
     return nic
 
 def get_local_machine_id(server_namebook):
@@ -69,9 +69,9 @@ def get_local_usable_addr():
     try:
         # doesn't even have to be reachable
         s.connect(('10.255.255.255', 1))
-        IP = s.getsockname()[0]
+        ip_addr = s.getsockname()[0]
     except:
-        IP = '127.0.0.1'
+        ip_addr = '127.0.0.1'
     finally:
         s.close()
         
@@ -81,7 +81,7 @@ def get_local_usable_addr():
     port = s.getsockname()[1]
     s.close()
 
-    return IP + ':' + str(port)
+    return ip_addr + ':' + str(port)
 
 def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'):
     """Connect this client to server.
