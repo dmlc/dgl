@@ -173,9 +173,7 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
     }
     StringStreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
     msg->tensors.resize(ndarray_count);
-    //for (int i = 0; i < ndarray_count; ++i) {
     static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&msg->tensors);
-    //}
   }
   return kRPCSuccess;
 }
