@@ -67,7 +67,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=20*1024*1024*1024
             register_res = rpc.ClientRegisterResponse(ID)
             rpc.send_response(ID, 0, register_res)
     # main service loop
-    server_state = get_server_state()
+    server_state = None
     while True:
         req = rpc.recv_request()
         res = req.process_request(server_state)
