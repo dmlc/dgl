@@ -33,18 +33,26 @@ class NegativeSampler(object):
 #### Neighbor sampler
 
 class NeighborSampler(object):
-    def __init__(self, g, fanouts, num_negs):
+    def __init__(self, g, fanouts, num_negs, neg_share=False):
         self.g = g
         self.fanouts = fanouts
         self.neg_sampler = NegativeSampler(g)
         self.num_negs = num_negs
+        self.neg_share = neg_share
 
     def sample_blocks(self, seed_edges):
         n_edges = len(seed_edges)
         seed_edges = th.LongTensor(np.asarray(seed_edges))
         heads, tails = self.g.find_edges(seed_edges)
-        neg_tails = self.neg_sampler(self.num_negs * n_edges)
-        neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
+        if self.neg_share and n_edges % self.num_negs == 0:
+            neg_tails = self.neg_sampler(n_edges)
+            neg_tails = neg_tails.view(-1, 1, self.num_negs).expand(n_edges//self.num_negs,
+                                                                    self.num_negs,
+                                                                    self.num_negs).flatten()
+            neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
+        else:
+            neg_tails = self.neg_sampler(self.num_negs * n_edges)
+            neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
 
         # Maintain the correspondence between heads, tails and negative tails as two
         # graphs.
@@ -256,7 +264,7 @@ def run(proc_id, n_gpus, args, devices, data):
     test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs)
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs, args.neg_share)
 
     # Create PyTorch DataLoader for constructing blocks
     nb_dataloader = DataLoader(
@@ -324,7 +332,6 @@ def run(proc_id, n_gpus, args, devices, data):
                     epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
-            '''
             if step % args.eval_every == 0 and proc_id == 0:
                 eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
@@ -332,7 +339,6 @@ def run(proc_id, n_gpus, args, devices, data):
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
-            '''
 
         if n_gpus > 1:
             th.distributed.barrier()
@@ -381,6 +387,8 @@ if __name__ == '__main__':
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
     argparser.add_argument('--num-negs', type=int, default=1)
+    argparser.add_argument('--neg-share', default=False, action='store_true',
+        help="sharing neg nodes for positive nodes")
     argparser.add_argument('--fan-out', type=str, default='10,25')
     argparser.add_argument('--batch-size', type=int, default=10000)
     argparser.add_argument('--log-every', type=int, default=20)
