@@ -2,6 +2,15 @@ import dgl
 import backend as F
 import unittest, pytest
 
+from numpy.testing import assert_array_equal
+
+INTEGER = 2
+STR = 'hello world!'
+HELLO_SERVICE_ID = 901231
+
+def test_func(tensor, integer):
+    return tensor * integer
+
 def test_rank():
     dgl.distributed.set_rank(2)
     assert dgl.distributed.get_rank() == 2
@@ -42,6 +51,64 @@ class MyResponse(dgl.distributed.Response):
     def __setstate__(self, state):
         self.x = state
  
+class HelloResponse(dgl.distributed.Response):
+    def __init__(self, hello_str, integer, tensor):
+        self.hello_str = hello_str
+        self.integer = integer
+        self.tensor = tensor
+
+    def __getstate__(self):
+        return self.hello_str, self.integer, self.tensor
+
+    def __setstate__(self, state):
+        self.hello_str, self.integer, self.tensor = state
+
+class HelloRequest(dgl.distributed.Request):
+    def __init__(self, hello_str, integer, tensor, func):
+        self.hello_str = hello_str
+        self.integer = integer
+        self.tensor = tensor
+        self.func = func
+
+    def __getstate__(self):
+        return self.hello_str, self.integer, self.tensor, self.func
+
+    def __setstate__(self, state):
+        self.hello_str, self.integer, self.tensor, self.func = state
+
+    def process_request(self, server_state):
+        assert self.hello_str == STR
+        assert self.integer == INTEGER
+        new_tensor = self.func(self.tensor, self.integer)
+        res = HelloResponse(self.hello_str, self.integer, new_tensor)
+
+def start_server():
+    dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+    dgl.distributed.start_server(server_id=0, ip_config='ip_config.txt', num_clients=1)
+
+def start_client():
+    dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+    dgl.distributed.connect_to_server(ip_config='ip_config.txt')
+    req = HelloRequest(STR, INTEGER, F.tensor([1,2,3]), test_func)
+    # test send and recv
+    dgl.distributed.send_request(0, req)
+    res = dgl.distributed.recv_response()
+    assert res.hello_str == STR
+    assert res.integer == INTEGER
+    assert_array_equal(res.tensor, F.tensor([2,4,6]))
+    # test remote_call
+    target_and_requests = []
+    for i in range(10):
+        target_and_requests.append((0, req))
+    res_list = dgl.distributed.remote_call(target_and_requests)
+    for res in res_list:
+        assert res.hello_str == STR
+        assert res.integer == INTEGER
+        assert_array_equal(res.tensor, F.tensor([2,4,6]))
+    # clean up
+    dgl.distributed.shutdown_servers()
+    dgl.distributed.finalize_client()
+
 def test_serialize():
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
     SERVICE_ID = 12345
@@ -73,3 +140,11 @@ def test_rpc_msg():
     assert len(rpcmsg.data) == len(data)
     assert len(rpcmsg.tensors) == 1
     assert F.array_equal(rpcmsg.tensors[0], req.z)
+
+def test_rpc():
+    pid = os.fork()
+    if pid == 0:
+        start_server()
+    else:
+        time.sleep(1)
+        start_client()
