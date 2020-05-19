@@ -4,6 +4,7 @@ import scipy as sp
 import dgl
 from dgl import utils
 import unittest
+import sys
 from numpy.testing import assert_array_equal
 
 np.random.seed(42)
@@ -697,6 +698,7 @@ def check_positive_edge_sampler():
 
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support item assignment")
+@unittest.skipIf(sys.platform.startswith('win'), reason="[Regression] EdgeSampler on Windows is slow")
 def test_negative_sampler():
     check_negative_sampler('chunk-head', False, 10)
     check_negative_sampler('head', True, 10)
