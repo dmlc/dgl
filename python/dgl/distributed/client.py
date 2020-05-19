@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 """Functions used by client."""
 
 import os
