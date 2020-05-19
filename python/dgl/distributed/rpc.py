@@ -10,7 +10,7 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'get_sender', 'get_receiver', 'finalize_sender', \
-'finalize_receiver', 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config' \
+'finalize_receiver', 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
 'send_request', 'recv_request', 'send_response', 'recv_response']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
