@@ -7,6 +7,7 @@
 
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/zerocopy_serializer.h>
 #include "../c_api_common.h"
 
 using dgl::network::StringPrintf;
@@ -103,8 +104,9 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
     raw_msg, msg.server_id), ADD_SUCCESS);
   if (msg.tensors.size() > 0) {
-    // has tensor: need JJ's serialize/deserialize code
-    return kRPCSuccess;
+    std::string zerocopy_blob;
+    StringStreamWithBuffer zc_write_strm(&zerocopy_blob);
+    static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg.tensors);
   }
   return kRPCSuccess;
 }
