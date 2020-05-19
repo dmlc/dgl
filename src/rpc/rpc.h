@@ -102,7 +102,7 @@ enum RPCStatus {
 };
 
 /*!
- * \brief Serialize one RPCMessage to data buffer.
+ * \brief Serialize one meta of RPCMessage to data buffer.
  *
  * The serialized data format is:
  * 
@@ -121,17 +121,17 @@ enum RPCStatus {
  * \param size the total size of serialized data
  * \return data buffer
  */
-char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size);
+char* SerializeRPCMeta(const RPCMessage& msg, int64_t* size);
 
 /*!
- * \brief Deserialize one RPCMessage from data buffer
+ * \brief Deserialize one meta of RPCMessage from data buffer
  *
  * \param msg RPC message to deserilaize
  * \param buffer buffer holding the serialized data
  * \param size buffer size
  * \return has_tensor
  */
-bool DeserializeRPCMessage(RPCMessage* msg, char* buffer, int64_t size);
+bool DeserializeRPCMeta(RPCMessage* msg, char* buffer, int64_t size);
 
 /*!
  * \brief Send out one RPC message.

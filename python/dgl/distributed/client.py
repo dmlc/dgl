@@ -134,12 +134,8 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     rpc.receiver_wait(client_ip, client_port, num_servers)
     # recv client ID from server
     res = rpc.recv_response()
-    print("response id: " + str(res._ID))
     rpc.set_rank(res._ID)
-
-    while True:
-        time.sleep(1)
-
+    print("client %d connect to server successfult!" % rpc.get_rank())
 
 def finalize():
     """Release resources of this client."""

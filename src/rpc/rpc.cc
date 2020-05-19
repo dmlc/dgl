@@ -15,7 +15,7 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace rpc {
 
-char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size) {
+char* SerializeRPCMeta(const RPCMessage& msg, int64_t* size) {
   int64_t total_size = 0;
   total_size += sizeof(msg.service_id);
   total_size += sizeof(msg.msg_seq);
@@ -55,7 +55,7 @@ char* SerializeRPCMessage(const RPCMessage& msg, int64_t* size) {
   return buffer;
 }
 
-bool DeserializeRPCMessage(RPCMessage* msg, char* buffer, int64_t size) {
+bool DeserializeRPCMeta(RPCMessage* msg, char* buffer, int64_t size) {
   int64_t total_size = 0;
   // read service_id
   msg->service_id = *(reinterpret_cast<int32_t*>(buffer));
@@ -95,14 +95,13 @@ bool DeserializeRPCMessage(RPCMessage* msg, char* buffer, int64_t size) {
 
 RPCStatus SendRPCMessage(const RPCMessage& msg) {
   int64_t rpc_meta_size = 0;
-  char* rpc_meta_buffer = SerializeRPCMessage(msg, &rpc_meta_size);
+  char* rpc_meta_buffer = SerializeRPCMeta(msg, &rpc_meta_size);
   network::Message raw_msg;
   raw_msg.data = rpc_meta_buffer;
   raw_msg.size = rpc_meta_size;
   raw_msg.deallocator = network::DefaultMessageDeleter;
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
-    raw_msg, msg.server_id), 
-    ADD_SUCCESS);
+    raw_msg, msg.server_id), ADD_SUCCESS);
   if (msg.tensors.size() > 0) {
     // has tensor: need JJ's serialize/deserialize code
     return kRPCSuccess;
@@ -115,9 +114,8 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   network::Message raw_msg;
   int send_id;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
-    &raw_msg, &send_id), 
-    REMOVE_SUCCESS);
-  bool has_tensor = DeserializeRPCMessage(msg, raw_msg.data, raw_msg.size);
+    &raw_msg, &send_id), REMOVE_SUCCESS);
+  bool has_tensor = DeserializeRPCMeta(msg, raw_msg.data, raw_msg.size);
   if (has_tensor) {
     // has tensor: need JJ's serialize/deserialize code
     return kRPCSuccess;
@@ -220,12 +218,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetRank")
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCIncrMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = (RPCContext::ThreadLocal()->msg_seq)++;
-});
-
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  int64_t msg_seq = args[0];
-  RPCContext::ThreadLocal()->msg_seq = msg_seq;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMsgSeq")
