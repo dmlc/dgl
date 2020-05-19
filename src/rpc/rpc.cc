@@ -126,9 +126,10 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
     // send real ndarray data
     for (auto ptr : zc_write_strm.buffer_list()) {
       network::Message ndarray_data_msg;
-      ndarray_data_msg.data = ptr.data;
+      ndarray_data_msg.data = reinterpret_cast<chat*>(ptr.data);
       ndarray_data_msg.size = ptr.size;
-      ndarray_data_msg.deallocator = [ptr.tensor](network::Message*) {}
+      NDArray tensor = ptr.tensor;
+      ndarray_data_msg.deallocator = [tensor](network::Message*) {}
     }
   }
   return kRPCSuccess;
@@ -147,7 +148,7 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
     CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
       &ndarray_meta_msg, send_id), REMOVE_SUCCESS);
     std::string zerocopy_blob;
-    zerocopy_blob.resize(ndarray_meta_msg.size());
+    zerocopy_blob.resize(ndarray_meta_msg.size);
     memcpy(const_cast<char*>(zerocopy_blob.data()), 
            ndarray_meta_msg.data, 
            ndarray_meta_msg.size);
