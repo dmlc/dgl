@@ -956,10 +956,22 @@ class HeteroGraphIndex(ObjectBase):
 
         Returns
         -------
-        string : 'any', 'coo', 'csr', or 'csc'
+        string : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
         """
         ret = _CAPI_DGLHeteroGetRestrictFormat(self, etype)
         return ret
+
+    def request_format(self, sparse_format, etype):
+        """Create a sparse matrix representation in given format immediately.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+        sparse_format : str
+            ``'coo'``, ``'csr'``, or ``'csc'``
+        """
+        _CAPI_DGLHeteroRequestFormat(self, sparse_format, etype)
 
     def to_format(self, restrict_format):
         """Return a clone graph index but stored in the given sparse format.
@@ -969,8 +981,8 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
-        restrict_format : string
-            Desired restrict format ('any', 'coo', 'csr', 'csc').
+        restrict_format : str
+            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
 
         Returns
         -------
