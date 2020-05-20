@@ -74,6 +74,11 @@ WLN for Reaction Center Prediction
 .. automodule:: dgllife.model.model_zoo.wln_reaction_center
     :members:
 
+WLN for Ranking Candidate Products
+``````````````````````````````````
+.. automodule:: dgllife.model.model_zoo.wln_reaction_ranking
+    :members:
+
 Protein-Ligand Binding Affinity Prediction
 
 ACNN

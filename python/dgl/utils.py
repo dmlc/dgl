@@ -5,7 +5,7 @@ from collections.abc import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from . import ndarray as nd
 
@@ -147,8 +147,17 @@ class Index(object):
             return self.tousertensor(), self.dtype
 
     def __setstate__(self, state):
-        data, self.dtype = state
-        self._initialize_data(data)
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
+        if isinstance(state, tuple) and len(state) == 2:
+            # post-0.4.4
+            data, self.dtype = state
+            self._initialize_data(data)
+        else:
+            # pre-0.4.3
+            dgl_warning("The object is pickled before 0.4.3.  Setting dtype of graph to int64")
+            self.dtype = 'int64'
+            self._initialize_data(state)
 
     def get_items(self, index):
         """Return values at given positions of an Index

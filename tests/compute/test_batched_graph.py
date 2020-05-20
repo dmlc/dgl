@@ -1,5 +1,6 @@
 import dgl
 import backend as F
+import unittest
 
 def tree1():
     """Generate a tree
@@ -102,6 +103,7 @@ def test_batch_unbatch1():
     assert F.allclose(t2.ndata['h'], rs2.ndata['h'])
     assert F.allclose(t2.edata['h'], rs2.edata['h'])
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_batch_unbatch_frame():
     """Test module of node/edge frames of batched/unbatched DGLGraphs.
     Also address the bug mentioned in https://github.com/dmlc/dgl/issues/1475.
@@ -118,26 +120,25 @@ def test_batch_unbatch_frame():
     t2.ndata['h'] = F.randn((N2, D))
     t2.edata['h'] = F.randn((E2, D))
     
-    if F.backend_name != 'tensorflow':  # tf's tensor is immutable
-        b1 = dgl.batch([t1, t2])
-        b2 = dgl.batch([t2])
-        b1.ndata['h'][:N1] = F.zeros((N1, D))
-        b1.edata['h'][:E1] = F.zeros((E1, D))
-        b2.ndata['h'][:N2] = F.zeros((N2, D))
-        b2.edata['h'][:E2] = F.zeros((E2, D))
-        assert not F.allclose(t1.ndata['h'], F.zeros((N1, D)))
-        assert not F.allclose(t1.edata['h'], F.zeros((E1, D)))
-        assert not F.allclose(t2.ndata['h'], F.zeros((N2, D)))
-        assert not F.allclose(t2.edata['h'], F.zeros((E2, D)))
+    b1 = dgl.batch([t1, t2])
+    b2 = dgl.batch([t2])
+    b1.ndata['h'][:N1] = F.zeros((N1, D))
+    b1.edata['h'][:E1] = F.zeros((E1, D))
+    b2.ndata['h'][:N2] = F.zeros((N2, D))
+    b2.edata['h'][:E2] = F.zeros((E2, D))
+    assert not F.allclose(t1.ndata['h'], F.zeros((N1, D)))
+    assert not F.allclose(t1.edata['h'], F.zeros((E1, D)))
+    assert not F.allclose(t2.ndata['h'], F.zeros((N2, D)))
+    assert not F.allclose(t2.edata['h'], F.zeros((E2, D)))
 
-        g1, g2 = dgl.unbatch(b1)
-        _g2, = dgl.unbatch(b2)
-        assert F.allclose(g1.ndata['h'], F.zeros((N1, D)))
-        assert F.allclose(g1.edata['h'], F.zeros((E1, D)))
-        assert F.allclose(g2.ndata['h'], t2.ndata['h'])
-        assert F.allclose(g2.edata['h'], t2.edata['h'])
-        assert F.allclose(_g2.ndata['h'], F.zeros((N2, D)))
-        assert F.allclose(_g2.edata['h'], F.zeros((E2, D)))
+    g1, g2 = dgl.unbatch(b1)
+    _g2, = dgl.unbatch(b2)
+    assert F.allclose(g1.ndata['h'], F.zeros((N1, D)))
+    assert F.allclose(g1.edata['h'], F.zeros((E1, D)))
+    assert F.allclose(g2.ndata['h'], t2.ndata['h'])
+    assert F.allclose(g2.edata['h'], t2.edata['h'])
+    assert F.allclose(_g2.ndata['h'], F.zeros((N2, D)))
+    assert F.allclose(_g2.edata['h'], F.zeros((E2, D)))
 
 def test_batch_unbatch2():
     # test setting/getting features after batch

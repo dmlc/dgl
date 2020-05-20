@@ -239,6 +239,8 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     return y
 
 def boolean_mask(input, mask):
+    if 'bool' not in str(mask.dtype):
+        mask = th.tensor(mask, dtype=th.bool)
     return input[mask]
 
 def equal(x, y):

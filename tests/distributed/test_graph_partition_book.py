@@ -9,14 +9,6 @@ import backend as F
 import unittest
 import pickle
 
-def create_ip_config():
-    ip_config = open("ip_config.txt", "w")
-    ip_config.write('192.168.9.12 30050 0\n')
-    ip_config.write('192.168.9.13 30050 1\n')
-    ip_config.write('192.168.9.14 30050 2\n')
-    ip_config.write('192.168.9.15 30050 3\n')
-    ip_config.close()
-
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
     ig = create_graph_index(arr, readonly=True)
@@ -30,7 +22,6 @@ def test_graph_partition_book():
     num_parts = 4
     num_hops = 2
 
-    create_ip_config()
     partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
 
     for i in range(num_parts):
