@@ -1460,11 +1460,13 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
 
-  int64_t format_code;
-  CHECK(fs->Read(&format_code)) << "Invalid format";
-  restrict_format_ = static_cast<SparseFormat>(format_code);
+  int64_t save_format_code, restrict_format_code;
+  CHECK(fs->Read(&save_format_code)) << "Invalid format";
+  CHECK(fs->Read(&restrict_format_code)) << "Invalid format";
+  restrict_format_ = static_cast<SparseFormat>(restrict_format_code);
+  auto save_format = static_cast<SparseFormat>(save_format_code);
 
-  switch (restrict_format_) {
+  switch (save_format) {
     case SparseFormat::kCOO:
       fs->Read(&coo_);
       break;
@@ -1491,6 +1493,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   // sparse matrix
   auto avail_fmt = SelectFormat(SparseFormat::kAny);
   fs->Write(static_cast<int64_t>(avail_fmt));
+  fs->Write(static_cast<int64_t>(restrict_format_));
   switch (avail_fmt) {
     case SparseFormat::kCOO:
       fs->Write(GetCOO());

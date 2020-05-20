@@ -1,20 +1,18 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/graph_serialize.cc
- * \brief Graph serialization implementation
+ * \file graph/serialize/heterograph_serialize.cc
+ * \brief DGLHeteroGraph serialization implementation
  *
  * The storage structure is
  * {
  *   // MetaData Section
  *   uint64_t kDGLSerializeMagic
- *   uint64_t kVersion
- *   uint64_t GraphType
+ *   uint64_t kVersion = 2
+ *   uint64_t GraphType = kDGLHeteroGraph
  *   ** Reserved Area till 4kB **
  *
  *   dgl_id_t num_graphs
  *   vector<dgl_id_t> graph_indices (start address of each graph)
- *   vector<dgl_id_t> nodes_num_list (list of number of nodes for each graph)
- *   vector<dgl_id_t> edges_num_list (list of number of edges for each graph)
  *
  *   vector<GraphData> graph_datas;
  *
@@ -23,11 +21,11 @@
  * Storage of GraphData is
  * {
  *   // Everything uses in csr
- *   NDArray indptr
- *   NDArray indices
- *   NDArray edge_ids
- *   vector<pair<string, NDArray>> node_tensors;
- *   vector<pair<string, NDArray>> edge_tensors;
+ *   HeteroGraphPtr ptr; 
+ *   vector<vector<pair<string, NDArray>>> node_tensors;
+ *   vector<vector<pair<string, NDArray>>> edge_tensors;
+ *   vector<string> ntype_name;
+ *   vector<string> etype_name;
  * }
  *
  */
