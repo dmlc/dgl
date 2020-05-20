@@ -91,7 +91,6 @@ class Value(ObjectBase):
 def convert_to_strmap(value):
     """Support convert empty dict to str dict"""
     assert isinstance(value, dict), "Only support dict"
-    vlist = []
     if len(value) == 0:
         return _api_internal._EmptyStrMap()
     else:
