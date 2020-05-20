@@ -130,8 +130,8 @@ StorageMetaData LoadHeteroGraphs(dmlc::SeekStream *fs,
 DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_MakeHeteroGraphData")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
-    List<Map<std::string, Value>> edata = args[1];
-    List<Map<std::string, Value>> ndata = args[2];
+    List<Map<std::string, Value>> ndata = args[1];
+    List<Map<std::string, Value>> edata = args[2];
     List<Value> ntype_names = args[3];
     List<Value> etype_names = args[4];
     *rv = HeteroGraphData::Create(hg.sptr(), ndata, edata, ntype_names,
@@ -194,16 +194,16 @@ DGL_REGISTER_GLOBAL(
   "data.heterograph_serialize._CAPI_GetEDataFromHeteroGraphData")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphData hdata = args[0];
-    List<List<Value>> ntensors;
+    List<List<Value>> etensors;
     for (auto tensor_list : hdata->edge_tensors) {
-      List<Value> nlist;
+      List<Value> elist;
       for (const auto &kv : tensor_list) {
-        nlist.push_back(Value(MakeValue(kv.first)));
-        nlist.push_back(Value(MakeValue(kv.second)));
+        elist.push_back(Value(MakeValue(kv.first)));
+        elist.push_back(Value(MakeValue(kv.second)));
       }
-      ntensors.push_back(nlist);
+      etensors.push_back(elist);
     }
-    *rv = ntensors;
+    *rv = etensors;
   });
 
 void StorageMetaDataObject::SetHeteroGraphData(

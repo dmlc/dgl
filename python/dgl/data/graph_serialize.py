@@ -10,6 +10,7 @@ _init_api("dgl.data.graph_serialize")
 
 __all__ = ['save_graphs', "load_graphs", "load_labels"]
 
+
 @register_object("graph_serialize.StorageMetaData")
 class StorageMetaData(ObjectBase):
     """StorageMetaData Object
@@ -97,6 +98,18 @@ def save_graphs(filename, g_list, labels=None):
     >>> save_graphs("./data.bin", [g1, g2], graph_labels)
 
     """
+    g_sample = g_list
+    if isinstance(g_list, list):
+        g_sample = g_list[0]
+    if isinstance(g_sample, DGLGraph):
+        save_dglgraphs(filename, g_list)
+    elif isinstance(g_sample, DGLHeteroGraph):
+        save_heterographs(filename, g_list)
+    else:
+        raise Exception("Invalid list of graph input")
+
+
+def save_dglgraphs(filename, g_list, labels=None):
     if isinstance(g_list, DGLGraph):
         g_list = [g_list]
     if (labels is not None) and (len(labels) != 0):
@@ -148,7 +161,6 @@ def load_graphs(filename, idx_list=None):
             label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
 
         return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
-
 
 
 def load_labels(filename):

@@ -23,12 +23,6 @@ def save_heterographs(filename, g_list):
     gdata_list = [HeteroGraphData.create(g) for g in g_list]
     _CAPI_SaveHeteroGraphData(filename, gdata_list)
 
-
-def load_heterographs(filename):
-    metadata = _CAPI_LoadDGLGraphFiles(filename, [], False)
-    return metadata
-
-
 @register_object("heterograph_serialize.HeteroGraphData")
 class HeteroGraphData(ObjectBase):
 
@@ -51,13 +45,11 @@ class HeteroGraphData(ObjectBase):
         nframes = []
         eframes = []
         for ntensor in ntensor_list:
-            ndict = {ntensor[0]: ntensor[1] for i in range(0, len(ntensor), 2)}
+            ndict = {ntensor[i]: F.zerocopy_from_dgl_ndarray(ntensor[i+1]) for i in range(0, len(ntensor), 2)}
             nframes.append(FrameRef(Frame(ndict)))
         
         for etensor in etensor_list:
-            edict = {etensor[0]: etensor[1] for i in range(0, len(etensor), 2)}
+            edict = {etensor[i]: F.zerocopy_from_dgl_ndarray(etensor[i+1]) for i in range(0, len(etensor), 2)}
             eframes.append(FrameRef(Frame(edict)))
         
         return DGLHeteroGraph(gidx, ntype_names, etype_names, nframes, eframes)
-
-    #     return DGLHeteroGraph()
