@@ -10,6 +10,7 @@ from numpy.testing import assert_array_equal
 INTEGER = 2
 STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
+TENSOR = F.tensor([1,2,3], F.int32)
 
 def test_func(tensor, integer):
     return tensor * integer
@@ -49,8 +50,10 @@ class MyRequest(dgl.distributed.Request):
 class MyResponse(dgl.distributed.Response):
     def __init__(self):
         self.x = 432
+
     def __getstate__(self):
         return self.x
+
     def __setstate__(self, state):
         self.x = state
  
@@ -92,13 +95,13 @@ def start_server():
 def start_client():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config='ip_config.txt')
-    req = HelloRequest(STR, INTEGER, F.tensor([1,2,3]), test_func)
+    req = HelloRequest(STR, INTEGER, TENSOR, test_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
     res = dgl.distributed.recv_response()
     assert res.hello_str == STR
     assert res.integer == INTEGER
-    assert_array_equal(res.tensor, F.tensor([2,4,6]))
+    assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
     # test remote_call
     target_and_requests = []
     for i in range(10):
@@ -107,7 +110,7 @@ def start_client():
     for res in res_list:
         assert res.hello_str == STR
         assert res.integer == INTEGER
-        assert_array_equal(res.tensor, F.tensor([2,4,6]))
+        assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
