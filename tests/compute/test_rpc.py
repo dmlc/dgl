@@ -1,4 +1,5 @@
 import os
+import time
 
 import dgl
 import backend as F
