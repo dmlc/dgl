@@ -157,3 +157,10 @@ def test_rpc():
     else:
         time.sleep(1)
         start_client()
+
+if __name__ == '__main__':
+    test_rank()
+    test_msg_seq()
+    test_serialize()
+    test_rpc_msg()
+    test_rpc()
