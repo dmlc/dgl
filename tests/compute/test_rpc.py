@@ -7,6 +7,11 @@ import unittest, pytest
 
 from numpy.testing import assert_array_equal
 
+INTEGER = 2
+STR = 'hello world!'
+HELLO_SERVICE_ID = 901231
+TENSOR = F.zeros((10, 10), F.int64, F.cpu())
+
 def test_rank():
     dgl.distributed.set_rank(2)
     assert dgl.distributed.get_rank() == 2
@@ -85,15 +90,10 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server():
-    HELLO_SERVICE_ID = 901231
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, ip_config='ip_config.txt', num_clients=1)
 
 def start_client():
-    INTEGER = 2
-    STR = 'hello world!'
-    HELLO_SERVICE_ID = 901231
-    TENSOR = F.zeros((10, 10), F.int64, F.cpu())
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config='ip_config.txt')
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
