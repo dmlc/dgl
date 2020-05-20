@@ -37,6 +37,10 @@ class VertexDataset(Dataset):
             ndev: number of ranks.
         '''
         self.mode = mode
+        if self.mode == 'infer':
+            dataset_list_path = os.path.join(dataset_list_path, '.test')
+        else:
+            dataset_list_path = os.path.join(dataset_list_path, '.'+self.mode)
         with open(dataset_list_path, 'r') as f:
             self.whole_dataset_list = f.readlines()
         # make sure each dev can get the same number of samples
@@ -55,25 +59,31 @@ class VertexDataset(Dataset):
         return len(self.dataset_list)
 
     def __getitem__(self, idx):
-        obj_file = self.dataset_list[idx].strip()
-        try:
-            verts, faces = preprocess_mesh_obj(obj_file, self.COORD_BIN)
-        except:
-            # If fail, try another random example
-            to_try = np.random.randint(0, len(self.dataset_list))
-            return self.__getitem__(to_try)
-        if np.any(faces < 0):
-            to_try = np.random.randint(0, len(self.dataset_list))
-            return self.__getitem__(to_try)
- 
-        # Flattern verts, order Y(up), X(front), Z(right)
-        reordered_verts = verts[:, (1, 0, 2)]
-        flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
+        # If in infer mode, we return the graph with max_len
+        if self.mode == 'infer':
+            # Fake loading. The only input we need to take is a INIT_BIN token
+            flattern_verts = [self.INIT_BIN] * (self.MAX_LENGTH + 1)
+        else:
+            obj_file = self.dataset_list[idx].strip()
+            try:
+                verts, faces = preprocess_mesh_obj(obj_file, self.COORD_BIN)
+            except:
+                # If fail, try another random example
+                to_try = np.random.randint(0, len(self.dataset_list))
+                return self.__getitem__(to_try)
+            if np.any(faces < 0):
+                to_try = np.random.randint(0, len(self.dataset_list))
+                return self.__getitem__(to_try)
+    
+            # Flattern verts, order Y(up), X(front), Z(right)
+            reordered_verts = verts[:, (1, 0, 2)]
+            flattern_verts = [self.INIT_BIN] + reordered_verts.flatten().astype(np.int64).tolist() + [self.EOS_BIN]
+            
+            # Filter out long sequence for memory and speed tuning
+            if len(flattern_verts) > self.MAX_LENGTH:
+                to_try = np.random.randint(0, len(self.dataset_list))
+                return self.__getitem__(to_try)
         
-        # Filter out long sequence for memory and speed tuning
-        if len(flattern_verts) > self.MAX_LENGTH:
-            to_try = np.random.randint(0, len(self.dataset_list))
-            return self.__getitem__(to_try)
         return VertexDataTuple(g=self.graphpool.get_graph_for_size(len(flattern_verts)-1),
                 num_edges_dd=self.graphpool.num_edges['dd'][len(flattern_verts)-1],
                 tgt=flattern_verts, device=self.device)
@@ -159,6 +169,10 @@ class FaceDataset(object):
             ndev: number of ranks.
         '''
         self.mode = mode
+        if self.mode == 'infer':
+            dataset_list_path = os.path.join(dataset_list_path, '.test')
+        else:
+            dataset_list_path = os.path.join(dataset_list_path, '.'+self.mode)
         with open(dataset_list_path, 'r') as f:
             self.whole_dataset_list = f.readlines()
         # make sure each dev can get the same number of samples
@@ -193,13 +207,16 @@ class FaceDataset(object):
             to_try = np.random.randint(0, len(self.dataset_list))
             return self.__getitem__(to_try)
         
-        # Real vertex index starts from FACE_VERT_OFFSET
-        faces += self.FACE_VERT_OFFSET
-        flattern_faces = [self.START_FACE_VERT_IDX] + faces.flatten().astype(np.int64).tolist() + [self.STOP_FACE_VERT_IDX]
-        # Has to also make face number half, or it will explode
-        if len(flattern_faces) > self.MAX_FACE_INDICES + 1:
-            to_try = np.random.randint(0, len(self.dataset_list))
-            return self.__getitem__(to_try)
+        if self.mode == 'infer':
+            flattern_faces = [self.START_FACE_VERT_IDX] * (self.MAX_FACE_INDICES + 1)
+        else:
+            # Real vertex index starts from FACE_VERT_OFFSET
+            faces += self.FACE_VERT_OFFSET
+            flattern_faces = [self.START_FACE_VERT_IDX] + faces.flatten().astype(np.int64).tolist() + [self.STOP_FACE_VERT_IDX]
+            # Has to also make face number half, or it will explode
+            if len(flattern_faces) > self.MAX_FACE_INDICES + 1:
+                to_try = np.random.randint(0, len(self.dataset_list))
+                return self.__getitem__(to_try)
         
         return FaceDataTuple(g=self.graphpool.get_graph_for_size(len(full_verts), len(flattern_faces)-1), 
                  num_edges_ee=self.graphpool.num_edges['ee'][len(full_verts), len(flattern_faces)-1],

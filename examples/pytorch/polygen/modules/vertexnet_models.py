@@ -4,6 +4,7 @@ from .embedding import *
 from dataset.datasets import VertexDataset
 import threading
 import torch as th
+import torch.function as F
 import dgl.nn as dglnn
 import dgl.function as fn
 import torch.nn.init as INIT
@@ -87,7 +88,8 @@ class Transformer(nn.Module):
         # embed
         coord_embed = self.coord_embed(graph.tgt[1]%3)
         pos_embed = self.pos_embed(graph.tgt[1]//3)
-        value_embed = self.value_embed(graph.tgt[0]) 
+        value_embed = self.value_embed(graph.tgt[0])
+        # NOTE: do we need dropout here?
         g.nodes[nids['dec']].data['x'] = coord_embed + pos_embed + value_embed
 
         for i in range(self.decoder.N):
@@ -106,80 +108,55 @@ class Transformer(nn.Module):
             max_len: the maximum length of decoding.
             eos_id: the index of end-of-sequence symbol.
         return:
-            ret: a list of index array correspond to the input sequence specified by `graph``.
+            ret: a list of index array correspond to the input sequence specified by `graph`.
         '''
         g = graph.g
-        N, E = graph.n_nodes, graph.n_edges
+        N = graph.n_nodes
         nids, eids = graph.nids, graph.eids
-        
+    
         # init mask
         device = next(self.parameters()).device
 
         g.ndata['mask'] = th.zeros(N, dtype=th.bool, device=device)
+
         g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
         coord_embed = self.coord_embed(graph.tgt[1]%3)
         pos_embed = self.pos_embed(graph.tgt[1]//3)
-        res = graph.tgt_y
 
         # decode
-        log_prob = None
         y = graph.tgt[0]
+        batch_size = N // VertexDataset.MAX_LENGTH
+        eos = th.zeros(batch_size).byte()
         for step in range(1, max_len):
             y = y.view(-1)
-            value_embed = self.value_embed(y) 
-            g.nodes[nids['dec']].data['x'] = self.pos_embed.dropout(coord_embed + pos_embed + value_embed)
+            value_embed = self.value_embed(y)
+            g.nodes[nids['dec']].data['x'] = coord_embed + pos_embed + value_embed
             edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
             nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
 
             for i in range(self.decoder.N):
                 pre_func = self.decoder.pre_func(i, 'qkv')
                 post_func = self.decoder.post_func(i)
-                nodes, edges = nids['dec'], eids['dd']
+                nodes, edges = nodes_d, edges_dd
                 self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
             frontiers = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
             out = self.generator(g.ndata['x'][frontiers])
-            batch_size = frontiers.shape[0] // k
-            vocab_size = out.shape[-1]
-            # Mask output for complete sequence
-            one_hot = th.zeros(vocab_size).fill_(-1e9).to(device)
-            one_hot[eos_id] = 0
-            mask = g.ndata['mask'][frontiers].unsqueeze(-1).float()
-            out = out * (1 - mask) + one_hot.unsqueeze(0) * mask
+            batch_size = frontiers.shape[0]
+            
 
-            if log_prob is None:
-                log_prob, pos = out.view(batch_size, k, -1)[:, 0, :].topk(k, dim=-1)
-                eos = th.zeros(batch_size, k).bool()
-            else:
-                norm_old = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((4. + step) / 6, alpha)
-                norm_new = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((5. + step) / 6, alpha)
-                log_prob, pos = ((out.view(batch_size, k, -1) + (log_prob * norm_old).unsqueeze(-1)) / norm_new.unsqueeze(-1)).view(batch_size, -1).topk(k, dim=-1)
-
-            _y = y.view(batch_size * k, -1)
-            y = th.zeros_like(_y)
-            _eos = eos.clone()
             for i in range(batch_size):
-                for j in range(k):
-                    _j = pos[i, j].item() // vocab_size
-                    token = pos[i, j].item() % vocab_size
-                    y[i*k+j, :] = _y[i*k+_j, :]
-                    y[i*k+j, step] = token
-                    eos[i, j] = _eos[i, _j] | (token == eos_id)
+                y[step] = out[i]
+                eos[i] = eos[i] | (out[i] == eos_id)
+            
             if eos.all():
                 break
             else:
-                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, 1, max_len).view(-1).to(device)
-        return y.view(batch_size, k, -1)[:, 0, :].tolist()
+                # Mask out all the nodes from the sample already met eos
+                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, max_len).view(-1).to(device)
+        return y.view(batch_size, -1).tolist()
 
-    def _register_att_map(self, g, enc_ids, dec_ids):
-        self.att_weight_map = [
-            get_attention_map(g, enc_ids, enc_ids, self.h),
-            get_attention_map(g, enc_ids, dec_ids, self.h),
-            get_attention_map(g, dec_ids, dec_ids, self.h),
-        ]
-
-
-def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, universal=False):
+def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, cumulative_p=0.9):
     '''
     args:
         N: transformer block number.
@@ -199,7 +176,7 @@ def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, univer
     tgt_vocab = VertexDataset.COORD_BIN + 3
     value_embed = Embeddings(tgt_vocab, dim_model)
     decoder = Decoder(DecoderLayer(dim_model, c(attn), None, c(ff), dropout), N)
-    generator = VertexGenerator(dim_model, tgt_vocab)
+    generator = NucleusSamplingGenerator(dim_model, tgt_vocab, cumulative_p=cumulative_p)
     model = Transformer(
         decoder, coord_embed, pos_embed, value_embed, generator, h, dim_model // h)
     # xavier init

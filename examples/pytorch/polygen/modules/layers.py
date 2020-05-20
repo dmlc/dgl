@@ -1,6 +1,7 @@
 import torch as th
 import torch.nn as nn
 from torch.nn import LayerNorm
+from torch.distributions import Categorical
 
 class VertexGenerator(nn.Module):
     '''
@@ -15,6 +16,47 @@ class VertexGenerator(nn.Module):
         return th.log_softmax(
             self.proj(x), dim=-1
         )
+
+
+class NucleusSamplingGenerator(nn.Module):
+    '''
+    Nucleus Sampler: keep the top tokens with cumulative probability >= top_p (nucleus filtering). Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
+    '''
+    def __init__(self, dim_model, vocab_size, cumulative_p = 0.9, min_tokens_to_keep = 1):
+        '''
+        args:
+            dim_model: input feature dimention.
+            vocab_size: vocabulary size.
+            cumulative_p: cumulative probability threshold for nucleus sampling.
+            min_tokens_to_keep: 1
+        '''
+        super(VertexGenerator, self).__init__()
+        self.proj = nn.Linear(dim_model, vocab_size)
+    
+    def forward(self, x):
+        logits = th.softmax(
+            self.proj(x), dim=-1
+        )
+        # Nucleus Sampling
+        sorted_logits, sorted_indices = th.sort(logits, descending=True)
+        cumulative_probs = th.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+        # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
+        sorted_indices_to_remove = cumulative_probs > cumulative_p
+        if min_tokens_to_keep > 1:
+            # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
+            sorted_indices_to_remove[..., :min_tokens_to_keep] = 0
+        # Shift the indices to the right to keep also the first token above the threshold
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+        # scatter sorted tensors to original indexing
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        frontiers[indices_to_remove] = 0
+        # Normalized the selected probs
+        frontiers = frontiers * (1.0 / frontiers.max(axis=-1)) 
+        # Sampling
+        sample_results = Categorical(frontiers)
+        return sample_results
+
 
 class SubLayerWrapper(nn.Module):
     '''
