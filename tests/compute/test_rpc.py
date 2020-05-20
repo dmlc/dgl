@@ -145,6 +145,9 @@ def test_rpc_msg():
     assert F.array_equal(rpcmsg.tensors[0], req.z)
 
 def test_rpc():
+    ip_config = open("ip_config.txt", "w")
+    ip_config.write('127.0.0.1 30050 1\n')
+    ip_config.close()
     pid = os.fork()
     if pid == 0:
         start_server()
