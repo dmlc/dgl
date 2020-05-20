@@ -92,7 +92,7 @@ def start_client():
     INTEGER = 2
     STR = 'hello world!'
     HELLO_SERVICE_ID = 901231
-    TENSOR = F.tensor([1,2,3], F.int32)
+    TENSOR = F.zeros((10, 10), F.int64, F.cpu())
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config='ip_config.txt')
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
