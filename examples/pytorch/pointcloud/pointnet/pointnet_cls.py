@@ -5,48 +5,48 @@ from torch.autograd import Variable
 import numpy as np
 
 class PointNetCls(nn.Module):
-    def __init__(self, output_classes, input_dims=3,
+    def __init__(self, output_classes, input_dims=3, conv1_dim=64,
                  dropout_prob=0.5, use_transform=True):
         super(PointNetCls, self).__init__()
         self.input_dims = input_dims
         self.conv1 = nn.ModuleList()
-        self.conv1.append(nn.Conv1d(input_dims, 64, 1))
-        self.conv1.append(nn.Conv1d(64, 64, 1))
-        self.conv1.append(nn.Conv1d(64, 64, 1))
+        self.conv1.append(nn.Conv1d(input_dims, conv1_dim, 1))
+        self.conv1.append(nn.Conv1d(conv1_dim, conv1_dim, 1))
+        self.conv1.append(nn.Conv1d(conv1_dim, conv1_dim, 1))
 
         self.bn1 = nn.ModuleList()
-        self.bn1.append(nn.BatchNorm1d(64))
-        self.bn1.append(nn.BatchNorm1d(64))
-        self.bn1.append(nn.BatchNorm1d(64))
+        self.bn1.append(nn.BatchNorm1d(conv1_dim))
+        self.bn1.append(nn.BatchNorm1d(conv1_dim))
+        self.bn1.append(nn.BatchNorm1d(conv1_dim))
 
         self.conv2 = nn.ModuleList()
-        self.conv2.append(nn.Conv1d(64, 128, 1))
-        self.conv2.append(nn.Conv1d(128, 1024, 1))
+        self.conv2.append(nn.Conv1d(conv1_dim, conv1_dim * 2, 1))
+        self.conv2.append(nn.Conv1d(conv1_dim * 2, conv1_dim * 16, 1))
 
         self.bn2 = nn.ModuleList()
-        self.bn2.append(nn.BatchNorm1d(128))
-        self.bn2.append(nn.BatchNorm1d(1024))
+        self.bn2.append(nn.BatchNorm1d(conv1_dim * 2))
+        self.bn2.append(nn.BatchNorm1d(conv1_dim * 16))
 
-        self.maxpool = nn.MaxPool1d(1024)
-        self.pool_feat_len = 1024
+        self.maxpool = nn.MaxPool1d(conv1_dim * 16)
+        self.pool_feat_len = conv1_dim * 16
 
         self.mlp3 = nn.ModuleList()
-        self.mlp3.append(nn.Linear(1024, 512))
-        self.mlp3.append(nn.Linear(512, 256))
+        self.mlp3.append(nn.Linear(conv1_dim * 16, conv1_dim * 8))
+        self.mlp3.append(nn.Linear(conv1_dim * 8, conv1_dim * 4))
 
         self.bn3 = nn.ModuleList()
-        self.bn3.append(nn.BatchNorm1d(512))
-        self.bn3.append(nn.BatchNorm1d(256))
+        self.bn3.append(nn.BatchNorm1d(conv1_dim * 8))
+        self.bn3.append(nn.BatchNorm1d(conv1_dim * 4))
 
         self.dropout = nn.Dropout(0.3)
-        self.mlp_out = nn.Linear(256, output_classes)
+        self.mlp_out = nn.Linear(conv1_dim * 4, output_classes)
 
         self.use_transform = use_transform
         if use_transform:
             self.transform1 = TransformNet(input_dims)
             self.trans_bn1 = nn.BatchNorm1d(input_dims)
-            self.transform2 = TransformNet(64)
-            self.trans_bn2 = nn.BatchNorm1d(64)
+            self.transform2 = TransformNet(conv1_dim)
+            self.trans_bn2 = nn.BatchNorm1d(conv1_dim)
 
     def forward(self, x):
         batch_size = x.shape[0]
@@ -86,31 +86,31 @@ class PointNetCls(nn.Module):
         return out
 
 class TransformNet(nn.Module):
-    def __init__(self, input_dims=3):
+    def __init__(self, input_dims=3, conv1_dim=64):
         super(TransformNet, self).__init__()
         self.conv = nn.ModuleList()
-        self.conv.append(nn.Conv1d(input_dims, 64, 1))
-        self.conv.append(nn.Conv1d(64, 128, 1))
-        self.conv.append(nn.Conv1d(128, 1024, 1))
+        self.conv.append(nn.Conv1d(input_dims, conv1_dim, 1))
+        self.conv.append(nn.Conv1d(conv1_dim, conv1_dim * 2, 1))
+        self.conv.append(nn.Conv1d(conv1_dim * 2, conv1_dim * 16, 1))
 
         self.bn = nn.ModuleList()
-        self.bn.append(nn.BatchNorm1d(64))
-        self.bn.append(nn.BatchNorm1d(128))
-        self.bn.append(nn.BatchNorm1d(1024))
+        self.bn.append(nn.BatchNorm1d(conv1_dim))
+        self.bn.append(nn.BatchNorm1d(conv1_dim * 2))
+        self.bn.append(nn.BatchNorm1d(conv1_dim * 16))
 
-        self.maxpool = nn.MaxPool1d(1024)
-        self.pool_feat_len = 1024
+        self.maxpool = nn.MaxPool1d(conv1_dim * 16)
+        self.pool_feat_len = conv1_dim * 16
 
         self.mlp2 = nn.ModuleList()
-        self.mlp2.append(nn.Linear(1024, 512))
-        self.mlp2.append(nn.Linear(512, 256))
+        self.mlp2.append(nn.Linear(conv1_dim * 16, conv1_dim * 8))
+        self.mlp2.append(nn.Linear(conv1_dim * 8, conv1_dim * 4))
 
         self.bn2 = nn.ModuleList()
-        self.bn2.append(nn.BatchNorm1d(512))
-        self.bn2.append(nn.BatchNorm1d(256))
+        self.bn2.append(nn.BatchNorm1d(conv1_dim * 8))
+        self.bn2.append(nn.BatchNorm1d(conv1_dim * 4))
 
         self.input_dims = input_dims
-        self.mlp_out = nn.Linear(256, input_dims * input_dims)
+        self.mlp_out = nn.Linear(conv1_dim * 4, input_dims * input_dims)
 
     def forward(self, h):
         batch_size = h.shape[0]
@@ -134,12 +134,3 @@ class TransformNet(nn.Module):
         out = out + iden
         out = out.view(-1, self.input_dims, self.input_dims)
         return out
-
-def compute_loss(logits, y, eps=0.2):
-    num_classes = logits.shape[1]
-    one_hot = torch.zeros_like(logits).scatter_(1, y.view(-1, 1), 1)
-    one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (num_classes - 1)
-    log_prob = F.log_softmax(logits, 1)
-    loss = -(one_hot * log_prob).sum(1).mean()
-    return loss
-

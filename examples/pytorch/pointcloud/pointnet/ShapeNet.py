@@ -99,7 +99,7 @@ class ShapeNetDataset(Dataset):
         for fn in tqdm.tqdm(self.file_list, ascii=True):
             with open(fn) as f:
                 data = np.array([t.split('\n')[0].split(' ') for t in f.readlines()]).astype(np.float)
-            data_list.append(data[:, 0:6])
+            data_list.append(data[:, 0:self.dim])
             label_list.append(data[:, 6].astype(np.int))
             category_list.append(shapenet.synset_dict[fn.split('/')[-2]])
         self.data = data_list

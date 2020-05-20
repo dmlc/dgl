@@ -16,7 +16,7 @@ import argparse
 # from dataset import ModelNet
 import provider
 from ModelNetDataLoader import ModelNetDataLoader
-from pointnet_cls import PointNetCls, compute_loss
+from pointnet_cls import PointNetCls
 from pointnet2 import PointNet2SSGCls, PointNet2MSGCls
 
 parser = argparse.ArgumentParser()
@@ -58,7 +58,6 @@ def train(net, opt, scheduler, train_loader, dev):
     total_correct = 0
     count = 0
     with tqdm.tqdm(train_loader, ascii=True) as tq:
-        # for data, label in tq:
         for data, label in tq:
             data = data.data.numpy()
             data = provider.random_point_dropout(data)
@@ -72,7 +71,7 @@ def train(net, opt, scheduler, train_loader, dev):
             data, label = data.to(dev), label.to(dev).squeeze().long()
             opt.zero_grad()
             logits = net(data)
-            loss = compute_loss(logits, label)
+            loss = nn.CrossEntropyLoss(logits, label)
             loss.backward()
             opt.step()
 
@@ -113,7 +112,6 @@ def evaluate(net, test_loader, dev):
                     'AvgAcc': '%.5f' % (total_correct / count)})
 
     return total_correct / count
-
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

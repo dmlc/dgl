@@ -4,8 +4,6 @@ import os
 from torch.utils.data import Dataset
 warnings.filterwarnings('ignore')
 
-
-
 def pc_normalize(pc):
     centroid = np.mean(pc, axis=0)
     pc = pc - centroid
@@ -15,6 +13,11 @@ def pc_normalize(pc):
 
 def farthest_point_sample(point, npoint):
     """
+    Farthest point sampler works as follows:
+    1. Initialize the sample set S with a random point
+    2. Pick point P not in S, which maximizes the distance d(P, S)
+    3. Repeat step 2 until |S| = npoint
+
     Input:
         xyz: pointcloud data, [N, D]
         npoint: number of samples
@@ -37,10 +40,20 @@ def farthest_point_sample(point, npoint):
     return point
 
 class ModelNetDataLoader(Dataset):
-    def __init__(self, root,  npoint=1024, split='train', uniform=False, normal_channel=True, cache_size=15000):
+    def __init__(self, root, npoint=1024, split='train', fps=False, 
+                 normal_channel=True, cache_size=15000):
+        """
+        Input:
+            root: the root path to the local data files 
+            npoint: number of points from each cloud
+            split: which split of the data, 'train' or 'test'
+            fps: whether to sample points with farthest point sampler
+            normal_channel: whether to use additional channel
+            cache_size: the cache size of in-memory point clouds
+        """
         self.root = root
         self.npoints = npoint
-        self.uniform = uniform
+        self.fps = fps
         self.catfile = os.path.join(self.root, 'modelnet40_shape_names.txt')
 
         self.cat = [line.rstrip() for line in open(self.catfile)]
@@ -58,8 +71,8 @@ class ModelNetDataLoader(Dataset):
                          in range(len(shape_ids[split]))]
         print('The size of %s data is %d'%(split,len(self.datapath)))
 
-        self.cache_size = cache_size  # how many data points to cache in memory
-        self.cache = {}  # from index to (point_set, cls) tuple
+        self.cache_size = cache_size
+        self.cache = {}
 
     def __len__(self):
         return len(self.datapath)
@@ -72,7 +85,7 @@ class ModelNetDataLoader(Dataset):
             cls = self.classes[self.datapath[index][0]]
             cls = np.array([cls]).astype(np.int32)
             point_set = np.loadtxt(fn[1], delimiter=',').astype(np.float32)
-            if self.uniform:
+            if self.fps:
                 point_set = farthest_point_sample(point_set, self.npoints)
             else:
                 point_set = point_set[0:self.npoints,:]
@@ -90,13 +103,10 @@ class ModelNetDataLoader(Dataset):
     def __getitem__(self, index):
         return self._get_item(index)
 
-
-
-
 if __name__ == '__main__':
     import torch
 
-    data = ModelNetDataLoader('/data/modelnet40_normal_resampled/',split='train', uniform=False, normal_channel=True,)
+    data = ModelNetDataLoader('/data/modelnet40_normal_resampled/',split='train', fps=False, normal_channel=True,)
     DataLoader = torch.utils.data.DataLoader(data, batch_size=12, shuffle=True)
     for point,label in DataLoader:
         print(point.shape)

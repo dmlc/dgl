@@ -5,7 +5,6 @@ from torch.autograd import Variable
 import numpy as np
 import dgl
 import dgl.function as fn
-from dgl.nn.pytorch import GraphConv
 
 '''
 Part of the code are adapted from
@@ -125,12 +124,12 @@ class FixedRadiusNNGraph(nn.Module):
         bg = dgl.batch(glist)
         return bg
 
-class GroupMessage(nn.Module):
+class RelativePositionMessage(nn.Module):
     '''
     Compute the input feature from neighbors
     '''
     def __init__(self, n_neighbor):
-        super(GroupMessage, self).__init__()
+        super(RelativePositionMessage, self).__init__()
         self.n_neighbor = n_neighbor
 
     def forward(self, edges):
@@ -184,6 +183,9 @@ class PointNetConv(nn.Module):
         return h
 
 class SAModule(nn.Module):
+    """
+    The Set Abstraction Layer
+    """
     def __init__(self, npoints, batch_size, radius, mlp_sizes, n_neighbor=64,
                  group_all=False):
         super(SAModule, self).__init__()
@@ -191,7 +193,7 @@ class SAModule(nn.Module):
         if not group_all:
             self.fps = FarthestPointSampler(npoints)
             self.frnn_graph = FixedRadiusNNGraph(radius, n_neighbor)
-        self.message = GroupMessage(n_neighbor)
+        self.message = RelativePositionMessage(n_neighbor)
         self.conv = PointNetConv(mlp_sizes, batch_size)
         self.batch_size = batch_size
 
@@ -210,6 +212,9 @@ class SAModule(nn.Module):
         return pos_res, feat_res
 
 class SAMSGModule(nn.Module):
+    """
+    The Set Abstraction Multi-Scale grouping Layer
+    """
     def __init__(self, npoints, batch_size, radius_list, n_neighbor_list, mlp_sizes_list):
         super(SAMSGModule, self).__init__()
         self.batch_size = batch_size
@@ -222,7 +227,7 @@ class SAMSGModule(nn.Module):
         for i in range(self.group_size):
             self.frnn_graph_list.append(FixedRadiusNNGraph(radius_list[i],
                                                            n_neighbor_list[i]))
-            self.message_list.append(GroupMessage(n_neighbor_list[i]))
+            self.message_list.append(RelativePositionMessage(n_neighbor_list[i]))
             self.conv_list.append(PointNetConv(mlp_sizes_list[i], batch_size))
 
     def forward(self, pos, feat):

@@ -40,7 +40,6 @@ CustomDataLoader = partial(
         drop_last=True)
 
 def train(net, opt, scheduler, train_loader, dev):
-
     category_list = sorted(list(shapenet.seg_classes.keys()))
     eye_mat = np.eye(16)
     net.train()
@@ -56,6 +55,7 @@ def train(net, opt, scheduler, train_loader, dev):
             label = label.to(dev, dtype=torch.long).view(-1)
             opt.zero_grad()
             cat_ind = [category_list.index(c) for c in cat]
+            # An one-hot encoding for the object category
             cat_tensor = torch.tensor(eye_mat[cat_ind]).to(dev, dtype=torch.float).repeat(1, 2048)
             cat_tensor = cat_tensor.view(num_examples, -1, 16).permute(0,2,1)
             logits = net(data, cat_tensor)
@@ -97,7 +97,6 @@ def mIoU(preds, label, cat, cat_miou, seg_classes):
     return cat_miou
 
 def evaluate(net, test_loader, dev, per_cat_verbose=False):
-
     category_list = sorted(list(shapenet.seg_classes.keys()))
     eye_mat = np.eye(16)
     net.eval()
