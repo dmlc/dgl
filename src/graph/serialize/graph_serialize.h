@@ -43,7 +43,7 @@ constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
 
 class StorageMetaDataObject : public runtime::Object {
  public:
-  bool is_hetero;  
+  bool is_hetero;
   // For saving DGLGraph
   dgl_id_t num_graph;
   Value nodes_num_list;
