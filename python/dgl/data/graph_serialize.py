@@ -63,7 +63,7 @@ class GraphData(ObjectBase):
         return g
 
 
-def save_graphs(filename, g_list, labels=None):
+def save_graphs(filename, g_list):
     r"""
     Save DGLGraphs and graph labels to file
 
@@ -73,30 +73,25 @@ def save_graphs(filename, g_list, labels=None):
         File name to store DGLGraphs. 
     g_list: list
         DGLGraph or list of DGLGraph
-    labels: dict (Default: None)
-        labels should be dict of tensors/ndarray, with str as keys
 
     Examples
     ----------
+    .. warning:: From DGL 0.4.4, save_graphs no longer supports saving tensor dict(labels) with graphs. If
+    you want to store labels, you can store them in a seperate file using numpy.save or other functions.
+
     >>> import dgl
     >>> import torch as th
 
     Create :code:`DGLGraph` objects and initialize node and edge features.
 
-    >>> g1 = dgl.DGLGraph()
-    >>> g1.add_nodes(3)
-    >>> g1.add_edges([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2])
-    >>> g1.ndata["e"] = th.ones(3, 5)
-    >>> g2 = dgl.DGLGraph()
-    >>> g2.add_nodes(3)
-    >>> g2.add_edges([0, 1, 2], [1, 2, 1])
-    >>> g2.edata["e"] = th.ones(3, 4)
+    >>> g1 = dgl.graph(([0, 1, 2], [1, 2, 3])
+    >>> g2 = dgl.graph(([0, 2], [2, 3])
+    >>> g2.edata["e"] = th.ones(2, 4)
 
     Save Graphs into file
 
     >>> from dgl.data.utils import save_graphs
-    >>> graph_labels = {"glabel": th.tensor([0, 1])}
-    >>> save_graphs("./data.bin", [g1, g2], graph_labels)
+    >>> save_graphs("./data.bin", [g1, g2])
 
     """
     g_sample = g_list
@@ -123,46 +118,56 @@ def save_dglgraphs(filename, g_list, labels=None):
     _CAPI_DGLSaveGraphs(filename, gdata_list, label_dict)
 
 
-def load_graphs(filename, idx_list=None):
+def load_graphs(filename, idx_list=None, ignore_labels=True):
     """
     Load DGLGraphs from file
 
     Parameters
     ----------
     filename: str
-        filename to load DGLGraphs
+        filename to load graphs
     idx_list: list of int
         list of index of graph to be loaded. If not specified, will
         load all graphs from file
+    ignore_labels: bool
+        Whether to ignore the return of labels
 
     Returns
     ----------
-    graph_list: list of immutable DGLGraphs
-    labels: dict of labels stored in file (empty dict returned if no
+    
+    graph_list: list of DGLGraphs / DGLHeteroGraph
+    labels(Optional): dict of labels stored in file (empty dict returned if no
     label stored)
+
+    If the file is stored with labels (before DGL 0.4.4) and set ignore_labels=False,
+     it will return graph_list and labels
+    If the file isn't stored with labels, it will only return graph_list
+
 
     Examples
     ----------
     Following the example in save_graphs.
 
     >>> from dgl.data.utils import load_graphs
-    >>> glist, label_dict = load_graphs("./data.bin") # glist will be [g1, g2]
-    >>> glist, label_dict = load_graphs("./data.bin", [0]) # glist will be [g1]
+    >>> glist = load_graphs("./data.bin") # glist will be [g1, g2]
+    >>> glist = load_graphs("./data.bin", [0]) # glist will be [g1]
 
     """
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
     metadata = _CAPI_LoadDGLGraphFiles(filename, idx_list, False)
+    label_dict = {}
     if metadata.is_hetero:
-        return [gdata.get_graph() for gdata in metadata.hetero_graph_data]
+        g_list = [gdata.get_graph() for gdata in metadata.hetero_graph_data]
     else:
-        label_dict = {}
         for k, v in metadata.labels.items():
             label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
-
-        return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
-
+        g_list = [gdata.get_graph() for gdata in metadata.graph_data], label_dict
+    if ignore_labels or len(label_dict) == 0:
+        return g_list
+    else: 
+        return g_list, label_dict
 
 def load_labels(filename):
     """
