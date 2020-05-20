@@ -1,10 +1,11 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
 from ..graph import DGLGraph
+from ..heterograph import DGLHeteroGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
 from .. import backend as F
-from .heterograph_serialize import *
+from .heterograph_serialize import HeteroGraphData, save_heterographs
 
 _init_api("dgl.data.graph_serialize")
 

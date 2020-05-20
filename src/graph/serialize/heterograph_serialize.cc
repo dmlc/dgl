@@ -73,7 +73,6 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
   fs->Write(num_graph);
   uint64_t indices_start_ptr = fs->Tell();
   fs->Write(graph_indices);
-  // fs->Write(labels_list);
 
   // Write HeteroGraphData
   for (uint64_t i = 0; i < num_graph; ++i) {

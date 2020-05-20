@@ -70,7 +70,7 @@ class Map(ObjectBase):
 class StrMap(Map):
     """A special map container that has str as key.
 
-    You can use convert to create a dict[str->ObjectBase] into a MWap.
+    You can use convert to create a dict[str->ObjectBase] into a Map.
     """
 
     def items(self):
