@@ -85,6 +85,7 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server():
+    HELLO_SERVICE_ID = 901231
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, ip_config='ip_config.txt', num_clients=1)
 
