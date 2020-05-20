@@ -43,6 +43,7 @@ constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
 
 class StorageMetaDataObject : public runtime::Object {
  public:
+  bool is_hetero;  
   // For saving DGLGraph
   dgl_id_t num_graph;
   Value nodes_num_list;
@@ -63,6 +64,7 @@ class StorageMetaDataObject : public runtime::Object {
   void SetHeteroGraphData(std::vector<HeteroGraphData> gdata);
 
   void VisitAttrs(AttrVisitor *v) final {
+    v->Visit("is_hetero", &is_hetero);
     v->Visit("num_graph", &num_graph);
     v->Visit("nodes_num_list", &nodes_num_list);
     v->Visit("edges_num_list", &edges_num_list);

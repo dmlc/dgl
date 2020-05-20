@@ -33,7 +33,10 @@ class List(ObjectBase):
                              .format(len(self), i))
         if i < 0:
             i += len(self)
-        return _api_internal._ListGetItem(self, i)
+        ret = _api_internal._ListGetItem(self, i)
+        if isinstance(ret, Value):
+            ret = ret.data
+        return ret
 
     def __len__(self):
         return _api_internal._ListSize(self)
@@ -67,13 +70,13 @@ class Map(ObjectBase):
 class StrMap(Map):
     """A special map container that has str as key.
 
-    You can use convert to create a dict[str->ObjectBase] into a Map.
+    You can use convert to create a dict[str->ObjectBase] into a MWap.
     """
 
     def items(self):
         """Get the items from the map"""
         akvs = _api_internal._MapItems(self)
-        return [(akvs[i].data, akvs[i+1]) for i in range(0, len(akvs), 2)]
+        return [(akvs[i], akvs[i+1]) for i in range(0, len(akvs), 2)]
 
 
 @register_object
