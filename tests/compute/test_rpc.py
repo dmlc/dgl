@@ -10,7 +10,7 @@ from numpy.testing import assert_array_equal
 INTEGER = 2
 STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
-TENSOR = F.tensor([1,2,3], F.int32)
+TENSOR = F.tensor([1,2,3], F.int32, F.cpu())
 
 def test_rank():
     dgl.distributed.set_rank(2)
