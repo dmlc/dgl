@@ -12,9 +12,6 @@ STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
 TENSOR = F.tensor([1,2,3], F.int32)
 
-def test_func(tensor):
-    return tensor
-
 def test_rank():
     dgl.distributed.set_rank(2)
     assert dgl.distributed.get_rank() == 2
@@ -57,6 +54,9 @@ class MyResponse(dgl.distributed.Response):
     def __setstate__(self, state):
         self.x = state
  
+def simple_func(tensor):
+    return tensor
+
 class HelloResponse(dgl.distributed.Response):
     def __init__(self, hello_str, integer, tensor):
         self.hello_str = hello_str
@@ -95,7 +95,7 @@ def start_server():
 def start_client():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config='ip_config.txt')
-    req = HelloRequest(STR, INTEGER, TENSOR, test_func)
+    req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
     res = dgl.distributed.recv_response()
