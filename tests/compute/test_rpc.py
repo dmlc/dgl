@@ -87,6 +87,7 @@ class HelloRequest(dgl.distributed.Request):
         assert self.integer == INTEGER
         new_tensor = self.func(self.tensor)
         res = HelloResponse(self.hello_str, self.integer, new_tensor)
+        return res
 
 def start_server():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
