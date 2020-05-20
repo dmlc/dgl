@@ -305,7 +305,8 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Training loop
     avg = 0
-    iter_tput = []
+    iter_pos = []
+    iter_neg = []
     iter_d = []
     iter_t = []
     best_eval_acc = 0
@@ -321,7 +322,6 @@ def run(proc_id, n_gpus, args, devices, data):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             d_step = time.time()
-            seeds = blocks[-1].dstdata[dgl.NID]
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -331,15 +331,19 @@ def run(proc_id, n_gpus, args, devices, data):
             optimizer.step()
 
             t = time.time()
-            iter_tput.append(len(seeds) / (t - tic_step))
+            pos_edges = pos_graph.number_of_edges()
+            neg_edges = neg_graph.number_of_edges()
+            iter_pos.append(pos_edges / (t - tic_step))
+            iter_neg.append(neg_edges / (t - tic_step))
             iter_d.append(d_step - tic_step)
             iter_t.append(t - d_step)
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
-                    proc_id, epoch, step, loss.item(), np.mean(iter_tput[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
+                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
+                    proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
+            '''
             if step % args.eval_every == 0 and proc_id == 0:
                 eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
@@ -347,6 +351,7 @@ def run(proc_id, n_gpus, args, devices, data):
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
+            '''
 
         if n_gpus > 1:
             th.distributed.barrier()
