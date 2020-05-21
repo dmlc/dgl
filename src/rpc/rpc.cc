@@ -24,7 +24,6 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   // Copy the data for now, can be optimized later
   memcpy(rpc_meta_buffer, zerocopy_blob.data(), zerocopy_blob.size());
   int64_t rpc_meta_size = zerocopy_blob.size();
-  LOG(INFO) << zerocopy_blob;
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = rpc_meta_buffer;
   rpc_meta_msg.size = rpc_meta_size;
@@ -62,13 +61,13 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   // Copy the data for now, can be optimized later
   std::string zerocopy_blob(rpc_meta_msg.data, rpc_meta_msg.size);
   rpc_meta_msg.deallocator(&rpc_meta_msg);
-  LOG(INFO) << zerocopy_blob;
   // Recv count
   network::Message ndarray_count_msg;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
     &ndarray_count_msg, send_id), REMOVE_SUCCESS);
   int32_t ndarray_count = *(reinterpret_cast<int32_t*>(ndarray_count_msg.data));
   ndarray_count_msg.deallocator(&ndarray_count_msg);
+  LOG(INFO) << "ndarray_count: " << ndarray_count;
   // Recv real ndarray data
   std::vector<void* > buffer_list(ndarray_count);
   for (int i = 0; i < ndarray_count; ++i) {
