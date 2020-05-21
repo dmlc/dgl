@@ -38,9 +38,9 @@ class VertexDataset(Dataset):
         '''
         self.mode = mode
         if self.mode == 'infer':
-            dataset_list_path = os.path.join(dataset_list_path, '.test')
+            dataset_list_path = dataset_list_path + '.test'
         else:
-            dataset_list_path = os.path.join(dataset_list_path, '.'+self.mode)
+            dataset_list_path = dataset_list_path + '.' + self.mode
         with open(dataset_list_path, 'r') as f:
             self.whole_dataset_list = f.readlines()
         # make sure each dev can get the same number of samples
@@ -170,9 +170,9 @@ class FaceDataset(object):
         '''
         self.mode = mode
         if self.mode == 'infer':
-            dataset_list_path = os.path.join(dataset_list_path, '.test')
+            dataset_list_path = dataset_list_path + '.test'
         else:
-            dataset_list_path = os.path.join(dataset_list_path, '.'+self.mode)
+            dataset_list_path = dataset_list_path + '.' + self.mode
         with open(dataset_list_path, 'r') as f:
             self.whole_dataset_list = f.readlines()
         # make sure each dev can get the same number of samples

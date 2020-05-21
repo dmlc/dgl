@@ -4,7 +4,7 @@ from .embedding import *
 from dataset.datasets import VertexDataset
 import threading
 import torch as th
-import torch.function as F
+import torch.functional as F
 import dgl.nn as dglnn
 import dgl.function as fn
 import torch.nn.init as INIT
