@@ -5,11 +5,10 @@
 import time
 
 from . import rpc
+from .constants import MAX_QUEUE_SIZE
 from .server_state import get_server_state
 
-QUEUE_SIZE = 20*1024*1024*1024
-
-def start_server(server_id, ip_config, num_clients, queue_size=QUEUE_SIZE, net_type='socket'):
+def start_server(server_id, ip_config, num_clients, queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
     This is a blocking function -- it returns only when the server shutdown.
@@ -22,13 +21,15 @@ def start_server(server_id, ip_config, num_clients, queue_size=QUEUE_SIZE, net_t
         Path of IP configuration file.
     num_clients : int
         Total number of clients that will be connected to the server.
-        Note that, we do not support dynamic connection for now.
-    queue_size : int
-        Size (bytes) of server queue buffer (~20 GB on default).
+        Note that, we do not support dynamic connection for now. It means
+        that when all the clients connect to server, no client will can be added
+        to the cluster.
+    max_queue_size : int
+        Maximal size (bytes) of server queue buffer (~20 GB on default).
         Note that the 20 GB is just an upper-bound because DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
-        networking type, e.g., 'socket' (on default) or 'mpi' (do not support yet).
+        Networking type. Current options are: 'socket'.
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
@@ -37,7 +38,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=QUEUE_SIZE, net_t
     'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
     # Register some basic services
     rpc.register_service(rpc.CLIENT_REGISTER,
-                         rpc.ClientRegisterReuqest,
+                         rpc.ClientRegisterRequest,
                          rpc.ClientRegisterResponse)
     rpc.register_service(rpc.SHUT_DOWN_SERVER,
                          rpc.ShutDownRequest,

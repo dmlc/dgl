@@ -44,7 +44,9 @@ def read_ip_config(filename):
     Returns
     -------
     dict
-        server namebook. The format is: {[server_id]:[machine_id, ip, port, group_count]}
+        server namebook.
+        The key is server_id (int)
+        The value is [machine_id, ip, port, group_count] ([int, str, int, int])
 
         e.g.,
 
@@ -74,49 +76,29 @@ def read_ip_config(filename):
         print("Error: data format on each line should be: [ip] [base_port] [server_count]")
     return server_namebook
 
-def create_sender(msg_queue_size, net_type):
+def create_sender(max_queue_size, net_type):
     """Create rpc sender of this process.
 
     Parameters
     ----------
-    msg_queue_size : int
-        Size (bytes) of network queue buffer.
+    max_queue_size : int
+        Maximal size (bytes) of network queue buffer.
     net_type : str
-        networking type, e.g., 'socket' or 'mpi' (do not support yet).
+        Networking type. Current options are: 'socket'.
     """
-    _CAPI_DGLRPCCreateSender(int(msg_queue_size), net_type)
+    _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type)
 
-def create_receiver(msg_queue_size, net_type):
+def create_receiver(max_queue_size, net_type):
     """Create rpc receiver of this process.
 
     Parameters
     ----------
-    msg_queue_size : int
-        Size (bytes) of network queue buffer.
+    max_queue_size : int
+        Maximal size (bytes) of network queue buffer.
     net_type : str
-        networking type, e.g., 'socket' or 'mpi' (do not support yet).
+        Networking type. Current options are: 'socket'.
     """
-    _CAPI_DGLRPCCreateReceiver(int(msg_queue_size), net_type)
-
-def get_sender():
-    """Get rpc sender of this process.
-
-    Returns
-    -------
-    c handler
-        sender handler
-    """
-    return _CAPI_DGLRPCGetSender()
-
-def get_receiver():
-    """Get rpc receiver of this process.
-
-    Returns
-    -------
-    c handler
-        receiver handler
-    """
-    return _CAPI_DGLRPCGetReceiver()
+    _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type)
 
 def finalize_sender():
     """Finalize rpc sender of this process.
@@ -592,7 +574,10 @@ def recv_request(timeout=0):
 def send_response(target, msg_seq, response):
     """Send one response to the target client.
 
-    Serilaize the given response object to an :class`RPCMessage` and send it
+    Serialize the given response object to an :class:`RPCMessage` and send it
+    out.
+
+    The operation is non-blocking -- it does not guarantee the payloads have
     reached the target or even have left the sender process. However,
     all the payloads (i.e., data and arrays) can be safely freed after this
     function returns.
@@ -779,7 +764,7 @@ def finalize_server():
 
 CLIENT_REGISTER = 22451
 
-class ClientRegisterReuqest(Request):
+class ClientRegisterRequest(Request):
     """This request will send client's ip to server.
 
     Parameters

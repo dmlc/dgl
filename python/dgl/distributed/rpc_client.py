@@ -3,6 +3,7 @@
 """Functions used by client."""
 
 from . import rpc
+from .constants import MAX_QUEUE_SIZE
 
 import os
 import time
@@ -15,6 +16,7 @@ if os.name != 'nt':
 def local_ip4_addr_list():
     """Return a set of IPv4 address
     """
+    assert os.name != 'nt', 'Do not support Windows rpc yet.'
     nic = set()
     for if_nidx in socket.if_nameindex():
         name = if_nidx[1]
@@ -36,14 +38,14 @@ def get_local_machine_id(server_namebook):
         (start from 0) and value is the server's machine_id, IP address,
         port, and group_count, e.g.,
 
-          {0:'[0, 172.31.40.143, 30050, 2],
-           1:'[0, 172.31.40.143, 30051, 2],
-           2:'[1, 172.31.36.140, 30050, 2],
-           3:'[1, 172.31.36.140, 30051, 2],
-           4:'[2, 172.31.47.147, 30050, 2],
-           5:'[2, 172.31.47.147, 30051, 2],
-           6:'[3, 172.31.30.180, 30050, 2],
-           7:'[3, 172.31.30.180, 30051, 2]}
+          {0:'[0, '172.31.40.143', 30050, 2],
+           1:'[0, '172.31.40.143', 30051, 2],
+           2:'[1, '172.31.36.140', 30050, 2],
+           3:'[1, '172.31.36.140', 30051, 2],
+           4:'[2, '172.31.47.147', 30050, 2],
+           5:'[2, '172.31.47.147', 30051, 2],
+           6:'[3, '172.31.30.180', 30050, 2],
+           7:'[3, '172.31.30.180', 30051, 2]}
 
     Returns
     -------
@@ -51,10 +53,11 @@ def get_local_machine_id(server_namebook):
         local machine ID
     """
     res = 0
+    ip_list = local_ip4_addr_list()
     for ID, data in server_namebook.items():
         machine_id = data[0]
         ip = data[1]
-        if ip in local_ip4_addr_list():
+        if ip in ip_list:
             res = machine_id
             break
     return res
@@ -84,30 +87,29 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
-def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'):
+def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
 
     Parameters
     ----------
     ip_config : str
         Path of server IP configuration file.
-    queue_size : int
-        Size (bytes) of client queue buffer (~20 GB on default).
+    max_queue_size : int
+        Maximal size (bytes) of client queue buffer (~20 GB on default).
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
-        networking type, e.g., 'socket' (on default) or 'mpi' (do not support yet).
+        Networking type. Current options are: 'socket'.
 
     Raises
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
-    assert net_type in ('socket', 'mpi'), \
-    'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
+    assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
+    assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
     # Register some basic service
     rpc.register_service(rpc.CLIENT_REGISTER,
-                         rpc.ClientRegisterReuqest,
+                         rpc.ClientRegisterRequest,
                          rpc.ClientRegisterResponse)
     rpc.register_service(rpc.SHUT_DOWN_SERVER,
                          rpc.ShutDownRequest,
@@ -115,6 +117,8 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
+    # group_count means how many servers 
+    # (main_server + bakcup_server) in total inside a machine.
     group_count = []
     max_machine_id = 0
     for server_info in server_namebook.values():
@@ -123,8 +127,8 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
             max_machine_id = server_info[0]
     num_machines = max_machine_id+1
     machine_id = get_local_machine_id(server_namebook)
-    rpc.create_sender(queue_size, net_type)
-    rpc.create_receiver(queue_size, net_type)
+    rpc.create_sender(max_queue_size, net_type)
+    rpc.create_receiver(max_queue_size, net_type)
     # Get connected with all server nodes
     for server_id, addr in server_namebook.items():
         server_ip = addr[1]
@@ -135,7 +139,7 @@ def connect_to_server(ip_config, queue_size=20*1024*1024*1024, net_type='socket'
     ip_addr = get_local_usable_addr()
     client_ip, client_port = ip_addr.split(':')
     # Register client on server
-    # a temp ID because we don't assign client ID yet
+    # 0 is a temp ID because we haven't assigned client ID yet
     rpc.set_rank(0)
     register_req = rpc.ClientRegisterReuqest(ip_addr)
     for server_id in range(num_servers):

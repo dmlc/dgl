@@ -202,16 +202,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   }
 });
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetSender")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->sender.get());
-});
-
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetReceiver")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = static_cast<CommunicatorHandle>(RPCContext::ThreadLocal()->receiver.get());
-});
-
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   RPCContext::ThreadLocal()->sender->Finalize();
