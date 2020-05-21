@@ -235,6 +235,10 @@ class ImmutableGraphSparseMatrixWrapper : public SparseMatrixWrapper {
     return gptr_->GetCOO()->ToCOOMatrix();
   }
 
+  SparseFormat GetRestrictFormat() const override {
+    return SparseFormat::kAny;
+  }
+
   DGLContext Context() const override {
     return gptr_->Context();
   }
@@ -262,6 +266,10 @@ class UnitGraphSparseMatrixWrapper : public SparseMatrixWrapper {
 
   aten::COOMatrix GetCOOMatrix() const override {
     return gptr_->GetCOOMatrix(0);
+  }
+
+  SparseFormat GetRestrictFormat() const override {
+    return gptr_->GetRestrictFormat();
   }
 
   DGLContext Context() const override {
@@ -344,7 +352,7 @@ void BinaryOpReduce(
 }
 
 
-void csrwrapper_switch(DGLArgValue argval,
+void spmat_wrapper_switch(DGLArgValue argval,
                        std::function<void(const SparseMatrixWrapper&)> fn) {
   DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);
   if (argval.IsObjectType<GraphRef>()) {
@@ -382,7 +390,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
                      static_cast<binary_op::Target>(rhs), lhs_data, rhs_data,
                      out_data, lhs_mapping, rhs_mapping, out_mapping);
     };
-    csrwrapper_switch(args[2], f);
+    spmat_wrapper_switch(args[2], f);
   });
 
 void BackwardLhsBinaryOpReduce(
@@ -449,7 +457,6 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
     NDArray out_data = args[10];
     NDArray grad_out_data = args[11];
     NDArray grad_lhs_data = args[12];
-
     auto f = [&reducer, &op, &lhs, &rhs, &lhs_mapping, &rhs_mapping,
               &out_mapping, &lhs_data, &rhs_data, &out_data, &grad_out_data,
               &grad_lhs_data](const SparseMatrixWrapper& wrapper) {
@@ -459,7 +466,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
           out_mapping, lhs_data, rhs_data, out_data, grad_out_data,
           grad_lhs_data);
     };
-    csrwrapper_switch(args[2], f);
+    spmat_wrapper_switch(args[2], f);
   });
 
 void BackwardRhsBinaryOpReduce(
@@ -525,7 +532,6 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
     NDArray out_data = args[10];
     NDArray grad_out_data = args[11];
     NDArray grad_rhs_data = args[12];
-
     auto f = [&reducer, &op, &lhs, &rhs, &lhs_mapping, &rhs_mapping,
               &out_mapping, &lhs_data, &rhs_data, out_data, &grad_out_data,
               &grad_rhs_data](const SparseMatrixWrapper& wrapper) {
@@ -535,8 +541,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
           out_mapping, lhs_data, rhs_data, out_data, grad_out_data,
           grad_rhs_data);
     };
-
-    csrwrapper_switch(args[2], f);
+    spmat_wrapper_switch(args[2], f);
   });
 
 void CopyReduce(
@@ -568,14 +573,12 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
     NDArray out_data = args[4];
     NDArray in_mapping = args[5];
     NDArray out_mapping = args[6];
-
     auto f = [&reducer, &target, &in_data, &out_data, &in_mapping,
               &out_mapping](const SparseMatrixWrapper& wrapper) {
       CopyReduce(reducer, wrapper, static_cast<binary_op::Target>(target),
                  in_data, out_data, in_mapping, out_mapping);
     };
-
-    csrwrapper_switch(args[1], f);
+    spmat_wrapper_switch(args[1], f);
   });
 
 void BackwardCopyReduce(
@@ -618,15 +621,13 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
     NDArray grad_in_data = args[6];
     NDArray in_mapping = args[7];
     NDArray out_mapping = args[8];
-
     auto f = [&reducer, &target, &in_mapping, &out_mapping, &in_data, &out_data,
               &grad_out_data, &grad_in_data](const SparseMatrixWrapper& wrapper) {
       BackwardCopyReduce(
           reducer, wrapper, static_cast<binary_op::Target>(target), in_mapping,
           out_mapping, in_data, out_data, grad_out_data, grad_in_data);
     };
-
-    csrwrapper_switch(args[1], f);
+    spmat_wrapper_switch(args[1], f);
   });
 
 }  // namespace kernel

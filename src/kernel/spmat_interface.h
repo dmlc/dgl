@@ -26,6 +26,7 @@ class SparseMatrixWrapper {
   virtual aten::CSRMatrix GetOutCSRMatrix() const = 0;
   virtual aten::COOMatrix GetCOOMatrix() const = 0;
   virtual DGLContext Context() const = 0;
+  virtual SparseFormat GetRestrictFormat() const = 0;
   virtual int NumBits() const = 0;
 };
 

@@ -371,9 +371,9 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get restrict sparse format of the graph.
    * 
-   * \return a string representing the sparse format: 'coo'/'csr'/'csc'/'any'
+   * \return restrict sparse format
    */
-  virtual std::string GetRestrictFormat() const = 0;
+  virtual SparseFormat GetRestrictFormat() const = 0;
 
   /*!
    * \brief Return the sparse format in use for the graph.

@@ -187,9 +187,9 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
   }
 
-  std::string GetRestrictFormat() const override {
+  SparseFormat GetRestrictFormat() const override {
     LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
-    return std::string("");
+    return SparseFormat::kAny;
   }
 
   dgl_format_code_t GetFormatInUse() const override {

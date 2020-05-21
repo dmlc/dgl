@@ -478,7 +478,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRestrictFormat")
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    *rv = hg->GetRelationGraph(etype)->GetRestrictFormat();
+    *rv = ToStringSparseFormat(hg->GetRelationGraph(etype)->GetRestrictFormat());
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")

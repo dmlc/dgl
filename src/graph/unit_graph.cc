@@ -334,9 +334,9 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return SparseFormat::kAny;
   }
 
-  std::string GetRestrictFormat() const override {
+  SparseFormat GetRestrictFormat() const override {
     LOG(FATAL) << "Not enabled for COO graph";
-    return std::string("");
+    return SparseFormat::kAny;
   }
 
   dgl_format_code_t GetFormatInUse() const override {
@@ -724,9 +724,9 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return SparseFormat::kAny;
   }
 
-  std::string GetRestrictFormat() const override {
+  SparseFormat GetRestrictFormat() const override {
     LOG(FATAL) << "Not enabled for CSR graph";
-    return std::string("");
+    return SparseFormat::kAny;
   }
 
   dgl_format_code_t GetFormatInUse() const override {
@@ -1265,8 +1265,8 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   if (inplace)
     if (restrict_format_ != SparseFormat::kAny &&
         restrict_format_ != SparseFormat::kCSC)
-      LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
-        ", cannot create CSC matrix.";
+      LOG(FATAL) << "The graph have restricted sparse format " <<
+        ToStringSparseFormat(GetRestrictFormat()) << ", cannot create CSC matrix.";
   CSRPtr ret = in_csr_;
   if (!in_csr_) {
     if (out_csr_) {
@@ -1292,8 +1292,8 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   if (inplace)
     if (restrict_format_ != SparseFormat::kAny &&
         restrict_format_ != SparseFormat::kCSR)
-      LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
-        ", cannot create CSR matrix.";
+      LOG(FATAL) << "The graph have restricted sparse format " <<
+        ToStringSparseFormat(GetRestrictFormat()) << ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
   if (!out_csr_) {
     if (in_csr_) {
@@ -1317,8 +1317,8 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
   if (inplace)
     if (restrict_format_ != SparseFormat::kAny &&
         restrict_format_ != SparseFormat::kCOO)
-      LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
-        ", cannot create COO matrix.";
+      LOG(FATAL) << "The graph have restricted sparse format " <<
+        ToStringSparseFormat(GetRestrictFormat()) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
   if (!coo_) {
     if (in_csr_) {
