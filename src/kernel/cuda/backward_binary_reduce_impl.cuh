@@ -20,10 +20,6 @@ namespace cuda {
 // Minigun UDF to compute backward binary reduce.
 template <int Mode, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduce {
-  static __device__ __forceinline__ bool CondEdge(
-      Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
@@ -91,10 +87,6 @@ struct BackwardBinaryReduce {
 // Minigun UDF to compute backward binary reduce with broadcasting.
 template <int Mode, int NDim, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduceBcast {
-  static __device__ __forceinline__ bool CondEdge(
-      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;

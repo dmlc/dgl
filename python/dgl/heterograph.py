@@ -4348,7 +4348,7 @@ class DGLHeteroGraph(object):
                 [1., 1., 1.]])}
         >>> g1.restrict_format()
         'coo'
-        
+
         For a graph with multiple edge types:
 
         >>> g = dgl.heterograph({

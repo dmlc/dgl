@@ -20,10 +20,6 @@ namespace cpu {
 // Minigun UDF to compute backward binary reduce.
 template <int Mode, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduce {
-  static inline bool CondEdge(
-      Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
-    return true;
-  }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
@@ -90,10 +86,6 @@ struct BackwardBinaryReduce {
 template <int Mode, int NDim,
           typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduceBcast {
-  static inline bool CondEdge(
-      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
-    return true;
-  }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
     const int64_t len = gdata->data_len;

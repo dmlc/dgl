@@ -22,10 +22,6 @@ namespace cpu {
 // Minigun UDF to compute binary reduce.
 template <typename Idx, typename DType, typename Functors>
 struct BinaryReduce {
-  static inline bool CondEdge(
-      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
-    return true;
-  }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
@@ -73,10 +69,6 @@ inline int64_t Ravel(const int64_t* idx, int ndim,
 // Minigun UDF to compute binary reduce with broadcasting.
 template <int NDim, typename Idx, typename DType, typename Functors>
 struct BinaryReduceBcast {
-  static inline bool CondEdge(
-      Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
-    return true;
-  }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
     const int64_t len = gdata->data_len;

@@ -20,10 +20,6 @@ namespace cuda {
 // Minigun UDF to compute binary reduce.
 template <typename Idx, typename DType, typename Functors>
 struct BinaryReduce {
-  static __device__ __forceinline__ bool CondEdge(
-      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
@@ -105,10 +101,6 @@ __device__ __forceinline__ void UnravelRavel(
 // Minigun UDF to compute binary reduce with broadcasting.
 template <int NDim, typename Idx, typename DType, typename Functors>
 struct BinaryReduceBcast {
-  static __device__ __forceinline__ bool CondEdge(
-      Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
