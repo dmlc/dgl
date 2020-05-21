@@ -67,7 +67,6 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
     &ndarray_count_msg, send_id), REMOVE_SUCCESS);
   int32_t ndarray_count = *(reinterpret_cast<int32_t*>(ndarray_count_msg.data));
   ndarray_count_msg.deallocator(&ndarray_count_msg);
-  LOG(INFO) << "ndarray_count: " << ndarray_count;
   // Recv real ndarray data
   std::vector<void* > buffer_list(ndarray_count);
   for (int i = 0; i < ndarray_count; ++i) {
@@ -77,7 +76,7 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
     buffer_list[i] = ndarray_data_msg.data;
   }
   StringStreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
-  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&msg);
+  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(msg);
   return kRPCSuccess;
 }
 
