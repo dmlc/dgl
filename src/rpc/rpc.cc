@@ -60,7 +60,7 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
   // Copy the data for now, can be optimized later
   std::string zerocopy_blob(rpc_meta_msg.data, rpc_meta_msg.size);
-  ndarray_meta_msg.deallocator(&ndarray_meta_msg);
+  rpc_meta_msg.deallocator(&rpc_meta_msg);
   // Recv count
   network::Message ndarray_count_msg;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
