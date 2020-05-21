@@ -8,6 +8,7 @@
 
 #include <dgl/runtime/object.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/zerocopy_serializer.h>
 #include <dmlc/thread_local.h>
 #include <cstdint>
 #include <memory>
@@ -106,6 +107,25 @@ struct RPCMessage : public runtime::Object {
   /*! \brief Extra payloads in the form of tensors.*/
   std::vector<runtime::NDArray> tensors;
 
+  bool Load(dmlc::Stream* stream) {
+    stream->Read(&service_id);
+    stream->Read(&msg_seq);
+    stream->Read(&client_id);
+    stream->Read(&server_id);
+    stream->Read(&data);
+    stream->Read(&tensors);
+    return true;
+  }
+
+  void Save(dmlc::Stream* stream) const {
+    stream->Write(service_id);
+    stream->Write(msg_seq);
+    stream->Write(client_id);
+    stream->Write(server_id);
+    stream->Write(data);
+    stream->Write(tensors);
+  }
+
   static constexpr const char* _type_key = "rpc.RPCMessage";
   DGL_DECLARE_OBJECT_TYPE_INFO(RPCMessage, runtime::Object);
 };
@@ -117,38 +137,6 @@ enum RPCStatus {
   kRPCSuccess = 0,
   kRPCTimeOut,
 };
-
-/*!
- * \brief Serialize one meta of RPCMessage to data buffer.
- *
- * The serialized data format is:
- * 
- * |service_id| -> int32_t
- * |msg_seq   | -> int64_t
- * |client_id | -> int32_t
- * |server_id | -> int32_t
- * |data_size | -> int64_t
- * |data      | -> string
- * |has_tensor| -> int8_t 1 for true and 0 for false
- *
- * Note: The real data of tensor will not be serialized to buffer, and
- * the the memory management of data buffer should be done by user.
- *
- * \param msg RPC message to serilaize
- * \param size the total size of serialized data
- * \return data buffer
- */
-char* SerializeRPCMeta(const RPCMessage& msg, int64_t* size);
-
-/*!
- * \brief Deserialize one meta of RPCMessage from data buffer
- *
- * \param msg RPC message to deserilaize
- * \param buffer buffer holding the serialized data
- * \param size buffer size
- * \return has_tensor
- */
-bool DeserializeRPCMeta(RPCMessage* msg, char* buffer, int64_t size);
 
 /*!
  * \brief Send out one RPC message.
@@ -181,5 +169,9 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout = 0);
 
 }  // namespace rpc
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::rpc::RPCMessage, true);
+}  // namespace dmlc
 
 #endif  // DGL_RPC_RPC_H_

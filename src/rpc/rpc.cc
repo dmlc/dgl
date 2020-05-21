@@ -16,87 +16,14 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace rpc {
 
-char* SerializeRPCMeta(const RPCMessage& msg, int64_t* size) {
-  int64_t total_size = 0;
-  total_size += sizeof(msg.service_id);
-  total_size += sizeof(msg.msg_seq);
-  total_size += sizeof(msg.client_id);
-  total_size += sizeof(msg.server_id);
-  total_size += sizeof(int64_t);  // data_size
-  total_size += msg.data.size();
-  total_size += sizeof(int8_t);   // has_tensor
-  char* buffer = new char[total_size];
-  char* pointer = buffer;
-  // write service_id
-  *(reinterpret_cast<int32_t*>(pointer)) = msg.service_id;
-  pointer += sizeof(msg.service_id);
-  // write msg_seq
-  *(reinterpret_cast<int64_t*>(pointer)) = msg.msg_seq;
-  pointer += sizeof(msg.msg_seq);
-  // write client_id
-  *(reinterpret_cast<int32_t*>(pointer)) = msg.client_id;
-  pointer += sizeof(msg.client_id);
-  // write server_id
-  *(reinterpret_cast<int32_t*>(pointer)) = msg.server_id;
-  pointer += sizeof(msg.server_id);
-  // write data size
-  *(reinterpret_cast<int64_t*>(pointer)) = msg.data.size();
-  pointer += sizeof(int64_t);
-  // write data
-  memcpy(pointer, msg.data.data(), msg.data.size());
-  pointer += msg.data.size();
-  // write hash_tensor
-  if (msg.tensors.size() > 0) {
-    *(reinterpret_cast<int8_t*>(pointer)) = 1;
-  } else {
-    *(reinterpret_cast<int8_t*>(pointer)) = 0;
-  }
-  pointer += sizeof(int8_t);
-  *size = total_size;
-  return buffer;
-}
-
-bool DeserializeRPCMeta(RPCMessage* msg, char* buffer, int64_t size) {
-  int64_t total_size = 0;
-  // read service_id
-  msg->service_id = *(reinterpret_cast<int32_t*>(buffer));
-  buffer += sizeof(msg->service_id);
-  total_size += sizeof(msg->service_id);
-  // read msg_seq
-  msg->msg_seq = *(reinterpret_cast<int64_t*>(buffer));
-  buffer += sizeof(msg->msg_seq);
-  total_size += sizeof(msg->msg_seq);
-  // read client_id
-  msg->client_id = *(reinterpret_cast<int32_t*>(buffer));
-  buffer += sizeof(msg->client_id);
-  total_size += sizeof(msg->client_id);
-  // read server_id
-  msg->server_id = *(reinterpret_cast<int32_t*>(buffer));
-  buffer += sizeof(msg->server_id);
-  total_size += sizeof(msg->server_id);
-  // read data size
-  int64_t data_size = *(reinterpret_cast<int64_t*>(buffer));
-  buffer += sizeof(int64_t);
-  total_size += sizeof(int64_t);
-  // read data
-  msg->data.resize(data_size);
-  memcpy(const_cast<char*>(msg->data.data()), buffer, data_size);
-  buffer += data_size;
-  total_size += data_size;
-  // read has_tensor
-  int8_t has_tensor = *(reinterpret_cast<int8_t*>(buffer));
-  buffer += sizeof(int8_t);
-  total_size += sizeof(int8_t);
-  CHECK_EQ(total_size, size);
-  if (has_tensor) {
-    return true;
-  }
-  return false;
-}
-
 RPCStatus SendRPCMessage(const RPCMessage& msg) {
-  int64_t rpc_meta_size = 0;
-  char* rpc_meta_buffer = SerializeRPCMeta(msg, &rpc_meta_size);
+  std::string zerocopy_blob;
+  StringStreamWithBuffer zc_write_strm(&zerocopy_blob);
+  static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
+  char* rpc_meta_buffer = new char[zerocopy_blob.size()];
+  // Copy the data for now, can be optimized later
+  memcpy(rpc_meta_size, zerocopy_blob.data(), zerocopy_blob.size());
+  int64_t rpc_meta_size = zerocopy_blob.size();
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = rpc_meta_buffer;
   rpc_meta_msg.size = rpc_meta_size;
@@ -104,18 +31,6 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
     rpc_meta_msg, msg.server_id), ADD_SUCCESS);
   if (msg.tensors.size() > 0) {
-    std::string zerocopy_blob;
-    StringStreamWithBuffer zc_write_strm(&zerocopy_blob);
-    static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg.tensors);
-    // send ndarray meta data
-    char* ndarray_meta_buffer = new char[zerocopy_blob.size()];
-    memcpy(ndarray_meta_buffer, zerocopy_blob.data(), zerocopy_blob.size());
-    network::Message ndarray_meta_msg;
-    ndarray_meta_msg.data = ndarray_meta_buffer;
-    ndarray_meta_msg.size = zerocopy_blob.size();
-    ndarray_meta_msg.deallocator = network::DefaultMessageDeleter;
-    CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
-      ndarray_meta_msg, msg.server_id), ADD_SUCCESS);
     // send ndarray count
     char* ndarray_count = new char[sizeof(int32_t)];
     *(reinterpret_cast<int32_t*>(ndarray_count)) = msg.tensors.size();
@@ -145,36 +60,24 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   int send_id;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
-  bool has_tensor = DeserializeRPCMeta(msg, rpc_meta_msg.data, rpc_meta_msg.size);
-  if (has_tensor) {
-    // Recv ndarray meta data
-    network::Message ndarray_meta_msg;
+  // Copy the data for now, can be optimized later
+  std::string zerocopy_blob(rpc_meta_msg.data);
+  // Recv count
+  network::Message ndarray_count_msg;
+  CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
+    &ndarray_count_msg, send_id), REMOVE_SUCCESS);
+  int32_t ndarray_count = *(reinterpret_cast<int32_t*>(ndarray_count_msg.data));
+  ndarray_count_msg.deallocator(&ndarray_count_msg);
+  // Recv real ndarray data
+  std::vector<void* > buffer_list(ndarray_count);
+  for (int i = 0; i < ndarray_count; ++i) {
+    network::Message ndarray_data_msg;
     CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
-      &ndarray_meta_msg, send_id), REMOVE_SUCCESS);
-    std::string zerocopy_blob;
-    zerocopy_blob.resize(ndarray_meta_msg.size);
-    memcpy(const_cast<char*>(zerocopy_blob.data()),
-           ndarray_meta_msg.data,
-           ndarray_meta_msg.size);
-    ndarray_meta_msg.deallocator(&ndarray_meta_msg);
-    // Recv ndarray count
-    network::Message ndarray_count_msg;
-    CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
-      &ndarray_count_msg, send_id), REMOVE_SUCCESS);
-    int32_t ndarray_count = *(reinterpret_cast<int32_t*>(ndarray_count_msg.data));
-    ndarray_count_msg.deallocator(&ndarray_count_msg);
-    // Recv real ndarray data
-    std::vector<void* > buffer_list(ndarray_count);
-    for (int i = 0; i < ndarray_count; ++i) {
-      network::Message ndarray_data_msg;
-      CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
         &ndarray_data_msg, send_id), REMOVE_SUCCESS);
-      buffer_list[i] = ndarray_data_msg.data;
-    }
-    StringStreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
-    msg->tensors.resize(ndarray_count);
-    static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&msg->tensors);
+    buffer_list[i] = ndarray_data_msg.data;
   }
+  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
+  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&msg);
   return kRPCSuccess;
 }
 
