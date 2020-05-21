@@ -171,6 +171,46 @@ def get_rank():
     """
     return _CAPI_DGLRPCGetRank()
 
+def set_server_id(server_id):
+    """Set server ID of current rpc message
+
+    Parameters
+    ----------
+    server_id : int
+        server ID
+    """
+    _CAPI_DGLRPCSetServerID(int(server_id))
+
+def get_server_id():
+    """Get server ID of current rpc message
+
+    Returns
+    -------
+    int
+        server ID
+    """
+    return _CAPI_DGLRPCGetServerID()
+
+def set_client_id(client_id):
+    """Set client ID of current rpc message
+
+    Parameters
+    ----------
+    client_id : int
+        client ID
+    """
+    _CAPI_DGLRPCSetClientID(int(client_id))
+
+def get_client_id():
+    """Get client ID of current rpc message
+
+    Returns
+    -------
+    int
+        server ID
+    """
+    return _CAPI_DGLRPCGetClientID()
+
 def set_num_server(num_server):
     """Set the total number of server.
     """
@@ -200,6 +240,16 @@ def get_msg_seq():
         Message sequence number
     """
     return _CAPI_DGLRPCGetMsgSeq()
+
+def set_msg_seq(msg_seq):
+    """Set the current message sequence number.
+
+    Parameters
+    ----------
+    msg_seq : int
+        sequence number of current rpc message.
+    """
+    _CAPI_DGLRPCSetMsgSeq(int(msg_seq))
 
 def register_service(service_id, req_cls, res_cls=None):
     """Register a service to RPC.
@@ -281,36 +331,6 @@ class Request:
             raise DGLError('Request class {} has not been registered as a service.'.format(cls))
         return sid
 
-    @property
-    def server_id(self):
-        """Get server ID"""
-        return self._server_id
-
-    @property
-    def client_id(self):
-        """Get client ID"""
-        return self._client_id
-
-    @property
-    def msg_seq(self):
-        """Get msg_seq"""
-        return self._msg_seq
-
-    @server_id.setter
-    def server_id(self, server_id):
-        """Set server ID"""
-        self._server_id = server_id
-
-    @client_id.setter
-    def client_id(self, client_id):
-        """Set client ID"""
-        self._client_id = client_id
-
-    @msg_seq.setter
-    def msg_seq(self, msg_seq):
-        """Set msg_seq"""
-        self._msg_seq = msg_seq
-
 class Response:
     """Base response class"""
 
@@ -340,36 +360,6 @@ class Response:
         if sid is None:
             raise DGLError('Response class {} has not been registered as a service.'.format(cls))
         return sid
-
-    @property
-    def server_id(self):
-        """Get server ID"""
-        return self._server_id
-
-    @property
-    def client_id(self):
-        """Get client ID"""
-        return self._client_id
-
-    @property
-    def msg_seq(self):
-        """Get msg_seq"""
-        return self._msg_seq
-
-    @server_id.setter
-    def server_id(self, server_id):
-        """Set server ID"""
-        self._server_id = server_id
-
-    @client_id.setter
-    def client_id(self, client_id):
-        """Set client ID"""
-        self._client_id = client_id
-
-    @msg_seq.setter
-    def msg_seq(self, msg_seq):
-        """Set msg_seq"""
-        self._msg_seq = msg_seq
 
 def serialize_to_payload(serializable):
     """Serialize an object to payloads.
@@ -532,6 +522,36 @@ def send_request(target, request):
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
     send_rpc_message(msg)
 
+def send_response(target, response):
+    """Send one response to the target client.
+
+    Serialize the given response object to an :class:`RPCMessage` and send it
+    out.
+
+    The operation is non-blocking -- it does not guarantee the payloads have
+    reached the target or even have left the sender process. However,
+    all the payloads (i.e., data and arrays) can be safely freed after this
+    function returns.
+
+    Parameters
+    ----------
+    target : int
+        ID of target client.
+    response : Response
+        The response to send.
+
+    Raises
+    ------
+    ConnectionError if there is any problem with the connection.
+    """
+    service_id = response.service_id
+    msg_seq = get_msg_seq()
+    client_id = target
+    server_id = get_rank()
+    data, tensors = serialize_to_payload(response)
+    msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
+    send_rpc_message(msg)
+
 def recv_request(timeout=0):
     """Receive one request.
 
@@ -563,44 +583,13 @@ def recv_request(timeout=0):
         raise DGLError('Got request message from service ID {}, '
                        'but no request class is registered.'.format(msg.service_id))
     req = deserialize_from_payload(req_cls, msg.data, msg.tensors)
-    req.server_id = msg.server_id
-    req.client_id = msg.client_id
-    req.msg_seq = msg.msg_seq
+    set_client_id(msg.client_id)
+    set_server_id(msg.server_id)
+    set_msg_seq(msg.msg_seq)
     if msg.server_id != get_rank():
         raise DGLError('Got request sent to server {}, '
                        'different from my rank {}!'.format(msg.server_id, get_rank()))
     return req
-
-def send_response(target, msg_seq, response):
-    """Send one response to the target client.
-
-    Serialize the given response object to an :class:`RPCMessage` and send it
-    out.
-
-    The operation is non-blocking -- it does not guarantee the payloads have
-    reached the target or even have left the sender process. However,
-    all the payloads (i.e., data and arrays) can be safely freed after this
-    function returns.
-
-    Parameters
-    ----------
-    target : int
-        ID of target client.
-    msg_seq : int
-        Number of message sequence.
-    response : Response
-        The response to send.
-
-    Raises
-    ------
-    ConnectionError if there is any problem with the connection.
-    """
-    service_id = response.service_id
-    client_id = target
-    server_id = get_rank()
-    data, tensors = serialize_to_payload(response)
-    msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-    send_rpc_message(msg)
 
 def recv_response(timeout=0):
     """Receive one response.
@@ -633,9 +622,6 @@ def recv_response(timeout=0):
         raise DGLError('Got response message from service ID {}, '
                        'but no response class is registered.'.format(msg.service_id))
     res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-    res.client_id = msg.client_id
-    res.server_id = msg.server_id
-    res.msg_seq = msg.msg_seq
     if msg.client_id != get_rank():
         raise DGLError('Got reponse of request sent by client {}, '
                        'different from my rank {}!'.format(msg.client_id, get_rank()))
@@ -667,7 +653,6 @@ def remote_call(target_and_requests, timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(minjie): implement local server short-cut
     # TODO(chao): handle timeout
     all_res = [None] * len(target_and_requests)
     msgseq2pos = {}
@@ -696,8 +681,6 @@ def remote_call(target_and_requests, timeout=0):
             raise DGLError('Got response message from service ID {}, '
                            'but no response class is registered.'.format(msg.service_id))
         res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-        res.client_id = msg.client_id
-        res.server_id = msg.server_id
         if msg.client_id != myrank:
             raise DGLError('Got reponse of request sent by client {}, '
                            'different from my rank {}!'.format(msg.client_id, myrank))

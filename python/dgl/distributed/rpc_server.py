@@ -80,8 +80,5 @@ def start_server(server_id, ip_config, num_clients, queue_size=MAX_QUEUE_SIZE, n
     while True:
         req = rpc.recv_request()
         res = req.process_request(server_state)
-        res.client_id = req.client_id
-        res.server_id = req.server_id
-        res.msg_seq = req.msg_seq
         if res is not None:
-            rpc.send_response(res.client_id, res.msg_seq, res)
+            rpc.send_response(rpc.get_client_id(), res)
