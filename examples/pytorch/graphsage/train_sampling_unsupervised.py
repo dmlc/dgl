@@ -80,30 +80,25 @@ class NeighborSampler(object):
             frontier = dgl.remove_edges(frontier, edge_ids)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
-            block.out_degree(0)
+
+            # Pre-generate CSR format that it can be used in training directly
+            block.to_format('csr')
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
             blocks.insert(0, block)
-        pos_graph.out_degree(0)
-        neg_graph.out_degree(0)
+
+        # Pre-generate CSR format that it can be used in training directly
+        pos_graph.to_format('csr')
+        neg_graph.to_format('csr')
         return pos_graph, neg_graph, blocks
 
-#### CopySampler
-
-class MemCopySampler(object):
-    def __init__(self, g, device, loader):
-        self.g = g
-        self.loader = iter(loader)
-        self.device = device
-
-    def sample_data(self, seeds):
-        pos_graph, neg_graph, blocks = next(self.loader)
-        input_nodes = blocks[0].srcdata[dgl.NID]
-        batch_inputs = self.g.ndata['features'][input_nodes]
-        batch_inputs = batch_inputs.to(self.device, non_blocking=True)
-
-        return pos_graph, neg_graph, blocks, batch_inputs
+def load_subtensor(g, input_nodes, device):
+    """
+    Copys features and labels of a set of nodes onto GPU.
+    """
+    batch_inputs = g.ndata['features'][input_nodes].to(device)
+    return batch_inputs
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -193,18 +188,6 @@ class CrossEntropyLoss(nn.Module):
         loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
-
 def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
@@ -275,7 +258,7 @@ def run(proc_id, n_gpus, args, devices, data):
                                   if (proc_id + 1) * num_per_gpu < train_seeds.shape[0]
                                   else train_seeds.shape[0]]
 
-    nb_dataloader = DataLoader(
+    dataloader = DataLoader(
         dataset=train_seeds,
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
@@ -283,16 +266,6 @@ def run(proc_id, n_gpus, args, devices, data):
         drop_last=False,
         pin_memory=True,
         num_workers=args.num_workers)
-
-    # Create PyTorch DataLoader for copy data into GPU
-    cp_sampler = MemCopySampler(g, device, nb_dataloader)
-    dataloader = DataLoader(
-        dataset=np.arange(g.number_of_edges()),
-        batch_size=args.batch_size,
-        collate_fn=cp_sampler.sample_data,
-        shuffle=False,
-        drop_last=False,
-        num_workers=0)
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
@@ -318,9 +291,11 @@ def run(proc_id, n_gpus, args, devices, data):
         # blocks.
 
         tic_step = time.time()
-        for step, (pos_graph, neg_graph, blocks, batch_inputs) in enumerate(dataloader):
+        for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
+            input_nodes = blocks[0].srcdata[dgl.NID]
+            batch_inputs = load_subtensor(g, input_nodes, device)
             d_step = time.time()
 
             # Compute loss and prediction
@@ -368,7 +343,6 @@ def main(args, devices):
     # Construct graph
     g = dgl.graph(data.graph.all_edges())
     g.ndata['features'] = features
-    prepare_mp(g)
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
 
