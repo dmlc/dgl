@@ -162,28 +162,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetRank")
   *rv = RPCContext::ThreadLocal()->rank;
 });
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetServerID")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  const int32_t server_id = args[0];
-  RPCContext::ThreadLocal()->server_id = server_id;
-});
-
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetServerID")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->server_id;
-});
-
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetClientID")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  const int32_t client_id = args[0];
-  RPCContext::ThreadLocal()->client_id = client_id;
-});
-
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetClientID")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->client_id;
-});
-
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumServer")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const int32_t num_servers = args[0];

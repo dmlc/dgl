@@ -61,7 +61,7 @@ def start_server(server_id, ip_config, num_clients, max_queue_size=MAX_QUEUE_SIZ
     addr_list = []
     client_namebook = {}
     for i in range(num_clients):
-        req = rpc.recv_request()
+        req, _ = rpc.recv_request()
         addr_list.append(req.ip_addr)
     addr_list.sort()
     for client_id, addr in enumerate(addr_list):
@@ -77,7 +77,7 @@ def start_server(server_id, ip_config, num_clients, max_queue_size=MAX_QUEUE_SIZ
     # main service loop
     server_state = None
     while True:
-        req = rpc.recv_request()
+        req, client_id = rpc.recv_request()
         res = req.process_request(server_state)
         if res is not None:
-            rpc.send_response(rpc.get_client_id(), res)
+            rpc.send_response(client_id, res)

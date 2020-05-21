@@ -42,16 +42,6 @@ struct RPCContext {
   int64_t msg_seq = 0;
 
   /*!
-   * \brief Server ID of current rpc message.
-   */
-  int32_t server_id = 0;
-
-  /*!
-   * \brief Client ID of current rpc message.
-   */
-  int32_t client_id = 0;
-
-  /*!
    * \brief Total number of server.
    */
   int32_t num_servers = 0;

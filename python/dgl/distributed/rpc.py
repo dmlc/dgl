@@ -171,46 +171,6 @@ def get_rank():
     """
     return _CAPI_DGLRPCGetRank()
 
-def set_server_id(server_id):
-    """Set server ID of current rpc message
-
-    Parameters
-    ----------
-    server_id : int
-        server ID
-    """
-    _CAPI_DGLRPCSetServerID(int(server_id))
-
-def get_server_id():
-    """Get server ID of current rpc message
-
-    Returns
-    -------
-    int
-        server ID
-    """
-    return _CAPI_DGLRPCGetServerID()
-
-def set_client_id(client_id):
-    """Set client ID of current rpc message
-
-    Parameters
-    ----------
-    client_id : int
-        client ID
-    """
-    _CAPI_DGLRPCSetClientID(int(client_id))
-
-def get_client_id():
-    """Get client ID of current rpc message
-
-    Returns
-    -------
-    int
-        server ID
-    """
-    return _CAPI_DGLRPCGetClientID()
-
 def set_num_server(num_server):
     """Set the total number of server.
     """
@@ -569,6 +529,8 @@ def recv_request(timeout=0):
     -------
     req : request
         One request received from the target, or None if it times out.
+    client_id : int
+        Client' ID received from the target.
 
     Raises
     ------
@@ -578,18 +540,16 @@ def recv_request(timeout=0):
     msg = recv_rpc_message(timeout)
     if msg is None:
         return None
+    set_msg_seq(msg.msg_seq)
     req_cls, _ = SERVICE_ID_TO_PROPERTY[msg.service_id]
     if req_cls is None:
         raise DGLError('Got request message from service ID {}, '
                        'but no request class is registered.'.format(msg.service_id))
     req = deserialize_from_payload(req_cls, msg.data, msg.tensors)
-    set_client_id(msg.client_id)
-    set_server_id(msg.server_id)
-    set_msg_seq(msg.msg_seq)
     if msg.server_id != get_rank():
         raise DGLError('Got request sent to server {}, '
                        'different from my rank {}!'.format(msg.server_id, get_rank()))
-    return req
+    return req, msg.client_id
 
 def recv_response(timeout=0):
     """Receive one response.
