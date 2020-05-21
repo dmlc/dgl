@@ -85,6 +85,7 @@ from .. import backend as F
 from ..base import NID, EID
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
+from .graph_partition_book import GraphPartitionBook
 
 def load_partition(conf_file, part_id):
     ''' Load data of a partition from the data path in the DistGraph server.
@@ -142,7 +143,7 @@ def load_partition(conf_file, part_id):
         edge_map = part_metadata['edge_map']
     else:
         edge_map = np.load(part_metadata['edge_map'])
-    meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map, edge_map, num_parts)
+    meta = (part_metadata['num_nodes'], part_metadata['num_edges'])
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
@@ -167,7 +168,8 @@ def load_partition(conf_file, part_id):
         part_ids = F.gather_row(edge_map, graph.edata[EID])
         graph.edata['local_edge'] = F.astype(part_ids == part_id, F.int64)
 
-    return graph, node_feats, edge_feats, meta
+    gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
+    return graph, node_feats, edge_feats, gpb, meta
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True):

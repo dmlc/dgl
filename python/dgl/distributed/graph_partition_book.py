@@ -144,7 +144,7 @@ class GraphPartitionBook:
 
 
     def partid2nids(self, partid):
-        """From partition id to node IDs
+        """From partition id to global node IDs
 
         Parameters
         ----------
@@ -160,7 +160,7 @@ class GraphPartitionBook:
 
 
     def partid2eids(self, partid):
-        """From partition id to edge IDs
+        """From partition id to global edge IDs
 
         Parameters
         ----------
