@@ -141,7 +141,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     # Register client on server
     # 0 is a temp ID because we haven't assigned client ID yet
     rpc.set_rank(0)
-    register_req = rpc.ClientRegisterReuqest(ip_addr)
+    register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
     # wait server connect back
