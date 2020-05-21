@@ -138,7 +138,7 @@ def test_split():
                                  node_map=node_map,
                                  edge_map=edge_map,
                                  part_graph=part_g)
-        local_nids = F.nonzero_1d(part_g.ndata['local_node'])
+        local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
         nodes2 = node_split(node_mask, gpb, i)
@@ -147,7 +147,7 @@ def test_split():
         for n in nodes1:
             assert n in local_nids
 
-        local_eids = F.nonzero_1d(part_g.edata['local_edge'])
+        local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
         edges2 = edge_split(edge_mask, gpb, i)

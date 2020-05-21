@@ -41,11 +41,11 @@ def _copy_graph_to_shared_mem(g, graph_name):
     new_g = DGLGraph(gidx)
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
-    local_node_path = _get_ndata_path(graph_name, 'local_node')
-    new_g.ndata['local_node'] = _move_data_to_shared_mem_array(g.ndata['local_node'],
+    local_node_path = _get_ndata_path(graph_name, 'inner_node')
+    new_g.ndata['inner_node'] = _move_data_to_shared_mem_array(g.ndata['inner_node'],
                                                                local_node_path)
-    local_edge_path = _get_edata_path(graph_name, 'local_edge')
-    new_g.edata['local_edge'] = _move_data_to_shared_mem_array(g.edata['local_edge'],
+    local_edge_path = _get_edata_path(graph_name, 'inner_edge')
+    new_g.edata['inner_edge'] = _move_data_to_shared_mem_array(g.edata['inner_edge'],
                                                                local_edge_path)
     new_g.ndata[NID] = _move_data_to_shared_mem_array(g.ndata[NID],
                                                       _get_ndata_path(graph_name, NID))
@@ -53,8 +53,8 @@ def _copy_graph_to_shared_mem(g, graph_name):
                                                       _get_edata_path(graph_name, EID))
     return new_g
 
-FIELD_DICT = {'local_node': F.int64,
-              'local_edge': F.int64,
+FIELD_DICT = {'inner_node': F.int64,
+              'inner_edge': F.int64,
               NID: F.int64,
               EID: F.int64}
 
@@ -118,8 +118,8 @@ def _get_graph_from_shared_mem(graph_name):
         return gidx
 
     g = DGLGraph(gidx)
-    g.ndata['local_node'] = _get_shared_mem_ndata(g, graph_name, 'local_node')
-    g.edata['local_edge'] = _get_shared_mem_edata(g, graph_name, 'local_edge')
+    g.ndata['inner_node'] = _get_shared_mem_ndata(g, graph_name, 'inner_node')
+    g.edata['inner_edge'] = _get_shared_mem_edata(g, graph_name, 'inner_edge')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
     return g
@@ -348,7 +348,7 @@ class DistGraphServer(KVServer):
         # Create node global2local map.
         node_g2l = F.zeros((num_nodes), dtype=F.int64, ctx=F.cpu()) - 1
         # The nodes that belong to this partition.
-        local_nids = F.nonzero_1d(self.client_g.ndata['local_node'])
+        local_nids = F.nonzero_1d(self.client_g.ndata['inner_node'])
         nids = F.asnumpy(F.gather_row(self.client_g.ndata[NID], local_nids))
         assert np.all(node_map[nids] == server_id), 'Load a wrong partition'
         F.scatter_row_inplace(node_g2l, nids, F.arange(0, len(nids)))
@@ -356,7 +356,7 @@ class DistGraphServer(KVServer):
         # Create edge global2local map.
         if len(edge_feats) > 0:
             edge_g2l = F.zeros((num_edges), dtype=F.int64, ctx=F.cpu()) - 1
-            local_eids = F.nonzero_1d(self.client_g.edata['local_edge'])
+            local_eids = F.nonzero_1d(self.client_g.edata['inner_edge'])
             eids = F.asnumpy(F.gather_row(self.client_g.edata[EID], local_eids))
             assert np.all(edge_map[eids] == server_id), 'Load a wrong partition'
             F.scatter_row_inplace(edge_g2l, eids, F.arange(0, len(eids)))
