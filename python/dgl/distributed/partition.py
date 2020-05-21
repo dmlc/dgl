@@ -85,7 +85,7 @@ from .. import backend as F
 from ..base import NID, EID
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
-from .graph_partition_book import GraphPartitionBook
+from .graph_partition_book import GraphPartitionBook, RangePartitionBook
 
 def load_partition(conf_file, part_id):
     ''' Load data of a partition from the data path in the DistGraph server.
@@ -135,40 +135,21 @@ def load_partition(conf_file, part_id):
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
     assert 'node_map' in part_metadata, "cannot get the node map."
     assert 'edge_map' in part_metadata, "cannot get the edge map."
-    if isinstance(part_metadata['node_map'], list):
-        node_map = part_metadata['node_map']
-    else:
-        node_map = np.load(part_metadata['node_map'])
-    if isinstance(part_metadata['edge_map'], list):
-        edge_map = part_metadata['edge_map']
-    else:
-        edge_map = np.load(part_metadata['edge_map'])
+
+    reshuffle = isinstance(part_metadata['node_map'], list)
+    node_map = part_metadata['node_map'] if reshuffle else np.load(part_metadata['node_map'])
+    edge_map = part_metadata['edge_map'] if reshuffle else np.load(part_metadata['edge_map'])
+    assert isinstance(node_map, list) == isinstance(edge_map, list), \
+            "The node map and edge map need to have the same format"
+
     meta = (part_metadata['num_nodes'], part_metadata['num_edges'])
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    # TODO we need to fix this. DGL backend doesn't support boolean or byte.
-    # int64 is unnecessary.
-    if isinstance(node_map, list):
-        nrange_start = node_map[part_id - 1] if part_id > 0 else 0
-        nrange_end = node_map[part_id]
-        graph.ndata['local_node'] = F.logical_and(graph.ndata[NID] > nrange_start,
-                                                  graph.ndata[NID] < nrange_end)
+    if reshuffle:
+        gpb = RangePartitionBook(part_id, num_parts, node_map, edge_map, graph)
     else:
-        node_map = F.zerocopy_from_numpy(node_map)
-        part_ids = F.gather_row(node_map, graph.ndata[NID])
-        graph.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
-    if isinstance(edge_map, list):
-        erange_start = edge_map[part_id - 1] if part_id > 0 else 0
-        erange_end = edge_map[part_id]
-        graph.edata['local_edge'] = F.logical_and(graph.edata[EID] > erange_start,
-                                                  graph.edata[EID] < erange_end)
-    else:
-        edge_map = F.zerocopy_from_numpy(edge_map)
-        part_ids = F.gather_row(edge_map, graph.edata[EID])
-        graph.edata['local_edge'] = F.astype(part_ids == part_id, F.int64)
-
-    gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
+        gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
     return graph, node_feats, edge_feats, gpb, meta
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
@@ -305,8 +286,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 local_nodes = F.arange(0, lnodes_list[part_id])
                 local_edges = F.arange(0, ledges_list[part_id])
             elif reshuffle:
-                local_nodes = F.arange(lnodes_list[part_id] - 1, lnodes_list[part_id])
-                local_edges = F.arange(ledges_list[part_id] - 1, ledges_list[part_id])
+                local_nodes = F.arange(lnodes_list[part_id - 1], lnodes_list[part_id])
+                local_edges = F.arange(ledges_list[part_id - 1], ledges_list[part_id])
             else:
                 local_nodes = lnodes_list[part_id]
                 local_edges = ledges_list[part_id]
