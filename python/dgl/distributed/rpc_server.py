@@ -74,7 +74,7 @@ def start_server(server_id, ip_config, num_clients, queue_size=MAX_QUEUE_SIZE, n
     if rpc.get_rank() == 0: # server_0 send all the IDs
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)
-            rpc.send_response(client_id, 0, register_res)
+            rpc.send_response(client_id, register_res)
     # main service loop
     server_state = None
     while True:
