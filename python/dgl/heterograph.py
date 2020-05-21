@@ -4348,11 +4348,7 @@ class DGLHeteroGraph(object):
                 [1., 1., 1.]])}
         >>> g1.restrict_format()
         'coo'
-<<<<<<< HEAD
         
-=======
-
->>>>>>> upstream/master
         For a graph with multiple edge types:
 
         >>> g = dgl.heterograph({
