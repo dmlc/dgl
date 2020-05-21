@@ -519,6 +519,11 @@ def send_request(target, request):
     client_id = get_rank()
     server_id = target
     data, tensors = serialize_to_payload(request)
+    print("-----Send------")
+    print("service_id: %d" % service_id)
+    print("msg_seq: %d" % msg_seq)
+    print("client_id: %d" % client_id)
+    print("server_id: %d" % server_id)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
     send_rpc_message(msg)
 
@@ -576,6 +581,11 @@ def recv_request(timeout=0):
     """
     # TODO(chao): handle timeout
     msg = recv_rpc_message(timeout)
+    print("-----Recv------")
+    print("service_id: %d" % msg.service_id)
+    print("msg_seq: %d" % msg.msg_seq)
+    print("client_id: %d" % msg.client_id)
+    print("server_id: %d" % msg.server_id)
     if msg is None:
         return None
     req_cls, _ = SERVICE_ID_TO_PROPERTY[msg.service_id]
