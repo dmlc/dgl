@@ -22,7 +22,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
   char* rpc_meta_buffer = new char[zerocopy_blob.size()];
   // Copy the data for now, can be optimized later
-  memcpy(rpc_meta_size, zerocopy_blob.data(), zerocopy_blob.size());
+  memcpy(rpc_meta_buffer, zerocopy_blob.data(), zerocopy_blob.size());
   int64_t rpc_meta_size = zerocopy_blob.size();
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = rpc_meta_buffer;
