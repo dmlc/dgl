@@ -246,7 +246,7 @@ Dataset Classes
 
 If your dataset is stored in a ``.csv`` file, you may find it helpful to use
 
-.. autoclass:: dgl.data.chem.CSVDataset
+.. autoclass:: dgl.data.chem.MoleculeCSVDataset
     :members: __getitem__, __len__
 
 Currently four datasets are supported:
