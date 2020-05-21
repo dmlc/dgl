@@ -216,8 +216,8 @@ def test_load_old_files2():
 
 def create_heterographs(index_dtype):
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', index_dtype=index_dtype)
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', index_dtype=index_dtype)
+                    'follows', index_dtype=index_dtype, restrict_format='any')
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', index_dtype=index_dtype, restrict_format='csr')
     g_x.nodes['user'].data['h'] = F.randn((4, 3))
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
     g_y.nodes['user'].data['hh'] = F.ones((4, 5))
@@ -250,6 +250,8 @@ def test_serialize_heterograph():
 
     g_list = load_graphs(path)
     assert g_list[0].idtype == F.int64
+    assert g_list[1].restrict_format() == 'any'
+    assert g_list[2].restrict_format() == 'csr'
     assert g_list[3].idtype == F.int32
     assert np.allclose(
         F.asnumpy(g_list[2].nodes['user'].data['hh']), np.ones((4, 5)))
