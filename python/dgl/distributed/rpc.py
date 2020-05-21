@@ -578,6 +578,12 @@ def recv_request(timeout=0):
     msg = recv_rpc_message(timeout)
     if msg is None:
         return None
+    print("-------------")
+    print(msg.client_id)
+    print(msg.server_id)
+    print(msg.msg_seq)
+    print(msg.service_id)
+    print("-------------")
     req_cls, _ = SERVICE_ID_TO_PROPERTY[msg.service_id]
     if req_cls is None:
         raise DGLError('Got request message from service ID {}, '
