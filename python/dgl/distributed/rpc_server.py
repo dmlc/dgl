@@ -8,7 +8,7 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .server_state import get_server_state
 
-def start_server(server_id, ip_config, num_clients, queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def start_server(server_id, ip_config, num_clients, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
     This is a blocking function -- it returns only when the server shutdown.
@@ -33,9 +33,8 @@ def start_server(server_id, ip_config, num_clients, queue_size=MAX_QUEUE_SIZE, n
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
-    assert queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
-    assert net_type in ('socket', 'mpi'), \
-    'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
+    assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
+    assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
     # Register some basic services
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,
@@ -50,8 +49,8 @@ def start_server(server_id, ip_config, num_clients, queue_size=MAX_QUEUE_SIZE, n
     port = server_namebook[server_id][2]
     # group_count means the total number of server on each machine
     group_count = server_namebook[server_id][3]
-    rpc.create_sender(queue_size, net_type)
-    rpc.create_receiver(queue_size, net_type)
+    rpc.create_sender(max_queue_size, net_type)
+    rpc.create_receiver(max_queue_size, net_type)
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not
     # accept new sender's connection
