@@ -343,7 +343,6 @@ def run(proc_id, n_gpus, args, devices, data):
                     proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
-            '''
             if step % args.eval_every == 0 and proc_id == 0:
                 eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
@@ -351,7 +350,6 @@ def run(proc_id, n_gpus, args, devices, data):
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
-            '''
 
         if n_gpus > 1:
             th.distributed.barrier()
