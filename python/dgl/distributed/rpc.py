@@ -412,9 +412,9 @@ def deserialize_from_payload(cls, data, tensors):
         state[i] = no_state
     if len(tensors) != 0:
         j = 0
-        for _, each_state in enumerate(state):
-            if each_state is None:
-                each_state = tensors[j]
+        for i in range(len(state)):
+            if state[i] is None:
+                state[i] = tensors[j]
                 j += 1
     if len(state) == 1:
         state = state[0]
