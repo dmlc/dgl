@@ -41,15 +41,22 @@ Reaction Prediction
 USPTO
 `````
 
-.. autoclass:: dgllife.data.USPTO
+.. autoclass:: dgllife.data.USPTOCenter
     :members: __getitem__, __len__
+    :show-inheritance:
+
+.. autoclass:: dgllife.data.USPTORank
+    :members: ignore_large, __getitem__, __len__
     :show-inheritance:
 
 Adapting to New Datasets for Weisfeiler-Lehman Networks
 ```````````````````````````````````````````````````````
 
-.. autoclass:: dgllife.data.WLNReactionDataset
+.. autoclass:: dgllife.data.WLNCenterDataset
     :members: __getitem__, __len__
+
+.. autoclass:: dgllife.data.WLNRankDataset
+    :members: ignore_large, __getitem__, __len__
 
 Protein-Ligand Binding Affinity Prediction
 ------------------------------------------

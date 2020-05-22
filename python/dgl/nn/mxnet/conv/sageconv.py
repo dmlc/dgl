@@ -113,7 +113,7 @@ class SAGEConv(nn.Block):
             elif self._aggre_type == 'gcn':
                 check_eq_shape(feat)
                 graph.srcdata['h'] = feat_src
-                graph.dstdata['h'] = feat_dst   # saame as above if homogeneous
+                graph.dstdata['h'] = feat_dst   # same as above if homogeneous
                 graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
                 # divide in degrees
                 degs = graph.in_degrees().astype(feat_dst.dtype)

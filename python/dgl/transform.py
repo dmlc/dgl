@@ -884,21 +884,21 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> g = dgl.bipartite([(0, 1), (1, 2), (2, 3)], utype='A', vtype='B')
 
     If you don't specify any node of type A on the right hand side, the node type ``A``
-    in the block would have zero nodes.
+    in the block would have zero nodes on the DST side.
     >>> block = dgl.to_block(g, {'B': torch.LongTensor([3, 2])})
-    >>> block.number_of_nodes('A')
+    >>> block.number_of_dst_nodes('A')
     0
-    >>> block.number_of_nodes('B')
+    >>> block.number_of_dst_nodes('B')
     2
-    >>> block.nodes['B'].data[dgl.NID]
+    >>> block.dstnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
     The left hand side would contain all the nodes on the right hand side:
-    >>> block.nodes['B'].data[dgl.NID]
+    >>> block.srcnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
     As well as all the nodes that have connections to the nodes on the right hand side:
-    >>> block.nodes['A'].data[dgl.NID]
+    >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
     """
     if dst_nodes is None:
@@ -952,6 +952,10 @@ def remove_edges(g, edge_ids):
     """Return a new graph with given edge IDs removed.
 
     The nodes are preserved.
+
+    Note: `remove_edges` is slow especially when removing a small number of edges from
+    a large graph. It creates a new graph with all remaining edges and return the new graph.
+    Please use it with caution especially when using it in mini-batch training.
 
     Parameters
     ----------
