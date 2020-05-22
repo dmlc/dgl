@@ -1,11 +1,11 @@
 """Functions used by client."""
 
-from . import rpc
-from .constants import MAX_QUEUE_SIZE
-
 import os
 import time
 import socket
+
+from . import rpc
+from .constants import MAX_QUEUE_SIZE
 
 if os.name != 'nt':
     import fcntl
@@ -52,10 +52,10 @@ def get_local_machine_id(server_namebook):
     """
     res = 0
     ip_list = local_ip4_addr_list()
-    for ID, data in server_namebook.items():
+    for _, data in server_namebook.items():
         machine_id = data[0]
-        ip = data[1]
-        if ip in ip_list:
+        ip_addr = data[1]
+        if ip_addr in ip_list:
             res = machine_id
             break
     return res
@@ -68,20 +68,20 @@ def get_local_usable_addr():
     str
         IP address, e.g., '192.168.8.12:50051'
     """
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable
-        s.connect(('10.255.255.255', 1))
-        ip_addr = s.getsockname()[0]
+        sock.connect(('10.255.255.255', 1))
+        ip_addr = sock.getsockname()[0]
     except:
         ip_addr = '127.0.0.1'
     finally:
-        s.close()
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("", 0))
-    s.listen(1)
-    port = s.getsockname()[1]
-    s.close()
+        sock.close()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("", 0))
+    sock.listen(1)
+    port = sock.getsockname()[1]
+    sock.close()
 
     return ip_addr + ':' + str(port)
 
@@ -115,7 +115,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
-    # group_count means how many servers 
+    # group_count means how many servers
     # (main_server + bakcup_server) in total inside a machine.
     group_count = []
     max_machine_id = 0
