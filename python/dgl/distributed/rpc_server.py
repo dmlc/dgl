@@ -1,12 +1,10 @@
 """Functions used by server."""
 
-import time
-
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .server_state import get_server_state
 
-def start_server(server_id, ip_config, num_clients, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def start_server(server_id, ip_config, num_clients, \
+    max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
     This is a blocking function -- it returns only when the server shutdown.
@@ -43,10 +41,9 @@ def start_server(server_id, ip_config, num_clients, max_queue_size=MAX_QUEUE_SIZ
     rpc.set_rank(server_id)
     server_namebook = rpc.read_ip_config(ip_config)
     machine_id = server_namebook[server_id][0]
+    rpc.set_machine_id(machine_id)
     ip_addr = server_namebook[server_id][1]
     port = server_namebook[server_id][2]
-    # group_count means the total number of server on each machine
-    group_count = server_namebook[server_id][3]
     rpc.create_sender(max_queue_size, net_type)
     rpc.create_receiver(max_queue_size, net_type)
     # wait all the senders connect to server.
@@ -58,7 +55,7 @@ def start_server(server_id, ip_config, num_clients, max_queue_size=MAX_QUEUE_SIZ
     # Recv all the client's IP and assign ID to clients
     addr_list = []
     client_namebook = {}
-    for i in range(num_clients):
+    for _ in range(num_clients):
         req, _ = rpc.recv_request()
         addr_list.append(req.ip_addr)
     addr_list.sort()
