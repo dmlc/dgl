@@ -275,7 +275,19 @@ class DGLHeteroGraph(object):
         return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
 
     def __setstate__(self, state):
-        self._init(*state)
+        # Compatibility check
+        # TODO: version the storage
+        if isinstance(state, tuple) and len(state) == 5:
+            # DGL 0.4.3+
+            self._init(*state)
+        elif isinstance(state, dict):
+            # DGL 0.4.2-
+            dgl_warning("The object is pickled with DGL version 0.4.2-.  "
+                        "Some of the original attributes are ignored.")
+            self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
+                       state['_edge_frames'])
+        else:
+            raise IOError("Unrecognized pickle format.")
 
     def _get_msg_index(self, etid):
         """Internal function for getting the message index array of the given edge type id."""
@@ -1099,6 +1111,11 @@ class DGLHeteroGraph(object):
         -------
         backend dtype object
             th.int32/th.int64 or tf.int32/tf.int64 etc.
+
+        See Also
+        --------
+        long
+        int
         """
         return getattr(F, self._graph.dtype)
 
@@ -4150,6 +4167,208 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
+    def format_in_use(self, etype=None):
+        """Return the sparse formats in use of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        Returns
+        -------
+        list of str
+            Return all the formats currently in use (could be multiple).
+
+        Examples
+        --------
+        For graph with only one edge type.
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
+        >>> g.format_in_use()
+        ['csr']
+
+        For a graph with multiple types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
+        ...     ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+        ...     }, restrict_format='any')
+        >>> g.format_in_use('develops')
+        ['coo']
+        >>> spmat = g['develops'].adjacency_matrix(
+        ...     transpose=True, scipy_fmt='csr')    // Create CSR representation.
+        >>> g.format_in_use('develops')
+        ['coo', 'csr']
+
+        which is equivalent to:
+
+        >>> g['develops'].restrict_format()
+        ['coo', 'csr']
+
+        See Also
+        --------
+        restrict_format
+        request_format
+        to_format
+        """
+        return self._graph.format_in_use(self.get_etype_id(etype))
+
+    def restrict_format(self, etype=None):
+        """Return the allowed sparse formats of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        Returns
+        -------
+        str : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
+            ``'any'`` indicates all sparse formats are allowed in .
+
+        Examples
+        --------
+        For graph with only one edge type.
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
+        >>> g.restrict_format()
+        'csr'
+
+        For a graph with multiple types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
+        ...     ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+        ...     }, restrict_format='any')
+        >>> g.restrict_format('develops')
+        'any'
+
+        which is equivalent to:
+
+        >>> g['develops'].restrict_format()
+        'any'
+
+        See Also
+        --------
+        format_in_use
+        request_format
+        to_format
+        """
+        return self._graph.restrict_format(self.get_etype_id(etype))
+
+    def request_format(self, sparse_format, etype=None):
+        """Create a sparse matrix representation in given format immediately.
+
+        When the restrict format of the given edge type is ``any``, all formats of
+        sparse matrix representation are created in demand. In some cases user may
+        want a sparse matrix representation to be created immediately (e.g. in a
+        multi-process data loader), this API is designed for such purpose.
+
+        Parameters
+        ----------
+        sparse_format : str
+            ``'coo'``, ``'csr'``, or ``'csc'``
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+        Examples
+        --------
+        For graph with only one edge type.
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='any')
+        >>> g.format_in_use()
+        ['coo']
+        >>> g.request_format('csr')
+        >>> g.format_in_use()
+        ['coo', 'csr']
+
+        For a graph with multiple types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
+        ...     ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+        ...     }, restrict_format='any')
+        >>> g.format_in_use('develops')
+        ['coo']
+        >>> g.request_format('csc', etype='develops')
+        >>> g.format_in_use('develops')
+        ['coo', 'csc']
+
+        Another way to request format for a given etype is:
+        >>> g['plays'].request_format('csr')
+        >>> g['plays'].format_in_use()
+        ['coo', 'csr']
+
+        See Also
+        --------
+        format_in_use
+        restrict_format
+        to_format
+        """
+        if self.restrict_format(etype) != 'any':
+            raise KeyError("request_format is only available for "
+                           "graph whose restrict_format is 'any'")
+        if not sparse_format in ['coo', 'csr', 'csc']:
+            raise KeyError("can only request coo/csr/csr.")
+        return self._graph.request_format(sparse_format, self.get_etype_id(etype))
+
+
+    def to_format(self, restrict_format):
+        """Return a cloned graph but stored in the given restrict format.
+
+        If ``'any'`` is given, the restrict formats of the returned graph is relaxed.
+        The returned graph share the same node/edge data of the original graph.
+
+        Parameters
+        ----------
+        restrict_format : str
+            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
+
+        Returns
+        -------
+        A new graph.
+
+        Examples
+        --------
+        For a graph with single edge type:
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
+        >>> g.ndata['h'] = th.ones(3, 3)
+        >>> g.restrict_format()
+        'csr'
+        >>> g1 = g.to_format('coo')
+        >>> g1.ndata
+        {'h': tensor([[1., 1., 1.],
+                [1., 1., 1.],
+                [1., 1., 1.]])}
+        >>> g1.restrict_format()
+        'coo'
+
+        For a graph with multiple edge types:
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
+        ...     ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+        ...     }, restrict_format='coo')
+        >>> g.restrict_format('develops')
+        'coo'
+        >>> g1 = g.to_format('any')
+        >>> g1.restrict_format('plays')
+        'any'
+
+        See Also
+        --------
+        format_in_use
+        restrict_format
+        request_format
+        """
+        return DGLHeteroGraph(self._graph.to_format(restrict_format), self.ntypes, self.etypes,
+                              self._node_frames,
+                              self._edge_frames)
+
     def long(self):
         """Return a heterograph object use int64 as index dtype,
         with the ndata and edata as the original object
@@ -4169,6 +4388,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         int
+        idtype
         """
         return DGLHeteroGraph(self._graph.asbits(64), self.ntypes, self.etypes,
                               self._node_frames,
@@ -4193,6 +4413,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         long
+        idtype
         """
         return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
                               self._node_frames,

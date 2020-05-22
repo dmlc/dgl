@@ -11,7 +11,7 @@ import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
-from dgl.distributed import partition_graph
+from dgl.distributed import partition_graph, load_partition, GraphPartitionBook, node_split, edge_split
 import backend as F
 import unittest
 import pickle
@@ -76,10 +76,20 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     assert g.node_attr_schemes()['test1'].dtype == F.int32
     assert g.node_attr_schemes()['features'].shape == (1,)
 
+    selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
+    # Test node split
+    nodes = node_split(selected_nodes, g.get_partition_book(), g.rank())
+    nodes = F.asnumpy(nodes)
+    # We only have one partition, so the local nodes are basically all nodes in the graph.
+    local_nids = np.arange(g.number_of_nodes())
+    for n in nodes:
+        assert n in local_nids
+
     g.shut_down()
     print('end')
 
-def run_server_client():
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
+def test_server_client():
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -110,5 +120,42 @@ def run_server_client():
         p.join()
     print('clients have terminated')
 
+def test_split():
+    g = create_random_graph(10000)
+    num_parts = 4
+    num_hops = 2
+    partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+
+    node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
+    edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
+    selected_nodes = np.nonzero(node_mask)[0]
+    selected_edges = np.nonzero(edge_mask)[0]
+    for i in range(num_parts):
+        part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
+        num_nodes, num_edges, node_map, edge_map, num_partitions = meta
+        gpb = GraphPartitionBook(part_id=i,
+                                 num_parts=num_partitions,
+                                 node_map=node_map,
+                                 edge_map=edge_map,
+                                 part_graph=part_g)
+        local_nids = F.nonzero_1d(part_g.ndata['local_node'])
+        local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
+        nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
+        nodes2 = node_split(node_mask, gpb, i)
+        assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes2)))
+        local_nids = F.asnumpy(local_nids)
+        for n in nodes1:
+            assert n in local_nids
+
+        local_eids = F.nonzero_1d(part_g.edata['local_edge'])
+        local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
+        edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
+        edges2 = edge_split(edge_mask, gpb, i)
+        assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges2)))
+        local_eids = F.asnumpy(local_eids)
+        for e in edges1:
+            assert e in local_eids
+
 if __name__ == '__main__':
-    run_server_client()
+    test_split()
+    test_server_client()
