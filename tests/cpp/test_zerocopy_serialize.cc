@@ -48,9 +48,9 @@ TEST(ZeroCopySerialize, NDArray) {
   static_cast<dmlc::Stream *>(&ifs)->Write(tensor2);
 
   std::string zerocopy_blob;
-  StringStreamWithBuffer zc_write_strm(&zerocopy_blob);
-  static_cast<dmlc::Stream *>(&zc_write_strm)->Write(tensor1);
-  static_cast<dmlc::Stream *>(&zc_write_strm)->Write(tensor2);
+  StreamWithBuffer zc_write_strm(&zerocopy_blob, true);
+  zc_write_strm.Write(tensor1);
+  zc_write_strm.Write(tensor2);
 
   EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 126)
     << "Invalid save";
@@ -64,9 +64,9 @@ TEST(ZeroCopySerialize, NDArray) {
   }
 
   NDArray loadtensor1, loadtensor2;
-  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, new_ptr_list);
-  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor1);
-  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor2);
+  StreamWithBuffer zc_read_strm(&zerocopy_blob, new_ptr_list);
+  zc_read_strm.Read(&loadtensor1);
+  zc_read_strm.Read(&loadtensor2);
 }
 
 TEST(ZeroCopySerialize, SharedMem) {
@@ -83,15 +83,16 @@ TEST(ZeroCopySerialize, SharedMem) {
   static_cast<dmlc::Stream *>(&ifs)->Write(shared_tensor);
 
   std::string zerocopy_blob;
-  StringStreamWithBuffer zc_write_strm(&zerocopy_blob, false);
-  static_cast<dmlc::Stream *>(&zc_write_strm)->Write(shared_tensor);
+  StreamWithBuffer zc_write_strm(&zerocopy_blob, false);
+  zc_write_strm.Write(shared_tensor);
 
   EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 51)
     << "Invalid save";
+  NDArray loadtensor1;
 
-  NDArray loadtensor1, loadtensor2;
-  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, false);
-  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&loadtensor1);
+  StreamWithBuffer zc_read_strm = StreamWithBuffer(&zerocopy_blob, false);
+  LOG(INFO) << "111111";
+  zc_read_strm.Read(&loadtensor1);
 }
 
 TEST(ZeroCopySerialize, HeteroGraph) {
@@ -114,8 +115,8 @@ TEST(ZeroCopySerialize, HeteroGraph) {
   static_cast<dmlc::Stream *>(&ifs)->Write(hrptr);
 
   std::string zerocopy_blob;
-  StringStreamWithBuffer zc_write_strm(&zerocopy_blob, true);
-  static_cast<dmlc::Stream *>(&zc_write_strm)->Write(hrptr);
+  StreamWithBuffer zc_write_strm(&zerocopy_blob, true);
+  zc_write_strm.Write(hrptr);
 
   EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 745)
     << "Invalid save";
@@ -129,8 +130,8 @@ TEST(ZeroCopySerialize, HeteroGraph) {
   }
 
   auto gptr = dgl::Serializer::make_shared<HeteroGraph>();
-  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, new_ptr_list);
-  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(&gptr);
+  StreamWithBuffer zc_read_strm(&zerocopy_blob, new_ptr_list);
+  zc_read_strm.Read(&gptr);
 
   EXPECT_EQ(gptr->NumVertices(0), 9);
   EXPECT_EQ(gptr->NumVertices(1), 8);

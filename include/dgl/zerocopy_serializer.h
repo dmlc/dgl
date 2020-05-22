@@ -22,14 +22,27 @@
 
 namespace dgl {
 
-// StringStreamWithBuffer is backed up by a string. This class supports
-// serializing and deserializing NDArrays stored in shared memory. If the stream
-// is created for sending/recving data through network, the data pointer of the
-// NDArray will be transmitted directly without and copy. Otherwise, the stream
-// is for sending/recving data to another process on the same machine, so if an
-// NDArray is stored in shared memory, it will just record the shared memory
-// name instead of the actual data buffer.
-class StringStreamWithBuffer : public dmlc::MemoryStringStream {
+/* StreamWithBuffer is backed up by dmlc::MemoryFixedSizeStream or
+dmlc::MemoryStringStream. This class supports serializing and deserializing
+NDArrays stored in shared memory. If the stream is created for
+sending/recving data through network, the data pointer of the NDArray will be
+transmitted directly without and copy. Otherwise, the stream is for
+sending/recving data to another process on the same machine, so if an NDArray
+is stored in shared memory, it will just record the shared memory name
+instead of the actual data buffer.
+For example:
+std::string blob;
+// Send to local
+StreamWithBuffer strm(&blob, false);
+// Send to remote
+StreamWithBuffer strm(&blob, true);
+// Receive from local
+StreamWithBuffer strm(&blob, false);
+// Receive from remote
+std::vector<void*> ptr_list
+StreamWithBuffer strm(&blob, ptr_list);
+*/
+class StreamWithBuffer : public dmlc::SeekStream {
  public:
   // Buffer type. Storing NDArray to maintain the reference counting to ensure
   // the liveness of data pointer
@@ -47,45 +60,94 @@ class StringStreamWithBuffer : public dmlc::MemoryStringStream {
   /*!
    * \brief This constructor is for writing scenario or reading from local
    * machine
-   * \param metadata_ptr The string to write/load from zerocopy write/load
+   * \param strm The backup stream to write/load from
    * \param send_to_remote Whether this stream will be deserialized at remote
    * machine or the local machine. If true, will record the data pointer into
    * buffer list.
-   *
-   * For example:
-   * std::string blob;
-   * // Write to send to local
-   * StringStreamWithBuffer buf_strm(&blob, false)
-   * // Write to send to remote
-   * StringStreamWithBuffer buf_strm(&blob, true)
-   * // Or
-   * StringStreamWithBuffer buf_strm(&blob)
-   * // Read from local
-   * StringStreamWithBuffer buf_strm(&blob, false)
    */
-  explicit StringStreamWithBuffer(std::string* metadata_ptr,
-                                  bool send_to_remote = true)
-      : MemoryStringStream(metadata_ptr),
+  StreamWithBuffer(std::unique_ptr<dmlc::SeekStream> strm, bool send_to_remote)
+      : strm_(std::move(strm)),
         buffer_list_(),
         send_to_remote_(send_to_remote) {}
   /*!
    * \brief This constructor is for reading from remote
-   * \param metadata_ptr The string to write/load from zerocopy write/load
+   * \param strm The stream to write/load from zerocopy write/load
    * \param data_ptr_list list of pointer to reconstruct NDArray
    *
    * For example:
    * std::string blob;
    * std::vector<void*> data_ptr_list;
    * // Read from remote sended pointer list
-   * StringStreamWithBuffer buf_strm(&blob, data_ptr_list)
+   * StreamWithBuffer buf_strm(&blob, data_ptr_list)
    */
-  StringStreamWithBuffer(std::string* metadata_ptr,
-                         const std::vector<void*>& data_ptr_list)
-      : MemoryStringStream(metadata_ptr), send_to_remote_(true) {
+  StreamWithBuffer(std::unique_ptr<dmlc::SeekStream> strm,
+                   const std::vector<void*>& data_ptr_list)
+      : strm_(std::move(strm)), send_to_remote_(true) {
     for (void* data : data_ptr_list) {
       buffer_list_.emplace_back(data);
     }
   }
+
+  /*!
+   * \brief Construct stream backed up by string
+   * \param blob The string to write/load from zerocopy write/load
+   * \param send_to_remote Whether this stream will be deserialized at remote
+   * machine or the local machine. If true, will record the data pointer into
+   * buffer list.
+   */
+  StreamWithBuffer(std::string* blob, bool send_to_remote)
+      : strm_(new dmlc::MemoryStringStream(blob)),
+        send_to_remote_(send_to_remote) {}
+
+  /*!
+   * \brief Construct stream backed up by string
+   * \param p_buffer buffer pointer
+   * \param size buffer size
+   * \param send_to_remote Whether this stream will be deserialized at remote
+   * machine or the local machine. If true, will record the data pointer into
+   * buffer list.
+   */
+  StreamWithBuffer(char* p_buffer, size_t size, bool send_to_remote)
+      : strm_(new dmlc::MemoryFixedSizeStream(p_buffer, size)),
+        send_to_remote_(send_to_remote) {}
+
+  /*!
+   * \brief Construct stream backed up by string, and reconstruct NDArray
+   * from data_ptr_list
+   * \param blob The string to write/load from zerocopy write/load
+   * \param data_ptr_list pointer list for NDArrays to deconstruct from
+   */
+  StreamWithBuffer(std::string* blob, const std::vector<void*>& data_ptr_list)
+      : strm_(new dmlc::MemoryStringStream(blob)), send_to_remote_(true) {
+    for (void* data : data_ptr_list) {
+      buffer_list_.emplace_back(data);
+    }
+  }
+
+  /*!
+   * \brief Construct stream backed up by string, and reconstruct NDArray
+   * from data_ptr_list
+   * \param p_buffer buffer pointer
+   * \param size buffer size
+   * \param data_ptr_list pointer list for NDArrays to deconstruct from
+   */
+  StreamWithBuffer(char* p_buffer, size_t size,
+                   const std::vector<void*>& data_ptr_list)
+      : strm_(new dmlc::MemoryFixedSizeStream(p_buffer, size)),
+        send_to_remote_(true) {
+    for (void* data : data_ptr_list) {
+      buffer_list_.emplace_back(data);
+    }
+  }
+
+  // delegate methods to strm_
+  virtual size_t Read(void* ptr, size_t size) { return strm_->Read(ptr, size); }
+  virtual void Write(const void* ptr, size_t size) { strm_->Write(ptr, size); }
+  virtual void Seek(size_t pos) { strm_->Seek(pos); }
+  virtual size_t Tell(void) { return strm_->Tell(); }
+
+  using dmlc::Stream::Read;
+  using dmlc::Stream::Write;
 
   /*!
    * \brief push NDArray into stream
@@ -113,6 +175,7 @@ class StringStreamWithBuffer : public dmlc::MemoryStringStream {
   const std::deque<Buffer>& buffer_list() const { return buffer_list_; }
 
  private:
+  std::unique_ptr<dmlc::SeekStream> strm_;
   std::deque<Buffer> buffer_list_;
   bool send_to_remote_;
 };  // namespace dgl
