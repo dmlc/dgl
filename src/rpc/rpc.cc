@@ -20,21 +20,15 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
   StringStreamWithBuffer zc_write_strm(zerocopy_blob.get());
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
+  zerocopy_blob->append(
+    reinterpret_cast<char*>(&msg.tensors.size()), 
+    sizeof(int32_t));
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
   rpc_meta_msg.size = zerocopy_blob->size();
   rpc_meta_msg.deallocator = [zerocopy_blob](network::Message*) {};
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
     rpc_meta_msg, msg.server_id), ADD_SUCCESS);
-  // send ndarray count
-  char* ndarray_count = new char[sizeof(int32_t)];
-  *(reinterpret_cast<int32_t*>(ndarray_count)) = msg.tensors.size();
-  network::Message ndarray_count_msg;
-  ndarray_count_msg.data = ndarray_count;
-  ndarray_count_msg.size = sizeof(int32_t);
-  ndarray_count_msg.deallocator = network::DefaultMessageDeleter;
-  CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
-    ndarray_count_msg, msg.server_id), ADD_SUCCESS);
   // send real ndarray data
   for (auto ptr : zc_write_strm.buffer_list()) {
     network::Message ndarray_data_msg;
@@ -56,14 +50,12 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
   // Copy the data for now, can be optimized later
-  std::string zerocopy_blob(rpc_meta_msg.data, rpc_meta_msg.size);
+  std::string zerocopy_blob(
+    rpc_meta_msg.data, 
+    rpc_meta_msg.size-sizeof(int32_t));
   rpc_meta_msg.deallocator(&rpc_meta_msg);
-  // Recv count
-  network::Message ndarray_count_msg;
-  CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
-    &ndarray_count_msg, send_id), REMOVE_SUCCESS);
-  int32_t ndarray_count = *(reinterpret_cast<int32_t*>(ndarray_count_msg.data));
-  ndarray_count_msg.deallocator(&ndarray_count_msg);
+  char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
+  int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
   // Recv real ndarray data
   std::vector<void* > buffer_list(ndarray_count);
   for (int i = 0; i < ndarray_count; ++i) {
