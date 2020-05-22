@@ -46,6 +46,7 @@ Results
 | Cora     | 84.02(0.40)   | 0.0113  | 0.0982 (**8.7x**)   | 0.0424 (**3.8x**)   |
 | Citeseer | 70.91(0.79)   | 0.0111  | n/a                 | n/a                 |
 | Pubmed   | 78.57(0.75)   | 0.0115  | n/a                 | n/a                 |
+| PPI      | 0.9836        | n/a     | n/a                 | n/a                 | 
 
 * All the accuracy numbers are obtained after 300 epochs.
 * The time measures how long it takes to train one epoch.

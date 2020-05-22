@@ -6,7 +6,9 @@ from torch.utils.data import IterableDataset, DataLoader
 def compact_and_copy(frontier, seeds):
     block = dgl.to_block(frontier, seeds)
     for col, data in frontier.edata.items():
-        block.edata[col] = data
+        if col == dgl.EID:
+            continue
+        block.edata[col] = data[block.edata[dgl.EID]]
     return block
 
 class ItemToItemBatchSampler(IterableDataset):
