@@ -13,6 +13,7 @@ from .. import backend as F
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
+'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
@@ -170,6 +171,46 @@ def get_rank():
         Rank value
     """
     return _CAPI_DGLRPCGetRank()
+
+def set_machine_id(machine_id):
+    """Set current machine ID
+
+    Parameters
+    ----------
+    machine_id : int
+        Current machine ID
+    """
+    _CAPI_DGLRPCSetMachineID(int(machine_id))
+
+def get_machine_id():
+    """Get current machine ID
+
+    Returns
+    -------
+    int
+        machine ID
+    """
+    return _CAPI_DGLRPCGetMachineID()
+
+def set_num_machines(num_machines):
+    """Set number of machine
+
+    Parameters
+    ----------
+    num_machines : int
+        Number of machine
+    """
+    _CAPI_DGLRPCSetNumMachines(int(num_machines))
+
+def get_num_machines():
+    """Get number of machines
+
+    Returns
+    -------
+    int
+        number of machines
+    """
+    return _CAPI_DGLRPCGetNumMachines()
 
 def set_num_server(num_server):
     """Set the total number of server.

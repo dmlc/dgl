@@ -37,6 +37,16 @@ struct RPCContext {
   int32_t rank = -1;
 
   /*!
+   * \brief Cuurent machine ID
+   */
+  int32_t machine_id = -1;
+
+  /*!
+   * \brief Total number of machines.
+   */
+  int32_t num_machines = 0;
+
+  /*!
    * \brief Message sequence number.
    */
   int64_t msg_seq = 0;

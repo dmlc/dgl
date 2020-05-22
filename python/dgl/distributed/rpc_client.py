@@ -1,7 +1,6 @@
 """Functions used by client."""
 
 import os
-import time
 import socket
 
 from . import rpc
@@ -73,7 +72,7 @@ def get_local_usable_addr():
         # doesn't even have to be reachable
         sock.connect(('10.255.255.255', 1))
         ip_addr = sock.getsockname()[0]
-    except:
+    except ValueError:
         ip_addr = '127.0.0.1'
     finally:
         sock.close()
@@ -124,7 +123,9 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
         if server_info[0] > max_machine_id:
             max_machine_id = server_info[0]
     num_machines = max_machine_id+1
+    rpc.set_num_machines(num_machines)
     machine_id = get_local_machine_id(server_namebook)
+    rpc.set_machine_id(machine_id)
     rpc.create_sender(max_queue_size, net_type)
     rpc.create_receiver(max_queue_size, net_type)
     # Get connected with all server nodes
@@ -147,7 +148,8 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     # recv client ID from server
     res = rpc.recv_response()
     rpc.set_rank(res.client_id)
-    print("Client (%d) connect to server successfuly!" % rpc.get_rank())
+    print("Machine (%d) client (%d) connect to server successfuly!" \
+        % (machine_id, rpc.get_rank()))
 
 def finalize_client():
     """Release resources of this client."""

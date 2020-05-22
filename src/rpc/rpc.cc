@@ -190,6 +190,28 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
   RPCContext::ThreadLocal()->msg_seq = msg_seq;
 });
 
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMachineID")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::ThreadLocal()->machine_id;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMachineID")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  const int32_t machine_id = args[0];
+  RPCContext::ThreadLocal()->machine_id = machine_id;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumMachines")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::ThreadLocal()->num_machines;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumMachines")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  const int32_t num_machines = args[0];
+  RPCContext::ThreadLocal()->num_machines = num_machines;
+});
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSendRPCMessage")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   RPCMessageRef msg = args[0];
