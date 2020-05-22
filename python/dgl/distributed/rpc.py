@@ -5,7 +5,7 @@ import pickle
 
 from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
-from ..base import DGLError, dgl_warning
+from ..base import DGLError
 from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
@@ -71,7 +71,7 @@ def read_ip_config(filename):
                 [int(machine_id), ip_addr, int(port)+s_count, int(server_count)]
                 server_id += 1
             machine_id += 1
-    except:
+    except ValueError:
         print("Error: data format on each line should be: [ip] [base_port] [server_count]")
     return server_namebook
 
@@ -293,7 +293,6 @@ class Request:
         individual return values (i.e., do not put them in containers like
         dictionary or list).
         """
-        pass
 
     @abc.abstractmethod
     def __setstate__(self, state):
@@ -301,7 +300,6 @@ class Request:
 
         Must be inherited by subclasses.
         """
-        pass
 
     @abc.abstractmethod
     def process_request(self, server_state):
@@ -319,7 +317,6 @@ class Request:
         Response
             Response of this request or None if no response.
         """
-        pass
 
     @property
     def service_id(self):
@@ -341,7 +338,6 @@ class Response:
         individual return values (i.e., do not put them in containers like
         dictionary or list).
         """
-        pass
 
     @abc.abstractmethod
     def __setstate__(self, state):
@@ -349,7 +345,6 @@ class Response:
 
         Must be inherited by subclasses.
         """
-        pass
 
     @property
     def service_id(self):
@@ -793,20 +788,20 @@ class ShutDownRequest(Request):
 
     Parameters
     ----------
-    ID : int
+    client_id : int
         client's ID
     """
-    def __init__(self, ID):
-        self.ID = ID
+    def __init__(self, client_id):
+        self.client_id = client_id
 
     def __getstate__(self):
-        return self.ID
+        return self.client_id
 
     def __setstate__(self, state):
-        self.ID = state
+        self.client_id = state
 
     def process_request(self, server_state):
-        assert self.ID == 0
+        assert self.client_id == 0
         finalize_server()
         exit()
 
