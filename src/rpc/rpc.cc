@@ -22,7 +22,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
   int32_t ndarray_count = msg.tensors.size();
   zerocopy_blob->append(
-    reinterpret_cast<char*>(&ndarray_count), 
+    reinterpret_cast<char*>(&ndarray_count),
     sizeof(int32_t));
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
@@ -52,7 +52,7 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
   // Copy the data for now, can be optimized later
   std::string zerocopy_blob(
-    rpc_meta_msg.data, 
+    rpc_meta_msg.data,
     rpc_meta_msg.size-sizeof(int32_t));
   char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
   int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
