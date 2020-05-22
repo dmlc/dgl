@@ -82,15 +82,13 @@ class NeighborSampler(object):
             block = dgl.to_block(frontier, seeds)
 
             # Pre-generate CSR format that it can be used in training directly
-            block.to_format('csr')
+            block.in_degree(0)
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
             blocks.insert(0, block)
 
         # Pre-generate CSR format that it can be used in training directly
-        pos_graph.to_format('csr')
-        neg_graph.to_format('csr')
         return pos_graph, neg_graph, blocks
 
 def load_subtensor(g, input_nodes, device):
@@ -330,7 +328,6 @@ def run(proc_id, n_gpus, args, devices, data):
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
-
         if n_gpus > 1:
             th.distributed.barrier()
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
