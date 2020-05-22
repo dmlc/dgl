@@ -21,7 +21,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   StringStreamWithBuffer zc_write_strm(zerocopy_blob.get());
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
   network::Message rpc_meta_msg;
-  rpc_meta_msg.data = zerocopy_blob->data();
+  rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
   rpc_meta_msg.size = zerocopy_blob->size();
   rpc_meta_msg.deallocator = [zerocopy_blob](network::Message*) {};
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
