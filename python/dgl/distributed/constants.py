@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 """Define all the constants used by DGL rpc"""
 
 # Maximum size of message queue in bytes
