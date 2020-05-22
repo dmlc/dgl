@@ -20,8 +20,9 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
   StringStreamWithBuffer zc_write_strm(zerocopy_blob.get());
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
+  int32_t ndarray_count = msg.tensors.size();
   zerocopy_blob->append(
-    reinterpret_cast<char*>(&msg.tensors.size()), 
+    reinterpret_cast<char*>(&ndarray_count), 
     sizeof(int32_t));
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
