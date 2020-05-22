@@ -131,7 +131,8 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataEdgeTensors")
 StorageMetaData LoadDGLGraphFiles(const std::string &filename,
                                   std::vector<dgl_id_t> idx_list,
                                   bool onlyMeta) {
-  SeekStream *fs = SeekStream::CreateForRead(filename.c_str(), true);
+  auto fs = std::unique_ptr<SeekStream>(dynamic_cast<SeekStream *>(
+    SeekStream::CreateForRead(filename.c_str(), true)));
   CHECK(fs) << "Filename is invalid";
   // Read DGL MetaData
   uint64_t magicNum, graphType, version;
@@ -150,7 +151,6 @@ StorageMetaData LoadDGLGraphFiles(const std::string &filename,
     LOG(FATAL) << "Invalid DGL graph file";
   }
 
-  delete fs;
   return ret;
 }
 

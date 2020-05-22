@@ -66,8 +66,8 @@ namespace serialize {
 
 bool SaveDGLGraphs(std::string filename, List<GraphData> graph_data,
                    std::vector<NamedTensor> labels_list) {
-  auto *fs =
-    dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w", true));
+  auto fs = std::unique_ptr<SeekStream>(dynamic_cast<SeekStream *>(
+    SeekStream::Create(filename.c_str(), "w", true)));
   CHECK(fs) << "File name is not a valid local file name";
 
   // Write DGL MetaData
@@ -106,11 +106,10 @@ bool SaveDGLGraphs(std::string filename, List<GraphData> graph_data,
   fs->Seek(indices_start_ptr);
   fs->Write(graph_indices);
 
-  delete fs;
   return true;
 }
 
-StorageMetaData LoadDGLGraphs(dmlc::SeekStream *fs,
+StorageMetaData LoadDGLGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
                               std::vector<dgl_id_t> idx_list, bool onlyMeta) {
   StorageMetaData metadata = StorageMetaData::Create();
   // Read Graph MetaData

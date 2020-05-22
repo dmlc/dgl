@@ -21,7 +21,7 @@
  * Storage of GraphData is
  * {
  *   // Everything uses in csr
- *   HeteroGraphPtr ptr; 
+ *   HeteroGraphPtr ptr;
  *   vector<vector<pair<string, NDArray>>> node_tensors;
  *   vector<vector<pair<string, NDArray>>> edge_tensors;
  *   vector<string> ntype_name;
@@ -52,8 +52,8 @@ using namespace dgl::runtime;
 using dmlc::SeekStream;
 
 bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
-  auto *fs =
-    dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w", true));
+  auto fs = std::unique_ptr<SeekStream>(dynamic_cast<SeekStream *>(
+    SeekStream::Create(filename.c_str(), "w", true)));
   CHECK(fs) << "File name is not a valid local file name";
 
   // Write DGL MetaData
@@ -82,11 +82,10 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
   fs->Seek(indices_start_ptr);
   fs->Write(graph_indices);
 
-  delete fs;
   return true;
 }
 
-StorageMetaData LoadHeteroGraphs(dmlc::SeekStream *fs,
+StorageMetaData LoadHeteroGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
                                  std::vector<dgl_id_t> idx_list) {
   uint64_t num_graph;
   CHECK(fs->Read(&num_graph)) << "Invalid num of graph";
