@@ -26,7 +26,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   int64_t rpc_meta_size = zerocopy_blob.size();
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = rpc_meta_buffer;
-  rpc_meta_msg.size = rpc_meta_size;
+  rpc_meta_msg.size = zerocopy_blob.size();
   rpc_meta_msg.deallocator = network::DefaultMessageDeleter;
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
     rpc_meta_msg, msg.server_id), ADD_SUCCESS);
@@ -54,6 +54,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   // ignore timeout now
+  CHECK_EQ(timeout, 0) << "rpc cannot support timeout now.";
   network::Message rpc_meta_msg;
   int send_id;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
