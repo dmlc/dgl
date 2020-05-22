@@ -50,13 +50,8 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   int send_id;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
-  // Copy the data for now, can be optimized later
-  std::string zerocopy_blob(
-    rpc_meta_msg.data,
-    rpc_meta_msg.size-sizeof(int32_t));
   char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
   int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
-  rpc_meta_msg.deallocator(&rpc_meta_msg);
   // Recv real ndarray data
   std::vector<void* > buffer_list(ndarray_count);
   for (int i = 0; i < ndarray_count; ++i) {
@@ -65,8 +60,10 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
         &ndarray_data_msg, send_id), REMOVE_SUCCESS);
     buffer_list[i] = ndarray_data_msg.data;
   }
-  StreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
-  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(msg);
+  StreamWithBuffer zc_read_strm(rpc_meta_msg.data, rpc_meta_msg.size-sizeof(int32_t), buffer_list);
+  zc_read_strm.Read(msg);
+  
+  rpc_meta_msg.deallocator(&rpc_meta_msg);
   return kRPCSuccess;
 }
 
