@@ -54,9 +54,9 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   std::string zerocopy_blob(
     rpc_meta_msg.data, 
     rpc_meta_msg.size-sizeof(int32_t));
-  rpc_meta_msg.deallocator(&rpc_meta_msg);
   char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
   int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
+  rpc_meta_msg.deallocator(&rpc_meta_msg);
   // Recv real ndarray data
   std::vector<void* > buffer_list(ndarray_count);
   for (int i = 0; i < ndarray_count; ++i) {
