@@ -199,7 +199,9 @@ struct BackwardFunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
+typedef minigun::advance::Config<minigun::advance::kSrc> AdvanceSrcConfig;
+typedef minigun::advance::Config<minigun::advance::kEdge> AdvanceEdgeConfig;
+typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
 
 }  // namespace cpu
 
@@ -239,7 +241,7 @@ void CallBackwardBinaryReduce(
   }
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig, BackwardGData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+        rtcfg, csr, gdata);
 }
 
 // Following macro is used to generate explicit-specialization of the template
@@ -290,7 +292,7 @@ void CallBackwardBinaryReduceBcast(
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig,
     BackwardBcastGData<NDim, Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+        rtcfg, csr, gdata);
 }
 
 // Following macro is used to generate explicit-specialization of the template

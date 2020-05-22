@@ -16,8 +16,21 @@ namespace dgl {
 namespace kernel {
 
 // Reducer functor specialization
+
 template <typename DType>
 struct ReduceSum<kDLCPU, DType> {
+  static void Call(DType* addr, DType val) {
+    if (0 == val)
+      return;
+    *addr += val;
+  }
+  static DType BackwardCall(DType val, DType accum) {
+    return 1;
+  }
+}
+
+template <typename DType>
+struct ReduceSumAtomic<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
     if (0 == val)
       return;
@@ -41,7 +54,28 @@ struct ReduceMax<kDLCPU, DType> {
 };
 
 template <typename DType>
+struct ReduceMaxAtomic<kDLCPU, DType> {
+  static void Call(DType* addr, DType val) {
+#pragma omp critical
+    *addr = std::max(*addr, val);
+  }
+  static DType BackwardCall(DType val, DType accum) {
+    return static_cast<DType>(val == accum);
+  }
+};
+
+template <typename DType>
 struct ReduceMin<kDLCPU, DType> {
+  static void Call(DType* addr, DType val) {
+    *addr = std::min(*addr, val);
+  }
+  static DType BackwardCall(DType val, DType accum) {
+    return static_cast<DType>(val == accum);
+  }
+};
+
+template <typename DType>
+struct ReduceMinAtomic<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
 #pragma omp critical
     *addr = std::min(*addr, val);
@@ -53,6 +87,16 @@ struct ReduceMin<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceProd<kDLCPU, DType> {
+  static void Call(DType* addr, DType val) {
+    *addr *= val;
+  }
+  static DType BackwardCall(DType val, DType accum) {
+    return accum / val;
+  }
+};
+
+template <typename DType>
+struct ReduceProdAtomic<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
 #pragma omp atomic
     *addr *= val;

@@ -31,6 +31,16 @@ struct LDGReader {
 template <typename DType>
 struct ReduceSum<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
+    *addr += val;
+  }
+  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
+    return 1;
+  }
+};
+
+template <typename DType>
+struct ReduceSumAtomic<kDLGPU, DType> {
+  static __device__ __forceinline__ void Call(DType* addr, DType val) {
     cuda::AtomicAdd(addr, val);
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
@@ -40,6 +50,16 @@ struct ReduceSum<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceMax<kDLGPU, DType> {
+  static __device__ __forceinline__ void Call(DType* addr, DType val) {
+    *addr = max(*addr, val);
+  }
+  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
+    return static_cast<DType>(val == accum);
+  }
+};
+
+template <typename DType>
+struct ReduceMaxAtomic<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     cuda::AtomicMax(addr, val);
   }
@@ -51,6 +71,16 @@ struct ReduceMax<kDLGPU, DType> {
 template <typename DType>
 struct ReduceMin<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
+    *addr = min(*addr, val);
+  }
+  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
+    return static_cast<DType>(val == accum);
+  }
+};
+
+template <typename DType>
+struct ReduceMinAtomic<kDLGPU, DType> {
+  static __device__ __forceinline__ void Call(DType* addr, DType val) {
     cuda::AtomicMin(addr, val);
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
@@ -60,6 +90,16 @@ struct ReduceMin<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceProd<kDLGPU, DType> {
+  static __device__ __forceinline__ void Call(DType* addr, DType val) {
+    *addr = *addr * val;
+  }
+  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
+    return accum / val;
+  }
+};
+
+template <typename DType>
+struct ReduceProdAtomic<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     cuda::AtomicMul(addr, val);
   }

@@ -163,7 +163,10 @@ struct FunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
+typedef minigun::advance::Config<minigun::advance::kSrc> AdvanceSrcConfig;
+typedef minigun::advance::Config<minigun::advance::kEdge> AdvanceEdgeConfig;
+typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
+
 }  // namespace cuda
 
 // Template implementation of BinaryReduce operator.
@@ -195,7 +198,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
   }
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, GData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+        rtcfg, csr, gdata);
 }
 
 // Template implementation of BinaryReduce broadcasting operator.
@@ -229,7 +232,7 @@ void CallBinaryReduceBcast(
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig,
     BcastGData<NDim, Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+        rtcfg, csr, gdata);
 }
 
 // Following macro is used to generate explicit-specialization of the template

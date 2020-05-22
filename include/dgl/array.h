@@ -880,6 +880,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   return ret.CopyTo(ctx);
 }
 
+NDArray MergeIDMapping(NDArray a, NDArray b);
+
 ///////////////////////// Dispatchers //////////////////////////
 
 /*
