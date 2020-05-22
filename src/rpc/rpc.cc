@@ -18,7 +18,7 @@ namespace rpc {
 
 RPCStatus SendRPCMessage(const RPCMessage& msg) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
-  StringStreamWithBuffer zc_write_strm(zerocopy_blob.get());
+  StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
   int32_t ndarray_count = msg.tensors.size();
   zerocopy_blob->append(
@@ -65,7 +65,7 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
         &ndarray_data_msg, send_id), REMOVE_SUCCESS);
     buffer_list[i] = ndarray_data_msg.data;
   }
-  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
+  StreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
   static_cast<dmlc::Stream *>(&zc_read_strm)->Read(msg);
   return kRPCSuccess;
 }
