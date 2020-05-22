@@ -17,7 +17,7 @@ namespace dgl {
 namespace rpc {
 
 RPCStatus SendRPCMessage(const RPCMessage& msg) {
-  shared_ptr<std::string> zerocopy_blob(new std::string());
+  std::shared_ptr<std::string> zerocopy_blob(new std::string());
   StringStreamWithBuffer zc_write_strm(zerocopy_blob.get());
   static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
   network::Message rpc_meta_msg;
