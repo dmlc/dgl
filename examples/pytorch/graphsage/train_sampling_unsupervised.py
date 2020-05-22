@@ -224,7 +224,12 @@ def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_si
     """
     model.eval()
     with th.no_grad():
-        pred = model.module.inference(g, inputs, batch_size, device)
+        # single gpu
+        if isinstance(model, SAGE):
+            pred = model.inference(g, inputs, batch_size, device)
+        # multi gpu
+        else:
+            pred = model.module.inference(g, inputs, batch_size, device)
     model.train()
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
