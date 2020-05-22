@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 """Functions used by server."""
 
 import time
