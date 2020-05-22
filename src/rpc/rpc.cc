@@ -62,7 +62,6 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   }
   StreamWithBuffer zc_read_strm(rpc_meta_msg.data, rpc_meta_msg.size-sizeof(int32_t), buffer_list);
   zc_read_strm.Read(msg);
-  
   rpc_meta_msg.deallocator(&rpc_meta_msg);
   return kRPCSuccess;
 }
