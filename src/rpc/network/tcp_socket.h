@@ -3,8 +3,8 @@
  * \file tcp_socket.h
  * \brief TCP socket for DGL distributed training.
  */
-#ifndef DGL_GRAPH_NETWORK_TCP_SOCKET_H_
-#define DGL_GRAPH_NETWORK_TCP_SOCKET_H_
+#ifndef DGL_RPC_NETWORK_TCP_SOCKET_H_
+#define DGL_RPC_NETWORK_TCP_SOCKET_H_
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -130,4 +130,4 @@ class TCPSocket {
 }  // namespace network
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_NETWORK_TCP_SOCKET_H_
+#endif  // DGL_RPC_NETWORK_TCP_SOCKET_H_
