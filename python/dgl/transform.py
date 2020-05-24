@@ -569,7 +569,8 @@ def reorder_nodes(g, new_node_ids):
             "The number of new node ids must match #nodes in the graph."
     new_node_ids = utils.toindex(new_node_ids)
     sorted_ids, idx = F.sort_1d(new_node_ids.tousertensor())
-    assert sorted_ids[0] == 0 and sorted_ids[-1] == g.number_of_nodes() - 1, \
+    assert F.asnumpy(sorted_ids[0]) == 0 \
+            and F.asnumpy(sorted_ids[-1]) == g.number_of_nodes() - 1, \
             "The new node Ids are incorrect."
     new_gidx = _CAPI_DGLReorderGraph(g._graph, new_node_ids.todgltensor())
     new_g = DGLGraph(new_gidx)
@@ -634,6 +635,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         if extra_cached_hops >= 1:
             inner_edge = F.zeros((subg.number_of_edges(),), F.int64, F.cpu())
             inner_nids = F.nonzero_1d(subg.ndata['inner_node'])
+            # TODO(zhengda) we need to fix utils.toindex() to avoid the dtype cast below.
+            inner_nids = F.astype(inner_nids, F.int64)
             inner_eids = subg.in_edges(inner_nids, form='eid')
             F.scatter_row_inplace(inner_edge, inner_eids, 1)
         else:

@@ -292,13 +292,14 @@ def check_metis_partition(g, extra_hops):
             edge_cnts[parent_ids] += 1
 
             orig_ids = subg.ndata['orig_id']
+            inner_node = F.asnumpy(subg.ndata['inner_node'])
             for nid in range(subg.number_of_nodes()):
                 neighs = subg.predecessors(nid)
                 old_neighs1 = F.gather_row(orig_ids, neighs)
-                old_nid = orig_ids[nid]
+                old_nid = F.asnumpy(orig_ids[nid])
                 old_neighs2 = g.predecessors(old_nid)
                 # If this is an inner node, it should have the full neighborhood.
-                if subg.ndata['inner_node'][nid]:
+                if inner_node[nid]:
                     assert np.all(np.sort(F.asnumpy(old_neighs1)) == np.sort(F.asnumpy(old_neighs2)))
         # Normally, local edges are only counted once.
         assert np.all(edge_cnts == 1)
