@@ -62,7 +62,7 @@ class VertexDataset(Dataset):
         # If in infer mode, we return the graph with max_len
         if self.mode == 'infer':
             # Fake loading. The only input we need to take is a INIT_BIN token
-            flattern_verts = [self.INIT_BIN] * (self.MAX_LENGTH + 1)
+            flattern_verts = [self.INIT_BIN] * self.MAX_LENGTH
         else:
             obj_file = self.dataset_list[idx].strip()
             try:

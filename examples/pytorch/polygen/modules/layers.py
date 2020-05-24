@@ -1,5 +1,6 @@
 import torch as th
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn import LayerNorm
 from torch.distributions import Categorical
 
@@ -30,8 +31,10 @@ class NucleusSamplingGenerator(nn.Module):
             cumulative_p: cumulative probability threshold for nucleus sampling.
             min_tokens_to_keep: 1
         '''
-        super(VertexGenerator, self).__init__()
+        super(NucleusSamplingGenerator, self).__init__()
         self.proj = nn.Linear(dim_model, vocab_size)
+        self.cumulative_p = cumulative_p
+        self.min_tokens_to_keep = min_tokens_to_keep
     
     def forward(self, x):
         logits = th.softmax(
@@ -39,22 +42,22 @@ class NucleusSamplingGenerator(nn.Module):
         )
         # Nucleus Sampling
         sorted_logits, sorted_indices = th.sort(logits, descending=True)
-        cumulative_probs = th.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+        cumulative_probs = th.cumsum(sorted_logits, dim=-1)
         # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
-        sorted_indices_to_remove = cumulative_probs > cumulative_p
-        if min_tokens_to_keep > 1:
+        sorted_indices_to_remove = cumulative_probs > self.cumulative_p
+        if self.min_tokens_to_keep > 1:
             # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
-            sorted_indices_to_remove[..., :min_tokens_to_keep] = 0
+            sorted_indices_to_remove[..., :self.min_tokens_to_keep] = 0
         # Shift the indices to the right to keep also the first token above the threshold
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
         sorted_indices_to_remove[..., 0] = 0
         # scatter sorted tensors to original indexing
         indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-        frontiers[indices_to_remove] = 0
+        logits[indices_to_remove] = 0
         # Normalized the selected probs
-        frontiers = frontiers * (1.0 / frontiers.max(axis=-1)) 
+        logits = logits * (1.0 / (logits.sum(dim=-1)+1e-6)).unsqueeze(-1)
         # Sampling
-        sample_results = Categorical(frontiers)
+        sample_results = Categorical(logits).sample()
         return sample_results
 
 

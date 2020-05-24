@@ -4,7 +4,6 @@ from .embedding import *
 from dataset.datasets import VertexDataset
 import threading
 import torch as th
-import torch.functional as F
 import dgl.nn as dglnn
 import dgl.function as fn
 import torch.nn.init as INIT
@@ -100,7 +99,7 @@ class Transformer(nn.Module):
 
         return self.generator(g.ndata['x'][nids['dec']])
 
-    def infer(self, graph, max_len, eos_id):
+    def infer(self, graph, eos_id):
         '''
         This function implements nucleus sampling in DGL, which is required in inference phase.
         args:
@@ -122,11 +121,12 @@ class Transformer(nn.Module):
         g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
         coord_embed = self.coord_embed(graph.tgt[1]%3)
         pos_embed = self.pos_embed(graph.tgt[1]//3)
+        max_len = VertexDataset.MAX_LENGTH - 1
 
         # decode
         y = graph.tgt[0]
-        batch_size = N // VertexDataset.MAX_LENGTH
-        eos = th.zeros(batch_size).byte()
+        batch_size = N // max_len
+        eos = th.zeros(batch_size).bool().to(device)
         for step in range(1, max_len):
             y = y.view(-1)
             value_embed = self.value_embed(y)
@@ -139,24 +139,25 @@ class Transformer(nn.Module):
                 post_func = self.decoder.post_func(i)
                 nodes, edges = nodes_d, edges_dd
                 self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-
+            
             frontiers = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
             out = self.generator(g.ndata['x'][frontiers])
             batch_size = frontiers.shape[0]
-            
 
+            y = y.view(batch_size, -1)
             for i in range(batch_size):
-                y[step] = out[i]
-                eos[i] = eos[i] | (out[i] == eos_id)
+                y[i, step] = out[i]
+                eos[i] = eos[i] | (out[i] == eos_id).bool()
             
             if eos.all():
                 break
             else:
                 # Mask out all the nodes from the sample already met eos
+                print (eos, g.ndata['mask'][nids['dec']].shape, max_len)
                 g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, max_len).view(-1).to(device)
         return y.view(batch_size, -1).tolist()
 
-def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, cumulative_p=0.9):
+def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, infer = False, cumulative_p=0.9):
     '''
     args:
         N: transformer block number.
@@ -176,7 +177,10 @@ def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, cumula
     tgt_vocab = VertexDataset.COORD_BIN + 3
     value_embed = Embeddings(tgt_vocab, dim_model)
     decoder = Decoder(DecoderLayer(dim_model, c(attn), None, c(ff), dropout), N)
-    generator = NucleusSamplingGenerator(dim_model, tgt_vocab, cumulative_p=cumulative_p)
+    if infer:
+        generator = NucleusSamplingGenerator(dim_model, tgt_vocab, cumulative_p=cumulative_p)
+    else:
+        generator = VertexGenerator(dim_model, tgt_vocab)
     model = Transformer(
         decoder, coord_embed, pos_embed, value_embed, generator, h, dim_model // h)
     # xavier init

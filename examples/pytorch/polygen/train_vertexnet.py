@@ -124,8 +124,6 @@ def main(dev_id, args):
                 break
 
 if __name__ == '__main__':
-    if not os.path.exists('checkpoints'):
-        os.makedirs('checkpoints')
     np.random.seed(1111)
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
