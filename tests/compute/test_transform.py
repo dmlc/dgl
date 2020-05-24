@@ -320,19 +320,19 @@ def test_reorder_nodes():
     new_out_deg1 = F.scatter_row(out_deg, F.tensor(new_nids), out_deg)
     assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
     assert np.all(F.asnumpy(new_out_deg == new_out_deg1))
-    orig_ids = new_g.ndata['orig_id']
+    orig_ids = F.asnumpy(new_g.ndata['orig_id'])
     for nid in range(new_g.number_of_nodes()):
-        neighs = new_g.successors(nid)
-        old_neighs1 = F.gather_row(orig_ids, neighs)
+        neighs = F.asnumpy(new_g.successors(nid))
+        old_neighs1 = orig_ids[neighs]
         old_nid = orig_ids[nid]
         old_neighs2 = g.successors(old_nid)
-        assert np.all(np.sort(F.asnumpy(old_neighs1)) == np.sort(F.asnumpy(old_neighs2)))
+        assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
-        neighs = new_g.predecessors(nid)
-        old_neighs1 = F.gather_row(orig_ids, neighs)
+        neighs = F.asnumpy(new_g.predecessors(nid))
+        old_neighs1 = orig_ids[neighs]
         old_nid = orig_ids[nid]
         old_neighs2 = g.predecessors(old_nid)
-        assert np.all(np.sort(F.asnumpy(old_neighs1)) == np.sort(F.asnumpy(old_neighs2)))
+        assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
