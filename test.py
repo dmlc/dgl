@@ -133,7 +133,7 @@ def main(args):
     criterion = nn.BCEWithLogitsLoss(reduction="none")
     optimizer = Adam(model.parameters(), lr=args['lr'], weight_decay=args['decay'])
 
-    for epoch in range(1, args['epochs'] + 1):
+    for epoch in range(args['epochs']):
         run_a_train_epoch(args, epoch, model, train_loader, criterion, optimizer)
 
         # Validation and early stop

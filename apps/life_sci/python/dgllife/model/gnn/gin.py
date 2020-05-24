@@ -78,7 +78,7 @@ class GINLayer(nn.Module):
         g.edata['feat'] = edge_embeds
         g.update_all(fn.u_add_e('feat', 'feat', 'm'), fn.sum('m', 'feat'))
 
-        node_feats = g.ndata.pop('feat')
+        node_feats = self.mlp(g.ndata.pop('feat'))
         if self.bn is not None:
             node_feats = self.bn(node_feats)
         if self.activation is not None:
