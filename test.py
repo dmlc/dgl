@@ -126,7 +126,7 @@ def main(args):
                          dropout=args['dropout'],
                          readout=args['readout'],
                          n_tasks=args['n_tasks'])
-    # model.gnn = load_pretrained('gin_supervised_{}'.format(args['unsup']))
+    model.gnn = load_pretrained('gin_supervised_{}'.format(args['unsup']))
     model.to(args['device'])
     criterion = nn.BCEWithLogitsLoss(reduction="none")
     optimizer = Adam(model.parameters(), lr=args['lr'], weight_decay=args['decay'])
