@@ -70,7 +70,7 @@ class Decoder(nn.Module):
         return func
 
 class Transformer(nn.Module):
-    def __init__(self, encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, h, d_k):
+    def __init__(self, encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, generator, h, d_k):
         '''
         args:
             encoder: encoder module
@@ -90,6 +90,7 @@ class Transformer(nn.Module):
         self.vert_idx_in_face_enc = vert_idx_in_face_enc
         self.h, self.d_k = h, d_k
         self.att_weight_map = None
+        self.generator = generator
 
     def propagate_attention(self, g, eids):
         # Compute attention score
@@ -184,6 +185,7 @@ class Transformer(nn.Module):
         vert_pos_enc = self.vert_pos_enc(graph.src[1])
         g.nodes[nids['enc']].data['x'] = self.vert_pos_enc.dropout(vert_val_embed + vert_pos_enc)
         g.nodes[nids['enc']].data['idx'] = graph.src[1]
+
         # init mask
         device = next(self.parameters()).device
         g.ndata['mask'] = th.zeros(N, dtype=th.uint8, device=device).bool()
@@ -199,18 +201,18 @@ class Transformer(nn.Module):
         log_prob = None
         y = graph.tgt[0]
 
+        # Indexing encoder results
+        tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, graph.tgt[0])
+        
         # Indexing result
         face_pos_enc = self.face_pos_enc(graph.tgt[1]//3)
         vert_idx_in_face_enc = self.vert_idx_in_face_enc(graph.tgt[1]%3)
-        g.nodes[nids['dec']].data['idx'] = graph.tgt[1]
-        g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
+        g.nodes[nids['dec']].data['idx'] = graph.tgt[1].float()
 
         for step in range(1, max_len):
             y = y.view(-1)
             tgt_embed = g.nodes[nids['enc']].data['x'].index_select(0, y)
-            g.nodes[nids['dec']].data['x'] = self.face_pos_enc.dropout(tgt_embed + face_pos_enc + vert_idx_in_face_enc)
-            # Are the two same???
-            #g.ndata['x'][nids['dec']] = self.pos_enc.dropout(tgt_embed + tgt_pos)
+            g.nodes[nids['dec']].data['x'] = tgt_embed + face_pos_enc + vert_idx_in_face_enc
             edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'] , eids['ed'])
             edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
             nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
@@ -220,44 +222,40 @@ class Transformer(nn.Module):
                 self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
             nodes, edges = nids['dec'], eids['ed']
-            # pointer net
-            g.send_and_recv(edges,
-                            [fn.u_dot_v('x', 'x', 'pointer_score'), fn.copy_u('idx', 'src_idx')],
-                            [softmax_and_pad])
 
-            frontiers = g.filter_nodes(lambda v: v.data['pos'] == step - 1, nids['dec'])
-            out = g.nodes[frontiers].data['log_softmax_res']
-            batch_size = out.shape[0] // k
-            vocab_size = out.shape[-1]
-            # Mask output for complete sequence
-            one_hot = th.zeros(vocab_size).fill_(-1e9).to(device)
-            one_hot[eos_id] = 0
-            mask = g.ndata['mask'][frontiers].unsqueeze(-1).float()
-            out = out * (1 - mask) + one_hot.unsqueeze(0) * mask
+            # Pointer network
+            # log(softmax) is not numerical stable.
+            # We will only output the dot_product result and use CrossEntropyLoss
+            # which combines log_softmax and nllloss
+            g.apply_edges(fn.u_dot_v('x', 'x', 'pointer_score'), edges)
+            pointer_score_flat = g.edata['pointer_score'][edges]
+            src_lens, tgt_lens = graph.src_lens, graph.tgt_lens
+            pointer_score_padded = -1e8 * th.ones([np.sum(tgt_lens), FaceDataset.MAX_VERT_LENGTH], dtype=th.float, device=tgt_embed.device)
+            # pad softmax res
+            cur_idx = 0
+            cur_tgt_head = 0
+            for n_dec, n_enc in zip(tgt_lens, src_lens):
+                pointer_score_padded[cur_tgt_head:cur_tgt_head+n_dec, :n_enc] = th.transpose(pointer_score_flat[cur_idx:cur_idx+n_enc*n_dec].reshape([n_enc, n_dec]),0,1)
+                cur_idx += n_enc * n_dec
+                cur_tgt_head += n_dec
 
-            if log_prob is None:
-                log_prob, pos = out.view(batch_size, k, -1)[:, 0, :].topk(k, dim=-1)
-                eos = th.zeros(batch_size, k).byte()
-            else:
-                norm_old = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((4. + step) / 6, alpha)
-                norm_new = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((5. + step) / 6, alpha)
-                log_prob, pos = ((out.view(batch_size, k, -1) + (log_prob * norm_old).unsqueeze(-1)) / norm_new.unsqueeze(-1)).view(batch_size, -1).topk(k, dim=-1)
+            batch_size = pointer_score_padded.shape[0] // tgt_lens[0]
+            frontiers = [i*tgt_lens[0]+step for i in range(batch_size)]
+            out = pointer_score_padded[frontiers].max(dim=-1)
 
-            _y = y.view(batch_size * k, -1)
-            y = th.zeros_like(_y)
-            _eos = eos.clone()
+            y = y.view(batch_size, -1)
             for i in range(batch_size):
-                for j in range(k):
-                    _j = pos[i, j].item() // vocab_size
-                    token = pos[i, j].item() % vocab_size
-                    y[i*k+j, :] = _y[i*k+_j, :]
-                    y[i*k+j, step] = token
-                    eos[i, j] = _eos[i, _j] | (token == eos_id)
+                y[i, step] = out[i]
+                eos[i] = eos[i] | (out[i] == eos_id).bool()
+            
             if eos.all():
                 break
             else:
-                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, 1, max_len).view(-1).to(device).bool()
-        return graph.src[0], y.view(batch_size, k, -1)[:, 0, :].tolist()
+                # Mask out all the nodes from the sample already met eos
+                print (eos, g.ndata['mask'][nids['dec']].shape, max_len)
+                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, max_len).view(-1).to(device)
+        return y.view(batch_size, -1).tolist()
+
 
     def _register_att_map(self, g, enc_ids, dec_ids):
         self.att_weight_map = [
@@ -267,7 +265,7 @@ class Transformer(nn.Module):
         ]
 
 
-def make_face_model(N=12, dim_model=256, dim_ff=1024, h=8, dropout=0.1):
+def make_face_model(N=12, dim_model=256, dim_ff=1024, h=8, dropout=0.1,, infer = False, cumulative_p=0.9):
     '''
     args:
         N: transformer block number.
@@ -275,6 +273,9 @@ def make_face_model(N=12, dim_model=256, dim_ff=1024, h=8, dropout=0.1):
         dim_ff: feedforward layer dimention.
         h: number of head for multihead attention
         dropout: dropout rate
+        infer: mode
+        cumulative_p: cumulative threshold for nucleus sampling
+        max_generator: use max to infer
     '''
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
@@ -289,8 +290,14 @@ def make_face_model(N=12, dim_model=256, dim_ff=1024, h=8, dropout=0.1):
     encoder = Encoder(EncoderLayer(dim_model, c(attn), c(ff), dropout), N)
     decoder = Decoder(DecoderLayer(dim_model, c(attn), None, c(ff), dropout), N)
 
+    if infer:
+        if cumulative_p > 0:
+            generator = NucleusSamplingGenerator(dim_model, tgt_vocab=tgt_vocab, cumulative_p=cumulative_p)
+    else:
+        generator = None
+
     model = Transformer(
-        encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, h, dim_model // h)
+        encoder, decoder, vert_val_embed, vert_pos_enc, face_pos_enc, vert_idx_in_face_enc, generator, h, dim_model // h)
     # xavier init
     for p in model.parameters():
         if p.dim() > 1:

@@ -18,12 +18,11 @@ class VertexGenerator(nn.Module):
             self.proj(x), dim=-1
         )
 
-
 class NucleusSamplingGenerator(nn.Module):
     '''
     Nucleus Sampler: keep the top tokens with cumulative probability >= top_p (nucleus filtering). Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
     '''
-    def __init__(self, dim_model, vocab_size, cumulative_p = 0.9, min_tokens_to_keep = 1):
+    def __init__(self, dim_model, vocab_size=-1, cumulative_p = 0.9, min_tokens_to_keep = 1):
         '''
         args:
             dim_model: input feature dimention.
@@ -32,14 +31,17 @@ class NucleusSamplingGenerator(nn.Module):
             min_tokens_to_keep: 1
         '''
         super(NucleusSamplingGenerator, self).__init__()
-        self.proj = nn.Linear(dim_model, vocab_size)
+        self.proj = None if vocab_size < 0 else nn.Linear(dim_model, vocab_size)
         self.cumulative_p = cumulative_p
         self.min_tokens_to_keep = min_tokens_to_keep
     
     def forward(self, x):
-        logits = th.softmax(
-            self.proj(x), dim=-1
-        )
+        if self.proj:
+            logits = th.softmax(
+                self.proj(x), dim=-1
+            )
+        else:
+            logits = x
         # Nucleus Sampling
         sorted_logits, sorted_indices = th.sort(logits, descending=True)
         cumulative_probs = th.cumsum(sorted_logits, dim=-1)

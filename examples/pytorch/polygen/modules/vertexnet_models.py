@@ -165,6 +165,8 @@ def make_vertex_model(N=18, dim_model=256, dim_ff=1024, h=8, dropout=0.1, infer 
         dim_ff: feedforward layer dimention.
         h: number of head for multihead attention
         dropout: dropout rate
+        infer: mode
+        cumulative_p: cumulative threshold for nucleus sampling
     '''
     c = copy.deepcopy
     attn = MultiHeadAttention(h, dim_model)
