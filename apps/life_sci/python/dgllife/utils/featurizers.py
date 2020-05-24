@@ -1630,7 +1630,6 @@ class PretrainBondFeaturizer(object):
         """
         edge_features = []
         num_bonds = mol.GetNumBonds()
-        print(num_bonds)
 
         # Compute features for each bond
         for i in range(num_bonds):
