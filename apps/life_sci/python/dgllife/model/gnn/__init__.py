@@ -7,3 +7,4 @@ from .mpnn import *
 from .schnet import *
 from .wln import *
 from .weave import *
+from .gin import *
