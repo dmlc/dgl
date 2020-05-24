@@ -88,8 +88,6 @@ def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print('epoch {:d}/{:d}, batch {:d}/{:d}, loss {:.4f}'.format(
-            epoch + 1, args['epochs'], batch_id + 1, len(data_loader), loss.item()))
         train_meter.update(logits, labels, masks)
     train_score = np.mean(train_meter.compute_metric(args['metric_name']))
     print('epoch {:d}/{:d}, training {} {:.4f}'.format(
@@ -128,7 +126,7 @@ def main(args):
                          dropout=args['dropout'],
                          readout=args['readout'],
                          n_tasks=args['n_tasks'])
-    model.gnn = load_pretrained('gin_supervised_{}'.format(args['unsup']))
+    # model.gnn = load_pretrained('gin_supervised_{}'.format(args['unsup']))
     model.to(args['device'])
     criterion = nn.BCEWithLogitsLoss(reduction="none")
     optimizer = Adam(model.parameters(), lr=args['lr'], weight_decay=args['decay'])
