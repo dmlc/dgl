@@ -231,7 +231,7 @@ class GraphPartitionBook:
         DGLGraph
             The graph of the partition.
         """
-        return None
+        pass
 
 class RangePartitionBook:
     """GraphPartitionBook is used to store parition information.
@@ -246,10 +246,8 @@ class RangePartitionBook:
         global node id mapping to partition id
     edge_map : tensor
         global edge id mapping to partition id
-    part_graph : DGLGraph
-        The graph partition structure.
     """
-    def __init__(self, part_id, num_parts, node_map, edge_map, part_graph):
+    def __init__(self, part_id, num_parts, node_map, edge_map):
         assert part_id >= 0, 'part_id cannot be a negative number.'
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._part_id = part_id
@@ -400,7 +398,7 @@ class RangePartitionBook:
 
         start = self._node_map[partid - 1] if partid > 0 else 0
         end = self._node_map[partid]
-        assert F.sum((nids >=start) * (nids < end), 0) == len(nids)
+        assert F.sum((nids >= start) * (nids < end), 0) == len(nids)
         return nids - start
 
 
@@ -425,7 +423,7 @@ class RangePartitionBook:
 
         start = self._edge_map[partid - 1] if partid > 0 else 0
         end = self._edge_map[partid]
-        assert F.sum((eids >=start) * (eids < end), 0) == len(eids)
+        assert F.sum((eids >= start) * (eids < end), 0) == len(eids)
         return eids - start
 
 
@@ -442,4 +440,4 @@ class RangePartitionBook:
         DGLGraph
             The graph of the partition.
         """
-        return None
+        pass

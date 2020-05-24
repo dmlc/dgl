@@ -11,7 +11,6 @@ from . import ndarray as nd
 from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
-from .graph_index import _get_halo_subgraph_inner_edge
 from .graph import unbatch
 from .convert import graph, bipartite
 from . import utils
