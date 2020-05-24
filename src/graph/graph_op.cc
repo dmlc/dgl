@@ -691,7 +691,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLReassignEdges")
     IdArray new_data = IdArray::Empty({num_edges}, csrmat.data->dtype, csrmat.data->ctx);
     // Return the original edge Ids.
     *rv = new_data;
-    // TODO I need to invalidate out-CSR and COO.
+    // TODO(zhengda) I need to invalidate out-CSR and COO.
 
     // Generate new edge Ids.
     // TODO(zhengda) after assignment, we actually don't need to store them
