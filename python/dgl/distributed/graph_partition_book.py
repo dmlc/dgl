@@ -231,7 +231,7 @@ class GraphPartitionBook:
         DGLGraph
             The graph of the partition.
         """
-        pass
+
 
 class RangePartitionBook:
     """GraphPartitionBook is used to store parition information.
@@ -440,4 +440,3 @@ class RangePartitionBook:
         DGLGraph
             The graph of the partition.
         """
-        pass

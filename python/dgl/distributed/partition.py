@@ -147,7 +147,7 @@ def load_partition(conf_file, part_id):
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
     if reshuffle:
-        gpb = RangePartitionBook(part_id, num_parts, node_map, edge_map, graph)
+        gpb = RangePartitionBook(part_id, num_parts, node_map, edge_map)
     else:
         gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
     return graph, node_feats, edge_feats, gpb, meta
