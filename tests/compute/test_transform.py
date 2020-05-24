@@ -246,22 +246,13 @@ def test_partition_with_halo():
 def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
-    # partitions without HALO nodes
-    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=0)
-    num_inner_nodes = 0
-    num_inner_edges = 0
-    if subgs is not None:
-        for part_id, subg in subgs.items():
-            assert np.all(F.asnumpy(subg.ndata['inner_node']) == 1)
-            assert np.all(F.asnumpy(subg.edata['inner_edge']) == 1)
-            assert np.all(F.asnumpy(subg.ndata['part_id']) == part_id)
-            num_inner_nodes += subg.number_of_nodes()
-            num_inner_edges += subg.number_of_edges()
-        assert num_inner_nodes == g.number_of_nodes()
-        print(g.number_of_edges() - num_inner_edges)
+    check_metis_partition(g, 0)
+    check_metis_partition(g, 1)
+    check_metis_partition(g, 2)
 
+def check_metis_partition(g, extra_hops):
     # partitions with 1-hop HALO nodes
-    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1)
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops)
     num_inner_nodes = 0
     num_inner_edges = 0
     if subgs is not None:
@@ -274,10 +265,14 @@ def test_metis_partition():
         assert num_inner_nodes == g.number_of_nodes()
         print(g.number_of_edges() - num_inner_edges)
 
+    if extra_hops == 0:
+        return
+
     # partitions with 1-hop HALO nodes and reshuffling nodes
-    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1, reshuffle=True)
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops, reshuffle=True)
     num_inner_nodes = 0
     num_inner_edges = 0
+    edge_cnts = np.zeros((g.number_of_edges(),))
     if subgs is not None:
         for part_id, subg in subgs.items():
             lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
@@ -288,15 +283,13 @@ def test_metis_partition():
             nids = F.asnumpy(subg.ndata[dgl.NID])
 
             # ensure the local node Ids are contiguous.
-            assert np.all(F.asnumpy(subg.ndata['inner_node'])[lnode_ids] == 1)
             parent_ids = F.asnumpy(subg.ndata[dgl.NID])
             parent_ids = parent_ids[:len(lnode_ids)]
             assert np.all(parent_ids == np.arange(parent_ids[0], parent_ids[-1] + 1))
 
-            # ensure the local edge Ids are contiguous
-            assert np.all(F.asnumpy(subg.edata['inner_edge'])[ledge_ids] == 1)
-            parent_ids = F.asnumpy(subg.edata[dgl.EID])
-            assert np.all(parent_ids == np.arange(parent_ids[0], parent_ids[-1] + 1))
+            # count the local edges.
+            parent_ids = F.asnumpy(subg.edata[dgl.EID])[ledge_ids]
+            edge_cnts[parent_ids] += 1
 
             orig_ids = subg.ndata['orig_id']
             for nid in range(subg.number_of_nodes()):
@@ -307,6 +300,8 @@ def test_metis_partition():
                 # If this is an inner node, it should have the full neighborhood.
                 if subg.ndata['inner_node'][nid]:
                     assert np.all(np.sort(F.asnumpy(old_neighs1)) == np.sort(F.asnumpy(old_neighs2)))
+        # Normally, local edges are only counted once.
+        assert np.all(edge_cnts == 1)
 
         assert num_inner_nodes == g.number_of_nodes()
         print(g.number_of_edges() - num_inner_edges)

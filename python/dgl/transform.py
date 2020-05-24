@@ -624,7 +624,6 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     node_part = node_part.tousertensor()
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
-        inner_edge = _get_halo_subgraph_inner_edge(subg)
         subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
         subg.ndata['inner_node'] = inner_node
@@ -632,7 +631,14 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         if reshuffle:
             subg.ndata['orig_id'] = F.gather_row(g.ndata['orig_id'], subg.ndata[NID])
             subg.edata['orig_id'] = F.gather_row(g.edata['orig_id'], subg.edata[EID])
-        inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
+
+        if extra_cached_hops >= 1:
+            inner_edge = F.zeros((subg.number_of_edges(),), F.int64, F.cpu())
+            inner_nids = F.nonzero_1d(subg.ndata['inner_node'])
+            inner_eids = subg.in_edges(inner_nids, form='eid')
+            F.scatter_row_inplace(inner_edge, inner_eids, 1)
+        else:
+            inner_edge = F.ones((subg.number_of_edges(),), F.int64, F.cpu())
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
     return subg_dict
