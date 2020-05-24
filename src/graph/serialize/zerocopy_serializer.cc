@@ -122,20 +122,4 @@ NDArray StreamWithBuffer::PopNDArray() {
 #endif  // _WIN32
 }
 
-// std::unique_ptr<StreamWithBuffer> StreamWithBuffer::Create(
-//   std::string* blob, bool send_to_remote) {
-//   auto strm =
-//     std::unique_ptr<dmlc::SeekStream>(new dmlc::MemoryStringStream(blob));
-//   return std::unique_ptr<StreamWithBuffer>(
-//     new StreamWithBuffer(std::move(strm), true));
-// }
-
-// std::unique_ptr<StreamWithBuffer> StreamWithBuffer::Create(
-//   char* p_buffer, size_t size, bool send_to_remote) {
-//   auto strm = std::unique_ptr<dmlc::SeekStream>(
-//     new dmlc::MemoryFixedSizeStream(p_buffer, size));
-//   return std::unique_ptr<StreamWithBuffer>(
-//     new StreamWithBuffer(std::move(strm), true));
-// }
-
 }  // namespace dgl
