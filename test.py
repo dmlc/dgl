@@ -8,6 +8,7 @@ from dgllife.data import Tox21
 from dgllife.model import GINPredictor, load_pretrained
 from dgllife.utils import smiles_to_bigraph, PretrainAtomFeaturizer, PretrainBondFeaturizer, \
     ScaffoldSplitter, Meter
+from functools import partial
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
@@ -109,7 +110,7 @@ def main(args):
     args['device'] = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     set_random_seed()
 
-    dataset = Tox21(smiles_to_graph=smiles_to_bigraph,
+    dataset = Tox21(smiles_to_graph=partial(smiles_to_bigraph, add_self_loop=True),
                     node_featurizer=PretrainAtomFeaturizer(),
                     edge_featurizer=PretrainBondFeaturizer())
     train_set, val_set, test_set = ScaffoldSplitter.train_val_test_split(dataset)
