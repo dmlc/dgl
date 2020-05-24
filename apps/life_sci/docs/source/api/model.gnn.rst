@@ -44,6 +44,11 @@ Weave
 .. automodule:: dgllife.model.gnn.weave
     :members:
 
+GIN
+---
+.. automodule:: dgllife.model.gnn.gin
+    :members:
+
 WLN
 ---
 .. automodule:: dgllife.model.gnn.wln

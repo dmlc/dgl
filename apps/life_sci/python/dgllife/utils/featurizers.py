@@ -41,15 +41,18 @@ __all__ = ['one_hot_encoding',
            'BaseAtomFeaturizer',
            'CanonicalAtomFeaturizer',
            'WeaveAtomFeaturizer',
+           'PretrainAtomFeaturizer',
            'bond_type_one_hot',
            'bond_is_conjugated_one_hot',
            'bond_is_conjugated',
            'bond_is_in_ring_one_hot',
            'bond_is_in_ring',
            'bond_stereo_one_hot',
+           'bond_direction_one_hot',
            'BaseBondFeaturizer',
            'CanonicalBondFeaturizer',
-           'WeaveEdgeFeaturizer']
+           'WeaveEdgeFeaturizer',
+           'PretrainBondFeaturizer']
 
 def one_hot_encoding(x, allowable_set, encode_unknown=False):
     """One-hot encoding.
@@ -1069,6 +1072,70 @@ class WeaveAtomFeaturizer(object):
 
         return {self._atom_data_field: F.zerocopy_from_numpy(atom_features.astype(np.float32))}
 
+class PretrainAtomFeaturizer(object):
+    """AtomFeaturizer in Strategies for Pre-training Graph Neural Networks.
+
+    The atom featurization performed in `Strategies for Pre-training Graph Neural Networks
+    <https://arxiv.org/abs/1905.12265>`__, which considers:
+
+    * atomic number
+    * chirality
+
+    Parameters
+    ----------
+    atomic_number_types : list of int or None
+        Atomic number types to consider for one-hot encoding. If None, we will use a default
+        choice of 1-118.
+    chiral_types : list of Chem.rdchem.ChiralType or None
+        Atom chirality to consider for one-hot encoding. If None, we will use a default
+        choice of ``Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
+        Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+        Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW, Chem.rdchem.ChiralType.CHI_OTHER``.
+    """
+    def __init__(self, atomic_number_types=None, chiral_types=None):
+        if atomic_number_types is None:
+            atomic_number_types = list(range(1, 119))
+        self._atomic_number_types = atomic_number_types
+
+        if chiral_types is None:
+            chiral_types = [
+                Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
+                Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+                Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW,
+                Chem.rdchem.ChiralType.CHI_OTHER
+            ]
+        self._chiral_types = chiral_types
+
+    def __call__(self, mol):
+        """Featurizes the input molecule.
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance.
+
+        Returns
+        -------
+        dict
+            Mapping 'atomic_number' and 'chirality_type' to separately an int64 tensor
+            of shape (N, 1), N is the number of atoms
+        """
+        atom_features = []
+        num_atoms = mol.GetNumAtoms()
+        for i in range(num_atoms):
+            atom = mol.GetAtomWithIdx(i)
+            atom_features.append([
+                self._atomic_number_types.index(atom.GetAtomicNum()),
+                self._chiral_types.index(atom.GetChiralTag())
+            ])
+        atom_features = np.stack(atom_features)
+        atom_features = F.zerocopy_from_numpy(atom_features.astype(np.int64))
+
+        return {
+            'atomic_number': atom_features[:, 0],
+            'chirality_type': atom_features[:, 1]
+        }
+
 def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for the type of a bond.
 
@@ -1225,6 +1292,35 @@ def bond_stereo_one_hot(bond, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.BondStereo.STEREOCIS,
                          Chem.rdchem.BondStereo.STEREOTRANS]
     return one_hot_encoding(bond.GetStereo(), allowable_set, encode_unknown)
+
+def bond_direction_one_hot(bond, allowable_set=None, encode_unknown=False):
+    """One hot encoding for the direction of a bond.
+
+    Parameters
+    ----------
+    bond : rdkit.Chem.rdchem.Bond
+        RDKit bond instance.
+    allowable_set : list of Chem.rdchem.BondDir
+        Bond directions to consider. Default: ``Chem.rdchem.BondDir.NONE``,
+        ``Chem.rdchem.BondDir.ENDUPRIGHT``, ``Chem.rdchem.BondDir.ENDDOWNRIGHT``.
+    encode_unknown : bool
+        If True, map inputs not in the allowable set to the
+        additional last element. (Default: False)
+
+    Returns
+    -------
+    list
+        List of boolean values where at most one value is True.
+
+    See Also
+    --------
+    one_hot_encoding
+    """
+    if allowable_set is None:
+        allowable_set = [Chem.rdchem.BondDir.NONE,
+                         Chem.rdchem.BondDir.ENDUPRIGHT,
+                         Chem.rdchem.BondDir.ENDDOWNRIGHT]
+    return one_hot_encoding(bond.GetBondDir(), allowable_set, encode_unknown)
 
 class BaseBondFeaturizer(object):
     """An abstract class for bond featurizers.
@@ -1479,3 +1575,77 @@ class WeaveEdgeFeaturizer(object):
         return {self._edge_data_field: torch.cat([distance_indicators,
                                                   bond_indicators,
                                                   ring_mate_indicators], dim=1)}
+
+class PretrainBondFeaturizer(object):
+    """BondFeaturizer in Strategies for Pre-training Graph Neural Networks.
+
+    The bond featurization performed in `Strategies for Pre-training Graph Neural Networks
+    <https://arxiv.org/abs/1905.12265>`__, which considers:
+
+    * bond type
+    * bond direction
+
+    Parameters
+    ----------
+    bond_types : list of Chem.rdchem.BondType or None
+        Bond types to consider. Default to ``Chem.rdchem.BondType.SINGLE``,
+        ``Chem.rdchem.BondType.DOUBLE``, ``Chem.rdchem.BondType.TRIPLE``,
+        ``Chem.rdchem.BondType.AROMATIC``.
+    bond_direction_types : list of Chem.rdchem.BondDir or None
+        Bond directions to consider. Default to ``Chem.rdchem.BondDir.NONE``,
+        ``Chem.rdchem.BondDir.ENDUPRIGHT``, ``Chem.rdchem.BondDir.ENDDOWNRIGHT``.
+    self_loop : bool
+        Whether self loops will be added. Default to True.
+    """
+    def __init__(self, bond_types=None, bond_direction_types=None, self_loop=True):
+        if bond_types is None:
+            bond_types = [
+                Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
+                Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC
+            ]
+        self._bond_types = bond_types
+
+        if bond_direction_types is None:
+            bond_direction_types = [
+                Chem.rdchem.BondDir.NONE,
+                Chem.rdchem.BondDir.ENDUPRIGHT,
+                Chem.rdchem.BondDir.ENDDOWNRIGHT
+            ]
+        self._bond_direction_types = bond_direction_types
+        self._self_loop = self_loop
+
+    def __call__(self, mol):
+        """Featurizes the input molecule.
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule instance.
+
+        Returns
+        -------
+        dict
+            Mapping 'bond_type' and 'bond_direction_type' separately to an int64
+            tensor of shape (N, 1), where N is the number of edges.
+        """
+        edge_features = []
+        num_bonds = mol.GetNumBonds()
+
+        # Compute features for each bond
+        for i in range(num_bonds):
+            bond = mol.GetBondWithIdx(i)
+            bond_feats = [
+                self._bond_types.index(bond.GetBondType()),
+                self._bond_direction_types.index(bond.GetBondDir())
+            ]
+            edge_features.extend([bond_feats, bond_feats.copy()])
+
+        edge_features = np.stack(edge_features)
+        edge_features = F.zerocopy_from_numpy(edge_features.astype(np.int64))
+
+        if self._self_loop:
+            self_loop_features = torch.zeros((mol.GetNumAtoms(), 2), dtype=torch.int64)
+            self_loop_features[:, 0] = len(self._bond_types)
+            edge_features = torch.cat([edge_features, self_loop_features], dim=0)
+
+        return {'bond_type': edge_features[:, 0], 'bond_direction_type': edge_features[:, 1]}
