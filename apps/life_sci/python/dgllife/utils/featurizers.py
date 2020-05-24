@@ -1630,6 +1630,7 @@ class PretrainBondFeaturizer(object):
         """
         edge_features = []
         num_bonds = mol.GetNumBonds()
+        print(num_bonds)
 
         # Compute features for each bond
         for i in range(num_bonds):
@@ -1640,12 +1641,15 @@ class PretrainBondFeaturizer(object):
             ]
             edge_features.extend([bond_feats, bond_feats.copy()])
 
-        edge_features = np.stack(edge_features)
-        edge_features = F.zerocopy_from_numpy(edge_features.astype(np.int64))
-
         if self._self_loop:
             self_loop_features = torch.zeros((mol.GetNumAtoms(), 2), dtype=torch.int64)
             self_loop_features[:, 0] = len(self._bond_types)
+
+        if num_bonds == 0:
+            edge_features = self_loop_features
+        else:
+            edge_features = np.stack(edge_features)
+            edge_features = F.zerocopy_from_numpy(edge_features.astype(np.int64))
             edge_features = torch.cat([edge_features, self_loop_features], dim=0)
 
         return {'bond_type': edge_features[:, 0], 'bond_direction_type': edge_features[:, 1]}
