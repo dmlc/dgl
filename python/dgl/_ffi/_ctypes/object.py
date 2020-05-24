@@ -49,6 +49,7 @@ class ObjectBase(object):
     def __getattr__(self, name):
         if name == 'handle':
             raise AttributeError("'handle' is a reserved attribute name that should not be used")
+        print('in get attr:', name)
         ret_val = DGLValue()
         ret_type_code = ctypes.c_int()
         ret_success = ctypes.c_int()

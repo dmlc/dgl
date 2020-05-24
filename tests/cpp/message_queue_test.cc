@@ -8,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-#include "../src/graph/network/msg_queue.h"
+#include "../src/rpc/network/msg_queue.h"
 
 using std::string;
 using dgl::network::Message;
