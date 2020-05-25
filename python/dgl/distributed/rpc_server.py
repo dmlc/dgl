@@ -70,8 +70,8 @@ def start_server(server_id, ip_config, num_clients, \
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)
             rpc.send_response(client_id, register_res)
-    # main service loop
     server_state = get_server_state()
+    # main service loop
     while True:
         req, client_id = rpc.recv_request()
         res = req.process_request(server_state)
