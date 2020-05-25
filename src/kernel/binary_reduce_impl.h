@@ -40,12 +40,15 @@ GData<Idx, DType> AllocGData(const std::string& op,
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   if (!aten::IsNullArray(lhs_mapping)) {
+    gdata.lhs = lhs_mapping;
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!aten::IsNullArray(rhs_mapping)) {
+    gdata.rhs = rhs_mapping;
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!aten::IsNullArray(out_mapping)) {
+    gdata.out = out_mapping;
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
 
