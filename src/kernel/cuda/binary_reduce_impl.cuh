@@ -201,7 +201,8 @@ struct BinaryReduceBcast {
 // Auxiliary template used in UDF.
 template <typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
-          typename BinaryOp, typename Reducer>
+          typename BinaryOp, typename Reducer,
+          bool atomic=false>
 struct FunctorsTempl {
   static __device__ __forceinline__ Idx SelectOut(
       Idx src, Idx edge, Idx dst) {
@@ -219,7 +220,7 @@ struct FunctorsTempl {
     return BinaryOp::Call(lhs, rhs, len);
   }
   static __device__ __forceinline__ void Write(DType* addr, DType val) {
-    Reducer::Call(addr, val);
+    Reducer::Call<atomic>(addr, val);
   }
   static __device__ __forceinline__ Idx GetId(Idx id, Idx* id_map) {
     return LDGReader<Idx>::Call(id_map + id);
@@ -243,24 +244,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
-  /*
-  // csr
-  auto outcsr = graph.GetOutCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  */
+
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
     auto coo_matrix = graph.GetCOOMatrix();
     minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);

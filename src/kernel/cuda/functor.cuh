@@ -30,18 +30,12 @@ struct LDGReader {
 // Reducer functor specialization
 template <typename DType>
 struct ReduceSum<kDLGPU, DType> {
+  template <bool Atomic=false>
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    *addr += val;
-  }
-  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
-    return 1;
-  }
-};
-
-template <typename DType>
-struct ReduceSumAtomic<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    cuda::AtomicAdd(addr, val);
+    if (!Atomic)
+      *addr += val;
+    else
+      cuda::AtomicAdd(addr, val);
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return 1;
@@ -50,18 +44,12 @@ struct ReduceSumAtomic<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceMax<kDLGPU, DType> {
+  template <bool Atomic=false>
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    *addr = max(*addr, val);
-  }
-  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
-    return static_cast<DType>(val == accum);
-  }
-};
-
-template <typename DType>
-struct ReduceMaxAtomic<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    cuda::AtomicMax(addr, val);
+    if (!Atomic)
+      *addr = max(*addr, val);
+    else
+      cuda::AtomicMax(addr, val); 
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -70,18 +58,12 @@ struct ReduceMaxAtomic<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceMin<kDLGPU, DType> {
+  template <bool Atomic=false>
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    *addr = min(*addr, val);
-  }
-  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
-    return static_cast<DType>(val == accum);
-  }
-};
-
-template <typename DType>
-struct ReduceMinAtomic<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    cuda::AtomicMin(addr, val);
+    if (!Atomic)
+      *addr = min(*addr, val);
+    else
+      cuda::AtomicMin(addr, val);
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -90,18 +72,12 @@ struct ReduceMinAtomic<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceProd<kDLGPU, DType> {
+  template <bool Atomic=false>
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    *addr = *addr * val;
-  }
-  static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
-    return accum / val;
-  }
-};
-
-template <typename DType>
-struct ReduceProdAtomic<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    cuda::AtomicMul(addr, val);
+    if (!Atomic)
+      *addr = *addr * val;
+    else
+      cuda::AtomicMul(addr, val);
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return accum / val;
@@ -110,6 +86,7 @@ struct ReduceProdAtomic<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceNone<kDLGPU, DType> {
+  template <bool Atomic=false>
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     *addr = val;
   }

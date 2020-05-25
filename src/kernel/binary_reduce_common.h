@@ -47,7 +47,6 @@ enum Target {
 enum BackwardMode {
   kGradLhs = 0,  // compute lhs gradient
   kGradRhs,      // compute rhs gradient
-  kGradBoth,     // compute both gradients
 };
 }  // namespace binary_op
 
@@ -532,8 +531,7 @@ struct OutSelector<ReduceNone<XPU, DType>> {
 // macro for unrolling different backward mode
 #define GEN_BACKWARD_MODE(GEN, ...)        \
   MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradLhs))    \
-  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradRhs))    \
-  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradBoth))
+  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradRhs))    
 
 }  // namespace kernel
 }  // namespace dgl

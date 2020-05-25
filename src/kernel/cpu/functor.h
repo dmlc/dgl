@@ -19,10 +19,16 @@ namespace kernel {
 
 template <typename DType>
 struct ReduceSum<kDLCPU, DType> {
+  template <bool Atomic=false>
   static void Call(DType* addr, DType val) {
     if (0 == val)
       return;
-    *addr += val;
+    if (!Atomic)
+      *addr += val;
+    else {
+#pragma omp atomic
+      *addr += val;
+    }
   }
   static DType BackwardCall(DType val, DType accum) {
     return 1;
@@ -30,34 +36,15 @@ struct ReduceSum<kDLCPU, DType> {
 }
 
 template <typename DType>
-struct ReduceSumAtomic<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
-    if (0 == val)
-      return;
-#pragma omp atomic
-    *addr += val;
-  }
-  static DType BackwardCall(DType val, DType accum) {
-    return 1;
-  }
-};
-
-template <typename DType>
 struct ReduceMax<kDLCPU, DType> {
+  template <bool Atomic=false>
   static void Call(DType* addr, DType val) {
+    if (!Atomic)
+      *addr = std::max(*addr, val);
+    else {
 #pragma omp critical
-    *addr = std::max(*addr, val);
-  }
-  static DType BackwardCall(DType val, DType accum) {
-    return static_cast<DType>(val == accum);
-  }
-};
-
-template <typename DType>
-struct ReduceMaxAtomic<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
-#pragma omp critical
-    *addr = std::max(*addr, val);
+      *addr = std::max(*addr, val);
+    }
   }
   static DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -66,19 +53,14 @@ struct ReduceMaxAtomic<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceMin<kDLCPU, DType> {
+  template <bool Atomic=false>
   static void Call(DType* addr, DType val) {
-    *addr = std::min(*addr, val);
-  }
-  static DType BackwardCall(DType val, DType accum) {
-    return static_cast<DType>(val == accum);
-  }
-};
-
-template <typename DType>
-struct ReduceMinAtomic<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
+    if (!Atomic)
+      *addr = std::min(*addr, val);
+    else {
 #pragma omp critical
-    *addr = std::min(*addr, val);
+      *addr = std::min(*addr, val);
+    }
   }
   static DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -87,19 +69,14 @@ struct ReduceMinAtomic<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceProd<kDLCPU, DType> {
+  template <bool Atomic=false>
   static void Call(DType* addr, DType val) {
-    *addr *= val;
-  }
-  static DType BackwardCall(DType val, DType accum) {
-    return accum / val;
-  }
-};
-
-template <typename DType>
-struct ReduceProdAtomic<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
+    if (!Atomic)
+      *addr *= val;
+    else {
 #pragma omp atomic
-    *addr *= val;
+      *addr *= val;
+    }
   }
   static DType BackwardCall(DType val, DType accum) {
     return accum / val;
@@ -108,6 +85,7 @@ struct ReduceProdAtomic<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceNone<kDLCPU, DType> {
+  template <bool Atomic=false>
   static void Call(DType* addr, DType val) {
     *addr = val;
   }
