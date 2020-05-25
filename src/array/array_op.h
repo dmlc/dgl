@@ -51,6 +51,9 @@ NDArray Repeat(NDArray array, IdArray repeats);
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray MergeIDMapping(runtime::NDArray a, runtime::NDArray b);
+
 template <DLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value);
 

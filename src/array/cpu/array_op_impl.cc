@@ -184,6 +184,47 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 template IdArray Relabel_<kDLCPU, int32_t>(const std::vector<IdArray>& arrays);
 template IdArray Relabel_<kDLCPU, int64_t>(const std::vector<IdArray>& arrays);
 
+////////////////////////// MergeIDMapping /////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+NDArray MergeIDMapping(NDArray a, NDArray b) {
+  // If csr is in GPU, copy it to CPU, translate the mapping and copy to GPU
+  const IdType* a_data;
+  const IdType* b_data;
+  NDArray tmp_a;
+  NDArray tmp_b;
+  CHECK(a->ndim == 1 && b->ndim == 1) << "mappings must be 1D tensors";
+  CHECK(a->shape[0] == b->shape[0]) << "mappings must have the same shape";
+  CHECK(a->dtype.code == b->dtype.code) << "two mapping should have same dtype";
+  CHECK(a->dtype.bits == b->dtype.bits) << "two mapping should have same dtype";
+  int64_t N = a->shape[0];
+
+  if (XPU == kDLGPU) {
+    CHECK(a->ctx.device_type == kDLGPU) << "a mapping should be in GPU";
+    CHECK(b->ctx.device_type == kDLGPU) << "b mapping should be in GPU";
+    tmp_a = a.CopyTo(DLContext{kDLCPU, 0});
+    tmp_b = b.CopyTo(DLContext{kDLCPU, 0});
+
+    a_data = static_cast<IdType*>(tmp_a->data);
+    b_data = static_cast<IdType*>(tmp_b->data);
+  } else {
+    a_data = static_cast<IdType*>(a->data);
+    b_data = static_cast<IdType*>(b->data);
+  }
+
+  NDArray ret_data = NDArray::Empty({N}, a->dtype, DLContext{kDLCPU, 0});
+  IdType *ret_data_data = static_cast<IdType*>(ret_data->data);
+  for (int64_t i = 0; i < N; ++i) {
+    ret_data_data[i] = b_data[a_data[i]];
+  }
+
+  if (XPU == kDLGPU) {
+    return ret_data.CopyTo(a->ctx);
+  }
+
+  return ret_data;
+}
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl

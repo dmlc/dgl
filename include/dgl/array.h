@@ -700,8 +700,8 @@ std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix , int64_t row);
 
 /*! \brief Whether the COO matrix contains data */
-inline bool COOHasData(COOMatrix csr) {
-  return !IsNullArray(csr.data);
+inline bool COOHasData(COOMatrix coo) {
+  return !IsNullArray(coo.data);
 }
 
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */

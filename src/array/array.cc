@@ -295,6 +295,16 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   return ret;
 }
 
+NDArray MergeIDMapping(NDArray a, NDArray b) {
+  NDArray ret;
+  ATEN_XPU_SWITCH(a->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(a->dtype, IdType, {
+      ret = impl::MergeIDMapping<XPU, IdType>(a, b);
+    });
+  });
+  return ret;
+}
+
 ///////////////////////// CSR routines //////////////////////////
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
