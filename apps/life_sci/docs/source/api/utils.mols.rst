@@ -114,6 +114,7 @@ For using featurization methods like above in creating node features:
     dgllife.utils.BaseAtomFeaturizer.feat_size
     dgllife.utils.CanonicalAtomFeaturizer
     dgllife.utils.CanonicalAtomFeaturizer.feat_size
+    dgllife.utils.PretrainAtomFeaturizer
 
 Featurization for Edges
 ```````````````````````
@@ -134,6 +135,7 @@ We consider the following bond descriptors:
     dgllife.utils.bond_is_in_ring_one_hot
     dgllife.utils.bond_is_in_ring
     dgllife.utils.bond_stereo_one_hot
+    dgllife.utils.bond_direction_one_hot
 
 For using featurization methods like above in creating edge features:
 
@@ -144,3 +146,4 @@ For using featurization methods like above in creating edge features:
     dgllife.utils.BaseBondFeaturizer.feat_size
     dgllife.utils.CanonicalBondFeaturizer
     dgllife.utils.CanonicalBondFeaturizer.feat_size
+    dgllife.utils.PretrainBondFeaturizer
