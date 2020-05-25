@@ -43,8 +43,10 @@ struct GData {
   // output data
   DType *out_data{nullptr};
   // input id mappings
+  runtime::NDArray lhs{nullptr}, rhs{nullptr};
   Idx *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output id mapping
+  runtime::NDArray out{nullptr};
   Idx *out_mapping{nullptr};
 };
 
@@ -125,10 +127,12 @@ struct BackwardGData {
   DType *lhs_data{nullptr}, *rhs_data{nullptr}, *out_data{nullptr};
   DType *grad_out_data{nullptr};
   // output data
+  runtime::NDArray lhs{nullptr}, rhs{nullptr};
   DType *grad_lhs_data{nullptr}, *grad_rhs_data{nullptr};
   // input id mappings
   Idx *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output id mapping
+  runtime::NDArray out{nullptr};
   Idx *out_mapping{nullptr};
 };
 
@@ -227,8 +231,10 @@ struct BcastGData {
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
   // input id mappings
+  runtime::NDArray lhs{nullptr}, rhs{nullptr};
   Idx *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output feature shape and stride
+  runtime::NDArray out{nullptr};
   int64_t out_len{0};  // output total feature length (equal to prod(out_shape));
   int64_t out_shape[NDim]{0}, out_stride[NDim]{0};
   // output data
@@ -331,6 +337,7 @@ struct BackwardBcastGData {
   // size of data, can be single value or a vector
   int64_t data_len{0};
   // input id mappings
+  runtime::NDArray lhs{nullptr}, rhs{nullptr}, out{nullptr};
   Idx *lhs_mapping{nullptr}, *rhs_mapping{nullptr}, *out_mapping{nullptr};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr}, *out_data{nullptr};

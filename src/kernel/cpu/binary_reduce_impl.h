@@ -46,7 +46,88 @@ struct BinaryReduce {
       Functors::Write(outoff + tx, out);
     }
   }
+
+  static inline void ApplyEdgeReduce(
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval, GData<Idx, DType>* gdata) {
+    const int64_t D = gdata->x_length;
+    const int64_t len = gdata->data_len;
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, ddst);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rhd * D * len;
+    DType out = Functors::Op(lhsoff + feat_idx * len, rhsoff + feat_idx * len, len);
+    Functors::Write(outval, out);
+  }
+
+  static inline Idx GetFeatSize(GData<Idx, DType> *gdata) {
+    return gdata->x_length;
+  }
+  
+  static inline DType *GetOutBuf(GData<Idx, DType> *gdata) {
+    return gdata->out_data;
+  }
+
+  static inline Idx GetOutOffset(Idx oid, GData<Idx, DType> *gdata) {
+    if (gdata->out_mapping) {
+      oid = Functors::GetID(oid, gdata->out_mapping);
+    }
+    return oid;
+  }
 };
+
+/*
+ * This func do the followings:
+ *   1. Convert flattened index to multi-dimension index
+ *      according to output shape (assume row-major).
+ *   2. Convert multi-dimension index to flattened index for lhs.
+ *   3. Convert multi-dimension index to flattened index for rhs.
+ */
+inline void UnravelRavel(
+    const int64_t idx, const int ndim, const int64_t* out_shape, const int64_t* out_stride,
+    const int64_t* lhs_shape, const int64_t* lhs_stride,
+    const int64_t* rhs_shape, const int64_t* rhs_stride, int64_t *lhs_out, int64_t *rhs_out) {
+  if (out_stride[0] == lhs_stride[0]) {
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t rhs_sh = rhs_shape[d];
+      int64_t rhs_st = rhs_stride[d];
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for rhs_out += min(i, rhs_sh - 1) * rhs_st;
+       * rhs_sh be o_sh or 1
+       */
+      if (rhs_sh > i) {
+        *rhs_out += i * rhs_st;
+      }
+    }
+    *lhs_out = idx;
+  } else {
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t lhs_sh = lhs_shape[d];
+      int64_t lhs_st = lhs_stride[d];
+
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for lhs_out += min(i, lhs_sh - 1) * lhs_st;
+       * lhs_sh be o_sh or 1
+       */
+      if (lhs_sh > i) {
+        *lhs_out += i * lhs_st;
+      }
+    }
+    *rhs_out = idx;
+  }
+}
 
 // Convert flattened index to multi-dimension index (assume row-major).
 inline void Unravel(int64_t idx, int ndim,
@@ -87,16 +168,55 @@ struct BinaryReduceBcast {
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  // data with len size
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
     for (int64_t tx = 0; tx < gdata->out_len; ++tx) {
-      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-      DType out = Functors::Op(
-          lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len,
-          rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
-          len);
-
-      Functors::Write(outoff + tx, out);
+      int64_t lhs_add = 0;
+      int64_t rhs_add = 0;
+      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+          gdata->lhs_shape, gdata->lhs_stride,
+          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
+      DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
+      DType* outaddr = outoff + tx;
+      Functors::Write(outaddr, out);
     }
+  }
+
+  static inline void ApplyEdgeReduce(
+    Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval, BcastGData<NDim, Idx, DType>* gdata) {
+    const int64_t len = gdata->data_len;
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  // data with len size
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
+
+    int64_t lhs_add = 0;
+    int64_t rhs_add = 0;
+    UnravelRavel(feat_idx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+        gdata->lhs_shape, gdata->lhs_stride,
+        gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
+    DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
+    Functors::Write(outval, out);
+  }
+
+  static inline Idx GetFeatSize(BcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_len;
+  }
+
+  static inline DType *GetOutBuf(BcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_data;
+  }
+
+  static inline Idx GetOutOffset(Idx oid, BcastGData<NDim, Idx, DType> *gdata) {
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
+
+    return oid;
   }
 };
 
@@ -145,25 +265,78 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cpu::BinaryReduce<Idx, DType, Functors> UDF;
-  // csr
-  auto outcsr = graph.GetOutCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
+  
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
+    // Out Target is Edge, we need use COO format
+    auto coo_matrix = graph.GetCOOMatrix();
+    minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
+    // If the user-given mapping is none and the target is edge data, we need to
+    // replace the mapping by the edge ids in the csr graph so that the edge
+    // data is correctly read/written.
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(coo_matrix.data, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(coo_matrix.data, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+    if (gdata->out_mapping == nullptr) {
+      gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    } else {
+      out_map = aten::MergeIDMapping(coo_matrix.data, gdata->out);
+      gdata->out_mapping = static_cast<Idx*>(out_map->data);
+    }
+
+    minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
+    // TODO(minjie): allocator
+    minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceEdgeConfig,
+      GData<Idx, DType>, UDF>(
+          rtcfg, spmat, gdata);
+  } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
+    CHECK(false) << "BinaryReduce target should not be kSrc";
+  } else if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
+    // Out Target is destination Node, we need use CSR_t format
+    // so data are aggregated in columns
+    auto incsr = graph.GetInCSRMatrix();
+    minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
+
+    // If the user-given mapping is none and the target is edge data, we need to
+    // replace the mapping by the edge ids in the csr graph so that the edge
+    // data is correctly read/written.
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(incsr.data, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(incsr.data, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+
+    minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
+    // TODO(minjie): allocator
+    minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceDstConfig,
+      GData<Idx, DType>, UDF>(
+          rtcfg, spmat, gdata);
   }
-  if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig, GData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata);
 }
 
 // Template implementation of BinaryReduce broadcasting operator.
@@ -178,26 +351,83 @@ void CallBinaryReduceBcast(
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cpu::BinaryReduceBcast<NDim, Idx, DType, Functors> UDF;
-  // csr
-  auto outcsr = graph.GetOutCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
+
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
+    // Out Target is Edge, we need use COO format
+    auto coo_matrix = graph.GetCOOMatrix();
+    minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
+    // If the user-given mapping is none and the target is edge data, we need to
+    // replace the mapping by the edge ids in the csr graph so that the edge
+    // data is correctly read/written.
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        auto target_mapping = coo_matrix.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        auto target_mapping = coo_matrix.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+    if (gdata->out_mapping == nullptr) {
+      gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    } else {
+      auto target_mapping = coo_matrix.data;
+      out_map = aten::MergeIDMapping(target_mapping, gdata->out);
+      gdata->out_mapping = static_cast<Idx*>(out_map->data);
+    }
+
+    minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
+    // TODO(minjie): allocator
+    minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceEdgeConfig,
+      BcastGData<NDim, Idx, DType>, UDF>(
+          rtcfg, spmat, gdata);
+  } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
+    CHECK(false) << "BinaryReduceBcast target should not be kSrc";
+  } else if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
+    // Out Target is destination Node, we need use CSR_t format
+    // so data are aggregated in columns
+    auto incsr = graph.GetInCSRMatrix();
+    minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
+
+    // If the user-given mapping is none and the target is edge data, we need to
+    // replace the mapping by the edge ids in the csr graph so that the edge
+    // data is correctly read/written.
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        auto target_mapping = incsr.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        auto target_mapping = incsr.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+
+    minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
+    // TODO(minjie): allocator
+    minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceDstConfig,
+      BcastGData<NDim, Idx, DType>, UDF>(
+          rtcfg, spmat, gdata);
   }
-  if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig,
-    BcastGData<NDim, Idx, DType>, UDF>(
-        rtcfg, csr, gdata);
 }
 
 // Following macro is used to generate explicit-specialization of the template
