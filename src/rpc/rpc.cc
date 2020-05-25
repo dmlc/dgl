@@ -281,7 +281,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   auto st = RPCContext::ThreadLocal()->server_state;
-  CHECK(st) << "Server state has not been initialized.";
+  if (st.get() == nullptr) {
+    RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
+  }
   *rv = st;
 });
 
