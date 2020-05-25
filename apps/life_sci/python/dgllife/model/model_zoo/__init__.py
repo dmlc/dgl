@@ -12,3 +12,4 @@ from .acnn import *
 from .wln_reaction_center import *
 from .wln_reaction_ranking import *
 from .weave_predictor import *
+from .gin_predictor import *
