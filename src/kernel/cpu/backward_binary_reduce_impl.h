@@ -330,19 +330,9 @@ void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const SparseMatrixWrapper& graph,
     BackwardGData<Idx, DType>* gdata) {
-  /*
-  // For backward computation, we use reverse csr and switch dst and src.
-  // This benefits the most common src_op_edge or copy_src case, because the
-  // gradients of src are now aggregated into destination buffer to reduce
-  // competition of atomic add.
-  auto incsr = graph.GetInCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-  */
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
-          //typename SwitchSrcDst<LeftSelector>::Type,
-          //typename SwitchSrcDst<RightSelector>::Type,
           LeftSelector, RightSelector,
-          BinaryOp, Reducer> Functors;
+          BinaryOp, Reducer, false> Functors;
   typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
   if (Mode == binary_op::kGradLhs) {
     if (LeftSelector::target == binary_op::kEdge) {
@@ -571,18 +561,9 @@ void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const SparseMatrixWrapper& graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata) {
-  /*
-  // For backward computation, we use reverse csr and switch dst and src.
-  // This benefits the most common src_op_edge or copy_src case, because the
-  // gradients of src are now aggregated into destination buffer to reduce
-  // competition of atomic add.
-  auto incsr = graph.GetInCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-  */
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
-          // typename SwitchSrcDst<LeftSelector>::Type,
-          // typename SwitchSrcDst<RightSelector>::Type,
-          BinaryOp, Reducer> Functors;
+          LeftSelector, RightSelector,
+          BinaryOp, Reducer, false> Functors;
   typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, Idx, DType, Functors> UDF;
   if (Mode == binary_op::kGradLhs) {
     if (LeftSelector::target == binary_op::kEdge) {

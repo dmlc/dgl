@@ -223,7 +223,8 @@ struct BinaryReduceBcast {
 // Auxiliary template used in UDF.
 template <typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
-          typename BinaryOp, typename Reducer>
+          typename BinaryOp, typename Reducer,
+          bool Atomic=false>
 struct FunctorsTempl {
   static inline Idx SelectOut(
       Idx src, Idx edge, Idx dst) {
@@ -238,7 +239,7 @@ struct FunctorsTempl {
     return RightSelector::Call(src, edge, dst);
   }
   static inline DType Op(DType *lhs, DType *rhs, int64_t len) {
-    return BinaryOp::Call(lhs, rhs, len);
+    return BinaryOp::Call<Atomic>(lhs, rhs, len);
   }
   static inline void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
@@ -262,7 +263,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                       const SparseMatrixWrapper& graph,
                       GData<Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
+                        RightSelector, BinaryOp, Reducer, false>
           Functors;
   typedef cpu::BinaryReduce<Idx, DType, Functors> UDF;
   
@@ -348,7 +349,7 @@ void CallBinaryReduceBcast(
   const SparseMatrixWrapper& graph,
   BcastGData<NDim, Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
+                        RightSelector, BinaryOp, Reducer, false>
           Functors;
   typedef cpu::BinaryReduceBcast<NDim, Idx, DType, Functors> UDF;
 

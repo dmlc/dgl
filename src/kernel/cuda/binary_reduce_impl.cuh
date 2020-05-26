@@ -202,7 +202,7 @@ struct BinaryReduceBcast {
 template <typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer,
-          bool atomic=false>
+          bool Atomic=false>
 struct FunctorsTempl {
   static __device__ __forceinline__ Idx SelectOut(
       Idx src, Idx edge, Idx dst) {
@@ -220,7 +220,7 @@ struct FunctorsTempl {
     return BinaryOp::Call(lhs, rhs, len);
   }
   static __device__ __forceinline__ void Write(DType* addr, DType val) {
-    Reducer::Call<atomic>(addr, val);
+    Reducer::Call<Atomic>(addr, val);
   }
   static __device__ __forceinline__ Idx GetId(Idx id, Idx* id_map) {
     return LDGReader<Idx>::Call(id_map + id);
@@ -241,7 +241,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                       const SparseMatrixWrapper& graph,
                       GData<Idx, DType>* gdata) {
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
+                        RightSelector, BinaryOp, Reducer, false>
           Functors;
   typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
 
@@ -325,7 +325,7 @@ void CallBinaryReduceBcast(
   const SparseMatrixWrapper& graph,
   BcastGData<NDim, Idx, DType>* gdata) {
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
+                        RightSelector, BinaryOp, Reducer, false>
           Functors;
   typedef cuda::BinaryReduceBcast<NDim, Idx, DType, Functors> UDF;
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
