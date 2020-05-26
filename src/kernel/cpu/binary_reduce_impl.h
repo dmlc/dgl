@@ -52,7 +52,7 @@ struct BinaryReduce {
     const int64_t D = gdata->x_length;
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
-    Idx rid = Functors::SelectRight(src, eid, ddst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
     if (gdata->lhs_mapping) {
       lid = Functors::GetId(lid, gdata->lhs_mapping);
     }
@@ -61,7 +61,7 @@ struct BinaryReduce {
     }
 
     DType* lhsoff = gdata->lhs_data + lid * D * len;
-    DType* rhsoff = gdata->rhs_data + rhd * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType out = Functors::Op(lhsoff + feat_idx * len, rhsoff + feat_idx * len, len);
     Functors::Write(outval, out);
   }
@@ -76,7 +76,7 @@ struct BinaryReduce {
 
   static inline Idx GetOutOffset(Idx oid, GData<Idx, DType> *gdata) {
     if (gdata->out_mapping) {
-      oid = Functors::GetID(oid, gdata->out_mapping);
+      oid = Functors::GetId(oid, gdata->out_mapping);
     }
     return oid;
   }
@@ -239,9 +239,10 @@ struct FunctorsTempl {
     return RightSelector::Call(src, edge, dst);
   }
   static inline DType Op(DType *lhs, DType *rhs, int64_t len) {
-    return BinaryOp::Call<Atomic>(lhs, rhs, len);
+    return BinaryOp::Call(lhs, rhs, len);
   }
   static inline void Write(DType* addr, DType val) {
+    // Reducer::Call<Atomic>(addr, val);
     Reducer::Call(addr, val);
   }
   static inline Idx GetId(Idx id, Idx* id_map) {

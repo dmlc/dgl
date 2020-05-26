@@ -33,7 +33,7 @@ struct ReduceSum<kDLCPU, DType> {
   static DType BackwardCall(DType val, DType accum) {
     return 1;
   }
-}
+};
 
 template <typename DType>
 struct ReduceMax<kDLCPU, DType> {

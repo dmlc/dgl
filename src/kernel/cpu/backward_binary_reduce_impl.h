@@ -53,16 +53,12 @@ struct BackwardBinaryReduce {
       DType* rhs_base = rhsoff + tx * len;
       if (Mode == binary_op::kGradLhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           Functors::Write(gradlhsoff + tx * len + i, grad_lhs);
         }
       } else if (Mode == binary_op::kGradRhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           Functors::Write(gradrhsoff + tx * len + i, grad_rhs);
         }
       }
@@ -180,16 +176,12 @@ struct BackwardBinaryReduceBcast {
       DType* rhs_base = rhsoff + rhs_add * len;
       if (Mode == binary_op::kGradLhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           Functors::Write(gradlhsoff + tx * len + i, grad_lhs);
         }
       } else if (Mode == binary_op::kGradRhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           Functors::Write(gradrhsoff + tx * len + i, grad_rhs);
         }
       }
@@ -308,10 +300,48 @@ struct BackwardFunctorsTempl {
   static inline DType BackwardWrite(DType val, DType accum) {
     return Reducer::BackwardCall(val, accum);
   }
-  static inline DType BackwardOpLhs(DType lhs, DType rhs, DType out) {
+  static inline DType BackwardOpLhs(DType* lhs_base,
+                                    DType* rhs_base,
+                                    int64_t i,
+                                    DType out) {
+    DType lhs = 0;
+    DType rhs = 0;
+    switch (BinaryOp::BackwardLhsReadMode()) {
+      case binary_op::kBackReadRhs:
+        rhs = Read(rhs_base + i);
+        break;
+      case binary_op::kBackReadLhs:
+        lhs = Read(lhs_base + i);
+        break;
+      case binary_op::kBackReadBoth:
+        lhs = Read(lhs_base + i);
+        rhs = Read(rhs_base + i);
+        break;
+      default:
+        break;
+    }
     return BinaryOp::BackwardLhs(lhs, rhs, out);
   }
-  static inline DType BackwardOpRhs(DType lhs, DType rhs, DType out) {
+  static inline DType BackwardOpRhs(DType* lhs_base,
+                                    DType* rhs_base,
+                                    int64_t i,
+                                    DType out) {
+    DType lhs = 0;
+    DType rhs = 0;
+    switch (BinaryOp::BackwardRhsReadMode()) {
+      case binary_op::kBackReadRhs:
+        rhs = Read(rhs_base + i);
+        break;
+      case binary_op::kBackReadLhs:
+        lhs = Read(lhs_base + i);
+        break;
+      case binary_op::kBackReadBoth:
+        lhs = Read(lhs_base + i);
+        rhs = Read(rhs_base + i);
+        break;
+      default:
+        break;
+    }
     return BinaryOp::BackwardRhs(lhs, rhs, out);
   }
 };

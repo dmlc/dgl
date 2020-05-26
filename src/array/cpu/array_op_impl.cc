@@ -225,6 +225,11 @@ NDArray MergeIDMapping(NDArray a, NDArray b) {
   return ret_data;
 }
 
+template NDArray MergeIDMapping<kDLCPU, int32_t>(NDArray a, NDArray b);
+template NDArray MergeIDMapping<kDLCPU, int64_t>(NDArray a, NDArray b);
+template NDArray MergeIDMapping<kDLGPU, int32_t>(NDArray a, NDArray b);
+template NDArray MergeIDMapping<kDLGPU, int64_t>(NDArray a, NDArray b);
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl
