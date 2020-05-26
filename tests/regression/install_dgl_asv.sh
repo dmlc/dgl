@@ -16,6 +16,7 @@ pip uninstall -y dgl
 python3 setup.py install
 # test inplace build (for cython)
 python3 setup.py build_ext --inplace
+python3 -m pip install -r /root/requirement.txt
 done
 popd
 conda deactivate
