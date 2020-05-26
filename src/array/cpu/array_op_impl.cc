@@ -189,6 +189,10 @@ template IdArray Relabel_<kDLCPU, int64_t>(const std::vector<IdArray>& arrays);
 template <DLDeviceType XPU, typename IdType>
 NDArray MergeIDMapping(NDArray a, NDArray b) {
   // If csr is in GPU, copy it to CPU, translate the mapping and copy to GPU
+  if (IsNullArray(a))
+    return b;
+  if (IsNullArray(b))
+    return a;
   const IdType* a_data;
   const IdType* b_data;
   NDArray tmp_a;

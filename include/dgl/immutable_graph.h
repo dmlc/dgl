@@ -266,7 +266,7 @@ class CSR : public GraphInterface {
 class COO : public GraphInterface {
  public:
   // Create a coo graph that shares the given src and dst
-  COO(int64_t num_vertices, IdArray src, IdArray dst);
+  COO(int64_t num_vertices, IdArray src, IdArray dst, IdArray eids = aten::NullArray());
 
   // TODO(da): add constructor for creating COO from shared memory
 
@@ -450,7 +450,7 @@ class COO : public GraphInterface {
 
   /*! \brief Return the transpose of this COO */
   COOPtr Transpose() const {
-    return COOPtr(new COO(adj_.num_rows, adj_.col, adj_.row));
+    return COOPtr(new COO(adj_.num_rows, adj_.col, adj_.row, adj_.data));
   }
 
   /*! \brief Convert this COO to CSR */

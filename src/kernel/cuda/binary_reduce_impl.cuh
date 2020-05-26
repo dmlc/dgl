@@ -196,6 +196,22 @@ struct BinaryReduceBcast {
     DType out = Functors::Op(lhs_off + lhs_add * len, rhs_off + rhs_add * len, len);
     Functors::Write(outval, out);
   }
+
+  static __device__ __forceinline__ Idx GetFeatSize(BcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_len;
+  }
+
+  static __device__ __forceinline__ DType * GetOutBuf(BcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_data;
+  }
+
+  static __device__ __forceinline__ Idx GetOutOffset(Idx oid, BcastGData<NDim, Idx, DType> *gdata) {
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
+
+    return oid;
+  }
 };
 
 // Auxiliary template used in UDF.
@@ -220,7 +236,8 @@ struct FunctorsTempl {
     return BinaryOp::Call(lhs, rhs, len);
   }
   static __device__ __forceinline__ void Write(DType* addr, DType val) {
-    Reducer::Call<Atomic>(addr, val);
+    // http://www.aerialmantis.co.uk/blog/2017/03/17/template-keywords/
+    Reducer::template Call<Atomic>(addr, val);
   }
   static __device__ __forceinline__ Idx GetId(Idx id, Idx* id_map) {
     return LDGReader<Idx>::Call(id_map + id);
