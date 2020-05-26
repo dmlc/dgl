@@ -6,10 +6,8 @@ import os
 from pathlib import Path
 import numpy as np
 import tempfile
-from ogb.nodeproppred import DglNodePropPredDataset
 
 base_path = Path("~/regression/dgl/")
-
 
 class PartitionBenchmark:
 
