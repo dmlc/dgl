@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
+#include <google/dense_hash_map>
 #include "../../c_api_common.h"
 
 #define CHECK_SAME_DTYPE(VAR1, VAR2)                                          \
@@ -33,14 +34,19 @@ template <typename IdType>
 class IdHashMap {
  public:
   // default ctor
-  IdHashMap(): filter_(kFilterSize, false) {}
+  IdHashMap(): filter_(kFilterSize, false) {
+    IdType empty_key = -1;
+    oldv2newv_.set_empty_key(empty_key);
+  }
 
   // Construct the hashmap using the given id array.
   // The id array could contain duplicates.
   // If the id array has no duplicates, the array will be relabeled to consecutive
   // integers starting from 0.
   explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
-    oldv2newv_.reserve(ids->shape[0]);
+    IdType empty_key = -1;
+    oldv2newv_.set_empty_key(empty_key);
+    oldv2newv_.resize(ids->shape[0]);
     Update(ids);
   }
 
@@ -48,7 +54,7 @@ class IdHashMap {
   IdHashMap(const IdHashMap &other) = default;
 
   void Reserve(const int64_t size) {
-    oldv2newv_.reserve(size);
+    oldv2newv_.resize(size);
   }
 
   // Update the hashmap with given id array.
@@ -112,7 +118,7 @@ class IdHashMap {
   // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
   std::vector<bool> filter_;
   // The hashmap from old vid to new vid
-  std::unordered_map<IdType, IdType> oldv2newv_;
+  google::dense_hash_map<IdType, IdType> oldv2newv_;
 };
 
 /*
