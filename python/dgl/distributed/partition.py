@@ -236,8 +236,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         for part_id in range(num_parts):
             part = client_parts[part_id]
             local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'])
-            num_local_nodes = F.as_scalar(F.sum(part.ndata['inner_node'], 0))
-            num_local_edges = F.as_scalar(F.sum(g.in_degrees(local_nodes), 0))
+            num_local_nodes = F.asnumpy(F.sum(part.ndata['inner_node'], 0))
+            num_local_edges = F.asnumpy(F.sum(g.in_degrees(local_nodes), 0))
             num_edges += num_local_edges
             num_nodes += num_local_nodes
             lnodes_list.append(num_nodes)
