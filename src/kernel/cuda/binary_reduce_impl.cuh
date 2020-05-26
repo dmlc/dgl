@@ -271,7 +271,8 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
     runtime::NDArray out_map;
     if (LeftSelector::target == binary_op::kEdge) {
       if (gdata->lhs_mapping == nullptr) {
-        gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+        if (!aten::IsNullArray(coo_matrix.data))
+          gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
       } else {
         out_map = aten::MergeIDMapping(coo_matrix.data, gdata->lhs);
         gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
@@ -279,14 +280,16 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
     }
     if (RightSelector::target == binary_op::kEdge) {
       if (gdata->rhs_mapping == nullptr) {
-        gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+        if (!aten::IsNullArray(coo_matrix.data))
+          gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
       } else {
         out_map = aten::MergeIDMapping(coo_matrix.data, gdata->rhs);
         gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
       }
     }
     if (gdata->out_mapping == nullptr) {
-      gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      if (!aten::IsNullArray(coo_matrix.data))
+        gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
     } else {
       out_map = aten::MergeIDMapping(coo_matrix.data, gdata->out);
       gdata->out_mapping = static_cast<Idx*>(out_map->data);
@@ -355,7 +358,8 @@ void CallBinaryReduceBcast(
     runtime::NDArray out_map;
     if (LeftSelector::target == binary_op::kEdge) {
       if (gdata->lhs_mapping == nullptr) {
-        gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+        if (!aten::IsNullArray(coo_matrix.data))
+          gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
       } else {
         auto target_mapping = coo_matrix.data;
         out_map = aten::MergeIDMapping(target_mapping, gdata->lhs);
@@ -364,7 +368,8 @@ void CallBinaryReduceBcast(
     }
     if (RightSelector::target == binary_op::kEdge) {
       if (gdata->rhs_mapping == nullptr) {
-        gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+        if (!aten::IsNullArray(coo_matrix.data))
+          gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
       } else {
         auto target_mapping = coo_matrix.data;
         out_map = aten::MergeIDMapping(target_mapping, gdata->rhs);
@@ -372,7 +377,8 @@ void CallBinaryReduceBcast(
       }
     }
     if (gdata->out_mapping == nullptr) {
-      gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      if (!aten::IsNullArray(coo_matrix.data))
+        gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
     } else {
       auto target_mapping = coo_matrix.data;
       out_map = aten::MergeIDMapping(target_mapping, gdata->out);
