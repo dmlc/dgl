@@ -159,25 +159,41 @@ void FallbackCallBinaryReduce(
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
-  // csr
-  auto outcsr = graph.GetOutCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
+  if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
+    // Out Target is destination Node, we need use CSR_t format
+    // so data are aggregated in columns
+    auto incsr = graph.GetInCSRMatrix();
+    minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
+
+    // If the user-given mapping is none and the target is edge data, we need to
+    // replace the mapping by the edge ids in the csr graph so that the edge
+    // data is correctly read/written.
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(incsr.data, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(incsr.data, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
+    }
+
+    minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
+    // TODO(minjie): allocator
+    minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig,
+      GData<Idx, DType>, UDF>(
+          rtcfg, spmat, gdata);
+  } else {
+    CHECK(false) << "FallbackCallBinaryReduce should only have Reducer target == KDst";
   }
-  if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, GData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
 template <typename DType>
@@ -192,35 +208,43 @@ void FallbackCallBackwardBinaryReduce(
   typedef SelectNone RightSelector;
   typedef BinaryUseLhs<DType> BinaryOp;
   typedef ReduceSum<kDLGPU, DType> Reducer;
-  // For backward computation, we use reverse csr and switch dst and src.
-  // This benefits the most common src_op_edge or copy_src case, because the
-  // gradients of src are now aggregated into destination buffer to reduce
-  // competition of atomic add.
-  auto incsr = graph.GetInCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
+
   typedef cuda::BackwardFunctorsTempl<Idx, DType,
-          typename SwitchSrcDst<LeftSelector>::Type,
-          typename SwitchSrcDst<RightSelector>::Type,
+          LeftSelector, RightSelector,
           BinaryOp, Reducer> Functors;
   typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge
-      && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+
+  // Only Mode == binary_op::kGradLhs
+  // Only LeftSelector::target == binary_op::kSrc)
+  CHECK(Mode == binary_op::kGradLhs) << "Only KGradLhs";
+  CHECK(LeftSelector::target == binary_op::kSrc) << "Only target == kSrc";
+
+  // Out Target is source Node, we need use CSR format
+  // so data are aggregated in rows
+  auto outcsr = graph.GetOutCSRMatrix();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
+  runtime::NDArray out_map;
+  if (RightSelector::target == binary_op::kEdge) {
+    if (gdata->rhs_mapping == nullptr) {
+      gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
+    } else {
+      out_map = aten::MergeIDMapping(outcsr.data, gdata->rhs);
+      gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+    }
   }
-  if (RightSelector::target == binary_op::kEdge
-      && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
+    if (gdata->out_mapping == nullptr) {
+      gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
+    } else {
+      out_map = aten::MergeIDMapping(outcsr.data, gdata->out);
+      gdata->out_mapping = static_cast<Idx*>(out_map->data);
+    }
   }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(incsr.data->data);
-  }
-  // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, BackwardGData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+
+  minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
+  minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceSrcConfig,
+  BackwardGData<Idx, DType>, UDF>(
+      rtcfg, spmat, gdata);
 }
 
 }  // namespace cuda
