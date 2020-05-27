@@ -14,7 +14,7 @@
 #include <string>
 
 #include "../c_api_common.h"
-#include "./network/msg_queue.h"
+#include "../rpc/network/msg_queue.h"
 
 using dgl::runtime::NDArray;
 

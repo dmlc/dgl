@@ -54,6 +54,11 @@ Weave Predictor
 .. automodule:: dgllife.model.model_zoo.weave_predictor
     :members:
 
+GIN Predictor
+`````````````
+.. automodule:: dgllife.model.model_zoo.gin_predictor
+    :members:
+
 Generative Models
 -----------------
 
