@@ -27,8 +27,8 @@ class ServerState(ObjectBase):
 
     Attributes
     ----------
-    kv_store : dict[str, Tensor]
-        Key value store for tensor data
+    data_store : dict[str, Tensor]
+        storing data tensors with specified name string
     graph : DGLHeteroGraph
         Graph structure of one partition
     total_num_nodes : int
@@ -36,10 +36,13 @@ class ServerState(ObjectBase):
     total_num_edges : int
         Total number of edges
     """
+    def __init__(self):
+        self._data_store = {}
+
     @property
-    def kv_store(self):
-        """Get KV store."""
-        return _CAPI_DGLRPCServerStateGetKVStore(self)
+    def data_store(self):
+        """Get data store."""
+        return self._data_store
 
     @property
     def graph(self):

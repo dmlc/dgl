@@ -2,7 +2,7 @@
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .server_state import get_server_state
+from .server_state import ServerState
 
 def start_server(server_id, ip_config, num_clients, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
@@ -70,7 +70,7 @@ def start_server(server_id, ip_config, num_clients, \
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)
             rpc.send_response(client_id, register_res)
-    server_state = get_server_state()
+    server_state = ServerState()
     # main service loop
     while True:
         req, client_id = rpc.recv_request()
