@@ -237,6 +237,7 @@ struct BinaryDot {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
     DType out = 0;
     // simple vector dot vector
+    // TODO(zihao) the unroll is ignored by compiler
 #pragma unroll
     for (int i = 0; i < len; i ++)
       out += lhs[i] * rhs[i];

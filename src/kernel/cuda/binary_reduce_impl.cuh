@@ -297,8 +297,9 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, GData<Idx, DType>, UDF>(
-        rtcfg, spmat, gdata);
+    minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig,
+      GData<Idx, DType>, UDF>(
+          rtcfg, spmat, gdata);
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
     // TODO(zihao): implement this.
     CHECK(false) << "BinaryReduce target should not be kSrc";
