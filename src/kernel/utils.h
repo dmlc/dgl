@@ -39,6 +39,12 @@ int64_t NElements(const runtime::NDArray& array);
 int64_t Prod(const std::vector<int64_t>& vec);
 
 /*
+ * !\brief Compute the edge mapping given mapping and edge index tensor.
+ */
+template <typename Idx>
+inline void ComputeEdgeMapping(Idx **cur_mapping, runtime::NDArray cur, runtime::NDArray eids);
+
+/*
  * !\brief Fill the array with constant value.
  */
 template <int XPU, typename DType>

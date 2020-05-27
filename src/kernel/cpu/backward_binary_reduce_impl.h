@@ -168,7 +168,7 @@ struct BackwardBinaryReduceBcast {
       DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
 
-      if (grad_e == 0)
+      if (grad_e == 0) // from intel ppl
         continue;
       // (pawelpiotrowicz) Although we can technically add the same condition for
       // skipping atomic additions as in BackwardBinaryReduce, doing so made the
