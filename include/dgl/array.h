@@ -896,6 +896,9 @@ NDArray MergeIDMapping(NDArray a, NDArray b);
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
+  } else if ((val) == kDLGPU) {                                 \
+    constexpr auto XPU = kDLGPU;                                \
+    {__VA_ARGS__}                                               \
   } else {                                                      \
     LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
   }                                                             \
