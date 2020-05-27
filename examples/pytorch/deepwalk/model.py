@@ -15,8 +15,8 @@ def init_emb2pos_index(walk_length, window_size, batch_size):
 
     Usage
     -----
-        # emb_u.shape: [batch_size * walk_length, dim]
-        batch_emb2posu = torch.index_select(emb_u, 0, index_emb_posu)
+    # emb_u.shape: [batch_size * walk_length, dim]
+    batch_emb2posu = torch.index_select(emb_u, 0, index_emb_posu)
     '''
     idx_list_u = []
     idx_list_v = []
@@ -48,8 +48,8 @@ def init_emb2neg_index(walk_length, window_size, negative, batch_size):
 
     Usage
     -----
-        # emb_u.shape: [batch_size * walk_length, dim]
-        batch_emb2negu = torch.index_select(emb_u, 0, index_emb_negu)
+    # emb_u.shape: [batch_size * walk_length, dim]
+    batch_emb2negu = torch.index_select(emb_u, 0, index_emb_negu)
     '''
     idx_list_u = []
     for b in range(batch_size):
@@ -74,9 +74,10 @@ def init_emb2neg_index(walk_length, window_size, negative, batch_size):
 
 def init_grad_avg(walk_length, window_size, batch_size):
     '''index version
-    Usage:
-        # emb_u.shape: [batch_size * walk_length, dim]
-        batch_emb2posu = torch.index_select(emb_u, 0, pos_u_index)
+    Usage
+    -----
+    # emb_u.shape: [batch_size * walk_length, dim]
+    batch_emb2posu = torch.index_select(emb_u, 0, pos_u_index)
     '''
     grad_avg = []
     for b in range(batch_size):
@@ -136,6 +137,20 @@ class SkipGramModel(nn.Module):
         ----------
         emb_size int : number of nodes
         emb_dimension int : embedding dimension
+        walk_length int : number of nodes in a sequence
+        window_size int : context window size
+        batch_size int : number of node sequences in each batch
+        only_cpu bool : training with CPU
+        only_gpu bool : training with GPU
+        mix bool : mixed training with CPU and GPU
+        negative int : negative samples for each positve node pair
+        neg_weight float : negative weight
+        lr float : initial learning rate
+        lap_norm float : weight of laplacian normalization
+        adam bool : use adam for embedding updation
+        sgd bool : use sgd for embedding updation
+        avg_sgd bool : average gradients of sgd for embedding updation
+        fast_neg bool : do negative sampling inside a batch
         """
         super(SkipGramModel, self).__init__()
         self.emb_size = emb_size
