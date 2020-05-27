@@ -18,8 +18,8 @@ namespace rpc {
 
 RPCStatus SendRPCMessage(const RPCMessage& msg) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
-  StringStreamWithBuffer zc_write_strm(zerocopy_blob.get());
-  static_cast<dmlc::Stream *>(&zc_write_strm)->Write(msg);
+  StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
+  zc_write_strm.Write(msg);
   int32_t ndarray_count = msg.tensors.size();
   zerocopy_blob->append(
     reinterpret_cast<char*>(&ndarray_count),
@@ -50,13 +50,8 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   int send_id;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
-  // Copy the data for now, can be optimized later
-  std::string zerocopy_blob(
-    rpc_meta_msg.data,
-    rpc_meta_msg.size-sizeof(int32_t));
   char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
   int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
-  rpc_meta_msg.deallocator(&rpc_meta_msg);
   // Recv real ndarray data
   std::vector<void* > buffer_list(ndarray_count);
   for (int i = 0; i < ndarray_count; ++i) {
@@ -65,8 +60,9 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
         &ndarray_data_msg, send_id), REMOVE_SUCCESS);
     buffer_list[i] = ndarray_data_msg.data;
   }
-  StringStreamWithBuffer zc_read_strm(&zerocopy_blob, buffer_list);
-  static_cast<dmlc::Stream *>(&zc_read_strm)->Read(msg);
+  StreamWithBuffer zc_read_strm(rpc_meta_msg.data, rpc_meta_msg.size-sizeof(int32_t), buffer_list);
+  zc_read_strm.Read(msg);
+  rpc_meta_msg.deallocator(&rpc_meta_msg);
   return kRPCSuccess;
 }
 
@@ -281,7 +277,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   auto st = RPCContext::ThreadLocal()->server_state;
-  CHECK(st) << "Server state has not been initialized.";
+  if (st.get() == nullptr) {
+    RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
+  }
   *rv = st;
 });
 

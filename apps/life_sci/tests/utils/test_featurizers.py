@@ -19,6 +19,9 @@ def test_mol1():
 def test_mol2():
     return Chem.MolFromSmiles('C1=CC2=CC=CC=CC2=C1')
 
+def test_mol3():
+    return Chem.MolFromSmiles('O=C(O)/C=C/C(=O)O')
+
 def test_atom_type_one_hot():
     mol = test_mol1()
     assert atom_type_one_hot(mol.GetAtomWithIdx(0), ['C', 'O']) == [1, 0]
@@ -226,6 +229,14 @@ def test_weave_atom_featurizer():
                                          1.0000, 1.0000, 1.0000, 0.0000, 0.0000, 0.0000,
                                          0.0000, 0.0000, 0.0000]]), rtol=1e-3)
 
+def test_pretrain_atom_featurizer():
+    featurizer = PretrainAtomFeaturizer()
+    mol = test_mol1()
+    feats = featurizer(mol)
+    assert list(feats.keys()) == ['atomic_number', 'chirality_type']
+    assert torch.allclose(feats['atomic_number'], torch.tensor([[5, 5, 7]]))
+    assert torch.allclose(feats['chirality_type'], torch.tensor([[0, 0, 0]]))
+
 def test_bond_type_one_hot():
     mol = test_mol1()
     assert bond_type_one_hot(mol.GetBondWithIdx(0)) == [1, 0, 0, 0]
@@ -259,6 +270,11 @@ def test_bond_is_in_ring():
 def test_bond_stereo_one_hot():
     mol = test_mol1()
     assert bond_stereo_one_hot(mol.GetBondWithIdx(0)) == [1, 0, 0, 0, 0, 0]
+
+def test_bond_direction_one_hot():
+    mol = test_mol3()
+    assert bond_direction_one_hot(mol.GetBondWithIdx(0)) == [1, 0, 0]
+    assert bond_direction_one_hot(mol.GetBondWithIdx(2)) == [0, 1, 0]
 
 class TestBondFeaturizer(BaseBondFeaturizer):
     def __init__(self):
@@ -309,6 +325,23 @@ def test_weave_edge_featurizer():
                                         [1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0.],
                                         [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]]))
 
+def test_pretrain_bond_featurizer():
+    mol = test_mol3()
+    test_featurizer = PretrainBondFeaturizer()
+    feats = test_featurizer(mol)
+    assert torch.allclose(feats['bond_type'].nonzero(),
+                          torch.tensor([[0], [1], [6], [7], [10], [11], [14], [15],
+                                        [16], [17], [18], [19], [20], [21]]))
+    assert torch.allclose(feats['bond_direction_type'].nonzero(),
+                          torch.tensor([[4], [5], [8], [9]]))
+
+    test_featurizer = PretrainBondFeaturizer(self_loop=False)
+    feats = test_featurizer(mol)
+    assert torch.allclose(feats['bond_type'].nonzero(),
+                          torch.tensor([[0], [1], [6], [7], [10], [11]]))
+    assert torch.allclose(feats['bond_direction_type'].nonzero(),
+                          torch.tensor([[4], [5], [8], [9]]))
+
 if __name__ == '__main__':
     test_one_hot_encoding()
     test_atom_type_one_hot()
@@ -338,12 +371,15 @@ if __name__ == '__main__':
     test_base_atom_featurizer()
     test_canonical_atom_featurizer()
     test_weave_atom_featurizer()
+    test_pretrain_atom_featurizer()
     test_bond_type_one_hot()
     test_bond_is_conjugated_one_hot()
     test_bond_is_conjugated()
     test_bond_is_in_ring_one_hot()
     test_bond_is_in_ring()
     test_bond_stereo_one_hot()
+    test_bond_direction_one_hot()
     test_base_bond_featurizer()
     test_canonical_bond_featurizer()
     test_weave_edge_featurizer()
+    test_pretrain_bond_featurizer()
