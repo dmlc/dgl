@@ -167,6 +167,9 @@ struct BackwardBinaryReduceBcast {
       DType grad_out = Functors::Read(gradoutoff + tx);
       DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
+
+      if (grad_e == 0)
+        continue;
       // (pawelpiotrowicz) Although we can technically add the same condition for
       // skipping atomic additions as in BackwardBinaryReduce, doing so made the
       // speed 2% slower in GCMC training on MovieLens-1M with 24 OpenMP threads.
