@@ -382,8 +382,19 @@ template CSRMatrix CSRTranspose<kDLCPU, int64_t>(CSRMatrix csr);
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr) {
   const int64_t nnz = csr.indices->shape[0];
-  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
-  NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
+  const IdType* indptr_data;
+  NDArray tmp_indptr;
+  NDArray tmp_data;;
+  if (XPU == kDLGPU) {
+    CHECK(csr.indptr->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    CHECK(csr.indices->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    CHECK(csr.data->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    tmp_indptr = csr.indptr.CopyTo(DLContext{kDLCPU, 0});
+    indptr_data = static_cast<IdType*>(tmp_indptr->data);
+  } else {
+    indptr_data = static_cast<IdType*>(csr.indptr->data);
+  }
+  NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, DLContext{kDLCPU, 0});
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
   for (IdType i = 0; i < csr.indptr->shape[0] - 1; ++i) {
     std::fill(ret_row_data + indptr_data[i],
