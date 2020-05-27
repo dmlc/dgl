@@ -8,7 +8,7 @@ from dgl.data.utils import _get_dgl_url, download, get_download_dir, extract_arc
 from rdkit import Chem
 
 from ..model import GCNPredictor, GATPredictor, AttentiveFPPredictor, DGMG, DGLJTNNVAE, \
-    WLNReactionCenter, WeavePredictor
+    WLNReactionCenter, WLNReactionRanking, WeavePredictor, GIN
 
 __all__ = ['load_pretrained']
 
@@ -22,7 +22,12 @@ URL = {
     'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
     'DGMG_ZINC_random': 'pre_trained/dgmg_ZINC_random.pth',
     'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth',
-    'wln_center_uspto': 'dgllife/pre_trained/wln_center_uspto_v2.pth'
+    'wln_center_uspto': 'dgllife/pre_trained/wln_center_uspto_v3.pth',
+    'wln_rank_uspto': 'dgllife/pre_trained/wln_rank_uspto.pth',
+    'gin_supervised_contextpred': 'dgllife/pre_trained/gin_supervised_contextpred.pth',
+    'gin_supervised_infomax': 'dgllife/pre_trained/gin_supervised_infomax.pth',
+    'gin_supervised_edgepred': 'dgllife/pre_trained/gin_supervised_edgepred.pth',
+    'gin_supervised_masking': 'dgllife/pre_trained/gin_supervised_masking.pth'
 }
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
@@ -84,6 +89,15 @@ def load_pretrained(model_name, log=True):
           with a random atom order
         * ``'JTNN_ZINC'``: A JTNN model pre-trained on ZINC for molecule generation
         * ``'wln_center_uspto'``: A WLN model pre-trained on USPTO for reaction prediction
+        * ``'wln_rank_uspto'``: A WLN model pre-trained on USPTO for candidate product ranking
+        * ``'gin_supervised_contextpred'``: A GIN model pre-trained with supervised learning
+          and context prediction
+        * ``'gin_supervised_infomax'``: A GIN model pre-trained with supervised learning
+          and deep graph infomax
+        * ``'gin_supervised_edgepred'``: A GIN model pre-trained with supervised learning
+          and edge prediction
+        * ``'gin_supervised_masking'``: A GIN model pre-trained with supervised learning
+          and attribute masking
 
     log : bool
         Whether to print progress for model loading
@@ -161,5 +175,20 @@ def load_pretrained(model_name, log=True):
                                   node_out_feats=300,
                                   n_layers=3,
                                   n_tasks=5)
+
+    elif model_name == 'wln_rank_uspto':
+        model = WLNReactionRanking(node_in_feats=89,
+                                   edge_in_feats=5,
+                                   node_hidden_feats=500,
+                                   num_encode_gnn_layers=3)
+
+    elif model_name in ['gin_supervised_contextpred', 'gin_supervised_infomax',
+                        'gin_supervised_edgepred', 'gin_supervised_masking']:
+        model = GIN(num_node_emb_list=[120, 3],
+                    num_edge_emb_list=[6, 3],
+                    num_layers=5,
+                    emb_dim=300,
+                    JK='last',
+                    dropout=0.5)
 
     return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)

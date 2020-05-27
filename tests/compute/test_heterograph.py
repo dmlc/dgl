@@ -1637,20 +1637,18 @@ def test_format():
     g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], restrict_format='coo')
     assert g.restrict_format() == 'coo'
     assert g.format_in_use() == ['coo']
-    
     try:
         spmat = g.adjacency_matrix(scipy_fmt="csr")
     except:
         print('test passed, graph with restrict_format coo should not create csr matrix.')
     else:
         assert False, 'cannot create csr when restrict_format is coo'
-    
     g1 = g.to_format('any')
     assert g1.restrict_format() == 'any'
-    spmat = g1.adjacency_matrix(scipy_fmt='coo')
-    spmat = g1.adjacency_matrix(scipy_fmt='csr')
-    spmat = g1.adjacency_matrix(transpose=True, scipy_fmt='csr')
-    assert len(g1.restrict_format()) == 3
+    g1.request_format('coo')
+    g1.request_format('csr')
+    g1.request_format('csc')
+    assert len(g1.format_in_use()) == 3
     assert g.restrict_format() == 'coo'
     assert g.format_in_use() == ['coo']
 
@@ -1664,15 +1662,13 @@ def test_format():
     g['follows'].srcdata['h'] = user_feat
     for rel_type in ['follows', 'plays', 'develops']:
         assert g.restrict_format(rel_type) == 'csr'
-        print(g.format_in_use(rel_type), g.restrict_format(rel_type))
         assert g.format_in_use(rel_type) == ['csr']
-    
         try:
-            spmat = g[rel_type].adjacency_matrix(scipy_fmt='coo')
+            g[rel_type].request_format('coo')
         except:
             print('test passed, graph with restrict_format csr should not create coo matrix')
         else:
-            assert False, 'cannot create coo when restrict_ormat is csr'
+            assert False, 'cannot create coo when restrict_format is csr'
 
     g1 = g.to_format('csc')
     # test frame

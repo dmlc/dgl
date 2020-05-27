@@ -29,7 +29,28 @@ class HeteroGraphIndex(ObjectBase):
 
     def __setstate__(self, state):
         self._cache = {}
-        self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
+
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
+        if isinstance(state, HeteroPickleStates):
+            # post-0.4.3
+            self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
+        elif isinstance(state, tuple) and len(state) == 3:
+            # pre-0.4.2
+            metagraph, number_of_nodes, edges = state
+
+            self._cache = {}
+            # loop over etypes and recover unit graphs
+            rel_graphs = []
+            for i, edges_per_type in enumerate(edges):
+                src_ntype, dst_ntype = metagraph.find_edge(i)
+                num_src = number_of_nodes[src_ntype]
+                num_dst = number_of_nodes[dst_ntype]
+                src_id, dst_id, _ = edges_per_type
+                rel_graphs.append(create_unitgraph_from_coo(
+                    1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, "any"))
+            self.__init_handle_by_constructor__(
+                _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 
     @property
     def metagraph(self):
@@ -935,10 +956,22 @@ class HeteroGraphIndex(ObjectBase):
 
         Returns
         -------
-        string : 'any', 'coo', 'csr', or 'csc'
+        string : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
         """
         ret = _CAPI_DGLHeteroGetRestrictFormat(self, etype)
         return ret
+
+    def request_format(self, sparse_format, etype):
+        """Create a sparse matrix representation in given format immediately.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+        sparse_format : str
+            ``'coo'``, ``'csr'``, or ``'csc'``
+        """
+        _CAPI_DGLHeteroRequestFormat(self, sparse_format, etype)
 
     def to_format(self, restrict_format):
         """Return a clone graph index but stored in the given sparse format.
@@ -948,8 +981,8 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
-        restrict_format : string
-            Desired restrict format ('any', 'coo', 'csr', 'csc').
+        restrict_format : str
+            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
 
         Returns
         -------

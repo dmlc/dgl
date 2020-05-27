@@ -54,6 +54,11 @@ Weave Predictor
 .. automodule:: dgllife.model.model_zoo.weave_predictor
     :members:
 
+GIN Predictor
+`````````````
+.. automodule:: dgllife.model.model_zoo.gin_predictor
+    :members:
+
 Generative Models
 -----------------
 
@@ -72,6 +77,11 @@ Reaction Prediction
 WLN for Reaction Center Prediction
 ``````````````````````````````````
 .. automodule:: dgllife.model.model_zoo.wln_reaction_center
+    :members:
+
+WLN for Ranking Candidate Products
+``````````````````````````````````
+.. automodule:: dgllife.model.model_zoo.wln_reaction_ranking
     :members:
 
 Protein-Ligand Binding Affinity Prediction

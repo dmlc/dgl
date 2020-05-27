@@ -248,6 +248,14 @@ class UnitGraph : public BaseHeteroGraph {
     return ToStringSparseFormat(this->restrict_format_);
   }
 
+  /*!
+   * \brief Return the graph in the given format. Perform format conversion if the
+   * requested format does not exist.
+   *
+   * \return A graph in the requested format.
+   */
+  HeteroGraphPtr GetFormat(SparseFormat format) const;
+
   dgl_format_code_t GetFormatInUse() const override;
 
   HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
@@ -297,14 +305,6 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
-
-  /*!
-   * \brief Return the graph in the given format. Perform format conversion if the
-   * requested format does not exist.
-   *
-   * \return A graph in the requested format.
-   */
-  HeteroGraphPtr GetFormat(SparseFormat format) const;
 
   /*!
    * \brief Determine which format to use with a preference.

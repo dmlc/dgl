@@ -15,6 +15,7 @@ API Reference
    propagate
    udf
    sampler
+   sampling
    data
    transform
    graph_store
