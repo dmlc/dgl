@@ -420,7 +420,7 @@ void CallBackwardBinaryReduce(
         utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
         utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping, gdata->rhs, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig, 
