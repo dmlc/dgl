@@ -35,4 +35,3 @@ def thread_wrapped_func(func):
 def shuffle_walks(walks):
     seeds = torch.randperm(walks.size()[0])
     return walks[seeds]
-

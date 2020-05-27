@@ -8,6 +8,10 @@ The implementation includes multi-processing training with CPU and mixed trainin
 ## Dependencies
 - PyTorch 1.0.1+
 
+## Tested version
+- PyTorch 1.5.0
+- DGL 0.4.3
+
 ## How to run the code
 
 Format of a network file:
