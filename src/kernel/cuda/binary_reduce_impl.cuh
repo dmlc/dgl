@@ -272,7 +272,6 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
     utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
-    // TODO(minjie): allocator
     minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig,
       GData<Idx, DType>, UDF>(
           rtcfg, spmat, gdata);
@@ -335,7 +334,6 @@ void CallBinaryReduceBcast(
       utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
-    // TODO(minjie): allocator
     minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig, 
       BcastGData<NDim, Idx, DType>, UDF>(
           rtcfg, spmat, gdata);
