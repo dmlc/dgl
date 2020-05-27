@@ -419,8 +419,6 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
-  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
-  const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
 
   // If csr is in GPU, copy it to CPU, generate COO and copy to GPU
   const IdType* indptr_data;
