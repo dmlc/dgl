@@ -265,9 +265,6 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
     auto coo_matrix = graph.GetCOOMatrix();
     minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
-    // If the user-given mapping is none and the target is edge data, we need to
-    // replace the mapping by the edge ids in the csr graph so that the edge
-    // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
       utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
     if (RightSelector::target == binary_op::kEdge)
@@ -287,10 +284,6 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
     // so data are aggregated in columns
     auto incsr = graph.GetInCSRMatrix();
     minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-
-    // If the user-given mapping is none and the target is edge data, we need to
-    // replace the mapping by the edge ids in the csr graph so that the edge
-    // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
       utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
     if (RightSelector::target == binary_op::kEdge)
@@ -319,9 +312,6 @@ void CallBinaryReduceBcast(
     // Out Target is Edge, we need use COO format
     auto coo_matrix = graph.GetCOOMatrix();
     minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
-    // If the user-given mapping is none and the target is edge data, we need to
-    // replace the mapping by the edge ids in the csr graph so that the edge
-    // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
       utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
     if (RightSelector::target == binary_op::kEdge)
@@ -339,10 +329,6 @@ void CallBinaryReduceBcast(
     // so data are aggregated in columns
     auto incsr = graph.GetInCSRMatrix();
     minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-
-    // If the user-given mapping is none and the target is edge data, we need to
-    // replace the mapping by the edge ids in the csr graph so that the edge
-    // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
       utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
     if (RightSelector::target == binary_op::kEdge)
