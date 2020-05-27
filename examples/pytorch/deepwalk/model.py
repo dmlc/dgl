@@ -242,9 +242,11 @@ class SkipGramModel(nn.Module):
 
     def fast_learn_super(self, batch_walks, lr, neg_nodes=None):
         """ Learn a batch of random walks in a fast way.
-        For each positive node pair (i,j), the updating procedure is as following:
-        score = 
-        u_embedding[i] += (1 - sigmoi)
+        For each positive/negative node pair (i,j), the updating procedure is as following:
+        score = self.fast_sigmoid(u_embedding[i].dot(v_embedding[j]))
+        # label = 1 for positive samples; label = 0 for negative samples.
+        u_embedding[i] += (label - score) * v_embedding[j]
+        v_embedding[i] += (label - score) * u_embedding[j]
 
         Parameters
         ----------
