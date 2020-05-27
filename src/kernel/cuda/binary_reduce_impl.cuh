@@ -269,10 +269,10 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
     if (RightSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
-    ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
+    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
     // TODO(minjie): allocator
@@ -292,9 +292,9 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
     if (RightSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
     minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig, 
@@ -323,10 +323,10 @@ void CallBinaryReduceBcast(
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
     if (RightSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
-    ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
+    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
     minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig, 
@@ -344,9 +344,9 @@ void CallBinaryReduceBcast(
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
     if (LeftSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
     if (RightSelector::target == binary_op::kEdge)
-      ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
     // TODO(minjie): allocator

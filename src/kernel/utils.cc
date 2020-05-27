@@ -50,17 +50,6 @@ int64_t Prod(const std::vector<int64_t>& vec) {
   return ret;
 }
 
-template <typename Idx>
-inline void ComputeEdgeMapping(Idx **cur_mapping, runtime::NDArray cur, runtime::NDArray eids) {
-  if (*cur_mapping == nullptr)
-    *cur_mapping = static_cast<Idx*>(eids->data);
-  else {
-    runtime::NDArray out_map = aten::MergeIDMapping(eids, cur);
-    *cur_mapping = static_cast<Idx*>(out_map->data);
-  }
-}
-
-
 }  // namespace utils
 }  // namespace kernel
 }  // namespace dgl

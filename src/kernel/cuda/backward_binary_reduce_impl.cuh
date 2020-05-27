@@ -373,10 +373,10 @@ void CallBackwardBinaryReduce(
       auto coo_matrix = graph.GetCOOMatrix();
       minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
       if (RightSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-      ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig, 
@@ -388,9 +388,9 @@ void CallBackwardBinaryReduce(
       auto outcsr = graph.GetOutCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
       if (RightSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, outcsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, outcsr.data);
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceSrcConfig, 
@@ -402,9 +402,9 @@ void CallBackwardBinaryReduce(
       auto incsr = graph.GetInCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
       if (RightSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, incsr.data);
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig, 
@@ -417,10 +417,10 @@ void CallBackwardBinaryReduce(
       auto coo_matrix = graph.GetCOOMatrix();
       minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
       if (LeftSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-      ComputeEdgeMapping(&(gdata->rhs_mapping, gdata->rhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping, gdata->rhs, coo_matrix.data);
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig, 
@@ -432,9 +432,9 @@ void CallBackwardBinaryReduce(
       auto outcsr = graph.GetOutCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
       if (LeftSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, outcsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, outcsr.data);
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceSrcConfig, 
@@ -446,9 +446,9 @@ void CallBackwardBinaryReduce(
       auto incsr = graph.GetInCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
       if (LeftSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, incsr.data);
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig,
@@ -489,10 +489,10 @@ void CallBackwardBinaryReduceBcast(
       auto coo_matrix = graph.GetCOOMatrix();
       minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
       if (RightSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-      ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig,
@@ -504,9 +504,9 @@ void CallBackwardBinaryReduceBcast(
       auto outcsr = graph.GetOutCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
       if (RightSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, outcsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, outcsr.data);
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceSrcConfig,
@@ -518,9 +518,9 @@ void CallBackwardBinaryReduceBcast(
       auto incsr = graph.GetInCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
       if (RightSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, incsr.data);
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig,
@@ -533,10 +533,10 @@ void CallBackwardBinaryReduceBcast(
       auto coo_matrix = graph.GetCOOMatrix();
       minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
       if (LeftSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-      ComputeEdgeMapping(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
+      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig, 
@@ -548,9 +548,9 @@ void CallBackwardBinaryReduceBcast(
       auto outcsr = graph.GetOutCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
       if (LeftSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, outcsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, outcsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, outcsr.data);
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceSrcConfig, 
@@ -562,9 +562,9 @@ void CallBackwardBinaryReduceBcast(
       auto incsr = graph.GetInCSRMatrix();
       minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
       if (LeftSelector::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
       if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        ComputeEdgeMapping(&(gdata->out_mapping), gdata->out, incsr.data);
+        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, incsr.data);
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig, 
