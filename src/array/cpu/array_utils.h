@@ -37,6 +37,7 @@ class IdHashMap {
   IdHashMap(): filter_(kFilterSize, false) {
     IdType empty_key = -1;
     oldv2newv_.set_empty_key(empty_key);
+    oldv2newv_.set_resizing_parameters(false, true); // only grow
   }
 
   // Construct the hashmap using the given id array.
@@ -47,7 +48,7 @@ class IdHashMap {
     IdType empty_key = -1;
     oldv2newv_.set_empty_key(empty_key);
     oldv2newv_.resize(ids->shape[0]);
-    Update(ids);
+    Update(ids, false);
   }
 
   // copy ctor
@@ -59,9 +60,14 @@ class IdHashMap {
 
   // Update the hashmap with given id array.
   // The id array could contain duplicates.
-  void Update(IdArray ids) {
+  void Update(IdArray ids, bool resize=true) {
     const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
+    oldv2newv_.set_resizing_parameters(false, true); // only grow
+    if (resize) {
+        auto size = oldv2newv_.size();
+        oldv2newv_.resize(size + 1.4*len);
+    }
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
       // std::unorderd_map::insert assures that an insertion will not happen if the
