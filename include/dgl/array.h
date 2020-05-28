@@ -885,7 +885,7 @@ NDArray MergeIDMapping(NDArray a, NDArray b);
 ///////////////////////// Dispatchers //////////////////////////
 
 /*
- * Dispatch according to device:
+ * Dispatch according to device (ONLY CPU):
  *
  * ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
  *   // Now XPU is a placeholder for array->ctx.device_type
@@ -896,6 +896,23 @@ NDArray MergeIDMapping(NDArray a, NDArray b);
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
+  } else {                                                      \
+    LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
+  }                                                             \
+} while (0)
+
+/*
+ * Dispatch according to device:
+ *
+ * ATEN_XPU_SELECT(array->ctx.device_type, XPU, {
+ *   // Now XPU is a placeholder for array->ctx.device_type
+ *   DeviceSpecificImplementation<XPU>(...);
+ * });
+ */
+#define ATEN_XPU_SELECT(val, XPU, ...) do {                     \
+  if ((val) == kDLCPU) {                                        \
+    constexpr auto XPU = kDLCPU;                                \
+    {__VA_ARGS__}                                               \
   } else if ((val) == kDLGPU) {                                 \
     constexpr auto XPU = kDLGPU;                                \
     {__VA_ARGS__}                                               \
@@ -903,6 +920,7 @@ NDArray MergeIDMapping(NDArray a, NDArray b);
     LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
   }                                                             \
 } while (0)
+
 
 /*
  * Dispatch according to integral type (either int32 or int64):
