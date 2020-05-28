@@ -166,7 +166,7 @@ void FallbackCallBinaryReduce(
 
   typedef GData<int32_t, DType> GDataType;
   auto udf_target = OutSelector<Reducer>::Type::target;
-  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GData) GDataType;
+  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
 }
 
 template <typename DType>
