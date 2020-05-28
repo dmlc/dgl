@@ -589,7 +589,7 @@ def retry_method_with_fix(fix_method):
     def _creator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            # pylint: disable=W0703
+            # pylint: disable=W0703,bare-except
             try:
                 return func(self, *args, **kwargs)
             except:
