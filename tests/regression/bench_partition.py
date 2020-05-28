@@ -31,8 +31,8 @@ class PartitionBenchmark:
         self.std_log[key_name] = str(output)
 
 
-    def track_partition_time(self, backend, dataset, gpu_id):
-        key_name = "{}_{}_{}".format(backend, dataset, gpu_id)
+    def track_partition_time(self, backend, dataset):
+        key_name = "{}_{}_{}".format(backend, dataset)
         lines = self.std_log[key_name].split("\\n")
 
         time_list = []
