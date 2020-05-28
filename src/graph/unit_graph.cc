@@ -631,9 +631,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override {
+    /*
     CHECK(order.empty() || order == std::string("srcdst"))
       << "CSR only support Edges of order \"srcdst\","
       << " but got \"" << order << "\".";
+    */
     const auto& coo = aten::CSRToCOO(adj_, false);
     return EdgeArray{coo.row, coo.col, coo.data};
   }
