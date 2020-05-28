@@ -85,6 +85,18 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
     return std::string("auto");
 }
 
+inline bool IsCooAvailable(SparseFormat sparse_format) {
+  return sparse_format == SparseFormat::kAny || sparse_format == SparseFormat::kCOO;
+}
+
+inline bool IsCsrAvailable(SparseFormat sparse_format) {
+  return sparse_format == SparseFormat::kAny || sparse_format == SparseFormat::kCSR;
+}
+
+inline bool IsCscAvailable(SparseFormat sparse_format) {
+  return sparse_format == SparseFormat::kAny || sparse_format == SparseFormat::kCSC;
+}
+
 // Sparse matrix object that is exposed to python API.
 struct SparseMatrix : public runtime::Object {
   // Sparse format.
