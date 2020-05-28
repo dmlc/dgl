@@ -363,7 +363,7 @@ void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const SparseMatrixWrapper& graph,
     BackwardGData<Idx, DType>* gdata) {
-  typedef GDataType = BackwardGData<Idx, DType>;
+  typedef BackwardGData<Idx, DType> GDataType;
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
           LeftSelector, RightSelector,
           BinaryOp, Reducer, true> AtomicFunctor;
