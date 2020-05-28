@@ -1227,7 +1227,7 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
     new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = nullptr;
   if (bg->out_csr_)
-    new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)))
+    new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
 
   return HeteroGraphPtr(
       new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
