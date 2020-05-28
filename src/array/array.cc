@@ -297,8 +297,8 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
 
 NDArray MergeIDMapping(NDArray a, NDArray b) {
   NDArray ret;
-  ATEN_XPU_SELECT(a->ctx.device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(a->dtype, IdType, {
+  ATEN_XPU_SELECT(b->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(b->dtype, IdType, {
       ret = impl::MergeIDMapping<XPU, IdType>(a, b);
     });
   });

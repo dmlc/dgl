@@ -139,7 +139,6 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
       CREATE_OUT_CSR(spmat, eid_data);                                              \
     }                                                                               \
   }                                                                                 \
-  eid_data = nullptr; \
   if (LeftSelector::target == binary_op::kEdge)                                     \
     utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, *eid_data);   \
   if (RightSelector::target == binary_op::kEdge)                                    \
