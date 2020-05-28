@@ -93,25 +93,40 @@ typedef minigun::advance::Config<minigun::advance::kSrc> AdvanceSrcConfig;
 typedef minigun::advance::Config<minigun::advance::kEdge> AdvanceEdgeConfig;
 typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
 
-#define CREATE_IN_CSR(spmat, eid_data) do {                                         \
+#define CREATE_IN_CSR(spmat) do {                                         \
   auto incsr = graph.GetInCSRMatrix();                                              \
   minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);       \
   (spmat).in_csr = &csr;                                                            \
-  (eid_data) = &(incsr.data);                                                       \
+  if (LeftSelector::target == binary_op::kEdge)                                     \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);   \
+  if (RightSelector::target == binary_op::kEdge)                                    \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);   \
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge)                       \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, incsr.data);   \
 } while(0)
 
-#define CREATE_OUT_CSR(spmat, eid_data) do {                                        \
+#define CREATE_OUT_CSR(spmat) do {                                        \
   auto outcsr = graph.GetOutCSRMatrix();                                            \
   minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);     \
   (spmat).out_csr = &csr;                                                           \
-  (eid_data) = &(outcsr.data);                                                      \
+  if (LeftSelector::target == binary_op::kEdge)                                     \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, outcsr.data);   \
+  if (RightSelector::target == binary_op::kEdge)                                    \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, outcsr.data);   \
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge)                       \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, outcsr.data);   \
 } while(0)
 
-#define CREATE_COO(spmat, eid_data) do {                                            \
+#define CREATE_COO(spmat) do {                                            \
   auto coo_matrix = graph.GetCOOMatrix();                                           \
   minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);    \
   (spmat).coo = &coo;                                                               \
-  (eid_data) = &(coo_matrix.data);                                                  \
+  if (LeftSelector::target == binary_op::kEdge)                                     \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);   \
+  if (RightSelector::target == binary_op::kEdge)                                    \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);   \
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge)                       \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);   \
 } while(0)
 
 #define ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, out_target, GDataType) do {\
@@ -139,12 +154,6 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
       CREATE_OUT_CSR(spmat, eid_data);                                              \
     }                                                                               \
   }                                                                                 \
-  if (LeftSelector::target == binary_op::kEdge)                                     \
-    utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, *eid_data);   \
-  if (RightSelector::target == binary_op::kEdge)                                    \
-    utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, *eid_data);   \
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge)                       \
-    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, *eid_data);   \
   if (atomic) {                                                                     \
     switch (parallel_mode) {                                                        \
       case minigun::advance::ParallelMode::kEdge:                                   \
