@@ -368,10 +368,13 @@ void CallBackwardBinaryReduce(
           LeftSelector, RightSelector,
           BinaryOp, Reducer, false> NonAtomicFunctor;
   typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
-  if (Mode == binary_op::kGradLhs)
-    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, LeftSelector::target, GDataType);
-  else
-    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, RightSelector::target, GDataType);
+  if (Mode == binary_op::kGradLhs) {
+    auto udf_target = LeftSelector::target;
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
+  } else {
+    auto udf_target = RightSelector::target;
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
+  }
 }
 
 // Following macro is used to generate explicit-specialization of the template
@@ -402,10 +405,13 @@ void CallBackwardBinaryReduceBcast(
           LeftSelector, RightSelector,
           BinaryOp, Reducer, false> NonAtomicFunctor;
   typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
-  if (Mode == binary_op::kGradLhs)
-    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, LeftSelector::target, GDataType);
-  else
-    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, RightSelector::target, GDataType);
+  if (Mode == binary_op::kGradLhs) {
+    auto udf_target = LeftSelector::target;
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
+  } else {
+    auto udf_target = RightSelector::target;
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
+  }
 }
 
 // Following macro is used to generate explicit-specialization of the template
