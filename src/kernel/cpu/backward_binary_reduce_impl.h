@@ -402,7 +402,10 @@ void CallBackwardBinaryReduceBcast(
           LeftSelector, RightSelector,
           BinaryOp, Reducer, false> NonAtomicFunctor;
   typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
-  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, Mode, GDataType);
+  if (Mode == binary_op::kGradLhs)
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, LeftSelector::target, GDataType);
+  else
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, RightSelector::target, GDataType);
 }
 
 // Following macro is used to generate explicit-specialization of the template
