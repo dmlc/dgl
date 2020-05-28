@@ -255,6 +255,9 @@ COOMatrix COOTranspose(COOMatrix coo) {
 
 template COOMatrix COOTranspose<kDLCPU, int32_t>(COOMatrix coo);
 template COOMatrix COOTranspose<kDLCPU, int64_t>(COOMatrix coo);
+template COOMatrix COOTranspose<kDLGPU, int32_t>(COOMatrix coo);
+template COOMatrix COOTranspose<kDLGPU, int64_t>(COOMatrix coo);
+
 
 ///////////////////////////// COOToCSR /////////////////////////////
 

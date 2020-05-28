@@ -1049,6 +1049,14 @@ NDArray MergeIDMapping(NDArray a, NDArray b);
     });                                                     \
   });
 
+// Macro to dispatch according to device context and index type.
+#define ATEN_COO_SELECT(coo, XPU, IdType, ...)              \
+  ATEN_XPU_SELECT((coo).row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {           \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
 ///////////////////////// Array checks //////////////////////////
 
 #define IS_INT32(a)  \
