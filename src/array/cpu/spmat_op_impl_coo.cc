@@ -322,7 +322,6 @@ template CSRMatrix COOToCSR<kDLCPU, int64_t>(COOMatrix coo);
 template CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo);
 template CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo);
 
-
 ///////////////////////////// COOSliceRows /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>

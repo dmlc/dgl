@@ -557,7 +557,7 @@ COOMatrix COOTranspose(COOMatrix coo) {
 
 CSRMatrix COOToCSR(COOMatrix coo) {
   CSRMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SELECT(coo, XPU, IdType, {
     ret = impl::COOToCSR<XPU, IdType>(coo);
   });
   return ret;
