@@ -378,7 +378,7 @@ void CallBackwardBinaryReduce(
 // Following macro is used to generate explicit-specialization of the template
 // operator.
 #define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
-  template void CallBackwardBinaryReduce<XPU,                \
+  template void CallBackwardBinaryReduce<XPU,                   \
                     mode, IDX, dtype,                           \
                     lhs_tgt, rhs_tgt,                           \
                     op<dtype>, REDUCER<XPU, dtype>>(            \
@@ -394,7 +394,7 @@ void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const SparseMatrixWrapper& graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata) {
-  typedef BackwardBcastGData<Idx, DType> GDataType;
+  typedef BackwardBcastGData<NDim, Idx, DType> GDataType;
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
           LeftSelector, RightSelector,
           BinaryOp, Reducer, true> AtomicFunctor;
