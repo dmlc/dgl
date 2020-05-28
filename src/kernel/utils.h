@@ -108,7 +108,6 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
 } while(0)
 
 #define CREATE_COO(spmat, eid_data) do {                                            \
-  LOG(INFO) << "STAGE 0";                                                           \
   auto coo_matrix = graph.GetCOOMatrix();                                           \
   minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);    \
   (spmat).coo = &coo;                                                               \
@@ -140,14 +139,12 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
       CREATE_OUT_CSR(spmat, eid_data);                                              \
     }                                                                               \
   }                                                                                 \
-  LOG(INFO) << "STAGE 1";                                              \
   if (LeftSelector::target == binary_op::kEdge)                                     \
     utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, *eid_data);   \
   if (RightSelector::target == binary_op::kEdge)                                    \
     utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, *eid_data);   \
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge)                       \
     utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, *eid_data);   \
-  LOG(INFO) << "STAGE 2";                                             \
   if (atomic) {                                                                     \
     switch (parallel_mode) {                                                        \
       case minigun::advance::ParallelMode::kEdge:                                   \

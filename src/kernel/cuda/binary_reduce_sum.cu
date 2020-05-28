@@ -211,40 +211,21 @@ void FallbackCallBackwardBinaryReduce(
 
   typedef cuda::BackwardFunctorsTempl<Idx, DType,
           LeftSelector, RightSelector,
-          BinaryOp, Reducer> Functors;
-  typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
+          BinaryOp, Reducer> NonAtomicFunctor;
+  typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
+  typedef cuda::BackwardFunctorsTempl<Idx, DType,
+          LeftSelector, RightSelector,
+          BinaryOp, Reducer> AtomicFunctor;
+  typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, AtomicFunctor> AtomicUDF;
+  typedef BackwardGData<int32_t, DType> GDataType;
+  auto udf_target = LeftSelector::target;
 
   // Only Mode == binary_op::kGradLhs
   // Only LeftSelector::target == binary_op::kSrc)
-  CHECK(Mode == binary_op::kGradLhs) << "Only KGradLhs";
-  CHECK(LeftSelector::target == binary_op::kSrc) << "Only target == kSrc";
+  // CHECK(Mode == binary_op::kGradLhs) << "Only KGradLhs";
+  // CHECK(LeftSelector::target == binary_op::kSrc) << "Only target == kSrc";
 
-  // Out Target is source Node, we need use CSR format
-  // so data are aggregated in rows
-  auto outcsr = graph.GetOutCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-  runtime::NDArray out_map;
-  if (RightSelector::target == binary_op::kEdge) {
-    if (gdata->rhs_mapping == nullptr) {
-      gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
-    } else {
-      out_map = aten::MergeIDMapping(outcsr.data, gdata->rhs);
-      gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
-    }
-  }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
-    if (gdata->out_mapping == nullptr) {
-      gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
-    } else {
-      out_map = aten::MergeIDMapping(outcsr.data, gdata->out);
-      gdata->out_mapping = static_cast<Idx*>(out_map->data);
-    }
-  }
-
-  minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
-  minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceSrcConfig,
-  BackwardGData<Idx, DType>, UDF>(
-      rtcfg, spmat, gdata);
+  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
 }
 
 }  // namespace cuda
