@@ -288,7 +288,7 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
 
 
 void NDArray::Save(dmlc::Stream* strm) const {
-  auto zc_strm = dynamic_cast<StringStreamWithBuffer*>(strm);
+  auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
   if (zc_strm) {
     zc_strm->PushNDArray(*this);
     return;
@@ -297,7 +297,7 @@ void NDArray::Save(dmlc::Stream* strm) const {
 }
 
 bool NDArray::Load(dmlc::Stream* strm) {
-  auto zc_strm = dynamic_cast<StringStreamWithBuffer*>(strm);
+  auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
   if (zc_strm) {
     *this = zc_strm->PopNDArray();
     return true;
