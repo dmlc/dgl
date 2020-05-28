@@ -253,7 +253,6 @@ template <int XPU, typename Idx, typename DType,
 void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                       const SparseMatrixWrapper& graph,
                       GData<Idx, DType>* gdata) {
-  LOG(INFO) << "Binary Reduce: " << ToStringSparseFormat(graph.GetRestrictFormat());
   typedef GData<Idx, DType> GDataType;
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer, false>
@@ -275,7 +274,6 @@ void CallBinaryReduceBcast(
   const minigun::advance::RuntimeConfig& rtcfg,
   const SparseMatrixWrapper& graph,
   BcastGData<NDim, Idx, DType>* gdata) {
-  LOG(INFO) << "Binary Reduce Bcast: " << ToStringSparseFormat(graph.GetRestrictFormat());
   typedef BcastGData<NDim, Idx, DType> GDataType;
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer, false>
