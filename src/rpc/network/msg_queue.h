@@ -3,8 +3,8 @@
  * \file msg_queue.h
  * \brief Message queue for DGL distributed training.
  */
-#ifndef DGL_GRAPH_NETWORK_MSG_QUEUE_H_
-#define DGL_GRAPH_NETWORK_MSG_QUEUE_H_
+#ifndef DGL_RPC_NETWORK_MSG_QUEUE_H_
+#define DGL_RPC_NETWORK_MSG_QUEUE_H_
 
 #include <dgl/runtime/ndarray.h>
 
@@ -179,4 +179,4 @@ class MessageQueue {
 }  // namespace network
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_NETWORK_MSG_QUEUE_H_
+#endif  // DGL_RPC_NETWORK_MSG_QUEUE_H_
