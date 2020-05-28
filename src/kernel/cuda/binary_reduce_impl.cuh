@@ -244,10 +244,6 @@ struct FunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<minigun::advance::kSrc> AdvanceSrcConfig;
-typedef minigun::advance::Config<minigun::advance::kEdge> AdvanceEdgeConfig;
-typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
-
 }  // namespace cuda
 
 // Template implementation of BinaryReduce operator.
@@ -257,42 +253,17 @@ template <int XPU, typename Idx, typename DType,
 void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                       const SparseMatrixWrapper& graph,
                       GData<Idx, DType>* gdata) {
+  typedef GData<Idx, DType> GDataType;
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer, false>
-          Functors;
-  typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
-
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
-    auto coo_matrix = graph.GetCOOMatrix();
-    minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
-    if (LeftSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
-    if (RightSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
-    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-
-    minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
-    minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig,
-      GData<Idx, DType>, UDF>(
-          rtcfg, spmat, gdata);
-  } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
-    // TODO(zihao): implement this.
-    CHECK(false) << "BinaryReduce target should not be kSrc";
-  } else if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
-    // Out Target is destination Node, we need use in_csr format
-    // so data are aggregated in columns
-    auto incsr = graph.GetInCSRMatrix();
-    minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-    if (LeftSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
-    if (RightSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
-
-    minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
-    minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig, 
-      GData<Idx, DType>, UDF>(
-          rtcfg, spmat, gdata);
-  }
+          NonAtomicFunctor;
+  typedef cuda::BinaryReduce<Idx, DType, NonAtomicFunctor> NonAtomicUDF;
+  typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
+                        RightSelector, BinaryOp, Reducer, true>
+          AtomicFunctor;
+  typedef cuda::BinaryReduce<Idx, DType, NonAtomicFunctor> AtomicUDF;
+  auto udf_target = OutSelector<Reducer>::Type::target;
+  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
 }
 
 // Template implementation of BinaryReduce broadcasting operator.
@@ -303,41 +274,17 @@ void CallBinaryReduceBcast(
   const minigun::advance::RuntimeConfig& rtcfg,
   const SparseMatrixWrapper& graph,
   BcastGData<NDim, Idx, DType>* gdata) {
+  typedef BcastGData<NDim, Idx, DType> GDataType;
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer, false>
-          Functors;
-  typedef cuda::BinaryReduceBcast<NDim, Idx, DType, Functors> UDF;
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
-    // Out Target is Edge, we need use COO format
-    auto coo_matrix = graph.GetCOOMatrix();
-    minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
-    if (LeftSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
-    if (RightSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
-    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-
-    minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
-    minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceEdgeConfig, 
-      BcastGData<NDim, Idx, DType>, UDF>(
-          rtcfg, spmat, gdata);
-  } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
-    CHECK(false) << "BinaryReduceBcast target should not be kSrc";
-  } else if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
-    // Out Target is destination Node, we need use CSR_t format
-    // so data are aggregated in columns
-    auto incsr = graph.GetInCSRMatrix();
-    minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-    if (LeftSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
-    if (RightSelector::target == binary_op::kEdge)
-      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
-
-    minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
-    minigun::advance::Advance<XPU, Idx, DType, cuda::AdvanceDstConfig, 
-      BcastGData<NDim, Idx, DType>, UDF>(
-          rtcfg, spmat, gdata);
-  }
+          NonAtomicFunctor;
+  typedef cuda::BinaryReduceBcast<NDim, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
+  typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
+                        RightSelector, BinaryOp, Reducer, true>
+          AtomicFunctor;
+  typedef cuda::BinaryReduceBcast<NDim, Idx, DType, NonAtomicFunctor> AtomicUDF;
+  auto udf_target = OutSelector<Reducer>::Type::target;
+  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
 }
 
 // Following macro is used to generate explicit-specialization of the template

@@ -349,10 +349,6 @@ struct BackwardFunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<minigun::advance::kSrc> AdvanceSrcConfig;
-typedef minigun::advance::Config<minigun::advance::kEdge> AdvanceEdgeConfig;
-typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
-
 }  // namespace cpu
 
 // Template implementation of BackwardBinaryReduce operator.
@@ -372,7 +368,10 @@ void CallBackwardBinaryReduce(
           LeftSelector, RightSelector,
           BinaryOp, Reducer, false> NonAtomicFunctor;
   typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
-  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, Mode, GDataType);
+  if (Mode == binary_op::kGradLhs)
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, LeftSelector::target, GDataType);
+  else
+    ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, RightSelector::target, GDataType);
 }
 
 // Following macro is used to generate explicit-specialization of the template
