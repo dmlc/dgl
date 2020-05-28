@@ -261,7 +261,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer, true>
           AtomicFunctor;
-  typedef cuda::BinaryReduce<Idx, DType, NonAtomicFunctor> AtomicUDF;
+  typedef cuda::BinaryReduce<Idx, DType, AtomicFunctor> AtomicUDF;
   auto udf_target = OutSelector<Reducer>::Type::target;
   ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
 }
@@ -282,7 +282,7 @@ void CallBinaryReduceBcast(
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer, true>
           AtomicFunctor;
-  typedef cuda::BinaryReduceBcast<NDim, Idx, DType, NonAtomicFunctor> AtomicUDF;
+  typedef cuda::BinaryReduceBcast<NDim, Idx, DType, AtomicFunctor> AtomicUDF;
   auto udf_target = OutSelector<Reducer>::Type::target;
   ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GDataType);
 }
