@@ -54,8 +54,8 @@ inline void ComputeEdgeMapping(Idx **cur_mapping, runtime::NDArray cur, runtime:
   }
 }
 
-template void ComputeEdgeMapping<int>(int **cur_mapping, runtime::NDArray cur, runtime::NDArray eids);
-template void ComputeEdgeMapping<long long>(long long **cur_mapping, runtime::NDArray cur, runtime::NDArray eids);
+template void ComputeEdgeMapping<int32_t>(int32_t **cur_mapping, runtime::NDArray cur, runtime::NDArray eids);
+template void ComputeEdgeMapping<int64_t>(int64_t **cur_mapping, runtime::NDArray cur, runtime::NDArray eids);
 
 /*
  * !\brief Fill the array with constant value.
@@ -139,6 +139,7 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
       CREATE_OUT_CSR(spmat, eid_data);                                              \
     }                                                                               \
   }                                                                                 \
+  eid_data = nullptr; \
   if (LeftSelector::target == binary_op::kEdge)                                     \
     utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, *eid_data);   \
   if (RightSelector::target == binary_op::kEdge)                                    \
