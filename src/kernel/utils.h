@@ -134,12 +134,11 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
   minigun::SpMat<Idx> spmat = {nullptr, nullptr, nullptr};                          \
   bool atomic = false;                                                              \
   minigun::advance::ParallelMode parallel_mode;                                     \
-  IdArray *eid_data = nullptr;                                                      \
   if (IsCscAvailable(fmt) && (out_target) == binary_op::kDst) {                     \
-    CREATE_IN_CSR(spmat, eid_data);                                                 \
+    CREATE_IN_CSR(spmat);                                                 \
     parallel_mode = minigun::advance::ParallelMode::kDst;                           \
   } else if (IsCsrAvailable(fmt) && (out_target) == binary_op::kSrc) {              \
-    CREATE_OUT_CSR(spmat, eid_data);                                                \
+    CREATE_OUT_CSR(spmat);                                                \
     parallel_mode = minigun::advance::ParallelMode::kSrc;                           \
   } else {                                                                          \
     atomic = true;                                                                  \
@@ -147,11 +146,11 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
     if (IsCooAvailable(fmt)) {                                                      \
       if ((out_target) == binary_op::kEdge)                                         \
         atomic = false;                                                             \
-      CREATE_COO(spmat, eid_data);                                                  \
+      CREATE_COO(spmat);                                                  \
     } else if (IsCscAvailable(fmt)) {                                               \
-      CREATE_IN_CSR(spmat, eid_data);                                               \
+      CREATE_IN_CSR(spmat);                                               \
     } else if (IsCsrAvailable(fmt)) {                                               \
-      CREATE_OUT_CSR(spmat, eid_data);                                              \
+      CREATE_OUT_CSR(spmat);                                              \
     }                                                                               \
   }                                                                                 \
   if (atomic) {                                                                     \
