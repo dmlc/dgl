@@ -95,31 +95,31 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
 
 #define CREATE_IN_CSR(spmat, eid_data) do {                                         \
   auto incsr = graph.GetInCSRMatrix();                                              \
-  minigun::Csr<Idx> csr = CreateCsr<Idx>(incsr.indptr, incsr.indices);              \
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);       \
   (spmat).in_csr = &csr;                                                            \
   (eid_data) = &(incsr.data);                                                       \
 } while(0)
 
 #define CREATE_OUT_CSR(spmat, eid_data) do {                                        \
   auto outcsr = graph.GetOutCSRMatrix();                                            \
-  minigun::Csr<Idx> csr = CreateCsr<Idx>(outcsr.indptr, outcsr.indices);            \
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);     \
   (spmat).out_csr = &csr;                                                           \
   (eid_data) = &(outcsr.data);                                                      \
 } while(0)
 
 #define CREATE_COO(spmat, eid_data) do {                                            \
   auto coo_matrix = graph.GetCOOMatrix();                                           \
-  minigun::Coo<Idx> coo = CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);           \
+  minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);    \
   (spmat).coo = &coo;                                                               \
   (eid_data) = &(coo_matrix.data);                                                  \
-}
+} while(0)
 
-#define ADVANCE_DISPATCH(graph, func_templ, op_templ, out_target, GDataType) do {   \
+#define ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, out_target, GDataType) do {\
   SparseFormat fmt = (graph).GetRestrictFormat();                                   \
   minigun::SpMat<Idx> spmat = {nullptr, nullptr, nullptr};                          \
   bool atomic = false;                                                              \
   minigun::advance::ParallelMode parallel_mode;                                     \
-  IdArray *eid_data;                                                                \
+  IdArray *eid_data = nullptr;                                                      \
   if (IsCscAvailable(fmt) && (out_target) == binary_op::kDst) {                     \
     CREATE_IN_CSR(spmat, eid_data);                                                 \
     parallel_mode = minigun::advance::ParallelMode::kDst;                           \
@@ -140,45 +140,39 @@ typedef minigun::advance::Config<minigun::advance::kDst> AdvanceDstConfig;
     }                                                                               \
   }                                                                                 \
   if (LeftSelector::target == binary_op::kEdge)                                     \
-    ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, *eid_data);          \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, *eid_data);   \
   if (RightSelector::target == binary_op::kEdge)                                    \
-    ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, *eid_data);          \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, *eid_data);   \
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge)                       \
-    ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, *eid_data);          \
+    utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, *eid_data);   \
   if (atomic) {                                                                     \
-    typedef (func_templ)<Idx, DType, LeftSelector,                                  \
-                        RightSelector, BinaryOp, Reducer, true> Functors;           \
-    typedef (op_templ)<Idx, DType, Functors> UDF;                                   \
     switch (parallel_mode) {                                                        \
       case minigun::advance::ParallelMode::kEdge:                                   \
-        minigun::advance::Advance<XPU, Idx, DType, AdvanceEdgeConfig,               \
-          (GDataType), UDF>(rtcfg, spmat, gdata);                                   \
+        minigun::advance::Advance<XPU, Idx, DType, utils::AdvanceEdgeConfig,        \
+          GDataType, AtomicUDF>(rtcfg, spmat, gdata);                               \
         break;                                                                      \
       case minigun::advance::ParallelMode::kDst:                                    \
-        minigun::advance::Advance<XPU, Idx, DType, AdvanceDstConfig,                \
-          (GDataType), UDF>(rtcfg, spmat, gdata);                                   \
+        minigun::advance::Advance<XPU, Idx, DType, utils::AdvanceDstConfig,         \
+          GDataType, AtomicUDF>(rtcfg, spmat, gdata);                               \
         break;                                                                      \
       case minigun::advance::ParallelMode::kSrc:                                    \
-        minigun::advance::Advance<XPU, Idx, DType, AdvanceSrcConfig,                \
-          (GDataType), UDF>(rtcfg, spmat, gdata);                                   \
+        minigun::advance::Advance<XPU, Idx, DType, utils::AdvanceSrcConfig,         \
+          GDataType, AtomicUDF>(rtcfg, spmat, gdata);                               \
         break;                                                                      \
     }                                                                               \
   } else {                                                                          \
-    typedef (func_templ)<Idx, DType, LeftSelector,                                  \
-                        RightSelector, BinaryOp, Reducer, false> Functors;          \
-    typedef (op_templ)<Idx, DType, Functors> UDF;                                   \
     switch (parallel_mode) {                                                        \
       case minigun::advance::ParallelMode::kEdge:                                   \
-        minigun::advance::Advance<XPU, Idx, DType, AdvanceEdgeConfig,               \
-          (GDataType), UDF>(rtcfg, spmat, gdata);                                   \
+        minigun::advance::Advance<XPU, Idx, DType, utils::AdvanceEdgeConfig,        \
+          GDataType, NonAtomicUDF>(rtcfg, spmat, gdata);                            \
         break;                                                                      \
       case minigun::advance::ParallelMode::kDst:                                    \
-        minigun::advance::Advance<XPU, Idx, DType, AdvanceDstConfig,                \
-          (GDataType), UDF>(rtcfg, spmat, gdata);                                   \
+        minigun::advance::Advance<XPU, Idx, DType, utils::AdvanceDstConfig,         \
+          GDataType, NonAtomicUDF>(rtcfg, spmat, gdata);                            \
         break;                                                                      \
       case minigun::advance::ParallelMode::kSrc:                                    \
-        minigun::advance::Advance<XPU, Idx, DType, AdvanceSrcConfig,                \
-          (GDataType), UDF>(rtcfg, spmat, gdata);                                   \
+        minigun::advance::Advance<XPU, Idx, DType, utils::AdvanceSrcConfig,         \
+          GDataType, NonAtomicUDF>(rtcfg, spmat, gdata);                            \
         break;                                                                      \
     }                                                                               \
   }                                                                                 \
