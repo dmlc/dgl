@@ -363,101 +363,16 @@ void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const SparseMatrixWrapper& graph,
     BackwardGData<Idx, DType>* gdata) {
+  typedef GDataType = BackwardGData<Idx, DType>;
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
           LeftSelector, RightSelector,
-          BinaryOp, Reducer, false> Functors;
-  typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
-  if (Mode == binary_op::kGradLhs) {
-    if (LeftSelector::target == binary_op::kEdge) {
-      // Out Target is Edge, we need use COO format
-      auto coo_matrix = graph.GetCOOMatrix();
-      minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
-      if (RightSelector::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
-      if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-      utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
-
-      minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
-      minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceEdgeConfig,
-        BackwardGData<Idx, DType>, UDF>(
-            rtcfg, spmat, gdata);
-    } else if (LeftSelector::target == binary_op::kSrc) {
-      // Out Target is source Node, we need use CSR format
-      // so data are aggregated in rows
-      auto outcsr = graph.GetOutCSRMatrix();
-      minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-      if (RightSelector::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, outcsr.data);
-      if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, outcsr.data);
-
-      minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
-      minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceSrcConfig,
-        BackwardGData<Idx, DType>, UDF>(
-            rtcfg, spmat, gdata);
-    } else if (LeftSelector::target == binary_op::kDst) {
-      // Out Target is destination Node, we need use CSR_t format
-      // so data are aggregated in columns
-      auto incsr = graph.GetInCSRMatrix();
-      minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-      if (RightSelector::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, incsr.data);
-      if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, incsr.data);
-
-      minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
-      minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceDstConfig,
-        BackwardGData<Idx, DType>, UDF>(
-            rtcfg, spmat, gdata);
-    }
-  } else if (Mode == binary_op::kGradRhs) {
-    if (RightSelector::target == binary_op::kEdge) {
-      // Out Target is Edge, we need use COO format
-      auto coo_matrix = graph.GetCOOMatrix();
-      minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
-      if (LeftSelector::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, coo_matrix.data);
-      if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, coo_matrix.data);
-      utils::ComputeEdgeMapping<Idx>(&(gdata->rhs_mapping), gdata->rhs, coo_matrix.data);
-
-      minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
-      minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceEdgeConfig,
-        BackwardGData<Idx, DType>, UDF>(
-            rtcfg, spmat, gdata);
-    } else if (RightSelector::target == binary_op::kSrc) {
-      // Out Target is source Node, we need use CSR format
-      // so data are aggregated in rows
-      auto outcsr = graph.GetOutCSRMatrix();
-      minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-      if (LeftSelector::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, outcsr.data);
-      if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, outcsr.data);
-
-      minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
-      minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceSrcConfig,
-        BackwardGData<Idx, DType>, UDF>(
-            rtcfg, spmat, gdata);
-    } else if (RightSelector::target == binary_op::kDst) {
-      // Out Target is destination Node, we need use CSR_t format
-      // so data are aggregated in columns
-      auto incsr = graph.GetInCSRMatrix();
-      minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
-      if (LeftSelector::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->lhs_mapping), gdata->lhs, incsr.data);
-      if (OutSelector<Reducer>::Type::target == binary_op::kEdge)
-        utils::ComputeEdgeMapping<Idx>(&(gdata->out_mapping), gdata->out, incsr.data);
-
-      minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
-      minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceDstConfig,
-        BackwardGData<Idx, DType>, UDF>(
-            rtcfg, spmat, gdata);
-    }
-  } else {
-    CHECK(false) << "BackwardBinaryReduce Mode not implemented";
-  }
+          BinaryOp, Reducer, true> AtomicFunctor;
+  typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, AtomicFunctor> AtomicUDF;
+  typedef cpu::BackwardFunctorsTempl<Idx, DType,
+          LeftSelector, RightSelector,
+          BinaryOp, Reducer, false> NonAtomicFunctor;
+  typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
+  ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, Mode, GDataType);
 }
 
 // Following macro is used to generate explicit-specialization of the template
