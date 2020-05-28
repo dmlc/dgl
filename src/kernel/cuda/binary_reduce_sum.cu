@@ -156,9 +156,14 @@ void FallbackCallBinaryReduce(
   typedef BinaryUseLhs<DType> BinaryOp;
   typedef ReduceSum<kDLGPU, DType> Reducer;
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
-          Functors;
-  typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
+                        RightSelector, BinaryOp, Reducer, false>
+          NonAtomicFunctor;
+  typedef cuda::BinaryReduce<Idx, DType, NonAtomicFunctor> NonAtomicUDF;
+  typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
+                        RightSelector, BinaryOp, Reducer, true>
+          AtomicFunctor;
+  typedef cuda::BinaryReduce<Idx, DType, AtomicFunctor> AtomicUDF;
+
   typedef GData<int32_t, DType> GDataType;
   auto udf_target = OutSelector<Reducer>::Type::target;
   ADVANCE_DISPATCH(graph, AtomicUDF, NonAtomicUDF, udf_target, GData) GDataType;
@@ -179,11 +184,11 @@ void FallbackCallBackwardBinaryReduce(
 
   typedef cuda::BackwardFunctorsTempl<Idx, DType,
           LeftSelector, RightSelector,
-          BinaryOp, Reducer> NonAtomicFunctor;
+          BinaryOp, Reducer, false> NonAtomicFunctor;
   typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, NonAtomicFunctor> NonAtomicUDF;
   typedef cuda::BackwardFunctorsTempl<Idx, DType,
           LeftSelector, RightSelector,
-          BinaryOp, Reducer> AtomicFunctor;
+          BinaryOp, Reducer, true> AtomicFunctor;
   typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, AtomicFunctor> AtomicUDF;
   typedef BackwardGData<int32_t, DType> GDataType;
   auto udf_target = LeftSelector::target;
