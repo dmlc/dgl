@@ -210,7 +210,7 @@ void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectNone,
     const SparseMatrixWrapper& graph,
     GData<int32_t, float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping ||
-    !IsCooAvailable(graph.GetRestrictFormat())) {
+    !IsCscAvailable(graph.GetRestrictFormat())) {
     cuda::FallbackCallBinaryReduce<float>(rtcfg, graph, gdata);
   } else {
     // cusparse use rev csr for csrmm
@@ -227,7 +227,7 @@ void CallBinaryReduce<kDLGPU, int32_t, double, SelectSrc, SelectNone,
     const SparseMatrixWrapper& graph,
     GData<int32_t, double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping ||
-    !IsCooAvailable(graph.GetRestrictFormat())) {
+    !IsCscAvailable(graph.GetRestrictFormat())) {
     cuda::FallbackCallBinaryReduce<double>(rtcfg, graph, gdata);
   } else {
     // cusparse use rev csr for csrmm
@@ -247,7 +247,7 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, float,
     const SparseMatrixWrapper& graph,
     BackwardGData<int32_t, float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping ||
-    !IsCooAvailable(graph.GetRestrictFormat())) {
+    !IsCsrAvailable(graph.GetRestrictFormat())) {
     cuda::FallbackCallBackwardBinaryReduce<float>(rtcfg, graph, gdata);
   } else {
     auto csr = graph.GetOutCSRMatrix();
@@ -264,7 +264,7 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, double,
     const SparseMatrixWrapper& graph,
     BackwardGData<int32_t, double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping ||
-    !IsCooAvailable(graph.GetRestrictFormat())) {
+    !IsCsrAvailable(graph.GetRestrictFormat())) {
     cuda::FallbackCallBackwardBinaryReduce<double>(rtcfg, graph, gdata);
   } else {
     auto csr = graph.GetOutCSRMatrix();
