@@ -549,7 +549,7 @@ std::vector<NDArray> COOGetDataAndIndices(
 
 COOMatrix COOTranspose(COOMatrix coo) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SELECT(coo, XPU, IdType, {
     ret = impl::COOTranspose<XPU, IdType>(coo);
   });
   return ret;
