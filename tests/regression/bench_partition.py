@@ -11,9 +11,9 @@ base_path = Path("~/regression/dgl/")
 
 class PartitionBenchmark:
 
-    params = [['pytorch'], ['amazon']]
+    params = [['pytorch'], ['livejournal']]
     param_names = ['backend', 'dataset']
-    timeout = 120
+    timeout = 600
 
     def __init__(self):
         self.std_log = {}
