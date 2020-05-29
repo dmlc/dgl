@@ -191,7 +191,7 @@ class BarrierRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv = server_state.kv_store
-        kv.barrier_count += 1
+        kv.barrier_count = kv.barrier_count + 1
         if kv.barrier_count == kv.num_clients:
             res_list = []
             kv.barrier_count = 0
@@ -200,6 +200,8 @@ class BarrierRequest(rpc.Request):
             return res_list
         else:
             return None
+
+REGISTER_PULL = 901236
 
 class RegisterPullHandlerResponse(rpc.Response):
     """Send a confirmation signal (just a server ID) to client.
@@ -241,6 +243,8 @@ class RegisterPullHandlerRequest(rpc.Request):
         res = RegisterPullHandlerResponse(kv.server_id)
         return res
 
+REGISTER_PUSH = 901237
+
 class RegisterPushHandlerResponse(rpc.Response):
     """Send a confirmation signal (just a server ID) to client.
 
@@ -281,6 +285,53 @@ class RegisterPushHandlerRequest(rpc.Request):
         res = RegisterPushHandlerResponse(kv.server_id)
         return res
 
+GET_SHARED = 901238
+
+class GetSharedDataResponse(rpc.Response):
+    """Send meta data of shared-tensor back to client.
+
+    Parameters
+    ----------
+    dict_of_tuple, e.g,
+
+        {'data_0' : (shape, dtype),
+         'data_1' : (shape, dtype)}
+    """
+    def __init__(self, meta):
+        self.meta = meta
+
+    def __getstate__(self):
+        return self.meta
+
+    def __setstate__(self, state):
+        self.meta = state
+
+class GetSharedDataRequest(rpc.Request):
+    """Send a signal (just a client ID) to get the meta data of shared-tensor from server
+
+    Parameters
+    ----------
+    client_id : int
+        ID od current client
+    """
+    def __init__(self, client_id):
+        self.client_id = client_id
+
+    def __getstate__(self):
+        return self.client_id
+
+    def __setstate__(self, state):
+        self.client_id = state
+
+    def process_request(self, server_state):
+        kv = server_state.kv_store
+        data_store = kv.data_store
+        meta = {}
+        for name, data in data_store.items():
+            meta[name] = (F.shape(data), get_type_str(F.dtype(data)))
+        res = GetSharedDataResponse(meta)
+        return res
+
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
 
@@ -303,12 +354,29 @@ class KVServer(object):
     """
     def __init__(self, server_id, ip_config, num_clients):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
-        assert len(ip_config) > 0, 'ip_config cannot be empty.'
+        assert len(ip_config) > 0, 'Path of ip_config file cannot be empty.'
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
-        rpc.register_service(KVSTORE_PULL, PullRequest, PullResponse)
-        rpc.register_service(KVSTORE_PUSH, PushRequest, None)
-        rpc.register_service(INIT_DATA, InitDataRequest, InitDataResponse)
-        rpc.register_service(BARRIER, BarrierRequest, BarrierResponse)
+        rpc.register_service(KVSTORE_PULL, 
+                             PullRequest, 
+                             PullResponse)
+        rpc.register_service(KVSTORE_PUSH, 
+                             PushRequest, 
+                             None)
+        rpc.register_service(INIT_DATA, 
+                             InitDataRequest, 
+                             InitDataResponse)
+        rpc.register_service(BARRIER, 
+                             BarrierRequest, 
+                             BarrierResponse)
+        rpc.register_service(REGISTER_PUSH, 
+                             RegisterPushHandlerRequest, 
+                             RegisterPushHandlerResponse)
+        rpc.register_service(REGISTER_PULL, 
+                             RegisterPullHandlerRequest, 
+                             RegisterPullHandlerResponse)
+        rpc.register_service(GET_SHARED,
+        	                 GetSharedDataRequest,
+        	                 GetSharedDataResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -318,7 +386,6 @@ class KVServer(object):
         self._server_id = server_id
         self._server_namebook = rpc.read_ip_config(ip_config)
         self._machine_id = self._server_namebook[server_id][0]
-        self._group_count = self._server_namebook[server_id][3]
         self._num_clients = num_clients
         # TODO(chao) : remove tmp file
         self._open_file_list = []
@@ -340,12 +407,11 @@ class KVServer(object):
          return self._server_id
 
      @property
-     def group_count(self):
-         return self._group_count
-
-     @property
      def barrier_count(self):
      	return self._barrier_count
+
+     @barrier_count.setter(self, barrier_count):
+         self._barrier_count = barrier_count
 
      @property
      def num_clients(self):
@@ -476,6 +542,42 @@ class KVServer(object):
 
         return data_shape, data_type
 
+    def _default_push_handler(self, name, ID, data):
+        """Default handler for PUSH message. 
+
+        On default, _push_handler perform update operation for the tensor.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        ID : tensor (mx.ndarray or torch.tensor)
+            a vector storing the ID list.
+        data : tensor (mx.ndarray or torch.tensor)
+            a tensor with the same row size of id
+        """
+        self._data_store[name][ID] = data
+
+
+    def _default_pull_handler(self, name, ID):
+        """Default handler for PULL operation.
+
+        On default, _pull_handler perform get operation for the tensor.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        ID : tensor (mx.ndarray or torch.tensor)
+            a vector storing the ID list.
+
+        Return
+        ------
+        tensor
+            a tensor with the same row size of ID.
+        """
+        return self._data_store[name][ID]
+
 class KVClient(object):
     """KVClient is used to push/pull data to/from KVServer. If the target kvclient and kvserver are
     in the same machine, they can communicate with each other using local shared-memory automatically,
@@ -491,15 +593,27 @@ class KVClient(object):
     """
     def __init__(self，ip_config):
         assert len(ip_config) > 0, 'ip_config cannot be empty.'
-        rpc.register_service(KVSTORE_PULL,
-                             PullRequest,
+        rpc.register_service(KVSTORE_PULL, 
+                             PullRequest, 
                              PullResponse)
-        rpc.register_service(KVSTORE_PUSH,
-                             PushRequest,
+        rpc.register_service(KVSTORE_PUSH, 
+                             PushRequest, 
                              None)
-        rpc.register_service(INIT_DATA,
-                             InitDataRequest,
+        rpc.register_service(INIT_DATA, 
+                             InitDataRequest, 
                              InitDataResponse)
+        rpc.register_service(BARRIER, 
+                             BarrierRequest, 
+                             BarrierResponse)
+        rpc.register_service(REGISTER_PUSH, 
+                             RegisterPushHandlerRequest, 
+                             RegisterPushHandlerResponse)
+        rpc.register_service(REGISTER_PULL, 
+                             RegisterPullHandlerRequest, 
+                             RegisterPullHandlerResponse)
+        rpc.register_service(GET_SHARED,
+        	                 GetSharedDataRequest,
+        	                 GetSharedDataResponse)
         self._data_store = {}
         self._server_count = len(server_namebook)
         self._group_count = server_namebook[0][3]
@@ -543,7 +657,7 @@ class KVClient(object):
         """
 
 
-    def get_shared_data():
+    def get_shared_data(self):
     	"""
     	"""
 
