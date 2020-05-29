@@ -15,11 +15,8 @@ def load_dataset(name):
         g, labels = dataset[0]
         labels = labels.squeeze()
         n_classes = int(labels.max() - labels.min() + 1)
-
         features = g.ndata.pop("feat").float()
-
     elif dataset in ["reddit", "cora"]:
-        print_stats = False
         if dataset == "reddit":
             from dgl.data import RedditDataset
             data = RedditDataset(self_loop=True)
@@ -39,5 +36,6 @@ def load_dataset(name):
         test_nid = torch.LongTensor(np.nonzero(test_mask)[0])
     else:
         print("Dataset {} is not supported".format(name))
+        assert(0)
 
     return g, features, labels, n_classes, train_nid, val_nid, test_nid

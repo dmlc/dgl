@@ -12,7 +12,7 @@ pip install requests ogb
 
 Results
 ---------------
-### [Ogbn-products](https://ogb.stanford.edu/docs/nodeprop/#ogbn-products)
+### [Ogbn-products](https://ogb.stanford.edu/docs/nodeprop/#ogbn-products) (Amazon co-purchase dataset)
 
 ```bash
 python sign.py --dataset amazon
