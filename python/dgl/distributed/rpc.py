@@ -33,7 +33,7 @@ def read_ip_config(filename):
     Note that, DGL supports multiple backup servers that shares data with each others
     on the same machine via shared-memory tensor. The server_count should be >= 1. For example,
     if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
-    current machine. Note that, the count of server on each machine can be different.
+    current machine.
 
     Parameters
     ----------
@@ -546,6 +546,20 @@ def send_response(target, response):
     data, tensors = serialize_to_payload(response)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
     send_rpc_message(msg)
+
+def send_batch_response(target_list, response_list):
+    """Send a batch of response to the target clients.
+
+    Parameters
+    ----------
+    target_list : list
+        a list of client id
+    response_list : list
+        a list of response
+    """
+    assert len(target_list) == len(response_list)
+    for i in range(target_list):
+        send_response(target_list[i], response_list[i])
 
 def recv_request(timeout=0):
     """Receive one request.
