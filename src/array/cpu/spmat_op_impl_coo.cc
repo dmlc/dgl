@@ -266,9 +266,28 @@ template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-  const IdType* row_data = static_cast<IdType*>(coo.row->data);
-  const IdType* col_data = static_cast<IdType*>(coo.col->data);
-  const IdType* data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
+  const IdType* row_data, col_data, data;
+  NDArray tmp_row, tmp_col, tmp_data;
+  if (XPU == kDLGPU) {
+    CHECK(coo.row->ctx.device_type == kDLGPU) << "coo should be in GPU";
+    CHECK(coo.col->ctx.device_type == kDLGPU) << "coo should be in GPU";
+    CHECK(coo.data->ctx.device_type == kDLGPU) << "coo should be in GPU";
+    tmp_row = coo.row.CopyTo(DLContext{kDLGPU, 0});
+    tmp_col = coo.col.CopyTo(DLContext{kDLGPU, 0});
+    row_data = static_cast<IdType*>(tmp_row->data);
+    col_data = static_cast<IdType*>(tmp_col->data);
+    if (COOHasData(coo)) {
+      tmp_data = coo.data.CopyTo(DLContext{kDLGPU, 0});
+      data = static_cast<IdType*>(tmp_data->data);
+    } else {
+      data = nullptr;
+    }
+  } else {
+    row_data = static_cast<IdType*>(coo.row->data);
+    col_data = static_cast<IdType*>(coo.col->data);
+    data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
+  }
+
   NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
   NDArray ret_indices;
   NDArray ret_data;
@@ -310,6 +329,12 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       Bp[i] = last;
       last = temp;
     }
+  }
+
+  if (XPU == kDLGPU) {
+    ret_indptr = ret_indptr.CopyTo(coo.row->ctx);
+    ret_indices = ret_indices.CopyTo(coo.col->ctx);
+    ret_data = ret_data.CopyTo(coo.data->ctx);
   }
 
   return CSRMatrix(coo.num_rows, coo.num_cols,
