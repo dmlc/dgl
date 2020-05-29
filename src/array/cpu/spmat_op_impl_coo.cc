@@ -271,12 +271,12 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   if (XPU == kDLGPU) {
     CHECK(coo.row->ctx.device_type == kDLGPU) << "coo should be in GPU";
     CHECK(coo.col->ctx.device_type == kDLGPU) << "coo should be in GPU";
-    CHECK(coo.data->ctx.device_type == kDLGPU) << "coo should be in GPU";
     tmp_row = coo.row.CopyTo(DLContext{kDLGPU, 0});
     tmp_col = coo.col.CopyTo(DLContext{kDLGPU, 0});
     row_data = static_cast<IdType*>(tmp_row->data);
     col_data = static_cast<IdType*>(tmp_col->data);
     if (COOHasData(coo)) {
+      CHECK(coo.data->ctx.device_type == kDLGPU) << "coo should be in GPU";
       tmp_data = coo.data.CopyTo(DLContext{kDLGPU, 0});
       data = static_cast<IdType*>(tmp_data->data);
     } else {
