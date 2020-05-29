@@ -222,7 +222,7 @@ class DGLHeteroGraph(object):
         else:
             self._ntypes = ntypes
             if len(ntypes) == 1:
-                src_dst_map = None 
+                src_dst_map = None
             else:
                 src_dst_map = find_src_dst_ntypes(self._ntypes, self._graph.metagraph)
             self._is_unibipartite = (src_dst_map is not None)

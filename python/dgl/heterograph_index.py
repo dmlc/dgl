@@ -1172,7 +1172,7 @@ class HeteroPickleStates(ObjectBase):
         Returns
         -------
         bytearray
-            Serialized meta info 
+            Serialized meta info
         """
         return bytearray(_CAPI_DGLHeteroPickleStatesGetMeta(self))
 
