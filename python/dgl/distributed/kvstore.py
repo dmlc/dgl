@@ -15,7 +15,7 @@ class PullResponse(rpc.Response):
     Parameters
     ----------
     data_tensor: tensor
-        a tensor with the same row size of data ID in request
+        a tensor with the same row size of data ID.
     """
     def __init__(self, data_tensor):
         self.data_tensor = data_tensor
@@ -27,7 +27,7 @@ class PullResponse(rpc.Response):
         self.data_tensor = state
 
 class PullRequest(rpc.Request):
-    """Send id tensor to server and get target data tensor as response.
+    """Send ID tensor to server and get target data tensor as response.
 
     Parameters
     ----------
@@ -56,8 +56,8 @@ class PullRequest(rpc.Request):
 KVSTORE_PUSH = 901232
 
 class PushRequest(rpc.Response):
-    """Send id tensor and data tensor to server and update
-    kvstore data by specified function. 
+    """Send ID tensor and data tensor to target server and
+    update kvstore's data.
 
     This request has no response.
 
@@ -89,7 +89,8 @@ class PushRequest(rpc.Response):
 INIT_DATA = 901233
 
 class InitDataResponse(rpc.Response):
-    """Send comfimation response to client
+    """Send confirmation response (just a server ID) of
+    InitDataRequest to client.
 
     Parameters
     ----------
@@ -106,7 +107,7 @@ class InitDataResponse(rpc.Response):
         self.server_id = state
 
 class InitDataRequest(rpc.Request):
-    """Send data meta info to server to initialize data on server.
+    """Send meta data to server to init data tensor on target kvserver.
 
     Parameters
     ----------
@@ -115,47 +116,63 @@ class InitDataRequest(rpc.Request):
     shape : tuple
         data shape
     dtype : str
-        data type string, e.g., 'int64', 'float32'
-    policy_str : str
-        policy string: 'edge' or 'node'
+        data type string, e.g., 'int64', 'float32', etc.
+    part_policy_str : str
+        partition policy string, 'e.g., edge' or 'node'.
     init_func : function
         user-defined init function
     """
-    def __init__(self, name, shape, dtype, policy_str, init_func):
+    def __init__(self, name, shape, dtype, part_policy_str, init_func):
         self.name = name
         self.shape = shape
         self.dtype = dtype
-        self.policy_str = policy_str
+        self.part_policy_str = part_policy_str
         self.init_func = init_func
 
     def __getstate__(self):
-        return self.name, self.shape, self.dtype, self.policy_str, self.init_func
+        return self.name, self.shape, self.dtype, self.part_policy_str, self.init_func
 
     def __setstate__(self, state):
-        self.name, self.shape, self.dtype, self.policy_str, self.init_func = state
+        self.name, self.shape, self.dtype, self.part_policy_str, self.init_func = state
 
     def process_request(self, server_state):
         kv = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
-        if kv.server_id % kv.group_count == 0: # master server
+        if kv.is_main_server(): # main server
             data_tensor = self.init_func(data_shape, dtype, F.cpu())
             kv.init_data(name=name, data_tensor=data_tensor)
-        else: # backup server
+        else: # backup server will read data from shared-memory
             kv.init_data(name=name)
-        for data_name, policy in kv.partition_policy.items():
-            if policy.str() == policy_str:
-                kv.partition_policy[self.name] = policy
-        res = InitDataResponse(kv.server_id)
-        return res
+        # Find the same partition policy from exsiting plolicy list.
+        for _, policy in kv.part_policy.items():
+            if policy.policy_str == self.part_policy_str:
+                kv.part_policy[self.name] = policy
+                res = InitDataResponse(kv.server_id)
+                return res
+        raise RuntimeError("Cannot find any partition policy match \
+            the policy string : %s" % self.part_policy_str)
 
 BARRIER = 901235
 
 class BarrierResponse(rpc.Response):
+    """Send an unblock signal (just a server ID) to client.
+
+    Parameters
+    ----------
+    server_id : int
+        ID of current server
     """
-    """
+    def __init__(self, server_id):
+        self.server_id = server_id
+
+    def __getstate__(self):
+        return self.server_id
+
+    def __setstate__(self, state):
+        self.server_id = state
 
 class BarrierRequest(rpc.Request):
-    """Send barrier signal to server
+    """Send a barrier signal (just a client ID) to server.
 
     Parameters
     ----------
@@ -176,8 +193,11 @@ class BarrierRequest(rpc.Request):
         kv.barrier_count += 1
         if kv.barrier_count == kv.num_clients:
             res_list = []
-            for 
-
+            for cli_id in range(kv.num_clients):
+                res_list.append(BarrierResponse(kv.server_id))
+            return res_list
+        else:
+            return None
 
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
