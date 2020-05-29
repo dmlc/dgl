@@ -1167,23 +1167,23 @@ class HeteroPickleStates(ObjectBase):
     """Pickle states object class in C++ backend."""
     @property
     def meta(self):
-        """Metagraph
+        """Meta info
 
         Returns
         -------
-        GraphIndex
-            Metagraph structure
+        bytearray
+            Serialized meta info 
         """
         return bytearray(_CAPI_DGLHeteroPickleStatesGetMeta(self))
 
     @property
     def arrays(self):
-        """Adjacency matrices of all the relation graphs
+        """Arrays representing the graph structure (COO or CSR)
 
         Returns
         -------
-        list of dgl.ndarray.SparseMatrix
-            Adjacency matrices
+        list of dgl.ndarray.NDArray
+            Arrays
         """
         num_arr = _CAPI_DGLHeteroPickleStatesGetArraysNum(self)
         arr_func = _CAPI_DGLHeteroPickleStatesGetArrays(self)
