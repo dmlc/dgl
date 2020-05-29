@@ -288,7 +288,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
   }
 
-  NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, DLContext{kDLCPU, 0});
   NDArray ret_indices;
   NDArray ret_data;
 
