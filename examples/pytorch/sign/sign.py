@@ -27,7 +27,7 @@ class FeedForwardNet(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        gain = nn.init.calculate_gain('relu')
+        gain = nn.init.calculate_gain("relu")
         for layer in self.layers:
             nn.init.xavier_uniform_(layer.weight, gain=gain)
             nn.init.zeros_(layer.bias)
@@ -66,7 +66,7 @@ def calc_weight(g, device):
     Compute row_normalized(D^(-1/2)AD^(-1/2))
     """
     with g.local_scope():
-        # compute D^(-0.5)*D(-1/2), assuming A is Indentity
+        # compute D^(-0.5)*D(-1/2), assuming A is Identity
         g.ndata["in_deg"] = g.in_degrees().float().to(device).pow(-0.5)
         g.ndata["out_deg"] = g.out_degrees().float().to(device).pow(-0.5)
         g.apply_edges(fn.u_mul_v("out_deg", "in_deg", "weight"))
@@ -77,6 +77,9 @@ def calc_weight(g, device):
 
 
 def preprocess(g, features, args, device):
+    """
+    Pre-compute the average of n-th hop neighbors
+    """
     with torch.no_grad():
         g.edata["weight"] = calc_weight(g, device)
         g.ndata["feat_0"] = features.to(device)
@@ -94,26 +97,34 @@ def prepare_data(device, args):
     g, features, labels, n_classes, train_nid, val_nid, test_nid = data
     in_feats = features.shape[1]
     feats = preprocess(g, features, args, device)
-    if args.cpu_eval:
-        # only leave training part on GPU
-        train_feats = [x[train_nid] for x in feats]
-        train_labels = labels[train_nid].to(device)
-        feats = [x.cpu() for x in feats]
-    else:
-        # move everything to GPU
-        labels = labels.to(device)
-        train_nid = train_nid.to(device)
-        val_nid = val_nid.to(device)
-        test_nid = test_nid.to(device)
-        train_feats = [x[train_nid] for x in feats]
-        train_labels = labels[train_nid]
+    # move to device
+    labels = labels.to(device)
+    train_nid = train_nid.to(device)
+    val_nid = val_nid.to(device)
+    test_nid = test_nid.to(device)
+    train_feats = [x[train_nid] for x in feats]
+    train_labels = labels[train_nid]
     return feats, labels, train_feats, train_labels, in_feats, \
         n_classes, train_nid, val_nid, test_nid
 
 
 def evaluate(epoch, args, model, feats, labels, train, val, test):
     with torch.no_grad():
-        pred = torch.argmax(model(feats), dim=1)
+        batch_size = args.eval_batch_size
+        if batch_size <= 0:
+            pred = model(feats)
+        else:
+            pred = []
+            num_nodes = labels.shape[0]
+            n_batch = (num_nodes + batch_size - 1) // batch_size
+            for i in range(n_batch):
+                batch_start = i * batch_size
+                batch_end = min((i + 1) * batch_size, num_nodes)
+                batch_feats = [feat[batch_start: batch_end] for feat in feats]
+                pred.append(model(batch_feats))
+            pred = torch.cat(pred)
+
+        pred = torch.argmax(pred, dim=1)
         correct = (pred == labels).float()
         train_acc = correct[train].sum() / len(train)
         val_acc = correct[val].sum() / len(val)
@@ -138,6 +149,10 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
                                  weight_decay=args.weight_decay)
 
+    best_epoch = 0
+    best_val = 0
+    best_test = 0
+
     for epoch in range(1, args.num_epochs + 1):
         start = time.time()
         model.train()
@@ -148,35 +163,37 @@ def main(args):
 
         if epoch % args.eval_every == 0:
             model.eval()
-            if args.cpu_eval:
-                model.cpu()
             acc = evaluate(epoch, args, model, feats, labels,
                            train_nid, val_nid, test_nid)
-            if args.cpu_eval:
-                model.to(device)
-
             end = time.time()
             log = "Epoch {}, Times(s): {:.4f}".format(epoch, end - start)
             log += ", Accuracy: Train {:.4f}, Val {:.4f}, Test {:.4f}" \
                 .format(*acc)
             print(log)
+            if acc[1] > best_val:
+                best_val = acc[1]
+                best_epoch = epoch
+                best_test = acc[2]
+
+    print("Best Epoch {}, Val {:.4f}, Test {:.4f}".format(
+        best_epoch, best_val, best_test))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SIGN")
-    parser.add_argument("--num-epochs", type=int, default=200)
+    parser.add_argument("--num-epochs", type=int, default=1000)
     parser.add_argument("--num-hidden", type=int, default=256)
-    parser.add_argument("--R", type=int, default=2,
+    parser.add_argument("--R", type=int, default=3,
                         help="number of hops")
-    parser.add_argument("--lr", type=float, default=1e-2)
+    parser.add_argument("--lr", type=float, default=0.003)
     parser.add_argument("--dataset", type=str, default="amazon")
-    parser.add_argument("--dropout", type=float, default=0.0)
+    parser.add_argument("--dropout", type=float, default=0.5)
     parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--weight-decay", type=float, default=0)
-    parser.add_argument("--eval-every", type=int, default=1)
-    parser.add_argument("--cpu-eval", action="store_true",
-                        help="evaluate model on CPU")
-    parser.add_argument("--ff-layer", type=int, default=1,
+    parser.add_argument("--eval-every", type=int, default=50)
+    parser.add_argument("--eval-batch-size", type=int, default=250000,
+                        help="evaluation batch size, -1 for full batch")
+    parser.add_argument("--ff-layer", type=int, default=2,
                         help="number of feed-forward layers")
     args = parser.parse_args()
 
