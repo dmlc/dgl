@@ -332,12 +332,30 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
-  const IdType* Ap = static_cast<IdType*>(csr.indptr->data);
-  const IdType* Aj = static_cast<IdType*>(csr.indices->data);
-  const IdType* Ax = CSRHasData(csr)? static_cast<IdType*>(csr.data->data) : nullptr;
-  NDArray ret_indptr = NDArray::Empty({M + 1}, csr.indptr->dtype, csr.indptr->ctx);
-  NDArray ret_indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
-  NDArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
+  const IdType *Ap, *Aj, *Ax;
+  if (XPU == kDLGPU) {
+    NDArray tmp_indptr, tmp_indices, tmp_data;
+    CHECK(csr.indptr->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    CHECK(csr.indices->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    tmp_indptr = csr.indptr.CopyTo(DLContext{kDLCPU, 0});
+    tmp_indices = csr.indices.CopyTo(DLContext{kDLCPU, 0});
+    Ap = static_cast<IdType*>(tmp_indptr->data);
+    Aj = static_cast<IdType*>(tmp_indices->data);
+    if (CSRHasData(csr)) {
+      CHECK(csr.data->ctx.device_type == kDLGPU) << "csr should be in GPU";
+      tmp_data = csr.data.CopyTo(DLContext{kDLCPU, 0});
+      Ax = static_cast<IdType*>(tmp_data->data);
+    } else {
+      Ax = nullptr;
+    }
+  } else {
+    Ap = static_cast<IdType*>(csr.indptr->data);
+    Aj = static_cast<IdType*>(csr.indices->data);
+    Ax = CSRHasData(csr)? static_cast<IdType*>(csr.data->data) : nullptr;
+  }
+  NDArray ret_indptr = NDArray::Empty({M + 1}, csr.indptr->dtype, DLContext{kDLCPU, 0});
+  NDArray ret_indices = NDArray::Empty({nnz}, csr.indices->dtype, DLContext{kDLCPU, 0});
+  NDArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, DLContext{kDLCPU, 0});
   IdType* Bp = static_cast<IdType*>(ret_indptr->data);
   IdType* Bi = static_cast<IdType*>(ret_indices->data);
   IdType* Bx = static_cast<IdType*>(ret_data->data);
@@ -372,11 +390,18 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
     last = temp;
   }
 
+  if (XPU == kDLGPU) {
+    ret_indptr = ret_indptr.CopyTo(csr.indptr->ctx);
+    ret_indices = ret_indices.CopyTo(csr.indptr->ctx);
+    ret_data = ret_data.CopyTo(csr.indptr->ctx);
+  }
   return CSRMatrix{csr.num_cols, csr.num_rows, ret_indptr, ret_indices, ret_data};
 }
 
 template CSRMatrix CSRTranspose<kDLCPU, int32_t>(CSRMatrix csr);
 template CSRMatrix CSRTranspose<kDLCPU, int64_t>(CSRMatrix csr);
+template CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr);
+template CSRMatrix CSRTranspose<kDLGPU, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRToCOO /////////////////////////////
 template <DLDeviceType XPU, typename IdType>

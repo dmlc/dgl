@@ -390,7 +390,7 @@ std::vector<NDArray> CSRGetDataAndIndices(
 
 CSRMatrix CSRTranspose(CSRMatrix csr) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SELECT(csr, XPU, IdType, {
     ret = impl::CSRTranspose<XPU, IdType>(csr);
   });
   return ret;
