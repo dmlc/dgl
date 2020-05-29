@@ -124,8 +124,6 @@ class GraphPartitionBook:
         tensor
             partition IDs
         """
-        if nids is None:
-            return self._nid2partid
         return F.gather_row(self._nid2partid, nids)
 
 
@@ -142,8 +140,6 @@ class GraphPartitionBook:
         tensor
             partition IDs
         """
-        if eids is None:
-            return self._eid2partid
         return F.gather_row(self._eid2partid, eids)
 
 
@@ -197,8 +193,6 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of nid2localnid.')
-        if nids is None:
-            return self._nidg2l
         return F.gather_row(self._nidg2l[partid], nids)
 
 
@@ -220,8 +214,6 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of eid2localeid.')
-        if eids is None:
-            return self._eidg2l
         return F.gather_row(self._eidg2l[partid], eids)
 
 
