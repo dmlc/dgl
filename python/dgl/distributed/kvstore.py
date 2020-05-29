@@ -87,17 +87,20 @@ class PullResponse(rpc.Response):
 
     Parameters
     ----------
-    data_tensor: tensor
+    server_id : int
+        ID of current server
+    data_tensor : tensor
         a tensor with the same row size of data ID.
     """
-    def __init__(self, data_tensor):
+    def __init__(self, server_id, data_tensor):
+    	self.server_id = server_id
         self.data_tensor = data_tensor
 
     def __getstate__(self):
-        return self.data_tensor
+        return self.server_id, self.data_tensor
 
     def __setstate__(self, state):
-        self.data_tensor = state
+        self.server_id, self.data_tensor = state
 
 class PullRequest(rpc.Request):
     """Send ID tensor to server and get target data tensor as response.
@@ -123,7 +126,7 @@ class PullRequest(rpc.Request):
         kv = server_state.kv_store
         local_id = kv.part_policy[self.name].to_local(self.id_tensor)
         data = kv.pull_handler(self.name, local_id)
-        res = PullResponse(data)
+        res = PullResponse(kv.server_id, data)
         return res
 
 KVSTORE_PUSH = 901232
@@ -994,30 +997,21 @@ class KVClient(object):
 
             start += count[idx]
 
-        msg_list = []
+        response_list = []
         if local_id is not None: # local pull
             local_data = self._pull_handler(name, local_id)
             s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
-            local_msg = KVStoreMsg(
-                type=KVMsgType.PULL_BACK, 
-                rank=s_id,
-                name=name, 
-                id=None,
-                data=local_data,
-                shape=None,
-                c_ptr=None)
-            msg_list.append(local_msg)
-            self._garbage_msg.append(local_msg)
+            local_response = PullResponse(s_id, local_data)
+            response_list.append(local_response)
 
         # wait message from server nodes
-        for idx in range(pull_count):
-            remote_msg = _recv_kv_msg(self._receiver)
-            msg_list.append(remote_msg)
-            self._garbage_msg.append(remote_msg)
+        for _ in range(pull_count):
+            remote_response = rpc.recv_response()
+            response_list.append(remote_response)
 
         # sort msg by server id and merge tensor together
-        msg_list.sort(key=self._takeId)
-        data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
+        response_list.sort(key=self._takeId)
+        data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
 
         return data_tensor[back_sorted_id] # return data with original index order
 
@@ -1033,6 +1027,11 @@ class KVClient(object):
         # recv response
         for _ in range(self._server_count):
             response = rpc.recv_response()
+
+    def _takeId(self, elem):
+        """Used by sort response list
+        """
+        return elem.server_id
 
     def _default_push_handler(self, name, id_tensor, data_tensor):
         """Default handler for PUSH message. 
