@@ -267,8 +267,8 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
   const IdType *row_data, *col_data, *data;
-  NDArray tmp_row, tmp_col, tmp_data;
   if (XPU == kDLGPU) {
+    NDArray tmp_row, tmp_col, tmp_data;
     CHECK(coo.row->ctx.device_type == kDLGPU) << "coo should be in GPU";
     CHECK(coo.col->ctx.device_type == kDLGPU) << "coo should be in GPU";
     tmp_row = coo.row.CopyTo(DLContext{kDLCPU, 0});
