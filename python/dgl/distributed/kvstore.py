@@ -312,7 +312,7 @@ class GetSharedDataRequest(rpc.Request):
     Parameters
     ----------
     client_id : int
-        ID od current client
+        ID of current client
     """
     def __init__(self, client_id):
         self.client_id = client_id
@@ -330,6 +330,48 @@ class GetSharedDataRequest(rpc.Request):
         for name, data in data_store.items():
             meta[name] = (F.shape(data), get_type_str(F.dtype(data)))
         res = GetSharedDataResponse(meta)
+        return res
+
+GET_FULL_SHAPE = 901239
+
+class GetFullShapeResponse(rpc.Response):
+    """Send the data shape back to client
+
+    Parameters
+    ----------
+    shape : tuple
+        shape of tensor
+    """
+    def __init__(self, shape):
+        self.shape = shape
+
+    def __getstate__(self):
+        return self.shape
+
+    def __setstate__(self, state):
+        self.shape = state
+
+class GetFullShapeRequest(rpc.Request):
+    """Send a signal (data name) to get the data shape from server
+
+    Parameters
+    ----------
+    name : str
+        data name
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def __getstate__(self):
+        return self.name
+
+    def __setstate__(self, state):
+        self.name = state
+
+    def process_request(self, server_state):
+        kv = server_state.kv_store
+        data_shape = F.shape(kv.data_store[name])
+        res = GetFullShapeResponse(data_shape)
         return res
 
 class KVServer(object):
@@ -591,7 +633,7 @@ class KVClient(object):
     ip_config : str
         Path of IP configuration file.
     """
-    def __init__(self，ip_config):
+    def __init__(self, ip_config):
         assert len(ip_config) > 0, 'ip_config cannot be empty.'
         rpc.register_service(KVSTORE_PULL, 
                              PullRequest, 
@@ -615,17 +657,19 @@ class KVClient(object):
         	                 GetSharedDataRequest,
         	                 GetSharedDataResponse)
         self._data_store = {}
-        self._server_count = len(server_namebook)
-        self._group_count = server_namebook[0][3]
+        self._full_data_shape = {}
+        self._server_namebook = rpc.read_ip_config(ip_config)
+        self._server_count = len(self._server_namebook)
+        self._group_count = self._server_namebook[0][3]
         self._machine_count = int(self._server_count / self._group_count)
         self._machine_id = rpc.get_machine_id()
         self._client_id = rpc.get_rank()
         # Delete temp file when kvstore service is closed
         self._open_file_list = []
         # User-defined pull handler
-        self._pull_handler = None
+        self._pull_handler = self._default_pull_handler
         # User-defined push handler
-        self._push_handler = None
+        self._push_handler = self._default_push_handler
         random.seed(time.time())
 
     def __del__(self):
@@ -636,9 +680,35 @@ class KVClient(object):
             if(os.path.exists(file)):
                 os.remove(file)
 
+    def get_shared_data(self):
+    	"""Mapping shared-tensor from kvserver to kvclient
+    	"""
+    	req = GetSharedDataRequest(self._client_id)
+    	rpc.send_request(self._main_server_id, request)
+    	res = rpc.recv_response()
+    	for name, meta in res.mete.items():
+    	    shape, dtype = meta
+    	    shared_data = empty_shared_mem(name, False, shape, dtype)
+    	    dlpack = shared_data.to_dlpack()
+    	    self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
+    	# Get full data shape
+    	for name, data in self._data_store.items():
+    	    data_shape = list(F.shape(data))
+    	    data_shape[0] = 0
+    	    req = GetFullShapeRequest(name)
+    	    # send req
+    	    for m_id in range(self._machine_count):
+    	        s_id = m_id * self._group_count
+    	        rpc.send_request(s_id, req)
+    	    # recv res
+    	    for m_id in range(self._machine_count):
+    	        res = rpc.recv_response()
+    	        data_shape[0] += res.shape[0]
+    	    self._full_data_shape[name] = tuple(data_shape)
+
     def init_data(self, name, shape, dtype, policy):
         """Send message to kvserver to initialize new data and 
-        get corresponded shared-tensor (e.g., partition_book, g2l) on kvclient. 
+        get corresponded shared-tensor on kvclient. 
 
         The new data will be initialized to zeros.
 
@@ -652,14 +722,33 @@ class KVClient(object):
             data shape
         dtype : dtype
             data type
-        target_name : str
-            target name is used to find existing partition_book and g2l mapping.
+        policy : PartitionPolicy
+            KVStore assume the policy has already been in shared-memory
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert len(shape) > 0, 'shape cannot be empty'
+
+        if self._client_id == 0: # only client_0 send this request to server
+
+
+    def get_data_name_list(self):
+    	"""Get all the data name
+
+    	Return
+    	------
+    	list of str
+    	    list of data name
+    	"""
+    	name_list = []
+    	for name, _ in self._data_store.items():
+    	    name_list.append(name)
+
+    	return name_list
+
+    def get_data_meta(self, name):
+        """Get meta data (data_type, data_shape, partition_policy) of the target shared-tensor
         """
 
-
-    def get_shared_data(self):
-    	"""
-    	"""
 
     def push(self, name, id_tensor, data_tensor):
         pass
@@ -669,3 +758,39 @@ class KVClient(object):
 
     def barrier(self):
         pass
+
+    def _default_push_handler(self, name, ID, data):
+        """Default handler for PUSH message. 
+
+        On default, _push_handler perform update operation for the tensor.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        ID : tensor (mx.ndarray or torch.tensor)
+            a vector storing the ID list.
+        data : tensor (mx.ndarray or torch.tensor)
+            a tensor with the same row size of id
+        """
+        self._data_store[name][ID] = data
+
+
+    def _default_pull_handler(self, name, ID):
+        """Default handler for PULL operation.
+
+        On default, _pull_handler perform get operation for the tensor.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        ID : tensor (mx.ndarray or torch.tensor)
+            a vector storing the ID list.
+
+        Return
+        ------
+        tensor
+            a tensor with the same row size of ID.
+        """
+        return self._data_store[name][ID]
