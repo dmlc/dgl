@@ -311,8 +311,8 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     ret_indices = coo.col;
     ret_data = coo.data;
   } else {
-    ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+    ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, DLContext{kDLCPU, 0});
+    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, DLContext{kDLCPU, 0});
     IdType* Bi = static_cast<IdType*>(ret_indices->data);
     IdType* Bx = static_cast<IdType*>(ret_data->data);
 
