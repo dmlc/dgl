@@ -333,8 +333,8 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
   if (XPU == kDLGPU) {
     ret_indptr = ret_indptr.CopyTo(coo.row->ctx);
-    ret_indices = ret_indices.CopyTo(coo.col->ctx);
-    ret_data = ret_data.CopyTo(coo.data->ctx);
+    ret_indices = ret_indices.CopyTo(coo.row->ctx);
+    ret_data = ret_data.CopyTo(coo.row->ctx);
   }
 
   return CSRMatrix(coo.num_rows, coo.num_cols,
