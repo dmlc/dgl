@@ -119,7 +119,10 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetMeta")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef st = args[0];
-    *rv = st->meta;
+    DGLByteArray buf;
+    buf.data = st->meta.c_str();
+    buf.size = st->meta.size();
+    *rv = buf;
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArrays")
