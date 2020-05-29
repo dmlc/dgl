@@ -85,6 +85,7 @@ class PushRequest(rpc.Response):
         kv = server_state.kv_store
         local_id = kv.part_policy[self.name].to_local(self.id_tensor)
         kv.push_handler(self.name, local_id, self.data_tensor)
+        return None
 
 INIT_DATA = 901233
 
@@ -193,11 +194,92 @@ class BarrierRequest(rpc.Request):
         kv.barrier_count += 1
         if kv.barrier_count == kv.num_clients:
             res_list = []
+            kv.barrier_count = 0
             for cli_id in range(kv.num_clients):
                 res_list.append(BarrierResponse(kv.server_id))
             return res_list
         else:
             return None
+
+class RegisterPullHandlerResponse(rpc.Response):
+    """Send a confirmation signal (just a server ID) to client.
+
+    Parameters
+    ----------
+    server_id : int
+        ID of current server
+    """
+    def __init__(self, server_id):
+        self.server_id = server_id
+
+    def __getstate__(self):
+        return self.server_id
+
+    def __setstate__(self, state):
+        self.server_id = state
+
+class RegisterPullHandlerRequest(rpc.Request):
+    """Register user-defined Pull handler on server.
+
+    Parameters
+    ----------
+    pull_func : func
+        user-defined pull handler
+    """
+    def __init__(self, pull_func):
+        self.pull_func = pull_func
+
+    def __getstate__(self):
+        return self.pull_func
+
+    def __setstate__(self, state):
+        self.pull_func = state
+
+    def process_request(self, server_state):
+        kv = server_state.kv_store
+        kv.pull_handler = self.pull_func
+        res = RegisterPullHandlerResponse(kv.server_id)
+        return res
+
+class RegisterPushHandlerResponse(rpc.Response):
+    """Send a confirmation signal (just a server ID) to client.
+
+    Parameters
+    ----------
+    server_id : int
+        ID of current server
+    """
+    def __init__(self, server_id):
+        self.server_id = server_id
+
+    def __getstate__(self):
+        return self.server_id
+
+    def __setstate__(self, state):
+        self.server_id = state
+
+class RegisterPushHandlerRequest(rpc.Request):
+    """Register user-defined Push handler on server.
+
+    Parameters
+    ----------
+    push_func : func
+        user-defined push handler
+    """
+    def __init__(self, push_func):
+        self.push_func = push_func
+
+    def __getstate__(self):
+        return self.push_func
+
+    def __setstate__(self, state):
+        self.push_handler = state
+
+    def process_request(self, server_state):
+        kv = server_state.kv_store
+        kv.push_handler = self.push_func
+        res = RegisterPushHandlerResponse(kv.server_id)
+        return res
 
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
@@ -223,18 +305,13 @@ class KVServer(object):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert len(ip_config) > 0, 'ip_config cannot be empty.'
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
-        rpc.register_service(KVSTORE_PULL,
-                             PullRequest,
-                             PullResponse)
-        rpc.register_service(KVSTORE_PUSH,
-                             PushRequest,
-                             None)
-        rpc.register_service(INIT_DATA,
-                             InitDataRequest,
-                             InitDataResponse)
+        rpc.register_service(KVSTORE_PULL, PullRequest, PullResponse)
+        rpc.register_service(KVSTORE_PUSH, PushRequest, None)
+        rpc.register_service(INIT_DATA, InitDataRequest, InitDataResponse)
+        rpc.register_service(BARRIER, BarrierRequest, BarrierResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
-        # Store the partition information, e.g, partition_book and g2l mapping
+        # Store the partition information with specified data name
         self._part_policy = {}
         # Used for barrier() API on KVClient
         self._barrier_count = 0
@@ -289,6 +366,14 @@ class KVServer(object):
      @property
      def pull_handler(self):
          return self._pull_handler
+
+     @pull_handler.setter
+     def pull_handler(self, pull_handler):
+         self._pull_handler = pull_handler
+
+     @push_handler.setter
+     def push_handler(self, push_handler):
+         self._push_handler = push_handler
 
     def init_data(self, name, data_tensor=None):
         """Init data tensor on kvserver.
