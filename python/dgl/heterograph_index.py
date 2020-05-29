@@ -1166,7 +1166,7 @@ class FlattenedHeteroGraph(ObjectBase):
 class HeteroPickleStates(ObjectBase):
     """Pickle states object class in C++ backend."""
     @property
-    def metagraph(self):
+    def meta(self):
         """Metagraph
 
         Returns
@@ -1174,21 +1174,10 @@ class HeteroPickleStates(ObjectBase):
         GraphIndex
             Metagraph structure
         """
-        return _CAPI_DGLHeteroPickleStatesGetMetagraph(self)
+        return bytearray(_CAPI_DGLHeteroPickleStatesGetMeta(self))
 
     @property
-    def num_nodes_per_type(self):
-        """Number of nodes per edge type
-
-        Returns
-        -------
-        Tensor
-            Array of number of nodes for each type
-        """
-        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLHeteroPickleStatesGetNumVertices(self))
-
-    @property
-    def adjs(self):
+    def arrays(self):
         """Adjacency matrices of all the relation graphs
 
         Returns
@@ -1196,15 +1185,18 @@ class HeteroPickleStates(ObjectBase):
         list of dgl.ndarray.SparseMatrix
             Adjacency matrices
         """
-        return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
+        num_arr = _CAPI_DGLHeteroPickleStatesGetArraysNum(self)
+        arr_func = _CAPI_DGLHeteroPickleStatesGetArrays(self)
+        return [arr_func(i) for i in range(num_arr)]
 
     def __getstate__(self):
-        return self.metagraph, self.num_nodes_per_type, self.adjs
+        arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
+        return self.meta, arrays
 
     def __setstate__(self, state):
-        metagraph, num_nodes_per_type, adjs = state
-        num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
+        meta, arrays = state
+        arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
         self.__init_handle_by_constructor__(
-            _CAPI_DGLCreateHeteroPickleStates, metagraph, num_nodes_per_type, adjs)
+            _CAPI_DGLCreateHeteroPickleStates, meta, arrays)
 
 _init_api("dgl.heterograph_index")

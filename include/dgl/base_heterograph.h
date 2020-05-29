@@ -739,14 +739,14 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
  * This class can be used as arguments and return values of a C API.
  */
 struct HeteroPickleStates : public runtime::Object {
-  /*! \brief Metagraph(64bits ImmutableGraph) */
-  GraphPtr metagraph;
+  /*! \brief Metainformation 
+   *
+   * metagraph, number of nodes per type, format, flags
+   */
+  std::string meta;
 
-  /*! \brief Number of nodes per type */
-  std::vector<int64_t> num_nodes_per_type;
-
-  /*! \brief adjacency matrices of each relation graph */
-  std::vector<std::shared_ptr<SparseMatrix> > adjs;
+  /*! \brief Arrays representing graph structure (coo or csr) */
+  std::vector<IdArray> arrays;
 
   static constexpr const char* _type_key = "graph.HeteroPickleStates";
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroPickleStates, runtime::Object);

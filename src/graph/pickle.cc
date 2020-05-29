@@ -5,6 +5,9 @@
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/immutable_graph.h>
+#include <dgl/graph_serializer.h>
+#include <dmlc/memory_io.h>
 #include "./heterograph.h"
 #include "../c_api_common.h"
 
@@ -14,85 +17,134 @@ namespace dgl {
 
 HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   HeteroPickleStates states;
-  states.metagraph = graph->meta_graph();
-  states.num_nodes_per_type = graph->NumVerticesPerType();
-  states.adjs.resize(graph->NumEdgeTypes());
+  dmlc::MemoryStringStream ofs(&states.meta);
+  dmlc::Stream *strm = &ofs;
+  strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
+  strm->Write(graph->NumVerticesPerType());
+  std::vector<SparseFormat> fmts;
+  std::vector<char> flags;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kAny);
-    states.adjs[etype] = std::make_shared<SparseMatrix>();
     switch (fmt) {
-      case SparseFormat::kCOO:
-        *states.adjs[etype] = graph->GetCOOMatrix(etype).ToSparseMatrix();
+      case SparseFormat::kCOO: {
+        fmts.push_back(SparseFormat::kCOO);
+        const auto &coo = graph->GetCOOMatrix(etype);
+        flags.push_back(coo.row_sorted);
+        flags.push_back(coo.col_sorted);
+        states.arrays.push_back(coo.row);
+        states.arrays.push_back(coo.col);
         break;
+      }
       case SparseFormat::kCSR:
-      case SparseFormat::kCSC:
-        *states.adjs[etype] = graph->GetCSRMatrix(etype).ToSparseMatrix();
+      case SparseFormat::kCSC: {
+        fmts.push_back(SparseFormat::kCSR);
+        const auto &csr = graph->GetCSRMatrix(etype);
+        flags.push_back(csr.sorted);
+        states.arrays.push_back(csr.indptr);
+        states.arrays.push_back(csr.indices);
+        states.arrays.push_back(csr.data);
         break;
+      }
       default:
         LOG(FATAL) << "Unsupported sparse format.";
     }
   }
+  strm->Write(fmts);
+  strm->Write(flags);
   return states;
 }
 
 HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
-  const auto metagraph = states.metagraph;
-  const auto &num_nodes_per_type = states.num_nodes_per_type;
-  CHECK_EQ(states.adjs.size(), metagraph->NumEdges());
+  char *buf = const_cast<char *>(states.meta.c_str());  // a readonly stream?
+  dmlc::MemoryFixedSizeStream ifs(buf, states.meta.size());
+  dmlc::Stream *strm = &ifs;
+  auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+  CHECK(strm->Read(&meta_imgraph)) << "Invalid meta graph";
+  GraphPtr metagraph = meta_imgraph;
   std::vector<HeteroGraphPtr> relgraphs(metagraph->NumEdges());
+  std::vector<int64_t> num_nodes_per_type;
+  CHECK(strm->Read(&num_nodes_per_type)) << "Invalid num_nodes_per_type";
+
+  std::vector<SparseFormat> fmts;
+  std::vector<char> flags;
+  CHECK(strm->Read(&fmts)) << "Invalid sparse matrix format";
+  CHECK(strm->Read(&flags)) << "Invalid flags";
+  auto fmt_itr = fmts.begin();
+  auto flags_itr = flags.begin();
+  auto array_itr = states.arrays.begin();
   for (dgl_type_t etype = 0; etype < metagraph->NumEdges(); ++etype) {
     const auto& pair = metagraph->FindEdge(etype);
     const dgl_type_t srctype = pair.first;
     const dgl_type_t dsttype = pair.second;
     const int64_t num_vtypes = (srctype == dsttype)? 1 : 2;
-    const SparseFormat fmt = static_cast<SparseFormat>(states.adjs[etype]->format);
+    int64_t num_src = num_nodes_per_type[srctype];
+    int64_t num_dst = num_nodes_per_type[dsttype];
+
+    CHECK(fmt_itr != fmts.end());
+    const auto fmt = *(fmt_itr++);
+    HeteroGraphPtr relgraph;
     switch (fmt) {
-      case SparseFormat::kCOO:
-        relgraphs[etype] = UnitGraph::CreateFromCOO(
-            num_vtypes, aten::COOMatrix(*states.adjs[etype]));
+      case SparseFormat::kCOO: {
+        CHECK_GE(states.arrays.end() - array_itr, 2);
+        const auto &row = *(array_itr++);
+        const auto &col = *(array_itr++);
+        CHECK_GE(flags.end() - flags_itr, 2);
+        bool rsorted = *(flags_itr++);
+        bool csorted = *(flags_itr++);
+
+        auto coo = aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
+        relgraph = CreateFromCOO(num_vtypes, coo);
         break;
-      case SparseFormat::kCSR:
-        relgraphs[etype] = UnitGraph::CreateFromCSR(
-            num_vtypes, aten::CSRMatrix(*states.adjs[etype]));
+      }
+      case SparseFormat::kCSR: {
+        CHECK_GE(states.arrays.end() - array_itr, 3);
+        const auto &indptr = *(array_itr++);
+        const auto &indices = *(array_itr++);
+        const auto &edge_id = *(array_itr++);
+        CHECK(flags_itr != flags.end());
+        bool sorted = *(flags_itr++);
+        auto csr = aten::CSRMatrix(num_src, num_dst, indptr, indices, edge_id, sorted);
+        relgraph = CreateFromCSR(num_vtypes, csr);
         break;
+      }
       case SparseFormat::kCSC:
       default:
         LOG(FATAL) << "Unsupported sparse format.";
     }
+    relgraphs[etype] = relgraph;
   }
   return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
 }
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetMetagraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetMeta")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef st = args[0];
-    *rv = GraphRef(st->metagraph);
+    DGLByteArray buf({st->meta.c_str(), st->meta.size()});
+    *rv = buf;
   });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetNumVertices")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArrays")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef st = args[0];
-    *rv = NDArray::FromVector(st->num_nodes_per_type);
+    *rv = ConvertNDArrayVectorToPackedFunc(st->arrays);
   });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetAdjs")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArraysNum")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef st = args[0];
-    std::vector<SparseMatrixRef> refs(st->adjs.begin(), st->adjs.end());
-    *rv = List<SparseMatrixRef>(refs);
+    *rv = static_cast<int64_t>(st->arrays.size());
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCreateHeteroPickleStates")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphRef metagraph = args[0];
-    IdArray num_nodes_per_type = args[1];
-    List<SparseMatrixRef> adjs = args[2];
+    std::string meta = args[0];
+    const List<Value> arrays = args[1];
     std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
-    st->metagraph = metagraph.sptr();
-    st->num_nodes_per_type = num_nodes_per_type.ToVector<int64_t>();
-    st->adjs.reserve(adjs.size());
-    for (const auto& ref : adjs)
-      st->adjs.push_back(ref.sptr());
+    st->meta = meta;
+    st->arrays.reserve(arrays.size());
+    for (const auto& ref : arrays) {
+      st->arrays.push_back(ref->data);
+    }
     *rv = HeteroPickleStatesRef(st);
   });
 
