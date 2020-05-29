@@ -77,7 +77,8 @@ def start_server(server_id, ip_config, num_clients, \
         res = req.process_request(server_state)
         if res is not None:
             if isinstance(res, list):
-                for cli_id in range(len(res)):
-                    rpc.send_response(cli_id, res[cli_id])
+                for response in res:
+                    target_id, res_data = response
+                    rpc.send_response(target_id, res_data)
             else:
                 rpc.send_response(client_id, res)

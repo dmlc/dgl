@@ -9,6 +9,75 @@ from .. import backend as F
 
 KVSTORE_PULL = 901231
 
+class PartitionPolicy(object):
+    """Wrapper for GraphPartitionBook and RangePartitionBook. 
+
+    We can extend this class to support HeteroGraph in the future.
+
+    Parameters
+    ----------
+    policy_str : str
+        partition policy string, e.g., 'edge' or 'node'.
+    part_id : int
+        partition ID
+    partition_book : GraphPartitionBook or RangePartitionBook
+        Store the partition information
+    """
+    def __init__(self, policy_str, part_id, partition_book):
+        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
+        self._policy_str = policy_str
+        self._part_id = part_id
+        self._partition_book = partition_book
+
+    @property
+    def policy_str(self):
+        return self._policy_str
+
+    @property
+    def part_id(self):
+    	return self._part_id
+    
+    def to_local(self, id_tensor):
+        """Mapping global ID to local ID
+
+        Parameters
+        ----------
+        id_tensor : tensor
+            Gloabl ID tensor
+
+        Return
+        ------
+        tensor
+            local ID tensor
+        """
+        if self._policy_str == 'edge':
+            return self._partition_book.eid2localeid(id_tensor, self._part_id)
+        elif self._policy_str == 'node':
+            return self._partition_book.nid2localnid(id_tensor, self._part_id)
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
+   def to_partid(self, id_tensor):
+        """Mapping global ID to partition ID
+
+        Parameters
+        ----------
+        id_tensor : tensor
+            Global ID tensor
+
+        Return
+        ------
+        tensor
+            partition ID
+        """
+        if self._policy_str == 'edge':
+            return self._partition_book.eid2partid(id_tensor)
+        elif self._policy_str == 'node':
+            return self._partition_book.nid2partid(id_tensor)
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
 class PullResponse(rpc.Response):
     """Send the sliced data tensor back to client.
 
@@ -90,7 +159,7 @@ class PushRequest(rpc.Response):
 INIT_DATA = 901233
 
 class InitDataResponse(rpc.Response):
-    """Send confirmation response (just a server ID) of
+    """Send a confirmation response (just a server ID) of
     InitDataRequest to client.
 
     Parameters
@@ -108,7 +177,7 @@ class InitDataResponse(rpc.Response):
         self.server_id = state
 
 class InitDataRequest(rpc.Request):
-    """Send meta data to server to init data tensor on target kvserver.
+    """Send meta data to server to init data tensor.
 
     Parameters
     ----------
@@ -118,45 +187,46 @@ class InitDataRequest(rpc.Request):
         data shape
     dtype : str
         data type string, e.g., 'int64', 'float32', etc.
-    part_policy_str : str
-        partition policy string, 'e.g., edge' or 'node'.
+    policy_str : str
+        partition policy string, e.g., 'edge' or 'node'.
     init_func : function
-        user-defined init function
+        user-defined initialization function.
     """
-    def __init__(self, name, shape, dtype, part_policy_str, init_func):
+    def __init__(self, name, shape, dtype, policy_str, init_func):
         self.name = name
         self.shape = shape
         self.dtype = dtype
-        self.part_policy_str = part_policy_str
+        self.policy_str = policy_str
         self.init_func = init_func
 
     def __getstate__(self):
-        return self.name, self.shape, self.dtype, self.part_policy_str, self.init_func
+        return self.name, self.shape, self.dtype, self.policy_str, self.init_func
 
     def __setstate__(self, state):
-        self.name, self.shape, self.dtype, self.part_policy_str, self.init_func = state
+        self.name, self.shape, self.dtype, self.policy_str, self.init_func = state
 
     def process_request(self, server_state):
         kv = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
-        if kv.is_main_server(): # main server
-            data_tensor = self.init_func(data_shape, dtype, F.cpu())
+        if kv.is_main_server():
+            data_tensor = self.init_func(data_shape, dtype)
             kv.init_data(name=name, data_tensor=data_tensor)
         else: # backup server will read data from shared-memory
             kv.init_data(name=name)
         # Find the same partition policy from exsiting plolicy list.
         for _, policy in kv.part_policy.items():
-            if policy.policy_str == self.part_policy_str:
+            if policy.policy_str == self.policy_str:
                 kv.part_policy[self.name] = policy
                 res = InitDataResponse(kv.server_id)
                 return res
         raise RuntimeError("Cannot find any partition policy match \
-            the policy string : %s" % self.part_policy_str)
+            the policy string : %s" % self.policy_str)
 
-BARRIER = 901235
+BARRIER = 901234
 
 class BarrierResponse(rpc.Response):
-    """Send an unblock signal (just a server ID) to client.
+    """Send an un-block signal (just a server ID) of
+    BarrierRequest to client.
 
     Parameters
     ----------
@@ -191,20 +261,21 @@ class BarrierRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv = server_state.kv_store
-        kv.barrier_count = kv.barrier_count + 1
+        kv.incre_barrier_count()
         if kv.barrier_count == kv.num_clients:
-            res_list = []
             kv.barrier_count = 0
-            for cli_id in range(kv.num_clients):
-                res_list.append(BarrierResponse(kv.server_id))
+            res_list = []
+            for target_id in range(kv.num_clients):
+                res_list.append((target_id, BarrierResponse(kv.server_id)))
             return res_list
         else:
             return None
 
-REGISTER_PULL = 901236
+REGISTER_PULL = 901235
 
 class RegisterPullHandlerResponse(rpc.Response):
-    """Send a confirmation signal (just a server ID) to client.
+    """Send a confirmation signal (just a server ID) of
+    RegisterPullHandler to client.
 
     Parameters
     ----------
@@ -221,12 +292,12 @@ class RegisterPullHandlerResponse(rpc.Response):
         self.server_id = state
 
 class RegisterPullHandlerRequest(rpc.Request):
-    """Register user-defined Pull handler on server.
+    """Send a UDF to register Pull handler on server.
 
     Parameters
     ----------
     pull_func : func
-        user-defined pull handler
+        UDF pull handler
     """
     def __init__(self, pull_func):
         self.pull_func = pull_func
@@ -243,10 +314,11 @@ class RegisterPullHandlerRequest(rpc.Request):
         res = RegisterPullHandlerResponse(kv.server_id)
         return res
 
-REGISTER_PUSH = 901237
+REGISTER_PUSH = 901236
 
 class RegisterPushHandlerResponse(rpc.Response):
-    """Send a confirmation signal (just a server ID) to client.
+    """Send a confirmation signal (just a server ID) of
+    RegisterPushHandler to client.
 
     Parameters
     ----------
@@ -263,12 +335,12 @@ class RegisterPushHandlerResponse(rpc.Response):
         self.server_id = state
 
 class RegisterPushHandlerRequest(rpc.Request):
-    """Register user-defined Push handler on server.
+    """Send a UDF to register Push handler on server.
 
     Parameters
     ----------
     push_func : func
-        user-defined push handler
+        UDF push handler
     """
     def __init__(self, push_func):
         self.push_func = push_func
@@ -277,7 +349,7 @@ class RegisterPushHandlerRequest(rpc.Request):
         return self.push_func
 
     def __setstate__(self, state):
-        self.push_handler = state
+        self.push_func = state
 
     def process_request(self, server_state):
         kv = server_state.kv_store
@@ -285,17 +357,18 @@ class RegisterPushHandlerRequest(rpc.Request):
         res = RegisterPushHandlerResponse(kv.server_id)
         return res
 
-GET_SHARED = 901238
+GET_SHARED = 901237
 
 class GetSharedDataResponse(rpc.Response):
     """Send meta data of shared-tensor back to client.
 
     Parameters
     ----------
-    dict_of_tuple, e.g,
+    meta : dict
+        a dict of meta, e.g,
 
-        {'data_0' : (shape, dtype),
-         'data_1' : (shape, dtype)}
+        {'data_0' : (shape, dtype, policy_str),
+         'data_1' : (shape, dtype, policy_str)}
     """
     def __init__(self, meta):
         self.meta = meta
@@ -307,7 +380,8 @@ class GetSharedDataResponse(rpc.Response):
         self.meta = state
 
 class GetSharedDataRequest(rpc.Request):
-    """Send a signal (just a client ID) to get the meta data of shared-tensor from server
+    """Send a signal (just a client ID) to get the
+    meta data of shared-tensor from server.
 
     Parameters
     ----------
@@ -325,17 +399,18 @@ class GetSharedDataRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv = server_state.kv_store
-        data_store = kv.data_store
         meta = {}
-        for name, data in data_store.items():
-            meta[name] = (F.shape(data), get_type_str(F.dtype(data)))
+        for name, data in kv.data_store.items():
+            meta[name] = (F.shape(data), 
+                          get_type_str(F.dtype(data)), 
+                          kv.part_policy[name].policy_str())
         res = GetSharedDataResponse(meta)
         return res
 
-GET_FULL_SHAPE = 901239
+GET_FULL_SHAPE = 901238
 
 class GetFullShapeResponse(rpc.Response):
-    """Send the data shape back to client
+    """Send the data shape back to client.
 
     Parameters
     ----------
@@ -352,7 +427,7 @@ class GetFullShapeResponse(rpc.Response):
         self.shape = state
 
 class GetFullShapeRequest(rpc.Request):
-    """Send a signal (data name) to get the data shape from server
+    """Send data name to get the data shape from server.
 
     Parameters
     ----------
@@ -398,6 +473,7 @@ class KVServer(object):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert len(ip_config) > 0, 'Path of ip_config file cannot be empty.'
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
+        # Register services on server
         rpc.register_service(KVSTORE_PULL, 
                              PullRequest, 
                              PullResponse)
@@ -419,27 +495,33 @@ class KVServer(object):
         rpc.register_service(GET_SHARED,
         	                 GetSharedDataRequest,
         	                 GetSharedDataResponse)
+        rpc.register_service(GET_FULL_SHAPE,
+        	                 GetFullShapeRequest,
+        	                 GetFullShapeResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
         self._part_policy = {}
         # Used for barrier() API on KVClient
         self._barrier_count = 0
+        # Basic information
         self._server_id = server_id
         self._server_namebook = rpc.read_ip_config(ip_config)
         self._machine_id = self._server_namebook[server_id][0]
+        self._group_count = self._server_namebook[server_id][3]
+        self._part_id = self._machine_id
         self._num_clients = num_clients
-        # TODO(chao) : remove tmp file
+        # TODO(chao) : remove tmp file using new shared-tensor API
         self._open_file_list = []
-        # user-defined push and pull handler
+        # push and pull handler
         self._push_handler = self._default_push_handler
         self._pull_handler = self._default_pull_handler
 
     def __del__(self):
         """Finalize KVServer
         """
-        # TODO(chao) : remove tmp file
         # Delete temp file when kvstore service is closed
+        # TODO(chao) : remove tmp file using new shared-tensor API
         for file in self._open_file_list:
             if (os.path.exists(file)):
                 os.remove(file)
@@ -452,8 +534,8 @@ class KVServer(object):
      def barrier_count(self):
      	return self._barrier_count
 
-     @barrier_count.setter(self, barrier_count):
-         self._barrier_count = barrier_count
+     def incre_barrier_count(self):
+        self._barrier_count +=1
 
      @property
      def num_clients(self):
@@ -464,8 +546,8 @@ class KVServer(object):
          return self._data_store
 
      @property
-     def partition_policy(self):
-         return self._partition_policy
+     def part_policy(self):
+         return self._part_policy
      
      @property
      def push_handler(self):
@@ -483,6 +565,13 @@ class KVServer(object):
      def push_handler(self, push_handler):
          self._push_handler = push_handler
 
+     def is_main_server(self):
+         """Return True is current server is not a backup-server.
+         """
+         if self._server_id % self._group_count == 0:
+             return True
+         return False
+
     def init_data(self, name, data_tensor=None):
         """Init data tensor on kvserver.
 
@@ -493,29 +582,28 @@ class KVServer(object):
         data_tensor : tensor
             If the data_tensor is None, KVServer will read shared-memory by name.
         """
-        # TODO(chao) : Once empty_shared_mem delete the shape and dtype arguments, 
-        # we can remove tmp file
+        # TODO(chao) : remove tmp file using new shared-tensor API
         assert len(name) > 0, 'name cannot be empty.'
         if data_tensor is not None: # Create shared-tensor
             data_type = get_type_str(F.dtype(data_tensor))
-            shared_data = empty_shared_mem(name+'-data-', True, data_tensor.shape, data_type)
+            shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-            self._write_data_meta_to_file(name+'-meta-'+str(self._machine_id), data_tensor)
-            self._open_file_list.append(name+'-meta-'+str(self._machine_id))
+            self._write_data_meta_to_file(name+'-kvmeta-'+str(self._machine_id), data_tensor)
+            self._open_file_list.append(name+'-kvmeta-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-meta-'+str(self._machine_id))):
+                if (os.path.exists(name+'-kvmeta-'+str(self._machine_id))):
                     break
                 else:
                     time.sleep(1) # wait until the file been created
-            data_shape, data_type = self._read_data_meta_from_file(name+'-meta-'+str(self._machine_id))
-            shared_data = empty_shared_mem(name+'-data-', False, data_shape, data_type)
+            data_shape, data_type = self._read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
+            shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
 
-    def set_partition_policy(self, name, policy):
+    def set_partition_policy(self, name, policy_str, partition_book):
     	"""Set partition policy 
 
         Set a partition policy to target data.
@@ -524,11 +612,14 @@ class KVServer(object):
         ----------
         name : str
             data name
-        policy : PartitionPolicy
-            KVStore assume the policy has already been in shared-memory
+        policy_str : str
+            partition policy string, e.g., 'edge' or 'node'.
+        partition_book : GraphPartitionBook or RangePartitionBook
+            Store the partition information
         """
         assert len(name) > 0, 'name cannot be empty.'
-        self._part_policy[name] = policy
+        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
 
     def _write_data_meta_to_file(self, filename, data):
         """Write data meta infor to a temp file.
@@ -540,12 +631,10 @@ class KVServer(object):
         data : tensor (mx.ndarray or torch.tensor)
             data tensor
         """
-        # TODO(chao) : Once empty_shared_mem delete the shape and dtype arguments, 
-        # we can remove tmp file
+        # TODO(chao) : remove tmp file using new shared-tensor API
         assert len(filename) > 0, 'filename cannot be empty.'
         if(os.path.exists(filename)):
             os.remove(filename)
-
         shape = F.shape(data)
         str_data = ''
         str_data += get_type_str(F.dtype(data))
@@ -570,8 +659,7 @@ class KVServer(object):
         tuple
             data shape
         """
-        # TODO(chao) : Once empty_shared_mem delete the shape and dtype arguments, 
-        # we can remove tmp file
+        # TODO(chao) : remove tmp file using new shared-tensor API
         assert len(filename) > 0, 'filename cannot be empty.'
         f = open(filename, "r")
         str_data = f.read()
@@ -581,10 +669,9 @@ class KVServer(object):
         for i in range(1, len(data_list)-1):
             data_shape.append(int(data_list[i]))
         f.close()
-
         return data_shape, data_type
 
-    def _default_push_handler(self, name, ID, data):
+    def _default_push_handler(self, name, id_tensor, data_tensor):
         """Default handler for PUSH message. 
 
         On default, _push_handler perform update operation for the tensor.
@@ -593,15 +680,15 @@ class KVServer(object):
         ----------
         name : str
             data name
-        ID : tensor (mx.ndarray or torch.tensor)
+        ID : tensor
             a vector storing the ID list.
-        data : tensor (mx.ndarray or torch.tensor)
+        data : tensor
             a tensor with the same row size of id
         """
         self._data_store[name][ID] = data
 
 
-    def _default_pull_handler(self, name, ID):
+    def _default_pull_handler(self, name, id_tensor):
         """Default handler for PULL operation.
 
         On default, _pull_handler perform get operation for the tensor.
@@ -610,7 +697,7 @@ class KVServer(object):
         ----------
         name : str
             data name
-        ID : tensor (mx.ndarray or torch.tensor)
+        ID : tensor
             a vector storing the ID list.
 
         Return
@@ -635,6 +722,7 @@ class KVClient(object):
     """
     def __init__(self, ip_config):
         assert len(ip_config) > 0, 'ip_config cannot be empty.'
+        # Register services on client
         rpc.register_service(KVSTORE_PULL, 
                              PullRequest, 
                              PullResponse)
@@ -656,6 +744,9 @@ class KVClient(object):
         rpc.register_service(GET_SHARED,
         	                 GetSharedDataRequest,
         	                 GetSharedDataResponse)
+        rpc.register_service(GET_FULL_SHAPE,
+        	                 GetFullShapeRequest,
+        	                 GetFullShapeResponse)
         self._data_store = {}
         self._full_data_shape = {}
         self._server_namebook = rpc.read_ip_config(ip_config)
