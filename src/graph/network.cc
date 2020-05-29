@@ -15,10 +15,10 @@
 
 #include <unordered_map>
 
-#include "./network/communicator.h"
-#include "./network/socket_communicator.h"
-#include "./network/msg_queue.h"
-#include "./network/common.h"
+#include "../rpc/network/communicator.h"
+#include "../rpc/network/socket_communicator.h"
+#include "../rpc/network/msg_queue.h"
+#include "../rpc/network/common.h"
 
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
