@@ -788,13 +788,14 @@ class KVClient(object):
         ----------
         func : UDF push function
         """
-        request = RegisterPushHandlerRequest(func)
-        # send request
-        for server_id in range(self._server_count):
-            rpc.send_request(server_id, request)
-        # wait confirmation
-        for _ in range(self._server_count):
-            response = rpc.recv_response()
+        if self._client_id == 0:
+            request = RegisterPushHandlerRequest(func)
+            # send request
+            for server_id in range(self._server_count):
+                rpc.send_request(server_id, request)
+            # wait confirmation
+            for _ in range(self._server_count):
+                response = rpc.recv_response()
 
     def register_pull_handler(self, func):
         """Register UDF pull function on server.
@@ -805,13 +806,14 @@ class KVClient(object):
         ----------
         func : UDF pull function
         """
-        request = RegisterPullHandlerRequest(func)
-        # send request
-        for server_id in range(self._server_count):
-            rpc.send_request(server_id, request)
-        # wait confirmation
-        for _ in range(self._server_namebook):
-            response = rpc.recv_response()
+        if self._client_id == 0:
+            request = RegisterPullHandlerRequest(func)
+            # send request
+            for server_id in range(self._server_count):
+                rpc.send_request(server_id, request)
+            # wait confirmation
+            for _ in range(self._server_namebook):
+                response = rpc.recv_response()
 
     def get_shared_data(self, partition_book):
         """Mapping shared-tensor from server to client.
@@ -846,13 +848,9 @@ class KVClient(object):
                 data_shape[0] += response.shape[0]
             self._full_data_shape[name] = tuple(data_shape)
 
-    def init_data(self, name, shape, dtype, policy_str):
+    def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
         """Send message to kvserver to initialize new data and 
         get corresponded shared-tensor on kvclient. 
-
-        The new data will be initialized to zeros.
-
-        Note that, this API must be invoked after the conenct() API. 
 
         Parameters
         ----------
@@ -862,14 +860,18 @@ class KVClient(object):
             data shape
         dtype : dtype
             data type
-        policy : PartitionPolicy
-            KVStore assume the policy has already been in shared-memory
+        policy_str : str
+            partition policy string, e.g., 'edge' or 'node'.
+        partition_book : GraphPartitionBook or RangePartitionBook
+            Store the partition information
+        init_func : func
+            UDF init function
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty'
-
-        if self._client_id == 0: # only client_0 send this request to server
-
+        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        if self._client_id == 0:
+        # TODO
 
     def get_data_name_list(self):
     	"""Get all the data name
@@ -882,23 +884,155 @@ class KVClient(object):
     	name_list = []
     	for name, _ in self._data_store.items():
     	    name_list.append(name)
-
     	return name_list
 
     def get_data_meta(self, name):
-        """Get meta data (data_type, data_shape, partition_policy)
+        """Get meta data (data_type, data_shape, part_policy)
         of the target shared-tensor
         """
-
+        assert len(name) > 0, 'name cannot be empty.'
+        data_type = F.dtype(self._data_store[name])
+        data_shape = self._full_data_shape[name]
+        part_policy = self._part_policy[name]
+        return (data_type, data_shape, part_policy)
 
     def push(self, name, id_tensor, data_tensor):
-        pass
+        """Push data to KVServer.
+
+        Note that push() is an non-blocking operation that will return immediately.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        id_tensor : tensor
+            a vector storing the global data ID
+        data_tensor : tensor
+            a tensor with the same row size of data ID
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
+        assert F.shape(id_tensor)[0] == F.shape(data_tensor)[0], 'The data must has the same row size with ID.'
+        # partition data
+        machine_id = self._part_policy[name].to_partid(id_tensor)
+        # sort index by machine id
+        sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
+        id_tensor = id_tensor[sorted_id]
+        data_tensor = data_tensor[sorted_id]
+        machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
+        # push data to server by order
+        start = 0
+        local_id = None
+        local_data = None
+        for idx in range(len(machine)):
+            end = start + count[idx]
+            if start == end: # No data for target machine
+                continue
+            partial_id = id_tensor[start:end]
+            partial_data = data_tensor[start:end]
+            if machine[idx] == self._machine_id: # local push
+                # Note that DO NOT push local data right now because we can overlap
+                # communication-local_push here
+                local_id =  self._part_policy[name].to_local(partial_id)
+                local_data = partial_data
+            else: # push data to remote server
+                request = PushRequest(name, partial_id, partial_data)
+                # randomly select a server node in target machine for load-balance
+                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
+                rpc.send_request(s_id, request)
+
+            start += count[idx]
+
+        if local_id is not None: # local push
+            self._push_handler(name, local_id, local_data)
 
     def pull(self, name, id_tensor):
-        pass
+        """Pull message from KVServer.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        id_tensor : tensor
+            a vector storing the ID list
+
+        Returns
+        -------
+        tensor
+            a data tensor with the same row size of id_tensor.
+        """
+        #TODO(chao) : add fast pull
+        assert len(name) > 0, 'name cannot be empty.'
+        assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
+
+        # partition data
+        machine_id = self._part_policy[name],to_partid(id_tensor)
+        # sort index by machine id
+        sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
+        back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
+        id_tensor = id_tensor[sorted_id]
+        machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
+        # pull data from server by order
+        start = 0
+        pull_count = 0
+        local_id = None
+        for idx in range(len(machine)):
+            end = start + count[idx]
+            if start == end: # No data for target machine
+                continue
+            partial_id = id_tensor[start:end]
+            if machine[idx] == self._machine_id: # local pull
+                # Note that DO NOT pull local data right now because we can overlap
+                # communication-local_pull here
+                local_id =  self._part_policy[name].to_local(partial_id)
+            else: # pull data from remote server
+                request = PullRequest(name, partial_id)
+                # randomly select a server node in target machine for load-balance
+                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
+                rpc.send_request(s_id, request)
+                pull_count += 1
+
+            start += count[idx]
+
+        msg_list = []
+        if local_id is not None: # local pull
+            local_data = self._pull_handler(name, local_id)
+            s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
+            local_msg = KVStoreMsg(
+                type=KVMsgType.PULL_BACK, 
+                rank=s_id,
+                name=name, 
+                id=None,
+                data=local_data,
+                shape=None,
+                c_ptr=None)
+            msg_list.append(local_msg)
+            self._garbage_msg.append(local_msg)
+
+        # wait message from server nodes
+        for idx in range(pull_count):
+            remote_msg = _recv_kv_msg(self._receiver)
+            msg_list.append(remote_msg)
+            self._garbage_msg.append(remote_msg)
+
+        # sort msg by server id and merge tensor together
+        msg_list.sort(key=self._takeId)
+        data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
+
+        return data_tensor[back_sorted_id] # return data with original index order
 
     def barrier(self):
-        pass
+        """Barrier for all client nodes
+
+        This API will be blocked untill all the clients call this API.
+        """
+        request = BarrierRequest(self._client_id)
+        # send request
+        for server_id in range(self._server_count):
+            rpc.send_request(server_id, request)
+        # recv response
+        for _ in range(self._server_count):
+            response = rpc.recv_response()
 
     def _default_push_handler(self, name, id_tensor, data_tensor):
         """Default handler for PUSH message. 
