@@ -266,7 +266,7 @@ template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-  const IdType* row_data, col_data, data;
+  const IdType *row_data, *col_data, *data;
   NDArray tmp_row, tmp_col, tmp_data;
   if (XPU == kDLGPU) {
     CHECK(coo.row->ctx.device_type == kDLGPU) << "coo should be in GPU";
