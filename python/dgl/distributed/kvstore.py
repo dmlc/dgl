@@ -82,6 +82,21 @@ class PartitionPolicy(object):
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
+    def get_data_size(self):
+        """Get data size in current partition.
+
+        Returns
+        -------
+        int
+            data size
+        """
+        if self._policy_str == 'edge':
+            return len(self._partition_book.partid2eids(self._part_id))
+        elif self._policy_str == 'node':
+            return len(self._partition_book.partid2nids(self._part_id))
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
 class PullResponse(rpc.Response):
     """Send the sliced data tensor back to client.
 
@@ -851,6 +866,19 @@ class KVClient(object):
                 data_shape[0] += response.shape[0]
             self._full_data_shape[name] = tuple(data_shape)
 
+    def barrier(self):
+        """Barrier for all client nodes
+
+        This API will be blocked untill all the clients call this API.
+        """
+        request = BarrierRequest(self._client_id)
+        # send request
+        for server_id in range(self._server_count):
+            rpc.send_request(server_id, request)
+        # recv response
+        for _ in range(self._server_count):
+            response = rpc.recv_response()
+
     def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
         """Send message to kvserver to initialize new data and 
         get corresponded shared-tensor on kvclient. 
@@ -873,8 +901,31 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        shape = list(shape)
+        policy_list = []
         if self._client_id == 0:
-        # TODO
+            for machine_id in range(self._machine_count):
+            	policy = PartitionPolicy(plolicy_str, machine_id, partition_book)
+                part_shape = shape.copy()
+                part_shape[0] = policy.get_data_size()
+                request = InitDataRequest(name,
+                                          tuple(part_shape), 
+                                          get_type_str(dtype), 
+                                          policy_str,
+                                          init_func)
+                for n in range(self._group_count):
+                    server_id = machine_id * self._group_count + n
+                    rpc.send_request(server_id, request)
+            for _ in range(self._server_count):
+                response = rpc.recv_response()
+            self.barrier() # wait all the client and server finish its job
+            self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+            data_shape, data_type = self._read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
+            shared_data = empty_shared_mem(name+'-kvdata-', False, shape, data_type)
+            dlpack = shared_data.to_dlpack()
+            self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
+            self._data_name_list.append(name)
+            self._full_data_shape[name] = tuple(shape)
 
     def get_data_name_list(self):
     	"""Get all the data name
@@ -1014,19 +1065,6 @@ class KVClient(object):
         data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
 
         return data_tensor[back_sorted_id] # return data with original index order
-
-    def barrier(self):
-        """Barrier for all client nodes
-
-        This API will be blocked untill all the clients call this API.
-        """
-        request = BarrierRequest(self._client_id)
-        # send request
-        for server_id in range(self._server_count):
-            rpc.send_request(server_id, request)
-        # recv response
-        for _ in range(self._server_count):
-            response = rpc.recv_response()
 
     def _takeId(self, elem):
         """Used by sort response list
