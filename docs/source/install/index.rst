@@ -36,6 +36,7 @@ After the ``conda`` environment is activated, run one of the following commands.
    conda install -c dglteam dgl-cuda9.0      # For CUDA 9.0 Build
    conda install -c dglteam dgl-cuda10.0     # For CUDA 10.0 Build
    conda install -c dglteam dgl-cuda10.1     # For CUDA 10.1 Build
+   conda install -c dglteam dgl-cuda10.2     # For CUDA 10.2 Build
 
 
 Install from pip
@@ -55,6 +56,7 @@ For CUDA builds, run one of the following commands and specify the CUDA version.
    pip install dgl-cu92      # For CUDA 9.2 Build
    pip install dgl-cu100     # For CUDA 10.0 Build
    pip install dgl-cu101     # For CUDA 10.1 Build
+   pip install dgl-cu102     # For CUDA 10.2 Build
 
 For the most current nightly build from master branch, run one of the following commands.
 
@@ -65,6 +67,7 @@ For the most current nightly build from master branch, run one of the following 
    pip install --pre dgl-cu92      # For CUDA 9.2 Build
    pip install --pre dgl-cu100     # For CUDA 10.0 Build
    pip install --pre dgl-cu101     # For CUDA 10.1 Build
+   pip install --pre dgl-cu102     # For CUDA 10.2 Build
 
 
 .. _install-from-source:
