@@ -36,6 +36,9 @@ class ServerState(ObjectBase):
     total_num_edges : int
         Total number of edges
     """
+    def __init__(self, kv_store):
+        self._kv_store = kv_store
+
     @property
     def kv_store(self):
         """Get data store."""

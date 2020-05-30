@@ -4,7 +4,7 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .server_state import ServerState
 
-def start_server(server_id, ip_config, num_clients, \
+def start_server(server_id, ip_config, num_clients, kv_server, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
@@ -70,7 +70,7 @@ def start_server(server_id, ip_config, num_clients, \
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)
             rpc.send_response(client_id, register_res)
-    server_state = ServerState()
+    server_state = ServerState(kv_server)
     # main service loop
     while True:
         req, client_id = rpc.recv_request()
