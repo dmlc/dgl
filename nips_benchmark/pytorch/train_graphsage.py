@@ -18,12 +18,12 @@ import torch.nn.functional as F
 import argparse
 from sklearn.metrics import f1_score
 from graphsage import GraphSAGE
-from dgl.data.ppi import LegacyPPIDataset
+from dgl.data.ppi import PPIDataset
 from torch.utils.data import DataLoader
 
 def collate(sample):
-    graph, feats, labels = sample[0]
-    feats = torch.from_numpy(feats)
+    graph, labels = sample[0]
+    feats = graph.ndata['feat']
     labels = torch.from_numpy(labels)
     #graphs, feats, labels =map(list, zip(*sample))
     #graph = dgl.batch(graphs)
@@ -56,9 +56,9 @@ def main(args):
     # define loss function
     loss_fcn = torch.nn.BCEWithLogitsLoss()
     # create the dataset
-    train_dataset = LegacyPPIDataset(mode='train')
-    valid_dataset = LegacyPPIDataset(mode='valid')
-    test_dataset = LegacyPPIDataset(mode='test')
+    train_dataset = PPIDataset(mode='train')
+    valid_dataset = PPIDataset(mode='valid')
+    test_dataset = PPIDataset(mode='test')
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate)
     valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, collate_fn=collate)
