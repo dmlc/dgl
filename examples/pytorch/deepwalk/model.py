@@ -227,6 +227,7 @@ class SkipGramModel(nn.Module):
             self.state_sum_v.share_memory_()
 
     def set_device(self, gpu_id):
+        """ set gpu device """
         self.device = torch.device("cuda:%d" % gpu_id)
         print("The device is", self.device)
         self.lookup_table = self.lookup_table.to(self.device)
@@ -281,13 +282,16 @@ class SkipGramModel(nn.Module):
             lr = self.lr
 
         # [batch_size, walk_length]
-        nodes = torch.stack(batch_walks)
+        if isinstance(batch_walks, list):
+            nodes = torch.stack(batch_walks)
+        elif isinstance(batch_walks, torch.LongTensor):
+            nodes = batch_walks
         if self.only_gpu:
             nodes = nodes.to(self.device)
             if neg_nodes is not None:
                 neg_nodes = neg_nodes.to(self.device)
-        emb_u = self.u_embeddings.weight[nodes].view(-1, self.emb_dimension).to(self.device)
-        emb_v = self.v_embeddings.weight[nodes].view(-1, self.emb_dimension).to(self.device)
+        emb_u = self.u_embeddings(nodes).view(-1, self.emb_dimension).to(self.device)
+        emb_v = self.v_embeddings(nodes).view(-1, self.emb_dimension).to(self.device)
 
         ## Postive
         bs = len(batch_walks)
@@ -346,8 +350,8 @@ class SkipGramModel(nn.Module):
         else:
             index_emb_negu = self.index_emb_negu
             index_emb_negv = self.index_emb_negv
-
         emb_neg_u = torch.index_select(emb_u, 0, index_emb_negu)
+        
         if neg_nodes is None:
             emb_neg_v = torch.index_select(emb_v, 0, index_emb_negv)
         else:
@@ -415,7 +419,18 @@ class SkipGramModel(nn.Module):
         return torch.sum(score), torch.sum(neg_score)
 
     def save_embedding(self, dataset, file_name):
-        """ Write embedding to local file
+        """ Write embedding to local file.
+
+        Parameter
+        ---------
+        dataset DeepwalkDataset : the dataset
+        file_name str : the file name
+        """
+        embedding = self.u_embeddings.weight.cpu().data.numpy()
+        np.save(file_name, embedding)
+
+    def save_embedding_txt(self, dataset, file_name):
+        """ Write embedding to local file. For future use.
 
         Parameter
         ---------

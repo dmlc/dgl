@@ -20,21 +20,23 @@ Format of a network file:
 1 3
 ...
 ```
-Format of embedding file:
-```
-1(node id) 0.1 0.34 0.5 ...
-2(node id) 0.5 0.4 0.6 ...
-...
-```
 
 To run the code:
 ```
 python3 deepwalk.py --net_file net.txt --emb_file emb.txt --adam --mix --lr 0.2 --num_procs 4 --batch_size 100 --negative 5
 ```
 
-To evalutate embedding on multi-label classification, please refer to [here](https://github.com/ShawXh/Evaluate-Embedding)
+## How to save the embedding
+
+Functions:
+```
+SkipGramModel.save_embedding(dataset, file_name)
+SkipGramModel.save_embedding_txt(dataset, file_name)
+```
 
 ## Evaluation
+
+To evalutate embedding on multi-label classification, please refer to [here](https://github.com/ShawXh/Evaluate-Embedding)
 
 YouTube (1M nodes).
 
@@ -48,7 +50,7 @@ The comparison between running time is shown as below, where the numbers in the 
 
 | Implementation | gensim.word2vec(hs) | gensim.word2vec(ns) | Ours |
 |----|----|----|----|
-| Time (s) |    27119.6(1759.8)  |   10580.3(1704.3)   | 631.92(175.66) |
+| Time (s) |    27119.6(1759.8)  |   10580.3(1704.3)   | 570.4 |
 
 Parameters.
 - walk_length = 80, number_walks = 10, window_size = 5

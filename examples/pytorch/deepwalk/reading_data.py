@@ -1,12 +1,22 @@
 import numpy as np
-import dgl
+import scipy.sparse as sp
+import pickle
 import torch
+from torch.utils.data import DataLoader
 import random
 import time
+import dgl
+from utils import shuffle_walks
 np.random.seed(3141592653)
 
-def ReadTxtNet(file_path=""):
-    """ Read the txt network file to a dict
+def ReadTxtNet(file_path="", undirected=True):
+    """ Read the txt network file. 
+    Notations: The network is unweighted.
+
+    Parameters
+    ----------
+    file_path str : path of network file
+    undirected bool : whether the edges are undirected
 
     Return
     ------
@@ -18,6 +28,8 @@ def ReadTxtNet(file_path=""):
     id2node = {}
     cid = 0
 
+    src = []
+    dst = []
     net = {}
     with open(file_path, "r") as f:
         for line in f.readlines():
@@ -33,43 +45,59 @@ def ReadTxtNet(file_path=""):
 
             n1 = node2id[n1]
             n2 = node2id[n2]
-            try:
-                net[n1][n2] = 1
-            except:
+            if n1 not in net:
                 net[n1] = {n2: 1}
-            try:
-                net[n2][n1] = 1
-            except:
-                net[n2] = {n1: 1}
+                src.append(n1)
+                dst.append(n2)
+            elif n2 not in net[n1]:
+                net[n1][n2] = 1
+                src.append(n1)
+                dst.append(n2)
+            
+            if undirected:
+                if n2 not in net:
+                    net[n2] = {n1: 1}
+                    src.append(n2)
+                    dst.append(n1)
+                elif n1 not in net[n2]:
+                    net[n2][n1] = 1
+                    src.append(n2)
+                    dst.append(n1)
 
     print("node num: %d" % len(net))
-    print("edge num: %d" % (sum(list(map(lambda i: len(net[i]), net.keys())))/2))
-    if max(net.keys()) != len(net) - 1:
-        print("error reading net, quit")
-        exit(1)
-    return net, node2id, id2node
+    print("edge num: %d" % len(src))
+    assert max(net.keys()) == len(net) - 1, "error reading net, quit"
 
-def net2graph(net):
-    """ Transform the network dict to DGL graph
+    sm = sp.coo_matrix(
+        (np.ones(len(src)), (src, dst)),
+        dtype=np.float32)
+
+    return net, node2id, id2node, sm
+
+def net2graph(net_sm):
+    """ Transform the network to DGL graph
 
     Return 
     ------
     G DGLGraph : graph by DGL
     """
-    G = dgl.DGLGraph()
-    G.add_nodes(len(net))
-    for i in net:
-        G.add_edges(i, list(net[i].keys()))
+    start = time.time()
+    G = dgl.DGLGraph(net_sm)
+    end = time.time()
+    t = end - start
+    print("Building DGLGraph in %.2fs" % t)
     return G
 
 class DeepwalkDataset:
     def __init__(self, 
             net_file,
+            map_file,
             walk_length=80,
             window_size=5,
             num_walks=10,
             batch_size=32,
             negative=5,
+            num_procs=4,
             fast_neg=True,
             ):
         """ This class has the following functions:
@@ -93,17 +121,19 @@ class DeepwalkDataset:
         self.num_walks = num_walks
         self.batch_size = batch_size
         self.negative = negative
-        self.net, self.node2id, self.id2node = ReadTxtNet(net_file)
-        self.G = net2graph(self.net)
+        self.num_procs = num_procs
+        self.fast_neg = fast_neg
+        self.net, self.node2id, self.id2node, self.sm = ReadTxtNet(net_file)
+        self.save_mapping(map_file)
+        self.G = net2graph(self.sm)
 
-        # random walk
+        # random walk seeds
         start = time.time()
-        walks = dgl.contrib.sampling.random_walk(self.G, self.G.nodes(), 
-                self.num_walks, self.walk_length-1)
-        self.walks = walks.view(-1, self.walk_length)
+        seeds = torch.cat([torch.LongTensor(self.G.nodes())] * num_walks)
+        self.seeds = torch.split(shuffle_walks(seeds), int(np.ceil(len(self.net) * self.num_walks / self.num_procs)), 0)
         end = time.time()
         t = end - start
-        print("%d walks in %.2fs" % (len(self.walks), t))
+        print("%d seeds in %.2fs" % (len(seeds), t))
 
         # negative table for true negative sampling
         if not fast_neg:
@@ -117,4 +147,32 @@ class DeepwalkDataset:
             self.neg_table_size = len(self.neg_table)
             self.neg_table = np.array(self.neg_table, dtype=np.long)
             del node_degree
-        
+
+    def create_sampler(self, gpu_id):
+        """ Still in construction...
+
+        Several mode:
+        1. do true negative sampling.
+          1.1 from random walk sequence
+          1.2 from node degree distribution
+          return the sampled node ids
+        2. do false negative sampling from random walk sequence
+          save GPU, faster
+          return the node indices in the sequences
+        """
+        return DeepwalkSampler(self.G, self.seeds[gpu_id], self.walk_length)
+
+    def save_mapping(self, map_file):
+        with open(map_file, "wb") as f:
+            pickle.dump(self.node2id, f)
+
+class DeepwalkSampler(object):
+    def __init__(self, G, seeds, walk_length):
+        self.G = G
+        self.seeds = seeds
+        self.walk_length = walk_length
+    
+    def sample(self, seeds):
+        walks = dgl.contrib.sampling.random_walk(self.G, seeds, 
+            1, self.walk_length-1)
+        return walks
