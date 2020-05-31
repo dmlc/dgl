@@ -69,13 +69,9 @@ def check_file_exists(filename):
     filename : str
         Path of file
     """
-    try:
-        f = open(filename)
-    except IOError:
-        return False
-    finally:
-        f.close()
-    return True
+    if os.path.exists(filename):
+        return True
+    return False
 
 class PartitionPolicy(object):
     """Wrapper for GraphPartitionBook and RangePartitionBook. 
@@ -306,7 +302,7 @@ class InitDataRequest(rpc.Request):
     def process_request(self, server_state):
         kv = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
-        if kv.is_main_server():
+        if kv.is_backup_server() == False:
             data_tensor = self.init_func(data_shape, dtype)
             kv.init_data(name=name, data_tensor=data_tensor)
         else: # backup server will read data from shared-memory
@@ -416,6 +412,7 @@ class RegisterPullHandlerRequest(rpc.Request):
         return res
 
 REGISTER_PUSH = 901236
+REGISTER_PUSH_MSG = 'Register_Push'
 
 class RegisterPushHandlerResponse(rpc.Response):
     """Send a confirmation signal (just a short string message) of
@@ -513,7 +510,7 @@ class GetSharedDataRequest(rpc.Request):
         res = GetSharedDataResponse(meta)
         return res
 
-GET_FULL_SHAPE = 901238
+GET_PART_SHAPE = 901238
 
 class GetPartShapeResponse(rpc.Response):
     """Send the partitioned data shape back to client.
@@ -603,9 +600,9 @@ class KVServer(object):
         rpc.register_service(GET_SHARED,
                              GetSharedDataRequest,
                              GetSharedDataResponse)
-        rpc.register_service(GET_FULL_SHAPE,
-                             GetFullShapeRequest,
-                             GetFullShapeResponse)
+        rpc.register_service(GET_PART_SHAPE,
+                             GetPartShapeRequest,
+                             GetPartShapeResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -635,51 +632,51 @@ class KVServer(object):
             if (os.path.exists(file)):
                 os.remove(file)
 
-     @property
-     def server_id(self):
-         return self._server_id
+    @property
+    def server_id(self):
+        return self._server_id
 
-     @property
-     def barrier_count(self):
-     	return self._barrier_count
+    @property
+    def barrier_count(self):
+        return self._barrier_count
 
-     def incr_barrier_count(self):
+    def incr_barrier_count(self):
         self._barrier_count +=1
 
-     @property
-     def num_clients(self):
-     	return self._num_clients
+    @property
+    def num_clients(self):
+        return self._num_clients
      
-     @property
-     def data_store(self):
-         return self._data_store
+    @property
+    def data_store(self):
+        return self._data_store
 
-     @property
-     def part_policy(self):
-         return self._part_policy
+    @property
+    def part_policy(self):
+        return self._part_policy
      
-     @property
-     def push_handler(self):
-         return self._push_handler
+    @property
+    def push_handler(self):
+        return self._push_handler
 
-     @property
-     def pull_handler(self):
-         return self._pull_handler
+    @property
+    def pull_handler(self):
+        return self._pull_handler
 
-     @pull_handler.setter
-     def pull_handler(self, pull_handler):
-         self._pull_handler = pull_handler
+    @pull_handler.setter
+    def pull_handler(self, pull_handler):
+        self._pull_handler = pull_handler
 
-     @push_handler.setter
-     def push_handler(self, push_handler):
-         self._push_handler = push_handler
+    @push_handler.setter
+    def push_handler(self, push_handler):
+        self._push_handler = push_handler
 
-     def is_main_server(self):
-         """Return True is current server is not a backup-server.
-         """
-         if self._server_id % self._group_count == 0:
-             return True
-         return False
+    def is_backup_server(self):
+        """Return True if current server is a backup server.
+        """
+        if self._server_id % self._group_count == 0:
+            return False
+        return True
 
     def init_data(self, name, data_tensor=None):
         """Init data tensor on kvserver.
@@ -699,30 +696,28 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-            self._write_data_meta_to_file(name+'-kvmeta-'+str(self._machine_id), data_tensor)
+            write_data_meta_to_file(name+'-kvmeta-'+str(self._machine_id), data_tensor)
             self._open_file_list.append(name+'-kvmeta-'+str(self._machine_id))
         else: # Read shared-tensor
             while True:
-                if (os.path.exists(name+'-kvmeta-'+str(self._machine_id))):
+                if (check_file_exists(name+'-kvmeta-'+str(self._machine_id))):
                     break
                 else:
                     time.sleep(1) # wait until the file been created
-            data_shape, data_type = self._read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
+            data_shape, data_type = read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
 
     def set_partition_policy(self, name, policy_str, partition_book):
-    	"""Set partition policy 
-
-        Set a partition policy to target data.
+        """Set a partition policy to target data.
 
         Parameters
         ----------
         name : str
             data name
         policy_str : str
-            partition policy string, e.g., 'edge' or 'node'.
+            partition-policy string, e.g., 'edge' or 'node'.
         partition_book : GraphPartitionBook or RangePartitionBook
             Store the partition information
         """
@@ -733,7 +728,7 @@ class KVServer(object):
     def _default_push_handler(self, name, id_tensor, data_tensor):
         """Default handler for PUSH message. 
 
-        On default, _push_handler perform update operation for the tensor.
+        On default, _push_handler perform scatter_row() operation for the tensor.
 
         Parameters
         ----------
@@ -749,7 +744,7 @@ class KVServer(object):
     def _default_pull_handler(self, name, id_tensor):
         """Default handler for PULL operation.
 
-        On default, _pull_handler perform get operation for the tensor.
+        On default, _pull_handler perform gather_row() operation for the tensor.
 
         Parameters
         ----------
@@ -781,8 +776,8 @@ class KVClient(object):
         Path of IP configuration file.
     """
     def __init__(self, ip_config):
-    	assert rpc.get_rank() != -1, 'RPC client is not started!'
-        assert len(ip_config) > 0, 'ip_config cannot be empty.'
+        assert rpc.get_rank() != -1, 'RPC client is not started!'
+        assert check_file_exists(ip_config), 'Cannot open file: %s' % ip_config
         # Register services on client
         rpc.register_service(KVSTORE_PULL, 
                              PullRequest, 
@@ -805,19 +800,23 @@ class KVClient(object):
         rpc.register_service(GET_SHARED,
                              GetSharedDataRequest,
                              GetSharedDataResponse)
-        rpc.register_service(GET_FULL_SHAPE,
-                             GetFullShapeRequest,
-                             GetFullShapeResponse)
+        rpc.register_service(GET_PART_SHAPE,
+                             GetPartShapeRequest,
+                             GetPartShapeResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
+        # Store the partition information with specified data name
+        self._part_policy = {}
         # Store the full data shape across kvserver
         self._full_data_shape = {}
+        # Store all the data name
+        self._data_name_list = []
         # Basic information
         self._server_namebook = rpc.read_ip_config(ip_config)
         self._server_count = len(self._server_namebook)
         self._group_count = self._server_namebook[0][3]
         self._machine_count = int(self._server_count / self._group_count)
-        self._client_id = rpc.get_rank()
+        self._client_id = rpc.get_client_id()
         self._machine_id = rpc.get_machine_id()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
@@ -836,10 +835,25 @@ class KVClient(object):
             if(os.path.exists(file)):
                 os.remove(file)
 
+    def barrier(self):
+        """Barrier for all client nodes
+
+        This API will be blocked untill all the clients call this API.
+        """
+        request = BarrierRequest(BARRIER_MSG)
+        # send request to all the server nodes
+        for server_id in range(self._server_count):
+            rpc.send_request(server_id, request)
+        # recv response from all the server nodes
+        for _ in range(self._server_count):
+            response = rpc.recv_response()
+            assert response.msg == BARRIER_MSG
+
     def register_push_handler(self, func):
         """Register UDF push function on server.
 
-        client_0 will send this request to all servers.
+        client_0 will send this request to all servers, and the other
+        clients will just invoke the barrier() api.
 
         Parameters
         ----------
@@ -847,17 +861,20 @@ class KVClient(object):
         """
         if self._client_id == 0:
             request = RegisterPushHandlerRequest(func)
-            # send request
+            # send request to all the server nodes
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
-            # wait confirmation
+            # recv response from all the server nodes
             for _ in range(self._server_count):
                 response = rpc.recv_response()
+                assert response.msg == REGISTER_PUSH_MSG
+        self.barrier()
 
     def register_pull_handler(self, func):
         """Register UDF pull function on server.
 
-        client_0 will send this request to all server.
+        client_0 will send this request to all servers, and the other
+        clients will just invoke the barrier() api.
 
         Parameters
         ----------
@@ -865,62 +882,53 @@ class KVClient(object):
         """
         if self._client_id == 0:
             request = RegisterPullHandlerRequest(func)
-            # send request
+            # send request to all the server nodes
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
-            # wait confirmation
+            # recv response from all the server nodes
             for _ in range(self._server_namebook):
                 response = rpc.recv_response()
+                assert response.msg == REGISTER_PULL_MSG
+        self.barrier()
 
     def get_shared_data(self, partition_book):
-        """Mapping shared-tensor from server to client.
+        """Mapping shared-memory tensor from server to client.
 
         Parameters
         ----------
         partition_book : GraphPartitionBook or RangePartitionBook
             Store the partition information
         """
-        # Get meta data
-        request = GetSharedDataRequest(self._client_id)
+        # Get shared data from server side
+        request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
-        for name, meta in res.meta.items():
+        for name, meta in response.meta.items():
             shape, dtype, plolicy_str = meta
-            shared_data = empty_shared_mem(name, False, shape, dtype)
+            shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-        # Get full data shape
-        for name, data in self._data_store.items():
-            data_shape = list(F.shape(data))
+            self._data_name_list.append(name)
+        # Get full data shape across servers
+        for name, meta in response.meta.items():
+            shape, _, _ = meta
+            data_shape = list(shape)
             data_shape[0] = 0
-            request = GetFullShapeRequest(name)
-            # send request
+            request = GetPartShapeRequest(name)
+            # send request to all main server nodes
             for machine_id in range(self._machine_count):
                 server_id = machine_id * self._group_count
                 rpc.send_request(server_id, request)
-            # recv response
+            # recv response from all the main server nodes
             for _ in range(self._machine_count):
                 response = rpc.recv_response()
                 data_shape[0] += response.shape[0]
             self._full_data_shape[name] = tuple(data_shape)
 
-    def barrier(self):
-        """Barrier for all client nodes
-
-        This API will be blocked untill all the clients call this API.
-        """
-        request = BarrierRequest(self._client_id)
-        # send request
-        for server_id in range(self._server_count):
-            rpc.send_request(server_id, request)
-        # recv response
-        for _ in range(self._server_count):
-            response = rpc.recv_response()
-
     def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
-        """Send message to kvserver to initialize new data and 
-        get corresponded shared-tensor on kvclient. 
+        """Send message to kvserver to initialize new data tensor and mapping this
+        data from server side to client side.
 
         Parameters
         ----------
@@ -931,7 +939,7 @@ class KVClient(object):
         dtype : dtype
             data type
         policy_str : str
-            partition policy string, e.g., 'edge' or 'node'.
+            partition-policy string, e.g., 'edge' or 'node'.
         partition_book : GraphPartitionBook or RangePartitionBook
             Store the partition information
         init_func : func
@@ -944,7 +952,7 @@ class KVClient(object):
         policy_list = []
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
-            	policy = PartitionPolicy(plolicy_str, machine_id, partition_book)
+                policy = PartitionPolicy(plolicy_str, machine_id, partition_book)
                 part_shape = shape.copy()
                 part_shape[0] = policy.get_data_size()
                 request = InitDataRequest(name,
@@ -957,31 +965,21 @@ class KVClient(object):
                     rpc.send_request(server_id, request)
             for _ in range(self._server_count):
                 response = rpc.recv_response()
-            self.barrier() # wait all the client and server finish its job
-            self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-            data_shape, data_type = self._read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
-            shared_data = empty_shared_mem(name+'-kvdata-', False, shape, data_type)
-            dlpack = shared_data.to_dlpack()
-            self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-            self._data_name_list.append(name)
-            self._full_data_shape[name] = tuple(shape)
+        self.barrier()
+        self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+        data_shape, data_type = read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
+        shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
+        dlpack = shared_data.to_dlpack()
+        self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
+        self._data_name_list.append(name)
+        self._full_data_shape[name] = tuple(shape)
 
-    def get_data_name_list(self):
-    	"""Get all the data name
-
-    	Return
-    	------
-    	list of str
-    	    list of data name
-    	"""
-    	name_list = []
-    	for name, _ in self._data_store.items():
-    	    name_list.append(name)
-    	return name_list
-
+    @property
+    def data_name_list(self):
+        return self._data_name_list
+    
     def get_data_meta(self, name):
-        """Get meta data (data_type, data_shape, part_policy)
-        of the target shared-tensor
+        """Get meta data (data_type, data_shape, partition_policy)
         """
         assert len(name) > 0, 'name cannot be empty.'
         data_type = F.dtype(self._data_store[name])
@@ -992,7 +990,7 @@ class KVClient(object):
     def push(self, name, id_tensor, data_tensor):
         """Push data to KVServer.
 
-        Note that push() is an non-blocking operation that will return immediately.
+        Note that, the push() is an non-blocking operation that will return immediately.
 
         Parameters
         ----------
@@ -1031,11 +1029,9 @@ class KVClient(object):
             else: # push data to remote server
                 request = PushRequest(name, partial_id, partial_data)
                 # randomly select a server node in target machine for load-balance
-                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
-                rpc.send_request(s_id, request)
-
+                server_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
+                rpc.send_request(server_id, request)
             start += count[idx]
-
         if local_id is not None: # local push
             self._push_handler(name, local_id, local_data)
 
@@ -1054,12 +1050,11 @@ class KVClient(object):
         tensor
             a data tensor with the same row size of id_tensor.
         """
-        #TODO(chao) : add fast pull
+        #TODO(chao) : add C++ rpc interface and add fast pull 
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
-
         # partition data
-        machine_id = self._part_policy[name],to_partid(id_tensor)
+        machine_id = self._part_policy[name].to_partid(id_tensor)
         # sort index by machine id
         sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
         back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
@@ -1081,28 +1076,24 @@ class KVClient(object):
             else: # pull data from remote server
                 request = PullRequest(name, partial_id)
                 # randomly select a server node in target machine for load-balance
-                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
+                server_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
                 rpc.send_request(s_id, request)
                 pull_count += 1
-
             start += count[idx]
-
+        # recv response
         response_list = []
         if local_id is not None: # local pull
             local_data = self._pull_handler(name, local_id)
-            s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
-            local_response = PullResponse(s_id, local_data)
+            server_id = self._main_server_id
+            local_response = PullResponse(server_id, local_data)
             response_list.append(local_response)
-
-        # wait message from server nodes
+        # wait response from remote server nodes
         for _ in range(pull_count):
             remote_response = rpc.recv_response()
             response_list.append(remote_response)
-
-        # sort msg by server id and merge tensor together
+        # sort response by server_id and concat tensor
         response_list.sort(key=self._takeId)
         data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
-
         return data_tensor[back_sorted_id] # return data with original index order
 
     def _takeId(self, elem):
@@ -1113,7 +1104,7 @@ class KVClient(object):
     def _default_push_handler(self, name, id_tensor, data_tensor):
         """Default handler for PUSH message. 
 
-        On default, _push_handler perform update operation for the tensor.
+        On default, _push_handler perform scatter_row() operation for the tensor.
 
         Parameters
         ----------
@@ -1129,7 +1120,7 @@ class KVClient(object):
     def _default_pull_handler(self, name, id_tensor):
         """Default handler for PULL operation.
 
-        On default, _pull_handler perform get operation for the tensor.
+        On default, _pull_handler perform gather_row() operation for the tensor.
 
         Parameters
         ----------
