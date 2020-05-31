@@ -65,7 +65,10 @@ def start_server():
                                  server_state=server_state)
 
 def start_client():
+	# Note: connect to server first !
     dgl.distributed.connect_to_server(ip_config='ip_config.txt')
+    # Init kvclient
+    kvclient = dgl.distributed.KVClient(ip_config='ip_config.txt')
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
