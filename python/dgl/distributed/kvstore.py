@@ -866,7 +866,7 @@ class KVClient(object):
         policy_list = []
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
-                policy = PartitionPolicy(plolicy_str, machine_id, partition_book)
+                policy = PartitionPolicy(policy_str, machine_id, partition_book)
                 part_shape = shape.copy()
                 part_shape[0] = policy.get_data_size()
                 request = InitDataRequest(name,
