@@ -217,7 +217,7 @@ class InitDataRequest(rpc.Request):
         kv = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
         if kv.is_backup_server() == False:
-            data_tensor = self.init_func(self.data_shape, dtype)
+            data_tensor = self.init_func(self.shape, dtype)
             kv.init_data(name=self.name, data_tensor=data_tensor)
         else: # backup server will read data from shared-memory
             kv.init_data(name=self.name)
