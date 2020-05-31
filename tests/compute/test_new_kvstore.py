@@ -7,6 +7,9 @@ import unittest, pytest
 
 from numpy.testing import assert_array_equal
 
+def test_partition_policy():
+    pass
+
 def start_server():
     kvserver = dgl.distributed.KVServer(server_id=0, 
                                         ip_config='ip_config.txt', 
@@ -36,4 +39,5 @@ def test_kv_store():
         start_client()
 
 if __name__ == '__main__':
+	test_partition_policy()
     test_kv_store()

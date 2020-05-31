@@ -92,7 +92,10 @@ class HelloRequest(dgl.distributed.Request):
 def start_server():
     server_state = dgl.distributed.ServerState(None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.start_server(server_id=0, ip_config='ip_config.txt', num_clients=1, server_state=server_state)
+    dgl.distributed.start_server(server_id=0, 
+                                 ip_config='ip_config.txt', 
+                                 num_clients=1, 
+                                 server_state=server_state)
 
 def start_client():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
