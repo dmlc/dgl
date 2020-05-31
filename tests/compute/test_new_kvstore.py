@@ -69,6 +69,7 @@ def start_client():
     dgl.distributed.connect_to_server(ip_config='ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='ip_config.txt')
+    kvclient.get_shared_data(partition_book=gpb)
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
