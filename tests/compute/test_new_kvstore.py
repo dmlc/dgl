@@ -20,13 +20,17 @@ gpb = dgl.distributed.GraphPartitionBook(part_id=0,
                                          global_nid=global_nid,
                                          global_eid=global_eid)
 
-node_policy = dgl.distributed.PartitionPolicy(policy_str='node', 
-                                              part_id=0, 
+node_policy = dgl.distributed.PartitionPolicy(policy_str='node',
+                                              part_id=0,
                                               partition_book=gpb)
 
-edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge', 
-                                              part_id=0, 
+edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge',
+                                              part_id=0,
                                               partition_book=gpb)
+
+data_0 = F.tensor([[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]], F.float32)
+data_1 = F.tensor([[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.]], F.float32)
+data_2 = F.tensor([[3.,3.],[3.,3.],[3.,3.],[3.,3.],[3.,3.],[3.,3.]], F.float32)
 
 def test_partition_policy():
     assert node_policy.policy_str == 'node'
@@ -45,13 +49,19 @@ def test_partition_policy():
     assert edge_policy.get_data_size() == len(edge_map)
 
 def start_server():
-    kvserver = dgl.distributed.KVServer(server_id=0, 
-                                        ip_config='ip_config.txt', 
+	# Init kvserver
+    kvserver = dgl.distributed.KVServer(server_id=0,
+                                        ip_config='ip_config.txt',
                                         num_clients=1)
+    kvserver.init_data(name='data_0', data_tensor=data_0)
+    kvserver.set_partition_policy('data_0', 'node', gpb)
+    kvserver.init_data(name='data_1', data_tensor=data_1)
+    kvserver.set_partition_policy('data_0', 'edge', gpb)
+    # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver)
-    dgl.distributed.start_server(server_id=0, 
-                                 ip_config='ip_config.txt', 
-                                 num_clients=1, 
+    dgl.distributed.start_server(server_id=0,
+                                 ip_config='ip_config.txt',
+                                 num_clients=1,
                                  server_state=server_state)
 
 def start_client():
