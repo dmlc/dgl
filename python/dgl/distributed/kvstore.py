@@ -420,7 +420,7 @@ class GetSharedDataRequest(rpc.Request):
         for name, data in kv.data_store.items():
             meta[name] = (F.shape(data), 
                           get_type_str(F.dtype(data)), 
-                          kv.part_policy[name].policy_str())
+                          kv.part_policy[name].policy_str)
         res = GetSharedDataResponse(meta)
         return res
 
