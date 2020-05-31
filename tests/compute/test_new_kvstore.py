@@ -8,7 +8,10 @@ import unittest, pytest
 from numpy.testing import assert_array_equal
 
 def start_server():
-    server_state = dgl.distributed.ServerState(None)
+    kvserver = dgl.distributed.KVServer(server_id=0, 
+                                        ip_config='ip_config.txt', 
+                                        num_clients=1)
+    server_state = dgl.distributed.ServerState(kv_store=kvserver)
     dgl.distributed.start_server(server_id=0, 
                                  ip_config='ip_config.txt', 
                                  num_clients=1, 
