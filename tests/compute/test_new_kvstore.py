@@ -7,8 +7,32 @@ import unittest, pytest
 
 from numpy.testing import assert_array_equal
 
+# Create an one-part Graph
+node_map = F.tensor([0,0,0,0,0,0], F.int64)
+edge_map = F.tensor([0,0,0,0,0,0], F.int64)
+global_nid = F.tensor([0,1,2,3,4,5], F.int64)
+global_eid = F.tensor([0,1,2,3,4,5], F.int64)
+
+gpb = dgl.distributed.GraphPartitionBook(part_id=0,
+                                         num_parts=1,
+                                         node_map=node_map,
+                                         edge_map=edge_map,
+                                         global_nid=global_nid,
+                                         global_eid=global_eid)
+
+node_policy = dgl.distributed.PartitionPolicy(policy_str='node', 
+                                              part_id=0, 
+                                              partition_book=gbp)
+
+edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge', 
+                                              part_id=0, 
+                                              partition_book=gbp)
+
 def test_partition_policy():
-    pass
+    assert node_policy.policy_str == 'node'
+    assert edge_policy.policy_str == 'edge'
+    assert node_policy.part_id == 0
+    assert edge_policy.part_id == 0
 
 def start_server():
     kvserver = dgl.distributed.KVServer(server_id=0, 
@@ -39,5 +63,5 @@ def test_kv_store():
         start_client()
 
 if __name__ == '__main__':
-	test_partition_policy()
+    test_partition_policy()
     test_kv_store()
