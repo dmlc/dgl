@@ -131,7 +131,7 @@ class PartitionPolicy(object):
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
-   def to_partid(self, id_tensor):
+    def to_partid(self, id_tensor):
         """Mapping global ID to partition ID.
 
         Parameters
