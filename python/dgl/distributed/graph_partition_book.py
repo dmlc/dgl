@@ -326,3 +326,4 @@ class PartitionPolicy(object):
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
     # TODO(chao): more APIs?
+    

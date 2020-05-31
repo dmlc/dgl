@@ -33,6 +33,14 @@ def test_partition_policy():
     assert edge_policy.policy_str == 'edge'
     assert node_policy.part_id == 0
     assert edge_policy.part_id == 0
+    local_nid = node_policy.to_local(F.tensor([0,1,2,3,4,5]))
+    local_eid = edge_policy.to_local(F.tensor([0,1,2,3,4,5]))
+    assert_array_equal(F.asnumpy(local_nid), F.asnumpy(F.tensor([0,1,2,3,4,5], int64)))
+    assert_array_equal(F.asnumpy(local_eid), F.asnumpy(F.tensor([0,1,2,3,4,5], int64)))
+
+    #to_partid()
+    #get_data_size()
+
 
 def start_server():
     kvserver = dgl.distributed.KVServer(server_id=0, 
