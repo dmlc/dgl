@@ -4,7 +4,7 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .server_state import ServerState
 
-def start_server(server_id, ip_config, num_clients, kv_server, \
+def start_server(server_id, ip_config, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
@@ -21,6 +21,8 @@ def start_server(server_id, ip_config, num_clients, kv_server, \
         Note that, we do not support dynamic connection for now. It means
         that when all the clients connect to server, no client will can be added
         to the cluster.
+    server_state : ServerSate object
+        Store in main data used by server.
     max_queue_size : int
         Maximal size (bytes) of server queue buffer (~20 GB on default).
         Note that the 20 GB is just an upper-bound because DGL uses zero-copy and
@@ -70,7 +72,6 @@ def start_server(server_id, ip_config, num_clients, kv_server, \
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)
             rpc.send_response(client_id, register_res)
-    server_state = ServerState(kv_server)
     # main service loop
     while True:
         req, client_id = rpc.recv_request()

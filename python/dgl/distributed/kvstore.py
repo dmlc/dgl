@@ -68,6 +68,10 @@ def check_file_exists(filename):
     ----------
     filename : str
         Path of file
+
+    Returns
+    -------
+    True if file exists.
     """
     if os.path.exists(filename):
         return True
