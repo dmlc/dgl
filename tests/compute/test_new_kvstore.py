@@ -30,7 +30,7 @@ edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge',
 
 data_0 = F.tensor([[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]], F.float32)
 data_1 = F.tensor([[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.]], F.float32)
-data_2 = F.tensor([[3.,3.],[3.,3.],[3.,3.],[3.,3.],[3.,3.],[3.,3.]], F.float32)
+data_2 = F.tensor([[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.]], F.float32)
 
 def init_zero_func(shape, dtype):
     return F.zeros(shape, dtype)
