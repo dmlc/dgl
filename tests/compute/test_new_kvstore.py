@@ -22,11 +22,11 @@ gpb = dgl.distributed.GraphPartitionBook(part_id=0,
 
 node_policy = dgl.distributed.PartitionPolicy(policy_str='node', 
                                               part_id=0, 
-                                              partition_book=gbp)
+                                              partition_book=gpb)
 
 edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge', 
                                               part_id=0, 
-                                              partition_book=gbp)
+                                              partition_book=gpb)
 
 def test_partition_policy():
     assert node_policy.policy_str == 'node'
