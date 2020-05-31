@@ -462,7 +462,7 @@ class GetPartShapeRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv = server_state.kv_store
-        data_shape = F.shape(kv.data_store[name])
+        data_shape = F.shape(kv.data_store[self.name])
         res = GetPartShapeResponse(data_shape)
         return res
 
