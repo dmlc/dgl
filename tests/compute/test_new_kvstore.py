@@ -32,6 +32,9 @@ data_0 = F.tensor([[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]], F.float32)
 data_1 = F.tensor([[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.]], F.float32)
 data_2 = F.tensor([[3.,3.],[3.,3.],[3.,3.],[3.,3.],[3.,3.],[3.,3.]], F.float32)
 
+def init_zero_func(shape, dtype):
+    return F.zeros(shape, dtype)
+
 def test_partition_policy():
     assert node_policy.policy_str == 'node'
     assert edge_policy.policy_str == 'edge'
@@ -70,6 +73,12 @@ def start_client():
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='ip_config.txt')
     kvclient.get_shared_data(partition_book=gpb)
+    kvclient.init_data(name='data_2', 
+                       shape=F.shape(data_2), 
+                       dtype=F.dtype(data_2), 
+                       policy_str='node', 
+                       partition_book=gpb, 
+                       init_func=init_zero_func)
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
