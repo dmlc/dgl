@@ -11,7 +11,71 @@ from .constants import get_type_str
 from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
-KVSTORE_PULL = 901231
+def write_data_meta_to_file(filename, data):
+    """Write data meta infor to a temp file.
+
+    Parameters
+    ----------
+    filename : str
+        name of temp file.
+    data : tensor (mx.ndarray or torch.tensor)
+        data tensor
+    """
+    # TODO(chao) : remove tmp file using new shared-tensor API
+    assert len(filename) > 0, 'filename cannot be empty.'
+    if(os.path.exists(filename)):
+        os.remove(filename)
+    shape = F.shape(data)
+    str_data = ''
+    str_data += get_type_str(F.dtype(data))
+    str_data += '|'
+    f = open(filename, "a");
+    for s in shape:
+        str_data += str(s)
+        str_data += '|'
+    f.write(str_data)
+    f.close()
+
+def read_data_meta_from_file(filename):
+    """Read data meta info from a tmp file.
+
+    Parameters
+    ----------
+    filename : str
+        name of temp file
+
+    Return
+    ------
+    tuple
+        data shape
+    """
+    # TODO(chao) : remove tmp file using new shared-tensor API
+    assert len(filename) > 0, 'filename cannot be empty.'
+    f = open(filename, "r")
+    str_data = f.read()
+    data_list = str_data.split('|')
+    data_type = data_list[0]
+    data_shape = []
+    for i in range(1, len(data_list)-1):
+        data_shape.append(int(data_list[i]))
+    f.close()
+    return data_shape, data_type
+
+def check_file_exists(filename):
+    """Check if file exists.
+
+    Parameters
+    ----------
+    filename : str
+        Path of file
+    """
+    try:
+        f = open(filename)
+    except IOError:
+        return False
+    finally:
+        f.close()
+    return True
 
 class PartitionPolicy(object):
     """Wrapper for GraphPartitionBook and RangePartitionBook. 
@@ -21,13 +85,14 @@ class PartitionPolicy(object):
     Parameters
     ----------
     policy_str : str
-        partition policy string, e.g., 'edge' or 'node'.
+        partition-policy string, e.g., 'edge' or 'node'.
     part_id : int
         partition ID
     partition_book : GraphPartitionBook or RangePartitionBook
-        Store the partition information
+        Main class storing the partition information
     """
     def __init__(self, policy_str, part_id, partition_book):
+        # TODO(chao): support more policies for HeteroGraph
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
         self._policy_str = policy_str
@@ -40,10 +105,14 @@ class PartitionPolicy(object):
 
     @property
     def part_id(self):
-    	return self._part_id
+        return self._part_id
+
+    @property
+    def partition_book(self):
+        return self._partition_book
     
     def to_local(self, id_tensor):
-        """Mapping global ID to local ID
+        """Mapping global ID to local ID.
 
         Parameters
         ----------
@@ -63,7 +132,7 @@ class PartitionPolicy(object):
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
    def to_partid(self, id_tensor):
-        """Mapping global ID to partition ID
+        """Mapping global ID to partition ID.
 
         Parameters
         ----------
@@ -83,7 +152,7 @@ class PartitionPolicy(object):
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
     def get_data_size(self):
-        """Get data size in current partition.
+        """Get data size of current partition.
 
         Returns
         -------
@@ -97,18 +166,24 @@ class PartitionPolicy(object):
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
+    # TODO(chao): more APIs?
+
+############################ Register KVStore Requsts and Responses ###############################
+
+KVSTORE_PULL = 901231
+
 class PullResponse(rpc.Response):
-    """Send the sliced data tensor back to client.
+    """Send the sliced data tensor back to the client.
 
     Parameters
     ----------
     server_id : int
         ID of current server
     data_tensor : tensor
-        a tensor with the same row size of data ID.
+        sliced data tensor
     """
     def __init__(self, server_id, data_tensor):
-    	self.server_id = server_id
+        self.server_id = server_id
         self.data_tensor = data_tensor
 
     def __getstate__(self):
@@ -128,7 +203,7 @@ class PullRequest(rpc.Request):
         a vector storing the data ID
     """
     def __init__(self, name, id_tensor):
-    	self.name = name
+        self.name = name
         self.id_tensor = id_tensor
 
     def __getstate__(self):
@@ -147,8 +222,7 @@ class PullRequest(rpc.Request):
 KVSTORE_PUSH = 901232
 
 class PushRequest(rpc.Response):
-    """Send ID tensor and data tensor to target server and
-    update kvstore's data.
+    """Send ID tensor and data tensor to server and update kvstore's data.
 
     This request has no response.
 
@@ -179,27 +253,29 @@ class PushRequest(rpc.Response):
         return None
 
 INIT_DATA = 901233
+INIT_MSG = 'Init'
 
 class InitDataResponse(rpc.Response):
-    """Send a confirmation response (just a server ID) of
+    """Send a confirmation response (just a short string message) of
     InitDataRequest to client.
 
     Parameters
     ----------
-    server_id : int
-        ID of current server
+    msg : string
+        string message
     """
-    def __init__(self, server_id):
-        self.server_id = server_id
+    def __init__(self, msg):
+        self.msg = msg
 
     def __getstate__(self):
-        return self.server_id
+        return self.msg
 
     def __setstate__(self, state):
-        self.server_id = state
+        self.msg = state
 
 class InitDataRequest(rpc.Request):
-    """Send meta data to server to init data tensor.
+    """Send meta data to server and init data tensor
+    on server using UDF init function.
 
     Parameters
     ----------
@@ -210,9 +286,9 @@ class InitDataRequest(rpc.Request):
     dtype : str
         data type string, e.g., 'int64', 'float32', etc.
     policy_str : str
-        partition policy string, e.g., 'edge' or 'node'.
+        partition-policy string, e.g., 'edge' or 'node'.
     init_func : function
-        user-defined initialization function.
+        UDF init function.
     """
     def __init__(self, name, shape, dtype, policy_str, init_func):
         self.name = name
@@ -239,82 +315,85 @@ class InitDataRequest(rpc.Request):
         for _, policy in kv.part_policy.items():
             if policy.policy_str == self.policy_str:
                 kv.part_policy[self.name] = policy
-                res = InitDataResponse(kv.server_id)
+                res = InitDataResponse(INIT_MSG)
                 return res
         raise RuntimeError("Cannot find any partition policy match \
-            the policy string : %s" % self.policy_str)
+            the requested policy : %s" % self.policy_str)
 
 BARRIER = 901234
+BARRIER_MSG = 'Barrier'
 
 class BarrierResponse(rpc.Response):
-    """Send an un-block signal (just a server ID) of
+    """Send an confimation signal (just a short string message) of
     BarrierRequest to client.
 
     Parameters
     ----------
-    server_id : int
-        ID of current server
+    msg : string
+        string msg
     """
-    def __init__(self, server_id):
-        self.server_id = server_id
+    def __init__(self, msg):
+        self.msg = msg
 
     def __getstate__(self):
-        return self.server_id
+        return self.msg
 
     def __setstate__(self, state):
-        self.server_id = state
+        self.msg = state
 
 class BarrierRequest(rpc.Request):
-    """Send a barrier signal (just a client ID) to server.
+    """Send a barrier signal (just a short string message) to server.
 
     Parameters
     ----------
-    client_id : int
-        ID of current client
+    msg : string
+        string msg
     """
-    def __init__(self, client_id):
-        self.client_id = client_id
+    def __init__(self, msg):
+        self.msg = msg
 
     def __getstate__(self):
-        return self.client_id
+        return self.msg
 
     def __setstate__(self):
-        self.client_id = state
+        self.msg = msg
 
     def process_request(self, server_state):
+        assert self.msg == BARRIER_MSG
         kv = server_state.kv_store
-        kv.incre_barrier_count()
+        kv.incr_barrier_count()
         if kv.barrier_count == kv.num_clients:
             kv.barrier_count = 0
             res_list = []
             for target_id in range(kv.num_clients):
-                res_list.append((target_id, BarrierResponse(kv.server_id)))
+                res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
             return res_list
         else:
-            return None
+            return None # No response
 
 REGISTER_PULL = 901235
+REGISTER_PULL_MSG = 'Register_Pull'
 
 class RegisterPullHandlerResponse(rpc.Response):
-    """Send a confirmation signal (just a server ID) of
+    """Send a confirmation signal (just a short string message) of
     RegisterPullHandler to client.
 
     Parameters
     ----------
-    server_id : int
-        ID of current server
+    msg : string
+        string message
     """
-    def __init__(self, server_id):
-        self.server_id = server_id
+    def __init__(self, msg):
+        self.msg = msg
 
     def __getstate__(self):
-        return self.server_id
+        return self.msg
 
     def __setstate__(self, state):
-        self.server_id = state
+        self.msg = state
 
 class RegisterPullHandlerRequest(rpc.Request):
-    """Send a UDF to register Pull handler on server.
+    """Send an UDF and register Pull handler on server.
 
     Parameters
     ----------
@@ -333,31 +412,31 @@ class RegisterPullHandlerRequest(rpc.Request):
     def process_request(self, server_state):
         kv = server_state.kv_store
         kv.pull_handler = self.pull_func
-        res = RegisterPullHandlerResponse(kv.server_id)
+        res = RegisterPullHandlerResponse(REGISTER_PULL_MSG)
         return res
 
 REGISTER_PUSH = 901236
 
 class RegisterPushHandlerResponse(rpc.Response):
-    """Send a confirmation signal (just a server ID) of
+    """Send a confirmation signal (just a short string message) of
     RegisterPushHandler to client.
 
     Parameters
     ----------
-    server_id : int
-        ID of current server
+    msg : string
+        string message
     """
-    def __init__(self, server_id):
-        self.server_id = server_id
+    def __init__(self, msg):
+        self.msg = msg
 
     def __getstate__(self):
-        return self.server_id
+        return self.msg
 
     def __setstate__(self, state):
-        self.server_id = state
+        self.msg = state
 
 class RegisterPushHandlerRequest(rpc.Request):
-    """Send a UDF to register Push handler on server.
+    """Send an UDF to register Push handler on server.
 
     Parameters
     ----------
@@ -376,18 +455,22 @@ class RegisterPushHandlerRequest(rpc.Request):
     def process_request(self, server_state):
         kv = server_state.kv_store
         kv.push_handler = self.push_func
-        res = RegisterPushHandlerResponse(kv.server_id)
+        res = RegisterPushHandlerResponse(REGISTER_PUSH)
         return res
 
 GET_SHARED = 901237
+GET_SHARED_MSG = 'Get_Shated'
 
 class GetSharedDataResponse(rpc.Response):
-    """Send meta data of shared-tensor back to client.
+    """Send meta data of shared-memory tensor to client.
+
+    TODO(chao): We will support new shared-memory API and we can
+    just send the data name to client.
 
     Parameters
     ----------
     meta : dict
-        a dict of meta, e.g,
+        a dict of meta, e.g.,
 
         {'data_0' : (shape, dtype, policy_str),
          'data_1' : (shape, dtype, policy_str)}
@@ -407,21 +490,22 @@ class GetSharedDataRequest(rpc.Request):
 
     Parameters
     ----------
-    client_id : int
-        ID of current client
+    msg : string
+        string message
     """
-    def __init__(self, client_id):
-        self.client_id = client_id
+    def __init__(self, msg):
+        self.msg = msg
 
     def __getstate__(self):
-        return self.client_id
+        return self.msg
 
     def __setstate__(self, state):
-        self.client_id = state
+        self.msg = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
+        assert self.msg == GET_SHARED_MSG
         meta = {}
+        kv = server_state.kv_store
         for name, data in kv.data_store.items():
             meta[name] = (F.shape(data), 
                           get_type_str(F.dtype(data)), 
@@ -431,8 +515,8 @@ class GetSharedDataRequest(rpc.Request):
 
 GET_FULL_SHAPE = 901238
 
-class GetFullShapeResponse(rpc.Response):
-    """Send the data shape back to client.
+class GetPartShapeResponse(rpc.Response):
+    """Send the partitioned data shape back to client.
 
     Parameters
     ----------
@@ -448,8 +532,8 @@ class GetFullShapeResponse(rpc.Response):
     def __setstate__(self, state):
         self.shape = state
 
-class GetFullShapeRequest(rpc.Request):
-    """Send data name to get the data shape from server.
+class GetPartShapeRequest(rpc.Request):
+    """Send data name to get the partitioned data shape from server.
 
     Parameters
     ----------
@@ -468,8 +552,10 @@ class GetFullShapeRequest(rpc.Request):
     def process_request(self, server_state):
         kv = server_state.kv_store
         data_shape = F.shape(kv.data_store[name])
-        res = GetFullShapeResponse(data_shape)
+        res = GetPartShapeResponse(data_shape)
         return res
+
+############################ KVServer ###############################
 
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
@@ -493,7 +579,7 @@ class KVServer(object):
     """
     def __init__(self, server_id, ip_config, num_clients):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
-        assert len(ip_config) > 0, 'Path of ip_config file cannot be empty.'
+        assert check_file_exists(ip_config), 'Cannot open file: %s' % ip_config
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
         # Register services on server
         rpc.register_service(KVSTORE_PULL, 
@@ -524,15 +610,16 @@ class KVServer(object):
         self._data_store = {}
         # Store the partition information with specified data name
         self._part_policy = {}
-        # Used for barrier() API on KVClient
-        self._barrier_count = 0
         # Basic information
         self._server_id = server_id
         self._server_namebook = rpc.read_ip_config(ip_config)
+        # TODO(chao): machine_id can be removed if we use new shared-memory API
         self._machine_id = self._server_namebook[server_id][0]
         self._group_count = self._server_namebook[server_id][3]
+        # We assume partition_id is equal to machine_id
         self._part_id = self._machine_id
         self._num_clients = num_clients
+        self._barrier_count = 0
         # TODO(chao) : remove tmp file using new shared-tensor API
         self._open_file_list = []
         # push and pull handler
@@ -556,7 +643,7 @@ class KVServer(object):
      def barrier_count(self):
      	return self._barrier_count
 
-     def incre_barrier_count(self):
+     def incr_barrier_count(self):
         self._barrier_count +=1
 
      @property
@@ -643,56 +730,6 @@ class KVServer(object):
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
 
-    def _write_data_meta_to_file(self, filename, data):
-        """Write data meta infor to a temp file.
-
-        Parameters
-        ----------
-        filename : str
-            name of temp file.
-        data : tensor (mx.ndarray or torch.tensor)
-            data tensor
-        """
-        # TODO(chao) : remove tmp file using new shared-tensor API
-        assert len(filename) > 0, 'filename cannot be empty.'
-        if(os.path.exists(filename)):
-            os.remove(filename)
-        shape = F.shape(data)
-        str_data = ''
-        str_data += get_type_str(F.dtype(data))
-        str_data += '|'
-        f = open(filename, "a");
-        for s in shape:
-            str_data += str(s)
-            str_data += '|'
-        f.write(str_data)
-        f.close()
-
-    def _read_data_meta_from_file(self, filename):
-        """Read data meta info from a tmp file.
-
-        Parameters
-        ----------
-        filename : str
-            name of temp file
-
-        Return
-        ------
-        tuple
-            data shape
-        """
-        # TODO(chao) : remove tmp file using new shared-tensor API
-        assert len(filename) > 0, 'filename cannot be empty.'
-        f = open(filename, "r")
-        str_data = f.read()
-        data_list = str_data.split('|')
-        data_type = data_list[0]
-        data_shape = []
-        for i in range(1, len(data_list)-1):
-            data_shape.append(int(data_list[i]))
-        f.close()
-        return data_shape, data_type
-
     def _default_push_handler(self, name, id_tensor, data_tensor):
         """Default handler for PUSH message. 
 
@@ -727,6 +764,8 @@ class KVServer(object):
             a tensor with the same row size of ID.
         """
         return F.gather_row(self._data_store[name], id_tensor)
+
+############################ KVClient ###############################
 
 class KVClient(object):
     """KVClient is used to push/pull data to/from KVServer. If the target kvclient and kvserver are
