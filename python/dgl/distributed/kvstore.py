@@ -818,7 +818,7 @@ class KVClient(object):
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
         for name, meta in response.meta.items():
-            shape, dtype, plolicy_str = meta
+            shape, dtype, policy_str = meta
             shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
