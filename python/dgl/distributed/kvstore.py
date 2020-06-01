@@ -273,7 +273,7 @@ class BarrierRequest(rpc.Request):
         kv = server_state.kv_store
         kv.incr_barrier_count()
         if kv.barrier_count == kv.num_clients:
-            kv.barrier_count = 0
+            kv.barrier_zero()
             res_list = []
             for target_id in range(kv.num_clients):
                 res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
@@ -556,6 +556,9 @@ class KVServer(object):
 
     def incr_barrier_count(self):
         self._barrier_count +=1
+
+    def barrier_zero(self):
+        self._barrier_count = 0
 
     @property
     def num_clients(self):
