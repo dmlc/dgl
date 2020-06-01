@@ -809,8 +809,8 @@ class KVClient(object):
                 rpc.send_request(server_id, request)
             # recv response from all the main server nodes
             for _ in range(self._machine_count):
-                response = rpc.recv_response()
-                data_shape[0] += response.shape[0]
+                res = rpc.recv_response()
+                data_shape[0] += res.shape[0]
             self._full_data_shape[name] = tuple(data_shape)
         # Send meta data to backup servers
         for name, meta in response.meta.items():
