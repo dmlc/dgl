@@ -85,24 +85,24 @@ def start_client():
     assert 'data_1' in name_list
     assert 'data_2' in name_list
     # Test get_meta_data
-    meta = kvclient.get_data_meta()
-    dtype, shape, policy = meta['data_0']
+    meta = kvclient.get_data_meta('data_0')
+    dtype, shape, policy = meta
     assert dtype == F.dtype(data_0)
     assert shape == F.shape(data_0)
     assert policy.policy_str == 'node'
-    dtype, shape, policy = meta['data_1']
+    meta = kvclient.get_data_meta('data_1')
+    dtype, shape, policy = meta
     assert dtype == F.dtype(data_1)
     assert shape == F.shape(data_1)
     assert policy.policy_str == 'edge'
-    dtype, shape, policy = meta['data_2']
+    meta = kvclient.get_data_meta('data_2')
+    dtype, shape, policy = meta
     assert dtype == F.dtype(data_2)
     assert shape == F.shape(data_2)
     assert policy.policy_str == 'node'
-    # Test push
-    # Test pull
+    # Test push and pull
     # Register new push and pull handler
-    # Test push
-    # Test pull
+    # Test push and pull
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
