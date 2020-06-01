@@ -79,7 +79,7 @@ def start_client():
                        policy_str='node', 
                        partition_book=gpb, 
                        init_func=init_zero_func)
-    name_list = kvclient.get_name_list()
+    name_list = kvclient.data_name_list()
     assert 'data_0' in name_list
     assert 'data_1' in name_list
     assert 'data_2' in name_list
