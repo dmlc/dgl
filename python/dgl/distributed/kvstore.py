@@ -75,7 +75,7 @@ def write_data_meta_to_shared_mem(dataname, data):
     for i in range(len(shape)):
         tmp_list[i+1] = shape[i]
     meta_tensor = F.tensor(tmp_list, F.int32)
-    shared_data = empty_shared_mem(dataname, True, tuple(10), 'int32')
+    shared_data = empty_shared_mem(dataname, True, (10,), 'int32')
     dlpack = shared_data.to_dlpack()
     data_tensor = F.zerocopy_from_dlpack(dlpack)
     data_tensor[:] = meta_tensor[:]
@@ -96,7 +96,7 @@ def read_data_meta_from_shared_mem(dataname):
         data shape
     """
     assert len(dataname) > 0, 'dataname cannot be empty.'
-    shared_data = empty_shared_mem(dataname, False, tuple(10), 'int32')
+    shared_data = empty_shared_mem(dataname, False, (10,), 'int32')
     dlpack = shared_data.to_dlpack()
     meta_tensor = F.zerocopy_from_dlpack(dlpack)
     tmp_list = (F.asnumpy(meta_tensor)).tolist()
