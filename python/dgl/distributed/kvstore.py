@@ -689,11 +689,6 @@ class KVServer(object):
             self._data_store[name][:] = data_tensor[:]
             write_data_meta_to_shared_mem(name+'-kvmeta-'+str(self._machine_id), data_tensor)
         else: # Read shared-tensor
-            while True:
-                if (check_file_exists(name+'-kvmeta-'+str(self._machine_id))):
-                    break
-                else:
-                    time.sleep(1) # wait until the file been created
             data_shape, data_type = read_data_meta_from_shared_mem(name+'-kvmeta-'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
             dlpack = shared_data.to_dlpack()
