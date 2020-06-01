@@ -892,7 +892,6 @@ class KVClient(object):
         self._data_name_list.append(name)
         self._full_data_shape[name] = tuple(shape)
 
-    @property
     def data_name_list(self):
         return self._data_name_list
     
