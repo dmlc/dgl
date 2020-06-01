@@ -101,6 +101,23 @@ def start_client():
     assert shape == F.shape(data_2)
     assert policy.policy_str == 'node'
     # Test push and pull
+    id_tensor = F.tensor([0,2,4], F.int64)
+    data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
+    kvclient.push(name='data_0', 
+                  id_tensor=id_tensor, 
+                  data_tensor=target_tensor)
+    kvclient.push(name='data_1', 
+                  id_tensor=id_tensor, 
+                  data_tensor=target_tensor)
+    kvclient.push(name='data_2', 
+                  id_tensor=id_tensor, 
+                  data_tensor=target_tensor)
+    #res = kvclient.pull(name='data_0', id_tensor=id_tensor)
+    #assert_array_equal(F.asnumpy(res), F.asnumpy(target_tensor))
+    #res = kvclient.pull(name='data_1', id_tensor=id_tensor)
+    #assert_array_equal(F.asnumpy(res), F.asnumpy(target_tensor))
+    #res = kvclient.pull(name='data_2', id_tensor=id_tensor)
+    #assert_array_equal(F.asnumpy(res), F.asnumpy(target_tensor))
     # Register new push and pull handler
     # Test push and pull
     # clean up
