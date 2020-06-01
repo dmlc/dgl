@@ -366,7 +366,7 @@ class RegisterPushHandlerRequest(rpc.Request):
     def process_request(self, server_state):
         kv = server_state.kv_store
         kv.push_handler = self.push_func
-        res = RegisterPushHandlerResponse(REGISTER_PUSH)
+        res = RegisterPushHandlerResponse(REGISTER_PUSH_MSG)
         return res
 
 GET_SHARED = 901237
