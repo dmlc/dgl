@@ -951,9 +951,8 @@ class KVClient(object):
             start += count[idx]
         if local_id is not None: # local push
             print("local push")
-            print(local_id)
-            print(local_data)
             self._push_handler(name, local_id, local_data)
+            print(self._data_store[name])
 
     def pull(self, name, id_tensor):
         """Pull message from KVServer.
