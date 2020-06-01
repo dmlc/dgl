@@ -266,7 +266,7 @@ class BarrierRequest(rpc.Request):
         return self.msg
 
     def __setstate__(self, state):
-        self.msg = msg
+        self.msg = state
 
     def process_request(self, server_state):
         assert self.msg == BARRIER_MSG
