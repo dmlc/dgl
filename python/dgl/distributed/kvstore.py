@@ -815,7 +815,6 @@ class KVClient(object):
         # Send meta data to backup servers
         for name, meta in response.meta.items():
             shape, dtype, _ = meta
-            dtype = F.reverse_data_type_dict[dtype]
             request = SendMetaToBackupRequest(name, dtype, shape)
             # send request to all the backup server nodes
             for i in range(self._group_count):
