@@ -28,7 +28,7 @@ def write_data_meta_to_file(filename, data):
         os.remove(filename)
     shape = F.shape(data)
     str_data = ''
-    str_data += get_type_str(F.dtype(data))
+    str_data += F.reverse_data_type_dict[F.dtype(data)]
     str_data += '|'
     f = open(filename, "a");
     for s in shape:
@@ -419,7 +419,7 @@ class GetSharedDataRequest(rpc.Request):
         kv = server_state.kv_store
         for name, data in kv.data_store.items():
             meta[name] = (F.shape(data), 
-                          get_type_str(F.dtype(data)), 
+                          F.reverse_data_type_dict[F.dtype(data)],
                           kv.part_policy[name].policy_str)
         res = GetSharedDataResponse(meta)
         return res
@@ -648,7 +648,7 @@ class KVServer(object):
         # TODO(chao) : remove tmp file using new shared-tensor API
         assert len(name) > 0, 'name cannot be empty.'
         if data_tensor is not None: # Create shared-tensor
-            data_type = get_type_str(F.dtype(data_tensor))
+            data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
             shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
@@ -881,7 +881,7 @@ class KVClient(object):
                 part_shape[0] = policy.get_data_size()
                 request = InitDataRequest(name,
                                           tuple(part_shape), 
-                                          get_type_str(dtype), 
+                                          F.reverse_data_type_dict[dtype],
                                           policy_str,
                                           init_func)
                 for n in range(self._group_count):
