@@ -6,7 +6,6 @@ import random
 import numpy as np
 
 from . import rpc
-from .constants import get_type_str
 from .graph_partition_book import PartitionPolicy
 
 from .. import backend as F
