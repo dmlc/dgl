@@ -879,7 +879,10 @@ class KVClient(object):
                     rpc.send_request(server_id, request)
             for _ in range(self._server_count):
                 response = rpc.recv_response()
+                assert response.msg == INIT_MSG
+        print("1111")
         self.barrier()
+        print("2222")
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
         data_shape, data_type = read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
         shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
