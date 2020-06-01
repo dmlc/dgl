@@ -125,7 +125,7 @@ class PullRequest(rpc.Request):
     def process_request(self, server_state):
         kv = server_state.kv_store
         local_id = kv.part_policy[self.name].to_local(self.id_tensor)
-        data = kv.pull_handler(self.name, local_id)
+        data = kv.pull_handler(kv.data_store, self.name, local_id)
         res = PullResponse(kv.server_id, data)
         return res
 
@@ -159,7 +159,7 @@ class PushRequest(rpc.Response):
     def process_request(self, server_state):
         kv = server_state.kv_store
         local_id = kv.part_policy[self.name].to_local(self.id_tensor)
-        kv.push_handler(self.name, local_id, self.data_tensor)
+        kv.push_handler(kv.data_store, self.name, local_id, self.data_tensor)
         return None
 
 INIT_DATA = 901233
@@ -468,6 +468,46 @@ class GetPartShapeRequest(rpc.Request):
 
 ############################ KVServer ###############################
 
+def default_push_handler(target, name, id_tensor, data_tensor):
+    """Default handler for PUSH message. 
+
+    On default, _push_handler perform scatter_row() operation for the tensor.
+
+    Parameters
+    ----------
+    target : tensor
+        target tensor
+    name : str
+        data name
+    id_tensor : tensor
+        a vector storing the ID list.
+    data_tensor : tensor
+        a tensor with the same row size of id
+    """
+    target[name] = F.scatter_row(target[name], id_tensor, data_tensor)
+
+def default_pull_handler(target, name, id_tensor):
+    """Default handler for PULL operation.
+
+    On default, _pull_handler perform gather_row() operation for the tensor.
+
+    Parameters
+    ----------
+    target : tensor
+        target tensor
+    name : str
+        data name
+    id_tensor : tensor
+        a vector storing the ID list.
+
+    Return
+    ------
+    tensor
+        a tensor with the same row size of ID.
+    """
+    return F.gather_row(target[name], id_tensor)
+
+
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
 
@@ -534,8 +574,8 @@ class KVServer(object):
         # TODO(chao) : remove tmp file using new shared-tensor API
         self._open_file_list = []
         # push and pull handler
-        self._push_handler = self._default_push_handler
-        self._pull_handler = self._default_pull_handler
+        self._push_handler = default_push_handler
+        self._pull_handler = default_pull_handler
 
     def __del__(self):
         """Finalize KVServer
@@ -642,41 +682,6 @@ class KVServer(object):
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
 
-    def _default_push_handler(self, name, id_tensor, data_tensor):
-        """Default handler for PUSH message. 
-
-        On default, _push_handler perform scatter_row() operation for the tensor.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        id_tensor : tensor
-            a vector storing the ID list.
-        data_tensor : tensor
-            a tensor with the same row size of id
-        """
-        F.scatter_row(self._data_store[name], id_tensor, data_tensor)
-
-    def _default_pull_handler(self, name, id_tensor):
-        """Default handler for PULL operation.
-
-        On default, _pull_handler perform gather_row() operation for the tensor.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        id_tensor : tensor
-            a vector storing the ID list.
-
-        Return
-        ------
-        tensor
-            a tensor with the same row size of ID.
-        """
-        return F.gather_row(self._data_store[name], id_tensor)
-
 ############################ KVClient ###############################
 
 class KVClient(object):
@@ -740,8 +745,8 @@ class KVClient(object):
         # TODO(chao) : remove tmp file using new shared-tensor API
         self._open_file_list = []
         # push and pull handler
-        self._pull_handler = self._default_pull_handler
-        self._push_handler = self._default_push_handler
+        self._pull_handler = default_pull_handler
+        self._push_handler = default_push_handler
         random.seed(time.time())
 
     def __del__(self):
@@ -950,7 +955,7 @@ class KVClient(object):
                 rpc.send_request(server_id, request)
             start += count[idx]
         if local_id is not None: # local push
-            self._push_handler(name, local_id, local_data)
+            self._push_handler(self._data_store, name, local_id, local_data)
 
     def pull(self, name, id_tensor):
         """Pull message from KVServer.
@@ -1000,7 +1005,7 @@ class KVClient(object):
         # recv response
         response_list = []
         if local_id is not None: # local pull
-            local_data = self._pull_handler(name, local_id)
+            local_data = self._pull_handler(self._data_store, name, local_id)
             server_id = self._main_server_id
             local_response = PullResponse(server_id, local_data)
             response_list.append(local_response)
@@ -1017,38 +1022,3 @@ class KVClient(object):
         """Used by sort response list
         """
         return elem.server_id
-
-    def _default_push_handler(self, name, id_tensor, data_tensor):
-        """Default handler for PUSH message. 
-
-        On default, _push_handler perform scatter_row() operation for the tensor.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        id_tensor : tensor
-            a vector storing the ID list.
-        data_tensor : tensor
-            a tensor with the same row size of id
-        """
-        self._data_store[name] = F.scatter_row(self._data_store[name], id_tensor, data_tensor)
-
-    def _default_pull_handler(self, name, id_tensor):
-        """Default handler for PULL operation.
-
-        On default, _pull_handler perform gather_row() operation for the tensor.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        id_tensor : tensor
-            a vector storing the ID list.
-
-        Return
-        ------
-        tensor
-            a tensor with the same row size of ID.
-        """
-        return F.gather_row(self._data_store[name], id_tensor)
