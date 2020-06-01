@@ -1,4 +1,5 @@
 """Classes and functions for batching multiple heterographs together."""
+from collections import defaultdict
 from collections.abc import Iterable
 
 from . import backend as F
@@ -146,7 +147,7 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
 
         # Sanity check. Make sure all graphs have same node/edge features in terns of name, size
         # and dtype if the number of nodes is nonzero.
-        ref_node_feats = {}
+        ref_node_feats = dict()
         for nty in ref_ntypes:
             for i, graph in enumerate(graph_list):
                 # No nodes, skip it
@@ -169,7 +170,7 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
                         '{}-typed nodes should be the same.'.format(
                             ref_node_feats[nty][0], i, nfeats, nty)
 
-        ref_edge_feats = {}
+        ref_edge_feats = dict()
         for ety in ref_canonical_etypes:
             for i, graph in enumerate(graph_list):
                 # No edges, skip it
@@ -197,9 +198,13 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
             if is_all(attrs):
                 for typ in types:
                     if mode == 'node':
-                        formatted_attrs[typ] = list(ref_node_feats[typ][1].keys())
+                        # Handle the case where the nodes of a type have no features
+                        formatted_attrs[typ] = list(ref_node_feats.get(
+                            typ, (None, dict()))[1].keys())
                     elif mode == 'edge':
-                        formatted_attrs[typ] = list(ref_edge_feats[typ][1].keys())
+                        # Handle the case where the edges of a type have no features
+                        formatted_attrs[typ] = list(ref_edge_feats.get(
+                            typ, (None, dict()))[1].keys())
             elif isinstance(attrs, dict):
                 for typ, v in attrs.items():
                     if isinstance(v, str):

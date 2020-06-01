@@ -262,6 +262,12 @@ def test_batching_with_zero_nodes_edges(index_dtype):
         node_attrs={'user': ['h1', 'h2'], 'game': ['h1', 'h2']},
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
+    # Test graphs without edges
+    g1 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(0, 4))
+    g2 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(1, 5))
+    g2.nodes['u'].data['x'] = F.tensor([1])
+    dgl.batch_hetero([g1, g2])
+
 if __name__ == '__main__':
     test_batching_hetero_topology()
     test_batching_hetero_and_batched_hetero_topology()
