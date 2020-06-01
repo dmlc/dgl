@@ -950,6 +950,9 @@ class KVClient(object):
                 rpc.send_request(server_id, request)
             start += count[idx]
         if local_id is not None: # local push
+            print("local push")
+            print(local_id)
+            print(local_data)
             self._push_handler(name, local_id, local_data)
 
     def pull(self, name, id_tensor):

@@ -110,7 +110,7 @@ def start_client():
                   id_tensor=id_tensor,
                   data_tensor=data_tensor)
     kvclient.push(name='data_2',
-                  id_tensor=id_tensor, 
+                  id_tensor=id_tensor,
                   data_tensor=data_tensor)
     res = kvclient.pull(name='data_0', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
