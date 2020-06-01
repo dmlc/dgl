@@ -35,8 +35,8 @@ data_2 = F.tensor([[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.]], F.float32)
 def init_zero_func(shape, dtype):
     return F.zeros(shape, dtype)
 
-#def udf_push()
-
+def udf_push(target, name, id_tensor, data_tensor):
+    target[name] = F.scatter_row(target[name], id_tensor, data_tensor*data_tensor)    
 
 def test_partition_policy():
     assert node_policy.policy_str == 'node'
@@ -122,7 +122,6 @@ def start_client():
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # Register new push handler
-    """
     kvclient.register_oush_handler(udf_push)
     # Test push and pull
     kvclient.push(name='data_0',
@@ -134,13 +133,13 @@ def start_client():
     kvclient.push(name='data_2',
                   id_tensor=id_tensor,
                   data_tensor=data_tensor)
+    data_tensor = data_tensor * data_tensor
     res = kvclient.pull(name='data_0', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     res = kvclient.pull(name='data_1', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
-    """
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
