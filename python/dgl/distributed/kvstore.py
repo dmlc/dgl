@@ -950,9 +950,7 @@ class KVClient(object):
                 rpc.send_request(server_id, request)
             start += count[idx]
         if local_id is not None: # local push
-            print("local push")
             self._push_handler(name, local_id, local_data)
-            print(self._data_store[name])
 
     def pull(self, name, id_tensor):
         """Pull message from KVServer.
@@ -1034,7 +1032,7 @@ class KVClient(object):
         data_tensor : tensor
             a tensor with the same row size of id
         """
-        F.scatter_row(self._data_store[name], id_tensor, data_tensor)
+        self._data_store[name] = F.scatter_row(self._data_store[name], id_tensor, data_tensor)
 
     def _default_pull_handler(self, name, id_tensor):
         """Default handler for PULL operation.
