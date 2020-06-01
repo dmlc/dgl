@@ -95,6 +95,7 @@ def read_data_meta_from_shared_mem(dataname):
     tuple
         data shape
     """
+    time.sleep(2)
     assert len(dataname) > 0, 'dataname cannot be empty.'
     shared_data = empty_shared_mem(dataname, False, (10,), 'int32')
     dlpack = shared_data.to_dlpack()
