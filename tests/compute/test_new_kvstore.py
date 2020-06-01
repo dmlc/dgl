@@ -35,7 +35,7 @@ data_2 = F.tensor([[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.]], F.float32)
 def init_zero_func(shape, dtype):
     return F.zeros(shape, dtype)
 
-def udf_push()
+#def udf_push()
 
 
 def test_partition_policy():
