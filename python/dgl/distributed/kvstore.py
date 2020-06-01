@@ -11,103 +11,6 @@ from .graph_partition_book import PartitionPolicy
 from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
-def TypeToIndex(dtype):
-    """Convert dtype to int index
-    """
-    if dtype == F.float16:
-        return 30030
-    elif dtype == F.float32:
-        return 30031
-    elif dtype == F.float64:
-        return 30032
-    elif dtype == F.uint8:
-        return 30033
-    elif dtype == F.int8:
-        return 30034
-    elif dtype == F.int16:
-        return 30035
-    elif dtype == F.int32:
-        return 30036
-    elif dtype == F.int64:
-        return 30037
-    else:
-        raise RuntimeError("Cannot support dtype: %s" % str(dtype))
-
-def IndexToType(index):
-    """Convert int index to dtype
-    """
-    if index == 30030:
-        return F.float16
-    elif index == 30031:
-        return F.float32
-    elif index == 30032:
-        return F.float64
-    elif index == 30033:
-        return F.uint8
-    elif index == 30034:
-        return F.int8
-    elif index == 30035:
-        return F.int16
-    elif index == 30036:
-        return F.int32
-    elif index == 30037:
-        return F.int64
-    else:
-        raise RuntimeError("Cannot support dtype index: %d" % index)
-
-def write_data_meta_to_shared_mem(dataname, data):
-    """Write data meta to shared-memory tensor
-
-    Parameters
-    ----------
-    dataname : str
-        name of shared-memory tensor
-    data : tensor
-        data tensor
-    """
-    assert len(dataname) > 0, 'dataname cannot be empty.'
-    shape = list(F.shape(data))
-    if len(shape) > 9:
-        raise RuntimeError("Cannot support dim larger than 9.")
-    type_idx = TypeToIndex(F.dtype(data))
-    tmp_list = [-1] * 10
-    tmp_list[0] = type_idx
-    for i in range(len(shape)):
-        tmp_list[i+1] = shape[i]
-    meta_tensor = F.tensor(tmp_list, F.int32)
-    shared_data = empty_shared_mem(dataname, True, (10,), 'int32')
-    dlpack = shared_data.to_dlpack()
-    data_tensor = F.zerocopy_from_dlpack(dlpack)
-    data_tensor[:] = meta_tensor[:]
-
-def read_data_meta_from_shared_mem(dataname):
-    """Read meta data from shared-memory tensor
-
-    Parameters
-    ----------
-    dataname : str
-        name of shared-memory tensor
-
-    Returns
-    -------
-    dtype
-        data type
-    tuple
-        data shape
-    """
-    time.sleep(2)
-    assert len(dataname) > 0, 'dataname cannot be empty.'
-    shared_data = empty_shared_mem(dataname, False, (10,), 'int32')
-    dlpack = shared_data.to_dlpack()
-    meta_tensor = F.zerocopy_from_dlpack(dlpack)
-    tmp_list = (F.asnumpy(meta_tensor)).tolist()
-    dtype = IndexToType(tmp_list[0])
-    shape = []
-    for i in range(len(tmp_list)):
-        if i != 0 and tmp_list[i] != -1:
-            shape.append(tmp_list[i])
-    return dtype, tuple(shape)
-
 def check_file_exists(filename):
     """Check if file exists.
 
@@ -512,6 +415,53 @@ class GetPartShapeRequest(rpc.Request):
         res = GetPartShapeResponse(data_shape)
         return res
 
+SEND_META_TO_BACKUP = 901239
+SEND_META_TO_BACKUP_MSG = "Send_Meta_TO_Backup"
+
+class SendMetaToBackupResponse(rpc.Response):
+    """Send a confirmation signal (just a short string message)
+    of SendMetaToBackupRequest to client.
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __getstate__(self):
+        return self.msg
+
+    def __setstate__(self, state):
+        self.msg = msg
+
+class SendMetaToBackupRequest(rpc.Request):
+    """Send meta data to backup server and backup server
+    will use this meta data to read shared-memory tensor.
+
+    Parameters
+    ----------
+    name : str
+        data name
+    dtype : str
+        data type string
+    shape : tuple of int
+        data shape
+    """
+    def __init__(self, name, dtype, shape):
+        self.name = name
+        self.dtype = dtype
+        self.shape = shape
+
+    def __getstate__(self):
+        return self.name, self.dtype, self.shape
+
+    def __setstate__(self, state):
+        self.name, self.dtype, self.shape = state
+
+    def process_request(self, server_state):
+        kv = server_state.kv_store
+        assert kv.is_backup_server()
+        shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
+        dlpack = shared_data.to_dlpack()
+        kv.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
+
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
@@ -678,9 +628,9 @@ class KVServer(object):
         name : str
             data name
         data_tensor : tensor
-            If the data_tensor is None, KVServer will read shared-memory by name.
+            If the data_tensor is None, KVServer will
+            read shared-memory when client invoking get_shared_data().
         """
-        # TODO(chao) : remove tmp file using new shared-tensor API
         assert len(name) > 0, 'name cannot be empty.'
         if data_tensor is not None: # Create shared-tensor
             data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
@@ -688,12 +638,6 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-            write_data_meta_to_shared_mem(name+'-kvmeta-'+str(self._machine_id), data_tensor)
-        else: # Read shared-tensor
-            data_shape, data_type = read_data_meta_from_shared_mem(name+'-kvmeta-'+str(self._machine_id))
-            shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
-            dlpack = shared_data.to_dlpack()
-            self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
 
     def set_partition_policy(self, name, policy_str, partition_book):
         """Set a partition policy to target data.
@@ -868,6 +812,19 @@ class KVClient(object):
                 response = rpc.recv_response()
                 data_shape[0] += response.shape[0]
             self._full_data_shape[name] = tuple(data_shape)
+        # Send meta data to backup servers
+        for name, meta in response.meta.items():
+            shape, dtype, _ = meta
+            dtype = F.reverse_data_type_dict[dtype]
+            request = SendMetaToBackupRequest(name, dtype, shape)
+            # send request to all the backup server nodes
+            for i in range(self._group_count):
+                server_id = self._machine_id * self._group_count + i + 1
+                rpc.send_request(server_id, request)
+            # recv response from all the backup server nodes
+            for _ in range(self._group_count):
+                response = rpc.recv_response()
+                assert response.msg == SEND_META_TO_BACKUP_MSG
 
     def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
         """Send message to kvserver to initialize new data tensor and mapping this
@@ -898,6 +855,8 @@ class KVClient(object):
                 policy = PartitionPolicy(policy_str, machine_id, partition_book)
                 part_shape = shape.copy()
                 part_shape[0] = policy.get_data_size()
+                if machine_id == self._machine_id:
+                    local_shape = part_shape.copy()
                 request = InitDataRequest(name,
                                           tuple(part_shape), 
                                           F.reverse_data_type_dict[dtype],
@@ -911,8 +870,7 @@ class KVClient(object):
                 assert response.msg == INIT_MSG
         self.barrier()
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-        data_shape, data_type = read_data_meta_from_shared_mem(name+'-kvmeta-'+str(self._machine_id))
-        shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
+        shared_data = empty_shared_mem(name+'-kvdata-', False, local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
         self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
         self._data_name_list.append(name)
