@@ -85,6 +85,19 @@ def start_client():
     assert 'data_1' in name_list
     assert 'data_2' in name_list
     # Test get_meta_data
+    meta = kvclient.get_data_meta()
+    dtype, shape, policy = meta['data_0']
+    assert dtype == F.dtype(data_0)
+    assert shape == F.shape(data_0)
+    assert policy.policy_str == 'node'
+    dtype, shape, policy = meta['data_1']
+    assert dtype == F.dtype(data_1)
+    assert shape == F.shape(data_1)
+    assert policy.policy_str == 'edge'
+    dtype, shape, policy = meta['data_2']
+    assert dtype == F.dtype(data_2)
+    assert shape == F.shape(data_2)
+    assert policy.policy_str == 'node'
     # Test push
     # Test pull
     # Register new push and pull handler
