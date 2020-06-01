@@ -790,6 +790,7 @@ class KVClient(object):
             for _ in range(self._server_count):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PUSH_MSG
+        self._push_handler = func
         self.barrier()
 
     def register_pull_handler(self, func):
@@ -811,6 +812,7 @@ class KVClient(object):
             for _ in range(self._server_namebook):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PULL_MSG
+        self._pull_handler = func
         self.barrier()
 
     def get_shared_data(self, partition_book):
