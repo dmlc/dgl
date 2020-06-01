@@ -72,7 +72,7 @@ def write_data_meta_to_shared_mem(dataname, data):
     type_idx = TypeToIndex(F.dtype(data))
     tmp_list = [-1] * 10
     tmp_list[0] = type_idx
-    for i in range(len(shape))
+    for i in range(len(shape)):
         tmp_list[i+1] = shape[i]
     meta_tensor = F.tensor(tmp_list, F.int32)
     shared_data = empty_shared_mem(dataname, True, (10), 'int32')
