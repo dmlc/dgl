@@ -98,13 +98,13 @@ file(GLOB DGL_SRC
   src/*.cc
   src/array/*.cc
   src/array/cpu/*.cc
-  src/fps/*.cc
-  src/fps/cpu/*.cc
   src/random/*.cc
   src/random/cpu/*.cc
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
+  src/pointcloud/*.cc
+  src/pointcloud/cpu/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1

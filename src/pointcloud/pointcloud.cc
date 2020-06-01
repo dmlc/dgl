@@ -7,7 +7,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include "../c_api_common.h"
-#include "./fps_op.h"
+#include "./3d_op.h"
 
 using namespace dgl::runtime;
 
@@ -26,7 +26,7 @@ IdArray FPS(NDArray array, IdArray batch_ptr, int64_t npoints) {
   return ret;
 }
 
-DGL_REGISTER_GLOBAL("fps._CAPI_FarthestPointSampler")
+DGL_REGISTER_GLOBAL("pointcloud._CAPI_FarthestPointSampler")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const NDArray data = args[0];
     const IdArray batch_ptr = args[1];

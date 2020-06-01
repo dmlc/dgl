@@ -12,4 +12,4 @@ def fps(data, batch_ptr, npoints):
                                      npoints)
     return F.zerocopy_from_dgl_ndarray(res)
 
-_init_api('dgl.fps', __name__)
+_init_api('dgl.pointcloud', __name__)
