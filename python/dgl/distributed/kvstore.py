@@ -553,6 +553,9 @@ class KVServer(object):
         rpc.register_service(GET_PART_SHAPE,
                              GetPartShapeRequest,
                              GetPartShapeResponse)
+        rpc.register_service(SEND_META_TO_BACKUP,
+                             SendMetaToBackupRequest,
+                             SendMetaToBackupResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -698,6 +701,9 @@ class KVClient(object):
         rpc.register_service(GET_PART_SHAPE,
                              GetPartShapeRequest,
                              GetPartShapeResponse)
+        rpc.register_service(SEND_META_TO_BACKUP,
+                             SendMetaToBackupRequest,
+                             SendMetaToBackupResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
