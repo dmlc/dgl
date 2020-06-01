@@ -7,7 +7,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include "../c_api_common.h"
-#include "./3d_op.h"
+#include "./pointcloud_op.h"
 
 using namespace dgl::runtime;
 
