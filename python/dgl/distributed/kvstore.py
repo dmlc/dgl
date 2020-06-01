@@ -265,7 +265,7 @@ class BarrierRequest(rpc.Request):
     def __getstate__(self):
         return self.msg
 
-    def __setstate__(self):
+    def __setstate__(self, state):
         self.msg = msg
 
     def process_request(self, server_state):
@@ -880,9 +880,7 @@ class KVClient(object):
             for _ in range(self._server_count):
                 response = rpc.recv_response()
                 assert response.msg == INIT_MSG
-        print("1111")
         self.barrier()
-        print("2222")
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
         data_shape, data_type = read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
         shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
