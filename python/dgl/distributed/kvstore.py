@@ -11,55 +11,101 @@ from .graph_partition_book import PartitionPolicy
 from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
-def write_data_meta_to_file(filename, data):
-    """Write data meta infor to a temp file.
+def TypeToIndex(dtype):
+    """Convert dtype to int index
+    """
+    if dtype == F.float16:
+        return 30030
+    elif dtype == F.float32:
+        return 30031
+    elif dtype == F.float64:
+        return 30032
+    elif dtype == F.uint8:
+        return 30033
+    elif dtype == F.int8:
+        return 30034
+    elif dtype == F.int16:
+        return 30035
+    elif dtype == F.int32:
+        return 30036
+    elif dtype == F.int64:
+        return 30037
+    else:
+        raise RuntimeError("Cannot support dtype: %s" % str(dtype))
+
+def IndexToType(index):
+    """Convert int index to dtype
+    """
+    if index == 30030:
+        return F.float16
+    elif index == 30031:
+        return F.float32
+    elif index == 30032:
+        return F.float64
+    elif index == 30033:
+        return F.uint8
+    elif index == 30034:
+        return F.int8
+    elif index == 30035:
+        return F.int16
+    elif index == 30036:
+        return F.int32
+    elif index == 30037:
+        return F.int64
+    else:
+        raise RuntimeError("Cannot support dtype index: %d" % index)
+
+def write_data_meta_to_shared_mem(dataname, data):
+    """Write data meta to shared-memory tensor
 
     Parameters
     ----------
-    filename : str
-        name of temp file.
-    data : tensor (mx.ndarray or torch.tensor)
+    dataname : str
+        name of shared-memory tensor
+    data : tensor
         data tensor
     """
-    # TODO(chao) : remove tmp file using new shared-tensor API
-    assert len(filename) > 0, 'filename cannot be empty.'
-    if(os.path.exists(filename)):
-        os.remove(filename)
-    shape = F.shape(data)
-    str_data = ''
-    str_data += F.reverse_data_type_dict[F.dtype(data)]
-    str_data += '|'
-    f = open(filename, "a");
-    for s in shape:
-        str_data += str(s)
-        str_data += '|'
-    f.write(str_data)
-    f.close()
+    assert len(dataname) > 0, 'dataname cannot be empty.'
+    shape = list(F.shape(data))
+    if len(shape) > 9:
+        raise RuntimeError("Cannot support dim larger than 9.")
+    type_idx = TypeToIndex(F.dtype(data))
+    tmp_list = [-1] * 10
+    tmp_list[0] = type_idx
+    for i in range(len(shape))
+        tmp_list[i+1] = shape[i]
+    meta_tensor = F.tensor(tmp_list, F.int32)
+    shared_data = empty_shared_mem(dataname, True, (10), 'int32')
+    dlpack = shared_data.to_dlpack()
+    data_tensor = F.zerocopy_from_dlpack(dlpack)
+    data_tensor[:] = meta_tensor[:]
 
-def read_data_meta_from_file(filename):
-    """Read data meta info from a tmp file.
+def read_data_meta_from_shared_mem(dataname):
+    """Read meta data from shared-memory tensor
 
     Parameters
     ----------
-    filename : str
-        name of temp file
+    dataname : str
+        name of shared-memory tensor
 
-    Return
-    ------
+    Returns
+    -------
+    dtype
+        data type
     tuple
         data shape
     """
-    # TODO(chao) : remove tmp file using new shared-tensor API
-    assert len(filename) > 0, 'filename cannot be empty.'
-    f = open(filename, "r")
-    str_data = f.read()
-    data_list = str_data.split('|')
-    data_type = data_list[0]
-    data_shape = []
-    for i in range(1, len(data_list)-1):
-        data_shape.append(int(data_list[i]))
-    f.close()
-    return data_shape, data_type
+    assert len(dataname) > 0, 'dataname cannot be empty.'
+    shared_data = empty_shared_mem(dataname, False, (10), 'int32')
+    dlpack = shared_data.to_dlpack()
+    meta_tensor = F.zerocopy_from_dlpack(dlpack)
+    tmp_list = (F.asnumpy(meta_tensor)).tolist()
+    dtype = IndexToType(tmp_list[0])
+    shape = []
+    for i in range(len(tmp_list)):
+        if i != 0 and tmp_list[i] != -1:
+            shape.append(tmp_list[i])
+    return dtype, tuple(shape)
 
 def check_file_exists(filename):
     """Check if file exists.
@@ -532,23 +578,23 @@ class KVServer(object):
         assert check_file_exists(ip_config), 'Cannot open file: %s' % ip_config
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
         # Register services on server
-        rpc.register_service(KVSTORE_PULL, 
-                             PullRequest, 
+        rpc.register_service(KVSTORE_PULL,
+                             PullRequest,
                              PullResponse)
-        rpc.register_service(KVSTORE_PUSH, 
-                             PushRequest, 
+        rpc.register_service(KVSTORE_PUSH,
+                             PushRequest,
                              None)
-        rpc.register_service(INIT_DATA, 
-                             InitDataRequest, 
+        rpc.register_service(INIT_DATA,
+                             InitDataRequest,
                              InitDataResponse)
         rpc.register_service(BARRIER, 
                              BarrierRequest, 
                              BarrierResponse)
         rpc.register_service(REGISTER_PUSH, 
-                             RegisterPushHandlerRequest, 
+                             RegisterPushHandlerRequest,
                              RegisterPushHandlerResponse)
-        rpc.register_service(REGISTER_PULL, 
-                             RegisterPullHandlerRequest, 
+        rpc.register_service(REGISTER_PULL,
+                             RegisterPullHandlerRequest,
                              RegisterPullHandlerResponse)
         rpc.register_service(GET_SHARED,
                              GetSharedDataRequest,
@@ -570,20 +616,9 @@ class KVServer(object):
         self._part_id = self._machine_id
         self._num_clients = num_clients
         self._barrier_count = 0
-        # TODO(chao) : remove tmp file using new shared-tensor API
-        self._open_file_list = []
         # push and pull handler
         self._push_handler = default_push_handler
         self._pull_handler = default_pull_handler
-
-    def __del__(self):
-        """Finalize KVServer
-        """
-        # Delete temp file when kvstore service is closed
-        # TODO(chao) : remove tmp file using new shared-tensor API
-        for file in self._open_file_list:
-            if (os.path.exists(file)):
-                os.remove(file)
 
     @property
     def server_id(self):
@@ -652,15 +687,14 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-            write_data_meta_to_file(name+'-kvmeta-'+str(self._machine_id), data_tensor)
-            self._open_file_list.append(name+'-kvmeta-'+str(self._machine_id))
+            write_data_meta_to_shared_mem(name+'-kvmeta-'+str(self._machine_id), data_tensor)
         else: # Read shared-tensor
             while True:
                 if (check_file_exists(name+'-kvmeta-'+str(self._machine_id))):
                     break
                 else:
                     time.sleep(1) # wait until the file been created
-            data_shape, data_type = read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
+            data_shape, data_type = read_data_meta_from_shared_mem(name+'-kvmeta-'+str(self._machine_id))
             shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
@@ -700,23 +734,23 @@ class KVClient(object):
         assert rpc.get_rank() != -1, 'RPC client is not started!'
         assert check_file_exists(ip_config), 'Cannot open file: %s' % ip_config
         # Register services on client
-        rpc.register_service(KVSTORE_PULL, 
-                             PullRequest, 
+        rpc.register_service(KVSTORE_PULL,
+                             PullRequest,
                              PullResponse)
-        rpc.register_service(KVSTORE_PUSH, 
-                             PushRequest, 
+        rpc.register_service(KVSTORE_PUSH,
+                             PushRequest,
                              None)
-        rpc.register_service(INIT_DATA, 
-                             InitDataRequest, 
+        rpc.register_service(INIT_DATA,
+                             InitDataRequest,
                              InitDataResponse)
-        rpc.register_service(BARRIER, 
-                             BarrierRequest, 
+        rpc.register_service(BARRIER,
+                             BarrierRequest,
                              BarrierResponse)
         rpc.register_service(REGISTER_PUSH,
-                             RegisterPushHandlerRequest, 
+                             RegisterPushHandlerRequest,
                              RegisterPushHandlerResponse)
-        rpc.register_service(REGISTER_PULL, 
-                             RegisterPullHandlerRequest, 
+        rpc.register_service(REGISTER_PULL,
+                             RegisterPullHandlerRequest,
                              RegisterPullHandlerResponse)
         rpc.register_service(GET_SHARED,
                              GetSharedDataRequest,
@@ -741,20 +775,10 @@ class KVClient(object):
         self._machine_id = rpc.get_machine_id()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
-        # TODO(chao) : remove tmp file using new shared-tensor API
-        self._open_file_list = []
         # push and pull handler
         self._pull_handler = default_pull_handler
         self._push_handler = default_push_handler
         random.seed(time.time())
-
-    def __del__(self):
-        """Finalize KVClient
-        """
-        # TODO(chao) : remove tmp file using new shared-tensor API
-        for file in self._open_file_list:
-            if(os.path.exists(file)):
-                os.remove(file)
 
     def barrier(self):
         """Barrier for all client nodes
@@ -891,7 +915,7 @@ class KVClient(object):
                 assert response.msg == INIT_MSG
         self.barrier()
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-        data_shape, data_type = read_data_meta_from_file(name+'-kvmeta-'+str(self._machine_id))
+        data_shape, data_type = read_data_meta_from_shared_mem(name+'-kvmeta-'+str(self._machine_id))
         shared_data = empty_shared_mem(name+'-kvdata-', False, data_shape, data_type)
         dlpack = shared_data.to_dlpack()
         self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
