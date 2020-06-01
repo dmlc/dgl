@@ -1,5 +1,4 @@
 """Classes and functions for batching multiple heterographs together."""
-from collections import defaultdict
 from collections.abc import Iterable
 
 from . import backend as F
