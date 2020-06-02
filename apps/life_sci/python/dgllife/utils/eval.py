@@ -238,6 +238,9 @@ class Meter(object):
     def roc_auc_score(self, reduction='none'):
         """Compute roc-auc score for binary classification.
 
+        ROC-AUC scores are not well-defined in cases where labels for a task have one single
+        class only. In this case we will simply ignore this task and print a warning message.
+
         Parameters
         ----------
         reduction : 'none' or 'mean' or 'sum'
