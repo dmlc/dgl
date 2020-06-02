@@ -1176,6 +1176,26 @@ def from_edge_list(elist, readonly):
         raise DGLError('Invalid edge list. Nodes must start from 0.')
     return from_coo(num_nodes, src_ids, dst_ids, readonly)
 
+
+def from_mesh_dict(mesh, readonly):
+    """Convert from an edge list.
+
+    Parameters
+    ---------
+    mesh : 
+        Dict which contains verts and faces.
+        Verts is float numpy array with shape [N, 3] indicating the coordinates of the vertexes.
+        Faces is int numpy array with shape [M, 3] indicating the vertex index of a triangle face.
+    """
+    faces = mesh['faces']
+    edge_pairs = np.concatenate([faces[:, [0,1]], faces[:, [1,2]], faces[:, [2,0]]], axis=0)
+    # make it undirected
+    edge_pairs = np.concatenate([edge_pairs, edge_pairs[:,[1,0]]], axis=0)
+    edge_pairs = np.unique(edge_pairs, axis=0)
+    g = from_edge_list((edge_pairs[0], edge_pairs[1]), readonly)
+    g.ndata['coords'] = mesh['verts']
+    return g
+
 def map_to_subgraph_nid(induced_nodes, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 
@@ -1285,6 +1305,11 @@ def create_graph_index(graph_data, readonly):
     elif isinstance(graph_data, (list, tuple)):
         # edge list
         return from_edge_list(graph_data, readonly)
+    elif isinstance(graph_data, dict):
+        # mesh dict
+        if set(graph_data.keys()) != set(['verts', 'faces']):
+            raise Exception('Error while creating graph from input of type mesh (as dict). The keys of the dict should be "verts" and "faces".')
+        return from_mesh_dict(graph_data, readonly)
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         # scipy format
         return from_scipy_sparse_matrix(graph_data, readonly)
