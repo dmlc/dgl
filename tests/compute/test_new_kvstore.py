@@ -59,10 +59,8 @@ def start_server():
     kvserver = dgl.distributed.KVServer(server_id=0,
                                         ip_config='ip_config.txt',
                                         num_clients=1)
-    kvserver.init_data(name='data_0', data_tensor=data_0)
-    kvserver.set_partition_policy('data_0', 'node', gpb)
-    kvserver.init_data(name='data_1', data_tensor=data_1)
-    kvserver.set_partition_policy('data_1', 'edge', gpb)
+    kvserver.init_data(name='data_0', 'node', gpb, data_tensor=data_0)
+    kvserver.init_data(name='data_1', 'edge', gpb, data_tensor=data_1)
     # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver)
     dgl.distributed.start_server(server_id=0,

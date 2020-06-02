@@ -428,16 +428,17 @@ class SendMetaToBackupRequest(rpc.Request):
     shape : tuple of int
         data shape
     """
-    def __init__(self, name, dtype, shape):
+    def __init__(self, name, dtype, shape, policy_str):
         self.name = name
         self.dtype = dtype
         self.shape = shape
+        self.ploicy_str = policy_str
 
     def __getstate__(self):
-        return self.name, self.dtype, self.shape
+        return self.name, self.dtype, self.shape, self.policy_str
 
     def __setstate__(self, state):
-        self.name, self.dtype, self.shape = state
+        self.name, self.dtype, self.shape, self.policy_str = state
 
     def process_request(self, server_state):
         kv = server_state.kv_store
@@ -445,6 +446,7 @@ class SendMetaToBackupRequest(rpc.Request):
         shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
         dlpack = shared_data.to_dlpack()
         kv.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
+        kv.part_policy[name] = PartitionPolicy(self.policy_str, self._part_id, kv.partition_book)
 
 ############################ KVServer ###############################
 
@@ -556,6 +558,7 @@ class KVServer(object):
         # push and pull handler
         self._push_handler = default_push_handler
         self._pull_handler = default_pull_handler
+        self._partition_book = None
 
     @property
     def server_id(self):
@@ -580,7 +583,11 @@ class KVServer(object):
     @property
     def part_policy(self):
         return self._part_policy
-     
+
+    @property
+    def partition_book(self):
+        return self._partition_book
+    
     @property
     def push_handler(self):
         return self._push_handler
@@ -604,27 +611,8 @@ class KVServer(object):
             return False
         return True
 
-    def init_data(self, name, data_tensor=None):
+    def init_data(self, name, policy_str, partition_book, data_tensor=None):
         """Init data tensor on kvserver.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        data_tensor : tensor
-            If the data_tensor is None, KVServer will
-            read shared-memory when client invoking get_shared_data().
-        """
-        assert len(name) > 0, 'name cannot be empty.'
-        if data_tensor is not None: # Create shared-tensor
-            data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
-            shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
-            dlpack = shared_data.to_dlpack()
-            self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-            self._data_store[name][:] = data_tensor[:]
-
-    def set_partition_policy(self, name, policy_str, partition_book):
-        """Set a partition policy to target data.
 
         Parameters
         ----------
@@ -632,12 +620,23 @@ class KVServer(object):
             data name
         policy_str : str
             partition-policy string, e.g., 'edge' or 'node'.
-        partition_book : GraphPartitionBook or RangePartitionBook
-            Store the partition information
+        partition_book : 
+            store the partition information.
+        data_tensor : tensor
+            If the data_tensor is None, KVServer will
+            read shared-memory when client invoking get_shared_data().
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        if data_tensor is not None: # Create shared-tensor
+            data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
+            shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
+            dlpack = shared_data.to_dlpack()
+            self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
+            self._data_store[name][:] = data_tensor[:]
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+        if self._partition_book == None:
+            self._partition_book = partition_book
 
 ############################ KVClient ###############################
 
@@ -801,8 +800,8 @@ class KVClient(object):
             self._full_data_shape[name] = tuple(data_shape)
         # Send meta data to backup servers
         for name, meta in response.meta.items():
-            shape, dtype, _ = meta
-            request = SendMetaToBackupRequest(name, dtype, shape)
+            shape, dtype, policy_str = meta
+            request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
             # send request to all the backup server nodes
             for i in range(self._group_count-1):
                 server_id = self._machine_id * self._group_count + i + 1
