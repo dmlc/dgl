@@ -1917,6 +1917,43 @@ class DGLGraph(DGLBaseGraph):
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
 
+    def from_mesh_dict(self, mesh_dict):
+        """Convert from an edge list.
+
+        Parameters
+        ---------
+        mesh : 
+            Dict which contains verts and faces.
+            Verts is float numpy array with shape [N, 3] indicating the coordinates of the vertexes.
+            Faces is int numpy array with shape [M, 3] indicating the vertex index of a triangle face.
+        
+        Examples
+        --------
+        >>> import numpy as np
+        >>> verts = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+        >>>                   [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=np.float)
+        >>> faces = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7],
+        >>>                   [0, 1, 5], [0, 4, 5], [1, 2, 5], [2, 5, 6],
+        >>>                   [2, 6, 7], [2, 3, 7], [0, 3, 4], [3, 4, 7]], dtype=np.int)
+        >>> mesh_dict = {'verts': verts, 'faces': faces}
+        >>> g = dgl.DGLGraph()
+        >>> g.from_mesh_dict(mesh_dict)
+        """
+        self.clear()
+        verts = mesh_dict['verts']
+        faces = mesh_dict['faces']
+        if verts.shape[-1] != 3:
+            raise DGLError('Invalid verts coordinates. Only support 3D coords now.')
+        if faces.shape[-1] != 3:
+            raise DGLError('Invalid faces format. Only support triangle mesh now.')
+        self._graph = graph_index.from_mesh_faces(faces, self.is_readonly)
+        self._node_frame.add_rows(self.number_of_nodes())
+        self._edge_frame.add_rows(self.number_of_edges())
+        self._msg_frame.add_rows(self.number_of_edges())
+
+        # Put coordinates into node attribute
+        self._node_frame['coords'] = verts
+
     def node_attr_schemes(self):
         """Return the node feature schemes.
 

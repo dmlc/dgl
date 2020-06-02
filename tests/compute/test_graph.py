@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as sp
 import networkx as nx
 import dgl
-import backend as F
+#import backend as F
 from dgl import DGLError
 import pytest
 
@@ -43,6 +43,14 @@ def scipy_csr_input():
     # src = [0 0 0 1 1 2 2 3 3 4 4 4 4 5 5 6 7 7 7 9]
     # dst = [4 6 9 3 5 3 7 5 8 1 3 4 9 1 9 6 2 8 9 2]
     return csr
+
+def mesh_dict_input():
+    verts = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                      [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=np.float)
+    faces = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7],
+                      [0, 1, 5], [0, 4, 5], [1, 2, 5], [2, 5, 6],
+                      [2, 6, 7], [2, 3, 7], [0, 3, 4], [3, 4, 7]], dtype=np.int)
+    return {'verts': verts, 'faces': faces}
 
 def gen_by_mutation():
     g = dgl.DGLGraph()
@@ -315,6 +323,14 @@ def test_incmat():
                       [0., 1., 0., -1., 0.],
                       [0., 0., 1., 1., 0.]]))
 
+def test_mesh():
+    mesh = mesh_dict_input()
+    g = dgl.DGLGraph()
+    g.from_mesh_dict(mesh)
+    assert g.number_of_nodes() == 8
+    assert g.number_of_edges() == 36
+    assert g.ndata['coords'].shape == (8, 3)
+
 def test_readonly():
     g = dgl.DGLGraph()
     g.add_nodes(5)
@@ -419,3 +435,4 @@ if __name__ == '__main__':
     test_incmat()
     test_readonly()
     test_find_edges()
+    test_mesh()
