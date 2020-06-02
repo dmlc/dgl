@@ -33,7 +33,11 @@ data_1 = F.tensor([[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.]], F.f
 data_2 = F.tensor([[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.]], F.float32)
 
 def init_zero_func(shape, dtype):
-    return F.zeros(shape, dtype)
+	print("shape:")
+	print(shape)
+	print("dtype:")
+	print(dtype)
+    return F.zeros(shape, dtype, F.cpu())
 
 def udf_push(target, name, id_tensor, data_tensor):
     target[name] = F.scatter_row(target[name], id_tensor, data_tensor*data_tensor)    
@@ -82,7 +86,6 @@ def start_client():
                        policy_str='node', 
                        partition_book=gpb, 
                        init_func=init_zero_func)
-    print("3333")
     # Test data_name_list
     name_list = kvclient.data_name_list()
     assert 'data_0' in name_list
