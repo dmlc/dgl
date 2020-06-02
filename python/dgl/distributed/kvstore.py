@@ -151,9 +151,14 @@ class InitDataRequest(rpc.Request):
         dtype = F.data_type_dict[self.dtype]
         if kv.is_backup_server() == False:
             data_tensor = self.init_func(self.shape, dtype)
-            kv.init_data(name=self.name, data_tensor=data_tensor)
+            kv.init_data(name=self.name, 
+                         policy_str=self.policy_str, 
+                         partition_book=kv.partition_book, 
+                         data_tensor=data_tensor):
         else: # backup server will read data from shared-memory
-            kv.init_data(name=self.name)
+            kv.init_data(name=self.name, 
+                         policy_str=self.policy_str, 
+                         partition_book=kv.partition_book)
         # Find the same partition policy from exsiting plolicy list.
         for _, policy in kv.part_policy.items():
             if policy.policy_str == self.policy_str:
