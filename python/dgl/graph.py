@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import Iterable
 from functools import wraps
 import networkx as nx
+import numpy as np
 
 import dgl
 from .base import ALL, NID, EID, is_all, DGLError, dgl_warning
@@ -1934,7 +1935,7 @@ class DGLGraph(DGLBaseGraph):
         >>>                   [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=np.float)
         >>> faces = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7],
         >>>                   [0, 1, 5], [0, 4, 5], [1, 2, 5], [2, 5, 6],
-        >>>                   [2, 6, 7], [2, 3, 7], [0, 3, 4], [3, 4, 7]], dtype=np.int)
+        >>>                   [2, 6, 7], [2, 3, 7], [0, 3, 4], [3, 4, 7]], dtype=np.int64)
         >>> mesh_dict = {'verts': verts, 'faces': faces}
         >>> g = dgl.DGLGraph()
         >>> g.from_mesh_dict(mesh_dict)
@@ -1946,13 +1947,27 @@ class DGLGraph(DGLBaseGraph):
             raise DGLError('Invalid verts coordinates. Only support 3D coords now.')
         if faces.shape[-1] != 3:
             raise DGLError('Invalid faces format. Only support triangle mesh now.')
-        self._graph = graph_index.from_mesh_faces(faces, self.is_readonly)
+
+        edge_pairs = np.concatenate([faces[:, [0,1]], faces[:, [1,2]], faces[:, [2,0]]], axis=0)
+        triangle_heads = np.concatenate([faces[:, 2], faces[:, 0], faces[:, 1]], axis=0)
+        # make it undirected
+        edge_pairs = np.concatenate([edge_pairs, edge_pairs[:,[1,0]]], axis=0)
+        triangle_heads = np.concatenate([triangle_heads, triangle_heads], axis=0)
+        edge_pairs, indices = np.unique(edge_pairs, axis=0, return_inverse=True)
+        sort_idx = np.argsort(indices)
+        triangle_heads = triangle_heads[sort_idx].reshape(-1, 2)
+
+        self._graph = graph_index.from_edge_list(edge_pairs, self.is_readonly)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
 
         # Put coordinates into node attribute
+        # Coordinates will be the node feature
         self._node_frame['coords'] = verts
+        # In mesh, each edge will be shared by two faces.
+        # We save face reconstruction info on edge features.
+        self._edge_frame['triangle_heads'] = triangle_heads
 
     def node_attr_schemes(self):
         """Return the node feature schemes.

@@ -32,7 +32,6 @@ class GraphIndex(ObjectBase):
     - `dgl.graph_index.from_shared_mem_csr_matrix`
     - `dgl.graph_index.from_csr`
     - `dgl.graph_index.from_coo`
-    - `dgl.graph_index.from_mesh_faces`
     """
     def __new__(cls):
         obj = ObjectBase.__new__(cls)
@@ -1176,21 +1175,6 @@ def from_edge_list(elist, readonly):
     if min_nodes != 0:
         raise DGLError('Invalid edge list. Nodes must start from 0.')
     return from_coo(num_nodes, src_ids, dst_ids, readonly)
-
-def from_mesh_faces(faces, readonly):
-    """Convert from an edge list.
-
-    Parameters
-    ---------
-    faces : int numpy array with shape [M, 3] indicating the vertex index of a triangle face.
-    """
-    if faces.shape[-1] != 3:
-        raise DGLError('Invalid faces format. Only support triangle mesh now.')
-    edge_pairs = np.concatenate([faces[:, [0,1]], faces[:, [1,2]], faces[:, [2,0]]], axis=0)
-    # make it undirected
-    edge_pairs = np.concatenate([edge_pairs, edge_pairs[:,[1,0]]], axis=0)
-    edge_pairs = np.unique(edge_pairs, axis=0)
-    return from_edge_list(edge_pairs, readonly)
 
 def map_to_subgraph_nid(induced_nodes, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
