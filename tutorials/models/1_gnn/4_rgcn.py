@@ -268,7 +268,6 @@ class Model(nn.Module):
 
 # load graph data
 from dgl.contrib.data import load_data
-import numpy as np
 data = load_data(dataset='aifb')
 num_nodes = data.num_nodes
 num_rels = data.num_rels
