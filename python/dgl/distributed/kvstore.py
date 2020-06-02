@@ -771,7 +771,6 @@ class KVClient(object):
             Store the partition information
         """
         # Get shared data from server side
-        print("000000")
         request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
@@ -782,17 +781,18 @@ class KVClient(object):
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
             self._data_name_list.append(name)
-        print("111111")
         # Get full data shape across servers
         for name, meta in response.meta.items():
             shape, _, _ = meta
             data_shape = list(shape)
             data_shape[0] = 0
             request = GetPartShapeRequest(name)
+            print("00000")
             # send request to all main server nodes
             for machine_id in range(self._machine_count):
                 server_id = machine_id * self._group_count
                 rpc.send_request(server_id, request)
+            print("11111")
             # recv response from all the main server nodes
             for _ in range(self._machine_count):
                 res = rpc.recv_response()
