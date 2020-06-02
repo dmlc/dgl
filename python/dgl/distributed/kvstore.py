@@ -783,16 +783,16 @@ class KVClient(object):
             self._data_name_list.append(name)
         # Get full data shape across servers
         for name, meta in response.meta.items():
+            print("-------------")
             shape, _, _ = meta
             data_shape = list(shape)
             data_shape[0] = 0
             request = GetPartShapeRequest(name)
-            print("00000")
             # send request to all main server nodes
             for machine_id in range(self._machine_count):
                 server_id = machine_id * self._group_count
+                print("server_id: %d" % server_id)
                 rpc.send_request(server_id, request)
-            print("11111")
             # recv response from all the main server nodes
             for _ in range(self._machine_count):
                 res = rpc.recv_response()
