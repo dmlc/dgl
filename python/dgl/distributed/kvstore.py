@@ -395,10 +395,10 @@ class GetPartShapeRequest(rpc.Request):
         self.name = state
 
     def process_request(self, server_state):
-        print("Get part shape: %s" % self.name)
         kv = server_state.kv_store
         data_shape = F.shape(kv.data_store[self.name])
         res = GetPartShapeResponse(data_shape)
+        print("Get part shape!")
         return res
 
 SEND_META_TO_BACKUP = 901239
