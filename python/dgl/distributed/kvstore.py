@@ -771,6 +771,7 @@ class KVClient(object):
             Store the partition information
         """
         # Get shared data from server side
+        print("000000")
         request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
@@ -781,6 +782,7 @@ class KVClient(object):
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
             self._data_name_list.append(name)
+        print("111111")
         # Get full data shape across servers
         for name, meta in response.meta.items():
             shape, _, _ = meta
@@ -796,6 +798,7 @@ class KVClient(object):
                 res = rpc.recv_response()
                 data_shape[0] += res.shape[0]
             self._full_data_shape[name] = tuple(data_shape)
+        print("22222")
         # Send meta data to backup servers
         for name, meta in response.meta.items():
             shape, dtype, policy_str = meta
@@ -808,6 +811,7 @@ class KVClient(object):
             for _ in range(self._group_count-1):
                 response = rpc.recv_response()
                 assert response.msg == SEND_META_TO_BACKUP_MSG
+        print("33333")
 
     def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
         """Send message to kvserver to initialize new data tensor and mapping this
