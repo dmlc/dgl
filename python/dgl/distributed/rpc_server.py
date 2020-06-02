@@ -1,5 +1,7 @@
 """Functions used by server."""
 
+import time
+
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .server_state import ServerState
@@ -67,6 +69,7 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
         rpc.add_receiver_addr(client_ip, client_port, client_id)
+    time.sleep(3)
     rpc.sender_connect()
     if rpc.get_rank() == 0: # server_0 send all the IDs
         for client_id, _ in client_namebook.items():
