@@ -699,6 +699,10 @@ class KVClient(object):
     @property
     def client_id(self):
         return self._client_id
+
+    @property
+    def machine_id(self):
+        return self._machine_id
     
     def barrier(self):
         """Barrier for all client nodes
