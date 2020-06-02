@@ -154,7 +154,7 @@ class InitDataRequest(rpc.Request):
             kv.init_data(name=self.name, 
                          policy_str=self.policy_str, 
                          partition_book=kv.partition_book, 
-                         data_tensor=data_tensor):
+                         data_tensor=data_tensor)
         else: # backup server will read data from shared-memory
             kv.init_data(name=self.name, 
                          policy_str=self.policy_str, 
