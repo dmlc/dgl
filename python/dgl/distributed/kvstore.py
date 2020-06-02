@@ -696,6 +696,10 @@ class KVClient(object):
         self._push_handler = default_push_handler
         random.seed(time.time())
 
+    @property
+    def client_id(self):
+        return self._client_id
+    
     def barrier(self):
         """Barrier for all client nodes
 
