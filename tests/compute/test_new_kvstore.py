@@ -33,10 +33,6 @@ data_1 = F.tensor([[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.]], F.f
 data_2 = F.tensor([[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.]], F.float32)
 
 def init_zero_func(shape, dtype):
-    print("shape:")
-    print(shape)
-    print("dtype:")
-    print(dtype)
     return F.zeros(shape, dtype, F.cpu())
 
 def udf_push(target, name, id_tensor, data_tensor):

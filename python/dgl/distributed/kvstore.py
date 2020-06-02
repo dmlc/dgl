@@ -840,9 +840,9 @@ class KVClient(object):
             for machine_id in range(self._machine_count):
                 part_shape = shape.copy()
                 if policy_str == 'edge':
-                    part_shape[0] = partition_book.partid2eids(machine_id)
+                    part_shape[0] = len(partition_book.partid2eids(machine_id))
                 elif policy_str == 'node':
-                    part_shape[0] = partition_book.partid2nids(machine_id)
+                    part_shape[0] = len(partition_book.partid2nids(machine_id))
                 else:
                     raise RuntimeError("Cannot support policy: %s" % policy_str)
                 if machine_id == self._machine_id:
