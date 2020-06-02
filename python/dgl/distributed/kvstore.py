@@ -149,20 +149,16 @@ class InitDataRequest(rpc.Request):
     def process_request(self, server_state):
         kv = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
-        if kv.is_backup_server() == False:
-            data_tensor = self.init_func(self.shape, dtype)
-            kv.init_data(name=self.name, 
-                         policy_str=self.policy_str, 
-                         partition_book=kv.partition_book, 
-                         data_tensor=data_tensor)
-        else: # backup server will read data from shared-memory
-            kv.init_data(name=self.name, 
-                         policy_str=self.policy_str, 
-                         partition_book=kv.partition_book)
-        # Find the same partition policy from exsiting plolicy list.
         for _, policy in kv.part_policy.items():
             if policy.policy_str == self.policy_str:
-                kv.part_policy[self.name] = policy
+                if kv.is_backup_server() == False:
+                    data_tensor = self.init_func(self.shape, dtype)
+                    kv.init_data(name=self.name, 
+                                 part_policy=policy, 
+                                 data_tensor=data_tensor)
+                else: # backup server will read data from shared-memory
+                    kv.init_data(name=self.name, 
+                                 part_policy=policy)
                 res = InitDataResponse(INIT_MSG)
                 return res
         raise RuntimeError("Cannot find any partition policy match \
@@ -553,7 +549,6 @@ class KVServer(object):
         # Basic information
         self._server_id = server_id
         self._server_namebook = rpc.read_ip_config(ip_config)
-        # TODO(chao): machine_id can be removed if we use new shared-memory API
         self._machine_id = self._server_namebook[server_id][0]
         self._group_count = self._server_namebook[server_id][3]
         # We assume partition_id is equal to machine_id
@@ -563,7 +558,6 @@ class KVServer(object):
         # push and pull handler
         self._push_handler = default_push_handler
         self._pull_handler = default_pull_handler
-        self._partition_book = None
 
     @property
     def server_id(self):
@@ -588,10 +582,6 @@ class KVServer(object):
     @property
     def part_policy(self):
         return self._part_policy
-
-    @property
-    def partition_book(self):
-        return self._partition_book
     
     @property
     def push_handler(self):
@@ -616,17 +606,15 @@ class KVServer(object):
             return False
         return True
 
-    def init_data(self, name, policy_str, partition_book, data_tensor=None):
+    def init_data(self, name, part_policy, data_tensor=None):
         """Init data tensor on kvserver.
 
         Parameters
         ----------
         name : str
             data name
-        policy_str : str
-            partition-policy string, e.g., 'edge' or 'node'.
-        partition_book : 
-            store the partition information.
+        part_policy : Partition policy
+            store the partition information
         data_tensor : tensor
             If the data_tensor is None, KVServer will
             read shared-memory when client invoking get_shared_data().
@@ -639,9 +627,7 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-        self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-        if self._partition_book == None:
-            self._partition_book = partition_book
+        self._part_policy[name] = part_policy
 
 ############################ KVClient ###############################
 
