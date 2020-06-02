@@ -134,10 +134,9 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
     """
     def __init__(self, graph_list, node_attrs, edge_attrs):
         # Sanity check. Make sure all graphs have the same node/edge types, in the same order.
-        ref_graph = graph_list[0]
-        ref_canonical_etypes = ref_graph.canonical_etypes
-        ref_ntypes = ref_graph.ntypes
-        ref_etypes = ref_graph.etypes
+        ref_canonical_etypes = graph_list[0].canonical_etypes
+        ref_ntypes = graph_list[0].ntypes
+        ref_etypes = graph_list[0].etypes
         for i in range(1, len(graph_list)):
             g_i = graph_list[i]
             assert g_i.ntypes == ref_ntypes, \
@@ -145,40 +144,66 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
             assert g_i.canonical_etypes == ref_canonical_etypes, \
                 'The canonical edge types of graph {:d} and {:d} should be the same.'.format(0, i)
 
-        # Sanity check. Make sure all graphs have same
-        # node/edge features in terns of name and size.
+        # Sanity check. Make sure all graphs have same node/edge features in terns of name, size
+        # and dtype if the number of nodes is nonzero.
+        ref_node_feats = dict()
         for nty in ref_ntypes:
-            ref_feats_nty = set(ref_graph.node_attr_schemes(nty).keys())
-            for i in range(1, len(graph_list)):
-                assert ref_feats_nty == set(graph_list[i].node_attr_schemes(nty).keys()), \
-                    'The node features of graph {:d} and {:d} for ' \
-                    'node type {} should be the same.'.format(0, i, nty)
-                for nfeats in ref_feats_nty:
-                    assert ref_graph.node_attr_schemes(nty)[nfeats] == \
-                           graph_list[i].node_attr_schemes(nty)[nfeats], \
-                        'For graph {:d} and {:d}, the size and dtype for feature ' \
-                        '{} of {}-typed nodes should be the same.'.format(0, i, nfeats, nty)
+            for i, graph in enumerate(graph_list):
+                # No nodes, skip it
+                if graph.number_of_nodes(nty) == 0:
+                    continue
+                # Use this for reference of feature names, shape and dtype
+                if nty not in ref_node_feats:
+                    ref_node_feats[nty] = (i, graph.node_attr_schemes(nty))
+                    continue
+                # Name check
+                assert set(ref_node_feats[nty][1].keys()) == \
+                       set(graph.node_attr_schemes(nty).keys()), \
+                    'The node features of graph {:d} and {:d} for node type {} should be the ' \
+                    'same.'.format(ref_node_feats[nty][0], i, nty)
+                # Size and dtype check
+                for nfeats in ref_node_feats[nty][1].keys():
+                    assert ref_node_feats[nty][1][nfeats] == \
+                           graph.node_attr_schemes(nty)[nfeats], \
+                        'For graph {:d} and {:d}, the size and dtype for feature {} of ' \
+                        '{}-typed nodes should be the same.'.format(
+                            ref_node_feats[nty][0], i, nfeats, nty)
 
+        ref_edge_feats = dict()
         for ety in ref_canonical_etypes:
-            ref_feats_ety = set(ref_graph.edge_attr_schemes(ety).keys())
-            for i in range(1, len(graph_list)):
-                assert ref_feats_ety == set(graph_list[i].edge_attr_schemes(ety).keys()), \
-                    'The edge features of graph {:d} and {:d} for ' \
-                    'edge type {} should be the same.'.format(0, i, ety)
-                for efeats in ref_feats_ety:
-                    assert ref_graph.edge_attr_schemes(ety)[efeats] == \
-                           graph_list[i].edge_attr_schemes(ety)[efeats], \
-                        'For graph {:d} and {:d}, the size and dtype for feature ' \
-                        '{} of {}-typed edge should be the same.'.format(0, i, efeats, ety)
+            for i, graph in enumerate(graph_list):
+                # No edges, skip it
+                if graph.number_of_edges(ety) == 0:
+                    continue
+                # Use this for reference of feature names, shape and dtype
+                if ety not in ref_edge_feats:
+                    ref_edge_feats[ety] = (i, graph.edge_attr_schemes(ety))
+                    continue
+                # Name check
+                assert set(ref_edge_feats[ety][1].keys()) == \
+                set(graph.edge_attr_schemes(ety).keys()), \
+                    'The edge features of graph {:d} and {:d} for edge type {} should be the ' \
+                    'same.'.format(ref_edge_feats[ety][0], i, ety)
+                # Size and dtype check
+                for efeats in ref_edge_feats[ety][1].keys():
+                    assert ref_edge_feats[ety][1][efeats] == \
+                           graph.edge_attr_schemes(ety)[efeats], \
+                        'For graph {:d} and {:d}, the size and dtype for feature {} of ' \
+                        '{}-typed edges should be the same.'.format(
+                            ref_edge_feats[ety][0], i, efeats, ety)
 
         def _init_attrs(types, attrs, mode):
             formatted_attrs = {t: [] for t in types}
             if is_all(attrs):
                 for typ in types:
                     if mode == 'node':
-                        formatted_attrs[typ] = list(ref_graph.node_attr_schemes(typ).keys())
+                        # Handle the case where the nodes of a type have no features
+                        formatted_attrs[typ] = list(ref_node_feats.get(
+                            typ, (None, dict()))[1].keys())
                     elif mode == 'edge':
-                        formatted_attrs[typ] = list(ref_graph.edge_attr_schemes(typ).keys())
+                        # Handle the case where the edges of a type have no features
+                        formatted_attrs[typ] = list(ref_edge_feats.get(
+                            typ, (None, dict()))[1].keys())
             elif isinstance(attrs, dict):
                 for typ, v in attrs.items():
                     if isinstance(v, str):
