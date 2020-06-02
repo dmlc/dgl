@@ -814,6 +814,7 @@ class KVClient(object):
             for _ in range(self._group_count):
                 response = rpc.recv_response()
                 assert response.msg == SEND_META_TO_BACKUP_MSG
+        print("333")
 
     def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
         """Send message to kvserver to initialize new data tensor and mapping this
