@@ -256,8 +256,8 @@ class Meter(object):
             'Label normalization should not be performed for binary classification.'
         def score(y_true, y_pred):
             if len(y_true.unique()) == 1:
-                print('Warning: Only one class present in y_true for a task. '
-                      'ROC AUC score is not defined in that case.')
+                print('Warning: Only one class {} present in y_true for a task. '
+                      'ROC AUC score is not defined in that case.'.format(y_true[0]))
                 return None
             else:
                 return roc_auc_score(y_true.long().numpy(), torch.sigmoid(y_pred).numpy())
