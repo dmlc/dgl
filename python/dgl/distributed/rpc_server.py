@@ -43,6 +43,8 @@ def start_server(server_id, ip_config, num_clients, server_state, \
                          None)
     rpc.set_rank(server_id)
     server_namebook = rpc.read_ip_config(ip_config)
+    print(server_namebook)
+    print("server_id: %d" % server_id)
     machine_id = server_namebook[server_id][0]
     rpc.set_machine_id(machine_id)
     ip_addr = server_namebook[server_id][1]
