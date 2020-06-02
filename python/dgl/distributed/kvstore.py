@@ -620,7 +620,6 @@ class KVServer(object):
             read shared-memory when client invoking get_shared_data().
         """
         assert len(name) > 0, 'name cannot be empty.'
-        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         if data_tensor is not None: # Create shared-tensor
             data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
             shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
