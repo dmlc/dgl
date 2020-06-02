@@ -324,6 +324,3 @@ class PartitionPolicy(object):
             return len(self._partition_book.partid2nids(self._part_id))
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
-
-    # TODO(chao): more APIs?
-    

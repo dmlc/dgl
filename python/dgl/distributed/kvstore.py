@@ -11,22 +11,6 @@ from .graph_partition_book import PartitionPolicy
 from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
-def check_file_exists(filename):
-    """Check if file exists.
-
-    Parameters
-    ----------
-    filename : str
-        Path of file
-
-    Returns
-    -------
-    True if file exists.
-    """
-    if os.path.exists(filename):
-        return True
-    return False
-
 ############################ Register KVStore Requsts and Responses ###############################
 
 KVSTORE_PULL = 901231
@@ -220,9 +204,9 @@ class BarrierRequest(rpc.Request):
     def process_request(self, server_state):
         assert self.msg == BARRIER_MSG
         kv = server_state.kv_store
-        kv.incr_barrier_count()
+        kv.barrier_count = kv.barrier_count + 1
         if kv.barrier_count == kv.num_clients:
-            kv.barrier_zero()
+            kv.barrier_count = 0
             res_list = []
             for target_id in range(kv.num_clients):
                 res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
@@ -503,7 +487,6 @@ def default_pull_handler(target, name, id_tensor):
     """
     return F.gather_row(target[name], id_tensor)
 
-
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
 
@@ -526,7 +509,7 @@ class KVServer(object):
     """
     def __init__(self, server_id, ip_config, num_clients):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
-        assert check_file_exists(ip_config), 'Cannot open file: %s' % ip_config
+        assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
         # Register services on server
         rpc.register_service(KVSTORE_PULL,
@@ -582,11 +565,9 @@ class KVServer(object):
     def barrier_count(self):
         return self._barrier_count
 
-    def incr_barrier_count(self):
-        self._barrier_count +=1
-
-    def barrier_zero(self):
-        self._barrier_count = 0
+    @barrier_count.setter
+    def barrier_count(self, count):
+        self._barrier_count = count
 
     @property
     def num_clients(self):
@@ -675,7 +656,7 @@ class KVClient(object):
     """
     def __init__(self, ip_config):
         assert rpc.get_rank() != -1, 'RPC client is not started!'
-        assert check_file_exists(ip_config), 'Cannot open file: %s' % ip_config
+        assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
         # Register services on client
         rpc.register_service(KVSTORE_PULL,
                              PullRequest,
@@ -857,9 +838,13 @@ class KVClient(object):
         policy_list = []
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
-                policy = PartitionPolicy(policy_str, machine_id, partition_book)
                 part_shape = shape.copy()
-                part_shape[0] = policy.get_data_size()
+                if policy_str == 'edge':
+                    part_shape[0] = partition_book.partid2eids(machine_id)
+                elif policy_str == 'node':
+                    part_shape[0] = partition_book.partid2nids(machine_id)
+                else:
+                    raise RuntimeError("Cannot support policy: %s" % policy_str)
                 if machine_id == self._machine_id:
                     local_shape = part_shape.copy()
                 request = InitDataRequest(name,
