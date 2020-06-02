@@ -1918,8 +1918,8 @@ class DGLGraph(DGLBaseGraph):
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
 
-    def from_mesh_dict(self, mesh_dict):
-        """Convert from an edge list.
+    def from_mesh(self, mesh_dict):
+        """Convert from a mesh dict.
 
         Parameters
         ---------
@@ -1968,6 +1968,19 @@ class DGLGraph(DGLBaseGraph):
         # In mesh, each edge will be shared by two faces.
         # We save face reconstruction info on edge features.
         self._edge_frame['triangle_heads'] = triangle_heads
+
+    def to_mesh(self):
+        """Convert DGLGraph to a mesh.
+        """
+        if ('coords' not in self.node_attr_schemes().keys()) or ('triangle_heads' not in self.edge_attr_schemes().keys()):
+            raise DGLError('To convert DGLGraph into mesh, node should have coordinate feature and edge should have face feature.')
+        verts = self.ndata['coords']
+        src, dst = self.all_edges()
+        faces_part1 = np.stack([src, dst, self.edata['triangle_heads'][:, 0]]).transpose()
+        faces_part2 = np.stack([src, dst, self.edata['triangle_heads'][:, 1]]).transpose()
+        faces = np.concatenate([faces_part1, faces_part2], axis=0)
+        faces = np.unique(np.sort(faces, axis=1), axis=0)
+        return {'verts': verts, 'faces': faces}
 
     def node_attr_schemes(self):
         """Return the node feature schemes.

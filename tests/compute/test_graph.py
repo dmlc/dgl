@@ -326,10 +326,13 @@ def test_incmat():
 def test_mesh():
     mesh = mesh_dict_input()
     g = dgl.DGLGraph()
-    g.from_mesh_dict(mesh)
+    g.from_mesh(mesh)
     assert g.number_of_nodes() == 8
     assert g.number_of_edges() == 36
     assert g.ndata['coords'].shape == (8, 3)
+    mesh = g.to_mesh()
+    assert mesh['verts'].shape[0] == 8
+    assert mesh['faces'].shape[0] == 12
 
 def test_readonly():
     g = dgl.DGLGraph()
