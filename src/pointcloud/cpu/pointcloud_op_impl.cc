@@ -12,76 +12,80 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
+inline int64_t get_index(int64_t dim1, int64_t dim2, int64_t dim) {
+  return dim1 * dim + dim2;
+}
+
 template <DLDeviceType XPU, typename DType, typename IdType>
-IdArray FPS(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx) {
+IdArray FPS(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx) {
   const DType* array_data = static_cast<DType*>(array->data);
-  const IdType* batch_data = static_cast<IdType*>(batch_ptr->data);
-  const auto batch_size = batch_ptr->shape[0] - 1;
-  const auto point_in_batch = batch_data[1] - batch_data[0];
+
+  const int64_t point_in_batch = array->shape[0] / batch_size;
+  const int64_t dim = array->shape[1];
 
   // Init distance
-  IdArray dist = NewIdArray(point_in_batch, ctx, sizeof(IdType) * 8);
-  IdType* dist_data = static_cast<IdType*>(dist->data);
-  std::fill(dist_data, dist_data + point_in_batch, 0);
+  std::vector<DType> dist_data(point_in_batch);
 
   // Init return value
-  IdArray ret = NewIdArray(npoints * batch_size, ctx, sizeof(IdType) * 8);
+  IdArray ret = NewIdArray(sample_points * batch_size, ctx, sizeof(IdType) * 8);
   IdType* ret_data = static_cast<IdType*>(ret->data);
+  std::fill(ret_data, ret_data + sample_points * batch_size, 0);
 
-  IdType src_start = 0, out_start = 0, src_end, out_end;
-  for (auto b = 0; b < point_in_batch; b++) {
-    src_end = batch_data[b];
-    out_end = npoints * b;
+  IdType array_start = 0, ret_start = 0;
+  // loop for each point cloud sample in this batch
+  for (auto b = 0; b < batch_size; b++) {
+    // random init start sample
+    IdType sample_idx = rand() % point_in_batch;
+    ret_data[ret_start] = array_start + sample_idx;
 
-    // init start sample
-    IdType start_idx = rand() % point_in_batch;
-    ret_data[out_start] = src_start + start_idx;
+    // compute the first-sample distance, and get the max value
+    IdType dist_argmax = 0;
+    DType dist_max = -1;
 
-    // Compute the first-sample distance, and get the max value
-    IdType dist_argmax = 0, dist_max = -1;
-    for (auto i = 0; i < src_end - src_start; i++) {
-      DType d = array_data[i + src_start] - array_data[i + start_idx];
-      dist_data[i] = d * d;
-      if (dist_data[i] > dist_max) {
-        dist_argmax = i;
-        dist_max = dist_data[i];
+    // sample the rest `sample_points - 1` points
+    for (auto i = 0; i < sample_points - 1; i++) {
+      // re-init distance and the argmax
+      dist_argmax = 0;
+      dist_max = -1;
+
+      // update the distance
+      for (auto j = 0; j < point_in_batch; j++) {
+        // compute the distance on dimensions
+        DType one_dist = 0;
+        for (auto d = 0; d < dim; d++) {
+          DType tmp = array_data[get_index(array_start + j, d, dim)] - array_data[get_index(array_start + sample_idx, d, dim)];
+          one_dist += tmp * tmp;
+        }
+
+        // for each out-of-set point, keep its nearest to-the-set distance
+        if (i == 0 || dist_data[j] > one_dist) {
+          dist_data[j] = one_dist;
+        }
+        // look for the farthest sample
+        if (dist_data[j] > dist_max) {
+          dist_argmax = j;
+          dist_max = dist_data[j];
+        }
       }
+      // sample the `dist_argmax`-th point
+      sample_idx = dist_argmax;
+      ret_data[ret_start + i + 1] = array_start + sample_idx;
     }
 
-    for (auto i = 1; i < out_end - out_start; i++) {
-      // add the `dist_argmax`-th sample
-      ret_data[out_start + i] = src_start + dist_argmax;
-      // update distance and the argmax
-      auto new_dist_argmax = 0;
-      auto new_dist_max = -1;
-      for (auto j = 0; j < src_end - src_start; j++) {
-        DType d = array_data[j + src_start] - array_data[j + dist_argmax];
-        DType dsqr = d * d;
-        if (dist_data[j] > dsqr) {
-          dist_data[j] = dsqr;
-        }
-        if (dist_data[j] > new_dist_max) {
-          new_dist_argmax = j;
-          new_dist_max = dist_data[j];
-        }
-      }
-      dist_argmax = new_dist_argmax;
-    }
-
-    src_start = src_end;
-    out_start = out_end;
+    array_start += point_in_batch;
+    ret_start += sample_points;
   }
   return ret;
 }
 
-template IdArray FPS<kDLCPU, int32_t, int32_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
-template IdArray FPS<kDLCPU, int64_t, int32_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
-template IdArray FPS<kDLCPU, float, int32_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
-template IdArray FPS<kDLCPU, double, int32_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
-template IdArray FPS<kDLCPU, int32_t, int64_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
-template IdArray FPS<kDLCPU, int64_t, int64_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
-template IdArray FPS<kDLCPU, float, int64_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
-template IdArray FPS<kDLCPU, double, int64_t>(NDArray array, IdArray batch_ptr, int64_t npoints, DLContext ctx);
+template IdArray FPS<kDLCPU, int32_t, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray FPS<kDLCPU, int64_t, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray FPS<kDLCPU, float, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray FPS<kDLCPU, double, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray FPS<kDLCPU, int32_t, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray FPS<kDLCPU, int64_t, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray FPS<kDLCPU, float, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray FPS<kDLCPU, double, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
 
 }  // namespace impl
 }  // namespace aten

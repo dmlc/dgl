@@ -14,13 +14,11 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace aten {
 
-IdArray FPS(NDArray array, IdArray batch_ptr, int64_t npoints) {
+IdArray FPS(NDArray array, int64_t batch_size, int64_t sample_points) {
   IdArray ret;
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
-      ATEN_ID_TYPE_SWITCH(batch_ptr->dtype, IdType, {
-        ret = impl::FPS<XPU, DType, IdType>(array, batch_ptr, npoints, array->ctx);
-      });
+      ret = impl::FPS<XPU, DType, int64_t>(array, batch_size, sample_points, array->ctx);
     });
   });
   return ret;
@@ -29,9 +27,9 @@ IdArray FPS(NDArray array, IdArray batch_ptr, int64_t npoints) {
 DGL_REGISTER_GLOBAL("pointcloud._CAPI_FarthestPointSampler")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const NDArray data = args[0];
-    const IdArray batch_ptr = args[1];
-    const int64_t npoints = args[2];
-    const auto result = FPS(data, batch_ptr, npoints);
+    const int64_t batch_size = args[1];
+    const int64_t sample_points = args[2];
+    const auto result = FPS(data, batch_size, sample_points);
     *rv = result;
   });
 
