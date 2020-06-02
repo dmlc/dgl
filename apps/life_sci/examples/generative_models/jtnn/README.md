@@ -25,7 +25,7 @@ molecules for training and 5000 molecules for validation.
 
 ### Preprocessing
 
-Class `JTNNDataset` will process a SMILES into a dict, including the junction tree, graph with 
+Class `JTNNDataset` will process a SMILES string into a dict, consisting of a junction tree, a graph with 
 encoded nodes(atoms) and edges(bonds), and other information for model to use.
 
 ## Usage
@@ -33,54 +33,17 @@ encoded nodes(atoms) and edges(bonds), and other information for model to use.
 ### Training
 
 To start training, use `python train.py`. By default, the script will use ZINC dataset
- with preprocessed vocabulary, and save model checkpoint at the current working directory. 
-```
--s SAVE_PATH, Path to save checkpoint models, default to be current
-              working directory (default: ./)
--m MODEL_PATH, Path to load pre-trained model (default: None)
--b BATCH_SIZE, Batch size (default: 40)
--w HIDDEN_SIZE, Size of representation vectors (default: 200)
--l LATENT_SIZE, Latent Size of node(atom) features and edge(atom)
-                features (default: 56)
--d DEPTH, Depth of message passing hops (default: 3)
--z BETA, Coefficient of KL Divergence term (default: 1.0)
--q LR, Learning Rate (default: 0.001)
-```
-
-Model will be saved periodically. 
-All training checkpoint will be stored at `SAVE_PATH`, passed by command line or by default.
-
-#### Dataset configuration
-
-If you want to use your own dataset, please create a file contains one SMILES a line, 
- and pass the file path to the `-t` or `--train` option.
-```
-  -t TRAIN, --train TRAIN
-                        Training file name (default: train)
-```
+ with preprocessed vocabulary, and save model checkpoint periodically in the current working directory. 
 
 ### Evaluation
 
-To start evaluation, use `python reconstruct_eval.py`, and following arguments
-```
--t TRAIN, Training file name (default: test)
--m MODEL_PATH, Pre-trained model to be loaded for evalutaion. If not
-               specified, would use pre-trained model from model zoo
-               (default: None)
--w HIDDEN_SIZE, Hidden size of representation vector, should be
-                consistent with pre-trained model (default: 450)
--l LATENT_SIZE, Latent Size of node(atom) features and edge(atom)
-                features, should be consistent with pre-trained model
-                 (default: 56)
--d DEPTH, Depth of message passing hops, should be consistent
-          with pre-trained model (default: 3)
-```
-
-And it would print out the success rate of reconstructing the same molecules.
+To start evaluation, use `python reconstruct_eval.py`. By default, we will perform evaluation with 
+DGL's pre-trained model. During the evaluation, the program will print out the success rate of 
+molecule reconstruction.
 
 ### Pre-trained models
 
-Below gives the statistics of pre-trained `JTNN_ZINC` model. 
+Below gives the statistics of our pre-trained `JTNN_ZINC` model. 
 
 | Pre-trained model  | % Reconstruction Accuracy
 | ------------------ | -------
@@ -96,3 +59,43 @@ Please put this script at the current directory (`examples/pytorch/model_zoo/che
 ![image](https://user-images.githubusercontent.com/8686776/63773593-0d37da00-c90e-11e9-8933-0abca4b430db.png)
 #### Neighbor Molecules
 ![image](https://user-images.githubusercontent.com/8686776/63773602-1163f780-c90e-11e9-8341-5122dc0d0c82.png)
+
+### Dataset configuration
+
+If you want to use your own dataset, please create a file with one SMILES a line as below
+
+```
+CCO
+Fc1ccccc1
+```
+
+You can generate the vocabulary file corresponding to your dataset with `python vocab.py -d X -v Y`, where `X` 
+is the path to the dataset and `Y` is the path to the vocabulary file to save. An example vocabulary file 
+corresponding to the two molecules above will be
+
+```
+CC
+CF
+C1=CC=CC=C1
+CO
+```
+
+If you want to develop a model based on DGL's pre-trained model, it's important to make sure that the vocabulary 
+generated above is a subset of the vocabulary we use for the pre-trained model. By running `vocab.py` above, we 
+also check if the new vocabulary is a subset of the vocabulary we use for the pre-trained model and print the 
+result in the terminal as follows:
+
+```
+The new vocabulary is a subset of the default vocabulary: True
+```
+
+To train on this new dataset, run
+
+```
+python train.py -t X
+```
+
+where `X` is the path to the new dataset. If you want to use the vocabulary generated above, also add `-v Y`, where 
+`Y` is the path to the vocabulary file we just saved.
+
+To evaluate on this new dataset, run `python reconstruct_eval.py` with arguments same as above.
