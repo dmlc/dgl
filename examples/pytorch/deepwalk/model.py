@@ -77,8 +77,7 @@ def init_grad_avg(walk_length, window_size, batch_size):
 
     Usage
     -----
-    # emb_u.shape: [batch_size * walk_length, dim]
-    batch_emb2posu = torch.index_select(emb_u, 0, pos_u_index)
+
     '''
     grad_avg = []
     for b in range(batch_size):
@@ -253,17 +252,20 @@ class SkipGramModel(nn.Module):
             self.state_sum_v = self.state_sum_v.to(self.device)
 
     def fast_sigmoid(self, score):
-        """ do fast sigmoid by looking up in a defined table """
+        """ do fast sigmoid by looking up in a pre-defined table """
         idx = torch.floor((score + 6.01) / 0.01).long()
         return self.lookup_table[idx]
 
-    def fast_learn_super(self, batch_walks, lr, neg_nodes=None):
-        """ Learn a batch of random walks in a fast way.
-        For each positive/negative node pair (i,j), the updating procedure is as following:
-        score = self.fast_sigmoid(u_embedding[i].dot(v_embedding[j]))
-        # label = 1 for positive samples; label = 0 for negative samples.
-        u_embedding[i] += (label - score) * v_embedding[j]
-        v_embedding[i] += (label - score) * u_embedding[j]
+    def fast_learn(self, batch_walks, lr, neg_nodes=None):
+        """ Learn a batch of random walks in a fast way. It has the following features:
+            1. It calculating the gradients directly without the forward operation.
+            2. It does sigmoid by a looking up table.
+
+        Specifically, for each positive/negative node pair (i,j), the updating procedure is as following:
+            score = self.fast_sigmoid(u_embedding[i].dot(v_embedding[j]))
+            # label = 1 for positive samples; label = 0 for negative samples.
+            u_embedding[i] += (label - score) * v_embedding[j]
+            v_embedding[i] += (label - score) * u_embedding[j]
 
         Parameters
         ----------
@@ -374,6 +376,12 @@ class SkipGramModel(nn.Module):
         ## Update
         nodes = nodes.view(-1)
         if self.avg_sgd:
+            # since the times that a node are performed backward propagation are different, 
+            # we need to average the gradients by different weight.
+            # e.g. for sequence [1, 2, 3, ...] with window_size = 5, we have positive node 
+            # pairs [(1,2), (1, 3), (1,4), ...]. To average the gradients for each node, we
+            # perform weighting on the gradients of node pairs. 
+            # The weights are: [1/5, 1/5, ..., 1/6, ..., 1/10, ..., 1/6, ..., 1/5].
             if bs < self.batch_size:
                 grad_avg = init_grad_avg(
                     self.walk_length,
@@ -387,6 +395,7 @@ class SkipGramModel(nn.Module):
             grad_u = grad_u * lr
             grad_v = grad_v * lr
         elif self.adam:
+            # use adam optimizer
             grad_u = adam(grad_u, self.state_sum_u, nodes, lr, self.device, self.only_gpu)
             grad_v = adam(grad_v, self.state_sum_v, nodes, lr, self.device, self.only_gpu)
 
@@ -403,7 +412,7 @@ class SkipGramModel(nn.Module):
         return
 
     def forward(self, pos_u, pos_v, neg_v):
-        ''' for future use '''
+        ''' Do forward and backward. It is designed for future use. '''
         emb_u = self.u_embeddings(pos_u)
         emb_v = self.v_embeddings(pos_v)
         emb_neg_v = self.v_embeddings(neg_v)

@@ -132,7 +132,7 @@ class DeepwalkTrainer:
                     lr = 0.00001
 
                 if self.args.fast_neg:
-                    self.emb_model.fast_learn_super(walks, lr)
+                    self.emb_model.fast_learn(walks, lr)
                 else:
                     # do negative sampling
                     bs = len(walks)
@@ -140,7 +140,7 @@ class DeepwalkTrainer:
                         np.random.choice(self.dataset.neg_table, 
                             bs * num_pos * self.args.negative, 
                             replace=True))
-                    self.emb_model.fast_learn_super(walks, lr, neg_nodes=neg_nodes)
+                    self.emb_model.fast_learn(walks, lr, neg_nodes=neg_nodes)
 
                 if i > 0 and i % self.args.print_interval == 0:
                     print("Solver [%d] batch %d tt: %.2fs" % (gpu_id, i, time.time()-start))
@@ -183,7 +183,7 @@ class DeepwalkTrainer:
                         lr = 0.00001
 
                     if self.args.fast_neg:
-                        self.emb_model.fast_learn_super(walks, lr)
+                        self.emb_model.fast_learn(walks, lr)
                     else:
                         # do negative sampling
                         bs = len(walks)
@@ -191,7 +191,7 @@ class DeepwalkTrainer:
                             np.random.choice(self.dataset.neg_table, 
                                 bs * num_pos * self.args.negative, 
                                 replace=True))
-                        self.emb_model.fast_learn_super(walks, lr, neg_nodes=neg_nodes)
+                        self.emb_model.fast_learn(walks, lr, neg_nodes=neg_nodes)
 
                     if i > 0 and i % self.args.print_interval == 0:
                         print("Batch %d, training time: %.2fs" % (i, time.time()-start))
