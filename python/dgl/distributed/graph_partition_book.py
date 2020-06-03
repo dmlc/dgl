@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from .. import backend as 
+from .. import backend as F
 from ..base import NID, EID
 from .. import utils
 
