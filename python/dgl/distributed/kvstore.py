@@ -833,9 +833,9 @@ class KVClient(object):
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         shape = list(shape)
         if policy_str == 'edge':
-            local_dim = len(partition_book.partid2eids(machine_id))
+            local_dim = len(partition_book.partid2eids(self._machine_id))
         elif policy_str == 'node':
-            local_dim = len(partition_book.partid2nids(machine_id))
+            local_dim = len(partition_book.partid2nids(self._machine_id))
         else:
             raise RuntimeError("Cannot support policy: %s" % policy_str)
         if self._client_id == 0:
