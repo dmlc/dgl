@@ -414,7 +414,7 @@ class SendMetaToBackupResponse(rpc.Response):
         return self.msg
 
     def __setstate__(self, state):
-        self.msg = msg
+        self.msg = state
 
 class SendMetaToBackupRequest(rpc.Request):
     """Send meta data to backup server and backup server
