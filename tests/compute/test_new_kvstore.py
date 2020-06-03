@@ -1,6 +1,7 @@
 import os
 import time
 
+from scipy import sparse as spsp
 import dgl
 import backend as F
 import unittest, pytest
