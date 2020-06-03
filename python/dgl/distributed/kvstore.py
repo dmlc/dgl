@@ -62,7 +62,7 @@ class PullRequest(rpc.Request):
         if kv_store.data_store.__contains__(self.name) is False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
-        data = kv_store.pull_handler(kv.data_store, self.name, local_id)
+        data = kv_store.pull_handler(kv_store.data_store, self.name, local_id)
         res = PullResponse(kv.server_id, data)
         return res
 
