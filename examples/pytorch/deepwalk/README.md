@@ -56,3 +56,8 @@ Parameters.
 - walk_length = 80, number_walks = 10, window_size = 5
 - Ours: 4GPU (Tesla V100), lr = 0.2, batchs_size = 128, neg_weight = 5, negative = 1, num_thread = 4
 - Others: workers = 8, negative = 5
+
+Speeding-up with mixed CPU & multi-GPU. The used parameters are the same as above.
+|  #GPUs   |   1   |   2   |   4   |
+|----------|-------|-------|-------|
+| Time (s) |1419.64| 952.04|428.89 |
