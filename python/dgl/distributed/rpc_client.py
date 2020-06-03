@@ -104,6 +104,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     """
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
+    print("rank: %d" % rpc.get_rank())
     # Register some basic service
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,
@@ -134,6 +135,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
         server_port = addr[2]
         rpc.add_receiver_addr(server_ip, server_port, server_id)
     rpc.sender_connect()
+    print("00000000")
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr()
     client_ip, client_port = ip_addr.split(':')
@@ -141,8 +143,10 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
+    print("11111111")
     # wait server connect back
     rpc.receiver_wait(client_ip, client_port, num_servers)
+    print("2222222")
     # recv client ID from server
     res = rpc.recv_response()
     rpc.set_rank(res.client_id)
