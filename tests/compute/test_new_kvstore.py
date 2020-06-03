@@ -13,12 +13,15 @@ edge_map = F.tensor([0,0,0,0,0,0,0], F.int64)
 global_nid = F.tensor([0,1,2,3,4,5], F.int64)
 global_eid = F.tensor([0,1,2,3,4,5,6], F.int64)
 
+g = create_random_graph(100)
+g.ndata[NID] = global_nid
+g.edata[EID] = global_eid
+
 gpb = dgl.distributed.GraphPartitionBook(part_id=0,
                                          num_parts=1,
                                          node_map=node_map,
                                          edge_map=edge_map,
-                                         global_nid=global_nid,
-                                         global_eid=global_eid)
+                                         part_graph=g)
 
 node_policy = dgl.distributed.PartitionPolicy(policy_str='node',
                                               part_id=0,
