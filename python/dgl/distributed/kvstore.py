@@ -447,7 +447,13 @@ class SendMetaToBackupRequest(rpc.Request):
         shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
         dlpack = shared_data.to_dlpack()
         kv.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
-        kv.part_policy[name] = PartitionPolicy(self.policy_str, kv.part_id, kv.partition_book)
+        for _, policy in kv.part_policy.items():
+            if policy.policy_str == self.policy_str:
+                kv.part_policy[name] = policy
+                res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
+                return res
+        raise RuntimeError("Cannot find any partition policy match \
+            the requested policy : %s" % self.policy_str)
 
 ############################ KVServer ###############################
 
