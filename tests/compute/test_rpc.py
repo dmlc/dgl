@@ -93,13 +93,13 @@ def start_server():
     server_state = dgl.distributed.ServerState(None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
-                                 ip_config='ip_config.txt', 
+                                 ip_config='rpc/ip_config.txt', 
                                  num_clients=1, 
                                  server_state=server_state)
 
 def start_client():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.connect_to_server(ip_config='ip_config.txt')
+    dgl.distributed.connect_to_server(ip_config='rpc/ip_config.txt')
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
