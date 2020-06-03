@@ -165,7 +165,7 @@ def start_client():
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():
     ip_config = open("kv_ip_config.txt", "w")
-    ip_config.write('127.0.0.1 30050 1\n')
+    ip_config.write('127.0.0.1 3001 1\n')
     ip_config.close()
     pid = os.fork()
     if pid == 0:
