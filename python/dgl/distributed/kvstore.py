@@ -902,10 +902,6 @@ class KVClient(object):
             shape, dtype, policy_str = meta
             shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
             dlpack = shared_data.to_dlpack()
-            if self._part_policy.__contains__(name) == True:
-                raise RuntimeError("Policy %s has already exists!" % name)
-            if self._data_store.__contains__(name) == True:
-                raise RuntimeError("Data %s has already exists!" % name)
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
             self._data_name_list.add(name)
@@ -923,8 +919,6 @@ class KVClient(object):
             for _ in range(self._machine_count):
                 res = rpc.recv_response()
                 data_shape[0] += res.shape[0]
-            if self._full_data_shape.__contains__(name) == True:
-                raise RuntimeError("Data shape %s has already exists!" % name)
             self._full_data_shape[name] = tuple(data_shape)
         # Send meta data to backup servers
         for name, meta in response.meta.items():
