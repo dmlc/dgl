@@ -64,7 +64,7 @@ class GraphPartitionBook:
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
-        g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
+        g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id), F.context(global_id)))
         self._nidg2l[self._part_id] = g2l
         # Get eidg2l
         self._eidg2l = [None] * self._num_partitions
@@ -72,7 +72,7 @@ class GraphPartitionBook:
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
-        g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
+        g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id), F.context(global_id)))
         self._eidg2l[self._part_id] = g2l
 
     def num_partitions(self):
