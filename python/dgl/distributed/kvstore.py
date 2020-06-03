@@ -584,67 +584,67 @@ class KVServer(object):
 
     @property
     def server_id(self):
-    """Get server ID"""
+        """Get server ID"""
         return self._server_id
 
     @property
     def barrier_count(self):
-    """Get barrier count"""
+        """Get barrier count"""
         return self._barrier_count
 
     @barrier_count.setter
     def barrier_count(self, count):
-    """Set barrier count"""
+        """Set barrier count"""
         self._barrier_count = count
 
     @property
     def freeze(self):
-    """Get freeze"""
+        """Get freeze"""
         return self._freeze
 
     @freeze.setter
     def freeze(self, freeze):
-    """Set freeze"""
+        """Set freeze"""
         self._freeze = freeze
 
     @property
     def num_clients(self):
-    """Get number of clients"""
+        """Get number of clients"""
         return self._num_clients
 
     @property
     def data_store(self):
-    """Get data store"""
+        """Get data store"""
         return self._data_store
 
     @property
     def part_policy(self):
-    """Get part policy"""
+        """Get part policy"""
         return self._part_policy
 
     @property
     def part_id(self):
-    """Get part ID"""
+        """Get part ID"""
         return self._part_id
 
     @property
     def push_handler(self):
-    """Get push handler"""
+        """Get push handler"""
         return self._push_handler
 
     @property
     def pull_handler(self):
-    """Get pull handler"""
+        """Get pull handler"""
         return self._pull_handler
 
     @pull_handler.setter
     def pull_handler(self, pull_handler):
-    """Set pull handler"""
+        """Set pull handler"""
         self._pull_handler = pull_handler
 
     @push_handler.setter
     def push_handler(self, push_handler):
-    """Set push handler"""
+        """Set push handler"""
         self._push_handler = push_handler
 
     def is_backup_server(self):
