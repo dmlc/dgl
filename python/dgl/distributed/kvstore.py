@@ -61,14 +61,8 @@ class PullRequest(rpc.Request):
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
         if kv.data_store.__contains__(self.name) == False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
-        try:
-            local_id = kv.part_policy[self.name].to_local(self.id_tensor)
-            data = kv.pull_handler(kv.data_store, self.name, local_id)
-        except Exception as e:
-            print("Error on kvserver pull handler:", e)
-        finally:
-            rpc.finalize_sender()
-            rpc.finalize_receiver()
+        local_id = kv.part_policy[self.name].to_local(self.id_tensor)
+        data = kv.pull_handler(kv.data_store, self.name, local_id)
         res = PullResponse(kv.server_id, data)
         return res
 
@@ -105,14 +99,8 @@ class PushRequest(rpc.Request):
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
         if kv.data_store.__contains__(self.name) == False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
-        try:
-            local_id = kv.part_policy[self.name].to_local(self.id_tensor)
-            kv.push_handler(kv.data_store, self.name, local_id, self.data_tensor)
-        except Exception as e:
-            print("Error on kvserver push handler: ", e)
-        finally:
-            rpc.finalize_sender()
-            rpc.finalize_receiver()
+        local_id = kv.part_policy[self.name].to_local(self.id_tensor)
+        kv.push_handler(kv.data_store, self.name, local_id, self.data_tensor)
         return None
 
 INIT_DATA = 901233
