@@ -975,7 +975,7 @@ class KVClient(object):
                 request = PullRequest(name, partial_id)
                 # randomly select a server node in target machine for load-balance
                 server_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
-                rpc.send_request(s_id, request)
+                rpc.send_request(server_id, request)
                 pull_count += 1
             start += count[idx]
         # recv response
