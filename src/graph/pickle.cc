@@ -21,25 +21,23 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   dmlc::Stream *strm = &ofs;
   strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
   strm->Write(graph->NumVerticesPerType());
-  std::vector<SparseFormat> fmts;
-  std::vector<char> flags;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kAny);
     switch (fmt) {
       case SparseFormat::kCOO: {
-        fmts.push_back(SparseFormat::kCOO);
+        strm->Write(SparseFormat::kCOO);
         const auto &coo = graph->GetCOOMatrix(etype);
-        flags.push_back(coo.row_sorted);
-        flags.push_back(coo.col_sorted);
+        strm->Write(coo.row_sorted);
+        strm->Write(coo.col_sorted);
         states.arrays.push_back(coo.row);
         states.arrays.push_back(coo.col);
         break;
       }
       case SparseFormat::kCSR:
       case SparseFormat::kCSC: {
-        fmts.push_back(SparseFormat::kCSR);
+        strm->Write(SparseFormat::kCSR);
         const auto &csr = graph->GetCSRMatrix(etype);
-        flags.push_back(csr.sorted);
+        strm->Write(csr.sorted);
         states.arrays.push_back(csr.indptr);
         states.arrays.push_back(csr.indices);
         states.arrays.push_back(csr.data);
@@ -49,8 +47,6 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
         LOG(FATAL) << "Unsupported sparse format.";
     }
   }
-  strm->Write(fmts);
-  strm->Write(flags);
   return states;
 }
 
@@ -65,12 +61,6 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
   std::vector<int64_t> num_nodes_per_type;
   CHECK(strm->Read(&num_nodes_per_type)) << "Invalid num_nodes_per_type";
 
-  std::vector<SparseFormat> fmts;
-  std::vector<char> flags;
-  CHECK(strm->Read(&fmts)) << "Invalid sparse matrix format";
-  CHECK(strm->Read(&flags)) << "Invalid flags";
-  auto fmt_itr = fmts.begin();
-  auto flags_itr = flags.begin();
   auto array_itr = states.arrays.begin();
   for (dgl_type_t etype = 0; etype < metagraph->NumEdges(); ++etype) {
     const auto& pair = metagraph->FindEdge(etype);
@@ -79,19 +69,18 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
     const int64_t num_vtypes = (srctype == dsttype)? 1 : 2;
     int64_t num_src = num_nodes_per_type[srctype];
     int64_t num_dst = num_nodes_per_type[dsttype];
-
-    CHECK(fmt_itr != fmts.end());
-    const auto fmt = *(fmt_itr++);
+    SparseFormat fmt;
+    CHECK(strm->Read(&fmt)) << "Invalid SparseFormat";
     HeteroGraphPtr relgraph;
     switch (fmt) {
       case SparseFormat::kCOO: {
         CHECK_GE(states.arrays.end() - array_itr, 2);
         const auto &row = *(array_itr++);
         const auto &col = *(array_itr++);
-        CHECK_GE(flags.end() - flags_itr, 2);
-        bool rsorted = *(flags_itr++);
-        bool csorted = *(flags_itr++);
-
+        bool rsorted;
+        bool csorted;
+        CHECK(strm->Read(&rsorted)) << "Invalid flag 'rsorted'";
+        CHECK(strm->Read(&csorted)) << "Invalid flag 'csorted'";
         auto coo = aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
         relgraph = CreateFromCOO(num_vtypes, coo);
         break;
@@ -101,8 +90,8 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
         const auto &indptr = *(array_itr++);
         const auto &indices = *(array_itr++);
         const auto &edge_id = *(array_itr++);
-        CHECK(flags_itr != flags.end());
-        bool sorted = *(flags_itr++);
+        bool sorted;
+        CHECK(strm->Read(&sorted)) << "Invalid flag 'sorted'";
         auto csr = aten::CSRMatrix(num_src, num_dst, indptr, indices, edge_id, sorted);
         relgraph = CreateFromCSR(num_vtypes, csr);
         break;
