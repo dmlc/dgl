@@ -7,11 +7,11 @@
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
 
 #include <dgl/array.h>
+#include <google/dense_hash_map>
 #include <vector>
 #include <unordered_map>
 #include <utility>
 #include "../../c_api_common.h"
-#include <google/dense_hash_map>
 
 #define CHECK_SAME_DTYPE(VAR1, VAR2)                                          \
   CHECK(VAR1->dtype == VAR2->dtype)                                           \
