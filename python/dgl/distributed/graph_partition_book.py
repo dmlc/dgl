@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from .. import backend as F
+from .. import backend as 
+from ..base import NID, EID
 from .. import utils
 
 class GraphPartitionBook:
