@@ -1,6 +1,6 @@
 import os
 import time
-
+import numpy as np
 from scipy import sparse as spsp
 import dgl
 import backend as F
