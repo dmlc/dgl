@@ -56,13 +56,13 @@ class PullRequest(rpc.Request):
         self.name, self.id_tensor = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
-        if kv.part_policy.__contains__(self.name) == False:
+        kv_store = server_state.kv_store
+        if kv_store.part_policy.__contains__(self.name) == False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if kv.data_store.__contains__(self.name) == False:
+        if kv_store.data_store.__contains__(self.name) == False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
-        local_id = kv.part_policy[self.name].to_local(self.id_tensor)
-        data = kv.pull_handler(kv.data_store, self.name, local_id)
+        local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
+        data = kv_store.pull_handler(kv.data_store, self.name, local_id)
         res = PullResponse(kv.server_id, data)
         return res
 
@@ -94,13 +94,13 @@ class PushRequest(rpc.Request):
         self.name, self.id_tensor, self.data_tensor = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
-        if kv.part_policy.__contains__(self.name) == False:
+        kv_store = server_state.kv_store
+        if kv_store.part_policy.__contains__(self.name) == False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if kv.data_store.__contains__(self.name) == False:
+        if kv_store.data_store.__contains__(self.name) == False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
-        local_id = kv.part_policy[self.name].to_local(self.id_tensor)
-        kv.push_handler(kv.data_store, self.name, local_id, self.data_tensor)
+        local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
+        kv_store.push_handler(kv_store.data_store, self.name, local_id, self.data_tensor)
         return None
 
 INIT_DATA = 901233
@@ -155,17 +155,17 @@ class InitDataRequest(rpc.Request):
         self.name, self.shape, self.dtype, self.policy_str, self.init_func = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
+        kv_store = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
-        for _, policy in kv.part_policy.items():
+        for _, policy in kv_store.part_policy.items():
             if policy.policy_str == self.policy_str:
-                if kv.is_backup_server() == False:
+                if kv_store.is_backup_server() == False:
                     data_tensor = self.init_func(self.shape, dtype)
-                    kv.init_data(name=self.name,
+                    kv_store.init_data(name=self.name,
                                  part_policy=policy,
                                  data_tensor=data_tensor)
                 else:
-                    kv.init_data(name=self.name,
+                    kv_store.init_data(name=self.name,
                                  part_policy=policy)
                 res = InitDataResponse(INIT_MSG)
                 return res
@@ -212,12 +212,12 @@ class BarrierRequest(rpc.Request):
 
     def process_request(self, server_state):
         assert self.msg == BARRIER_MSG
-        kv = server_state.kv_store
-        kv.barrier_count = kv.barrier_count + 1
-        if kv.barrier_count == kv.num_clients:
-            kv.barrier_count = 0
+        kv_store = server_state.kv_store
+        kv_store.barrier_count = kv_store.barrier_count + 1
+        if kv_store.barrier_count == kv_store.num_clients:
+            kv_store.barrier_count = 0
             res_list = []
-            for target_id in range(kv.num_clients):
+            for target_id in range(kv_store.num_clients):
                 res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
             return res_list
         else:
@@ -262,8 +262,8 @@ class RegisterPullHandlerRequest(rpc.Request):
         self.pull_func = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
-        kv.pull_handler = self.pull_func
+        kv_store = server_state.kv_store
+        kv_store.pull_handler = self.pull_func
         res = RegisterPullHandlerResponse(REGISTER_PULL_MSG)
         return res
 
@@ -306,8 +306,8 @@ class RegisterPushHandlerRequest(rpc.Request):
         self.push_func = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
-        kv.push_handler = self.push_func
+        kv_store = server_state.kv_store
+        kv_store.push_handler = self.push_func
         res = RegisterPushHandlerResponse(REGISTER_PUSH_MSG)
         return res
 
@@ -355,15 +355,15 @@ class GetSharedDataRequest(rpc.Request):
     def process_request(self, server_state):
         assert self.msg == GET_SHARED_MSG
         meta = {}
-        kv = server_state.kv_store
-        for name, data in kv.data_store.items():
-            meta[name] = (F.shape(data), 
+        kv_store = server_state.kv_store
+        for name, data in kv_store.data_store.items():
+            meta[name] = (F.shape(data),
                           F.reverse_data_type_dict[F.dtype(data)],
-                          kv.part_policy[name].policy_str)
+                          kv_store.part_policy[name].policy_str)
         if len(meta) == 0:
             raise RuntimeError('There is no data on kvserver.')
         # Freeze data init
-        kv.freeze = True
+        kv_store.freeze = True
         res = GetSharedDataResponse(meta)
         return res
 
@@ -404,10 +404,10 @@ class GetPartShapeRequest(rpc.Request):
         self.name = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
-        if kv.data_store.__contains__(self.name) == False:
+        kv_store = server_state.kv_store
+        if kv_store.data_store.__contains__(self.name) == False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
-        data_shape = F.shape(kv.data_store[self.name])
+        data_shape = F.shape(kv_store.data_store[self.name])
         res = GetPartShapeResponse(data_shape)
         return res
 
@@ -455,14 +455,14 @@ class SendMetaToBackupRequest(rpc.Request):
         self.name, self.dtype, self.shape, self.policy_str = state
 
     def process_request(self, server_state):
-        kv = server_state.kv_store
-        assert kv.is_backup_server()
+        kv_store = server_state.kv_store
+        assert kv_store.is_backup_server()
         shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
         dlpack = shared_data.to_dlpack()
-        kv.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
-        for _, policy in kv.part_policy.items():
+        kv_store.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
+        for _, policy in kv_store.part_policy.items():
             if policy.policy_str == self.policy_str:
-                kv.part_policy[self.name] = policy
+                kv_store.part_policy[self.name] = policy
                 res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
                 return res
         raise RuntimeError("Cannot find any partition policy match \
@@ -471,7 +471,7 @@ class SendMetaToBackupRequest(rpc.Request):
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
-    """Default handler for PUSH message. 
+    """Default handler for PUSH message.
 
     On default, _push_handler perform scatter_row() operation for the tensor.
 
@@ -545,10 +545,10 @@ class KVServer(object):
         rpc.register_service(INIT_DATA,
                              InitDataRequest,
                              InitDataResponse)
-        rpc.register_service(BARRIER, 
-                             BarrierRequest, 
+        rpc.register_service(BARRIER,
+                             BarrierRequest,
                              BarrierResponse)
-        rpc.register_service(REGISTER_PUSH, 
+        rpc.register_service(REGISTER_PUSH,
                              RegisterPushHandlerRequest,
                              RegisterPushHandlerResponse)
         rpc.register_service(REGISTER_PULL,
@@ -584,54 +584,67 @@ class KVServer(object):
 
     @property
     def server_id(self):
+    """Get server ID"""
         return self._server_id
 
     @property
     def barrier_count(self):
+    """Get barrier count"""
         return self._barrier_count
 
     @barrier_count.setter
     def barrier_count(self, count):
+    """Set barrier count"""
         self._barrier_count = count
 
     @property
     def freeze(self):
+    """Get freeze"""
         return self._freeze
-    
+
     @freeze.setter
     def freeze(self, freeze):
+    """Set freeze"""
         self._freeze = freeze
 
     @property
     def num_clients(self):
+    """Get number of clients"""
         return self._num_clients
-     
+
     @property
     def data_store(self):
+    """Get data store"""
         return self._data_store
 
     @property
     def part_policy(self):
+    """Get part policy"""
         return self._part_policy
 
     @property
     def part_id(self):
+    """Get part ID"""
         return self._part_id
-    
+
     @property
     def push_handler(self):
+    """Get push handler"""
         return self._push_handler
 
     @property
     def pull_handler(self):
+    """Get pull handler"""
         return self._pull_handler
 
     @pull_handler.setter
     def pull_handler(self, pull_handler):
+    """Set pull handler"""
         self._pull_handler = pull_handler
 
     @push_handler.setter
     def push_handler(self, push_handler):
+    """Set push handler"""
         self._push_handler = push_handler
 
     def is_backup_server(self):
@@ -656,7 +669,8 @@ class KVServer(object):
         """
         assert len(name) > 0, 'name cannot be empty.'
         if self._freeze == True:
-            raise RuntimeError("KVServer cannot create new data after client invoking get_shared_data() API.")
+            raise RuntimeError("KVServer cannot create new data \
+                after client invoking get_shared_data() API.")
         if self._data_store.__contains__(name) == True:
             raise RuntimeError("Data %s has already exists!" % name)
         if data_tensor is not None: # Create shared-tensor
@@ -672,12 +686,14 @@ class KVServer(object):
 ############################ KVClient ###############################
 
 class KVClient(object):
-    """KVClient is used to push/pull data to/from KVServer. If the target kvclient and kvserver are
-    in the same machine, they can communicate with each other using local shared-memory automatically,
-    instead of going through the tcp/ip RPC.
+    """KVClient is used to push/pull data to/from KVServer. If the
+    target kvclient and kvserver are in the same machine, they can
+    communicate with each other using local shared-memory
+    automatically, instead of going through the tcp/ip RPC.
 
-    DO NOT use KVClient in multi-threads because this behavior is not defined. For now, KVClient
-    can only support CPU-to-CPU communication. We may support GPU-communication in the future.
+    DO NOT use KVClient in multi-threads because this behavior is
+    not defined. For now, KVClient can only support CPU-to-CPU communication.
+    We may support GPU-communication in the future.
 
     Parameters
     ----------
@@ -971,7 +987,7 @@ class KVClient(object):
             if machine[idx] == self._machine_id: # local push
                 # Note that DO NOT push local data right now because we can overlap
                 # communication-local_push here
-                local_id =  self._part_policy[name].to_local(partial_id)
+                local_id = self._part_policy[name].to_local(partial_id)
                 local_data = partial_data
             else: # push data to remote server
                 request = PushRequest(name, partial_id, partial_data)
@@ -1019,11 +1035,12 @@ class KVClient(object):
             if machine[idx] == self._machine_id: # local pull
                 # Note that DO NOT pull local data right now because we can overlap
                 # communication-local_pull here
-                local_id =  self._part_policy[name].to_local(partial_id)
+                local_id = self._part_policy[name].to_local(partial_id)
             else: # pull data from remote server
                 request = PullRequest(name, partial_id)
                 # randomly select a server node in target machine for load-balance
-                server_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
+                server_id = random.randint(machine[idx]*self._group_count, \
+                    (machine[idx]+1)*self._group_count-1)
                 rpc.send_request(server_id, request)
                 pull_count += 1
             start += count[idx]

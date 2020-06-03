@@ -75,7 +75,6 @@ class GraphPartitionBook:
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
 
-
     def num_partitions(self):
         """Return the number of partitions.
 
@@ -85,7 +84,6 @@ class GraphPartitionBook:
             number of partitions
         """
         return self._num_partitions
-
 
     def metadata(self):
         """Return the partition meta data.
@@ -110,7 +108,6 @@ class GraphPartitionBook:
         """
         return self._partition_meta_data
 
-
     def nid2partid(self, nids):
         """From global node IDs to partition IDs
 
@@ -125,7 +122,6 @@ class GraphPartitionBook:
             partition IDs
         """
         return F.gather_row(self._nid2partid, nids)
-
 
     def eid2partid(self, eids):
         """From global edge IDs to partition IDs
@@ -142,7 +138,6 @@ class GraphPartitionBook:
         """
         return F.gather_row(self._eid2partid, eids)
 
-
     def partid2nids(self, partid):
         """From partition id to node IDs
 
@@ -158,7 +153,6 @@ class GraphPartitionBook:
         """
         return self._partid2nids[partid]
 
-
     def partid2eids(self, partid):
         """From partition id to edge IDs
 
@@ -173,7 +167,6 @@ class GraphPartitionBook:
             edge IDs
         """
         return self._partid2eids[partid]
-
 
     def nid2localnid(self, nids, partid):
         """Get local node IDs within the given partition.
@@ -195,7 +188,6 @@ class GraphPartitionBook:
                 getting remote tensor of nid2localnid.')
         return F.gather_row(self._nidg2l[partid], nids)
 
-
     def eid2localeid(self, eids, partid):
         """Get the local edge ids within the given partition.
 
@@ -215,7 +207,6 @@ class GraphPartitionBook:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of eid2localeid.')
         return F.gather_row(self._eidg2l[partid], eids)
-
 
     def get_partition(self, partid):
         """Get the graph of one partition.
@@ -237,7 +228,7 @@ class GraphPartitionBook:
         return self._graph
 
 class PartitionPolicy(object):
-    """Wrapper for GraphPartitionBook and RangePartitionBook. 
+    """Wrapper for GraphPartitionBook and RangePartitionBook.
 
     We can extend this class to support HeteroGraph in the future.
 
@@ -260,16 +251,19 @@ class PartitionPolicy(object):
 
     @property
     def policy_str(self):
+        """Get policy string"""
         return self._policy_str
 
     @property
     def part_id(self):
+        """Get partition ID"""
         return self._part_id
 
     @property
     def partition_book(self):
+        """Get partition book"""
         return self._partition_book
-    
+
     def to_local(self, id_tensor):
         """Mapping global ID to local ID.
 

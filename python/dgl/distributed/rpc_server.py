@@ -4,7 +4,6 @@ import time
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .server_state import ServerState
 
 def start_server(server_id, ip_config, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
