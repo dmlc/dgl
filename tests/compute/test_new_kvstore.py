@@ -57,7 +57,9 @@ def init_zero_func(shape, dtype):
 def udf_push(target, name, id_tensor, data_tensor):
     target[name] = F.scatter_row(target[name], id_tensor, data_tensor*data_tensor)    
 
-@unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow' or F._default_context_str == 'gpu', \
+@unittest.skipIf(os.name == 'nt' or \
+  os.getenv('DGLBACKEND') == 'tensorflow' or \
+  F._default_context_str == 'gpu' or os.getenv('DGLBACKEND') == 'mxnet', \
   reason='Do not support windows and TF yet')
 def test_partition_policy():
     assert node_policy.policy_str == 'node'
@@ -163,7 +165,9 @@ def start_client():
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
 
-@unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow' or F._default_context_str == 'gpu', \
+@unittest.skipIf(os.name == 'nt' or \
+  os.getenv('DGLBACKEND') == 'tensorflow' or \
+  F._default_context_str == 'gpu' or os.getenv('DGLBACKEND') == 'mxnet', \
   reason='Do not support windows and TF yet')
 def test_kv_store():
     ip_config = open("kv_ip_config.txt", "w")
