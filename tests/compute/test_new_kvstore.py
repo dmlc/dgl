@@ -8,6 +8,11 @@ from dgl.graph_index import create_graph_index
 
 from numpy.testing import assert_array_equal
 
+def create_random_graph(n):
+    arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
+    ig = create_graph_index(arr, readonly=True)
+    return dgl.DGLGraph(ig)
+
 # Create an one-part Graph
 node_map = F.tensor([0,0,0,0,0,0], F.int64)
 edge_map = F.tensor([0,0,0,0,0,0,0], F.int64)
