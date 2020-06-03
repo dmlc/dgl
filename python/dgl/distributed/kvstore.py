@@ -356,6 +356,7 @@ class GetSharedDataRequest(rpc.Request):
                           F.reverse_data_type_dict[F.dtype(data)],
                           kv.part_policy[name].policy_str)
         res = GetSharedDataResponse(meta)
+        print("Get shared data!")
         return res
 
 GET_PART_SHAPE = 901238
