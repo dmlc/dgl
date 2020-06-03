@@ -1920,6 +1920,7 @@ class DGLGraph(DGLBaseGraph):
 
     def from_mesh(self, mesh_dict):
         """Convert from a mesh dict.
+        TODO: implement batching.
 
         Parameters
         ---------
@@ -1971,6 +1972,7 @@ class DGLGraph(DGLBaseGraph):
 
     def to_mesh(self):
         """Convert DGLGraph to a mesh.
+        TODO: implement batching.
         """
         if ('coords' not in self.node_attr_schemes().keys()) or ('triangle_heads' not in self.edge_attr_schemes().keys()):
             raise DGLError('To convert DGLGraph into mesh, node should have coordinate feature and edge should have face feature.')
@@ -1981,6 +1983,46 @@ class DGLGraph(DGLBaseGraph):
         faces = np.concatenate([faces_part1, faces_part2], axis=0)
         faces = np.unique(np.sort(faces, axis=1), axis=0)
         return {'verts': verts, 'faces': faces}
+    
+    def sample_point_cloud_from_mesh(self, num_samples):
+        """Convert point cloud from mesh stored as a DGLGraph
+        TODO: implement batching.
+        
+        Parameters
+        ---------
+        num_samples : number of points to sample from a mesh
+        """
+        # Converting to mesh.
+        mesh = self.to_mesh()
+        verts = mesh['verts']
+        faces = mesh['faces']
+
+        # Computing area for each face
+        # Nomalize the edges to 0 - 1
+        # NOTE: when go to batched dgl graph, the normalize could be per mesh
+        # or on the whole DGLGraph
+        verts = verts / verts.max()
+        ab = verts[faces[1]] - verts[faces[0]]
+        ac = verts[faces[2]] - verts[faces[0]]
+        area = 0.5 * np.linalg.norm(np.cross(ab, ac), ord=2, axis=1)
+
+        # Number of points to sample from each face
+        area_portion = area / area.sum()
+        sample = np.random.multinomial(prob, self.num, replacement=True)
+        face = face[sample]
+
+        # Sample points from each face
+        uv = np.random.rand([2, num_samples])
+        u, v = uv[0], uv[1]
+        u_sqrt = u.sqrt()
+        w0 = 1.0 - u_sqrt
+        w1 = u_sqrt * (1.0 - v)
+        w2 = u_sqrt * v
+        a = verts[faces, 0]
+        b = verts[faces, 1]
+        c = verts[faces, 2]
+        point_samples = w0[:, None] * a + w1[:, None] * b + w2[:, None] * c
+        return point_samples
 
     def node_attr_schemes(self):
         """Return the node feature schemes.
