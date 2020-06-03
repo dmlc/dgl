@@ -617,7 +617,7 @@ def recv_response(timeout=0):
         raise DGLError('Got response message from service ID {}, '
                        'but no response class is registered.'.format(msg.service_id))
     res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-    if msg.client_id != get_rank():
+    if msg.client_id != get_rank() and get_rank() != -1:
         raise DGLError('Got reponse of request sent by client {}, '
                        'different from my rank {}!'.format(msg.client_id, get_rank()))
     return res
