@@ -59,22 +59,22 @@ def test_partition_policy():
 def start_server():
 	# Init kvserver
     kvserver = dgl.distributed.KVServer(server_id=0,
-                                        ip_config='kv/ip_config.txt',
+                                        ip_config='kv_ip_config.txt',
                                         num_clients=1)
     kvserver.init_data('data_0', node_policy, data_0)
     kvserver.init_data('data_1', edge_policy, data_1)
     # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver)
     dgl.distributed.start_server(server_id=0,
-                                 ip_config='kv/ip_config.txt',
+                                 ip_config='kv_ip_config.txt',
                                  num_clients=1,
                                  server_state=server_state)
 
 def start_client():
     # Note: connect to server first !
-    dgl.distributed.connect_to_server(ip_config='kv/ip_config.txt')
+    dgl.distributed.connect_to_server(ip_config='kv_ip_config.txt')
     # Init kvclient
-    kvclient = dgl.distributed.KVClient(ip_config='kv/ip_config.txt')
+    kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt')
     kvclient.init_data(name='data_2', 
                        shape=F.shape(data_2), 
                        dtype=F.dtype(data_2), 
@@ -147,7 +147,7 @@ def start_client():
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', \
   reason='Do not support windows and TF yet')
 def test_kv_store():
-    ip_config = open("kv/ip_config.txt", "w")
+    ip_config = open("kv_ip_config.txt", "w")
     ip_config.write('127.0.0.1 30050 1\n')
     ip_config.close()
     pid = os.fork()
