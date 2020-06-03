@@ -20,9 +20,18 @@ edge_map = F.tensor([0,0,0,0,0,0,0], F.int64)
 global_nid = F.tensor([0,1,2,3,4,5], F.int64)
 global_eid = F.tensor([0,1,2,3,4,5,6], F.int64)
 
-g = create_random_graph(100)
+g = dgl.DGLGraph()
+g.add_nodes(6)
+g.add_edge(0, 1) # 0
+g.add_edge(0, 2) # 1
+g.add_edge(0, 3) # 2
+g.add_edge(2, 3) # 3
+g.add_edge(1, 1) # 4
+g.add_edge(0, 4) # 5
+g.add_edge(2, 5) # 6
+
 g.ndata[dgl.NID] = global_nid
-g.edata[dgl.EID] = global_eid
+g.ndata[dgl.EID] = global_eid
 
 gpb = dgl.distributed.GraphPartitionBook(part_id=0,
                                          num_parts=1,
