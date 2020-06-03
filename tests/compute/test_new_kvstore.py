@@ -73,13 +73,13 @@ def start_client():
     dgl.distributed.connect_to_server(ip_config='ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='ip_config.txt')
-    kvclient.get_shared_data(partition_book=gpb)
     kvclient.init_data(name='data_2', 
                        shape=F.shape(data_2), 
                        dtype=F.dtype(data_2), 
                        policy_str='node', 
                        partition_book=gpb, 
                        init_func=init_zero_func)
+    kvclient.get_shared_data(partition_book=gpb)
     # Test data_name_list
     name_list = kvclient.data_name_list()
     assert 'data_0' in name_list
