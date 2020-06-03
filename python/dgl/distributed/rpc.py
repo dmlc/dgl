@@ -661,7 +661,7 @@ def remote_call(target_and_requests, timeout=0):
         server_id = target
         data, tensors = serialize_to_payload(request)
         msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-        send_rpc_message(msg)
+        send_rpc_message(msg, server_id)
         # check if has response
         res_cls = get_service_property(service_id)[1]
         if res_cls is not None:
