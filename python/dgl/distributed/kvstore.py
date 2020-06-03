@@ -219,6 +219,7 @@ class BarrierRequest(rpc.Request):
             for target_id in range(kv_store.num_clients):
                 res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
             return res_list
+        return None
 
 REGISTER_PULL = 901235
 REGISTER_PULL_MSG = 'Register_Pull'
