@@ -356,7 +356,6 @@ class GetSharedDataRequest(rpc.Request):
                           F.reverse_data_type_dict[F.dtype(data)],
                           kv.part_policy[name].policy_str)
         res = GetSharedDataResponse(meta)
-        print("Get shared data!")
         return res
 
 GET_PART_SHAPE = 901238
@@ -399,7 +398,6 @@ class GetPartShapeRequest(rpc.Request):
         kv = server_state.kv_store
         data_shape = F.shape(kv.data_store[self.name])
         res = GetPartShapeResponse(data_shape)
-        print("Get part shape!")
         return res
 
 SEND_META_TO_BACKUP = 901239
