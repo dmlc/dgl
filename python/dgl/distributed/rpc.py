@@ -539,13 +539,16 @@ def send_response(target, response):
     ------
     ConnectionError if there is any problem with the connection.
     """
+    print("aaaa")
     service_id = response.service_id
     msg_seq = get_msg_seq()
     client_id = target
     server_id = get_rank()
     data, tensors = serialize_to_payload(response)
+    print("bbbb")
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
     send_rpc_message(msg)
+    print("cccc")
 
 def recv_request(timeout=0):
     """Receive one request.
@@ -609,21 +612,17 @@ def recv_response(timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     # TODO(chao): handle timeout
-    print("aaaaa")
     msg = recv_rpc_message(timeout)
     if msg is None:
         return None
     _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
-    print("bbbbb")
     if res_cls is None:
         raise DGLError('Got response message from service ID {}, '
                        'but no response class is registered.'.format(msg.service_id))
     res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-    print("ccccc")
     if msg.client_id != get_rank():
         raise DGLError('Got reponse of request sent by client {}, '
                        'different from my rank {}!'.format(msg.client_id, get_rank()))
-    print("ddddd")
     return res
 
 def remote_call(target_and_requests, timeout=0):
