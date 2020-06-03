@@ -696,8 +696,6 @@ class KVClient(object):
         self._push_handler = default_push_handler
         random.seed(time.time())
 
-        print("machine_id: %d" % self._machine_id)
-
     @property
     def client_id(self):
         return self._client_id
@@ -834,18 +832,16 @@ class KVClient(object):
         assert len(shape) > 0, 'shape cannot be empty'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         shape = list(shape)
-        policy_list = []
+        if policy_str == 'edge':
+            local_dim = len(partition_book.partid2eids(machine_id))
+        elif policy_str == 'node':
+            local_dim = len(partition_book.partid2nids(machine_id))
+        else:
+            raise RuntimeError("Cannot support policy: %s" % policy_str)
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
                 part_shape = shape.copy()
-                if policy_str == 'edge':
-                    part_shape[0] = len(partition_book.partid2eids(machine_id))
-                elif policy_str == 'node':
-                    part_shape[0] = len(partition_book.partid2nids(machine_id))
-                else:
-                    raise RuntimeError("Cannot support policy: %s" % policy_str)
-                if machine_id == self._machine_id:
-                    local_shape = part_shape.copy()
+                part_shape[0] = local_dim
                 request = InitDataRequest(name,
                                           tuple(part_shape), 
                                           F.reverse_data_type_dict[dtype],
@@ -858,6 +854,8 @@ class KVClient(object):
                 response = rpc.recv_response()
                 assert response.msg == INIT_MSG
         self.barrier()
+        local_shape = shape.copy()
+        local_shape[0] = local_dim
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
         shared_data = empty_shared_mem(name+'-kvdata-', False, local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
