@@ -447,7 +447,7 @@ class SendMetaToBackupRequest(rpc.Request):
         shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
         dlpack = shared_data.to_dlpack()
         kv.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
-        kv.part_policy[name] = PartitionPolicy(self.policy_str, self._part_id, kv.partition_book)
+        kv.part_policy[name] = PartitionPolicy(self.policy_str, kv.part_id, kv.partition_book)
 
 ############################ KVServer ###############################
 
@@ -582,6 +582,10 @@ class KVServer(object):
     @property
     def part_policy(self):
         return self._part_policy
+
+    @property
+    def part_id(self):
+        return self._part_id
     
     @property
     def push_handler(self):
