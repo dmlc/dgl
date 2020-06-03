@@ -47,7 +47,7 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool includ
   std::vector<int64_t> num_nodes_per_type;
   num_nodes_per_type.reserve(2 * num_ntypes);
 
-  #pragma omp parallel for schedule(dynamic) if (num_etypes>=4)
+  #pragma omp parallel for schedule(dynamic) if (num_etypes >= 4)
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
