@@ -18,12 +18,10 @@ class GraphPartitionBook:
         global node id mapping to partition id
     edge_map : tensor
         global edge id mapping to partition id
-    global_nid : tensor
-        global node id
-    global_eid : tensor
-        global edge id
+    part_graph : DGLGraph
+        The graph partition structure.
     """
-    def __init__(self, part_id, num_parts, node_map, edge_map, global_nid, global_eid):
+    def __init__(self, part_id, num_parts, node_map, edge_map, part_graph):
         assert part_id >= 0, 'part_id cannot be a negative number.'
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._part_id = part_id
@@ -32,6 +30,7 @@ class GraphPartitionBook:
         self._nid2partid = node_map.tousertensor()
         edge_map = utils.toindex(edge_map)
         self._eid2partid = edge_map.tousertensor()
+        self._graph = part_graph
         # Get meta data of GraphPartitionBook
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
@@ -60,7 +59,7 @@ class GraphPartitionBook:
             self._partid2eids.append(part_eids)
         # Get nidg2l
         self._nidg2l = [None] * self._num_partitions
-        global_id = global_nid
+        global_id = self._graph.ndata[NID]
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
@@ -68,7 +67,7 @@ class GraphPartitionBook:
         self._nidg2l[self._part_id] = g2l
         # Get eidg2l
         self._eidg2l = [None] * self._num_partitions
-        global_id = global_eid
+        global_id = self._graph.edata[EID]
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))

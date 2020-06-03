@@ -31,8 +31,7 @@ def test_graph_partition_book():
                                  num_parts=num_partitions,
                                  node_map=node_map,
                                  edge_map=edge_map,
-                                 global_nid=part_g.ndata[dgl.NID],
-                                 global_eid=part_g.edata[dgl.EID])
+                                 part_graph=part_g)
         assert gpb.num_partitions() == num_parts
         gpb_meta = gpb.metadata()
         assert len(gpb_meta) == num_parts
