@@ -64,7 +64,7 @@ class PullRequest(rpc.Request):
 
 KVSTORE_PUSH = 901232
 
-class PushRequest(rpc.Response):
+class PushRequest(rpc.Request):
     """Send ID tensor and data tensor to server and update kvstore's data.
 
     This request has no response.
