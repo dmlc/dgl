@@ -691,7 +691,7 @@ class KVClient(object):
         # Store the full data shape across kvserver
         self._full_data_shape = {}
         # Store all the data name
-        self._data_name_list = []
+        self._data_name_list = set()
         # Basic information
         self._server_namebook = rpc.read_ip_config(ip_config)
         self._server_count = len(self._server_namebook)
@@ -790,7 +790,7 @@ class KVClient(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-            self._data_name_list.append(name)
+            self._data_name_list.add(name)
         # Get full data shape across servers
         for name, meta in response.meta.items():
             shape, _, _ = meta
@@ -870,11 +870,11 @@ class KVClient(object):
         shared_data = empty_shared_mem(name+'-kvdata-', False, local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
         self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-        self._data_name_list.append(name)
+        self._data_name_list.add(name)
         self._full_data_shape[name] = tuple(shape)
 
     def data_name_list(self):
-        return self._data_name_list
+        return list(self._data_name_list)
     
     def get_data_meta(self, name):
         """Get meta data (data_type, data_shape, partition_policy)
