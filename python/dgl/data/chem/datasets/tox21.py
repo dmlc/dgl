@@ -4,6 +4,7 @@ from .csv_dataset import MoleculeCSVDataset
 from ..utils import smiles_to_bigraph
 from ...utils import get_download_dir, download, _get_dgl_url
 from .... import backend as F
+from ....utils import retry_method_with_fix
 from ....base import dgl_warning
 from ....contrib.deprecation import deprecated
 
@@ -55,7 +56,15 @@ class Tox21(MoleculeCSVDataset):
 
         self._url = 'dataset/tox21.csv.gz'
         data_path = get_download_dir() + '/tox21.csv.gz'
-        download(_get_dgl_url(self._url), path=data_path)
+        self._data_path = data_path
+
+        self._load(data_path, smiles_to_graph, node_featurizer, edge_featurizer, load)
+
+    def _download(self):
+        download(_get_dgl_url(self._url), path=self._data_path)
+
+    @retry_method_with_fix(_download)
+    def _load(self, data_path, smiles_to_graph, node_featurizer, edge_featurizer, load):
         df = pd.read_csv(data_path)
         self.id = df['mol_id']
 
