@@ -592,7 +592,7 @@ class KVServer(object):
         self._push_handler = default_push_handler
         self._pull_handler = default_pull_handler
         # We cannot create new data on kvstore when freeze == True
-        bool self._freeze = False
+        self._freeze = False
 
     @property
     def server_id(self):
@@ -748,7 +748,7 @@ class KVClient(object):
         self._pull_handler = default_pull_handler
         self._push_handler = default_push_handler
         # We cannot create new data on kvstore when freeze == True
-        bool self._freeze = False
+        self._freeze = False
         random.seed(time.time())
 
     @property
