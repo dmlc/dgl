@@ -12,6 +12,7 @@ import scipy.sparse as sp
 import os, sys
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 from ..graph import batch as graph_batch
 
@@ -48,10 +49,13 @@ class CitationGraphDataset(object):
         self.name = name
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
-        download(_get_dgl_url(_urls[name]), path=self.zip_file_path)
-        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, name))
         self._load()
 
+    def _download_and_extract(self):
+        download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
+        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, self.name))
+
+    @retry_method_with_fix(_download_and_extract)
     def _load(self):
         """Loads input data from gcn/data directory
 
@@ -307,10 +311,13 @@ class CoraBinary(object):
         self.dir = get_download_dir()
         self.name = 'cora_binary'
         self.zip_file_path='{}/{}.zip'.format(self.dir, self.name)
-        download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
-        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, self.name))
         self._load()
 
+    def _download_and_extract(self):
+        download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
+        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, self.name))
+
+    @retry_method_with_fix(_download_and_extract)
     def _load(self):
         root = '{}/{}'.format(self.dir, self.name)
         # load graphs
