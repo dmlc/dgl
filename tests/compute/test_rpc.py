@@ -15,6 +15,7 @@ TENSOR = F.zeros((10, 10), F.int64, F.cpu())
 def test_rank():
     dgl.distributed.set_rank(2)
     assert dgl.distributed.get_rank() == 2
+    dgl.distributed.set_rank(-1)
 
 def test_msg_seq():
     from dgl.distributed.rpc import get_msg_seq, incr_msg_seq
