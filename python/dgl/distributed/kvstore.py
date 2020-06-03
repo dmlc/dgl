@@ -433,7 +433,7 @@ class SendMetaToBackupRequest(rpc.Request):
         self.name = name
         self.dtype = dtype
         self.shape = shape
-        self.ploicy_str = policy_str
+        self.policy_str = policy_str
 
     def __getstate__(self):
         return self.name, self.dtype, self.shape, self.policy_str
