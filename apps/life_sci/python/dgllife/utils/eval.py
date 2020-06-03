@@ -173,7 +173,9 @@ class Meter(object):
             task_w = mask[:, task]
             task_y_true = y_true[:, task][task_w != 0]
             task_y_pred = y_pred[:, task][task_w != 0]
-            scores.append(score_func(task_y_true, task_y_pred))
+            task_score = score_func(task_y_true, task_y_pred)
+            if task_score is not None:
+                scores.append(task_score)
         return self._reduce_scores(scores, reduction)
 
     def pearson_r2(self, reduction='none'):
@@ -236,6 +238,9 @@ class Meter(object):
     def roc_auc_score(self, reduction='none'):
         """Compute roc-auc score for binary classification.
 
+        ROC-AUC scores are not well-defined in cases where labels for a task have one single
+        class only. In this case we will simply ignore this task and print a warning message.
+
         Parameters
         ----------
         reduction : 'none' or 'mean' or 'sum'
@@ -253,7 +258,12 @@ class Meter(object):
         assert (self.mean is None) and (self.std is None), \
             'Label normalization should not be performed for binary classification.'
         def score(y_true, y_pred):
-            return roc_auc_score(y_true.long().numpy(), torch.sigmoid(y_pred).numpy())
+            if len(y_true.unique()) == 1:
+                print('Warning: Only one class {} present in y_true for a task. '
+                      'ROC AUC score is not defined in that case.'.format(y_true[0]))
+                return None
+            else:
+                return roc_auc_score(y_true.long().numpy(), torch.sigmoid(y_pred).numpy())
         return self.multilabel_score(score, reduction)
 
     def compute_metric(self, metric_name, reduction='none'):
