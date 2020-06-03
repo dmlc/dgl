@@ -57,9 +57,9 @@ class PullRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if kv_store.part_policy.__contains__(self.name) == False:
+        if kv_store.part_policy.__contains__(self.name) is False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if kv_store.data_store.__contains__(self.name) == False:
+        if kv_store.data_store.__contains__(self.name) is False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
         data = kv_store.pull_handler(kv.data_store, self.name, local_id)
@@ -95,9 +95,9 @@ class PushRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if kv_store.part_policy.__contains__(self.name) == False:
+        if kv_store.part_policy.__contains__(self.name) is False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if kv_store.data_store.__contains__(self.name) == False:
+        if kv_store.data_store.__contains__(self.name) is False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
         kv_store.push_handler(kv_store.data_store, self.name, local_id, self.data_tensor)
@@ -159,14 +159,14 @@ class InitDataRequest(rpc.Request):
         dtype = F.data_type_dict[self.dtype]
         for _, policy in kv_store.part_policy.items():
             if policy.policy_str == self.policy_str:
-                if kv_store.is_backup_server() == False:
+                if kv_store.is_backup_server() is False:
                     data_tensor = self.init_func(self.shape, dtype)
                     kv_store.init_data(name=self.name,
-                                 part_policy=policy,
-                                 data_tensor=data_tensor)
+                                       part_policy=policy,
+                                       data_tensor=data_tensor)
                 else:
                     kv_store.init_data(name=self.name,
-                                 part_policy=policy)
+                                       part_policy=policy)
                 res = InitDataResponse(INIT_MSG)
                 return res
         raise RuntimeError("Cannot find any partition policy match \
@@ -405,7 +405,7 @@ class GetPartShapeRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if kv_store.data_store.__contains__(self.name) == False:
+        if kv_store.data_store.__contains__(self.name) is False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         data_shape = F.shape(kv_store.data_store[self.name])
         res = GetPartShapeResponse(data_shape)
@@ -668,10 +668,10 @@ class KVServer(object):
             read shared-memory when client invoking get_shared_data().
         """
         assert len(name) > 0, 'name cannot be empty.'
-        if self._freeze == True:
+        if self._freeze:
             raise RuntimeError("KVServer cannot create new data \
                 after client invoking get_shared_data() API.")
-        if self._data_store.__contains__(name) == True:
+        if self._data_store.__contains__(name):
             raise RuntimeError("Data %s has already exists!" % name)
         if data_tensor is not None: # Create shared-tensor
             data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
@@ -679,7 +679,7 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-        if self._part_policy.__contains__(name) == True:
+        if self._part_policy.__contains__(name):
             raise RuntimeError("Policy %s has already exists!" % name)
         self._part_policy[name] = part_policy
 
@@ -701,7 +701,8 @@ class KVClient(object):
         Path of IP configuration file.
     """
     def __init__(self, ip_config):
-        assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() before creating KVClient.'
+        assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() \
+        before creating KVClient.'
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
         # Register services on client
         rpc.register_service(KVSTORE_PULL,
@@ -762,7 +763,7 @@ class KVClient(object):
     @property
     def machine_id(self):
         return self._machine_id
-    
+
     def barrier(self):
         """Barrier for all client nodes.
 
@@ -843,8 +844,9 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
-        if self._freeze == True:
-            raise RuntimeError("KVClient cannot create new data after invoking get_shared_data() API.")
+        if self._freeze:
+            raise RuntimeError("KVClient cannot create new \
+                data after invoking get_shared_data() API.")
         shape = list(shape)
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
@@ -857,7 +859,7 @@ class KVClient(object):
                 part_shape = shape.copy()
                 part_shape[0] = part_dim
                 request = InitDataRequest(name,
-                                          tuple(part_shape), 
+                                          tuple(part_shape),
                                           F.reverse_data_type_dict[dtype],
                                           policy_str,
                                           init_func)
@@ -877,14 +879,15 @@ class KVClient(object):
             raise RuntimeError("Cannot support policy: %s" % policy_str)
         local_shape = shape.copy()
         local_shape[0] = local_dim
-        if self._part_policy.__contains__(name) == True:
+        if self._part_policy.__contains__(name):
             raise RuntimeError("Policy %s has already exists!" % name)
-        if self._data_store.__contains__(name) == True:
+        if self._data_store.__contains__(name):
             raise RuntimeError("Data %s has already exists!" % name)
-        if self._full_data_shape.__contains__(name) == True:
+        if self._full_data_shape.__contains__(name):
             raise RuntimeError("Data shape %s has already exists!" % name)
         self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-        shared_data = empty_shared_mem(name+'-kvdata-', False, local_shape, F.reverse_data_type_dict[dtype])
+        shared_data = empty_shared_mem(name+'-kvdata-', False, \
+            local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
         self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
         self._data_name_list.add(name)
@@ -940,7 +943,7 @@ class KVClient(object):
 
     def data_name_list(self):
         return list(self._data_name_list)
-    
+
     def get_data_meta(self, name):
         """Get meta data (data_type, data_shape, partition_policy)
         """
@@ -966,7 +969,8 @@ class KVClient(object):
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
-        assert F.shape(id_tensor)[0] == F.shape(data_tensor)[0], 'The data must has the same row size with ID.'
+        assert F.shape(id_tensor)[0] == F.shape(data_tensor)[0], \
+        'The data must has the same row size with ID.'
         # partition data
         machine_id = self._part_policy[name].to_partid(id_tensor)
         # sort index by machine id
@@ -992,7 +996,8 @@ class KVClient(object):
             else: # push data to remote server
                 request = PushRequest(name, partial_id, partial_data)
                 # randomly select a server node in target machine for load-balance
-                server_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
+                server_id = random.randint(machine[idx]*self._group_count, \
+                    (machine[idx]+1)*self._group_count-1)
                 rpc.send_request(server_id, request)
             start += count[idx]
         if local_id is not None: # local push
@@ -1013,7 +1018,7 @@ class KVClient(object):
         tensor
             a data tensor with the same row size of id_tensor.
         """
-        #TODO(chao) : add C++ rpc interface and add fast pull 
+        #TODO(chao) : add C++ rpc interface and add fast pull
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         # partition data
