@@ -101,7 +101,6 @@ class PushRequest(rpc.Request):
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
         kv_store.push_handler(kv_store.data_store, self.name, local_id, self.data_tensor)
-        return None
 
 INIT_DATA = 901233
 INIT_MSG = 'Init'
@@ -220,8 +219,6 @@ class BarrierRequest(rpc.Request):
             for target_id in range(kv_store.num_clients):
                 res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
             return res_list
-        else:
-            return None # No response
 
 REGISTER_PULL = 901235
 REGISTER_PULL_MSG = 'Register_Pull'
@@ -758,10 +755,12 @@ class KVClient(object):
 
     @property
     def client_id(self):
+        """Get client ID"""
         return self._client_id
 
     @property
     def machine_id(self):
+        """Get machine ID"""
         return self._machine_id
 
     def barrier(self):
@@ -942,6 +941,7 @@ class KVClient(object):
         self._freeze = True
 
     def data_name_list(self):
+        """Get all the data name"""
         return list(self._data_name_list)
 
     def get_data_meta(self, name):
@@ -982,13 +982,13 @@ class KVClient(object):
         start = 0
         local_id = None
         local_data = None
-        for idx in range(len(machine)):
+        for idx, machine_idx in enumerate(machine):
             end = start + count[idx]
             if start == end: # No data for target machine
                 continue
             partial_id = id_tensor[start:end]
             partial_data = data_tensor[start:end]
-            if machine[idx] == self._machine_id: # local push
+            if machine_idx == self._machine_id: # local push
                 # Note that DO NOT push local data right now because we can overlap
                 # communication-local_push here
                 local_id = self._part_policy[name].to_local(partial_id)
@@ -996,8 +996,8 @@ class KVClient(object):
             else: # push data to remote server
                 request = PushRequest(name, partial_id, partial_data)
                 # randomly select a server node in target machine for load-balance
-                server_id = random.randint(machine[idx]*self._group_count, \
-                    (machine[idx]+1)*self._group_count-1)
+                server_id = random.randint(machine_idx*self._group_count, \
+                    (machine_idx+1)*self._group_count-1)
                 rpc.send_request(server_id, request)
             start += count[idx]
         if local_id is not None: # local push
@@ -1032,20 +1032,20 @@ class KVClient(object):
         start = 0
         pull_count = 0
         local_id = None
-        for idx in range(len(machine)):
+        for idx, machine_idx in enumerate(machine):
             end = start + count[idx]
             if start == end: # No data for target machine
                 continue
             partial_id = id_tensor[start:end]
-            if machine[idx] == self._machine_id: # local pull
+            if machine_idx == self._machine_id: # local pull
                 # Note that DO NOT pull local data right now because we can overlap
                 # communication-local_pull here
                 local_id = self._part_policy[name].to_local(partial_id)
             else: # pull data from remote server
                 request = PullRequest(name, partial_id)
                 # randomly select a server node in target machine for load-balance
-                server_id = random.randint(machine[idx]*self._group_count, \
-                    (machine[idx]+1)*self._group_count-1)
+                server_id = random.randint(machine_idx*self._group_count, \
+                    (machine_idx+1)*self._group_count-1)
                 rpc.send_request(server_id, request)
                 pull_count += 1
             start += count[idx]
@@ -1061,11 +1061,11 @@ class KVClient(object):
             remote_response = rpc.recv_response()
             response_list.append(remote_response)
         # sort response by server_id and concat tensor
-        response_list.sort(key=self._takeId)
+        response_list.sort(key=self._take_id)
         data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
         return data_tensor[back_sorted_id] # return data with original index order
 
-    def _takeId(self, elem):
+    def _take_id(self, elem):
         """Used by sort response list
         """
         return elem.server_id
