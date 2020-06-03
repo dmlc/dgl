@@ -449,7 +449,7 @@ class SendMetaToBackupRequest(rpc.Request):
         kv.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
         for _, policy in kv.part_policy.items():
             if policy.policy_str == self.policy_str:
-                kv.part_policy[name] = policy
+                kv.part_policy[self.name] = policy
                 res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
                 return res
         raise RuntimeError("Cannot find any partition policy match \
