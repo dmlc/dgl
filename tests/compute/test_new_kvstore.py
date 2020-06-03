@@ -142,7 +142,8 @@ def start_client():
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', \
+  reason='Do not support windows and TF yet')
 def test_kv_store():
     ip_config = open("ip_config.txt", "w")
     ip_config.write('127.0.0.1 30050 1\n')
