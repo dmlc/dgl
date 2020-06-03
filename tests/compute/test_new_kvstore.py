@@ -4,6 +4,7 @@ import time
 import dgl
 import backend as F
 import unittest, pytest
+from dgl.graph_index import create_graph_index
 
 from numpy.testing import assert_array_equal
 
@@ -14,8 +15,8 @@ global_nid = F.tensor([0,1,2,3,4,5], F.int64)
 global_eid = F.tensor([0,1,2,3,4,5,6], F.int64)
 
 g = create_random_graph(100)
-g.ndata[NID] = global_nid
-g.edata[EID] = global_eid
+g.ndata[dgl.NID] = global_nid
+g.edata[dgl.EID] = global_eid
 
 gpb = dgl.distributed.GraphPartitionBook(part_id=0,
                                          num_parts=1,
