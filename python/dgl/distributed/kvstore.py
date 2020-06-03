@@ -696,6 +696,8 @@ class KVClient(object):
         self._push_handler = default_push_handler
         random.seed(time.time())
 
+        print("machine_id: %d" % self._machine_id)
+
     @property
     def client_id(self):
         return self._client_id
