@@ -473,7 +473,7 @@ def default_push_handler(target, name, id_tensor, data_tensor):
     data_tensor : tensor
         a tensor with the same row size of id
     """
-    target[name] = F.scatter_row(target[name], id_tensor, data_tensor)
+    target[name][id_tensor] = data_tensor
 
 def default_pull_handler(target, name, id_tensor):
     """Default handler for PULL operation.
@@ -494,7 +494,7 @@ def default_pull_handler(target, name, id_tensor):
     tensor
         a tensor with the same row size of ID.
     """
-    return F.gather_row(target[name], id_tensor)
+    return target[name][id_tensor]
 
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
