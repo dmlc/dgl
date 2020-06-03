@@ -31,7 +31,7 @@ g.add_edge(0, 4) # 5
 g.add_edge(2, 5) # 6
 
 g.ndata[dgl.NID] = global_nid
-g.ndata[dgl.EID] = global_eid
+g.edata[dgl.EID] = global_eid
 
 gpb = dgl.distributed.GraphPartitionBook(part_id=0,
                                          num_parts=1,
