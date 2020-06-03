@@ -793,6 +793,7 @@ class KVClient(object):
             for machine_id in range(self._machine_count):
                 server_id = machine_id * self._group_count
                 rpc.send_request(server_id, request)
+                print("send part request.")
             # recv response from all the main server nodes
             for _ in range(self._machine_count):
                 res = rpc.recv_response()
