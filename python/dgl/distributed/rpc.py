@@ -515,7 +515,7 @@ def send_request(target, request):
     server_id = target
     data, tensors = serialize_to_payload(request)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-    send_rpc_message(msg)
+    send_rpc_message(msg, server_id)
 
 def send_response(target, response):
     """Send one response to the target client.
@@ -539,16 +539,13 @@ def send_response(target, response):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    print("aaaa")
     service_id = response.service_id
     msg_seq = get_msg_seq()
     client_id = target
     server_id = get_rank()
     data, tensors = serialize_to_payload(response)
-    print("bbbb")
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-    send_rpc_message(msg)
-    print("cccc")
+    send_rpc_message(msg, client_id)
 
 def recv_request(timeout=0):
     """Receive one request.
@@ -686,7 +683,7 @@ def remote_call(target_and_requests, timeout=0):
         all_res[msgseq2pos[msg.msg_seq]] = res
     return all_res
 
-def send_rpc_message(msg):
+def send_rpc_message(msg, target):
     """Send one message to the target server.
 
     The operation is non-blocking -- it does not guarantee the payloads have
@@ -703,12 +700,14 @@ def send_rpc_message(msg):
     ----------
     msg : RPCMessage
         The message to send.
+    target : int
+        target ID
 
     Raises
     ------
     ConnectionError if there is any problem with the connection.
     """
-    _CAPI_DGLRPCSendRPCMessage(msg)
+    _CAPI_DGLRPCSendRPCMessage(msg, int(target))
 
 def recv_rpc_message(timeout=0):
     """Receive one message.
