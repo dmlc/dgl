@@ -50,9 +50,9 @@ The comparison between running time is shown as below, where the numbers in the 
 
 | Implementation | gensim.word2vec(hs) | gensim.word2vec(ns) | Ours |
 |----|----|----|----|
-| Time (s) |    27119.6(1759.8)  |   10580.3(1704.3)   | 570.4 |
+| Time (s) |     27119.6(1759.8)    |    10580.3(1704.3)    | 428.89 |
 
 Parameters.
 - walk_length = 80, number_walks = 10, window_size = 5
-- Ours: 4GPU (Tesla V100), lr = 0.2, batchs_size = 256, neg_weight = 5, negative = 1
+- Ours: 4GPU (Tesla V100), lr = 0.2, batchs_size = 128, neg_weight = 5, negative = 1, num_thread = 4
 - Others: workers = 8, negative = 5

@@ -113,7 +113,7 @@ class DeepwalkTrainer:
             collate_fn=sampler.sample,
             shuffle=False,
             drop_last=False,
-            num_workers=self.args.num_threads,
+            num_workers=4,
             )
         num_batches = len(dataloader)
         print("num batchs: %d in subprocess [%d]" % (num_batches, gpu_id))
@@ -163,7 +163,7 @@ class DeepwalkTrainer:
             collate_fn=sampler.sample,
             shuffle=False,
             drop_last=False,
-            num_workers=self.args.num_threads,
+            num_workers=4,
             )
         
         num_batches = len(dataloader)

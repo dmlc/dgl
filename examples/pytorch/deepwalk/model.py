@@ -73,7 +73,8 @@ def init_emb2neg_index(walk_length, window_size, negative, batch_size):
     return index_emb_negu, index_emb_negv
 
 def init_grad_avg(walk_length, window_size, batch_size):
-    '''index version
+    '''select nodes' gradients from gradient matrix
+
     Usage
     -----
     # emb_u.shape: [batch_size * walk_length, dim]
