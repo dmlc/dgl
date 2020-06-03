@@ -12,19 +12,6 @@ STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
 TENSOR = F.zeros((10, 10), F.int64, F.cpu())
 
-def test_rank():
-    dgl.distributed.set_rank(2)
-    assert dgl.distributed.get_rank() == 2
-    dgl.distributed.set_rank(-1)
-
-def test_msg_seq():
-    from dgl.distributed.rpc import get_msg_seq, incr_msg_seq
-    assert get_msg_seq() == 0
-    incr_msg_seq()
-    incr_msg_seq()
-    incr_msg_seq()
-    assert get_msg_seq() == 3
-
 def foo(x, y):
     assert x == 123
     assert y == "abc"
