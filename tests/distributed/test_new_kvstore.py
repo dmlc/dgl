@@ -82,7 +82,6 @@ def start_server():
     kvserver.add_part_policy(node_policy)
     kvserver.add_part_policy(edge_policy)
     kvserver.init_data('data_0', 'node', data_0)
-    kvserver.init_data('data_1', 'edge', data_1)
     # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver)
     dgl.distributed.start_server(server_id=0,
@@ -95,6 +94,12 @@ def start_client():
     dgl.distributed.connect_to_server(ip_config='kv_ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt')
+    kvclient.init_data(name='data_1', 
+                       shape=F.shape(data_1), 
+                       dtype=F.dtype(data_1), 
+                       policy_str='edge', 
+                       partition_book=gpb, 
+                       init_func=init_zero_func)
     kvclient.init_data(name='data_2', 
                        shape=F.shape(data_2), 
                        dtype=F.dtype(data_2), 
@@ -104,6 +109,7 @@ def start_client():
     kvclient.get_shared_data(partition_book=gpb)
     # Test data_name_list
     name_list = kvclient.data_name_list()
+    print(name_list)
     assert 'data_0' in name_list
     assert 'data_1' in name_list
     assert 'data_2' in name_list
