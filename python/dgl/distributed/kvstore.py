@@ -907,7 +907,7 @@ class KVClient(object):
         self._data_name_list.add(name)
         self._full_data_shape[name] = tuple(shape)
 
-    def get_shared_data(self, partition_book):
+    def map_shared_data(self, partition_book):
         """Mapping shared-memory tensor from server to client.
 
         Parameters

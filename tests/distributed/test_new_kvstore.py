@@ -106,7 +106,9 @@ def start_client():
                        policy_str='node', 
                        partition_book=gpb, 
                        init_func=init_zero_func)
-    kvclient.get_shared_data(partition_book=gpb)
+
+    kvclient.map_shared_data(partition_book=gpb)
+    
     # Test data_name_list
     name_list = kvclient.data_name_list()
     print(name_list)
