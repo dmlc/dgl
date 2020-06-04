@@ -454,7 +454,7 @@ class SendMetaToBackupRequest(rpc.Request):
         shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
         dlpack = shared_data.to_dlpack()
         kv_store.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
-        kv_store.part_policy[self.name] = kv.find_policy(self.policy_str)
+        kv_store.part_policy[self.name] = kv_store.find_policy(self.policy_str)
         res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
         return res
 
