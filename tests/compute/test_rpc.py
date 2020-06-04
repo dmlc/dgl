@@ -12,18 +12,6 @@ STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
 TENSOR = F.zeros((10, 10), F.int64, F.cpu())
 
-def test_rank():
-    dgl.distributed.set_rank(2)
-    assert dgl.distributed.get_rank() == 2
-
-def test_msg_seq():
-    from dgl.distributed.rpc import get_msg_seq, incr_msg_seq
-    assert get_msg_seq() == 0
-    incr_msg_seq()
-    incr_msg_seq()
-    incr_msg_seq()
-    assert get_msg_seq() == 3
-
 def foo(x, y):
     assert x == 123
     assert y == "abc"
@@ -90,12 +78,16 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server():
+    server_state = dgl.distributed.ServerState(None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.start_server(server_id=0, ip_config='ip_config.txt', num_clients=1)
+    dgl.distributed.start_server(server_id=0, 
+                                 ip_config='rpc_ip_config.txt', 
+                                 num_clients=1, 
+                                 server_state=server_state)
 
 def start_client():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.connect_to_server(ip_config='ip_config.txt')
+    dgl.distributed.connect_to_server(ip_config='rpc_ip_config.txt')
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
@@ -150,7 +142,7 @@ def test_rpc_msg():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
-    ip_config = open("ip_config.txt", "w")
+    ip_config = open("rpc_ip_config.txt", "w")
     ip_config.write('127.0.0.1 30050 1\n')
     ip_config.close()
     pid = os.fork()
