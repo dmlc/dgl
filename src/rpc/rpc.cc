@@ -16,7 +16,7 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace rpc {
 
-RPCStatus SendRPCMessage(const RPCMessage& msg) {
+RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
   StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
   zc_write_strm.Write(msg);
@@ -29,7 +29,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
   rpc_meta_msg.size = zerocopy_blob->size();
   rpc_meta_msg.deallocator = [zerocopy_blob](network::Message*) {};
   CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
-    rpc_meta_msg, msg.server_id), ADD_SUCCESS);
+    rpc_meta_msg, target_id), ADD_SUCCESS);
   // send real ndarray data
   for (auto ptr : zc_write_strm.buffer_list()) {
     network::Message ndarray_data_msg;
@@ -38,7 +38,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg) {
     NDArray tensor = ptr.tensor;
     ndarray_data_msg.deallocator = [tensor](network::Message*) {};
     CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
-      ndarray_data_msg, msg.server_id), ADD_SUCCESS);
+      ndarray_data_msg, target_id), ADD_SUCCESS);
   }
   return kRPCSuccess;
 }
@@ -200,7 +200,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumMachines")
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSendRPCMessage")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   RPCMessageRef msg = args[0];
-  *rv = SendRPCMessage(*(msg.sptr()));
+  const int32_t target_id = args[1];
+  *rv = SendRPCMessage(*(msg.sptr()), target_id);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCRecvRPCMessage")

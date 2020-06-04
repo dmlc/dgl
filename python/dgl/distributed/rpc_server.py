@@ -1,10 +1,11 @@
 """Functions used by server."""
 
+import time
+
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .server_state import get_server_state
 
-def start_server(server_id, ip_config, num_clients, \
+def start_server(server_id, ip_config, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
@@ -21,6 +22,8 @@ def start_server(server_id, ip_config, num_clients, \
         Note that, we do not support dynamic connection for now. It means
         that when all the clients connect to server, no client will can be added
         to the cluster.
+    server_state : ServerSate object
+        Store in main data used by server.
     max_queue_size : int
         Maximal size (bytes) of server queue buffer (~20 GB on default).
         Note that the 20 GB is just an upper-bound because DGL uses zero-copy and
@@ -65,15 +68,22 @@ def start_server(server_id, ip_config, num_clients, \
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
         rpc.add_receiver_addr(client_ip, client_port, client_id)
+    time.sleep(3) # wait client's socket ready. 3 sec is enough.
     rpc.sender_connect()
     if rpc.get_rank() == 0: # server_0 send all the IDs
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)
             rpc.send_response(client_id, register_res)
-    server_state = get_server_state()
     # main service loop
     while True:
         req, client_id = rpc.recv_request()
         res = req.process_request(server_state)
         if res is not None:
-            rpc.send_response(client_id, res)
+            if isinstance(res, list):
+                for response in res:
+                    target_id, res_data = response
+                    rpc.send_response(target_id, res_data)
+            elif isinstance(res, str) and res == 'exit':
+                break # break the loop and exit server
+            else:
+                rpc.send_response(client_id, res)
