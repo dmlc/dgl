@@ -79,8 +79,8 @@ def start_server():
     kvserver = dgl.distributed.KVServer(server_id=0,
                                         ip_config='kv_ip_config.txt',
                                         num_clients=1)
-    kvserver.add_policy(node_policy)
-    kvserver.add_policy(edge_policy)
+    kvserver.add_part_policy(node_policy)
+    kvserver.add_part_policy(edge_policy)
     kvserver.init_data('data_0', 'node', data_0)
     kvserver.init_data('data_1', 'edge', data_1)
     # start server
