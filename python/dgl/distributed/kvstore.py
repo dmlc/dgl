@@ -865,9 +865,9 @@ class KVClient(object):
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
                 if policy_str == 'edge':
-                    part_dim = len(partition_book.partid2eids(machine_id))
+                    part_dim = partition_book.get_edge_size()
                 elif policy_str == 'node':
-                    part_dim = len(partition_book.partid2nids(machine_id))
+                    part_dim = partition_book.get_node_size()
                 else:
                     raise RuntimeError("Cannot support policy: %s" % policy_str)
                 part_shape = shape.copy()
@@ -886,9 +886,9 @@ class KVClient(object):
         self.barrier()
         # Create local shared-data
         if policy_str == 'edge':
-            local_dim = len(partition_book.partid2eids(self._machine_id))
+            local_dim = partition_book.get_edge_size()
         elif policy_str == 'node':
-            local_dim = len(partition_book.partid2nids(self._machine_id))
+            local_dim = partition_book.get_node_size()
         else:
             raise RuntimeError("Cannot support policy: %s" % policy_str)
         local_shape = shape.copy()

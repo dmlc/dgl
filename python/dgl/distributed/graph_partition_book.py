@@ -74,6 +74,9 @@ class GraphPartitionBook:
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
+        # node size and edge size
+        self._edge_size = len(self.partid2eids(part_id))
+        self._node_size = len(self.partid2nids(part_id))
 
     def num_partitions(self):
         """Return the number of partitions.
@@ -226,6 +229,26 @@ class GraphPartitionBook:
                 getting remote partitions.')
 
         return self._graph
+
+    def get_node_size(self):
+        """Get node size
+
+        Return
+        ------
+        int
+            node size in current partition
+        """
+        return self._node_size
+
+    def get_edge_size(self):
+        """Get edge size
+
+        Return
+        ------
+        int
+            edge size in current partition
+        """
+        return self._edge_size
 
 class PartitionPolicy(object):
     """Wrapper for GraphPartitionBook and RangePartitionBook.
