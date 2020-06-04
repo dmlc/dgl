@@ -7,6 +7,7 @@ import networkx as nx
 from networkx.readwrite import json_graph
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 _url = 'dataset/ppi.zip'
@@ -32,9 +33,18 @@ class PPIDataset(object):
         """
         assert mode in ['train', 'valid', 'test']
         self.mode = mode
+        self._name = 'ppi'
+        self._dir = get_download_dir()
+        self._zip_file_path = '{}/{}.zip'.format(self._dir, self._name)
         self._load()
         self._preprocess()
 
+    def _download(self):
+        download(_get_dgl_url(_url), path=self._zip_file_path)
+        extract_archive(self._zip_file_path,
+                        '{}/{}'.format(self._dir, self._name))
+
+    @retry_method_with_fix(_download)
     def _load(self):
         """Loads input data.
 
@@ -52,34 +62,28 @@ class PPIDataset(object):
           object and the length of it is equal the number of nodes,
           it's like [1, 1, 2, 1...20]. 
         """
-        name = 'ppi'
-        dir = get_download_dir()
-        zip_file_path = '{}/{}.zip'.format(dir, name)
-        download(_get_dgl_url(_url), path=zip_file_path)
-        extract_archive(zip_file_path,
-                        '{}/{}'.format(dir, name))
         print('Loading G...')
         if self.mode == 'train':
-            with open('{}/ppi/train_graph.json'.format(dir)) as jsonfile:
+            with open('{}/ppi/train_graph.json'.format(self._dir)) as jsonfile:
                 g_data = json.load(jsonfile)
-            self.labels = np.load('{}/ppi/train_labels.npy'.format(dir))
-            self.features = np.load('{}/ppi/train_feats.npy'.format(dir))
+            self.labels = np.load('{}/ppi/train_labels.npy'.format(self._dir))
+            self.features = np.load('{}/ppi/train_feats.npy'.format(self._dir))
             self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
-            self.graph_id = np.load('{}/ppi/train_graph_id.npy'.format(dir))
+            self.graph_id = np.load('{}/ppi/train_graph_id.npy'.format(self._dir))
         if self.mode == 'valid':
-            with open('{}/ppi/valid_graph.json'.format(dir)) as jsonfile:
+            with open('{}/ppi/valid_graph.json'.format(self._dir)) as jsonfile:
                 g_data = json.load(jsonfile)
-            self.labels = np.load('{}/ppi/valid_labels.npy'.format(dir))
-            self.features = np.load('{}/ppi/valid_feats.npy'.format(dir))
+            self.labels = np.load('{}/ppi/valid_labels.npy'.format(self._dir))
+            self.features = np.load('{}/ppi/valid_feats.npy'.format(self._dir))
             self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
-            self.graph_id = np.load('{}/ppi/valid_graph_id.npy'.format(dir))
+            self.graph_id = np.load('{}/ppi/valid_graph_id.npy'.format(self._dir))
         if self.mode == 'test':
-            with open('{}/ppi/test_graph.json'.format(dir)) as jsonfile:
+            with open('{}/ppi/test_graph.json'.format(self._dir)) as jsonfile:
                 g_data = json.load(jsonfile)
-            self.labels = np.load('{}/ppi/test_labels.npy'.format(dir))
-            self.features = np.load('{}/ppi/test_feats.npy'.format(dir))
+            self.labels = np.load('{}/ppi/test_labels.npy'.format(self._dir))
+            self.features = np.load('{}/ppi/test_feats.npy'.format(self._dir))
             self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
-            self.graph_id = np.load('{}/ppi/test_graph_id.npy'.format(dir))
+            self.graph_id = np.load('{}/ppi/test_graph_id.npy'.format(self._dir))
 
     def _preprocess(self):
         if self.mode == 'train':

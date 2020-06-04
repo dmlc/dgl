@@ -5,6 +5,7 @@ import pandas as pd
 
 from ..utils import multiprocess_load_molecules, ACNN_graph_construction_and_featurization
 from ...utils import get_download_dir, download, _get_dgl_url, extract_archive
+from ....utils import retry_method_with_fix
 from .... import backend as F
 from ....contrib.deprecation import deprecated
 
@@ -80,8 +81,6 @@ class PDBBind(object):
         root_dir_path = get_download_dir()
         data_path = root_dir_path + '/pdbbind_v2015.tar.gz'
         extracted_data_path = root_dir_path + '/pdbbind_v2015'
-        download(_get_dgl_url(self._url), path=data_path)
-        extract_archive(data_path, extracted_data_path)
 
         if subset == 'core':
             index_label_file = extracted_data_path + '/v2015/INDEX_core_data.2013'
@@ -91,6 +90,9 @@ class PDBBind(object):
             raise ValueError(
                 'Expect the subset_choice to be either '
                 'core or refined, got {}'.format(subset))
+
+        self._data_path = data_path
+        self._extracted_data_path = extracted_data_path
 
         self._preprocess(extracted_data_path, index_label_file, load_binding_pocket,
                          add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
@@ -135,6 +137,11 @@ class PDBBind(object):
                 self.protein_mols.append(protein_mol)
                 self.protein_coordinates.append(protein_coordinates)
 
+    def _download_and_extract(self):
+        download(_get_dgl_url(self._url), path=self._data_path)
+        extract_archive(self._data_path, self._extracted_data_path)
+
+    @retry_method_with_fix(_download_and_extract)
     def _preprocess(self, root_path, index_label_file, load_binding_pocket,
                     add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
                     construct_graph_and_featurize, zero_padding, num_processes):

@@ -3,6 +3,7 @@ import numpy as np
 import os
 
 from .utils import get_download_dir, download
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 class QM7b(object):
@@ -21,10 +22,13 @@ class QM7b(object):
     def __init__(self):
         self.dir = get_download_dir()
         self.path = os.path.join(self.dir, 'qm7b', "qm7b.mat")
-        download(self._url, path=self.path)
         self.graphs = []
         self._load(self.path)
 
+    def _download(self):
+        download(self._url, path=self.path)
+
+    @retry_method_with_fix(_download)
     def _load(self, filename):
         data = io.loadmat(self.path)
         labels = data['T']

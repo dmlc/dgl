@@ -4,6 +4,7 @@ import os
 import datetime
 
 from .utils import get_download_dir, download, extract_archive
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 
@@ -28,14 +29,16 @@ class BitcoinOTC(object):
         self.dir = get_download_dir()
         self.zip_path = os.path.join(
             self.dir, 'bitcoin', "soc-sign-bitcoinotc.csv.gz")
-        download(self._url, path=self.zip_path)
-        extract_archive(self.zip_path, os.path.join(
-            self.dir, 'bitcoin'))
         self.path = os.path.join(
             self.dir, 'bitcoin', "soc-sign-bitcoinotc.csv")
         self.graphs = []
         self._load(self.path)
 
+    def _download_and_extract(self):
+        download(self._url, path=self.zip_path)
+        extract_archive(self.zip_path, os.path.join(self.dir, 'bitcoin'))
+
+    @retry_method_with_fix(_download_and_extract)
     def _load(self, filename):
         data = np.loadtxt(filename, delimiter=',').astype(np.int64)
         data[:, 0:2] = data[:, 0:2] - data[:, 0:2].min()
