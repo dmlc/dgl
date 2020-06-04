@@ -1920,7 +1920,7 @@ class DGLGraph(DGLBaseGraph):
 
     def from_mesh(self, mesh_dict):
         """Convert from a mesh dict.
-        TODO: implement batching.
+        NOTE: May need implement batching.
 
         Parameters
         ---------
@@ -1972,7 +1972,6 @@ class DGLGraph(DGLBaseGraph):
 
     def to_mesh(self):
         """Convert DGLGraph to a mesh.
-        TODO: implement batching.
         """
         if ('coords' not in self.node_attr_schemes().keys()) or ('triangle_heads' not in self.edge_attr_schemes().keys()):
             raise DGLError('To convert DGLGraph into mesh, node should have coordinate feature and edge should have face feature.')
@@ -1986,7 +1985,6 @@ class DGLGraph(DGLBaseGraph):
     
     def sample_point_cloud_from_mesh(self, num_samples):
         """Convert point cloud from mesh stored as a DGLGraph
-        TODO: implement batching.
         
         Parameters
         ---------
@@ -2002,26 +2000,28 @@ class DGLGraph(DGLBaseGraph):
         # NOTE: when go to batched dgl graph, the normalize could be per mesh
         # or on the whole DGLGraph
         verts = verts / verts.max()
-        ab = verts[faces[1]] - verts[faces[0]]
-        ac = verts[faces[2]] - verts[faces[0]]
+        ab = verts[faces[:, 1]] - verts[faces[:, 0]]
+        ac = verts[faces[:, 2]] - verts[faces[:, 0]]
         area = 0.5 * np.linalg.norm(np.cross(ab, ac), ord=2, axis=1)
 
         # Number of points to sample from each face
-        area_portion = area / area.sum()
-        sample = np.random.multinomial(prob, self.num, replacement=True)
-        face = face[sample]
+        face_prob = area / area.sum()
+        sample_hist = np.random.multinomial(num_samples, face_prob)
+        sample_idx = np.repeat(range(faces.shape[0]), sample_hist)
+        faces = faces[sample_idx, :]
 
         # Sample points from each face
-        uv = np.random.rand([2, num_samples])
-        u, v = uv[0], uv[1]
-        u_sqrt = u.sqrt()
-        w0 = 1.0 - u_sqrt
-        w1 = u_sqrt * (1.0 - v)
-        w2 = u_sqrt * v
-        a = verts[faces, 0]
-        b = verts[faces, 1]
-        c = verts[faces, 2]
-        point_samples = w0[:, None] * a + w1[:, None] * b + w2[:, None] * c
+        # https://math.stackexchange.com/questions/18686/uniform-random-point-in-triangle
+        r1r2 = np.random.rand(2, num_samples)
+        r1, r2 = r1r2[0], r1r2[1]
+        r1_sqrt = np.sqrt(r1)
+        w0 = np.expand_dims(1.0 - r1_sqrt, axis=-1)
+        w1 = np.expand_dims(r1_sqrt * (1.0 - r2), axis=-1)
+        w2 = np.expand_dims(r1_sqrt * r2, axis=-1)
+        a = verts[faces[:,0]]
+        b = verts[faces[:,1]]
+        c = verts[faces[:,2]]
+        point_samples = w0 * a + w1 * b + w2 * c
         return point_samples
 
     def node_attr_schemes(self):
