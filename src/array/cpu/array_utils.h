@@ -7,10 +7,10 @@
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
 
 #include <dgl/array.h>
+#include <google/dense_hash_map>
 #include <vector>
 #include <unordered_map>
 #include <utility>
-#include <google/dense_hash_map>
 #include "../../c_api_common.h"
 
 #define CHECK_SAME_DTYPE(VAR1, VAR2)                                          \
@@ -37,7 +37,7 @@ class IdHashMap {
   IdHashMap(): filter_(kFilterSize, false) {
     IdType empty_key = -1;
     oldv2newv_.set_empty_key(empty_key);
-    oldv2newv_.set_resizing_parameters(false, true); // only grow
+    oldv2newv_.set_resizing_parameters(false, true);  // only grow
   }
 
   // Construct the hashmap using the given id array.
@@ -60,18 +60,17 @@ class IdHashMap {
 
   // Update the hashmap with given id array.
   // The id array could contain duplicates.
-  void Update(IdArray ids, bool resize=true) {
+  void Update(IdArray ids, bool resize = true) {
     const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
-    oldv2newv_.set_resizing_parameters(false, true); // only grow
+    oldv2newv_.set_resizing_parameters(false, true);  // only grow
     if (resize) {
         auto size = oldv2newv_.size();
         oldv2newv_.resize(size + 1.4*len);
     }
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
-      // std::unorderd_map::insert assures that an insertion will not happen if the
-      // key already exists.
+      // It is an error to call insert() with an item whose key is the "empty key."
       oldv2newv_.insert({id, oldv2newv_.size()});
       filter_[id & kFilterMask] = true;
     }
