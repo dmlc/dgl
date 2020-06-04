@@ -293,8 +293,9 @@ def test_copy_shared_mem():
     p1.join()
     p2.join()
 
-if __name__ == '__main__':
-    test_copy_shared_mem()
-    test_init()
-    test_sync_barrier()
-    test_compute()
+# Skip test this file
+#if __name__ == '__main__':
+#    test_copy_shared_mem()
+#    test_init()
+#    test_sync_barrier()
+#    test_compute()
