@@ -84,6 +84,6 @@ def start_server(server_id, ip_config, num_clients, server_state, \
                     target_id, res_data = response
                     rpc.send_response(target_id, res_data)
             elif isinstance(res, str) and res == 'exit':
-                break
+                break # break the loop and exit server
             else:
                 rpc.send_response(client_id, res)
