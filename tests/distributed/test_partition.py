@@ -8,6 +8,7 @@ from dgl.distributed import partition_graph, load_partition
 import backend as F
 import unittest
 import pickle
+import random
 
 def create_random_graph(n):
     random.seed(100)
