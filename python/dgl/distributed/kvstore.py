@@ -156,20 +156,16 @@ class InitDataRequest(rpc.Request):
     def process_request(self, server_state):
         kv_store = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
-        for _, policy in kv_store.part_policy.items():
-            if policy.policy_str == self.policy_str:
-                if kv_store.is_backup_server() is False:
-                    data_tensor = self.init_func(self.shape, dtype)
-                    kv_store.init_data(name=self.name,
-                                       part_policy=policy,
-                                       data_tensor=data_tensor)
-                else:
-                    kv_store.init_data(name=self.name,
-                                       part_policy=policy)
-                res = InitDataResponse(INIT_MSG)
-                return res
-        raise RuntimeError("Cannot find any partition policy match \
-            the requested policy : %s" % self.policy_str)
+        if kv_store.is_backup_server() is False:
+            data_tensor = self.init_func(self.shape, dtype)
+            kv_store.init_data(name=self.name,
+                               policy_str=self.policy_str,
+                               data_tensor=data_tensor)
+        else:
+            kv_store.init_data(name=self.name,
+                               policy_str=self.policy_str)
+        res = InitDataResponse(INIT_MSG)
+        return res
 
 BARRIER = 901234
 BARRIER_MSG = 'Barrier'
@@ -458,13 +454,9 @@ class SendMetaToBackupRequest(rpc.Request):
         shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
         dlpack = shared_data.to_dlpack()
         kv_store.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
-        for _, policy in kv_store.part_policy.items():
-            if policy.policy_str == self.policy_str:
-                kv_store.part_policy[self.name] = policy
-                res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
-                return res
-        raise RuntimeError("Cannot find any partition policy match \
-            the requested policy : %s" % self.policy_str)
+        kv_store.part_policy[self.name] = self._find_policy(self.policy_str)
+        res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
+        return res
 
 ############################ KVServer ###############################
 
@@ -564,6 +556,7 @@ class KVServer(object):
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
+        self._policy_set = set()
         self._part_policy = {}
         # Basic information
         self._server_id = server_id
@@ -652,15 +645,25 @@ class KVServer(object):
             return False
         return True
 
-    def init_data(self, name, part_policy, data_tensor=None):
+    def add_part_policy(self, policy):
+        """Add partition policy to kvserver.
+
+        Parameters
+        ----------
+        policy : PartitionPolicy
+            Store the partition information
+        """
+        self._policy_set.add(policy)
+
+    def init_data(self, name, policy_str, data_tensor=None):
         """Init data tensor on kvserver.
 
         Parameters
         ----------
         name : str
             data name
-        part_policy : Partition policy
-            store the partition information
+        policy_str : str
+            partition-policy string, e.g., 'edge' or 'node'.
         data_tensor : tensor
             If the data_tensor is None, KVServer will
             read shared-memory when client invoking get_shared_data().
@@ -677,9 +680,20 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-        if self._part_policy.__contains__(name):
-            raise RuntimeError("Policy %s has already exists!" % name)
-        self._part_policy[name] = part_policy
+        self._part_policy[name] = self._find_policy(policy_str)
+
+    def _find_policy(self, policy_str):
+        """Find a partition policy from existing policy set
+
+        Parameters
+        ----------
+        policy_str : str
+            partition-policy string, e.g., 'edge' or 'node'.
+        """
+        for policy in self._policy_set:
+            if policy_str == policy.policy_str:
+                return policy
+        raise RuntimeError("Cannot find policy_str: %s from kvserver." % policy_str)
 
 ############################ KVClient ###############################
 
