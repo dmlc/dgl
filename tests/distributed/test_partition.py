@@ -10,6 +10,7 @@ import unittest
 import pickle
 
 def create_random_graph(n):
+    random.seed(100)
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
