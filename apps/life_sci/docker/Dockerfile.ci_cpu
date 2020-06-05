@@ -1,8 +1,0 @@
-From dgllib/dgl-sagemaker-cpu:dgl_0.4_pytorch_1.2.0_rdkit
-
-RUN pip uninstall -y scikit-learn
-RUN pip install scikit-learn==0.22.2.post1
-RUN pip uninstall -y pandas
-RUN pip install pandas==0.24.2
-RUN pip uninstall -y dgl
-RUN pip install --pre dgl
