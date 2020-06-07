@@ -1,8 +1,6 @@
 """Define distributed graph."""
 
-import socket
 from collections.abc import MutableMapping
-import numpy as np
 
 from ..graph import DGLGraph
 from .. import backend as F
@@ -13,7 +11,6 @@ from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition
 from .graph_partition_book import GraphPartitionBook, PartitionPolicy, get_shared_mem_partition_book
-from .. import ndarray as nd
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .rpc_client import connect_to_server
@@ -275,7 +272,7 @@ class DistGraphServer(KVServer):
 
         # Load graph partition data.
         self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
-        num_nodes, num_edges, node_map, edge_map, num_partitions = self.meta
+        node_map, edge_map, num_partitions = self.meta
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
         # Init kvstore.
@@ -286,9 +283,11 @@ class DistGraphServer(KVServer):
 
         if not self.is_backup_server():
             for name in node_feats:
-                self.init_data(name=_get_ndata_name(name), policy_str='node', data_tensor=node_feats[name])
+                self.init_data(name=_get_ndata_name(name), policy_str='node',
+                               data_tensor=node_feats[name])
             for name in edge_feats:
-                self.init_data(name=_get_edata_name(name), policy_str='edge', data_tensor=edge_feats[name])
+                self.init_data(name=_get_edata_name(name), policy_str='edge',
+                               data_tensor=edge_feats[name])
         else:
             for name in node_feats:
                 self.init_data(name=_get_ndata_name(name), policy_str='node')
@@ -296,6 +295,8 @@ class DistGraphServer(KVServer):
                 self.init_data(name=_get_edata_name(name), policy_str='edge')
 
     def start(self):
+        """ Start graph store server.
+        """
         # start server
         server_state = ServerState(kv_store=self)
         start_server(server_id=0, ip_config=self.ip_config,
