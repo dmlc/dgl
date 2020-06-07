@@ -78,6 +78,9 @@ edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge',
                                               partition_book=gpb)
 
 data_0 = F.tensor([[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]], F.float32)
+data_0_1 = F.tensor([1.,2.,3.,4.,5.,6.], F.float32)
+data_0_2 = F.tensor([1,2,3,4,5,6], F.int32)
+data_0_3 = F.tensor([1,2,3,4,5,6], F.int64)
 data_1 = F.tensor([[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.]], F.float32)
 data_2 = F.tensor([[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.]], F.float32)
 
@@ -112,6 +115,9 @@ def start_server():
     kvserver.add_part_policy(node_policy)
     kvserver.add_part_policy(edge_policy)
     kvserver.init_data('data_0', 'node', data_0)
+    kvserver.init_data('data_0_1', 'node', data_0_1)
+    kvserver.init_data('data_0_2', 'node', data_0_2)
+    kvserver.init_data('data_0_3', 'node', data_0_3)
     # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver)
     dgl.distributed.start_server(server_id=0,
@@ -143,6 +149,9 @@ def start_client():
     name_list = kvclient.data_name_list()
     print(name_list)
     assert 'data_0' in name_list
+    assert 'data_0_1' in name_list
+    assert 'data_0_2' in name_list
+    assert 'data_0_3' in name_list
     assert 'data_1' in name_list
     assert 'data_2' in name_list
     # Test get_meta_data
@@ -151,16 +160,37 @@ def start_client():
     assert dtype == F.dtype(data_0)
     assert shape == F.shape(data_0)
     assert policy.policy_str == 'node'
+
+    meta = kvclient.get_data_meta('data_0_1')
+    dtype, shape, policy = meta
+    assert dtype == F.dtype(data_0_1)
+    assert shape == F.shape(data_0_1)
+    assert policy.policy_str == 'node'
+
+    meta = kvclient.get_data_meta('data_0_2')
+    dtype, shape, policy = meta
+    assert dtype == F.dtype(data_0_2)
+    assert shape == F.shape(data_0_2)
+    assert policy.policy_str == 'node'
+
+    meta = kvclient.get_data_meta('data_0_3')
+    dtype, shape, policy = meta
+    assert dtype == F.dtype(data_0_3)
+    assert shape == F.shape(data_0_3)
+    assert policy.policy_str == 'node'
+
     meta = kvclient.get_data_meta('data_1')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_1)
     assert shape == F.shape(data_1)
     assert policy.policy_str == 'edge'
+
     meta = kvclient.get_data_meta('data_2')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_2)
     assert shape == F.shape(data_2)
     assert policy.policy_str == 'node'
+
     # Test push and pull
     id_tensor = F.tensor([0,2,4], F.int64)
     data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
