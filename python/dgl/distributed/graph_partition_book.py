@@ -49,6 +49,23 @@ def _get_shared_mem_metadata(graph_name):
 
 
 def get_shared_mem_partition_book(graph_name, graph_part):
+    '''Get a graph partition book from shared memory.
+
+    A graph partition book of a specific graph can be serialized to shared memory.
+    We can reconstruct a graph partition book from shared memory.
+
+    Parameters
+    ----------
+    graph_name : str
+        The name of the graph.
+    graph_part : DGLGraph
+        The graph structure of a partition.
+
+    Returns
+    -------
+    GraphPartitionBook
+        A graph partition book for a particular partition.
+    '''
     part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
     return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
 
