@@ -83,7 +83,9 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     for n in nodes:
         assert n in local_nids
 
-    g.shut_down()
+    # clean up
+    dgl.distributed.shutdown_servers()
+    dgl.distributed.finalize_client()
     print('end')
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")

@@ -301,6 +301,9 @@ class DistGraphServer(KVServer):
         start_server(server_id=0, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
 
+def _default_init_data(shape, dtype):
+    return F.zeros(shape, dtype, F.cpu())
+
 class DistGraph:
     ''' The DistGraph client.
 
@@ -322,8 +325,11 @@ class DistGraph:
         self._g = _get_graph_from_shared_mem(graph_name)
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
         self._client.barrier()
+        self._client.map_shared_data(self._gpb)
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
+        self._default_init_ndata = _default_init_data
+        self._default_init_edata = _default_init_data
 
 
     def init_ndata(self, ndata_name, shape, dtype):
