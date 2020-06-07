@@ -5,6 +5,52 @@ import numpy as np
 from .. import backend as F
 from ..base import NID, EID
 from .. import utils
+from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
+from .._ffi.ndarray import empty_shared_mem
+
+def _move_metadata_to_shared_mam(graph_name, num_nodes, num_edges, part_id,
+                                 num_partitions, node_map, edge_map):
+    ''' Move all metadata to the shared memory.
+
+    We need these metadata to construct graph partition book.
+    '''
+    meta = _to_shared_mem(F.tensor([num_nodes, num_edges,
+                                    num_partitions, part_id]),
+                          _get_ndata_path(graph_name, 'meta'))
+    node_map = _to_shared_mem(node_map, _get_ndata_path(graph_name, 'node_map'))
+    edge_map = _to_shared_mem(edge_map, _get_edata_path(graph_name, 'edge_map'))
+    return meta, node_map, edge_map
+
+def _get_shared_mem_metadata(graph_name):
+    ''' Get the metadata of the graph through shared memory.
+
+    The metadata includes the number of nodes and the number of edges. In the future,
+    we can add more information, especially for heterograph.
+    '''
+    shape = (4,)
+    dtype = F.int64
+    dtype = DTYPE_DICT[dtype]
+    data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
+    dlpack = data.to_dlpack()
+    meta = F.asnumpy(F.zerocopy_from_dlpack(dlpack))
+    num_nodes, num_edges, num_partitions, part_id = meta[0], meta[1], meta[2], meta[3]
+
+    # Load node map
+    data = empty_shared_mem(_get_ndata_path(graph_name, 'node_map'), False, (num_nodes,), dtype)
+    dlpack = data.to_dlpack()
+    node_map = F.zerocopy_from_dlpack(dlpack)
+
+    # Load edge_map
+    data = empty_shared_mem(_get_edata_path(graph_name, 'edge_map'), False, (num_edges,), dtype)
+    dlpack = data.to_dlpack()
+    edge_map = F.zerocopy_from_dlpack(dlpack)
+
+    return part_id, num_partitions, node_map, edge_map
+
+
+def get_shared_mem_partition_book(graph_name, graph_part):
+    part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
+    return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
 
 class GraphPartitionBook:
     """GraphPartitionBook is used to store parition information.
@@ -36,8 +82,12 @@ class GraphPartitionBook:
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
         _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
+        self._num_nodes = 0
+        self._num_edges = 0
         for partid in range(self._num_partitions):
             part_info = {}
+            self._num_nodes += nid_count[partid]
+            self._num_edges += eid_count[partid]
             part_info['machine_id'] = partid
             part_info['num_nodes'] = nid_count[partid]
             part_info['num_edges'] = eid_count[partid]
@@ -78,6 +128,18 @@ class GraphPartitionBook:
         self._edge_size = len(self.partid2eids(part_id))
         self._node_size = len(self.partid2nids(part_id))
 
+    def shared_memory(self, graph_name):
+        """Move data to shared memory.
+
+        Parameters
+        ----------
+        graph_name : str
+            The graph name
+        """
+        self._meta, self._nid2partid, self._eid2partid = _move_metadata_to_shared_mam(
+            graph_name, self.num_nodes(), self.num_edges(), self._part_id, self._num_partitions,
+            self._nid2partid, self._eid2partid)
+
     def num_partitions(self):
         """Return the number of partitions.
 
@@ -110,6 +172,16 @@ class GraphPartitionBook:
             Meta data of each partition.
         """
         return self._partition_meta_data
+
+    def num_nodes(self):
+        """ The total number of nodes
+        """
+        return self._num_nodes
+
+    def num_edges(self):
+        """ The total number of edges
+        """
+        return self._num_edges
 
     def nid2partid(self, nids):
         """From global node IDs to partition IDs

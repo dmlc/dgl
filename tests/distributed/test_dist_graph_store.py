@@ -16,15 +16,13 @@ import backend as F
 import unittest
 import pickle
 
-server_namebook = {0: [0, '127.0.0.1', 30000, 1]}
-
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
 def run_server(graph_name, server_id, num_clients, barrier):
-    g = DistGraphServer(server_id, server_namebook, num_clients, graph_name,
+    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
                         '/tmp/{}.json'.format(graph_name))
     barrier.wait()
     print('start server', server_id)
@@ -32,7 +30,7 @@ def run_server(graph_name, server_id, num_clients, barrier):
 
 def run_client(graph_name, barrier, num_nodes, num_edges):
     barrier.wait()
-    g = DistGraph(server_namebook, graph_name)
+    g = DistGraph("kv_ip_config.txt", graph_name)
 
     # Test API
     assert g.number_of_nodes() == num_nodes
@@ -90,6 +88,7 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
+    prepare_dist()
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -121,6 +120,7 @@ def test_server_client():
     print('clients have terminated')
 
 def test_split():
+    prepare_dist()
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
@@ -155,6 +155,11 @@ def test_split():
         local_eids = F.asnumpy(local_eids)
         for e in edges1:
             assert e in local_eids
+
+def prepare_dist():
+    ip_config = open("kv_ip_config.txt", "w")
+    ip_config.write('127.0.0.1 2500 1\n')
+    ip_config.close()
 
 if __name__ == '__main__':
     test_split()
