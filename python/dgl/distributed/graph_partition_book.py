@@ -99,12 +99,8 @@ class GraphPartitionBook:
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
         _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
-        self._num_nodes = 0
-        self._num_edges = 0
         for partid in range(self._num_partitions):
             part_info = {}
-            self._num_nodes += nid_count[partid]
-            self._num_edges += eid_count[partid]
             part_info['machine_id'] = partid
             part_info['num_nodes'] = nid_count[partid]
             part_info['num_edges'] = eid_count[partid]
@@ -193,12 +189,12 @@ class GraphPartitionBook:
     def num_nodes(self):
         """ The total number of nodes
         """
-        return self._num_nodes
+        return len(self._nid2partid)
 
     def num_edges(self):
         """ The total number of edges
         """
-        return self._num_edges
+        return len(self._eid2partid)
 
     def nid2partid(self, nids):
         """From global node IDs to partition IDs
@@ -320,22 +316,22 @@ class GraphPartitionBook:
         return self._graph
 
     def get_node_size(self):
-        """Get node size
+        """Get the number of nodes in the current partition.
 
         Return
         ------
         int
-            node size in current partition
+            The number of nodes in current partition
         """
         return self._node_size
 
     def get_edge_size(self):
-        """Get edge size
+        """Get the number of edges in the current partition.
 
         Return
         ------
         int
-            edge size in current partition
+            The number of edges in current partition
         """
         return self._edge_size
 
