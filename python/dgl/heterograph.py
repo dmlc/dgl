@@ -4013,7 +4013,7 @@ class DGLHeteroGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
-    def to(self, ctx):  # pylint: disable=invalid-name
+    def to(self, ctx, **kwargs):  # pylint: disable=invalid-name
         """Move both ndata and edata to the targeted mode (cpu/gpu)
         Framework agnostic
 
