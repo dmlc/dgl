@@ -1,5 +1,5 @@
-
-import torch as th
+"""Torch modules for graph attention networks(GAT)."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
 
 from .... import function as fn
