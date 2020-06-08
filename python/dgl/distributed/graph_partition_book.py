@@ -74,7 +74,9 @@ class GraphPartitionBook:
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
-
+        # node size and edge size
+        self._edge_size = len(self.partid2eids(part_id))
+        self._node_size = len(self.partid2nids(part_id))
 
     def num_partitions(self):
         """Return the number of partitions.
@@ -85,7 +87,6 @@ class GraphPartitionBook:
             number of partitions
         """
         return self._num_partitions
-
 
     def metadata(self):
         """Return the partition meta data.
@@ -110,7 +111,6 @@ class GraphPartitionBook:
         """
         return self._partition_meta_data
 
-
     def nid2partid(self, nids):
         """From global node IDs to partition IDs
 
@@ -125,7 +125,6 @@ class GraphPartitionBook:
             partition IDs
         """
         return F.gather_row(self._nid2partid, nids)
-
 
     def eid2partid(self, eids):
         """From global edge IDs to partition IDs
@@ -142,7 +141,6 @@ class GraphPartitionBook:
         """
         return F.gather_row(self._eid2partid, eids)
 
-
     def partid2nids(self, partid):
         """From partition id to node IDs
 
@@ -158,7 +156,6 @@ class GraphPartitionBook:
         """
         return self._partid2nids[partid]
 
-
     def partid2eids(self, partid):
         """From partition id to edge IDs
 
@@ -173,7 +170,6 @@ class GraphPartitionBook:
             edge IDs
         """
         return self._partid2eids[partid]
-
 
     def nid2localnid(self, nids, partid):
         """Get local node IDs within the given partition.
@@ -193,9 +189,7 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of nid2localnid.')
-
         return F.gather_row(self._nidg2l[partid], nids)
-
 
     def eid2localeid(self, eids, partid):
         """Get the local edge ids within the given partition.
@@ -215,9 +209,7 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of eid2localeid.')
-
         return F.gather_row(self._eidg2l[partid], eids)
-
 
     def get_partition(self, partid):
         """Get the graph of one partition.
@@ -237,3 +229,115 @@ class GraphPartitionBook:
                 getting remote partitions.')
 
         return self._graph
+
+    def get_node_size(self):
+        """Get node size
+
+        Return
+        ------
+        int
+            node size in current partition
+        """
+        return self._node_size
+
+    def get_edge_size(self):
+        """Get edge size
+
+        Return
+        ------
+        int
+            edge size in current partition
+        """
+        return self._edge_size
+
+class PartitionPolicy(object):
+    """Wrapper for GraphPartitionBook and RangePartitionBook.
+
+    We can extend this class to support HeteroGraph in the future.
+
+    Parameters
+    ----------
+    policy_str : str
+        partition-policy string, e.g., 'edge' or 'node'.
+    part_id : int
+        partition ID
+    partition_book : GraphPartitionBook or RangePartitionBook
+        Main class storing the partition information
+    """
+    def __init__(self, policy_str, part_id, partition_book):
+        # TODO(chao): support more policies for HeteroGraph
+        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
+        self._policy_str = policy_str
+        self._part_id = part_id
+        self._partition_book = partition_book
+
+    @property
+    def policy_str(self):
+        """Get policy string"""
+        return self._policy_str
+
+    @property
+    def part_id(self):
+        """Get partition ID"""
+        return self._part_id
+
+    @property
+    def partition_book(self):
+        """Get partition book"""
+        return self._partition_book
+
+    def to_local(self, id_tensor):
+        """Mapping global ID to local ID.
+
+        Parameters
+        ----------
+        id_tensor : tensor
+            Gloabl ID tensor
+
+        Return
+        ------
+        tensor
+            local ID tensor
+        """
+        if self._policy_str == 'edge':
+            return self._partition_book.eid2localeid(id_tensor, self._part_id)
+        elif self._policy_str == 'node':
+            return self._partition_book.nid2localnid(id_tensor, self._part_id)
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
+    def to_partid(self, id_tensor):
+        """Mapping global ID to partition ID.
+
+        Parameters
+        ----------
+        id_tensor : tensor
+            Global ID tensor
+
+        Return
+        ------
+        tensor
+            partition ID
+        """
+        if self._policy_str == 'edge':
+            return self._partition_book.eid2partid(id_tensor)
+        elif self._policy_str == 'node':
+            return self._partition_book.nid2partid(id_tensor)
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
+    def get_data_size(self):
+        """Get data size of current partition.
+
+        Returns
+        -------
+        int
+            data size
+        """
+        if self._policy_str == 'edge':
+            return len(self._partition_book.partid2eids(self._part_id))
+        elif self._policy_str == 'node':
+            return len(self._partition_book.partid2nids(self._part_id))
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)

@@ -24,7 +24,7 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 
 ## Using DGL
 
-**A data scientist** may want to apply a pre-trained model to your data right away. For this you can use DGL's [Application packages, formally *Model Zoo*](https://github.com/dmlc/dgl/tree/master/apps). Application packages are developed for domain applications, as is the case for [DGL-LifeScience](https://github.com/dmlc/dgl/tree/master/apps/life_sci). We will soon add model zoo for knowledge graph embedding learning and recommender systems. Here's how you will use a pretrained model:
+**A data scientist** may want to apply a pre-trained model to your data right away. For this you can use DGL's [Application packages, formally *Model Zoo*](https://github.com/dmlc/dgl/tree/master/apps). Application packages are developed for domain applications, as is the case for [DGL-LifeScience](https://github.com/awslabs/dgl-lifesci). We will soon add model zoo for knowledge graph embedding learning and recommender systems. Here's how you will use a pretrained model:
 ```python
 from dgllife.data import Tox21
 from dgllife.model import load_pretrained
@@ -148,7 +148,7 @@ Overall there are 30+ models implemented by using DGL:
 - [TensorFlow](https://github.com/dmlc/dgl/tree/master/examples/tensorflow)
 
 ### DGL for domain applications
-- [DGL-LifeSci](https://github.com/dmlc/dgl/tree/master/apps/life_sci), previously DGL-Chem
+- [DGL-LifeSci](https://github.com/awslabs/dgl-lifesci), previously DGL-Chem
 - [DGL-KE](https://github.com/awslabs/dgl-ke)
 - DGL-RecSys(coming soon)
 

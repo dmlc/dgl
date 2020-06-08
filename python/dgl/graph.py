@@ -823,7 +823,8 @@ def mutation(func):
     @wraps(func)
     def inner(g, *args, **kwargs):
         if g.is_readonly:
-            raise DGLError("Readonly graph. Mutation is not allowed.")
+            raise DGLError("Readonly graph. Mutation is not allowed. "
+                           "To mutate it, call g.readonly(False) first.")
         if g.batch_size > 1:
             dgl_warning("The graph has batch_size > 1, and mutation would break"
                         " batching related properties, call `flatten` to remove"
