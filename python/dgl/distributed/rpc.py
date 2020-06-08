@@ -33,7 +33,7 @@ def read_ip_config(filename):
     Note that, DGL supports multiple backup servers that shares data with each others
     on the same machine via shared-memory tensor. The server_count should be >= 1. For example,
     if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
-    current machine. Note that, the count of server on each machine can be different.
+    current machine.
 
     Parameters
     ----------
@@ -515,7 +515,7 @@ def send_request(target, request):
     server_id = target
     data, tensors = serialize_to_payload(request)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-    send_rpc_message(msg)
+    send_rpc_message(msg, server_id)
 
 def send_response(target, response):
     """Send one response to the target client.
@@ -545,7 +545,7 @@ def send_response(target, response):
     server_id = get_rank()
     data, tensors = serialize_to_payload(response)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-    send_rpc_message(msg)
+    send_rpc_message(msg, client_id)
 
 def recv_request(timeout=0):
     """Receive one request.
@@ -617,7 +617,7 @@ def recv_response(timeout=0):
         raise DGLError('Got response message from service ID {}, '
                        'but no response class is registered.'.format(msg.service_id))
     res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-    if msg.client_id != get_rank():
+    if msg.client_id != get_rank() and get_rank() != -1:
         raise DGLError('Got reponse of request sent by client {}, '
                        'different from my rank {}!'.format(msg.client_id, get_rank()))
     return res
@@ -661,7 +661,7 @@ def remote_call(target_and_requests, timeout=0):
         server_id = target
         data, tensors = serialize_to_payload(request)
         msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-        send_rpc_message(msg)
+        send_rpc_message(msg, server_id)
         # check if has response
         res_cls = get_service_property(service_id)[1]
         if res_cls is not None:
@@ -683,7 +683,7 @@ def remote_call(target_and_requests, timeout=0):
         all_res[msgseq2pos[msg.msg_seq]] = res
     return all_res
 
-def send_rpc_message(msg):
+def send_rpc_message(msg, target):
     """Send one message to the target server.
 
     The operation is non-blocking -- it does not guarantee the payloads have
@@ -700,12 +700,14 @@ def send_rpc_message(msg):
     ----------
     msg : RPCMessage
         The message to send.
+    target : int
+        target ID
 
     Raises
     ------
     ConnectionError if there is any problem with the connection.
     """
-    _CAPI_DGLRPCSendRPCMessage(msg)
+    _CAPI_DGLRPCSendRPCMessage(msg, int(target))
 
 def recv_rpc_message(timeout=0):
     """Receive one message.
@@ -804,7 +806,6 @@ class ShutDownRequest(Request):
     def process_request(self, server_state):
         assert self.client_id == 0
         finalize_server()
-        exit()
-
+        return 'exit'
 
 _init_api("dgl.distributed.rpc")

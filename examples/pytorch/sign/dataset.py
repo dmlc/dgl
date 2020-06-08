@@ -22,8 +22,8 @@ def load_dataset(name):
             data = RedditDataset(self_loop=True)
             g = data.graph
         else:
-            from dgl.data import CoraDataset
-            data = CoraDataset()
+            from dgl.data import CitationGraphDataset
+            data = CitationGraphDataset('cora')
             g = dgl.DGLGraph(data.graph)
         train_mask = data.train_mask
         val_mask = data.val_mask
