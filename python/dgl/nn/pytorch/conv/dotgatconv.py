@@ -8,8 +8,21 @@ from ....utils import expand_as_pair
 
 
 class DotGatConv(nn.Module):
-    """
-    This is similar to GatConv to implement dot product attention
+    r"""Apply dot product version of self attention in GCN.
+
+        .. math::
+            h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i, j} h_j^{(l)}
+
+        where :math:`\alpha_{ij}` is the attention score bewteen node :math:`i` and node :math:`j`:
+
+        .. math::
+            \alpha_{i, j} = \mathrm{softmax_i}(e_{ij}^{l})
+
+            e_{ij}^{l} = ({W_i^{(l)} h_i^{(l)}})^T \cdot {W_j^{(l)} h_j^{(l)}}
+
+        where :math:`W_i` and :math:`W_j` transform node :math:`i`'s and node :math:`j`'s
+        features into the same dimension, so that when compute note features' similarity,
+        we can use dot-product.
     """
 
     def __init__(self,
@@ -27,22 +40,7 @@ class DotGatConv(nn.Module):
             self.fc = nn.Linear(self._in_src_feats, self._out_feats, bias=False)
 
     def forward(self, graph, feat):
-        """
-        Apply dot product version of self attention in GCN.
-
-        .. math::
-            h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i, j} h_j^{(l)}
-
-        where :math:`\alpha_{ij}` is the attention score bewteen node :math:`i` and node :math:`j`:
-
-        .. math::
-            \alpha_{i, j} = \mathrm{softmax_i}(e_{ij}^{l})
-
-            e_{ij}^{l} = ({W_i^{(l)} h_i^{(l)}})^T \cdot {W_j^{(l)} h_j^{(l)}}
-
-        where :math:`W_i` and :math:`W_j` transform node :math:`i`'s and node :math:`j`'s
-        features into the same dimension, so that when compute note features' similarity,
-        we can use dot-product.
+        r"""Apply dot product version of self attention in GCN.
 
         Parameters
         ----------
