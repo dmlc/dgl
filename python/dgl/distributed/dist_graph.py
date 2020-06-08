@@ -272,7 +272,7 @@ class DistGraphServer(KVServer):
 
         # Load graph partition data.
         self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
-        node_map, edge_map, num_partitions = self.meta
+        _, _, node_map, edge_map, num_partitions = self.meta
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
         # Init kvstore.
