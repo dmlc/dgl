@@ -9,6 +9,31 @@ from dgl.graph_index import create_graph_index
 
 from numpy.testing import assert_array_equal
 
+def get_local_usable_addr():
+    """Get local usable IP and port
+
+    Returns
+    -------
+    str
+        IP address, e.g., '192.168.8.12:50051'
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        sock.connect(('10.255.255.255', 1))
+        ip_addr = sock.getsockname()[0]
+    except ValueError:
+        ip_addr = '127.0.0.1'
+    finally:
+        sock.close()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("", 0))
+    sock.listen(1)
+    port = sock.getsockname()[1]
+    sock.close()
+
+    return ip_addr + ' ' + str(port)
+
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
     ig = create_graph_index(arr, readonly=True)
@@ -175,7 +200,8 @@ def start_client():
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():
     ip_config = open("kv_ip_config.txt", "w")
-    ip_config.write('127.0.0.1 2500 1\n')
+    ip_addr = get_local_usable_addr()
+    ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
     pid = os.fork()
     if pid == 0:
