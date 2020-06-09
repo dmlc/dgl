@@ -14,7 +14,7 @@ class IGMC(torch.nn.Module):
         super(IGMC, self).__init__()
         self.multiply_by = multiply_by
         self.convs = torch.nn.ModuleList()
-        self.convs.append(gconv(in_dim, latent_dim[0], num_relations, num_bases=num_bases))
+        self.convs.append(gconv(in_dim, latent_dim[0], num_relations, num_bases=num_bases, self_loop=True))
         self.regression = regression
         for i in range(0, len(latent_dim)-1):
             self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases=num_bases))
