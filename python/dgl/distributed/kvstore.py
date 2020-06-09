@@ -356,8 +356,6 @@ class GetSharedDataRequest(rpc.Request):
                           kv_store.part_policy[name].policy_str)
         if len(meta) == 0:
             raise RuntimeError('There is no data on kvserver.')
-        # Freeze data init
-        kv_store.freeze = True
         res = GetSharedDataResponse(meta)
         return res
 
@@ -570,8 +568,6 @@ class KVServer(object):
         # push and pull handler
         self._push_handler = default_push_handler
         self._pull_handler = default_pull_handler
-        # We cannot create new data on kvstore when freeze == True
-        self._freeze = False
 
     @property
     def server_id(self):
@@ -587,16 +583,6 @@ class KVServer(object):
     def barrier_count(self, count):
         """Set barrier count"""
         self._barrier_count = count
-
-    @property
-    def freeze(self):
-        """Get freeze"""
-        return self._freeze
-
-    @freeze.setter
-    def freeze(self, freeze):
-        """Set freeze"""
-        self._freeze = freeze
 
     @property
     def num_clients(self):
@@ -669,9 +655,6 @@ class KVServer(object):
             read shared-memory when client invoking get_shared_data().
         """
         assert len(name) > 0, 'name cannot be empty.'
-        if self._freeze:
-            raise RuntimeError("KVServer cannot create new data \
-                after client invoking get_shared_data() API.")
         if self._data_store.__contains__(name):
             raise RuntimeError("Data %s has already exists!" % name)
         if data_tensor is not None: # Create shared-tensor
@@ -764,9 +747,6 @@ class KVClient(object):
         # push and pull handler
         self._pull_handler = default_pull_handler
         self._push_handler = default_push_handler
-        # We cannot create new data on kvstore when freeze == True
-        self._freeze = False
-        random.seed(time.time())
 
     @property
     def client_id(self):
@@ -858,9 +838,7 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
-        if self._freeze:
-            raise RuntimeError("KVClient cannot create new \
-                data after invoking get_shared_data() API.")
+        assert name not in self._data_name_list, 'data name: %s already exists.' % name
         shape = list(shape)
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
@@ -920,40 +898,41 @@ class KVClient(object):
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
         for name, meta in response.meta.items():
-            shape, dtype, policy_str = meta
-            shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
-            dlpack = shared_data.to_dlpack()
-            self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-            self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-            self._data_name_list.add(name)
+            if name not in self._data_name_list:
+                shape, dtype, policy_str = meta
+                shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
+                dlpack = shared_data.to_dlpack()
+                self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
+                self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+                self._data_name_list.add(name)
         # Get full data shape across servers
         for name, meta in response.meta.items():
-            shape, _, _ = meta
-            data_shape = list(shape)
-            data_shape[0] = 0
-            request = GetPartShapeRequest(name)
-            # send request to all main server nodes
-            for machine_id in range(self._machine_count):
-                server_id = machine_id * self._group_count
-                rpc.send_request(server_id, request)
-            # recv response from all the main server nodes
-            for _ in range(self._machine_count):
-                res = rpc.recv_response()
-                data_shape[0] += res.shape[0]
-            self._full_data_shape[name] = tuple(data_shape)
-        # Send meta data to backup servers
-        for name, meta in response.meta.items():
-            shape, dtype, policy_str = meta
-            request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
-            # send request to all the backup server nodes
-            for i in range(self._group_count-1):
-                server_id = self._machine_id * self._group_count + i + 1
-                rpc.send_request(server_id, request)
-            # recv response from all the backup server nodes
-            for _ in range(self._group_count-1):
-                response = rpc.recv_response()
-                assert response.msg == SEND_META_TO_BACKUP_MSG
-        self._freeze = True
+            if name not in self._data_name_list:
+                shape, _, _ = meta
+                data_shape = list(shape)
+                data_shape[0] = 0
+                request = GetPartShapeRequest(name)
+                # send request to all main server nodes
+                for machine_id in range(self._machine_count):
+                    server_id = machine_id * self._group_count
+                    rpc.send_request(server_id, request)
+                # recv response from all the main server nodes
+                for _ in range(self._machine_count):
+                    res = rpc.recv_response()
+                    data_shape[0] += res.shape[0]
+                self._full_data_shape[name] = tuple(data_shape)
+            # Send meta data to backup servers
+            for name, meta in response.meta.items():
+                shape, dtype, policy_str = meta
+                request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
+                # send request to all the backup server nodes
+                for i in range(self._group_count-1):
+                    server_id = self._machine_id * self._group_count + i + 1
+                    rpc.send_request(server_id, request)
+                # recv response from all the backup server nodes
+                for _ in range(self._group_count-1):
+                    response = rpc.recv_response()
+                    assert response.msg == SEND_META_TO_BACKUP_MSG
 
     def data_name_list(self):
         """Get all the data name"""
