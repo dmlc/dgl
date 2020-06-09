@@ -1,7 +1,6 @@
 """Define distributed kvstore"""
 
 import os
-import time
 import random
 import numpy as np
 
