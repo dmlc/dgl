@@ -1,6 +1,7 @@
 import os
 import time
 import numpy as np
+import socket
 from scipy import sparse as spsp
 import dgl
 import backend as F
@@ -8,6 +9,10 @@ import unittest, pytest
 from dgl.graph_index import create_graph_index
 
 from numpy.testing import assert_array_equal
+
+if os.name != 'nt':
+    import fcntl
+    import struct
 
 def get_local_usable_addr():
     """Get local usable IP and port
