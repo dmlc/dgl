@@ -904,7 +904,6 @@ class KVClient(object):
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
                 self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-                self._data_name_list.add(name)
         # Get full data shape across servers
         for name, meta in response.meta.items():
             if name not in self._data_name_list:
@@ -921,8 +920,9 @@ class KVClient(object):
                     res = rpc.recv_response()
                     data_shape[0] += res.shape[0]
                 self._full_data_shape[name] = tuple(data_shape)
-            # Send meta data to backup servers
-            for name, meta in response.meta.items():
+        # Send meta data to backup servers
+        for name, meta in response.meta.items():
+            if name not in self._data_name_list:
                 shape, dtype, policy_str = meta
                 request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
                 # send request to all the backup server nodes
@@ -933,6 +933,7 @@ class KVClient(object):
                 for _ in range(self._group_count-1):
                     response = rpc.recv_response()
                     assert response.msg == SEND_META_TO_BACKUP_MSG
+                self._data_name_list.add(name)
 
     def data_name_list(self):
         """Get all the data name"""
