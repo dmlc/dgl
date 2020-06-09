@@ -16,8 +16,8 @@ inline int64_t get_index(int64_t dim1, int64_t dim2, int64_t dim) {
   return dim1 * dim + dim2;
 }
 
-template <DLDeviceType XPU, typename DType, typename IdType>
-IdArray FPS(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx) {
+template <typename DType>
+IdArray _FPS_CPU(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx) {
   const DType* array_data = static_cast<DType*>(array->data);
 
   const int64_t point_in_batch = array->shape[0] / batch_size;
@@ -27,19 +27,19 @@ IdArray FPS(NDArray array, int64_t batch_size, int64_t sample_points, DLContext 
   std::vector<DType> dist_data(point_in_batch);
 
   // Init return value
-  IdArray ret = NewIdArray(sample_points * batch_size, ctx, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
+  IdArray ret = NewIdArray(sample_points * batch_size, ctx, sizeof(int64_t) * 8);
+  int64_t* ret_data = static_cast<int64_t*>(ret->data);
   std::fill(ret_data, ret_data + sample_points * batch_size, 0);
 
-  IdType array_start = 0, ret_start = 0;
+  int64_t array_start = 0, ret_start = 0;
   // loop for each point cloud sample in this batch
   for (auto b = 0; b < batch_size; b++) {
     // random init start sample
-    IdType sample_idx = rand() % point_in_batch;
+    int64_t sample_idx = 0;//rand() % point_in_batch;
     ret_data[ret_start] = array_start + sample_idx;
 
     // compute the first-sample distance, and get the max value
-    IdType dist_argmax = 0;
+    int64_t dist_argmax = 0;
     DType dist_max = -1;
 
     // sample the rest `sample_points - 1` points
@@ -78,14 +78,8 @@ IdArray FPS(NDArray array, int64_t batch_size, int64_t sample_points, DLContext 
   return ret;
 }
 
-template IdArray FPS<kDLCPU, int32_t, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
-template IdArray FPS<kDLCPU, int64_t, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
-template IdArray FPS<kDLCPU, float, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
-template IdArray FPS<kDLCPU, double, int32_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
-template IdArray FPS<kDLCPU, int32_t, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
-template IdArray FPS<kDLCPU, int64_t, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
-template IdArray FPS<kDLCPU, float, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
-template IdArray FPS<kDLCPU, double, int64_t>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray _FPS_CPU<float>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template IdArray _FPS_CPU<double>(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
 
 }  // namespace impl
 }  // namespace aten

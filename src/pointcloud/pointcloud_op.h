@@ -15,8 +15,8 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename DType, typename IdType>
-IdArray FPS(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
+template <typename DType>
+IdArray _FPS_CPU(NDArray array, int64_t batch_size, int64_t sample_points, DLContext ctx);
 
 }  // namespace impl
 }  // namespace aten
