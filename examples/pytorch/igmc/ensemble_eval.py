@@ -47,7 +47,6 @@ def ensemble_evaluate(args, net, ckpts_path):
         preds.append(pred)
     ys = th.cat(ys, 0)
     preds = th.cat(preds, 1).mean(1)
-    print (ys.shape, preds.shape)
     rmse = ((preds - ys) ** 2.).mean().item()
     rmse = np.sqrt(rmse)
     print ('ensemble rmse', rmse)
