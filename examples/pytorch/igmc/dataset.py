@@ -54,8 +54,8 @@ def collate_movielens(data):
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
     x = th.tensor(np.concatenate(x, axis=0), dtype=th.float, device=device[0])
-    g.ndata['x'] = x 
+    g.ndata['x'] = x
     etype = th.tensor(np.concatenate(etype, axis=0), dtype=th.long, device=device[0])
     g.edata['etype'] = etype
-    g_label = th.tensor(np.array(g_label), dtype=th.float, device=device[0]) 
+    g_label = th.tensor(np.array(g_label), dtype=th.float, device=device[0])
     return g, g_label

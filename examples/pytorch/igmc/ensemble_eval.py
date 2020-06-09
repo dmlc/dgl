@@ -87,20 +87,8 @@ def config():
     parser.add_argument('--data_test_ratio', type=float, default=0.1) ## for ml-100k the test ration is 0.2
     parser.add_argument('--data_valid_ratio', type=float, default=0.1)
     parser.add_argument('--use_one_hot_fea', action='store_true', default=False)
-    parser.add_argument('--model_activation', type=str, default="leaky")
-    parser.add_argument('--gcn_dropout', type=float, default=0.7)
     parser.add_argument('--gcn_agg_norm_symm', type=bool, default=True)
-    parser.add_argument('--gcn_agg_units', type=int, default=500)
-    parser.add_argument('--gcn_agg_accum', type=str, default="sum")
-    parser.add_argument('--gcn_out_units', type=int, default=75)
-    parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
-    parser.add_argument('--train_max_iter', type=int, default=2000)
-    parser.add_argument('--train_log_interval', type=int, default=100)
-    parser.add_argument('--train_valid_interval', type=int, default=1)
     parser.add_argument('--train_optimizer', type=str, default="adam")
-    parser.add_argument('--train_grad_clip', type=float, default=1.0)
-    parser.add_argument('--train_early_stopping_patience', type=int, default=100)
-    parser.add_argument('--share_param', default=False, action='store_true')
     # igmc settings
     parser.add_argument('--hop', default=1, metavar='S', 
                     help='enclosing subgraph hop number')

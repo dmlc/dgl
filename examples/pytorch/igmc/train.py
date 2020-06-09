@@ -53,7 +53,6 @@ def train(args):
     net = IGMC(in_dim=args.hop*2+1+1, num_relations=len(dataset_base.class_values), num_bases=args.num_igmc_bases, regression=True, latent_dim=latent_dim)
     net = net.to(args.device)
 
-    #rating_loss_net = nn.CrossEntropyLoss()
     rating_loss_net = nn.MSELoss()
     learning_rate = args.train_lr
     optimizer = get_optimizer(args.train_optimizer)(net.parameters(), lr=learning_rate)
@@ -131,13 +130,13 @@ def train(args):
         valid_loss_logger.log(epoch = epoch_idx, rmse = valid_rmse)
         logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
 
-        if True:
+        if best_valid_rmse > valid_rmse:
             best_valid_rmse = valid_rmse
             best_iter = iter_idx
-            test_rmse = evaluate(args=args, net=net, data_iter=test_loader)
-            best_test_rmse = test_rmse
-            test_loss_logger.log(epoch=epoch_idx, rmse=test_rmse)
-            logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
+        test_rmse = evaluate(args=args, net=net, data_iter=test_loader)
+        best_test_rmse = test_rmse
+        test_loss_logger.log(epoch=epoch_idx, rmse=test_rmse)
+        logging_str += ', Test RMSE={:.4f}'.format(test_rmse)
         
         if epoch_idx + 1 % args.train_decay_epoch == 0:
             for p in optimizer.param_groups:
@@ -163,23 +162,13 @@ def config():
     parser.add_argument('--data_test_ratio', type=float, default=0.1) ## for ml-100k the test ration is 0.2
     parser.add_argument('--data_valid_ratio', type=float, default=0.1)
     parser.add_argument('--use_one_hot_fea', action='store_true', default=False)
-    parser.add_argument('--model_activation', type=str, default="leaky")
-    parser.add_argument('--gcn_dropout', type=float, default=0.7)
     parser.add_argument('--gcn_agg_norm_symm', type=bool, default=True)
-    parser.add_argument('--gcn_agg_units', type=int, default=500)
-    parser.add_argument('--gcn_agg_accum', type=str, default="sum")
-    parser.add_argument('--gcn_out_units', type=int, default=75)
-    parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
-    parser.add_argument('--train_max_iter', type=int, default=2000)
+    parser.add_argument('--train_optimizer', type=str, default="adam")
     parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--train_valid_interval', type=int, default=1)
-    parser.add_argument('--train_optimizer', type=str, default="adam")
-    parser.add_argument('--train_grad_clip', type=float, default=1.0)
-    parser.add_argument('--train_early_stopping_patience', type=int, default=100)
-    parser.add_argument('--share_param', default=False, action='store_true')
     # igmc settings
     parser.add_argument('--hop', default=1, metavar='S', 
-                    help='enclosing subgraph hop number')
+                        help='enclosing subgraph hop number')
     parser.add_argument('--arr_lambda', type=float, default=0.001)
     parser.add_argument('--num_igmc_bases', type=int, default=2)
     parser.add_argument('--sample_ratio', type=float, default=1.0, 

@@ -43,45 +43,9 @@ class MovieLens(object):
 
     The training, validation and test set can be summarized as follows:
 
-    training_enc_graph : training user-movie pairs + rating info
-    training_dec_graph : training user-movie pairs
-    valid_enc_graph : training user-movie pairs + rating info
-    valid_dec_graph : validation user-movie pairs
-    test_enc_graph : training user-movie pairs + validation user-movie pairs + rating info
-    test_dec_graph : test user-movie pairs
-
-    Attributes
-    ----------
-    train_enc_graph : dgl.DGLHeteroGraph
-        Encoder graph for training.
-    train_dec_graph : dgl.DGLHeteroGraph
-        Decoder graph for training.
-    train_labels : torch.Tensor
-        The categorical label of each user-movie pair
-    train_truths : torch.Tensor
-        The actual rating values of each user-movie pair
-    valid_enc_graph : dgl.DGLHeteroGraph
-        Encoder graph for validation.
-    valid_dec_graph : dgl.DGLHeteroGraph
-        Decoder graph for validation.
-    valid_labels : torch.Tensor
-        The categorical label of each user-movie pair
-    valid_truths : torch.Tensor
-        The actual rating values of each user-movie pair
-    test_enc_graph : dgl.DGLHeteroGraph
-        Encoder graph for test.
-    test_dec_graph : dgl.DGLHeteroGraph
-        Decoder graph for test.
-    test_labels : torch.Tensor
-        The categorical label of each user-movie pair
-    test_truths : torch.Tensor
-        The actual rating values of each user-movie pair
-    user_feature : torch.Tensor
-        User feature tensor. If None, representing an identity matrix.
-    movie_feature : torch.Tensor
-        Movie feature tensor. If None, representing an identity matrix.
-    possible_rating_values : np.ndarray
-        Available rating values in the dataset
+    train_graph : training user-movie pairs + rating info
+    valid_graph : training user-movie pairs + rating info
+    test_graph : training user-movie pairs + validation user-movie pairs + rating info
 
     Parameters
     ----------
@@ -89,6 +53,8 @@ class MovieLens(object):
         Dataset name. Could be "ml-100k", "ml-1m", "ml-10m"
     device : torch.device
         Device context
+    args : dict
+        Argument dictionary, need code cleaning to make those param explicitely.
     mix_cpu_gpu : bool, optional
         If true, the ``user_feature`` attribute is stored in CPU
     use_one_hot_fea : bool, optional
@@ -199,12 +165,12 @@ class MovieLens(object):
         test_rating_pairs, test_rating_values = self._generate_pair_value(self.test_rating_info)
 
         # Create adjacent matrix
-        # TODO: we do not +1 and do not create rating map since no need for ml dataset
+        # TODO [tianjun]: we do not +1 and do not create rating map since no need for ml dataset
         # but might needed for others
         neutral_rating = 0
         rating_mx_train = np.full((self._num_user, self._num_movie), neutral_rating, dtype=np.int32)
         assert 0 not in train_rating_values, '0 should not be a valid rating type'
-        rating_mx_train[train_rating_pairs] = train_rating_values 
+        rating_mx_train[train_rating_pairs] = train_rating_values
         self.rating_mx_train = sp.csr_matrix(rating_mx_train)
         # Create subgraphs
         # adj_train is rating matrix
