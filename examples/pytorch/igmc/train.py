@@ -40,8 +40,10 @@ def adj_rating_reg(net):
 
 
 def train(args):
+    import multiprocessing as mp
+    pool = mp.Pool(mp.cpu_count())
     ### build the net
-    dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+    dataset_base = MovieLens(args.data_name, args.device, pool, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                             test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     # multiply num_relations by 2 because now we have two types for u-v edge and v-u edge
     # NOTE: can't remember why we need add 2 for dim, need check
@@ -78,7 +80,7 @@ def train(args):
     for epoch_idx in range(args.train_max_epoch):
         print ('Epoch', epoch_idx)
         # Rebuild subgraph for each epoch to force 
-        dataset_base = MovieLens(args.data_name, args.device, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+        dataset_base = MovieLens(args.data_name, args.device, pool, args, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                             test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
         train_dataset = MovieLensDataset(dataset_base.train_graphs, args.device, mode='train', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=collate_movielens)
@@ -145,6 +147,7 @@ def train(args):
         print (logging_str)
     print('Best Iter Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
         best_iter, best_valid_rmse, best_test_rmse))
+    pool.close()
     train_loss_logger.close()
     valid_loss_logger.close()
     test_loss_logger.close()

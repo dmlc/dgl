@@ -69,7 +69,7 @@ class MovieLens(object):
         Ratio of validation data
 
     """
-    def __init__(self, name, device, args, mix_cpu_gpu=False,
+    def __init__(self, name, device, pool, args, mix_cpu_gpu=False,
                  use_one_hot_fea=False, symm=True,
                  test_ratio=0.1, valid_ratio=0.1):
         self._name = name
@@ -77,6 +77,7 @@ class MovieLens(object):
         self._symm = symm
         self._test_ratio = test_ratio
         self._valid_ratio = valid_ratio
+        self.pool = pool
         # download and extract
         download_dir = get_download_dir()
         zip_file_path = '{}/{}.zip'.format(download_dir, name)
@@ -181,6 +182,7 @@ class MovieLens(object):
 
         self.train_graphs, self.val_graphs, self.test_graphs = links2subgraphs(
                 rating_mx_train,
+                self.pool,
                 train_rating_pairs,
                 valid_rating_pairs,
                 test_rating_pairs,
@@ -438,6 +440,7 @@ class MovieLens(object):
 
 def links2subgraphs(
         A,
+        pool,
         train_indices, 
         val_indices, 
         test_indices, 
@@ -466,7 +469,6 @@ def links2subgraphs(
                     pbar.update(1)
         else:
             start = time.time()
-            pool = mp.Pool(mp.cpu_count())
             results = pool.starmap_async(parallel_worker, [(g_label, (i, j), A, h, max_node_label, sample_ratio, max_nodes_per_hop, u_features, v_features, class_values) for i, j, g_label in zip(links[0], links[1], g_labels)])
             remaining = results._number_left
             pbar = tqdm(total=remaining)
@@ -476,7 +478,8 @@ def links2subgraphs(
                 remaining = results._number_left
                 time.sleep(1)
             g_list += results.get()
-            pool.close()
+            #pool.close()
+            #pool.join()
             pbar.close()
             end = time.time()
             print("Time eplased for subgraph extraction: {}s".format(end-start))
@@ -544,8 +547,9 @@ def subgraph_extraction_labeling(g_label, ind, A, h=1, max_node_label=3, sample_
     v_node_labels = [x*2+1 for x in v_dist]
     u_x = one_hot(u_node_labels, max_node_label+1)
     v_x = one_hot(v_node_labels, max_node_label+1)
- 
+
     subgraph_info['x'] = np.concatenate([u_x, v_x], axis=0)
+    
     return subgraph_info
  
     '''

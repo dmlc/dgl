@@ -45,7 +45,11 @@ class MovieLensDataset(Dataset):
         subgraph = self.subgraphs[idx]
         if self.mode == 'train' and self.link_dropout > 0:
             subgraph = self.dropout_link(subgraph)
-        return self.create_dgl_graph(subgraph)
+        try:
+            return self.create_dgl_graph(subgraph)
+        except:
+            to_try = np.random.randint(0, len(self.subgraphs))
+            return self.__getitem__(to_try)
 
 def collate_movielens(data):
     g_list, g_label, x, etype, device = map(list, zip(*data))
