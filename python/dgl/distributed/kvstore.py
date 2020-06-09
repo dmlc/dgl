@@ -449,10 +449,11 @@ class SendMetaToBackupRequest(rpc.Request):
     def process_request(self, server_state):
         kv_store = server_state.kv_store
         assert kv_store.is_backup_server()
-        shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
-        dlpack = shared_data.to_dlpack()
-        kv_store.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
-        kv_store.part_policy[self.name] = kv_store.find_policy(self.policy_str)
+        if self.name not in kv_store.data_store:
+            shared_data = empty_shared_mem(self.name+'-kvdata-', False, self.shape, self.dtype)
+            dlpack = shared_data.to_dlpack()
+            kv_store.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
+            kv_store.part_policy[self.name] = kv_store.find_policy(self.policy_str)
         res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
         return res
 
@@ -922,18 +923,17 @@ class KVClient(object):
                 self._full_data_shape[name] = tuple(data_shape)
         # Send meta data to backup servers
         for name, meta in response.meta.items():
-            if name not in self._data_name_list:
-                shape, dtype, policy_str = meta
-                request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
-                # send request to all the backup server nodes
-                for i in range(self._group_count-1):
-                    server_id = self._machine_id * self._group_count + i + 1
-                    rpc.send_request(server_id, request)
-                # recv response from all the backup server nodes
-                for _ in range(self._group_count-1):
-                    response = rpc.recv_response()
-                    assert response.msg == SEND_META_TO_BACKUP_MSG
-                self._data_name_list.add(name)
+            shape, dtype, policy_str = meta
+            request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
+            # send request to all the backup server nodes
+            for i in range(self._group_count-1):
+                server_id = self._machine_id * self._group_count + i + 1
+                rpc.send_request(server_id, request)
+            # recv response from all the backup server nodes
+            for _ in range(self._group_count-1):
+                response = rpc.recv_response()
+                assert response.msg == SEND_META_TO_BACKUP_MSG
+            self._data_name_list.add(name)
 
     def data_name_list(self):
         """Get all the data name"""
