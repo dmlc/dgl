@@ -17,6 +17,9 @@
 #include "serializer.h"
 #include "shared_mem.h"
 
+// forward declaration
+inline std::ostream& operator << (std::ostream& os, DGLType t);
+
 namespace dgl {
 
 /*!
@@ -45,9 +48,6 @@ GEN_DLDATATYPETRAITS_FOR(double, kDLFloat, 64);
 #undef GEN_DLDATATYPETRAITS_FOR
 
 namespace runtime {
-
-// forward declaration
-inline std::ostream& operator << (std::ostream& os, DGLType t);
 
 /*!
  * \brief Managed NDArray.

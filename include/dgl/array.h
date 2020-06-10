@@ -890,12 +890,14 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  *   DeviceSpecificImplementation<XPU>(...);
  * });
  */
-#define ATEN_XPU_SWITCH(val, XPU, ...) do {                     \
+#define ATEN_XPU_SWITCH(val, XPU, op, ...) do {                 \
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
   } else {                                                      \
-    LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
+    LOG(FATAL) << "Operator " << (op) << " does not support "   \
+               << dgl::runtime::DeviceTypeCode2Str(val)         \
+               << " device.";                                   \
   }                                                             \
 } while (0)
 
@@ -910,7 +912,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  * });
  */
 #ifdef DGL_USE_CUDA
-#define ATEN_XPU_SWITCH_CUDA(val, XPU, ...) do {                \
+#define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...) do {            \
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
@@ -918,7 +920,9 @@ IdArray VecToIdArray(const std::vector<T>& vec,
     constexpr auto XPU = kDLGPU;                                \
     {__VA_ARGS__}                                               \
   } else {                                                      \
-    LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
+    LOG(FATAL) << "Operator " << (op) << " does not support "   \
+               << dgl::runtime::DeviceTypeCode2Str(val)         \
+               << " device.";                                   \
   }                                                             \
 } while (0)
 #else  // DGL_USE_CUDA
@@ -1037,17 +1041,17 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 } while (0)
 
 // Macro to dispatch according to device context and index type.
-#define ATEN_CSR_SWITCH(csr, XPU, IdType, ...)              \
-  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, {       \
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, op, ...)            \
+  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, op, {   \
     ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {        \
-      {__VA_ARGS__}                                         \
-    });                                                     \
+      {__VA_ARGS__}                                           \
+    });                                                       \
   });
 
 // Macro to dispatch according to device context and index type.
-#define ATEN_COO_SWITCH(coo, XPU, IdType, ...)              \
-  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {           \
+#define ATEN_COO_SWITCH(coo, XPU, IdType, op, ...)          \
+  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, op, {    \
+    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {         \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
