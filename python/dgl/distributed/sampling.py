@@ -4,8 +4,9 @@ from .dist_graph import DistGraph
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
 from .graph_partition_book import GraphPartitionBook
-from .. import to_block
-import dgl
+from .. import to_block, graph
+from ..base import NID, EID
+
 import torch as th
 
 SAMPLING_SERVICE_ID = 6657
@@ -38,20 +39,22 @@ class SamplingRequest(Request):
         self.seed_nodes, self.edge_dir, self.prob, self.replace, self.fan_out = state
 
     def __getstate__(self):
-        return self.seed_nodes, self.edge_dir, self.prob, self.replace, self.fan_out        
+        return self.seed_nodes, self.edge_dir, self.prob, self.replace, self.fan_out
 
-    def process_request(self, server_state):        
+    def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
-        local_ids = partition_book.nid2localnid(th.tensor(self.seed_nodes), partition_book._part_id)
+        local_ids = partition_book.nid2localnid(
+            th.tensor(self.seed_nodes), partition_book._part_id)
         sampled_graph = local_sample_neighbors(
             local_g, local_ids, self.fan_out, self.edge_dir, self.prob, self.replace)
-        global_nid_mapping = local_g.ndata[dgl.NID]
+        global_nid_mapping = local_g.ndata[NID]
         src, dst = sampled_graph.edges()
         global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
-        global_eids = local_g.edata[dgl.EID][sampled_graph.edata[dgl.EID]]
+        global_eids = local_g.edata[EID][sampled_graph.edata[EID]]
         res = SamplingResponse(global_src, global_dst, global_eids)
         return res
+
 
 def merge_graphs(res_list, num_nodes):
     srcs = []
@@ -64,20 +67,21 @@ def merge_graphs(res_list, num_nodes):
     src_tensor = th.cat(srcs)
     dst_tensor = th.cat(dsts)
     eid_tensor = th.cat(eids)
-    g = dgl.graph((src_tensor, dst_tensor), restrict_format='coo', num_nodes=num_nodes)
-    g.edata[dgl.EID] = eid_tensor
+    g = graph((src_tensor, dst_tensor),
+                  restrict_format='coo', num_nodes=num_nodes)
+    g.edata[EID] = eid_tensor
     return g
-    
+
 
 def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, replace=False):
-    # assert fanout == 1
     assert edge_dir == 'in'
     req_list = []
     blocks = []
     partition_book = g.get_partition_book()
 
     partition_id = partition_book.nid2partid(th.tensor(nodes))
-    node_id_per_partition = [[] for _ in range(partition_book.num_partitions())]
+    node_id_per_partition = [[]
+                             for _ in range(partition_book.num_partitions())]
     for idx in range(len(nodes)):
         node_id_per_partition[partition_id[idx]].append(nodes[idx])
 
@@ -90,6 +94,4 @@ def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, repl
     return merge_graphs(res_list, g.total_num_nodes)
 
 
-
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SamplingResponse)
-

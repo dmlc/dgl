@@ -87,14 +87,12 @@ def start_client(rank):
 def test_rpc_sampling():
     num_server = 3
     ip_config = open("rpc_ip_config.txt", "w")
-    ip_config.write(f'127.0.0.1 30040 {num_server}\n')
+    ip_config.write(f'127.0.0.1 30060 {num_server}\n')
     ip_config.close()
 
     # partition graph
     g = CitationGraphDataset("cora")[0]
     g.readonly()
-    g.ndata['labels'] = th.arange(0, g.number_of_nodes())
-    # g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
     num_parts = num_server
     num_hops = 2
 
