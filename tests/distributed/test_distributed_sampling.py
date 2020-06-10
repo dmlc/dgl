@@ -6,7 +6,8 @@ from dgl.distributed.sampling import sample_neighbors
 from dgl.distributed import partition_graph, load_partition, GraphPartitionBook
 import sys
 import multiprocessing as mp
-import torch as th
+import numpy as np
+import backend as F
 import time
 
 
@@ -87,7 +88,7 @@ def start_client(rank):
 def test_rpc_sampling():
     num_server = 3
     ip_config = open("rpc_ip_config.txt", "w")
-    ip_config.write(f'127.0.0.1 30060 {num_server}\n')
+    ip_config.write(f'127.0.0.1 30050 {num_server}\n')
     ip_config.close()
 
     # partition graph
@@ -100,22 +101,23 @@ def test_rpc_sampling():
                     num_hops=num_hops, part_method='metis')
 
     pserver_list = []
-    # mp.set_start_method("spawn")
+    ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = mp.Process(target=start_server, args=(i,))
+        p = ctx.Process(target=start_server, args=(i,))
         p.start()
         # time.sleep(1)
         pserver_list.append(p)
 
     sampled_graph = start_client(0)
-    for p in pserver_list:
-        p.join()
+    # for p in pserver_list:
+    #     p.join()
 
     src, dst = sampled_graph.edges()
-    assert sampled_graph.number_of_nodes() == g.number_of_nodes() 
-    assert th.all(g.has_edges_between(src, dst).bool())
+    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
+    assert np.all(F.asnumpy(g.has_edges_between(src, dst).bool()))
     eids = g.edge_ids(src, dst)
-    assert th.equal(sampled_graph.edata[dgl.EID], eids)
+    assert np.array_equal(
+        F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
 
 
 if __name__ == "__main__":
