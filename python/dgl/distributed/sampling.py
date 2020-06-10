@@ -1,3 +1,4 @@
+"""Sampling module"""
 from .rpc import Request, Response, remote_call
 from .dist_graph import DistGraph
 from ..sampling import sample_neighbors as local_sample_neighbors
@@ -10,8 +11,10 @@ __all__ = ['sample_neighbors']
 
 SAMPLING_SERVICE_ID = 6657
 
+
 class SamplingResponse(Response):
     """Sampling Response"""
+
     def __init__(self, global_src, global_dst, global_eids):
         self.global_src = global_src
         self.global_dst = global_dst
@@ -26,6 +29,7 @@ class SamplingResponse(Response):
 
 class SamplingRequest(Request):
     """Sampling Request"""
+
     def __init__(self, nodes, fan_out, edge_dir='in', prob=None, replace=False):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
@@ -67,7 +71,7 @@ def merge_graphs(res_list, num_nodes):
     dst_tensor = F.cat(dsts, 0)
     eid_tensor = F.cat(eids, 0)
     g = graph((src_tensor, dst_tensor),
-                  restrict_format='coo', num_nodes=num_nodes)
+              restrict_format='coo', num_nodes=num_nodes)
     g.edata[EID] = eid_tensor
     return g
 
@@ -81,8 +85,8 @@ def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, repl
     partition_id = partition_book.nid2partid(F.tensor(nodes))
     node_id_per_partition = [[]
                              for _ in range(partition_book.num_partitions())]
-    for idx in range(len(nodes)):
-        node_id_per_partition[partition_id[idx]].append(nodes[idx])
+    for pid, node in zip(partition_id, nodes):
+        node_id_per_partition[pid].append(node)
 
     for pid, node_id in enumerate(node_id_per_partition):
         if len(node_id) != 0:
