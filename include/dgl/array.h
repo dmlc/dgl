@@ -900,6 +900,32 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 } while (0)
 
 /*
+ * Dispatch according to device:
+ *
+ * XXX(minjie): temporary macro that allows CUDA operator
+ *
+ * ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+ *   // Now XPU is a placeholder for array->ctx.device_type
+ *   DeviceSpecificImplementation<XPU>(...);
+ * });
+ */
+#ifdef DGL_USE_CUDA
+#define ATEN_XPU_SWITCH_CUDA(val, XPU, ...) do {                \
+  if ((val) == kDLCPU) {                                        \
+    constexpr auto XPU = kDLCPU;                                \
+    {__VA_ARGS__}                                               \
+  } else if ((val) == kDLGPU) {                                 \
+    constexpr auto XPU = kDLGPU;                                \
+    {__VA_ARGS__}                                               \
+  } else {                                                      \
+    LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
+  }                                                             \
+} while (0)
+#else  // DGL_USE_CUDA
+#define ATEN_XPU_SWITCH_CUDA ATEN_XPU_SWITCH
+#endif  // DGL_USE_CUDA
+
+/*
  * Dispatch according to integral type (either int32 or int64):
  *
  * ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {

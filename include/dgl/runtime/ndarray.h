@@ -22,9 +22,19 @@ inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
 }
 
+/*! \brief Check whether two data types are different.*/
+inline bool operator != (const DLDataType& ty1, const DLDataType& ty2) {
+  return !(ty1 == ty2);
+}
+
 /*! \brief Check whether two device contexts are the same.*/
 inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
   return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
+}
+
+/*! \brief Check whether two device contexts are different.*/
+inline bool operator != (const DLContext& ctx1, const DLContext& ctx2) {
+  return !(ctx1 == ctx2);
 }
 
 namespace dgl {
@@ -210,6 +220,12 @@ class NDArray {
    * \brief Get the size of the array in the number of bytes.
    */
   size_t GetSize() const;
+
+  /*!
+   * \brief Get the number of elements in this array.
+   */
+  int64_t Numel() const;
+
   /*!
    * \brief Create a NDArray backed by a dlpack tensor.
    *

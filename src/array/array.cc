@@ -27,7 +27,7 @@ IdArray Clone(IdArray arr) {
 
 IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
   IdArray ret;
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, {
     if (nbits == 32) {
       ret = impl::Range<XPU, int32_t>(low, high, ctx);
     } else if (nbits == 64) {
@@ -54,8 +54,13 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
 }
 
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
+  CHECK(bits == 32 || bits == 64)
+    << "Invalid ID type. Must be int32 or int64, but got int"
+    << static_cast<int>(bits) << ".";
+  if (arr->dtype.bits == bits)
+    return arr;
   IdArray ret;
-  ATEN_XPU_SWITCH(arr->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(arr->dtype, IdType, {
       ret = impl::AsNumBits<XPU, IdType>(arr, bits);
     });
@@ -380,8 +385,10 @@ std::vector<NDArray> CSRGetDataAndIndices(
 
 CSRMatrix CSRTranspose(CSRMatrix csr) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
-    ret = impl::CSRTranspose<XPU, IdType>(csr);
+  ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRTranspose<XPU, IdType>(csr);
+    });
   });
   return ret;
 }
@@ -389,13 +396,13 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
   COOMatrix ret;
   if (data_as_order) {
-    ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {
+    ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
         ret = impl::CSRToCOODataAsOrder<XPU, IdType>(csr);
       });
     });
   } else {
-    ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {
+    ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
         ret = impl::CSRToCOO<XPU, IdType>(csr);
       });
@@ -538,17 +545,15 @@ std::vector<NDArray> COOGetDataAndIndices(
 }
 
 COOMatrix COOTranspose(COOMatrix coo) {
-  COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
-    ret = impl::COOTranspose<XPU, IdType>(coo);
-  });
-  return ret;
+  return COOMatrix(coo.num_cols, coo.num_rows, coo.col, coo.row, coo.data);
 }
 
 CSRMatrix COOToCSR(COOMatrix coo) {
   CSRMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
-    ret = impl::COOToCSR<XPU, IdType>(coo);
+  ATEN_XPU_SWITCH_CUDA(coo.row->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOToCSR<XPU, IdType>(coo);
+    });
   });
   return ret;
 }
