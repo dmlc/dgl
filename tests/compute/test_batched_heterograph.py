@@ -25,11 +25,15 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
 
     if node_attrs is not None:
         for nty in node_attrs.keys():
+            if g1.number_of_nodes(nty) == 0:
+                continue
             for feat_name in node_attrs[nty]:
                 assert F.allclose(g1.nodes[nty].data[feat_name], g2.nodes[nty].data[feat_name])
 
     if edge_attrs is not None:
         for ety in edge_attrs.keys():
+            if g1.number_of_edges(ety) == 0:
+                continue
             for feat_name in edge_attrs[ety]:
                 assert F.allclose(g1.edges[ety].data[feat_name], g2.edges[ety].data[feat_name])
 
@@ -211,7 +215,61 @@ def test_batched_features(index_dtype):
         node_attrs={'user': ['h1', 'h2'], 'game': ['h1', 'h2']},
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
+@parametrize_dtype
+def test_batching_with_zero_nodes_edges(index_dtype):
+    """Test the features of batched DGLHeteroGraphs"""
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+        ('user', 'plays', 'game'): []
+    }, index_dtype=index_dtype)
+    g1.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
+    g1.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
+    g1.edges['follows'].data['h1'] = F.tensor([[0.], [1.]])
+    g1.edges['follows'].data['h2'] = F.tensor([[2.], [3.]])
+
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
+    }, index_dtype=index_dtype)
+    g2.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
+    g2.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
+    g2.nodes['game'].data['h1'] = F.tensor([[0.]])
+    g2.nodes['game'].data['h2'] = F.tensor([[1.]])
+    g2.edges['follows'].data['h1'] = F.tensor([[0.], [1.]])
+    g2.edges['follows'].data['h2'] = F.tensor([[2.], [3.]])
+    g2.edges['plays'].data['h1'] = F.tensor([[0.], [1.]])
+
+    bg = dgl.batch_hetero([g1, g2])
+
+    assert F.allclose(bg.nodes['user'].data['h1'],
+                      F.cat([g1.nodes['user'].data['h1'], g2.nodes['user'].data['h1']], dim=0))
+    assert F.allclose(bg.nodes['user'].data['h2'],
+                      F.cat([g1.nodes['user'].data['h2'], g2.nodes['user'].data['h2']], dim=0))
+    assert F.allclose(bg.nodes['game'].data['h1'], g2.nodes['game'].data['h1'])
+    assert F.allclose(bg.nodes['game'].data['h2'], g2.nodes['game'].data['h2'])
+    assert F.allclose(bg.edges['follows'].data['h1'],
+                      F.cat([g1.edges['follows'].data['h1'], g2.edges['follows'].data['h1']], dim=0))
+    assert F.allclose(bg.edges['plays'].data['h1'], g2.edges['plays'].data['h1'])
+
+    # Test unbatching graphs
+    g3, g4 = dgl.unbatch_hetero(bg)
+    check_equivalence_between_heterographs(
+        g1, g3,
+        node_attrs={'user': ['h1', 'h2'], 'game': ['h1', 'h2']},
+        edge_attrs={('user', 'follows', 'user'): ['h1']})
+    check_equivalence_between_heterographs(
+        g2, g4,
+        node_attrs={'user': ['h1', 'h2'], 'game': ['h1', 'h2']},
+        edge_attrs={('user', 'follows', 'user'): ['h1']})
+
+    # Test graphs without edges
+    g1 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(0, 4))
+    g2 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(1, 5))
+    g2.nodes['u'].data['x'] = F.tensor([1])
+    dgl.batch_hetero([g1, g2])
+
 if __name__ == '__main__':
     test_batching_hetero_topology()
     test_batching_hetero_and_batched_hetero_topology()
     test_batched_features()
+    test_batching_with_zero_nodes_edges()

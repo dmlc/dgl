@@ -5,6 +5,7 @@ import datetime
 import warnings
 
 from .utils import get_download_dir, download, extract_archive, loadtxt
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 
@@ -40,10 +41,6 @@ class ICEWS18(object):
         self.dir = get_download_dir()
         self.mode = mode
         self.graphs = []
-        for dname in self._url:
-            dpath = os.path.join(
-                self.dir, 'ICEWS18', self._url[dname.lower()].split('/')[-1])
-            download(self._url[dname.lower()], path=dpath)
         train_data = loadtxt(os.path.join(
             self.dir, 'ICEWS18', 'train.txt'), delimiter='\t').astype(np.int64)
         if self.mode == 'train':
@@ -63,6 +60,13 @@ class ICEWS18(object):
             self._load(np.concatenate(
                 [train_data, val_data, test_data], axis=0))
 
+    def _download(self):
+        for dname in self._url:
+            dpath = os.path.join(
+                self.dir, 'ICEWS18', self._url[dname.lower()].split('/')[-1])
+            download(self._url[dname.lower()], path=dpath)
+
+    @retry_method_with_fix(_download)
     def _load(self, data):
         num_nodes = 23033
         # The source code is not released, but the paper indicates there're
