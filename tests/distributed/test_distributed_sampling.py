@@ -100,7 +100,7 @@ def test_rpc_sampling():
                     num_hops=num_hops, part_method='metis')
 
     pserver_list = []
-    mp.set_start_method("spawn")
+    # mp.set_start_method("spawn")
     for i in range(num_server):
         p = mp.Process(target=start_server, args=(i,))
         p.start()
