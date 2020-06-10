@@ -17,8 +17,9 @@ def myexcepthook(exctype, value, traceback):
 
 class MochDistGraph:
 
-    def __init__(self, partition_book):
+    def __init__(self, partition_book, num_nodes):
         self.partition_book = partition_book
+        self.total_num_nodes = num_nodes
 
     def get_partition_book(self):
         return self.partition_book
@@ -26,8 +27,9 @@ class MochDistGraph:
 
 class MockServerState:
 
-    def __init__(self, g):
-        self.state = dgl.distributed.ServerState(None)
+    def __init__(self, g, rank, partition_book):
+        self.rank = rank
+        self.partition_book = partition_book
         self.hgraph = dgl.as_heterograph(g)
 
     @property
@@ -53,14 +55,11 @@ def start_server(rank):
                              node_map=node_map,
                              edge_map=edge_map,
                              part_graph=part_g)
-    server_state = MockServerState(part_g)
-    server_state.rank = rank
-    server_state.partition_book = gpb
+    server_state = MockServerState(part_g, rank, gpb)
     dgl.distributed.start_server(server_id=rank,
                                  ip_config='rpc_ip_config.txt',
                                  num_clients=1,
                                  server_state=server_state)
-    pass
 
 
 def start_client(rank):
@@ -70,26 +69,25 @@ def start_client(rank):
     part_g, node_feats, edge_feats, meta = load_partition(
         '/tmp/test.json', rank)
     num_nodes, num_edges, node_map, edge_map, num_partitions = meta
-    print(node_map)
     gpb = GraphPartitionBook(part_id=rank,
                              num_parts=num_partitions,
                              node_map=node_map,
                              edge_map=edge_map,
                              part_graph=part_g)
 
-    g = MochDistGraph(gpb)
-    results = sample_neighbors(g, [0], 1)
-    print(results)
-    print("11111111")
+    g = MochDistGraph(gpb, num_nodes)
+    results = sample_neighbors(g, [0, 10, 99], 3)
+
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
+    return results
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-def test_rpc():
+def test_rpc_sampling():
     num_server = 3
     ip_config = open("rpc_ip_config.txt", "w")
-    ip_config.write(f'127.0.0.1 30050 {num_server}\n')
+    ip_config.write(f'127.0.0.1 30040 {num_server}\n')
     ip_config.close()
 
     # partition graph
@@ -111,13 +109,16 @@ def test_rpc():
         # time.sleep(1)
         pserver_list.append(p)
 
-    pclient = mp.Process(target=start_client, args=(i,))
-    sys.excepthook = myexcepthook
-    pclient.start()
-    pclient.join()
+    sampled_graph = start_client(0)
     for p in pserver_list:
         p.join()
 
+    src, dst = sampled_graph.edges()
+    assert sampled_graph.number_of_nodes() == g.number_of_nodes() 
+    assert th.all(g.has_edges_between(src, dst).bool())
+    eids = g.edge_ids(src, dst)
+    assert th.equal(sampled_graph.edata[dgl.EID], eids)
+
 
 if __name__ == "__main__":
-    test_rpc()
+    test_rpc_sampling()
