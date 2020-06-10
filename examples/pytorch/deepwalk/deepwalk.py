@@ -17,14 +17,14 @@ class DeepwalkTrainer:
         """ Initializing the trainer with the input arguments """
         self.args = args
         self.dataset = DeepwalkDataset(
-            net_file=args.net_file,
+            net_file=args.data_file,
             map_file=args.map_file,
             walk_length=args.walk_length,
             window_size=args.window_size,
             num_walks=args.num_walks,
             batch_size=args.batch_size,
             negative=args.negative,
-            num_procs=args.num_procs,
+            gpus=args.gpus,
             fast_neg=args.fast_neg,
             )
         self.emb_size = len(self.dataset.net)
@@ -36,7 +36,6 @@ class DeepwalkTrainer:
         """
         choices = sum([self.args.only_gpu, self.args.only_cpu, self.args.mix])
         assert choices == 1, "Must choose only *one* training mode in [only_cpu, only_gpu, mix]"
-        assert self.args.num_procs >= 1, "The number of process must be larger than 1"
         choices = sum([self.args.sgd, self.args.adam, self.args.avg_sgd])
         assert choices == 1, "Must choose only *one* gradient descent strategy in [sgd, avg_sgd, adam]"
         
@@ -63,17 +62,21 @@ class DeepwalkTrainer:
         torch.set_num_threads(self.args.num_threads)
         if self.args.only_gpu:
             print("Run in 1 GPU")
-            self.emb_model.all_to_device(0)
+            assert self.args.gpus[0] >= 0
+            self.emb_model.all_to_device(self.args.gpus[0])
         elif self.args.mix:
-            print("Mix CPU with %d GPU" % self.args.num_procs)
-            if self.args.num_procs == 1:
-                self.emb_model.set_device(0)
+            print("Mix CPU with %d GPU" % len(self.args.gpus))
+            if len(self.args.gpus) == 1:
+                assert self.args.gpus[0] >= 0, 'mix CPU with GPU should have abaliable GPU'
+                self.emb_model.set_device(self.args.gpus[0])
         else:
-            print("Run in %d CPU process" % self.args.num_procs)
+            print("Run in CPU process")
+            self.args.gpus = [torch.device('cpu')]
+
 
     def train(self):
         """ train the embedding """
-        if self.args.num_procs > 1:
+        if len(self.args.gpus) > 1:
             self.fast_train_mp()
         else:
             self.fast_train()
@@ -86,9 +89,8 @@ class DeepwalkTrainer:
         start_all = time.time()
         ps = []
 
-        np_ = self.args.num_procs
-        for i in range(np_):
-            p = mp.Process(target=self.fast_train_sp, args=(i,))
+        for i in range(len(self.args.gpus)):
+            p = mp.Process(target=self.fast_train_sp, args=(self.args.gpus[i],))
             ps.append(p)
             p.start()
 
@@ -96,7 +98,10 @@ class DeepwalkTrainer:
             p.join()
         
         print("Used time: %.2fs" % (time.time()-start_all))
-        self.emb_model.save_embedding(self.dataset, self.args.emb_file)
+        if self.args.save_in_txt:
+            self.emb_model.save_embedding_txt(self.dataset, self.args.output_emb_file)
+        else:
+            self.emb_model.save_embedding(self.dataset, self.args.output_emb_file)
 
     @thread_wrapped_func
     def fast_train_sp(self, gpu_id):
@@ -198,14 +203,19 @@ class DeepwalkTrainer:
                         start = time.time()
 
         print("Training used time: %.2fs" % (time.time()-start_all))
-        self.emb_model.save_embedding(self.dataset, self.args.emb_file)
+        if self.args.save_in_txt:
+            self.emb_model.save_embedding_txt(self.dataset, self.args.output_emb_file)
+        else:
+            self.emb_model.save_embedding(self.dataset, self.args.output_emb_file)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="DeepWalk")
-    parser.add_argument('--net_file', type=str, 
-            help="path of the txt network file")
-    parser.add_argument('--emb_file', type=str, default="emb.npy",
-            help='path of the npy embedding file')
+    parser.add_argument('--data_file', type=str, 
+            help="path of the txt network file, builtin dataset include youtube-net and blog-net") 
+    parser.add_argument('--save_in_txt', default=False, action="store_true",
+            help='Whether save dat in txt format or npy')
+    parser.add_argument('--output_emb_file', type=str, default="emb.npy",
+            help='path of the output npy embedding file')
     parser.add_argument('--map_file', type=str, default="nodeid_to_index.pickle",
             help='path of the mapping dict that maps node ids to embedding index')
     parser.add_argument('--dim', default=128, type=int, 
@@ -246,8 +256,8 @@ if __name__ == '__main__':
             help="average gradients of sgd for embedding updation")
     parser.add_argument('--num_threads', default=2, type=int, 
             help="number of threads used for each CPU-core/GPU")
-    parser.add_argument('--num_procs', default=1, type=int, 
-            help="number of GPUs/CPUs when mixed training")
+    parser.add_argument('--gpus', type=int, default=[-1], nargs='+', 
+            help='a list of active gpu ids, e.g. 0')
     args = parser.parse_args()
 
     start_time = time.time()
