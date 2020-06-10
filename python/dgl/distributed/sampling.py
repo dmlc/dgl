@@ -40,7 +40,7 @@ class SamplingRequest(Request):
     def __getstate__(self):
         return self.seed_nodes, self.edge_dir, self.prob, self.replace, self.fan_out        
 
-    def process_request(self, server_state: ServerState):        
+    def process_request(self, server_state):        
         local_g = server_state.graph
         partition_book = server_state.partition_book
         local_ids = partition_book.nid2localnid(th.tensor(self.seed_nodes), partition_book._part_id)
@@ -58,7 +58,6 @@ def merge_graphs(res_list, num_nodes):
     dsts = []
     eids = []
     for res in res_list:
-        res: SamplingResponse
         srcs.append(res.global_src)
         dsts.append(res.global_dst)
         eids.append(res.global_eids)
@@ -75,7 +74,7 @@ def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, repl
     assert edge_dir == 'in'
     req_list = []
     blocks = []
-    partition_book: GraphPartitionBook = g.get_partition_book()
+    partition_book = g.get_partition_book()
 
     partition_id = partition_book.nid2partid(th.tensor(nodes))
     node_id_per_partition = [[] for _ in range(partition_book.num_partitions())]
