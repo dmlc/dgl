@@ -1,5 +1,6 @@
 #include <dgl/array.h>
 #include <cstdio>
+#include <vector>
 
 #include "../../runtime/cuda/cuda_common.h"
 #include "../../c_api_common.h"
@@ -36,7 +37,7 @@ __global__ void fps_kernel(const DType *array_data, const int64_t batch_size, co
 
   // avoid race
   if (thread_idx == 0) {
-    ret_data[ret_start] = array_start + 0; //start_idx[batch_idx];
+    ret_data[ret_start] = array_start + start_idx[batch_idx];
   }
 
   // sample the rest `sample_points - 1` points
@@ -62,7 +63,7 @@ __global__ void fps_kernel(const DType *array_data, const int64_t batch_size, co
 
       if (dist_data[array_start + j] > dist_max) {
         dist_argmax = j;
-        dist_max = one_dist;
+        dist_max = dist_data[array_start + j];
       }
     }
 
@@ -110,11 +111,11 @@ IdArray _FPS_CUDA(NDArray array, int64_t batch_size, int64_t sample_points, DLCo
   // Init sample for each cloud in the batch
   IdArray start_idx = NewIdArray(batch_size, ctx, sizeof(int64_t) * 8);
   int64_t* start_idx_data = static_cast<int64_t*>(start_idx->data);
-  /*
+  std::vector<int64_t> start_idx_cpu(batch_size);
   for (auto i = 0; i < batch_size; i++) {
-    start_idx_data[i] = (int64_t)(rand() % point_in_batch);
+    start_idx_cpu[i] = (int64_t)(rand() % point_in_batch);
   }
-  */
+  cudaMemcpy(start_idx_data, start_idx_cpu.data(), batch_size*sizeof(int64_t), cudaMemcpyHostToDevice);
 
   fps_kernel<<<batch_size, THREADS, 0, thr_entry->stream>>>(
     array_data, batch_size, sample_points, ctx,

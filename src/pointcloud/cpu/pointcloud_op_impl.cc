@@ -35,7 +35,7 @@ IdArray _FPS_CPU(NDArray array, int64_t batch_size, int64_t sample_points, DLCon
   // loop for each point cloud sample in this batch
   for (auto b = 0; b < batch_size; b++) {
     // random init start sample
-    int64_t sample_idx = 0;//rand() % point_in_batch;
+    int64_t sample_idx = rand() % point_in_batch;
     ret_data[ret_start] = array_start + sample_idx;
 
     // compute the first-sample distance, and get the max value
