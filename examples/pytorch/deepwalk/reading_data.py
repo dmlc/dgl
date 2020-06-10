@@ -1,13 +1,15 @@
+import os
 import numpy as np
 import scipy.sparse as sp
 import pickle
 import torch
 from torch.utils.data import DataLoader
+from dgl.data.utils import download, _get_dgl_url, get_download_dir, extract_archive
 import random
 import time
 import dgl
 from utils import shuffle_walks
-np.random.seed(3141592653)
+#np.random.seed(3141592653)
 
 def ReadTxtNet(file_path="", undirected=True):
     """ Read the txt network file. 
@@ -24,6 +26,15 @@ def ReadTxtNet(file_path="", undirected=True):
     node2id dict : a dict mapping the nodes to their embedding indices 
     id2node dict : a dict mapping nodes embedding indices to the nodes
     """
+    if file_path == 'youtube' or file_path == 'blog':
+        name = file_path
+        dir = get_download_dir()
+        zip_file_path='{}/{}.zip'.format(dir, name)
+        download(_get_dgl_url(os.path.join('dataset/DeepWalk/', '{}.zip'.format(file_path))), path=zip_file_path)
+        extract_archive(zip_file_path,
+                        '{}/{}'.format(dir, name))
+        file_path = "{}/{}/{}-net.txt".format(dir, name, name)
+
     node2id = {}
     id2node = {}
     cid = 0
@@ -97,7 +108,7 @@ class DeepwalkDataset:
             num_walks=10,
             batch_size=32,
             negative=5,
-            num_procs=4,
+            gpus=[0],
             fast_neg=True,
             ):
         """ This class has the following functions:
@@ -121,7 +132,7 @@ class DeepwalkDataset:
         self.num_walks = num_walks
         self.batch_size = batch_size
         self.negative = negative
-        self.num_procs = num_procs
+        self.num_procs = len(gpus)
         self.fast_neg = fast_neg
         self.net, self.node2id, self.id2node, self.sm = ReadTxtNet(net_file)
         self.save_mapping(map_file)
