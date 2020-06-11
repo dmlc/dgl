@@ -4,6 +4,7 @@ import os
 import datetime
 
 from .utils import get_download_dir, download, extract_archive, loadtxt
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 
@@ -39,10 +40,6 @@ class GDELT(object):
         self.dir = get_download_dir()
         self.mode = mode
         # self.graphs = []
-        for dname in self._url:
-            dpath = os.path.join(
-                self.dir, 'GDELT', self._url[dname.lower()].split('/')[-1])
-            download(self._url[dname.lower()], path=dpath)
         train_data = loadtxt(os.path.join(
             self.dir, 'GDELT', 'train.txt'), delimiter='\t').astype(np.int64)
         if self.mode == 'train':
@@ -62,6 +59,13 @@ class GDELT(object):
             self._load(np.concatenate(
                 [train_data, val_data, test_data], axis=0))
 
+    def _download(self):
+        for dname in self._url:
+            dpath = os.path.join(
+                self.dir, 'GDELT', self._url[dname.lower()].split('/')[-1])
+            download(self._url[dname.lower()], path=dpath)
+
+    @retry_method_with_fix(_download)
     def _load(self, data):
         # The source code is not released, but the paper indicates there're
         # totally 137 samples. The cutoff below has exactly 137 samples.

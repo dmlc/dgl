@@ -2,6 +2,7 @@
 server and clients."""
 import abc
 import pickle
+import random
 
 from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
@@ -12,7 +13,8 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
-'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call']
+'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
+'send_request_to_machine', 'remote_call_to_machine']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
@@ -33,7 +35,7 @@ def read_ip_config(filename):
     Note that, DGL supports multiple backup servers that shares data with each others
     on the same machine via shared-memory tensor. The server_count should be >= 1. For example,
     if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
-    current machine. Note that, the count of server on each machine can be different.
+    current machine.
 
     Parameters
     ----------
@@ -219,6 +221,16 @@ def get_num_server():
     """Get the total number of server.
     """
     return _CAPI_DGLRPCGetNumServer()
+
+def set_num_server_per_machine(num_server):
+    """Set the total number of server per machine
+    """
+    _CAPI_DGLRPCSetNumServerPerMachine(num_server)
+
+def get_num_server_per_machine():
+    """Get the total number of server per machine
+    """
+    return _CAPI_DGLRPCGetNumServerPerMachine()
 
 def incr_msg_seq():
     """Increment the message sequence number and return the old one.
@@ -515,7 +527,36 @@ def send_request(target, request):
     server_id = target
     data, tensors = serialize_to_payload(request)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-    send_rpc_message(msg)
+    send_rpc_message(msg, server_id)
+
+def send_request_to_machine(target, request):
+    """Send one request to the target machine, which will randomly
+    select a server node to process this request.
+
+    The operation is non-blocking -- it does not guarantee the payloads have
+    reached the target or even have left the sender process. However,
+    all the payloads (i.e., data and arrays) can be safely freed after this
+    function returns.
+
+    Parameters
+    ----------
+    target : int
+        ID of target machine.
+    request : Request
+        The request to send.
+
+    Raises
+    ------
+    ConnectionError if there is any problem with the connection.
+    """
+    service_id = request.service_id
+    msg_seq = incr_msg_seq()
+    client_id = get_rank()
+    server_id = random.randint(target*get_num_server_per_machine(),
+                               (target+1)*get_num_server_per_machine()-1)
+    data, tensors = serialize_to_payload(request)
+    msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
+    send_rpc_message(msg, server_id)
 
 def send_response(target, response):
     """Send one response to the target client.
@@ -545,7 +586,7 @@ def send_response(target, response):
     server_id = get_rank()
     data, tensors = serialize_to_payload(response)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-    send_rpc_message(msg)
+    send_rpc_message(msg, client_id)
 
 def recv_request(timeout=0):
     """Receive one request.
@@ -617,7 +658,7 @@ def recv_response(timeout=0):
         raise DGLError('Got response message from service ID {}, '
                        'but no response class is registered.'.format(msg.service_id))
     res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-    if msg.client_id != get_rank():
+    if msg.client_id != get_rank() and get_rank() != -1:
         raise DGLError('Got reponse of request sent by client {}, '
                        'different from my rank {}!'.format(msg.client_id, get_rank()))
     return res
@@ -658,10 +699,11 @@ def remote_call(target_and_requests, timeout=0):
         service_id = request.service_id
         msg_seq = incr_msg_seq()
         client_id = get_rank()
-        server_id = target
+        server_id = random.randint(target*get_num_server_per_machine(),
+                                   (target+1)*get_num_server_per_machine()-1)
         data, tensors = serialize_to_payload(request)
         msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-        send_rpc_message(msg)
+        send_rpc_message(msg, server_id)
         # check if has response
         res_cls = get_service_property(service_id)[1]
         if res_cls is not None:
@@ -683,7 +725,69 @@ def remote_call(target_and_requests, timeout=0):
         all_res[msgseq2pos[msg.msg_seq]] = res
     return all_res
 
-def send_rpc_message(msg):
+def remote_call_to_machine(target_and_requests, timeout=0):
+    """Invoke registered services on remote machine
+    (which will ramdom select a server to process the request) and collect responses.
+
+    The operation is blocking -- it returns when it receives all responses
+    or it times out.
+
+    If the target server state is available locally, it invokes local computation
+    to calculate the response.
+
+    Parameters
+    ----------
+    target_and_requests : list[(int, Request)]
+        A list of requests and the machine they should be sent to.
+    timeout : int, optional
+        The timeout value in milliseconds. If zero, wait indefinitely.
+
+    Returns
+    -------
+    list[Response]
+        Responses for each target-request pair. If the request does not have
+        response, None is placed.
+
+    Raises
+    ------
+    ConnectionError if there is any problem with the connection.
+    """
+    # TODO(chao): handle timeout
+    all_res = [None] * len(target_and_requests)
+    msgseq2pos = {}
+    num_res = 0
+    myrank = get_rank()
+    for pos, (target, request) in enumerate(target_and_requests):
+        # send request
+        service_id = request.service_id
+        msg_seq = incr_msg_seq()
+        client_id = get_rank()
+        server_id = target
+        data, tensors = serialize_to_payload(request)
+        msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
+        send_rpc_message(msg, server_id)
+        # check if has response
+        res_cls = get_service_property(service_id)[1]
+        if res_cls is not None:
+            num_res += 1
+            msgseq2pos[msg_seq] = pos
+    while num_res != 0:
+        # recv response
+        msg = recv_rpc_message(timeout)
+        num_res -= 1
+        _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
+        if res_cls is None:
+            raise DGLError('Got response message from service ID {}, '
+                           'but no response class is registered.'.format(msg.service_id))
+        res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
+        if msg.client_id != myrank:
+            raise DGLError('Got reponse of request sent by client {}, '
+                           'different from my rank {}!'.format(msg.client_id, myrank))
+        # set response
+        all_res[msgseq2pos[msg.msg_seq]] = res
+    return all_res
+
+def send_rpc_message(msg, target):
     """Send one message to the target server.
 
     The operation is non-blocking -- it does not guarantee the payloads have
@@ -700,12 +804,14 @@ def send_rpc_message(msg):
     ----------
     msg : RPCMessage
         The message to send.
+    target : int
+        target ID
 
     Raises
     ------
     ConnectionError if there is any problem with the connection.
     """
-    _CAPI_DGLRPCSendRPCMessage(msg)
+    _CAPI_DGLRPCSendRPCMessage(msg, int(target))
 
 def recv_rpc_message(timeout=0):
     """Receive one message.
@@ -804,7 +910,6 @@ class ShutDownRequest(Request):
     def process_request(self, server_state):
         assert self.client_id == 0
         finalize_server()
-        exit()
-
+        return 'exit'
 
 _init_api("dgl.distributed.rpc")

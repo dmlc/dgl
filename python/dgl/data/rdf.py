@@ -17,6 +17,7 @@ import numpy as np
 import dgl
 import dgl.backend as F
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 
 __all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
 
@@ -108,9 +109,17 @@ class RDFGraphDataset:
                  insert_reverse=True):
         download_dir = get_download_dir()
         zip_file_path = os.path.join(download_dir, '{}.zip'.format(name))
-        download(url, path=zip_file_path)
         self._dir = os.path.join(download_dir, name)
-        extract_archive(zip_file_path, self._dir)
+        self._url = url
+        self._zip_file_path = zip_file_path
+        self._load(print_every, insert_reverse, force_reload)
+
+    def _download(self):
+        download(self._url, path=self._zip_file_path)
+        extract_archive(self._zip_file_path, self._dir)
+
+    @retry_method_with_fix(_download)
+    def _load(self, print_every, insert_reverse, force_reload):
         self._print_every = print_every
         self._insert_reverse = insert_reverse
         if not force_reload and self.has_cache():
