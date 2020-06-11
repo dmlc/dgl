@@ -1,7 +1,6 @@
 """Define distributed kvstore"""
 
 import os
-import random
 import numpy as np
 
 from . import rpc
@@ -375,7 +374,11 @@ class GetPartShapeResponse(rpc.Response):
         return self.shape
 
     def __setstate__(self, state):
-        self.shape = state
+        # When the shape has only one dimension, state is an integer.
+        if isinstance(state, int):
+            self.shape = (state,)
+        else:
+            self.shape = state
 
 class GetPartShapeRequest(rpc.Request):
     """Send data name to get the partitioned data shape from server.
@@ -989,10 +992,7 @@ class KVClient(object):
                 local_data = partial_data
             else: # push data to remote server
                 request = PushRequest(name, partial_id, partial_data)
-                # randomly select a server node in target machine for load-balance
-                server_id = random.randint(machine_idx*self._group_count, \
-                    (machine_idx+1)*self._group_count-1)
-                rpc.send_request(server_id, request)
+                rpc.send_request_to_machine(machine_idx, request)
             start += count[idx]
         if local_id is not None: # local push
             self._push_handler(self._data_store, name, local_id, local_data)
@@ -1037,10 +1037,7 @@ class KVClient(object):
                 local_id = self._part_policy[name].to_local(partial_id)
             else: # pull data from remote server
                 request = PullRequest(name, partial_id)
-                # randomly select a server node in target machine for load-balance
-                server_id = random.randint(machine_idx*self._group_count, \
-                    (machine_idx+1)*self._group_count-1)
-                rpc.send_request(server_id, request)
+                rpc.send_request_to_machine(machine_idx, request)
                 pull_count += 1
             start += count[idx]
         # recv response
