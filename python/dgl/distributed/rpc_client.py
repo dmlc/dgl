@@ -122,6 +122,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
         group_count.append(server_info[3])
         if server_info[0] > max_machine_id:
             max_machine_id = server_info[0]
+    rpc.set_num_server_per_machine(group_count[0])
     num_machines = max_machine_id+1
     rpc.set_num_machines(num_machines)
     machine_id = get_local_machine_id(server_namebook)
