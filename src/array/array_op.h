@@ -196,6 +196,11 @@ template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
 
+/////////////////////////////////// Geometry Op ///////////////////////////////////
+
+template <DLDeviceType XPU, typename FloatType>
+void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist, IdArray start_idx, IdArray result);
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl
