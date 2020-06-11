@@ -1,5 +1,6 @@
 import dgl
 import sys
+import os
 import numpy as np
 from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
@@ -21,10 +22,9 @@ def test_partition():
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
     num_parts = 4
     num_hops = 2
-
-    partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+    partition_graph(g, 'test', num_parts, '/tmp/partition', num_hops=num_hops, part_method='metis')
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
+        part_g, node_feats, edge_feats, meta = load_partition('/tmp/partition/test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
 
         # Check the metadata
@@ -54,4 +54,5 @@ def test_partition():
 
 
 if __name__ == '__main__':
+    os.mkdir('/tmp/partition')
     test_partition()
