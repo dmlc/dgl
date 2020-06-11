@@ -271,6 +271,15 @@ if __name__ == '__main__':
     graph, labels = data[0]
     labels = labels[:, 0]
 
+    graph.readonly(False)
+    _, _, self_e = graph.edge_ids(th.arange(graph.number_of_nodes()), th.arange(graph.number_of_nodes()), return_uv=True)
+    print('Total edges before adding self-loop {}'.format(graph.number_of_edges()))
+    # clean partial self-loop edges
+    graph.remove_edges(self_e)
+    # Add all self-loop edges
+    graph.add_edges(th.arange(graph.number_of_nodes()), th.arange(graph.number_of_nodes()))
+    print('Total edges after adding self-loop {}'.format(graph.number_of_edges()))
+    graph.readonly(True)
     graph = dgl.as_heterograph(graph)
 
     in_feats = graph.ndata['feat'].shape[1]
