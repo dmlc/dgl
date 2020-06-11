@@ -14,6 +14,7 @@ import time
 def myexcepthook(exctype, value, traceback):
     for p in mp.active_children():
         p.terminate()
+    # raise Exception("11111111111")
 
 
 class MochDistGraph:
@@ -88,9 +89,9 @@ def start_client(rank):
 def test_rpc_sampling():
     num_server = 3
     ip_config = open("rpc_ip_config.txt", "w")
-    ip_config.write(f'127.0.0.1 30050 {num_server}\n')
+    ip_config.write(f'127.0.0.1 40090 {num_server}\n')
     ip_config.close()
-
+    # sys.excepthook = myexcepthook
     # partition graph
     g = CitationGraphDataset("cora")[0]
     g.readonly()
@@ -109,8 +110,8 @@ def test_rpc_sampling():
         pserver_list.append(p)
 
     sampled_graph = start_client(0)
-    # for p in pserver_list:
-    #     p.join()
+    for p in pserver_list:
+        p.join()
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
