@@ -22,7 +22,7 @@ def test_graph_partition_book():
     num_parts = 4
     num_hops = 2
 
-    partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+    partition_graph(g, 'gpb_test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
 
     for i in range(num_parts):
         part_g, node_feats, edge_feats, meta = load_partition('/tmp/gpb_test.json', i)
