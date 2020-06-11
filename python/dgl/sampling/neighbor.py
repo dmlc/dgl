@@ -1,4 +1,5 @@
 """Neighbor sampling APIs"""
+from functools import partial
 
 from .._ffi.function import _init_api
 from .. import backend as F
@@ -165,5 +166,48 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     for i, etype in enumerate(ret.canonical_etypes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
+
+
+class NeighborSamplerDataLoader(object):
+    def __init__(
+            self,
+            g,
+            fanouts,
+            dataloader_class,
+            **kwargs):
+        self.g = g
+        self.fanouts = fanouts
+        self.dataloaders = {
+            ntype: self._get_dataloader_class(dataloader_class, ntype)(nids[ntype], **kwargs)
+            for ntype in nids.keys()}
+
+    def _sample(self, ntype, nids):
+        seeds = {ntype: nids}
+        blocks = []
+
+        for fanout in self.fanouts:
+            if fanout is None:
+                frontier = transform.in_subgraph(self.g, seeds)
+            else:
+                frontier = sample_neighbors(self.g, seeds, fanout)
+            block = transform.to_block(frontier)
+            seeds = {ntype: block.srcnodes[ntype].data[dgl.NID] for ntype in block.srctypes}
+            blocks.insert(0, block)
+
+    def _get_dataloader_class(self, dataloader_class, ntype):
+        backend_name = F.get_preferred_backend()
+        collator = partial(self._sample, ntype)
+
+        if backend_name == 'pytorch':
+            from torch.utils.data import DataLoader
+            return partial(DataLoader, collate_fn=collator)
+        elif backend_name == 'mxnet':
+            raise NotImplementedError(
+                'NeighborSamplerDataLoader for MXNet not implemented yet')
+        elif backend_name == 'tensorflow':
+            raise NotImplementedError(
+                'NeighborSamplerDataLoader for Tensorflow not implemented yet')
+        else:
+            raise NotImplementedError('Unknown backend {}'.format(backend_name))
 
 _init_api('dgl.sampling.neighbor', __name__)
