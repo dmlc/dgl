@@ -147,8 +147,8 @@ def test_server_client():
         p.start()
         cli_ps.append(p)
 
-    for p in cli_ps:
-        p.join()
+    #for p in cli_ps:
+    #    p.join()
     print('clients have terminated')
 
 def test_split():
