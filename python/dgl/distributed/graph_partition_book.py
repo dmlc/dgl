@@ -243,9 +243,9 @@ class RangePartitionBook:
     num_parts : int
         number of total partitions
     node_map : tensor
-        global node id mapping to partition id
+        map global node id to partition id
     edge_map : tensor
-        global edge id mapping to partition id
+        map global edge id to partition id
     """
     def __init__(self, part_id, num_parts, node_map, edge_map):
         assert part_id >= 0, 'part_id cannot be a negative number.'
