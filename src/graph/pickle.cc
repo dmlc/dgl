@@ -154,4 +154,40 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
     *rv = HeteroGraphRef(graph);
   });
 
+// For backward compatibility
+HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states) {
+  const auto metagraph = states.metagraph;
+  const auto &num_nodes_per_type = states.num_nodes_per_type;
+  CHECK_EQ(states.adjs.size(), metagraph->NumEdges());
+  std::vector<HeteroGraphPtr> relgraphs(metagraph->NumEdges());
+  for (dgl_type_t etype = 0; etype < metagraph->NumEdges(); ++etype) {
+    const auto& pair = metagraph->FindEdge(etype);
+    const dgl_type_t srctype = pair.first;
+    const dgl_type_t dsttype = pair.second;
+    const int64_t num_vtypes = (srctype == dsttype)? 1 : 2;
+    const SparseFormat fmt = static_cast<SparseFormat>(states.adjs[etype]->format);
+    switch (fmt) {
+      case SparseFormat::kCOO:
+        relgraphs[etype] = UnitGraph::CreateFromCOO(
+            num_vtypes, aten::COOMatrix(*states.adjs[etype]));
+        break;
+      case SparseFormat::kCSR:
+        relgraphs[etype] = UnitGraph::CreateFromCSR(
+            num_vtypes, aten::CSRMatrix(*states.adjs[etype]));
+        break;
+      case SparseFormat::kCSC:
+      default:
+        LOG(FATAL) << "Unsupported sparse format.";
+    }
+  }
+  return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
+}
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickleOld")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroPickleStatesRef ref = args[0];
+    HeteroGraphPtr graph = HeteroUnpickleOld(*ref.sptr());
+    *rv = HeteroGraphRef(graph);
+  });
+
 }  // namespace dgl

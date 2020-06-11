@@ -748,6 +748,19 @@ struct HeteroPickleStates : public runtime::Object {
   /*! \brief Arrays representing graph structure (coo or csr) */
   std::vector<IdArray> arrays;
 
+  /* To support backward compatibility, we have to retain fields in the old 
+   * version of HeteroPickleStates
+   */
+
+  /*! \brief Metagraph(64bits ImmutableGraph) */
+  GraphPtr metagraph;
+
+  /*! \brief Number of nodes per type */
+  std::vector<int64_t> num_nodes_per_type;
+
+  /*! \brief adjacency matrices of each relation graph */
+  std::vector<std::shared_ptr<SparseMatrix> > adjs;
+
   static constexpr const char* _type_key = "graph.HeteroPickleStates";
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroPickleStates, runtime::Object);
 };
@@ -766,9 +779,17 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states);
 /*!
  * \brief Get the pickling state of the relation graph structure in backend tensors.
  *
- * \returnAdjacency matrices of all relation graphs in a list of arrays.
+ * \return a HeteroPickleStates object
  */
 HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
+
+/*!
+ * \brief Old version of HeteroUnpickle, for backward compatibility
+ *
+ * \param states Pickle states
+ * \return A heterograph pointer
+ */
+HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
 
 }  // namespace dgl
 
