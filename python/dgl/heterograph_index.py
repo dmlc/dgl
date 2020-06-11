@@ -1166,6 +1166,17 @@ class FlattenedHeteroGraph(ObjectBase):
 class HeteroPickleStates(ObjectBase):
     """Pickle states object class in C++ backend."""
     @property
+    def version(self):
+        """Version number
+
+        Returns
+        -------
+        int
+            version number
+        """
+        return _CAPI_DGLHeteroPickleStatesGetVersion(self)
+
+    @property
     def meta(self):
         """Meta info
 
@@ -1191,12 +1202,11 @@ class HeteroPickleStates(ObjectBase):
 
     def __getstate__(self):
         arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
-        version_number = 1
-        return version_number, self.meta, arrays
+        return self.version, self.meta, arrays
 
     def __setstate__(self, state):
         if isinstance(state[0], int):
-            version_number, meta, arrays = state
+            version, meta, arrays = state
             arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
             self.__init_handle_by_constructor__(
                 _CAPI_DGLCreateHeteroPickleStates, meta, arrays)

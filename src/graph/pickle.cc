@@ -105,55 +105,6 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
   return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
 }
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetMeta")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroPickleStatesRef st = args[0];
-    DGLByteArray buf;
-    buf.data = st->meta.c_str();
-    buf.size = st->meta.size();
-    *rv = buf;
-  });
-
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArrays")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroPickleStatesRef st = args[0];
-    *rv = ConvertNDArrayVectorToPackedFunc(st->arrays);
-  });
-
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArraysNum")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroPickleStatesRef st = args[0];
-    *rv = static_cast<int64_t>(st->arrays.size());
-  });
-
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCreateHeteroPickleStates")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::string meta = args[0];
-    const List<Value> arrays = args[1];
-    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
-    st->meta = meta;
-    st->arrays.reserve(arrays.size());
-    for (const auto& ref : arrays) {
-      st->arrays.push_back(ref->data);
-    }
-    *rv = HeteroPickleStatesRef(st);
-  });
-
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickle")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef ref = args[0];
-    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
-    *st = HeteroPickle(ref.sptr());
-    *rv = HeteroPickleStatesRef(st);
-  });
-
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroPickleStatesRef ref = args[0];
-    HeteroGraphPtr graph = HeteroUnpickle(*ref.sptr());
-    *rv = HeteroGraphRef(graph);
-  });
-
 // For backward compatibility
 HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states) {
   const auto metagraph = states.metagraph;
@@ -183,11 +134,74 @@ HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states) {
   return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
 }
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickleOld")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetVersion")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroPickleStatesRef st = args[0];
+    *rv = st->version;
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetMeta")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroPickleStatesRef st = args[0];
+    DGLByteArray buf;
+    buf.data = st->meta.c_str();
+    buf.size = st->meta.size();
+    *rv = buf;
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArrays")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroPickleStatesRef st = args[0];
+    *rv = ConvertNDArrayVectorToPackedFunc(st->arrays);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArraysNum")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroPickleStatesRef st = args[0];
+    *rv = static_cast<int64_t>(st->arrays.size());
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCreateHeteroPickleStates")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string meta = args[0];
+    const List<Value> arrays = args[1];
+    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
+    st->version = 1;
+    st->meta = meta;
+    st->arrays.reserve(arrays.size());
+    for (const auto& ref : arrays) {
+      st->arrays.push_back(ref->data);
+    }
+    *rv = HeteroPickleStatesRef(st);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickle")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef ref = args[0];
+    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
+    *st = HeteroPickle(ref.sptr());
+    *rv = HeteroPickleStatesRef(st);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef ref = args[0];
-    HeteroGraphPtr graph = HeteroUnpickleOld(*ref.sptr());
+    HeteroGraphPtr graph = ref->version ? HeteroUnpickle(*ref.sptr()) : HeteroUnpickleOld(*ref.sptr());
     *rv = HeteroGraphRef(graph);
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCreateHeteroPickleStatesOld")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef metagraph = args[0];
+    IdArray num_nodes_per_type = args[1];
+    List<SparseMatrixRef> adjs = args[2];
+    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
+    st->version = 0;
+    st->metagraph = metagraph.sptr();
+    st->num_nodes_per_type = num_nodes_per_type.ToVector<int64_t>();
+    st->adjs.reserve(adjs.size());
+    for (const auto& ref : adjs)
+      st->adjs.push_back(ref.sptr());
+    *rv = HeteroPickleStatesRef(st);
+  });
 }  // namespace dgl

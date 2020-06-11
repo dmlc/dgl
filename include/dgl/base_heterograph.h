@@ -739,6 +739,9 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
  * This class can be used as arguments and return values of a C API.
  */
 struct HeteroPickleStates : public runtime::Object {
+  /*! \brief version number */
+  int64_t version = 0;
+
   /*! \brief Metainformation 
    *
    * metagraph, number of nodes per type, format, flags
