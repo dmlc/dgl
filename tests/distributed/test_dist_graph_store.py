@@ -201,4 +201,4 @@ def prepare_dist():
 if __name__ == '__main__':
     os.mkdir('/tmp/dist_graph')
     test_split()
-    #test_server_client()
+    test_server_client()
