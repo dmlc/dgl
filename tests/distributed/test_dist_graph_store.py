@@ -152,7 +152,7 @@ def test_server_client():
 
     for p in serv_ps:
         p.join()
-        
+
     print('clients have terminated')
 
 def test_split():
@@ -201,4 +201,4 @@ def prepare_dist():
 if __name__ == '__main__':
     os.mkdir('/tmp/dist_graph')
     test_split()
-    test_server_client()
+    #test_server_client()
