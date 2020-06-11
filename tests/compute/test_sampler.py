@@ -8,7 +8,6 @@ from numpy.testing import assert_array_equal
 
 np.random.seed(42)
 
-'''
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     return dgl.DGLGraph(arr, readonly=True)
@@ -708,17 +707,15 @@ def test_negative_sampler():
     check_positive_edge_sampler()
     #disable this check for now. It might take too long time.
     #check_negative_sampler('head', False, 100)
-'''
 
 
 if __name__ == '__main__':
-    #test_create_full()
-    #test_1neighbor_sampler_all()
-    #test_10neighbor_sampler_all()
-    #test_1neighbor_sampler()
-    #test_10neighbor_sampler()
-    #test_layer_sampler()
-    #test_nonuniform_neighbor_sampler()
-    #test_setseed()
-    #test_negative_sampler()
-    pass
+    test_create_full()
+    test_1neighbor_sampler_all()
+    test_10neighbor_sampler_all()
+    test_1neighbor_sampler()
+    test_10neighbor_sampler()
+    test_layer_sampler()
+    test_nonuniform_neighbor_sampler()
+    test_setseed()
+    test_negative_sampler()
