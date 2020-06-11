@@ -54,5 +54,5 @@ def test_partition():
         assert len(edge_feats) == 0
 
 
-#if __name__ == '__main__':
-    #test_partition()
+if __name__ == '__main__':
+    test_partition()
