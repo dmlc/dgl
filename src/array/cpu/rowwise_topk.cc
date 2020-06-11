@@ -26,7 +26,7 @@ inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) 
               return wdata[data[i]] < wdata[data[j]];
             };
         } else {
-          compare_fn = [wdata, data] (IdxType i, IdxType j) {
+          compare_fn = [wdata] (IdxType i, IdxType j) {
               return wdata[i] < wdata[j];
             };
         }
@@ -36,7 +36,7 @@ inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) 
               return wdata[data[i]] > wdata[data[j]];
             };
         } else {
-          compare_fn = [wdata, data] (IdxType i, IdxType j) {
+          compare_fn = [wdata] (IdxType i, IdxType j) {
               return wdata[i] > wdata[j];
             };
         }
