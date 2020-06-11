@@ -238,7 +238,7 @@ def test_query(index_dtype):
             assert F.asnumpy(e).tolist() == list(range(n_edges))
 
             # find_edges
-            for edge_ids in [list(range(n_edges)), np.arange(n_edges), F.arange(0, n_edges)]:
+            for edge_ids in [list(range(n_edges)), np.arange(n_edges), F.astype(F.arange(0, n_edges), g.idtype)]:
                 u, v = g.find_edges(edge_ids, etype)
                 assert F.asnumpy(u).tolist() == srcs
                 assert F.asnumpy(v).tolist() == dsts
