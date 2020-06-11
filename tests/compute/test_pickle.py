@@ -9,6 +9,7 @@ import backend as F
 import dgl.function as fn
 import pickle
 import io
+import unittest
 
 def _assert_is_identical(g, g2):
     assert g.is_readonly == g2.is_readonly
