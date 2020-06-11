@@ -7,7 +7,7 @@ import dgl
 import backend as F
 import unittest, pytest
 from dgl.graph_index import create_graph_index
-
+import multiprocessing as mp
 from numpy.testing import assert_array_equal
 
 if os.name != 'nt':
@@ -238,12 +238,14 @@ def test_kv_store():
     ip_addr = get_local_usable_addr()
     ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
-    pid = os.fork()
-    if pid == 0:
-        start_server()
-    else:
-        time.sleep(1)
-        start_client()
+    ctx = mp.get_context('spawn')
+    pserver = ctx.Process(target=start_server)
+    pclient = ctx.Process(target=start_client)
+    pserver.start()
+    time.sleep(1)
+    pclient.start()
+    pserver.join()
+    pclient.join()
 
 if __name__ == '__main__':
     test_partition_policy()
