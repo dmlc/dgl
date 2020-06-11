@@ -53,7 +53,7 @@ def create_random_graph(n):
 
 def run_server(graph_name, server_id, num_clients, barrier):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
-                        '/tmp/{}.json'.format(graph_name))
+                        '/tmp/dist_graph/{}.json'.format(graph_name))
     barrier.wait()
     print('start server', server_id)
     g.start()
@@ -128,7 +128,7 @@ def test_server_client():
     graph_name = 'dist_graph_test'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
-    partition_graph(g, graph_name, num_parts, '/tmp')
+    partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
@@ -156,14 +156,14 @@ def test_split():
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
-    partition_graph(g, 'dist_graph_test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+    partition_graph(g, 'dist_graph_test', num_parts, '/tmp/dist_graph', num_hops=num_hops, part_method='metis')
 
     node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, meta = load_partition('/tmp/dist_graph_test.json', i)
+        part_g, node_feats, edge_feats, meta = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
         gpb = GraphPartitionBook(part_id=i,
                                  num_parts=num_partitions,
@@ -195,5 +195,6 @@ def prepare_dist():
     ip_config.close()
 
 if __name__ == '__main__':
+    os.mkdir('/tmp/dist_graph')
     test_split()
     test_server_client()
