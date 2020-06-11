@@ -257,7 +257,7 @@ def test_pickling_heterograph():
     new_g = _reconstruct_pickle(g)
     _assert_is_identical_hetero(g, new_g)
 
-def test_pickling_heterograph_compatibility():
+def test_pickling_heterograph_index_compatibility():
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     wishes_nx = nx.DiGraph()
     wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
@@ -272,8 +272,9 @@ def test_pickling_heterograph_compatibility():
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
 
     with open("tests/compute/hetero_pickle_old.pkl", "rb") as f:
-        new_g = pickle.load(f)
+        gi = pickle.load(f)
         f.close()
+    new_g = dgl.DGLHeteroGraph(gi, g.ntypes, g.etypes)
     _assert_is_identical_hetero(g, new_g)
 
 if __name__ == '__main__':
