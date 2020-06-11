@@ -530,7 +530,7 @@ def send_request(target, request):
     send_rpc_message(msg, server_id)
 
 def send_request_to_machine(target, request):
-    """Send one request to the target machine, which will randomly 
+    """Send one request to the target machine, which will randomly
     select a server node to process this request.
 
     The operation is non-blocking -- it does not guarantee the payloads have
@@ -552,7 +552,7 @@ def send_request_to_machine(target, request):
     service_id = request.service_id
     msg_seq = incr_msg_seq()
     client_id = get_rank()
-    server_id = random.randint(target*get_num_server_per_machine(), 
+    server_id = random.randint(target*get_num_server_per_machine(),
                                (target+1)*get_num_server_per_machine()-1)
     data, tensors = serialize_to_payload(request)
     msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
@@ -699,7 +699,7 @@ def remote_call(target_and_requests, timeout=0):
         service_id = request.service_id
         msg_seq = incr_msg_seq()
         client_id = get_rank()
-        server_id = random.randint(target*get_num_server_per_machine(), 
+        server_id = random.randint(target*get_num_server_per_machine(),
                                    (target+1)*get_num_server_per_machine()-1)
         data, tensors = serialize_to_payload(request)
         msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
@@ -726,7 +726,7 @@ def remote_call(target_and_requests, timeout=0):
     return all_res
 
 def remote_call_to_machine(target_and_requests, timeout=0):
-    """Invoke registered services on remote machine 
+    """Invoke registered services on remote machine
     (which will ramdom select a server to process the request) and collect responses.
 
     The operation is blocking -- it returns when it receives all responses
@@ -785,7 +785,7 @@ def remote_call_to_machine(target_and_requests, timeout=0):
                            'different from my rank {}!'.format(msg.client_id, myrank))
         # set response
         all_res[msgseq2pos[msg.msg_seq]] = res
-    return all_res    
+    return all_res
 
 def send_rpc_message(msg, target):
     """Send one message to the target server.
