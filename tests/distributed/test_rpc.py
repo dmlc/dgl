@@ -104,6 +104,21 @@ def start_client():
         assert res.hello_str == STR
         assert res.integer == INTEGER
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
+    # test send_request_to_machine
+    dgl.distributed.send_request_to_machine(0, req)
+    res = dgl.distributed.recv_response()
+    assert res.hello_str == STR
+    assert res.integer == INTEGER
+    assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
+    # test remote_call_to_machine
+    target_and_requests = []
+    for i in range(10):
+        target_and_requests.append((0, req))
+    res_list = dgl.distributed.remote_call_to_machine(target_and_requests)
+    for res in res_list:
+        assert res.hello_str == STR
+        assert res.integer == INTEGER
+        assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
@@ -153,8 +168,6 @@ def test_rpc():
         start_client()
 
 if __name__ == '__main__':
-    test_rank()
-    test_msg_seq()
     test_serialize()
     test_rpc_msg()
     test_rpc()
