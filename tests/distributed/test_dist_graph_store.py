@@ -125,7 +125,7 @@ def test_server_client():
 
     # Partition the graph
     num_parts = 1
-    graph_name = 'dist_graph_test'
+    graph_name = 'dist_graph_test_2'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
@@ -197,4 +197,4 @@ def prepare_dist():
 if __name__ == '__main__':
     os.mkdir('/tmp/dist_graph')
     test_split()
-    test_server_client()
+    #test_server_client()
