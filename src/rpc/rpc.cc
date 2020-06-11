@@ -159,6 +159,17 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumServer")
   *rv = RPCContext::ThreadLocal()->num_servers;
 });
 
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumServerPerMachine")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  const int32_t num_servers = args[0];
+  *rv = RPCContext::ThreadLocal()->num_servers_per_machine = num_servers;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumServerPerMachine")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::ThreadLocal()->num_servers_per_machine;
+});
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCIncrMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = (RPCContext::ThreadLocal()->msg_seq)++;
