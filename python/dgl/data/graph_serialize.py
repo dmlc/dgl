@@ -63,7 +63,7 @@ class GraphData(ObjectBase):
         return g
 
 
-def save_graphs(filename, g_list):
+def save_graphs(filename, g_list, labels=None):
     r"""
     Save DGLGraphs and graph labels to file
 
@@ -98,8 +98,9 @@ def save_graphs(filename, g_list):
     if isinstance(g_list, list):
         g_sample = g_list[0]
     if isinstance(g_sample, DGLGraph):
-        save_dglgraphs(filename, g_list)
+        save_dglgraphs(filename, g_list, labels)
     elif isinstance(g_sample, DGLHeteroGraph):
+        assert (labels is None), "Cannot support save labels with DGLHeteroGraph"
         save_heterographs(filename, g_list)
     else:
         raise Exception("Invalid list of graph input")
@@ -118,7 +119,7 @@ def save_dglgraphs(filename, g_list, labels=None):
     _CAPI_DGLSaveGraphs(filename, gdata_list, label_dict)
 
 
-def load_graphs(filename, idx_list=None, ignore_labels=True):
+def load_graphs(filename, idx_list=None, ignore_labels=False):
     """
     Load DGLGraphs from file
 
@@ -134,7 +135,7 @@ def load_graphs(filename, idx_list=None, ignore_labels=True):
 
     Returns
     ----------
-    
+
     graph_list: list of DGLGraphs / DGLHeteroGraph
     labels(Optional): dict of labels stored in file (empty dict returned if no
     label stored)
@@ -160,14 +161,14 @@ def load_graphs(filename, idx_list=None, ignore_labels=True):
     label_dict = {}
     if metadata.is_hetero:
         g_list = [gdata.get_graph() for gdata in metadata.hetero_graph_data]
+        return g_list
     else:
         for k, v in metadata.labels.items():
             label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
-        g_list = [gdata.get_graph() for gdata in metadata.graph_data], label_dict
-    if ignore_labels or len(label_dict) == 0:
-        return g_list
-    else: 
+        g_list = [gdata.get_graph()
+                  for gdata in metadata.graph_data]
         return g_list, label_dict
+
 
 def load_labels(filename):
     """

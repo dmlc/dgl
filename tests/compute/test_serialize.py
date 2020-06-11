@@ -104,7 +104,6 @@ def test_graph_serialize_without_feature():
     os.unlink(path)
 
 
-@pytest.mark.skip("No longer support save graphs with labels")
 def test_graph_serialize_with_labels():
     num_graphs = 100
     g_list = [generate_rand_graph(30) for _ in range(num_graphs)]
