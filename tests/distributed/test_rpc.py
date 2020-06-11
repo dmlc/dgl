@@ -1,5 +1,6 @@
 import os
 import time
+import socket
 
 import dgl
 import backend as F
@@ -7,10 +8,39 @@ import unittest, pytest
 
 from numpy.testing import assert_array_equal
 
+if os.name != 'nt':
+    import fcntl
+    import struct
+
 INTEGER = 2
 STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
 TENSOR = F.zeros((10, 10), F.int64, F.cpu())
+
+def get_local_usable_addr():
+    """Get local usable IP and port
+
+    Returns
+    -------
+    str
+        IP address, e.g., '192.168.8.12:50051'
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        sock.connect(('10.255.255.255', 1))
+        ip_addr = sock.getsockname()[0]
+    except ValueError:
+        ip_addr = '127.0.0.1'
+    finally:
+        sock.close()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("", 0))
+    sock.listen(1)
+    port = sock.getsockname()[1]
+    sock.close()
+
+    return ip_addr + ' ' + str(port)
 
 def foo(x, y):
     assert x == 123
@@ -158,7 +188,8 @@ def test_rpc_msg():
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
     ip_config = open("rpc_ip_config.txt", "w")
-    ip_config.write('127.0.0.1 30050 1\n')
+    ip_addr = get_local_usable_addr()
+    ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
     pid = os.fork()
     if pid == 0:
