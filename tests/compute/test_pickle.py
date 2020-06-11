@@ -257,6 +257,7 @@ def test_pickling_heterograph():
     new_g = _reconstruct_pickle(g)
     _assert_is_identical_hetero(g, new_g)
 
+@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")
 def test_pickling_heterograph_index_compatibility():
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     wishes_nx = nx.DiGraph()
