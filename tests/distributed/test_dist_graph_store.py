@@ -134,15 +134,16 @@ def test_server_client():
     # We cannot run multiple servers and clients on the same machine.
     barrier = mp.Barrier(2)
     serv_ps = []
+    ctx = mp.get_context('spawn')
     for serv_id in range(1):
-        p = Process(target=run_server, args=(graph_name, serv_id, 1, barrier))
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, barrier))
         serv_ps.append(p)
         p.start()
 
     cli_ps = []
     for cli_id in range(1):
         print('start client', cli_id)
-        p = Process(target=run_client, args=(graph_name, barrier, g.number_of_nodes(),
+        p = ctx.Process(target=run_client, args=(graph_name, barrier, g.number_of_nodes(),
                                              g.number_of_edges()))
         p.start()
         cli_ps.append(p)
