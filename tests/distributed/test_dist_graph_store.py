@@ -4,6 +4,7 @@ import dgl
 import sys
 import numpy as np
 import time
+import socket
 from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
 from multiprocessing import Process, Manager, Condition, Value
@@ -16,7 +17,34 @@ import backend as F
 import unittest
 import pickle
 
-server_namebook = {0: [0, '127.0.0.1', 30000, 1]}
+if os.name != 'nt':
+    import fcntl
+    import struct
+
+def get_local_usable_addr():
+    """Get local usable IP and port
+
+    Returns
+    -------
+    str
+        IP address, e.g., '192.168.8.12:50051'
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        sock.connect(('10.255.255.255', 1))
+        ip_addr = sock.getsockname()[0]
+    except ValueError:
+        ip_addr = '127.0.0.1'
+    finally:
+        sock.close()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("", 0))
+    sock.listen(1)
+    port = sock.getsockname()[1]
+    sock.close()
+
+    return ip_addr + ' ' + str(port)
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
@@ -24,7 +52,7 @@ def create_random_graph(n):
     return dgl.DGLGraph(ig)
 
 def run_server(graph_name, server_id, num_clients, barrier):
-    g = DistGraphServer(server_id, server_namebook, num_clients, graph_name,
+    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
                         '/tmp/{}.json'.format(graph_name))
     barrier.wait()
     print('start server', server_id)
@@ -32,7 +60,7 @@ def run_server(graph_name, server_id, num_clients, barrier):
 
 def run_client(graph_name, barrier, num_nodes, num_edges):
     barrier.wait()
-    g = DistGraph(server_namebook, graph_name)
+    g = DistGraph("kv_ip_config.txt", graph_name)
 
     # Test API
     assert g.number_of_nodes() == num_nodes
@@ -85,16 +113,19 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     for n in nodes:
         assert n in local_nids
 
-    g.shut_down()
+    # clean up
+    dgl.distributed.shutdown_servers()
+    dgl.distributed.finalize_client()
     print('end')
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
+    prepare_dist()
     g = create_random_graph(10000)
 
     # Partition the graph
     num_parts = 1
-    graph_name = 'test'
+    graph_name = 'dist_graph_test'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp')
@@ -121,17 +152,18 @@ def test_server_client():
     print('clients have terminated')
 
 def test_split():
+    prepare_dist()
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
-    partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+    partition_graph(g, 'dist_graph_test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
 
     node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
+        part_g, node_feats, edge_feats, meta = load_partition('/tmp/dist_graph_test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
         gpb = GraphPartitionBook(part_id=i,
                                  num_parts=num_partitions,
@@ -155,6 +187,12 @@ def test_split():
         local_eids = F.asnumpy(local_eids)
         for e in edges1:
             assert e in local_eids
+
+def prepare_dist():
+    ip_config = open("kv_ip_config.txt", "w")
+    ip_addr = get_local_usable_addr()
+    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.close()
 
 if __name__ == '__main__':
     test_split()
