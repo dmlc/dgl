@@ -1,7 +1,6 @@
 """Define distributed kvstore"""
 
 import os
-import random
 import numpy as np
 
 from . import rpc
