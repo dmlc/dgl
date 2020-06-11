@@ -1,5 +1,5 @@
 """Sampling module"""
-from .rpc import Request, Response, remote_call
+from .rpc import Request, Response, remote_call_to_machine
 from .dist_graph import DistGraph
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
@@ -93,7 +93,7 @@ def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, repl
             req = SamplingRequest(
                 node_id, fanout, edge_dir=edge_dir, prob=prob, replace=replace)
             req_list.append((pid, req))
-    res_list = remote_call(req_list)
+    res_list = remote_call_to_machine(req_list)
     return merge_graphs(res_list, g.total_num_nodes)
 
 

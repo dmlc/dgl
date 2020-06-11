@@ -9,6 +9,7 @@ import multiprocessing as mp
 import numpy as np
 import backend as F
 import time
+from utils import get_local_usable_addr
 
 
 def myexcepthook(exctype, value, traceback):
@@ -78,8 +79,9 @@ def start_client(rank):
                              part_graph=part_g)
 
     g = MochDistGraph(gpb, num_nodes)
+    print("Pre sample")
     results = sample_neighbors(g, [0, 10, 99], 3)
-
+    print("after sample")
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
     return results
@@ -89,7 +91,8 @@ def start_client(rank):
 def test_rpc_sampling():
     num_server = 3
     ip_config = open("rpc_ip_config.txt", "w")
-    ip_config.write(f'127.0.0.1 40090 {num_server}\n')
+    ip_addr = get_local_usable_addr()
+    ip_config.write('%s 3\n' % ip_addr)
     ip_config.close()
     # sys.excepthook = myexcepthook
     # partition graph
@@ -110,6 +113,7 @@ def test_rpc_sampling():
         pserver_list.append(p)
 
     sampled_graph = start_client(0)
+    print("Done sampling")
     for p in pserver_list:
         p.join()
 
