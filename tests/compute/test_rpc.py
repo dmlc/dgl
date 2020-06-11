@@ -104,7 +104,7 @@ def start_client():
         assert res.hello_str == STR
         assert res.integer == INTEGER
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
-    # test send to machine
+    # test send_request_to_machine
     dgl.distributed.send_request_to_machine(0, req)
     res = dgl.distributed.recv_response()
     assert res.hello_str == STR
