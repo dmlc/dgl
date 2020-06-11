@@ -35,7 +35,7 @@ COOMatrix CSRToCOO(CSRMatrix csr) {
       csr.num_rows,
       row_ptr,
       CUSPARSE_INDEX_BASE_ZERO));
-  
+
   return COOMatrix(csr.num_rows, csr.num_cols,
                    row, indices, data,
                    true, csr.sorted);

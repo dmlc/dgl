@@ -94,7 +94,7 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
     device->FreeWorkspace(row->ctx, workspace);
     device->FreeWorkspace(row->ctx, indptr);
   }
-  
+
   return COOMatrix(coo.num_rows, coo.num_cols,
                    row, col, data, true, sort_column);
 }

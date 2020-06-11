@@ -71,7 +71,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
         coo.num_rows,
         indptr_ptr,
         CUSPARSE_INDEX_BASE_ZERO));
-  
+
   return CSRMatrix(coo.num_rows, coo.num_cols,
                    indptr, col, data, false);
 }
