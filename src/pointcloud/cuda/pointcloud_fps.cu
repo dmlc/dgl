@@ -1,9 +1,6 @@
-#include <dgl/array.h>
 #include <cstdio>
 #include <vector>
 
-#include "../../runtime/cuda/cuda_common.h"
-#include "../../c_api_common.h"
 #include "./pointcloud_fps.cuh"
 
 #define THREADS 256
@@ -35,7 +32,7 @@ __global__ void fps_kernel(const DType *array_data, const int64_t batch_size, co
   __shared__ DType dist_max_ht[THREADS];
   __shared__ int64_t dist_argmax_ht[THREADS];
 
-  // avoid race
+  // start with random initialization
   if (thread_idx == 0) {
     ret_data[ret_start] = array_start + start_idx[batch_idx];
   }

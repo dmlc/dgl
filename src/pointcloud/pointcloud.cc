@@ -32,7 +32,7 @@ IdArray FPS_CUDA(NDArray array, int64_t batch_size, int64_t sample_points) {
   return ret;
 }
 
-DGL_REGISTER_GLOBAL("pointcloud._CAPI_FarthestPointSampler")
+DGL_REGISTER_GLOBAL("geometry._CAPI_FarthestPointSampler")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const NDArray data = args[0];
     const int64_t batch_size = args[1];

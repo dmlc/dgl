@@ -7,9 +7,6 @@
 #define DGL_FPS_FPS_OP_H_
 
 #include <dgl/array.h>
-#include <vector>
-#include <tuple>
-#include <utility>
 
 namespace dgl {
 namespace aten {

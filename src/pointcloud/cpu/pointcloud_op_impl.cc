@@ -38,7 +38,6 @@ IdArray _FPS_CPU(NDArray array, int64_t batch_size, int64_t sample_points, DLCon
     int64_t sample_idx = rand() % point_in_batch;
     ret_data[ret_start] = array_start + sample_idx;
 
-    // compute the first-sample distance, and get the max value
     int64_t dist_argmax = 0;
     DType dist_max = -1;
 
