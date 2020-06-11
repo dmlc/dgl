@@ -31,7 +31,7 @@ namespace network {
 static void NaiveDeleter(DLManagedTensor* managed_tensor) {
   delete [] managed_tensor->dl_tensor.shape;
   delete [] managed_tensor->dl_tensor.strides;
-  delete [] managed_tensor->dl_tensor.data;
+  free(managed_tensor->dl_tensor.data);
   delete managed_tensor;
 }
 
