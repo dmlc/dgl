@@ -188,6 +188,7 @@ def test_rpc_msg():
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
     ip_config = open("rpc_ip_config.txt", "w")
+    # dynamic bind
     ip_addr = get_local_usable_addr()
     ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
