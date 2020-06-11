@@ -15,7 +15,7 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr) {
-  CHECK(sizeof(IdType) == 4) << "CUDA COOToCSR does not support int64.";
+  CHECK(sizeof(IdType) == 4) << "CUDA CSRToCOO does not support int64.";
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
