@@ -1214,5 +1214,5 @@ class HeteroPickleStates(ObjectBase):
             metagraph, num_nodes_per_type, adjs = state
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
             self.__init_handle_by_constructor__(
-                _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)            
+                _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
 _init_api("dgl.heterograph_index")
