@@ -375,7 +375,11 @@ class GetPartShapeResponse(rpc.Response):
         return self.shape
 
     def __setstate__(self, state):
-        self.shape = state
+        # When the shape has only one dimension, state is an integer.
+        if isinstance(state, int):
+            self.shape = (state,)
+        else:
+            self.shape = state
 
 class GetPartShapeRequest(rpc.Request):
     """Send data name to get the partitioned data shape from server.
