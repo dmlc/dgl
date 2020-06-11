@@ -16,7 +16,7 @@ inline int64_t get_index(int64_t dim1, int64_t dim2, int64_t dim) {
   return dim1 * dim + dim2;
 }
 
-template <DLDeviceType XPU, typename FloatType>
+template <DLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
   const FloatType* array_data = static_cast<FloatType*>(array->data);
@@ -29,19 +29,19 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   // std::vector<FloatType> dist_data(point_in_batch);
 
   // Init sample for each cloud in the batch
-  int64_t* start_idx_data = static_cast<int64_t*>(start_idx->data);
+  IdType* start_idx_data = static_cast<IdType*>(start_idx->data);
 
   // Init return value
   // IdArray ret = NewIdArray(sample_points * batch_size, ctx, sizeof(int64_t) * 8);
-  int64_t* ret_data = static_cast<int64_t*>(result->data);
+  IdType* ret_data = static_cast<IdType*>(result->data);
   // std::fill(ret_data, ret_data + sample_points * batch_size, 0);
 
   int64_t array_start = 0, ret_start = 0;
   // loop for each point cloud sample in this batch
   for (auto b = 0; b < batch_size; b++) {
     // random init start sample
-    int64_t sample_idx = start_idx_data[b]; //rand() % point_in_batch;
-    ret_data[ret_start] = array_start + sample_idx;
+    int64_t sample_idx = (int64_t)start_idx_data[b]; //rand() % point_in_batch;
+    ret_data[ret_start] = (IdType)(array_start + sample_idx);
 
     int64_t dist_argmax = 0;
     FloatType dist_max = -1;
@@ -73,7 +73,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
       }
       // sample the `dist_argmax`-th point
       sample_idx = dist_argmax;
-      ret_data[ret_start + i + 1] = array_start + sample_idx;
+      ret_data[ret_start + i + 1] = (IdType)(array_start + sample_idx);
     }
 
     array_start += point_in_batch;
@@ -82,9 +82,17 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   // return ret;
 }
 
-template void FarthestPointSampler<kDLCPU, float>(NDArray array, int64_t batch_size, int64_t sample_points,
+template void FarthestPointSampler<kDLCPU, float, int32_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLCPU, double>(NDArray array, int64_t batch_size, int64_t sample_points,
+template void FarthestPointSampler<kDLCPU, float, int64_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
+    NDArray dist, IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDLCPU, double, int32_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
+    NDArray dist, IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDLCPU, double, int64_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
 }  // namespace impl

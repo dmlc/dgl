@@ -22,10 +22,10 @@ __global__ void _FillKernel(FloatType* ptr, int64_t length, FloatType val) {
   }
 }
 
-template <typename FloatType>
+template <typename FloatType, typename IdType>
 __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size, const int64_t sample_points,
                            const int64_t point_in_batch, const int64_t dim,
-                           const int64_t *start_idx, FloatType *dist_data, int64_t *ret_data) {
+                           const IdType *start_idx, FloatType *dist_data, IdType *ret_data) {
   const int64_t thread_idx = threadIdx.x;
   const int64_t batch_idx = blockIdx.x;
 
@@ -37,7 +37,7 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
 
   // start with random initialization
   if (thread_idx == 0) {
-    ret_data[ret_start] = array_start + start_idx[batch_idx];
+    ret_data[ret_start] = (IdType)(array_start + start_idx[batch_idx]);
   }
 
   // sample the rest `sample_points - 1` points
@@ -45,7 +45,7 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
     __syncthreads();
 
     // the last sampled point
-    int64_t sample_idx = ret_data[ret_start + i];
+    int64_t sample_idx = (int64_t)(ret_data[ret_start + i]);
     FloatType dist_max = (FloatType)(-1.);
     int64_t dist_argmax = 0;
 
@@ -80,12 +80,12 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
     }
 
     if (thread_idx == 0) {
-      ret_data[ret_start + i + 1] = array_start + dist_argmax_ht[0];
+      ret_data[ret_start + i + 1] = (IdType)(array_start + dist_argmax_ht[0]);
     }
   }
 }
 
-template <DLDeviceType XPU, typename FloatType>
+template <DLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -97,7 +97,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
 
   // Init return value
   // IdArray ret = NewIdArray(sample_points * batch_size, ctx, sizeof(int64_t) * 8);
-  int64_t* ret_data = static_cast<int64_t*>(result->data);
+  IdType* ret_data = static_cast<IdType*>(result->data);
   // std::fill(ret_data, ret_data + sample_points * batch_size , 0);
   /*
   _FillKernel<<<(sample_points * batch_size + THREADS - 1) / THREADS, THREADS, 0, thr_entry->stream>>>(
@@ -115,7 +115,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
 
   // Init sample for each cloud in the batch
   // IdArray start_idx = NewIdArray(batch_size, ctx, sizeof(int64_t) * 8);
-  int64_t* start_idx_data = static_cast<int64_t*>(start_idx->data);
+  IdType* start_idx_data = static_cast<IdType*>(start_idx->data);
   /*
   std::vector<int64_t> start_idx_cpu(batch_size);
   for (auto i = 0; i < batch_size; i++) {
@@ -130,9 +130,17 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   // return ret;
 }
 
-template void FarthestPointSampler<kDLGPU, float>(NDArray array, int64_t batch_size, int64_t sample_points,
+template void FarthestPointSampler<kDLGPU, float, int32_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLGPU, double>(NDArray array, int64_t batch_size, int64_t sample_points,
+template void FarthestPointSampler<kDLGPU, float, int64_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
+    NDArray dist, IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDLGPU, double, int32_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
+    NDArray dist, IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDLGPU, double, int64_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
 } // impl
