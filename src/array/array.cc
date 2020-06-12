@@ -6,6 +6,7 @@
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/ndarray.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
@@ -638,6 +639,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
 
   ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
     ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
+#ifdef DGL_USE_CUDA
       if (XPU == kDLCPU) {
         impl::FarthestPointSampler<kDLCPU, FloatType, IdType>(
             array, batch_size, sample_points, dist, start_idx, result);
@@ -647,6 +649,16 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
       } else {
         LOG(FATAL) << "Incompatible array context. Currently only CPU/GPU are supported.";
       }
+#else
+      if (XPU == kDLCPU) {
+        impl::FarthestPointSampler<kDLCPU, FloatType, IdType>(
+            array, batch_size, sample_points, dist, start_idx, result);
+      } else if (XPU == kDLGPU) {
+        LOG(FATAL) << "The install DGL is CPU-only. Please install the CUDA version or re-build.";
+      } else {
+        LOG(FATAL) << "Incompatible array context. Currently only CPU/GPU are supported.";
+      }
+#endif
     });
   });
 }
