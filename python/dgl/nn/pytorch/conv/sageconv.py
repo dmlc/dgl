@@ -1,10 +1,10 @@
 """Torch Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-from numbers import Integral
 from torch import nn
 from torch.nn import functional as F
 
 from .... import function as fn
+from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(nn.Module):
@@ -56,14 +56,7 @@ class SAGEConv(nn.Module):
                  activation=None):
         super(SAGEConv, self).__init__()
 
-        if isinstance(in_feats, tuple):
-            self._in_src_feats = in_feats[0]
-            self._in_dst_feats = in_feats[1]
-        elif isinstance(in_feats, Integral):
-            self._in_src_feats = self._in_dst_feats = in_feats
-        else:
-            raise TypeError('in_feats must be either int or pair of ints')
-
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         self.norm = norm
@@ -121,47 +114,47 @@ class SAGEConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        graph = graph.local_var()
+        with graph.local_scope():
+            if isinstance(feat, tuple):
+                feat_src = self.feat_drop(feat[0])
+                feat_dst = self.feat_drop(feat[1])
+            else:
+                feat_src = feat_dst = self.feat_drop(feat)
 
-        if isinstance(feat, tuple):
-            feat_src = self.feat_drop(feat[0])
-            feat_dst = self.feat_drop(feat[1])
-        else:
-            feat_src = feat_dst = self.feat_drop(feat)
+            h_self = feat_dst
 
-        h_self = feat_dst
+            if self._aggre_type == 'mean':
+                graph.srcdata['h'] = feat_src
+                graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
+                h_neigh = graph.dstdata['neigh']
+            elif self._aggre_type == 'gcn':
+                check_eq_shape(feat)
+                graph.srcdata['h'] = feat_src
+                graph.dstdata['h'] = feat_dst     # same as above if homogeneous
+                graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
+                # divide in_degrees
+                degs = graph.in_degrees().to(feat_dst)
+                h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.unsqueeze(-1) + 1)
+            elif self._aggre_type == 'pool':
+                graph.srcdata['h'] = F.relu(self.fc_pool(feat_src))
+                graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
+                h_neigh = graph.dstdata['neigh']
+            elif self._aggre_type == 'lstm':
+                graph.srcdata['h'] = feat_src
+                graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
+                h_neigh = graph.dstdata['neigh']
+            else:
+                raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
 
-        if self._aggre_type == 'mean':
-            graph.srcdata['h'] = feat_src
-            graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
-            h_neigh = graph.dstdata['neigh']
-        elif self._aggre_type == 'gcn':
-            graph.srcdata['h'] = feat_src
-            graph.dstdata['h'] = feat_dst     # same as above if homogeneous
-            graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
-            # divide in_degrees
-            degs = graph.in_degrees().to(feat_dst)
-            h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.unsqueeze(-1) + 1)
-        elif self._aggre_type == 'pool':
-            graph.srcdata['h'] = F.relu(self.fc_pool(feat_src))
-            graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
-            h_neigh = graph.dstdata['neigh']
-        elif self._aggre_type == 'lstm':
-            graph.srcdata['h'] = feat_src
-            graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
-            h_neigh = graph.dstdata['neigh']
-        else:
-            raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
-
-        # GraphSAGE GCN does not require fc_self.
-        if self._aggre_type == 'gcn':
-            rst = self.fc_neigh(h_neigh)
-        else:
-            rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
-        # activation
-        if self.activation is not None:
-            rst = self.activation(rst)
-        # normalization
-        if self.norm is not None:
-            rst = self.norm(rst)
-        return rst
+            # GraphSAGE GCN does not require fc_self.
+            if self._aggre_type == 'gcn':
+                rst = self.fc_neigh(h_neigh)
+            else:
+                rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
+            # activation
+            if self.activation is not None:
+                rst = self.activation(rst)
+            # normalization
+            if self.norm is not None:
+                rst = self.norm(rst)
+            return rst

@@ -369,6 +369,27 @@ class BaseHeteroGraph : public runtime::Object {
   virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
 
   /*!
+   * \brief Get restrict sparse format of the graph.
+   * 
+   * \return a string representing the sparse format: 'coo'/'csr'/'csc'/'any'
+   */
+  virtual std::string GetRestrictFormat() const = 0;
+
+  /*!
+   * \brief Return the sparse format in use for the graph.
+   * 
+   * \return a number of type dgl_format_code_t. 
+   */
+  virtual dgl_format_code_t GetFormatInUse() const = 0;
+
+  /*!
+   * \brief Return the graph in specified restrict format.
+   * 
+   * \return The new graph.
+   */
+  virtual HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const = 0;
+
+  /*!
    * \brief Get adjacency matrix in COO format.
    * \param etype Edge type.
    * \return COO matrix.
@@ -435,6 +456,12 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const {
     LOG(FATAL) << "Flatten operation unsupported";
+    return nullptr;
+  }
+
+  /*! \brief Cast this graph to immutable graph */
+  virtual GraphPtr AsImmutableGraph() const {
+    LOG(FATAL) << "AsImmutableGraph not supported.";
     return nullptr;
   }
 
@@ -663,10 +690,12 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
  *
  * TODO(minjie): remove the meta_graph argument
  * 
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param meta_graph Metagraph of the inputs and result.
  * \param component_graphs Input graphs
  * \return One graph that unions all the components
  */
+template <class IdType>
 HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
@@ -683,12 +712,14 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
  * TODO(minjie): remove the meta_graph argument; use vector<IdArray> for vertex_sizes
  *   and edge_sizes.
  *
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param meta_graph Metagraph.
  * \param batched_graph Input graph.
  * \param vertex_sizes Number of vertices of each component.
  * \param edge_sizes Number of vertices of each component.
  * \return A list of graphs representing each disjoint components.
  */
+template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     GraphPtr meta_graph,
     HeteroGraphPtr batched_graph,
@@ -708,7 +739,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
  * This class can be used as arguments and return values of a C API.
  */
 struct HeteroPickleStates : public runtime::Object {
-  /*! \brief Metagraph. */
+  /*! \brief Metagraph(64bits ImmutableGraph) */
   GraphPtr metagraph;
 
   /*! \brief Number of nodes per type */

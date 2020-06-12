@@ -122,7 +122,6 @@ class ObjectRef {
    * Compare with the two are referencing to the same object (compare by address).
    *
    * \param other Another object ref.
-   * \param other Another object ref.
    * \return the compare result.
    */
   inline bool same_as(const ObjectRef& other) const;

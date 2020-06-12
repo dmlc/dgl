@@ -18,12 +18,10 @@ The basic use is execute a script, and get the needed results out of the printed
 
 ## Run locally
 
+The default regression branch in asv is `master`. If you need to run on other branch on your fork, please change the `branches` value in the `asv.conf.json` at the root of your repo.
+
 ```bash
-docker run --name dgl-reg --rm --hostname=reg-machine --runtime=nvidia -dit dgllib/dgl-ci-gpu:conda /bin/bash
-docker cp /home/ubuntu/asv_data dgl-reg:/root/asv_data/
-docker exec dgl-reg bash /root/asv_data/run.sh
-docker cp dgl-reg:/root/regression/dgl/asv/. /home/ubuntu/asv_data/  # Change /home/ubuntu/asv to the path you want to put the result
-docker stop dgl-reg
+bash ./publish.sh <repo> <branch>
 ```
 
-And in the directory you choose (such as `/home/ubuntu/asv_data`), there's a `html` directory. You can use `python -m http.server` to start a server to see the result
+The running result will be at `./asv_data/`. You can use `python -m http.server` inside the `html` folder to start a server to see the result

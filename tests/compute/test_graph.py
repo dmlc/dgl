@@ -5,6 +5,7 @@ import networkx as nx
 import dgl
 import backend as F
 from dgl import DGLError
+import pytest
 
 # graph generation: a random graph with 10 nodes
 #  and 20 edges.
@@ -58,7 +59,6 @@ def test_query():
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
         assert len(g) == 10
-        assert not g.is_multigraph
 
         for i in range(10):
             assert g.has_node(i)
@@ -131,7 +131,6 @@ def test_query():
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
         assert len(g) == 10
-        assert not g.is_multigraph
 
         for i in range(10):
             assert g.has_node(i)
@@ -203,6 +202,25 @@ def test_query():
         _test_csr_one(g)
         _test_csr_one(g)
 
+    def _test_edge_ids():
+        g = gen_by_mutation()
+        eids = g.edge_ids([4,0], [4,9])
+        assert eids.shape[0] == 2
+        eid = g.edge_id(4, 4)
+        assert isinstance(eid, int)
+        with pytest.raises(AssertionError):
+            eids = g.edge_ids([9,0], [4,9])
+
+        with pytest.raises(AssertionError):
+            eid = g.edge_id(4, 5)
+
+        g.add_edge(0, 4)
+        with pytest.raises(AssertionError):
+            eids = g.edge_ids([0,0], [4,9])
+
+        with pytest.raises(AssertionError):
+            eid = g.edge_id(0, 4)
+
     _test(gen_by_mutation())
     _test(gen_from_data(elist_input(), False, False))
     _test(gen_from_data(elist_input(), True, False))
@@ -214,6 +232,7 @@ def test_query():
 
     _test_csr(gen_from_data(scipy_csr_input(), False, False))
     _test_csr(gen_from_data(scipy_csr_input(), True, False))
+    _test_edge_ids()
 
 def test_mutation():
     g = dgl.DGLGraph()
@@ -358,8 +377,8 @@ def test_find_edges():
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
     e = g.find_edges([1, 3, 2, 4])
-    assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
-    assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
+    assert F.asnumpy(e[0][0]) == 1 and F.asnumpy(e[0][1]) == 3 and F.asnumpy(e[0][2]) == 2 and F.asnumpy(e[0][3]) == 4
+    assert F.asnumpy(e[1][0]) == 2 and F.asnumpy(e[1][1]) == 4 and F.asnumpy(e[1][2]) == 3 and F.asnumpy(e[1][3]) == 5
 
     try:
         g.find_edges([10])
@@ -371,8 +390,8 @@ def test_find_edges():
 
     g.readonly()
     e = g.find_edges([1, 3, 2, 4])
-    assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
-    assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
+    assert F.asnumpy(e[0][0]) == 1 and F.asnumpy(e[0][1]) == 3 and F.asnumpy(e[0][2]) == 2 and F.asnumpy(e[0][3]) == 4
+    assert F.asnumpy(e[1][0]) == 2 and F.asnumpy(e[1][1]) == 4 and F.asnumpy(e[1][2]) == 3 and F.asnumpy(e[1][3]) == 5
 
     try:
         g.find_edges([10])
@@ -381,6 +400,17 @@ def test_find_edges():
         fail = True
     finally:
         assert fail
+
+def test_ismultigraph():
+    g = dgl.DGLGraph()
+    g.add_nodes(10)
+    assert g.is_multigraph == False
+    g.add_edges([0], [0])
+    assert g.is_multigraph == False
+    g.add_edges([1], [2])
+    assert g.is_multigraph == False
+    g.add_edges([0, 2], [0, 3])
+    assert g.is_multigraph == True
 
 if __name__ == '__main__':
     test_query()

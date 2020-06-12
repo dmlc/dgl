@@ -17,8 +17,16 @@ import numpy as np
 import dgl
 import dgl.backend as F
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 
 __all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
+
+# Dictionary for renaming reserved node/edge type names to the ones
+# that are allowed by nn.Module.
+RENAME_DICT = {
+    'type' : 'rdftype',
+    'rev-type' : 'rev-rdftype',
+}
 
 class Entity:
     """Class for entities
@@ -101,9 +109,17 @@ class RDFGraphDataset:
                  insert_reverse=True):
         download_dir = get_download_dir()
         zip_file_path = os.path.join(download_dir, '{}.zip'.format(name))
-        download(url, path=zip_file_path)
         self._dir = os.path.join(download_dir, name)
-        extract_archive(zip_file_path, self._dir)
+        self._url = url
+        self._zip_file_path = zip_file_path
+        self._load(print_every, insert_reverse, force_reload)
+
+    def _download(self):
+        download(self._url, path=self._zip_file_path)
+        extract_archive(self._zip_file_path, self._dir)
+
+    @retry_method_with_fix(_download)
+    def _load(self, print_every, insert_reverse, force_reload):
         self._print_every = print_every
         self._insert_reverse = insert_reverse
         if not force_reload and self.has_cache():
@@ -214,6 +230,14 @@ class RDFGraphDataset:
         g.edata[dgl.ETYPE] = F.tensor(etid)
         print('Total #nodes:', g.number_of_nodes())
         print('Total #edges:', g.number_of_edges())
+
+        # rename names such as 'type' so that they an be used as keys
+        # to nn.ModuleDict
+        etypes = [RENAME_DICT.get(ty, ty) for ty in etypes]
+        mg_edges = mg.edges(keys=True)
+        mg = nx.MultiDiGraph()
+        for sty, dty, ety in mg_edges:
+            mg.add_edge(sty, dty, key=RENAME_DICT.get(ety, ety))
 
         # convert to heterograph
         print('Convert to heterograph ...')

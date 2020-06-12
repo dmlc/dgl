@@ -11,7 +11,6 @@ import pickle
 import io
 
 def _assert_is_identical(g, g2):
-    assert g.is_multigraph == g2.is_multigraph
     assert g.is_readonly == g2.is_readonly
     assert g.number_of_nodes() == g2.number_of_nodes()
     src, dst = g.all_edges(order='eid')
@@ -27,7 +26,6 @@ def _assert_is_identical(g, g2):
         assert F.allclose(g.edata[k], g2.edata[k])
 
 def _assert_is_identical_hetero(g, g2):
-    assert g.is_multigraph == g2.is_multigraph
     assert g.is_readonly == g2.is_readonly
     assert g.ntypes == g2.ntypes
     assert g.canonical_etypes == g2.canonical_etypes
@@ -53,7 +51,6 @@ def _assert_is_identical_hetero(g, g2):
             assert F.allclose(g.edges[etype].data[k], g2.edges[etype].data[k])
 
 def _assert_is_identical_nodeflow(nf1, nf2):
-    assert nf1.is_multigraph == nf2.is_multigraph
     assert nf1.is_readonly == nf2.is_readonly
     assert nf1.number_of_nodes() == nf2.number_of_nodes()
     src, dst = nf1.all_edges()
@@ -107,7 +104,7 @@ def test_pickling_index():
     _assert_is_identical_index(i, i2)
 
 def test_pickling_graph_index():
-    gi = create_graph_index(None, False, False)
+    gi = create_graph_index(None, False)
     gi.add_nodes(3)
     src_idx = toindex([0, 0])
     dst_idx = toindex([1, 2])
@@ -210,12 +207,12 @@ def test_pickling_graph():
     _assert_is_identical(g, new_g)
 
     # multigraph
-    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True)
+    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)])
     new_g = _reconstruct_pickle(g)
     _assert_is_identical(g, new_g)
 
     # readonly multigraph
-    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True, readonly=True)
+    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], readonly=True)
     new_g = _reconstruct_pickle(g)
     _assert_is_identical(g, new_g)
 

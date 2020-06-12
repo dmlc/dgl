@@ -27,13 +27,7 @@ class SharedMemory {
    * and will be responsible for deleting it when the object is destroyed.
    */
   bool own;
-  /*
-   * \brief the name of the object.
-   *
-   * In Unix, shared memory is identified by a file. Thus, `name` is actually
-   * the file name that identifies the shared memory.
-   */
-  std::string name;
+
   /* \brief the file descripter of the shared memory. */
   int fd;
   /* \brief the address of the shared memory. */
@@ -41,7 +35,19 @@ class SharedMemory {
   /* \brief the size of the shared memory. */
   size_t size;
 
+  /*
+   * \brief the name of the object.
+   *
+   * In Unix, shared memory is identified by a file. Thus, `name` is actually
+   * the file name that identifies the shared memory.
+   */
+  std::string name;
+
  public:
+  /* \brief Get the filename of shared memory file
+   */
+  std::string GetName() const { return name; }
+
   /*
    * \brief constructor of the shared memory.
    * \param name The file corresponding to the shared memory.
@@ -58,13 +64,20 @@ class SharedMemory {
    * \param size the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *create_new(size_t size);
+  void *CreateNew(size_t size);
   /*
    * \brief allocate shared memory that has been created.
    * \param size the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *open(size_t size);
+  void *Open(size_t size);
+
+  /*
+   * \brief check if the shared memory exist.
+   * \param name the name of the shared memory.
+   * \return a boolean value to indicate if the shared memory exists.
+   */
+  static bool Exist(const std::string &name);
 };
 #endif  // _WIN32
 

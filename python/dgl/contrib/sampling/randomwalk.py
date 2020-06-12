@@ -209,8 +209,8 @@ def metapath_random_walk(hg, etypes, seeds, num_traces):
         raise ValueError('beginning and ending node type mismatch')
     if len(seeds) == 0:
         return []
-    etype_array = ndarray.array(np.asarray([hg.get_etype_id(et) for et in etypes], dtype='int64'))
-    seed_array = utils.toindex(seeds).todgltensor()
+    etype_array = ndarray.array(np.asarray([hg.get_etype_id(et) for et in etypes], dtype="int64"))
+    seed_array = utils.toindex(seeds, hg._idtype_str).todgltensor()
     traces = _CAPI_DGLMetapathRandomWalk(hg._graph, etype_array, seed_array, num_traces)
     return _split_traces(traces)
 

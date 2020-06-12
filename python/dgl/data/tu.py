@@ -4,6 +4,7 @@ import os
 import random
 
 from .utils import download, extract_archive, get_download_dir, loadtxt
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 class LegacyTUDataset(object):
@@ -28,7 +29,24 @@ class LegacyTUDataset(object):
 
         self.name = name
         self.hidden_size = hidden_size
-        self.extract_dir = self._download()
+        self.extract_dir = self._get_extract_dir()
+        self._load()
+
+    def _get_extract_dir(self):
+        download_dir = get_download_dir()
+        zip_file_path = os.path.join(
+            download_dir,
+            "tu_{}.zip".format(
+                self.name))
+        extract_dir = os.path.join(download_dir, "tu_{}".format(self.name))
+        return extract_dir
+
+    def _download(self):
+        download(self._url.format(self.name), path=zip_file_path)
+        extract_archive(zip_file_path, extract_dir)
+
+    @retry_method_with_fix(_download)
+    def _load(self):
         self.data_mode = None
         self.max_allow_node = max_allow_node
 
@@ -75,6 +93,8 @@ class LegacyTUDataset(object):
         try:
             DS_node_attr = np.loadtxt(
                 self._file_path("node_attributes"), delimiter=",")
+            if DS_node_attr.ndim == 1:
+                DS_node_attr = np.expand_dims(DS_node_attr, -1)
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = DS_node_attr[idxs, :]
             self.data_mode = "node_attr"
@@ -121,17 +141,6 @@ class LegacyTUDataset(object):
 
     def __len__(self):
         return len(self.graph_lists)
-
-    def _download(self):
-        download_dir = get_download_dir()
-        zip_file_path = os.path.join(
-            download_dir,
-            "tu_{}.zip".format(
-                self.name))
-        download(self._url.format(self.name), path=zip_file_path)
-        extract_dir = os.path.join(download_dir, "tu_{}".format(self.name))
-        extract_archive(zip_file_path, extract_dir)
-        return extract_dir
 
     def _file_path(self, category):
         return os.path.join(self.extract_dir, self.name,

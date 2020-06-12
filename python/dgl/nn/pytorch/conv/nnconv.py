@@ -6,6 +6,7 @@ from torch.nn import init
 
 from .... import function as fn
 from ..utils import Identity
+from ....utils import expand_as_pair
 
 
 class NNConv(nn.Module):
@@ -20,6 +21,11 @@ class NNConv(nn.Module):
     ----------
     in_feats : int
         Input feature size.
+
+        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
     out_feats : int
         Output feature size.
     edge_func : callable activation function/layer
@@ -42,7 +48,7 @@ class NNConv(nn.Module):
                  residual=False,
                  bias=True):
         super(NNConv, self).__init__()
-        self._in_feats = in_feats
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self.edge_nn = edge_func
         if aggregator_type == 'sum':
@@ -55,8 +61,8 @@ class NNConv(nn.Module):
             raise KeyError('Aggregator type {} not recognized: '.format(aggregator_type))
         self._aggre_type = aggregator_type
         if residual:
-            if in_feats != out_feats:
-                self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+            if self._in_dst_feats != out_feats:
+                self.res_fc = nn.Linear(self._in_dst_feats, out_feats, bias=False)
             else:
                 self.res_fc = Identity()
         else:
@@ -82,7 +88,7 @@ class NNConv(nn.Module):
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : torch.Tensor or pair of torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`N`
             is the number of nodes of the graph and :math:`D_{in}` is the
             input feature size.
@@ -96,18 +102,20 @@ class NNConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         """
-        graph = graph.local_var()
-        # (n, d_in, 1)
-        graph.ndata['h'] = feat.unsqueeze(-1)
-        # (n, d_in, d_out)
-        graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_feats, self._out_feats)
-        # (n, d_in, d_out)
-        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
-        rst = graph.ndata.pop('neigh').sum(dim=1) # (n, d_out)
-        # residual connection
-        if self.res_fc is not None:
-            rst = rst + self.res_fc(feat)
-        # bias
-        if self.bias is not None:
-            rst = rst + self.bias
-        return rst
+        with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
+
+            # (n, d_in, 1)
+            graph.srcdata['h'] = feat_src.unsqueeze(-1)
+            # (n, d_in, d_out)
+            graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_src_feats, self._out_feats)
+            # (n, d_in, d_out)
+            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
+            rst = graph.dstdata['neigh'].sum(dim=1) # (n, d_out)
+            # residual connection
+            if self.res_fc is not None:
+                rst = rst + self.res_fc(feat_dst)
+            # bias
+            if self.bias is not None:
+                rst = rst + self.bias
+            return rst

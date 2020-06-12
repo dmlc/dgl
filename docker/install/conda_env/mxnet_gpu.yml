@@ -5,12 +5,12 @@ dependencies:
   - pip:
     - mxnet-cu101
     - pytest
-  - nose
-  - numpy
-  - cython
-  - scipy
-  - networkx
-  - matplotlib
-  - nltk
-  - requests[security]
-  - tqdm
+    - nose
+    - numpy
+    - cython
+    - scipy
+    - networkx
+    - matplotlib
+    - nltk
+    - requests[security]
+    - tqdm

@@ -7,11 +7,16 @@ from tqdm import tqdm
 
 from reading_data import DataReader, Metapath2vecDataset
 from model import SkipGramModel
+from download import AminerDataset, CustomDataset
 
 
 class Metapath2VecTrainer:
     def __init__(self, args):
-        self.data = DataReader(args.download, args.min_count, args.care_type)
+        if args.aminer:
+            dataset = AminerDataset(args.path)
+        else:
+            dataset = CustomDataset(args.path)
+        self.data = DataReader(dataset, args.min_count, args.care_type)
         dataset = Metapath2vecDataset(self.data, args.window_size)
         self.dataloader = DataLoader(dataset, batch_size=args.batch_size,
                                      shuffle=True, num_workers=args.num_workers, collate_fn=dataset.collate)
@@ -60,7 +65,8 @@ class Metapath2VecTrainer:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Metapath2vec")
     #parser.add_argument('--input_file', type=str, help="input_file")
-    parser.add_argument('--download', type=str, help="download_path")
+    parser.add_argument('--aminer', action='store_true', help='Use AMiner dataset')
+    parser.add_argument('--path', type=str, help="input_path")
     parser.add_argument('--output_file', type=str, help='output_file')
     parser.add_argument('--dim', default=128, type=int, help="embedding dimensions")
     parser.add_argument('--window_size', default=7, type=int, help="context window size")

@@ -13,12 +13,24 @@
 #include <dgl/graph_interface.h>
 #include <algorithm>
 #include <vector>
+#include <string>
 
 using dgl::runtime::operator<<;
 
 /*! \brief Output the string representation of device context.*/
-inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
-  return os << ctx.device_type << ":" << ctx.device_id;
+inline std::ostream& operator<<(std::ostream& os, const DLContext& ctx) {
+  std::string device_name;
+  switch (ctx.device_type) {
+    case kDLCPU:
+      device_name = "CPU";
+      break;
+    case kDLGPU:
+      device_name = "GPU";
+      break;
+    default:
+      device_name = "Unknown device";
+  }
+  return os << device_name << ":" << ctx.device_id;
 }
 
 namespace dgl {
@@ -28,13 +40,6 @@ typedef void* CommunicatorHandle;
 
 // KVstore message handler type
 typedef void* KVMsgHandle;
-
-/*! \brief Enum type for bool value with unknown */
-enum BoolFlag {
-  kBoolUnknown = -1,
-  kBoolFalse = 0,
-  kBoolTrue = 1
-};
 
 /*!
  * \brief Convert a vector of NDArray to PackedFunc.

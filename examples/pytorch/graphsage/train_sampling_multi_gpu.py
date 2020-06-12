@@ -10,12 +10,12 @@ import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
 import traceback
+
+from utils import thread_wrapped_func
 
 #### Neighbor sampler
 
@@ -29,7 +29,7 @@ class NeighborSampler(object):
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout, replace=True)
+            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -110,39 +110,6 @@ class SAGE(nn.Module):
             x = y
         return y
 
-#### Miscellaneous functions
-
-# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
-# is necessary to make fork() and openmp work together.
-#
-# TODO: confirm if this is necessary for MXNet and Tensorflow.  If so, we need
-# to standardize worker process creation since our operators are implemented with
-# OpenMP.
-def thread_wrapped_func(func):
-    """
-    Wraps a process entry point to make it work with OpenMP.
-    """
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        queue = mp.Queue()
-        def _queue_result():
-            exception, trace, res = None, None, None
-            try:
-                res = func(*args, **kwargs)
-            except Exception as e:
-                exception = e
-                trace = traceback.format_exc()
-            queue.put((res, exception, trace))
-
-        start_new_thread(_queue_result, ())
-        result, exception, trace = queue.get()
-        if exception is None:
-            return result
-        else:
-            assert isinstance(exception, Exception)
-            raise exception.__class__(trace)
-    return decorated_function
-
 def prepare_mp(g):
     """
     Explicitly materialize the CSR, CSC and COO representation of the given graph
@@ -197,7 +164,7 @@ def run(proc_id, n_gpus, args, devices, data):
         th.distributed.init_process_group(backend="nccl",
                                           init_method=dist_init_method,
                                           world_size=world_size,
-                                          rank=dev_id)
+                                          rank=proc_id)
     th.cuda.set_device(dev_id)
 
     # Unpack data
@@ -208,7 +175,7 @@ def run(proc_id, n_gpus, args, devices, data):
     val_mask = th.BoolTensor(val_mask)
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
+    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
@@ -282,9 +249,9 @@ def run(proc_id, n_gpus, args, devices, data):
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
-                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
+                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
                 else:
-                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
+                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
 
 

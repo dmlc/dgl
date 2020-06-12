@@ -74,27 +74,27 @@ class SGConv(nn.Block):
         If ``cache`` is se to True, ``feat`` and ``graph`` should not change during
         training, or you will get wrong results.
         """
-        graph = graph.local_var()
-        if self._cached_h is not None:
-            feat = self._cached_h
-        else:
-            # compute normalization
-            degs = nd.clip(graph.in_degrees().astype(feat.dtype), 1, float('inf'))
-            norm = nd.power(degs, -0.5).expand_dims(1)
-            norm = norm.as_in_context(feat.context)
-            # compute (D^-1 A D)^k X
-            for _ in range(self._k):
-                feat = feat * norm
-                graph.ndata['h'] = feat
-                graph.update_all(fn.copy_u('h', 'm'),
-                                 fn.sum('m', 'h'))
-                feat = graph.ndata.pop('h')
-                feat = feat * norm
+        with graph.local_scope():
+            if self._cached_h is not None:
+                feat = self._cached_h
+            else:
+                # compute normalization
+                degs = nd.clip(graph.in_degrees().astype(feat.dtype), 1, float('inf'))
+                norm = nd.power(degs, -0.5).expand_dims(1)
+                norm = norm.as_in_context(feat.context)
+                # compute (D^-1 A D)^k X
+                for _ in range(self._k):
+                    feat = feat * norm
+                    graph.ndata['h'] = feat
+                    graph.update_all(fn.copy_u('h', 'm'),
+                                     fn.sum('m', 'h'))
+                    feat = graph.ndata.pop('h')
+                    feat = feat * norm
 
-            if self.norm is not None:
-                feat = self.norm(feat)
+                if self.norm is not None:
+                    feat = self.norm(feat)
 
-            # cache feature
-            if self._cached:
-                self._cached_h = feat
-        return self.fc(feat)
+                # cache feature
+                if self._cached:
+                    self._cached_h = feat
+            return self.fc(feat)

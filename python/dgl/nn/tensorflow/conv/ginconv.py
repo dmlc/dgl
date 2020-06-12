@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 from .... import function as fn
+from ....utils import expand_as_pair
 
 
 class GINConv(layers.Layer):
@@ -52,10 +53,13 @@ class GINConv(layers.Layer):
         ----------
         graph : DGLGraph
             The graph.
-        feat : tf.Tensor
-            The input feature of shape :math:`(N, D)` where :math:`D`
-            could be any positive integer, :math:`N` is the number
-            of nodes. If ``apply_func`` is not None, :math:`D` should
+
+        feat : tf.Tensor or pair of tf.Tensor
+            If a tf.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tf.Tensor is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
+            If ``apply_func`` is not None, :math:`D_{in}` should
             fit the input dimensionality requirement of ``apply_func``.
 
         Returns
@@ -66,10 +70,11 @@ class GINConv(layers.Layer):
             If ``apply_func`` is None, :math:`D_{out}` should be the same
             as input dimensionality.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = feat
-        graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
-        rst = (1 + self.eps) * feat + graph.ndata['neigh']
-        if self.apply_func is not None:
-            rst = self.apply_func(rst)
-        return rst
+        with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
+            graph.srcdata['h'] = feat_src
+            graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
+            rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
+            if self.apply_func is not None:
+                rst = self.apply_func(rst)
+            return rst

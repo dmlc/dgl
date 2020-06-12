@@ -27,7 +27,7 @@ def test_node_removal():
     assert F.array_equal(g.ndata['id'], F.tensor([0, 7, 8, 9, 0, 0, 0]))
 
 def test_multigraph_node_removal():
-    g = dgl.DGLGraph(multigraph=True)
+    g = dgl.DGLGraph()
     g.add_nodes(5)
     for i in range(5):
         g.add_edge(i, i)
@@ -53,7 +53,7 @@ def test_multigraph_node_removal():
     assert g.number_of_edges() == 6
 
 def test_multigraph_edge_removal():
-    g = dgl.DGLGraph(multigraph=True)
+    g = dgl.DGLGraph()
     g.add_nodes(5)
     for i in range(5):
         g.add_edge(i, i)
@@ -163,6 +163,24 @@ def test_edge_frame():
     g.remove_edges(range(3, 7))
     assert F.allclose(g.edata['h'], F.zerocopy_from_numpy(new_data))
 
+def test_frame_size():
+    # reproduce https://github.com/dmlc/dgl/issues/1287.
+    # remove nodes
+    g = dgl.DGLGraph()
+    g.add_nodes(5)
+    g.add_edges([0, 2, 3, 1, 1], [1, 0, 3, 1, 0])
+    g.remove_nodes([0, 1])
+    assert g._node_frame.num_rows == 3
+    assert g._edge_frame.num_rows == 1
+
+    # remove edges 
+    g = dgl.DGLGraph()
+    g.add_nodes(5)
+    g.add_edges([0, 2, 3, 1, 1], [1, 0, 3, 1, 0])
+    g.remove_edges([0, 1])
+    assert g._node_frame.num_rows == 5
+    assert g._edge_frame.num_rows == 3
+
 if __name__ == '__main__':
     test_node_removal()
     test_edge_removal()
@@ -171,3 +189,4 @@ if __name__ == '__main__':
     test_node_and_edge_removal()
     test_node_frame()
     test_edge_frame()
+    test_frame_size()

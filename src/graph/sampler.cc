@@ -355,7 +355,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            std::vector<std::pair<dgl_id_t, int> > *sub_vers,
                            std::vector<neighbor_info> *neigh_pos,
                            const std::string &edge_type,
-                           int64_t num_edges, int num_hops, bool is_multigraph) {
+                           int64_t num_edges, int num_hops) {
   NodeFlow nf = NodeFlow::Create();
   uint64_t num_vertices = sub_vers->size();
   nf->node_mapping = aten::NewIdArray(num_vertices);
@@ -368,9 +368,8 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf->flow_offsets->data);
   dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf->edge_mapping->data);
 
-  // Construct sub_csr_graph
-  // TODO(minjie): is nodeflow a multigraph?
-  auto subg_csr = CSRPtr(new CSR(num_vertices, num_edges, is_multigraph));
+  // Construct sub_csr_graph, we treat nodeflow as multigraph by default
+  auto subg_csr = CSRPtr(new CSR(num_vertices, num_edges));
   dgl_id_t* indptr_out = static_cast<dgl_id_t*>(subg_csr->indptr()->data);
   dgl_id_t* col_list_out = static_cast<dgl_id_t*>(subg_csr->indices()->data);
   dgl_id_t* eid_out = static_cast<dgl_id_t*>(subg_csr->edge_ids()->data);
@@ -592,7 +591,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
   }
 
   return ConstructNodeFlow(neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
-                           edge_type, num_edges, num_hops, graph->IsMultigraph());
+                           edge_type, num_edges, num_hops);
 }
 
 }  // namespace
@@ -1090,7 +1089,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   int64_t num_tot_nodes = gptr_->NumVertices();
   if (neg_sample_size > num_tot_nodes)
     neg_sample_size = num_tot_nodes;
-  bool is_multigraph = gptr_->IsMultigraph();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
@@ -1223,7 +1221,7 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   NegSubgraph neg_subg;
   // We sample negative vertices without replacement.
   // There shouldn't be duplicated edges.
-  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
+  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst));
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
@@ -1374,7 +1372,7 @@ NegSubgraph EdgeSamplerObject::genChunkedNegEdgeSubgraph(const Subgraph &pos_sub
   NegSubgraph neg_subg;
   // We sample negative vertices without replacement.
   // There shouldn't be duplicated edges.
-  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, gptr_->IsMultigraph()));
+  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst));
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
