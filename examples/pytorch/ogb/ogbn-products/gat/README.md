@@ -4,4 +4,4 @@ Requires DGL 0.4.3post2 or later versions.
 
 Run `main.py` and you should directly see the result.
 
-Accuracy over 5 runs: 0.7825504 ± 0.005703136
+Accuracy over 5 runs: 0.7835164 ± 0.00801149
