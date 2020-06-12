@@ -70,6 +70,7 @@ class RelGraphConv(gluon.Block):
                  bias=True,
                  activation=None,
                  self_loop=False,
+                 low_mem=False,
                  dropout=0.0):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
