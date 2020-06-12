@@ -54,8 +54,9 @@ class RelGraphConv(nn.Module):
     self_loop : bool, optional
         True to include self loop message. Default: False
     low_mem : bool, optional
-        True to use low memory implementation of relation message passing function
-        trade speed with memory consumption
+        True to use low memory implementation of relation message passing function. Default: False
+        This option trade speed with memory consumption, and will slowdown the forward/backward.
+        Turn it on when you encounter OOM problem during training or evaluation.
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
@@ -146,8 +147,6 @@ class RelGraphConv(nn.Module):
                            device=edges.src['h'].device)
             for etype in etypes:
                 loc = edges.data['type'] == etype
-                if loc.sum() == 0:
-                    continue
                 w = weight[etype]
                 src = edges.src['h'][loc]
                 sub_msg = th.matmul(src, w)
@@ -172,8 +171,6 @@ class RelGraphConv(nn.Module):
                            device=edges.src['h'].device)
             for etype in etypes:
                 loc = edges.data['type'] == etype
-                if loc.sum() == 0:
-                    continue
                 w = self.weight[etype].view(self.num_bases, self.submat_in, self.submat_out)
                 src = edges.src['h'][loc].view(-1, self.num_bases, self.submat_in)
                 sub_msg = th.einsum('abc,bcd->abd', src, w)
