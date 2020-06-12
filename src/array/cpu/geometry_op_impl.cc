@@ -48,7 +48,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   for (auto b = 0; b < batch_size; b++) {
     // random init start sample
     int64_t sample_idx = (int64_t)start_idx_data[b];
-    ret_data[ret_start] = (IdType)(array_start + sample_idx);
+    ret_data[ret_start] = (IdType)(sample_idx);
 
     // sample the rest `sample_points - 1` points
     for (auto i = 0; i < sample_points - 1; i++) {
@@ -77,7 +77,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
       }
       // sample the `dist_argmax`-th point
       sample_idx = dist_argmax;
-      ret_data[ret_start + i + 1] = (IdType)(array_start + sample_idx);
+      ret_data[ret_start + i + 1] = (IdType)(sample_idx);
     }
 
     array_start += point_in_batch;

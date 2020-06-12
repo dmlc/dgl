@@ -43,7 +43,7 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
 
   // start with random initialization
   if (thread_idx == 0) {
-    ret_data[ret_start] = (IdType)(array_start + start_idx[batch_idx]);
+    ret_data[ret_start] = (IdType)(start_idx[batch_idx]);
   }
 
   // sample the rest `sample_points - 1` points
@@ -59,7 +59,7 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
     for (auto j = thread_idx; j < point_in_batch; j += THREADS) {
       FloatType one_dist = (FloatType)(0.);
       for (auto d = 0; d < dim; d++) {
-        FloatType tmp = array_data[(array_start + j) * dim + d] - array_data[sample_idx * dim + d];
+        FloatType tmp = array_data[(array_start + j) * dim + d] - array_data[(array_start + sample_idx) * dim + d];
         one_dist += tmp * tmp;
       }
 
@@ -86,7 +86,7 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
     }
 
     if (thread_idx == 0) {
-      ret_data[ret_start + i + 1] = (IdType)(array_start + dist_argmax_ht[0]);
+      ret_data[ret_start + i + 1] = (IdType)(dist_argmax_ht[0]);
     }
   }
 }
