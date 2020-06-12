@@ -199,7 +199,8 @@ COOMatrix COORowWiseTopk(
 /////////////////////////////////// Geometry Op ///////////////////////////////////
 
 template <DLDeviceType XPU, typename FloatType, typename IdType>
-void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist, IdArray start_idx, IdArray result);
+void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
+    NDArray dist, IdArray start_idx, IdArray result);
 
 }  // namespace impl
 }  // namespace aten

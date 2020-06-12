@@ -29,9 +29,10 @@ namespace impl {
  * This process will be repeated for ``sample_points`` - 1 times.
  */
 template <typename FloatType, typename IdType>
-__global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size, const int64_t sample_points,
-                           const int64_t point_in_batch, const int64_t dim,
-                           const IdType *start_idx, FloatType *dist_data, IdType *ret_data) {
+__global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size,
+                           const int64_t sample_points, const int64_t point_in_batch,
+                           const int64_t dim, const IdType *start_idx,
+                           FloatType *dist_data, IdType *ret_data) {
   const int64_t thread_idx = threadIdx.x;
   const int64_t batch_idx = blockIdx.x;
 
@@ -59,7 +60,8 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
     for (auto j = thread_idx; j < point_in_batch; j += THREADS) {
       FloatType one_dist = (FloatType)(0.);
       for (auto d = 0; d < dim; d++) {
-        FloatType tmp = array_data[(array_start + j) * dim + d] - array_data[(array_start + sample_idx) * dim + d];
+        FloatType tmp = array_data[(array_start + j) * dim + d] -
+            array_data[(array_start + sample_idx) * dim + d];
         one_dist += tmp * tmp;
       }
 
@@ -128,6 +130,6 @@ template void FarthestPointSampler<kDLGPU, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
-} // impl
-} // aten
-} // dgl
+}  // namespace impl
+}  // namespace aten
+}  // namespace dgl
