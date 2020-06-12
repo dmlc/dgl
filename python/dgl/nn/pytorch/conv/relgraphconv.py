@@ -143,7 +143,7 @@ class RelGraphConv(nn.Module):
         if edges.src['h'].dtype != th.int64 and self.low_mem:
             etypes = th.unique(edges.data['type'])
             msg = th.empty((edges.src['h'].shape[0], self.out_feat),
-                        device=edges.src['h'].device)
+                           device=edges.src['h'].device)
             for etype in etypes:
                 loc = edges.data['type'] == etype
                 if loc.sum() == 0:
@@ -169,7 +169,7 @@ class RelGraphConv(nn.Module):
         if self.low_mem:
             etypes = th.unique(edges.data['type'])
             msg = th.empty((edges.src['h'].shape[0], self.out_feat),
-                        device=edges.src['h'].device)
+                           device=edges.src['h'].device)
             for etype in etypes:
                 loc = edges.data['type'] == etype
                 if loc.sum() == 0:
