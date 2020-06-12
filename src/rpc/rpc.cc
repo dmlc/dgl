@@ -295,5 +295,75 @@ DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
   *rv = st;
 });
 
+//////////////////////////// KVStore ////////////////////////////
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  // Input
+  std::string name = args[0];
+  int local_machine_id = args[1];
+  int machine_count = args[2];
+  int group_count = args[3];
+  int client_id = args[4];
+  std::string pickle_data = args[5];
+  NDArray ID = args[6];
+  NDArray part_id = args[7];
+  NDArray local_id = args[8];
+  NDArray local_data = args[9];
+  // Data
+  int64_t ID_size = ID.GetSize() / sizeof(int64_t);
+  int64_t* ID_data = static_cast<int64_t*>(ID->data);
+  int64_t* part_id_data = static_cast<int64_t*>(part_id->data);
+  int64_t* local_id_data = static_cast<int64_t*>(local_id->data);
+  char* local_data_char = static_cast<char*>(local_data->data);
+  std::vector<int64_t> local_ids;
+  std::vector<int64_t> local_ids_orginal;
+  std::vector<int64_t> local_data_shape;
+  std::vector<std::vector<int64_t> > remote_ids(machine_count);
+  std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
+  unsigned int seed = 314;
+  int row_size = 1;
+  for (int i = 0; i < local_data->ndim; ++i) {
+    local_data_shape.push_back(local_data->shape[i]);
+    if (i != 0) {
+      row_size *= local_data->shape[i];
+    }
+  }
+  row_size *= (local_data->dtype.bits / 8);
+  size_t data_size = local_data.GetSize();
+  CHECK_GT(local_data_shape.size(), 0);
+  CHECK_EQ(row_size * local_data_shape[0], data_size);
+  // Get local id and remote id
+  for (int64_t i = 0; i < ID_size; ++i) {
+    int64_t p_id = part_id_data[i];
+    if (p_id == local_machine_id) {
+      l_id = local_id_data[i];
+      local_ids.push_back(l_id);
+      local_ids_orginal.push_back(i);
+    } else {
+      int64_t id = ID_data[i];
+      remote_ids[p_id].push_back(id);
+      remote_ids_original.push_back(i);
+    }
+  }
+  // Send remote id
+  int msg_count = 0;
+  for (int i = 0; i < remote_ids.size(); ++i) {
+    if (remote_ids[i].size() != 0) {
+      RPCMessage msg;
+      msg.
+      msg.
+      msg.
+      SendRPCMessage(msg, server_id);
+      msg_count++;
+    }
+  }
+  // Copy local data
+
+  // Recv remote message
+
+  // Get final tensor
+});
+
 }  // namespace rpc
 }  // namespace dgl
