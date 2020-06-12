@@ -637,9 +637,9 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   CHECK_EQ(array->ctx, result->ctx) << "Array and The result should be on the same device.";
   const DLDeviceType XPU = array->ctx.device_type;
 
+#ifdef DGL_USE_CUDA
   ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
     ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
-#ifdef DGL_USE_CUDA
       if (XPU == kDLCPU) {
         impl::FarthestPointSampler<kDLCPU, FloatType, IdType>(
             array, batch_size, sample_points, dist, start_idx, result);
@@ -649,7 +649,11 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
       } else {
         LOG(FATAL) << "Incompatible array context. Currently only CPU/GPU are supported.";
       }
+    });
+  });
 #else
+  ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
+    ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
       if (XPU == kDLCPU) {
         impl::FarthestPointSampler<kDLCPU, FloatType, IdType>(
             array, batch_size, sample_points, dist, start_idx, result);
@@ -658,9 +662,9 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
       } else {
         LOG(FATAL) << "Incompatible array context. Currently only CPU/GPU are supported.";
       }
-#endif
     });
   });
+#endif
 }
 
 ///////////////////////// C APIs /////////////////////////
