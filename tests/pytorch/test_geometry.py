@@ -1,6 +1,6 @@
 import torch as th
 from dgl.geometry.pytorch import FarthestPointSampler
-
+import backend as F
 import numpy as np
 
 def test_fps():
