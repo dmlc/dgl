@@ -635,13 +635,6 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
     NDArray dist, IdArray start_idx, IdArray result) {
   CHECK_EQ(array->ctx, result->ctx) << "Array and The result should be on the same device.";
   const DLDeviceType XPU = array->ctx.device_type;
-  /*
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
-      impl::FarthestPointSampler<XPU, FloatType>(array, batch_size, sample_points, dist, start_idx, result);
-    });
-  });
-  */
 
   ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
     ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
@@ -716,7 +709,6 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_FarthestPointSampler")
     IdArray result = args[5];
     const DLDeviceType XPU = data->ctx.device_type;
     FarthestPointSampler(data, batch_size, sample_points, dist, start_idx, result);
-    *rv = result;
   });
 
 }  // namespace aten

@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file array/cuda/geometry_op_impl.cc
+ * \brief Geometry operator CUDA implementation
+ */
 #include <cstdio>
 #include <vector>
 #include <dgl/array.h>
@@ -12,16 +17,17 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-template <typename FloatType>
-__global__ void _FillKernel(FloatType* ptr, int64_t length, FloatType val) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    ptr[tx] = val;
-    tx += stride_x;
-  }
-}
-
+/*!
+ * \brief Farthest Point Sampler without the need to compute all pairs of distance.
+ * 
+ * The input array has shape (N, d), where N is the number of points, and d is the dimension.
+ * It consists of a (flatten) batch of point clouds.
+ *
+ * In each batch, the algorithm starts with the sample index specified by ``start_idx``.
+ * Then for each point, we maintain the minimum to-sample distance.
+ * Finally, we pick the point with the maximum such distance.
+ * This process will be repeated for ``sample_points`` - 1 times.
+ */
 template <typename FloatType, typename IdType>
 __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size, const int64_t sample_points,
                            const int64_t point_in_batch, const int64_t dim,
@@ -95,39 +101,18 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   const int64_t point_in_batch = array->shape[0] / batch_size;
   const int64_t dim = array->shape[1];
 
-  // Init return value
-  // IdArray ret = NewIdArray(sample_points * batch_size, ctx, sizeof(int64_t) * 8);
+  // return value
   IdType* ret_data = static_cast<IdType*>(result->data);
-  // std::fill(ret_data, ret_data + sample_points * batch_size , 0);
-  /*
-  _FillKernel<<<(sample_points * batch_size + THREADS - 1) / THREADS, THREADS, 0, thr_entry->stream>>>(
-    ret_data, sample_points * batch_size, static_cast<int64_t>(0));
-  */
 
-  // Init distance
-  // NDArray dist = NDArray::Empty({array->shape[0]}, array->dtype, ctx);
+  // distance
   FloatType* dist_data = static_cast<FloatType*>(dist->data);
-  // std::fill(dist_data, dist_data + point_in_batch, 1e9);
-  /*
-  _FillKernel<<<(array->shape[0] + THREADS - 1) / THREADS, THREADS, 0, thr_entry->stream>>>(
-    dist_data, static_cast<int64_t>(array->shape[0]), static_cast<FloatType>(1e9));
-  */
 
-  // Init sample for each cloud in the batch
-  // IdArray start_idx = NewIdArray(batch_size, ctx, sizeof(int64_t) * 8);
+  // sample for each cloud in the batch
   IdType* start_idx_data = static_cast<IdType*>(start_idx->data);
-  /*
-  std::vector<int64_t> start_idx_cpu(batch_size);
-  for (auto i = 0; i < batch_size; i++) {
-    start_idx_cpu[i] = (int64_t)(rand() % point_in_batch);
-  }
-  cudaMemcpy(start_idx_data, start_idx_cpu.data(), batch_size*sizeof(int64_t), cudaMemcpyHostToDevice);
-  */
 
   fps_kernel<<<batch_size, THREADS, 0, thr_entry->stream>>>(
     array_data, batch_size, sample_points,
     point_in_batch, dim, start_idx_data, dist_data, ret_data);
-  // return ret;
 }
 
 template void FarthestPointSampler<kDLGPU, float, int32_t>(

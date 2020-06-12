@@ -1,4 +1,4 @@
-"""Utilities for pytorch NN package"""
+"""Farthest Point Sampler for pytorch Geometry package"""
 #pylint: disable=no-member, invalid-name
 
 import torch as th
@@ -7,11 +7,30 @@ from torch import nn
 from ..capi import farthest_point_sampler
 
 class FarthestPointSampler(nn.Module):
+    """Farthest Point Sampler
+
+    Parameters
+    ----------
+    npoints : int
+        The number of points to sample in each batch.
+    """
     def __init__(self, npoints):
         super(FarthestPointSampler, self).__init__()
         self.npoints = npoints
 
     def forward(self, pos):
+        r"""Memory allocation and sampling
+
+        Parameters
+        ----------
+        pos : tensor
+            The positional tensor of shape (B, N, C)
+
+        Returns
+        -------
+        tensor of shape (B, self.npoints)
+            The sampled indices in each batch.
+        """
         device = pos.device
         B, N, C = pos.shape
         pos = pos.reshape(-1, C)

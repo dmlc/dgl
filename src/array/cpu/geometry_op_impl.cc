@@ -16,41 +16,45 @@ inline int64_t get_index(int64_t dim1, int64_t dim2, int64_t dim) {
   return dim1 * dim + dim2;
 }
 
+/*!
+ * \brief Farthest Point Sampler without the need to compute all pairs of distance.
+ * 
+ * The input array has shape (N, d), where N is the number of points, and d is the dimension.
+ * It consists of a (flatten) batch of point clouds.
+ *
+ * In each batch, the algorithm starts with the sample index specified by ``start_idx``.
+ * Then for each point, we maintain the minimum to-sample distance.
+ * Finally, we pick the point with the maximum such distance.
+ * This process will be repeated for ``sample_points`` - 1 times.
+ */
 template <DLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
   const FloatType* array_data = static_cast<FloatType*>(array->data);
-
   const int64_t point_in_batch = array->shape[0] / batch_size;
   const int64_t dim = array->shape[1];
 
-  // Init distance
+  // distance
   FloatType* dist_data = static_cast<FloatType*>(dist->data);
-  // std::vector<FloatType> dist_data(point_in_batch);
 
-  // Init sample for each cloud in the batch
+  // sample for each cloud in the batch
   IdType* start_idx_data = static_cast<IdType*>(start_idx->data);
 
-  // Init return value
-  // IdArray ret = NewIdArray(sample_points * batch_size, ctx, sizeof(int64_t) * 8);
+  // return value
   IdType* ret_data = static_cast<IdType*>(result->data);
-  // std::fill(ret_data, ret_data + sample_points * batch_size, 0);
 
   int64_t array_start = 0, ret_start = 0;
   // loop for each point cloud sample in this batch
   for (auto b = 0; b < batch_size; b++) {
     // random init start sample
-    int64_t sample_idx = (int64_t)start_idx_data[b]; //rand() % point_in_batch;
+    int64_t sample_idx = (int64_t)start_idx_data[b];
     ret_data[ret_start] = (IdType)(array_start + sample_idx);
-
-    int64_t dist_argmax = 0;
-    FloatType dist_max = -1;
 
     // sample the rest `sample_points - 1` points
     for (auto i = 0; i < sample_points - 1; i++) {
       // re-init distance and the argmax
-      dist_argmax = 0;
-      dist_max = -1;
+      int64_t dist_argmax = 0;
+      FloatType dist_max = -1;
 
       // update the distance
       for (auto j = 0; j < point_in_batch; j++) {
@@ -79,7 +83,6 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
     array_start += point_in_batch;
     ret_start += sample_points;
   }
-  // return ret;
 }
 
 template void FarthestPointSampler<kDLCPU, float, int32_t>(
