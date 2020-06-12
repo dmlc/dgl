@@ -3,9 +3,9 @@
  * \file array/cuda/geometry_op_impl.cc
  * \brief Geometry operator CUDA implementation
  */
+#include <dgl/array.h>
 #include <cstdio>
 #include <vector>
-#include <dgl/array.h>
 
 #include "../../runtime/cuda/cuda_common.h"
 #include "../../c_api_common.h"

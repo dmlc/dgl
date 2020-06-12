@@ -61,7 +61,8 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
         // compute the distance on dimensions
         FloatType one_dist = 0;
         for (auto d = 0; d < dim; d++) {
-          FloatType tmp = array_data[get_index(array_start + j, d, dim)] - array_data[get_index(array_start + sample_idx, d, dim)];
+          FloatType tmp = array_data[get_index(array_start + j, d, dim)] -
+              array_data[get_index(array_start + sample_idx, d, dim)];
           one_dist += tmp * tmp;
         }
 
