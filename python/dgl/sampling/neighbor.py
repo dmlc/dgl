@@ -1,5 +1,6 @@
 """Neighbor sampling APIs"""
 from functools import partial
+from itertools import chain
 
 from .._ffi.function import _init_api
 from .. import backend as F
@@ -173,10 +174,14 @@ class NeighborSamplerDataLoader(object):
             self,
             g,
             fanouts,
-            dataloader_class,
+            replace=True,
+            return_eids=False,
+            dataloader_class=None,
             **kwargs):
         self.g = g
         self.fanouts = fanouts
+        self.replace = replace
+        self.return_eids = return_eids
         self.dataloaders = {
             ntype: self._get_dataloader_class(dataloader_class, ntype)(nids[ntype], **kwargs)
             for ntype in nids.keys()}
@@ -189,12 +194,22 @@ class NeighborSamplerDataLoader(object):
             if fanout is None:
                 frontier = transform.in_subgraph(self.g, seeds)
             else:
-                frontier = sample_neighbors(self.g, seeds, fanout)
+                frontier = sample_neighbors(self.g, seeds, fanout, replace=self.replace)
             block = transform.to_block(frontier)
             seeds = {ntype: block.srcnodes[ntype].data[dgl.NID] for ntype in block.srctypes}
             blocks.insert(0, block)
 
+            if self.return_eids:
+                for etype in block.canonical_etypes:
+                    block.edges[etype].data[dgl.EID] = frontier.edges[etype].data[dgl.EID][
+                        block.edges[etype].data[dgl.EID]]
+
+        return blocks
+
     def _get_dataloader_class(self, dataloader_class, ntype):
+        if dataloader_class is not None:
+            return partial(dataloader_class, ntype)
+
         backend_name = F.get_preferred_backend()
         collator = partial(self._sample, ntype)
 
@@ -209,5 +224,11 @@ class NeighborSamplerDataLoader(object):
                 'NeighborSamplerDataLoader for Tensorflow not implemented yet')
         else:
             raise NotImplementedError('Unknown backend {}'.format(backend_name))
+
+    def __iter__(self):
+        return chain(*self.dataloaders.values())
+
+    def __len__(self):
+        return sum(len(dl) for dl in self.dataloaders.values())
 
 _init_api('dgl.sampling.neighbor', __name__)
