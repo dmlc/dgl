@@ -455,18 +455,14 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
   // Output COO
   NDArray out_row_arr = NDArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
   NDArray out_col_arr = NDArray::Empty({nnz}, coo.col->dtype, coo.col->ctx);
-  NDArray out_data_arr = COOHasData(coo) ? NDArray::Empty({nnz}, coo.data->dtype,
-                                                          coo.data->ctx) : NullArray();
+  NDArray out_data_arr = COOHasData(coo) ? coo.data : NullArray();
   IdType *out_row = static_cast<IdType*>(out_row_arr->data);
   IdType *out_col = static_cast<IdType*>(out_col_arr->data);
-  IdType *out_data = COOHasData(coo) ? static_cast<IdType*>(out_data_arr->data) : nullptr;
 
 #pragma omp parallel for
   for (int64_t i = 0; i < nnz; i++) {
     out_row[i] = new_row_ids[in_rows[i]];
     out_col[i] = new_col_ids[in_cols[i]];
-    if (out_data)
-      out_data[i] = in_data[i];
   }
   return COOMatrix(num_rows, num_cols, out_row_arr, out_col_arr, out_data_arr);
 }
