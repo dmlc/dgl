@@ -350,6 +350,9 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def logical_and(input1, input2):
+    return tf.math.logical_and(input1, input2)
+
 def clone(input):
     # TF tensor is always immutable so returning the input is safe.
     return input

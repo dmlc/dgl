@@ -310,8 +310,11 @@ def boolean_mask(input, mask):
 def equal(x, y):
     return x == y
 
-def logical_not(input):
-    return nd.logical_not(input)
+def logical_not(input1, input2):
+    return nd.logical_not(input1, input2)
+
+def logical_and(input):
+    return nd.logical_and(input)
 
 def clone(input):
     return input.copy()
