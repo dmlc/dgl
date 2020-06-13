@@ -578,11 +578,18 @@ def reorder_nodes(g, new_node_ids):
     return new_g
 
 def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
-    ''' This is to partition a graph. Each partition contains HALO nodes
-    so that we can generate NodeFlow in each partition correctly.
+    '''Partition a graph.
 
-    If `reshuffle` is turned on, a partitioend graph has node data 'orig_id',
-    which stores the node Ids in the original input graph.
+    Based on the given node assignments for each partition, the function splits
+    the input graph into subgraphs. A subgraph may contain HALO nodes which does
+    not belong to the partition of a subgraph but are connected to the nodes
+    in the partition within a fixed number of hops.
+
+    If `reshuffle` is turned on, the function reshuffles node Ids and edge Ids
+    of the input graph before partitioning. After reshuffling, all nodes and edges
+    in a partition fall in a contiguous Id range in the input graph.
+    The partitioend subgraphs have node data 'orig_id', which stores the node Ids
+    in the original input graph.
 
     Parameters
     ------------
@@ -676,13 +683,20 @@ def metis_partition_assignment(g, k):
 def metis_partition(g, k, extra_cached_hops=0, reshuffle=False):
     ''' This is to partition a graph with Metis partitioning.
 
-    Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
-    to the partitions and their incoming edges.
+    Metis assigns vertices to partitions. This API constructs subgraphs with the vertices assigned
+    to the partitions and their incoming edges. A subgraph may contain HALO nodes which does
+    not belong to the partition of a subgraph but are connected to the nodes
+    in the partition within a fixed number of hops.
 
-    The partitioned graph is stored in DGLGraph. The DGLGraph has the `part_id`
-    node data that indicates the partition a node belongs to. If `reshuffle` is turned
-    on, a partitioend graph has node data 'orig_id', which stores the node Ids in the original
-    input graph.
+    If `reshuffle` is turned on, the function reshuffles node Ids and edge Ids
+    of the input graph before partitioning. After reshuffling, all nodes and edges
+    in a partition fall in a contiguous Id range in the input graph.
+    The partitioend subgraphs have node data 'orig_id', which stores the node Ids
+    in the original input graph.
+
+    The partitioned subgraph is stored in DGLGraph. The DGLGraph has the `part_id`
+    node data that indicates the partition a node belongs to. The subgraphs do not contain
+    the node/edge data in the input graph.
 
     Parameters
     ------------
