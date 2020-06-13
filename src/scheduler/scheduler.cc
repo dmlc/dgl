@@ -90,7 +90,7 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
     ret.push_back(std::move(mids));
     ret.push_back(std::move(mid_section));
 
-    return std::move(ret);
+    return ret;
 }
 
 template std::vector<IdArray> DegreeBucketing<int32_t>(const IdArray& msg_ids,
@@ -161,7 +161,7 @@ std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids,
   ret.push_back(std::move(new_eids));
   ret.push_back(std::move(sections));
 
-  return std::move(ret);
+  return ret;
 }
 
 template std::vector<IdArray> GroupEdgeByNodeDegree<int32_t>(

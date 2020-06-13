@@ -629,8 +629,8 @@ COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, {
-    ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
-      ret = impl::COORowWiseTopk<XPU, IdType, FloatType>(
+    ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
+      ret = impl::COORowWiseTopk<XPU, IdType, DType>(
           mat, rows, k, weight, ascending);
     });
   });

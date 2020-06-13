@@ -5,6 +5,69 @@ import numpy as np
 from .. import backend as F
 from ..base import NID, EID
 from .. import utils
+from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
+from .._ffi.ndarray import empty_shared_mem
+
+def _move_metadata_to_shared_mam(graph_name, num_nodes, num_edges, part_id,
+                                 num_partitions, node_map, edge_map):
+    ''' Move all metadata to the shared memory.
+
+    We need these metadata to construct graph partition book.
+    '''
+    meta = _to_shared_mem(F.tensor([num_nodes, num_edges,
+                                    num_partitions, part_id]),
+                          _get_ndata_path(graph_name, 'meta'))
+    node_map = _to_shared_mem(node_map, _get_ndata_path(graph_name, 'node_map'))
+    edge_map = _to_shared_mem(edge_map, _get_edata_path(graph_name, 'edge_map'))
+    return meta, node_map, edge_map
+
+def _get_shared_mem_metadata(graph_name):
+    ''' Get the metadata of the graph through shared memory.
+
+    The metadata includes the number of nodes and the number of edges. In the future,
+    we can add more information, especially for heterograph.
+    '''
+    shape = (4,)
+    dtype = F.int64
+    dtype = DTYPE_DICT[dtype]
+    data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
+    dlpack = data.to_dlpack()
+    meta = F.asnumpy(F.zerocopy_from_dlpack(dlpack))
+    num_nodes, num_edges, num_partitions, part_id = meta[0], meta[1], meta[2], meta[3]
+
+    # Load node map
+    data = empty_shared_mem(_get_ndata_path(graph_name, 'node_map'), False, (num_nodes,), dtype)
+    dlpack = data.to_dlpack()
+    node_map = F.zerocopy_from_dlpack(dlpack)
+
+    # Load edge_map
+    data = empty_shared_mem(_get_edata_path(graph_name, 'edge_map'), False, (num_edges,), dtype)
+    dlpack = data.to_dlpack()
+    edge_map = F.zerocopy_from_dlpack(dlpack)
+
+    return part_id, num_partitions, node_map, edge_map
+
+
+def get_shared_mem_partition_book(graph_name, graph_part):
+    '''Get a graph partition book from shared memory.
+
+    A graph partition book of a specific graph can be serialized to shared memory.
+    We can reconstruct a graph partition book from shared memory.
+
+    Parameters
+    ----------
+    graph_name : str
+        The name of the graph.
+    graph_part : DGLGraph
+        The graph structure of a partition.
+
+    Returns
+    -------
+    GraphPartitionBook
+        A graph partition book for a particular partition.
+    '''
+    part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
+    return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
 
 class GraphPartitionBook:
     """GraphPartitionBook is used to store parition information.
@@ -73,7 +136,21 @@ class GraphPartitionBook:
         g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
+        # node size and edge size
+        self._edge_size = len(self.partid2eids(part_id))
+        self._node_size = len(self.partid2nids(part_id))
 
+    def shared_memory(self, graph_name):
+        """Move data to shared memory.
+
+        Parameters
+        ----------
+        graph_name : str
+            The graph name
+        """
+        self._meta, self._nid2partid, self._eid2partid = _move_metadata_to_shared_mam(
+            graph_name, self.num_nodes(), self.num_edges(), self._part_id, self._num_partitions,
+            self._nid2partid, self._eid2partid)
 
     def num_partitions(self):
         """Return the number of partitions.
@@ -84,7 +161,6 @@ class GraphPartitionBook:
             number of partitions
         """
         return self._num_partitions
-
 
     def metadata(self):
         """Return the partition meta data.
@@ -109,6 +185,15 @@ class GraphPartitionBook:
         """
         return self._partition_meta_data
 
+    def num_nodes(self):
+        """ The total number of nodes
+        """
+        return len(self._nid2partid)
+
+    def num_edges(self):
+        """ The total number of edges
+        """
+        return len(self._eid2partid)
 
     def nid2partid(self, nids):
         """From global node IDs to partition IDs
@@ -125,7 +210,6 @@ class GraphPartitionBook:
         """
         return F.gather_row(self._nid2partid, nids)
 
-
     def eid2partid(self, eids):
         """From global edge IDs to partition IDs
 
@@ -140,7 +224,6 @@ class GraphPartitionBook:
             partition IDs
         """
         return F.gather_row(self._eid2partid, eids)
-
 
     def partid2nids(self, partid):
         """From partition id to global node IDs
@@ -157,7 +240,6 @@ class GraphPartitionBook:
         """
         return self._partid2nids[partid]
 
-
     def partid2eids(self, partid):
         """From partition id to global edge IDs
 
@@ -172,7 +254,6 @@ class GraphPartitionBook:
             edge IDs
         """
         return self._partid2eids[partid]
-
 
     def nid2localnid(self, nids, partid):
         """Get local node IDs within the given partition.
@@ -192,9 +273,7 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of nid2localnid.')
-
         return F.gather_row(self._nidg2l[partid], nids)
-
 
     def eid2localeid(self, eids, partid):
         """Get the local edge ids within the given partition.
@@ -214,9 +293,7 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of eid2localeid.')
-
         return F.gather_row(self._eidg2l[partid], eids)
-
 
     def get_partition(self, partid):
         """Get the graph of one partition.
@@ -232,6 +309,26 @@ class GraphPartitionBook:
             The graph of the partition.
         """
         #TODO(zhengda) add implementation later.
+
+    def get_node_size(self):
+        """Get the number of nodes in the current partition.
+
+        Return
+        ------
+        int
+            The number of nodes in current partition
+        """
+        return self._node_size
+
+    def get_edge_size(self):
+        """Get the number of edges in the current partition.
+
+        Return
+        ------
+        int
+            The number of edges in current partition
+        """
+        return self._edge_size
 
 
 class RangePartitionBook:
@@ -279,6 +376,16 @@ class RangePartitionBook:
         """
         return self._num_partitions
 
+
+    def num_nodes(self):
+        """ The total number of nodes
+        """
+        return self._node_map[-1]
+
+    def num_edges(self):
+        """ The total number of edges
+        """
+        return self._edge_map[-1]
 
     def metadata(self):
         """Return the partition meta data.
@@ -442,3 +549,119 @@ class RangePartitionBook:
             The graph of the partition.
         """
         #TODO(zhengda) add implementation later.
+
+    def get_node_size(self):
+        """Get the number of nodes in the current partition.
+
+        Return
+        ------
+        int
+            The number of nodes in current partition
+        """
+        range_start = self._node_map[self._partid - 1] if self._partid > 0 else 0
+        range_end = self._node_map[self._partid]
+        return range_end - range_start
+
+    def get_edge_size(self):
+        """Get the number of edges in the current partition.
+
+        Return
+        ------
+        int
+            The number of edges in current partition
+        """
+        range_start = self._edge_map[self._partid - 1] if self._partid > 0 else 0
+        range_end = self._edge_map[self._partid]
+        return range_end - range_start
+
+class PartitionPolicy(object):
+    """Wrapper for GraphPartitionBook and RangePartitionBook.
+
+    We can extend this class to support HeteroGraph in the future.
+
+    Parameters
+    ----------
+    policy_str : str
+        partition-policy string, e.g., 'edge' or 'node'.
+    part_id : int
+        partition ID
+    partition_book : GraphPartitionBook or RangePartitionBook
+        Main class storing the partition information
+    """
+    def __init__(self, policy_str, part_id, partition_book):
+        # TODO(chao): support more policies for HeteroGraph
+        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
+        self._policy_str = policy_str
+        self._part_id = part_id
+        self._partition_book = partition_book
+
+    @property
+    def policy_str(self):
+        """Get policy string"""
+        return self._policy_str
+
+    @property
+    def part_id(self):
+        """Get partition ID"""
+        return self._part_id
+
+    @property
+    def partition_book(self):
+        """Get partition book"""
+        return self._partition_book
+
+    def to_local(self, id_tensor):
+        """Mapping global ID to local ID.
+
+        Parameters
+        ----------
+        id_tensor : tensor
+            Gloabl ID tensor
+
+        Return
+        ------
+        tensor
+            local ID tensor
+        """
+        if self._policy_str == 'edge':
+            return self._partition_book.eid2localeid(id_tensor, self._part_id)
+        elif self._policy_str == 'node':
+            return self._partition_book.nid2localnid(id_tensor, self._part_id)
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
+    def to_partid(self, id_tensor):
+        """Mapping global ID to partition ID.
+
+        Parameters
+        ----------
+        id_tensor : tensor
+            Global ID tensor
+
+        Return
+        ------
+        tensor
+            partition ID
+        """
+        if self._policy_str == 'edge':
+            return self._partition_book.eid2partid(id_tensor)
+        elif self._policy_str == 'node':
+            return self._partition_book.nid2partid(id_tensor)
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
+    def get_data_size(self):
+        """Get data size of current partition.
+
+        Returns
+        -------
+        int
+            data size
+        """
+        if self._policy_str == 'edge':
+            return len(self._partition_book.partid2eids(self._part_id))
+        elif self._policy_str == 'node':
+            return len(self._partition_book.partid2nids(self._part_id))
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)

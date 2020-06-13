@@ -8,6 +8,8 @@
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/shared_mem.h>
+#include <dgl/zerocopy_serializer.h>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -277,6 +279,76 @@ template std::vector<uint32_t> NDArray::ToVector<uint32_t>() const;
 template std::vector<uint64_t> NDArray::ToVector<uint64_t>() const;
 template std::vector<float> NDArray::ToVector<float>() const;
 template std::vector<double> NDArray::ToVector<double>() const;
+
+#ifndef _WIN32
+std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
+  return this->data_->mem;
+}
+#endif  // _WIN32
+
+
+void NDArray::Save(dmlc::Stream* strm) const {
+  auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
+  if (zc_strm) {
+    zc_strm->PushNDArray(*this);
+    return;
+  }
+  SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
+}
+
+bool NDArray::Load(dmlc::Stream* strm) {
+  auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
+  if (zc_strm) {
+    *this = zc_strm->PopNDArray();
+    return true;
+  }
+  uint64_t header, reserved;
+  CHECK(strm->Read(&header))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&reserved))
+      << "Invalid DLTensor file format";
+  CHECK(header == kDGLNDArrayMagic)
+      << "Invalid DLTensor file format";
+  DLContext ctx;
+  int ndim;
+  DLDataType dtype;
+  CHECK(strm->Read(&ctx))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&ndim))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&dtype))
+      << "Invalid DLTensor file format";
+  CHECK_EQ(ctx.device_type, kDLCPU)
+      << "Invalid DLTensor context: can only save as CPU tensor";
+  std::vector<int64_t> shape(ndim);
+  if (ndim != 0) {
+    CHECK(strm->ReadArray(&shape[0], ndim))
+        << "Invalid DLTensor file format";
+  }
+  NDArray ret = NDArray::Empty(shape, dtype, ctx);
+  int64_t num_elems = 1;
+  int elem_bytes = (ret->dtype.bits + 7) / 8;
+  for (int i = 0; i < ret->ndim; ++i) {
+    num_elems *= ret->shape[i];
+  }
+  int64_t data_byte_size;
+  CHECK(strm->Read(&data_byte_size))
+      << "Invalid DLTensor file format";
+  CHECK(data_byte_size == num_elems * elem_bytes)
+      << "Invalid DLTensor file format";
+  if (data_byte_size != 0)  {
+    // strm->Read will return the total number of elements successfully read.
+    // Therefore if data_byte_size is zero, the CHECK below would fail.
+    CHECK(strm->Read(ret->data, data_byte_size))
+        << "Invalid DLTensor file format";
+  }
+  if (!DMLC_IO_NO_ENDIAN_SWAP) {
+    dmlc::ByteSwap(ret->data, elem_bytes, num_elems);
+  }
+  *this = ret;
+  return true;
+}
+
 
 }  // namespace runtime
 }  // namespace dgl

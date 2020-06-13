@@ -113,7 +113,6 @@ a useful manual for in-depth developers.
    api/python/data
    api/python/nodeflow
    api/python/random
-   api/python/model_zoo
 
 .. toctree::
    :maxdepth: 1

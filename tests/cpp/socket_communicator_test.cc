@@ -9,8 +9,8 @@
 #include <thread>
 #include <vector>
 
-#include "../src/graph/network/msg_queue.h"
-#include "../src/graph/network/socket_communicator.h"
+#include "../src/rpc/network/msg_queue.h"
+#include "../src/rpc/network/socket_communicator.h"
 
 using std::string;
 
