@@ -77,6 +77,7 @@ class SAGE(nn.Module):
             for blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
                 input_nodes = block.srcdata[dgl.NID]
+                output_nodes = block.dstdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -85,7 +86,7 @@ class SAGE(nn.Module):
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[start:end] = h.cpu()
+                y[output_nodes] = h.cpu()
 
             x = y
         return y
