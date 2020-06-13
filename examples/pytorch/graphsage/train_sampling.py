@@ -16,27 +16,6 @@ from dgl.data import RedditDataset
 import tqdm
 import traceback
 
-#### Neighbor sampler
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts):
-        self.g = g
-        self.fanouts = fanouts
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
-
 class SAGE(nn.Module):
     def __init__(self,
                  in_feats,
@@ -90,10 +69,13 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
-                end = start + batch_size
-                batch_nodes = nodes[start:end]
-                block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
+            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
+            dataloader = dgl.sampling.NodeDataLoader(
+                g, th.arange(g.number_of_nodes()), sampler,
+                shuffle=False, drop_last=False, batch_size=batch_size)
+
+            for blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
                 input_nodes = block.srcdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
@@ -159,13 +141,12 @@ def run(args, device, data):
     val_mask = th.BoolTensor(val_mask)
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = dgl.sampling.MultiLayerNeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
-        dataset=train_nid.numpy(),
+    dataloader = dgl.sampling.NodeDataLoader(
+        g, train_nid, sampler,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
         num_workers=args.num_workers)

@@ -1,6 +1,4 @@
 """Neighbor sampling APIs"""
-from functools import partial
-from itertools import chain
 
 from .._ffi.function import _init_api
 from .. import backend as F
@@ -8,10 +6,13 @@ from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
+from .. import transform
+from .dataloader import BlockSampler, assign_block_eids
 
 __all__ = [
     'sample_neighbors',
-    'select_topk']
+    'select_topk',
+    'MultiLayerNeighborSampler']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes and return the induced subgraph.
@@ -169,66 +170,70 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     return ret
 
 
-class NeighborSamplerDataLoader(object):
-    def __init__(
-            self,
-            g,
-            fanouts,
-            replace=True,
-            return_eids=False,
-            dataloader_class=None,
-            **kwargs):
-        self.g = g
+class MultiLayerNeighborSampler(BlockSampler):
+    """Sampler that builds computational dependency of node representations via
+    neighbor sampling for multilayer GNN.
+
+    This sampler will make every node gather messages from a fixed number of neighbors
+    per edge type.  The neighbors are picked uniformly.
+
+    Often works with a DGL dataloader for stochastic training of GNNs.
+
+    Parameters
+    ----------
+    fanouts : list[int] or list[dict[etype, int]]
+        List of neighbors to sample per edge type for each GNN layer, starting from the
+        first layer.
+
+        If the graph is homogeneous, only an integer is needed for each layer.
+    replace : bool, default True
+        Whether to sample with replacement
+    return_eids : bool, default False
+        Whether to return edge IDs of the original graph in the sampled blocks.
+
+        If True, the edge IDs will be stored as ``dgl.EID`` feature for each edge type.
+
+    Examples
+    --------
+    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
+    a homogeneous graph where each node takes messages from all neighbors (assume
+    the backend is PyTorch):
+    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
+    >>> dataloader = dgl.sampling.NodeDataLoader(
+    ...     g, train_nid, sampler,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for blocks in dataloader:
+    ...     train_on(blocks)
+
+    If we wish to gather from 5 neighbors on the first layer, 10 neighbors on the second,
+    and 15 layers on the third:
+    >>> sampler = dgl.sampling.NeighborSampler([5, 10, 15])
+
+    If training on a heterogeneous graph, one should instead provide a list of dicts.
+    Each dict would specify the number of neighbors to pick per edge type.
+    >>> sampler = dgl.sampling.NeighborSampler([
+    ...     {('user', 'follows', 'user'): 5,
+    ...      ('user', 'plays', 'game'): 4,
+    ...      ('game', 'played-by', 'user'): 3}] * 3)
+    """
+    def __init__(self, fanouts, replace=True, return_eids=False):
+        super().__init__()
+
         self.fanouts = fanouts
         self.replace = replace
         self.return_eids = return_eids
-        self.dataloaders = {
-            ntype: self._get_dataloader_class(dataloader_class, ntype)(nids[ntype], **kwargs)
-            for ntype in nids.keys()}
+        if return_eids:
+            self.add_block_postprocessor(assign_block_eids)
 
-    def _sample(self, ntype, nids):
-        seeds = {ntype: nids}
-        blocks = []
-
-        for fanout in self.fanouts:
-            if fanout is None:
-                frontier = transform.in_subgraph(self.g, seeds)
-            else:
-                frontier = sample_neighbors(self.g, seeds, fanout, replace=self.replace)
-            block = transform.to_block(frontier)
-            seeds = {ntype: block.srcnodes[ntype].data[dgl.NID] for ntype in block.srctypes}
-            blocks.insert(0, block)
-
-            if self.return_eids:
-                for etype in block.canonical_etypes:
-                    block.edges[etype].data[dgl.EID] = frontier.edges[etype].data[dgl.EID][
-                        block.edges[etype].data[dgl.EID]]
-
-        return blocks
-
-    def _get_dataloader_class(self, dataloader_class, ntype):
-        if dataloader_class is not None:
-            return partial(dataloader_class, ntype)
-
-        backend_name = F.get_preferred_backend()
-        collator = partial(self._sample, ntype)
-
-        if backend_name == 'pytorch':
-            from torch.utils.data import DataLoader
-            return partial(DataLoader, collate_fn=collator)
-        elif backend_name == 'mxnet':
-            raise NotImplementedError(
-                'NeighborSamplerDataLoader for MXNet not implemented yet')
-        elif backend_name == 'tensorflow':
-            raise NotImplementedError(
-                'NeighborSamplerDataLoader for Tensorflow not implemented yet')
+    def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
+        fanout = self.fanouts[block_id]
+        if fanout is None:
+            frontier = transform.in_subgraph(g, seed_nodes)
         else:
-            raise NotImplementedError('Unknown backend {}'.format(backend_name))
-
-    def __iter__(self):
-        return chain(*self.dataloaders.values())
+            frontier = sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
+        return frontier
 
     def __len__(self):
-        return sum(len(dl) for dl in self.dataloaders.values())
+        return len(self.fanouts)
 
 _init_api('dgl.sampling.neighbor', __name__)

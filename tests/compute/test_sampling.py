@@ -2,6 +2,7 @@ import dgl
 import backend as F
 import numpy as np
 import unittest
+from collections import defaultdict
 
 def check_random_walk(g, metapath, traces, ntypes, prob=None):
     traces = F.asnumpy(traces)
@@ -469,6 +470,105 @@ def test_sample_neighbors_with_0deg():
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=True)
     assert sg.number_of_edges() == 0
 
+def _check_neighbor_sampling_dataloader(dl):
+    g = dl.g
+    seeds = defaultdict(list)
+
+    for blocks in dl:
+        prev_dst = {ntype: None for ntype in g.ntypes}
+        for block in blocks:
+            for canonical_etype in block.canonical_etypes:
+                utype, etype, vtype = canonical_etype
+                uu, vv = block.all_edges(order='eid', etype=canonical_etype)
+                src = block.srcnodes[utype].data[dgl.NID]
+                dst = block.dstnodes[vtype].data[dgl.NID]
+                if prev_dst[utype] is not None:
+                    assert F.array_equal(src, prev_dst[utype])
+                u = src[uu]
+                v = dst[vv]
+                assert F.asnumpy(g.has_edges_between(u, v, etype=canonical_etype)).all()
+                eid = block.edges[canonical_etype].data[dgl.EID]
+                ufound, vfound = g.find_edges(eid, etype=canonical_etype)
+                assert F.array_equal(ufound, u)
+                assert F.array_equal(vfound, v)
+            for ntype in block.dsttypes:
+                src = block.srcnodes[ntype].data[dgl.NID]
+                dst = block.dstnodes[ntype].data[dgl.NID]
+                assert F.array_equal(src[:block.number_of_dst_nodes(ntype)], dst)
+                prev_dst[ntype] = dst
+        for ntype in blocks[-1].dsttypes:
+            seeds[ntype].append(blocks[-1].dstnodes[ntype].data[dgl.NID])
+
+    # Check if all nodes are iterated
+    seeds = {k: F.cat(v, 0) for k, v in seeds.items()}
+    for k, v in seeds.items():
+        v_set = set(F.asnumpy(v))
+        seed_set = set(F.asnumpy(dl.nids[k]))
+        assert v_set == seed_set
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+@unittest.skipIf(F.get_preferred_backend() not in ['pytorch'], reason="Only implemented PyTorch dataloader")
+def test_neighbor_sampler_dataloader():
+    g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
+            'user', 'follow', num_nodes=6)
+    g_sampler1 = dgl.sampling.MultiLayerNeighborSampler([2, 2], return_eids=True)
+    g_sampler2 = dgl.sampling.MultiLayerNeighborSampler([None, None], return_eids=True)
+
+    dl = dgl.sampling.NodeDataLoader(
+        g, [0, 1, 2, 3, 5], g_sampler1, batch_size=2, shuffle=True, drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+    dl = dgl.sampling.NodeDataLoader(
+        g, [0, 1, 2, 3, 5], g_sampler2, batch_size=2, shuffle=True, drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+    dl = dgl.sampling.NodeDataLoader(
+        g, [4, 5], g_sampler1, batch_size=2, shuffle=True, drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+    dl = dgl.sampling.NodeDataLoader(
+        g, [4, 5], g_sampler2, batch_size=2, shuffle=True, drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+
+    hg = dgl.heterograph({
+        ('user', 'follow', 'user'): [(0, 1), (0, 2), (0, 3), (1, 0), (1, 2), (1, 3), (2, 0)],
+        ('user', 'plays', 'game'): [(0, 0), (1, 1), (1, 2), (3, 0), (5, 2)],
+        ('game', 'wanted-by', 'user'): [(0, 1), (2, 1), (1, 3), (2, 3), (2, 5)]})
+    hg_sampler1 = dgl.sampling.MultiLayerNeighborSampler(
+        [{'plays': 1, 'wanted-by': 1, 'follow': 2}] * 2,
+        return_eids=True)
+    hg_sampler2 = dgl.sampling.MultiLayerNeighborSampler([None, None], return_eids=True)
+
+    dl = dgl.sampling.NodeDataLoader(
+        hg,
+        {'user': [0, 1, 3, 5], 'game': [0, 1, 2]},
+        hg_sampler1,
+        batch_size=2,
+        shuffle=True,
+        drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+    dl = dgl.sampling.NodeDataLoader(
+        hg,
+        {'user': [0, 1, 3, 5], 'game': [0, 1, 2]},
+        hg_sampler2,
+        batch_size=2,
+        shuffle=True,
+        drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+    dl = dgl.sampling.NodeDataLoader(
+        hg,
+        {'user': [4, 5], 'game': [0, 1, 2]},
+        hg_sampler1,
+        batch_size=2,
+        shuffle=True,
+        drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+    dl = dgl.sampling.NodeDataLoader(
+        hg,
+        {'user': [4, 5], 'game': [0, 1, 2]},
+        hg_sampler2,
+        batch_size=2,
+        shuffle=True,
+        drop_last=False)
+    _check_neighbor_sampling_dataloader(dl)
+
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
@@ -478,3 +578,4 @@ if __name__ == '__main__':
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()
     test_sample_neighbors_with_0deg()
+    test_neighbor_sampler_dataloader()
