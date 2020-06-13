@@ -348,7 +348,7 @@ class RangePartitionBook:
     def __init__(self, part_id, num_parts, node_map, edge_map):
         assert part_id >= 0, 'part_id cannot be a negative number.'
         assert num_parts > 0, 'num_parts must be greater than zero.'
-        self._part_id = part_id
+        self._partid = part_id
         self._num_partitions = num_parts
         self._node_map = node_map
         self._edge_map = edge_map
@@ -500,7 +500,7 @@ class RangePartitionBook:
         tensor
              local node IDs
         """
-        if partid != self._part_id:
+        if partid != self._partid:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of nid2localnid.')
 
@@ -525,7 +525,7 @@ class RangePartitionBook:
         tensor
              local edge ids
         """
-        if partid != self._part_id:
+        if partid != self._partid:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of eid2localeid.')
 
