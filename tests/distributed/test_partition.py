@@ -55,8 +55,7 @@ def check_partition(reshuffle):
         # Check the edge map.
         local_edges = F.asnumpy(F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge']))
         local_edges1 = F.asnumpy(gpb.partid2eids(i))
-        #TODO I need to inner edge
-        #assert np.all(np.sort(local_edges) == np.sort(local_edges1))
+        assert np.all(np.sort(local_edges) == np.sort(local_edges1))
 
         for name in ['labels', 'feats']:
             assert name in node_feats
