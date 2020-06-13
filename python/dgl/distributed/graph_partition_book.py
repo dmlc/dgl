@@ -340,9 +340,9 @@ class RangePartitionBook:
         partition id of current GraphPartitionBook
     num_parts : int
         number of total partitions
-    node_map : tensor
+    node_map : NumPy NDArray
         map global node id to partition id
-    edge_map : tensor
+    edge_map : NumPy NDArray
         map global edge id to partition id
     """
     def __init__(self, part_id, num_parts, node_map, edge_map):
@@ -424,7 +424,8 @@ class RangePartitionBook:
         tensor
             partition IDs
         """
-        ret = _CAPI_DGLRangeSearch(self._node_map, nids)
+        nids = utils.toindex(nids)
+        ret = np.searchsorted(self._node_map, nids.tonumpy(), side='right')
         ret = utils.toindex(ret)
         return ret.tousertensor()
 
@@ -442,7 +443,8 @@ class RangePartitionBook:
         tensor
             partition IDs
         """
-        ret = _CAPI_DGLRangeSearch(self._edge_map, eids)
+        eids = utils.toindex(eids)
+        ret = np.searchsorted(self._edge_map, eids.tonumpy(), side='right')
         ret = utils.toindex(ret)
         return ret.tousertensor()
 

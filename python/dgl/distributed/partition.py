@@ -150,7 +150,7 @@ def load_partition(conf_file, part_id):
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
     if is_range_part:
-        gpb = RangePartitionBook(part_id, num_parts, node_map, edge_map)
+        gpb = RangePartitionBook(part_id, num_parts, np.array(node_map), np.array(edge_map))
     else:
         gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
     return graph, node_feats, edge_feats, gpb, meta
