@@ -231,6 +231,7 @@ class GraphPartitionBook:
         DGLGraph
             The graph of the partition.
         """
+        #TODO(zhengda) add implementation later.
 
 
 class RangePartitionBook:
@@ -440,3 +441,4 @@ class RangePartitionBook:
         DGLGraph
             The graph of the partition.
         """
+        #TODO(zhengda) add implementation later.

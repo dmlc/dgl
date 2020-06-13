@@ -136,9 +136,12 @@ def load_partition(conf_file, part_id):
     assert 'node_map' in part_metadata, "cannot get the node map."
     assert 'edge_map' in part_metadata, "cannot get the edge map."
 
-    reshuffle = isinstance(part_metadata['node_map'], list)
-    node_map = part_metadata['node_map'] if reshuffle else np.load(part_metadata['node_map'])
-    edge_map = part_metadata['edge_map'] if reshuffle else np.load(part_metadata['edge_map'])
+    # If this is a range partitioning, node_map actually stores a list, whose elements
+    # indicate the boundary of range partitioning. Otherwise, node_map stores a filename
+    # that contains node map in a NumPy array.
+    is_range_part = isinstance(part_metadata['node_map'], list)
+    node_map = part_metadata['node_map'] if is_range_part else np.load(part_metadata['node_map'])
+    edge_map = part_metadata['edge_map'] if is_range_part else np.load(part_metadata['edge_map'])
     assert isinstance(node_map, list) == isinstance(edge_map, list), \
             "The node map and edge map need to have the same format"
 
@@ -146,7 +149,7 @@ def load_partition(conf_file, part_id):
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    if reshuffle:
+    if is_range_part:
         gpb = RangePartitionBook(part_id, num_parts, node_map, edge_map)
     else:
         gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
