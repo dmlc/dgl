@@ -84,7 +84,7 @@ class RelGraphConv(gluon.Block):
         self.activation = activation
         self.self_loop = self_loop
 
-        assert low_mem, 'MXNet currently not support low mem RelGraphConv.'
+        assert low_mem is True, 'MXNet currently not support low mem RelGraphConv.'
 
         if regularizer == "basis":
             # add basis weights
