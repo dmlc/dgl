@@ -209,8 +209,9 @@ class MultiLayerNeighborSampler(BlockSampler):
     and 15 layers on the third:
     >>> sampler = dgl.sampling.NeighborSampler([5, 10, 15])
 
-    If training on a heterogeneous graph, one should instead provide a list of dicts.
-    Each dict would specify the number of neighbors to pick per edge type.
+    If training on a heterogeneous graph and you want different number of neighbors for each
+    edge type, one should instead provide a list of dicts.  Each dict would specify the
+    number of neighbors to pick per edge type.
     >>> sampler = dgl.sampling.NeighborSampler([
     ...     {('user', 'follows', 'user'): 5,
     ...      ('user', 'plays', 'game'): 4,

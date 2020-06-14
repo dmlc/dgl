@@ -16,40 +16,6 @@ import dgl
 from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 from model import EntityClassify, RelGraphEmbed
 
-class HeteroNeighborSampler:
-    """Neighbor sampler on heterogeneous graphs
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Full graph
-    category : str
-        Category name of the seed nodes.
-    fanouts : list of int
-        Fanout of each hop starting from the seed nodes. If a fanout is None,
-        sample full neighbors.
-    """
-    def __init__(self, g, category, fanouts):
-        self.g = g
-        self.category = category
-        self.fanouts = fanouts
-
-    def sample_blocks(self, seeds):
-        blocks = []
-        seeds = {self.category : th.tensor(seeds).long()}
-        cur = seeds
-        for fanout in self.fanouts:
-            if fanout is None:
-                frontier = dgl.in_subgraph(self.g, cur)
-            else:
-                frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
-            block = dgl.to_block(frontier, cur)
-            cur = {}
-            for ntype in block.srctypes:
-                cur[ntype] = block.srcnodes[ntype].data[dgl.NID]
-            blocks.insert(0, block)
-        return seeds, blocks
-
 def extract_embed(node_embed, block):
     emb = {}
     for ntype in block.srctypes:
@@ -122,20 +88,20 @@ def main(args):
         model.cuda()
 
     # train sampler
-    sampler = HeteroNeighborSampler(g, category, [args.fanout] * args.n_layers)
-    loader = DataLoader(dataset=train_idx.numpy(),
-                        batch_size=args.batch_size,
-                        collate_fn=sampler.sample_blocks,
-                        shuffle=True,
-                        num_workers=0)
+    sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    loader = dgl.sampling.NodeDataLoader(
+        g, {category: train_idx}, sampler,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=0)
 
     # validation sampler
-    val_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
-    _, val_blocks = val_sampler.sample_blocks(val_idx)
+    val_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)
+    val_blocks = val_sampler.sample_blocks(g, {category: val_idx})
 
     # test sampler
-    test_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
-    _, test_blocks = test_sampler.sample_blocks(test_idx)
+    test_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)
+    test_blocks = val_sampler.sample_blocks(g, {category: test_idx})
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -150,10 +116,11 @@ def main(args):
         if epoch > 3:
             t0 = time.time()
 
-        for i, (seeds, blocks) in enumerate(loader):
+        for i, blocks in enumerate(loader):
+            seeds = blocks[-1].dstnodes[category].data[dgl.NID]
             batch_tic = time.time()
             emb = extract_embed(node_embed, blocks[0])
-            lbl = labels[seeds[category]]
+            lbl = labels[seeds]
             if use_cuda:
                 emb = {k : e.cuda() for k, e in emb.items()}
                 lbl = lbl.cuda()
@@ -162,7 +129,7 @@ def main(args):
             loss.backward()
             optimizer.step()
 
-            train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds[category])
+            train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
             print("Epoch {:05d} | Batch {:03d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Time: {:.4f}".
                   format(epoch, i, train_acc, loss.item(), time.time() - batch_tic))
 
