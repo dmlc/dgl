@@ -10,7 +10,7 @@ from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition
-from .graph_partition_book import GraphPartitionBook, PartitionPolicy, get_shared_mem_partition_book
+from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .rpc_client import connect_to_server
