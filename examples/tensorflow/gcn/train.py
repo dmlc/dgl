@@ -49,9 +49,9 @@ def main(args):
         # graph preprocess and calculate normalization factor
         g = data.graph
         if args.self_loop:
-            g.remove_edges_from(nx.selfloop_edges(g))
-            g.add_edges_from(zip(g.nodes(), g.nodes()))
-        g = DGLGraph(g)
+            _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+            g.remove_edges(self_e)
+            g.add_edges(g.nodes(), g.nodes())
         n_edges = g.number_of_edges()
         # normalization
         degs = tf.cast(tf.identity(g.in_degrees()), dtype=tf.float32)

@@ -57,8 +57,8 @@ def main(args):
     # create graph
     g = data.graph
     # add self-loop
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
+    _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+    g.remove_edges(self_e)
     g.add_edges(g.nodes(), g.nodes())
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]

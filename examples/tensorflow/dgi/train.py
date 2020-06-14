@@ -39,9 +39,9 @@ def main(args):
         g = data.graph
         # add self loop
         if args.self_loop:
-            g.remove_edges_from(nx.selfloop_edges(g))
-            g.add_edges_from(zip(g.nodes(), g.nodes()))
-        g = DGLGraph(g)
+            _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+            g.remove_edges(self_e)
+            g.add_edges(g.nodes(), g.nodes())
         n_edges = g.number_of_edges()
 
         # create DGI model

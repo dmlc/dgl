@@ -55,9 +55,11 @@ def main(args):
     test_mask = test_mask.as_in_context(ctx)
 
     # graph preprocess and calculate normalization factor
-    g = DGLGraph(data.graph)
+    g = data.graph
     n_edges = g.number_of_edges()
     # add self loop
+    _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+    g.remove_edges(self_e)
     g.add_edges(g.nodes(), g.nodes())
 
     # create SGC model

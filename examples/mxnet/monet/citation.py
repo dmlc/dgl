@@ -94,8 +94,9 @@ def main(args):
 
     # graph preprocess and calculate normalization factor
     g = data.graph
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
+    # remove self-loop
+    _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+    g.remove_edges(self_e)
     n_edges = g.number_of_edges()
     us, vs = g.edges()
     pseudo = []

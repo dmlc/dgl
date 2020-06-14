@@ -11,7 +11,9 @@ import networkx as nx
 import scipy.sparse as sp
 import os, sys
 
+from .dgl_dataset import DGLBuiltinDataset
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from .utils import save_graphs, load_graphs, save_info, load_info
 from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 from ..graph import batch as graph_batch
@@ -29,7 +31,7 @@ def _pickle_load(pkl_file):
     else:
         return pkl.load(pkl_file)
 
-class CitationGraphDataset(object):
+class CitationGraphDataset(DGLBuiltinDataset):
     r"""The citation graph dataset, including cora, citeseer and pubmeb.
     Nodes mean authors and edges mean citation relationships.
 
@@ -46,17 +48,10 @@ class CitationGraphDataset(object):
         if name.lower() == 'cora':
             name = 'cora_v2'
 
-        self.name = name
-        self.dir = get_download_dir()
-        self.zip_file_path='{}/{}.zip'.format(self.dir, name)
-        self._load()
+        url = _get_dgl_url(_urls[name])
+        super(CitationGraphDataset, self).__init__(name, url)
 
-    def _download_and_extract(self):
-        download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
-        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, self.name))
-
-    @retry_method_with_fix(_download_and_extract)
-    def _load(self):
+    def process(self, root_path):
         """Loads input data from gcn/data directory
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
@@ -75,7 +70,7 @@ class CitationGraphDataset(object):
         :param name: Dataset name
         :return: All data input files loaded (as well the training/test data).
         """
-        root = '{}/{}'.format(self.dir, self.name)
+        root = root_path
         objnames = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
         objects = []
         for i in range(len(objnames)):
@@ -113,19 +108,18 @@ class CitationGraphDataset(object):
         val_mask = _sample_mask(idx_val, labels.shape[0])
         test_mask = _sample_mask(idx_test, labels.shape[0])
 
-        self.graph = graph
-        self.features = _preprocess_features(features)
-        self.labels = labels
-        self.onehot_labels = onehot_labels
-        self.num_labels = onehot_labels.shape[1]
-        self.train_mask = train_mask
-        self.val_mask = val_mask
-        self.test_mask = test_mask
+        self._features = _preprocess_features(features)
+        self._labels = labels
+        self._num_labels = onehot_labels.shape[1]
+        self._train_mask = train_mask
+        self._val_mask = val_mask
+        self._test_mask = test_mask
+        self._g = DGLGraph(graph)
 
         print('Finished data loading and preprocessing.')
         print('  NumNodes: {}'.format(self.graph.number_of_nodes()))
         print('  NumEdges: {}'.format(self.graph.number_of_edges()))
-        print('  NumFeats: {}'.format(self.features.shape[1]))
+        print('  NumFeats: {}'.format(self.node_features.shape[1]))
         print('  NumClasses: {}'.format(self.num_labels))
         print('  NumTrainingSamples: {}'.format(len(np.nonzero(self.train_mask)[0])))
         print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
@@ -133,7 +127,7 @@ class CitationGraphDataset(object):
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
-        g = DGLGraph(self.graph)
+        g = self.graph
         g.ndata['train_mask'] = self.train_mask
         g.ndata['val_mask'] = self.val_mask
         g.ndata['test_mask'] = self.test_mask
@@ -143,6 +137,101 @@ class CitationGraphDataset(object):
 
     def __len__(self):
         return 1
+
+    def has_cache(self):
+        if os.path.exists(os.path.join(self.raw_path, 'graph.bin')) and \
+            os.path.exists(os.path.join(self.raw_path, 'dgl_info.pickle')):
+            return True
+
+        return False
+
+    def load(self):
+        g = load_graphs(os.path.join(self.raw_path, 'graph.bin'))[0]
+        info = load_info(os.path.join(self.raw_path, 'dgl_info.pickle'))
+        self._features = g.pop('feat')
+        self._labels = g.pop('label')
+        self._num_labels = info['num_labels']
+        self._train_mask = g.pop('train_mask')
+        self._val_mask = g.pop('val_mask')
+        self._test_mask = g.pop('test_mask')
+        self._g = g
+
+        print('Finished loading data from cached files.')
+        print('  NumNodes: {}'.format(self.graph.number_of_nodes()))
+        print('  NumEdges: {}'.format(self.graph.number_of_edges()))
+        print('  NumFeats: {}'.format(self.node_features.shape[1]))
+        print('  NumClasses: {}'.format(self.num_labels))
+        print('  NumTrainingSamples: {}'.format(len(np.nonzero(self.train_mask)[0])))
+        print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
+        print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
+
+    def save(self):
+        g = self.graph
+        g.ndata['train_mask'] = self.train_mask
+        g.ndata['val_mask'] = self.val_mask
+        g.ndata['test_mask'] = self.test_mask
+        g.ndata['label'] = self.labels
+        g.ndata['feat'] = self.features
+        graph_path = os.path.join(self.raw_path, 'dgl_graph.bin')
+        info_path = os.path.join(self.raw_path, 'dgl_info.pickle')
+        info = {'num_labels' : self.num_labels}
+
+        # save data in files
+        save_graphs(graph_path, self.graph)
+        save_info(info_path, info)
+        print('Done saving data into cached files.')
+
+    @property
+    def graph(self):
+        return self._g
+
+    @property
+    def train_mask(self):
+        return self._train_mask
+
+    @property
+    def val_mask(self):
+        return self._val_mask
+
+    @property
+    def test_mask(self):
+        return self._test_mask
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @property
+    def num_labels(self):
+        return self._num_labels
+
+    @property
+    def node_features(self):
+        return self._features
+
+    @property
+    def features(self):
+        """For backward compatability
+        """
+        return self.node_features
+
+class CoraGraphDataset(CitationGraphDataset):
+    def __init__(self):
+        name = 'cora'
+
+        super(CoraGraphDataset, self).__init__(name)
+
+class CiteseerGraphDataset(CitationGraphDataset):
+    def __init__(self):
+        name = 'citeseer'
+
+        super(CiteseerGraphDataset, self).__init__(name)
+
+class PubmedGraphDataset(CitationGraphDataset):
+    def __init__(self):
+        name = 'pubmed'
+
+        super(PubmedGraphDataset, self).__init__(name)
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
@@ -167,138 +256,18 @@ def _sample_mask(idx, l):
     return mask
 
 def load_cora():
-    data = CitationGraphDataset('cora')
+    data = CoraGraphDataset()
     return data
 
 def load_citeseer():
-    data = CitationGraphDataset('citeseer')
+    data = CiteseerGraphDataset()
     return data
 
 def load_pubmed():
-    data = CitationGraphDataset('pubmed')
+    data = PubmedGraphDataset()
     return data
 
-class GCNSyntheticDataset(object):
-    def __init__(self,
-                 graph_generator,
-                 num_feats=500,
-                 num_classes=10,
-                 train_ratio=1.,
-                 val_ratio=0.,
-                 test_ratio=0.,
-                 seed=None):
-        rng = np.random.RandomState(seed)
-        # generate graph
-        self.graph = graph_generator(seed)
-        num_nodes = self.graph.number_of_nodes()
-
-        # generate features
-        #self.features = rng.randn(num_nodes, num_feats).astype(np.float32)
-        self.features = np.zeros((num_nodes, num_feats), dtype=np.float32)
-
-        # generate labels
-        self.labels = rng.randint(num_classes, size=num_nodes)
-        onehot_labels = np.zeros((num_nodes, num_classes), dtype=np.float32)
-        onehot_labels[np.arange(num_nodes), self.labels] = 1.
-        self.onehot_labels = onehot_labels
-        self.num_labels = num_classes
-
-        # generate masks
-        ntrain = int(num_nodes * train_ratio)
-        nval = int(num_nodes * val_ratio)
-        ntest = int(num_nodes * test_ratio)
-        mask_array = np.zeros((num_nodes,), dtype=np.int32)
-        mask_array[0:ntrain] = 1
-        mask_array[ntrain:ntrain+nval] = 2
-        mask_array[ntrain+nval:ntrain+nval+ntest] = 3
-        rng.shuffle(mask_array)
-        self.train_mask = (mask_array == 1).astype(np.int32)
-        self.val_mask = (mask_array == 2).astype(np.int32)
-        self.test_mask = (mask_array == 3).astype(np.int32)
-
-        print('Finished synthetic dataset generation.')
-        print('  NumNodes: {}'.format(self.graph.number_of_nodes()))
-        print('  NumEdges: {}'.format(self.graph.number_of_edges()))
-        print('  NumFeats: {}'.format(self.features.shape[1]))
-        print('  NumClasses: {}'.format(self.num_labels))
-        print('  NumTrainingSamples: {}'.format(len(np.nonzero(self.train_mask)[0])))
-        print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
-        print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
-
-    def __getitem__(self, idx):
-        return self
-
-    def __len__(self):
-        return 1
-
-def get_gnp_generator(args):
-    n = args.syn_gnp_n
-    p = (2 * np.log(n) / n) if args.syn_gnp_p == 0. else args.syn_gnp_p
-    def _gen(seed):
-        return nx.fast_gnp_random_graph(n, p, seed, True)
-    return _gen
-
-class ScipyGraph(object):
-    """A simple graph object that uses scipy matrix."""
-    def __init__(self, mat):
-        self._mat = mat
-
-    def get_graph(self):
-        return self._mat
-
-    def number_of_nodes(self):
-        return self._mat.shape[0]
-
-    def number_of_edges(self):
-        return self._mat.getnnz()
-
-def get_scipy_generator(args):
-    n = args.syn_gnp_n
-    p = (2 * np.log(n) / n) if args.syn_gnp_p == 0. else args.syn_gnp_p
-    def _gen(seed):
-        return ScipyGraph(sp.random(n, n, p, format='coo'))
-    return _gen
-
-def load_synthetic(args):
-    ty = args.syn_type
-    if ty == 'gnp':
-        gen = get_gnp_generator(args)
-    elif ty == 'scipy':
-        gen = get_scipy_generator(args)
-    else:
-        raise ValueError('Unknown graph generator type: {}'.format(ty))
-    return GCNSyntheticDataset(
-            gen,
-            args.syn_nfeats,
-            args.syn_nclasses,
-            args.syn_train_ratio,
-            args.syn_val_ratio,
-            args.syn_test_ratio,
-            args.syn_seed)
-
-def register_args(parser):
-    # Args for synthetic graphs.
-    parser.add_argument('--syn-type', type=str, default='gnp',
-            help='Type of the synthetic graph generator')
-    parser.add_argument('--syn-nfeats', type=int, default=500,
-            help='Number of node features')
-    parser.add_argument('--syn-nclasses', type=int, default=10,
-            help='Number of output classes')
-    parser.add_argument('--syn-train-ratio', type=float, default=.1,
-            help='Ratio of training nodes')
-    parser.add_argument('--syn-val-ratio', type=float, default=.2,
-            help='Ratio of validation nodes')
-    parser.add_argument('--syn-test-ratio', type=float, default=.5,
-            help='Ratio of testing nodes')
-    # Args for GNP generator
-    parser.add_argument('--syn-gnp-n', type=int, default=1000,
-            help='n in gnp random graph')
-    parser.add_argument('--syn-gnp-p', type=float, default=0.0,
-            help='p in gnp random graph')
-    parser.add_argument('--syn-seed', type=int, default=42,
-            help='random seed')
-
-class CoraBinary(object):
+class CoraBinary(DGLBuiltinDataset):
     """A mini-dataset for binary classification task using Cora.
 
     After loaded, it has following members:
@@ -308,55 +277,82 @@ class CoraBinary(object):
     labels : list of :class:`numpy.ndarray`
     """
     def __init__(self):
-        self.dir = get_download_dir()
-        self.name = 'cora_binary'
-        self.zip_file_path='{}/{}.zip'.format(self.dir, self.name)
-        self._load()
+        name = 'cora_binary'
 
-    def _download_and_extract(self):
-        download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
-        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, self.name))
+        url = _get_dgl_url(_urls[name])
+        super(CoraBinary, self).__init__(name, url)
 
-    @retry_method_with_fix(_download_and_extract)
-    def _load(self):
-        root = '{}/{}'.format(self.dir, self.name)
+    def process(self, root_path):
+        root = root_path
         # load graphs
-        self.graphs = []
+        self._graphs = []
         with open("{}/graphs.txt".format(root), 'r') as f:
             elist = []
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(DGLGraph(elist))
+                        self._graphs.append(DGLGraph(elist))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(DGLGraph(elist))
+                self._graphs.append(DGLGraph(elist))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
-            self.pmpds = _pickle_load(f)
-        self.labels = []
+            self._pmpds = _pickle_load(f)
+        self._labels = []
         with open("{}/labels.txt".format(root), 'r') as f:
             cur = []
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(cur) != 0:
-                        self.labels.append(np.asarray(cur))
+                        self._labels.append(np.asarray(cur))
                     cur = []
                 else:
                     cur.append(int(line.strip()))
             if len(cur) != 0:
-                self.labels.append(np.asarray(cur))
+                self._labels.append(np.asarray(cur))
         # sanity check
-        assert len(self.graphs) == len(self.pmpds)
-        assert len(self.graphs) == len(self.labels)
+        assert len(self.graph) == len(self.pmpds)
+        assert len(self.graph) == len(self.labels)
+
+    def save(self):
+        graph_path = os.path.join(self.raw_path, 'dgl_graph.bin')
+        info_path = os.path.join(self.raw_path, 'dgl_info.pickle')
+        info = {'pmpds': self.pmpds,
+                'labels': self.labels}
+
+        #save data in files
+        save_graphs(graph_path, self.graph)
+        save_info(info_path, info)
+        print('Done saving data into cached files.')
+
+    def load(self):
+        graphs = load_graphs(os.path.join(self.raw_path, 'graph.bin'))
+        info = load_info(os.path.join(self.raw_path, 'dgl_info.pickle'))
+
+        self._graphs = graphs
+        self._pmpds = info['pmpds']
+        self._labels = info['labels']
+        print('Finished loading data from cached files.')
+
+    @property
+    def graph(self):
+        return self._graphs
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @property
+    def pmpds(self):
+        return self._pmpds
 
     def __len__(self):
-        return len(self.graphs)
+        return len(self.graph)
 
     def __getitem__(self, i):
-        return (self.graphs[i], self.pmpds[i], self.labels[i])
+        return (self.graph[i], self.pmpds[i], self.labels[i])
 
     @staticmethod
     def collate_fn(batch):

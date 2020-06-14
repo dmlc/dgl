@@ -56,9 +56,9 @@ def main(args):
     # create GCN model
     g = data.graph
     if args.self_loop:
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g.add_edges_from(zip(g.nodes(), g.nodes()))
-    g = DGLGraph(g)
+        _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+        g.remove_edges(self_e)
+        g.add_edges(g.nodes(), g.nodes())
     # normalization
     degs = g.in_degrees().astype('float32')
     norm = mx.nd.power(degs, -0.5)

@@ -16,8 +16,9 @@ import numpy as np
 
 import dgl
 import dgl.backend as F
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
-from ..utils import retry_method_with_fix
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import _get_dgl_url
+from .utils import save_graphs, load_graphs, save_info, load_info
 
 __all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
 
@@ -59,7 +60,7 @@ class Relation:
     def __str__(self):
         return str(self.cls)
 
-class RDFGraphDataset:
+class RDFGraphDataset(DGLBuiltinDataset):
     """Base graph dataset class from RDF tuples.
 
     To derive from this, implement the following abstract methods:
@@ -107,35 +108,21 @@ class RDFGraphDataset:
                  force_reload=False,
                  print_every=10000,
                  insert_reverse=True):
-        download_dir = get_download_dir()
-        zip_file_path = os.path.join(download_dir, '{}.zip'.format(name))
-        self._dir = os.path.join(download_dir, name)
-        self._url = url
-        self._zip_file_path = zip_file_path
-        self._load(print_every, insert_reverse, force_reload)
-
-    def _download(self):
-        download(self._url, path=self._zip_file_path)
-        extract_archive(self._zip_file_path, self._dir)
-
-    @retry_method_with_fix(_download)
-    def _load(self, print_every, insert_reverse, force_reload):
-        self._print_every = print_every
         self._insert_reverse = insert_reverse
-        if not force_reload and self.has_cache():
-            print('Found cached graph. Load cache ...')
-            self.load_cache()
-        else:
-            raw_tuples = self.load_raw_tuples()
-            self.process_raw_tuples(raw_tuples)
+        self._print_every = print_every
+        super(RDFGraphDataset, self).__init__(name, url, force_reload)
+
+    def process(self, root_path):
+        raw_tuples = self.load_raw_tuples(root_path)
+        self.process_raw_tuples(root_path, raw_tuples)
         print('#Training samples:', len(self.train_idx))
         print('#Testing samples:', len(self.test_idx))
         print('#Classes:', self.num_classes)
-        print('Predict category:', self.predict_category)
+        print('Predict category:', self.predict_ntype)
 
-    def load_raw_tuples(self):
+    def load_raw_tuples(self, root_path):
         raw_rdf_graphs = []
-        for i, filename in enumerate(os.listdir(self._dir)):
+        for i, filename in enumerate(os.listdir(root_path)):
             fmt = None
             if filename.endswith('nt'):
                 fmt = 'nt'
@@ -145,11 +132,11 @@ class RDFGraphDataset:
                 continue
             g = rdf.Graph()
             print('Parsing file %s ...' % filename)
-            g.parse(os.path.join(self._dir, filename), format=fmt)
+            g.parse(os.path.join(root_path, filename), format=fmt)
             raw_rdf_graphs.append(g)
         return itertools.chain(*raw_rdf_graphs)
 
-    def process_raw_tuples(self, raw_tuples):
+    def process_raw_tuples(self, root_path, raw_tuples):
         mg = nx.MultiDiGraph()
         ent_classes = OrderedDict()
         rel_classes = OrderedDict()
@@ -211,16 +198,14 @@ class RDFGraphDataset:
         self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
 
         print('Load training/validation/testing split ...')
-        idmap = F.asnumpy(self.graph.nodes[self.predict_category].data[dgl.NID])
+        idmap = F.asnumpy(self.graph.nodes[self.predict_ntype].data[dgl.NID])
         glb2lcl = {glbid : lclid for lclid, glbid in enumerate(idmap)}
         def findidfn(ent):
             if ent not in entities:
                 return None
             else:
                 return glb2lcl[entities[ent]]
-        self.load_data_split(findidfn)
-
-        self.save_cache(mg, src, dst, ntid, etid, ntypes, etypes)
+        self.load_data_split(root_path, findidfn)
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
         # create homo graph
@@ -248,61 +233,63 @@ class RDFGraphDataset:
         print('#Node types:', len(hg.ntypes))
         print('#Canonical edge types:', len(hg.etypes))
         print('#Unique edge type names:', len(set(hg.etypes)))
-        self.graph = hg
-
-    def save_cache(self, mg, src, dst, ntid, etid, ntypes, etypes):
-        nx.write_gpickle(mg, os.path.join(self._dir, 'cached_mg.gpickle'))
-        np.save(os.path.join(self._dir, 'cached_src.npy'), src)
-        np.save(os.path.join(self._dir, 'cached_dst.npy'), dst)
-        np.save(os.path.join(self._dir, 'cached_ntid.npy'), ntid)
-        np.save(os.path.join(self._dir, 'cached_etid.npy'), etid)
-        save_strlist(os.path.join(self._dir, 'cached_ntypes.txt'), ntypes)
-        save_strlist(os.path.join(self._dir, 'cached_etypes.txt'), etypes)
-        np.save(os.path.join(self._dir, 'cached_train_idx.npy'), F.asnumpy(self.train_idx))
-        np.save(os.path.join(self._dir, 'cached_test_idx.npy'), F.asnumpy(self.test_idx))
-        np.save(os.path.join(self._dir, 'cached_labels.npy'), F.asnumpy(self.labels))
+        print(hg.etypes)
+        self._graph = hg
 
     def has_cache(self):
-        return (os.path.exists(os.path.join(self._dir, 'cached_mg.gpickle'))
-            and os.path.exists(os.path.join(self._dir, 'cached_src.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_dst.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_ntid.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_etid.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_ntypes.txt'))
-            and os.path.exists(os.path.join(self._dir, 'cached_etypes.txt'))
-            and os.path.exists(os.path.join(self._dir, 'cached_train_idx.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_test_idx.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_labels.npy')))
+        # (TODO) Wait for save_graphs of heterogous graph
+        return False
+        if os.path.exists(os.path.join(self.raw_path, 'graph.bin')) and \
+            os.path.exists(os.path.join(self.raw_path, 'dgl_info.pickle')):
+            return True
 
-    def load_cache(self):
-        mg = nx.read_gpickle(os.path.join(self._dir, 'cached_mg.gpickle'))
-        src = np.load(os.path.join(self._dir, 'cached_src.npy'))
-        dst = np.load(os.path.join(self._dir, 'cached_dst.npy'))
-        ntid = np.load(os.path.join(self._dir, 'cached_ntid.npy'))
-        etid = np.load(os.path.join(self._dir, 'cached_etid.npy'))
-        ntypes = load_strlist(os.path.join(self._dir, 'cached_ntypes.txt'))
-        etypes = load_strlist(os.path.join(self._dir, 'cached_etypes.txt'))
-        self.train_idx = F.tensor(np.load(os.path.join(self._dir, 'cached_train_idx.npy')))
-        self.test_idx = F.tensor(np.load(os.path.join(self._dir, 'cached_test_idx.npy')))
-        labels = np.load(os.path.join(self._dir, 'cached_labels.npy'))
-        self.num_classes = labels.max() + 1
-        self.labels = F.tensor(labels)
+        return False
 
-        self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
+    def save(self):
+        # (TODO) Wait for save_graphs of heterogous graph
+        return
+        graph_path = os.path.join(self.raw_path, 'dgl_graph.bin')
+        info_path = os.path.join(self.raw_path, 'dgl_info.pickle')
+        info = {'train_idx' : F.asnumpy(self.train_idx),
+                'test_idx' : F.asnumpy(self.test_idx),
+                'labels' : F.asnumpy(self.labels),
+                'num_classes' : self.labels.max() + 1}
 
-    def load_data_split(self, ent2id):
+        # save data in files
+        save_graphs(graph_path, self.graph)
+        save_info(info_path, info)
+        print('Done saving data into cached files.')
+
+    def load(self):
+        # (TODO) Wait for save_graphs of heterogous graph
+        return
+        hg = load_graphs(os.path.join(self.raw_path, 'graph.bin'))[0]
+        info = load_info(os.path.join(self.raw_path, 'dgl_info.pickle'))
+
+        self._graph = hg
+        self._train_idx = F.tensor(info['train_idx'])
+        self._test_idx = F.tensor(info['test_idx'])
+        self._labels = F.tensor(info['labels'])
+        self._num_labels = info['num_classes']
+
+        print('#Training samples:', len(self.train_idx))
+        print('#Testing samples:', len(self.test_idx))
+        print('#Classes:', self.num_classes)
+        print('Predict category:', self.predict_ntype)
+
+    def load_data_split(self, root_path, ent2id):
         label_dict = {}
-        labels = np.zeros((self.graph.number_of_nodes(self.predict_category),)) - 1
+        labels = np.zeros((self.graph.number_of_nodes(self.predict_ntype),)) - 1
         train_idx = self.parse_idx_file(
-            os.path.join(self._dir, 'trainingSet.tsv'),
+            os.path.join(root_path, 'trainingSet.tsv'),
             ent2id, label_dict, labels)
         test_idx = self.parse_idx_file(
-            os.path.join(self._dir, 'testSet.tsv'),
+            os.path.join(root_path, 'testSet.tsv'),
             ent2id, label_dict, labels)
-        self.train_idx = F.tensor(train_idx)
-        self.test_idx = F.tensor(test_idx)
-        self.labels = F.tensor(labels).long()
-        self.num_classes = len(label_dict)
+        self._train_idx = F.tensor(train_idx)
+        self._test_idx = F.tensor(test_idx)
+        self._labels = F.tensor(labels).long()
+        self._num_classes = len(label_dict)
 
     def parse_idx_file(self, filename, ent2id, label_dict, labels):
         idx = []
@@ -403,9 +390,35 @@ class RDFGraphDataset:
 
     @property
     @abc.abstractmethod
-    def predict_category(self):
-        """Return the category name that has labels."""
+    def predict_ntype(self):
+        """Return the node type (the category) that has labels."""
         pass
+
+    @property
+    @abc.abstractmethod
+    def predict_ntid(self):
+        """Return the node type ID that has labels."""
+        pass
+
+    @property
+    def graph(self):
+        return self._graph
+
+    @property
+    def train_idx(self):
+        return self._train_idx
+
+    @property
+    def test_idx(self):
+        return self._test_idx
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @property
+    def num_classes(self):
+        return self._num_classes
 
 def _get_id(dict, key):
     id = dict.get(key, None)
@@ -483,8 +496,18 @@ class AIFB(RDFGraphDataset):
         return person, label
 
     @property
-    def predict_category(self):
+    def predict_ntype(self):
         return 'Personen'
+
+    @property
+    def predict_ntid(self):
+        predict_ntype = self.predict_ntype
+        ntid = len(self.graph.ntypes)
+        for i, ntype in enumerate(self.graph.ntypes):
+            if ntype == predict_ntype:
+                ntid = i
+        return ntid
+
 
 class MUTAG(RDFGraphDataset):
     """MUTAG dataset.
@@ -566,8 +589,17 @@ class MUTAG(RDFGraphDataset):
         return bond, label
 
     @property
-    def predict_category(self):
+    def predict_ntype(self):
         return 'd'
+
+    @property
+    def predict_ntid(self):
+        predict_ntype = self.predict_ntype
+        ntid = len(self.graph.ntypes)
+        for i, ntype in enumerate(self.graph.ntypes):
+            if ntype == predict_ntype:
+                ntid = i
+        return ntid
 
 class BGS(RDFGraphDataset):
     """BGS dataset.
@@ -645,8 +677,17 @@ class BGS(RDFGraphDataset):
         return rock, label
 
     @property
-    def predict_category(self):
+    def predict_ntype(self):
         return 'Lexicon/NamedRockUnit'
+
+    @property
+    def predict_ntid(self):
+        predict_ntype = self.predict_ntype
+        ntid = len(self.graph.ntypes)
+        for i, ntype in enumerate(self.graph.ntypes):
+            if ntype == predict_ntype:
+                ntid = i
+        return ntid
 
 class AM(RDFGraphDataset):
     """AM dataset.
@@ -723,8 +764,17 @@ class AM(RDFGraphDataset):
         return proxy, label
 
     @property
-    def predict_category(self):
+    def predict_ntid(self):
         return 'proxy'
+
+    @property
+    def predict_ntid(self):
+        predict_ntype = self.predict_ntype
+        ntid = len(self.graph.ntypes)
+        for i, ntype in enumerate(self.graph.ntypes):
+            if ntype == predict_ntype:
+                ntid = i
+        return ntid
 
 if __name__ == '__main__':
     AIFB()

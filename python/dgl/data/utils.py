@@ -3,11 +3,13 @@ from __future__ import absolute_import
 
 import os
 import sys
+import errno
 import hashlib
 import warnings
 import numpy as np
 import warnings
 import requests
+import pickle
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
@@ -236,6 +238,25 @@ def get_download_dir():
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     return dirname
+
+
+def makedirs(path):
+    try:
+        os.makedirs(os.path.expanduser(os.path.normpath(path)))
+    except OSError as e:
+        if e.errno != errno.EEXIST and os.path.isdir(path):
+            raise e
+
+
+def save_info(path, info):
+    with open(path, "wb" ) as pf:
+        pickle.dump(info, pf)
+
+
+def load_info(path):
+    with open(path, "r" ) as pf:
+        info = pickle.load(pf)
+    return info
 
 
 class Subset(object):

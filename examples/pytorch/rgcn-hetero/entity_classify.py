@@ -26,15 +26,12 @@ def main(args):
         raise ValueError()
 
     g = dataset.graph
-    category = dataset.predict_category
+    category = dataset.predict_ntype
     num_classes = dataset.num_classes
     train_idx = dataset.train_idx
     test_idx = dataset.test_idx
     labels = dataset.labels
-    category_id = len(g.ntypes)
-    for i, ntype in enumerate(g.ntypes):
-        if ntype == category:
-            category_id = i
+    category_id = dataset.predict_ntid
 
     # split dataset into train, validate, test
     if args.validation:
