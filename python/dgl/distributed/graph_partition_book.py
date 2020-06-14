@@ -154,7 +154,7 @@ class GraphPartitionBook:
             The graph name
         """
         self._meta, self._nid2partid, self._eid2partid = _move_metadata_to_shared_mam(
-            graph_name, self.num_nodes(), self.num_edges(), self._part_id, self._num_partitions,
+            graph_name, self._num_nodes(), self._num_edges(), self._part_id, self._num_partitions,
             self._nid2partid, self._eid2partid, False)
 
     def num_partitions(self):
@@ -190,12 +190,12 @@ class GraphPartitionBook:
         """
         return self._partition_meta_data
 
-    def num_nodes(self):
+    def _num_nodes(self):
         """ The total number of nodes
         """
         return len(self._nid2partid)
 
-    def num_edges(self):
+    def _num_edges(self):
         """ The total number of edges
         """
         return len(self._eid2partid)
@@ -379,7 +379,7 @@ class RangePartitionBook:
             The graph name
         """
         self._meta = _move_metadata_to_shared_mam(
-            graph_name, self.num_nodes(), self.num_edges(), self._partid,
+            graph_name, self._num_nodes(), self._num_edges(), self._partid,
             self._num_partitions, F.tensor(self._node_map), F.tensor(self._edge_map), True)
 
     def num_partitions(self):
@@ -393,15 +393,15 @@ class RangePartitionBook:
         return self._num_partitions
 
 
-    def num_nodes(self):
+    def _num_nodes(self):
         """ The total number of nodes
         """
-        return self._node_map[-1]
+        return int(self._node_map[-1])
 
-    def num_edges(self):
+    def _num_edges(self):
         """ The total number of edges
         """
-        return self._edge_map[-1]
+        return int(self._edge_map[-1])
 
     def metadata(self):
         """Return the partition meta data.
