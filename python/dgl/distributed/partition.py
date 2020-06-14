@@ -218,7 +218,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     # Let's calculate edge assignment.
     # TODO(zhengda) we should replace int64 with int16. int16 should be sufficient.
-    if num_parts > 1 and not reshuffle:
+    if not reshuffle:
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
         num_edges = 0
         lnodes_list = []      # The node ids of each partition
@@ -232,7 +232,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             lnodes_list.append(local_nodes)
             ledges_list.append(local_edges)
         assert num_edges == g.number_of_edges()
-    elif num_parts > 1:
+    else:
         num_edges = 0
         num_nodes = 0
         lnodes_list = []      # The node ids of each partition
@@ -255,7 +255,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     out_path = os.path.abspath(out_path)
 
     # Without reshuffling, we have to store the entire node/edge mapping in a file.
-    if not reshuffle and num_parts > 1:
+    if not reshuffle:
         node_part_file = os.path.join(out_path, "node_map")
         edge_part_file = os.path.join(out_path, "edge_map")
         np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=False)
