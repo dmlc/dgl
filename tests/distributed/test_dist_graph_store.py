@@ -168,13 +168,7 @@ def test_split():
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, meta = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
-        num_nodes, num_edges, node_map, edge_map, num_partitions = meta
-        gpb = GraphPartitionBook(part_id=i,
-                                 num_parts=num_partitions,
-                                 node_map=node_map,
-                                 edge_map=edge_map,
-                                 part_graph=part_g)
+        part_g, node_feats, edge_feats, gpb = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
@@ -200,6 +194,6 @@ def prepare_dist():
     ip_config.close()
 
 if __name__ == '__main__':
-    os.mkdir('/tmp/dist_graph')
-    test_split()
-    #test_server_client()
+    os.makedirs('/tmp/dist_graph', exist_ok=True)
+    #test_split()
+    test_server_client()

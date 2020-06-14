@@ -116,8 +116,8 @@ def load_partition(conf_file, part_id):
         All node features.
     dict of tensors
         All edge features.
-    (int, int, NumPy ndarray, Numpy ndarray))
-        The metadata of the global graph: number of nodes, number of edges, node map, edge map.
+    GraphPartitionBook
+        The global partition information.
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
@@ -145,7 +145,6 @@ def load_partition(conf_file, part_id):
     assert isinstance(node_map, list) == isinstance(edge_map, list), \
             "The node map and edge map need to have the same format"
 
-    meta = (part_metadata['num_nodes'], part_metadata['num_edges'])
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
@@ -153,7 +152,7 @@ def load_partition(conf_file, part_id):
         gpb = RangePartitionBook(part_id, num_parts, np.array(node_map), np.array(edge_map))
     else:
         gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
-    return graph, node_feats, edge_feats, gpb, meta
+    return graph, node_feats, edge_feats, gpb
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True):
@@ -206,6 +205,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_parts = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
         g.ndata[NID] = F.arange(0, g.number_of_nodes())
         g.edata[EID] = F.arange(0, g.number_of_edges())
+        g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int64, F.cpu())
+        g.edata['inner_edge'] = F.ones((g.number_of_edges(),), F.int64, F.cpu())
     elif part_method == 'metis':
         node_parts = metis_partition_assignment(g, num_parts)
         client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)

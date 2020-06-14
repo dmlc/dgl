@@ -28,12 +28,11 @@ def check_partition(reshuffle):
                     part_method='metis', reshuffle=reshuffle)
     part_sizes = []
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, gpb, meta = load_partition('/tmp/partition/test.json', i)
-        num_nodes, num_edges = meta
+        part_g, node_feats, edge_feats, gpb = load_partition('/tmp/partition/test.json', i)
 
         # Check the metadata
-        assert num_nodes == g.number_of_nodes()
-        assert num_edges == g.number_of_edges()
+        assert gpb.num_nodes() == g.number_of_nodes()
+        assert gpb.num_edges() == g.number_of_edges()
 
         assert gpb.num_partitions() == num_parts
         gpb_meta = gpb.metadata()

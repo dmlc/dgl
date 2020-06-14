@@ -270,12 +270,10 @@ class DistGraphServer(KVServer):
         self.ip_config = ip_config
 
         # Load graph partition data.
-        self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
-        _, _, node_map, edge_map, num_partitions = self.meta
+        self.client_g, node_feats, edge_feats, self.gpb = load_partition(conf_file, server_id)
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
         # Init kvstore.
-        self.gpb = GraphPartitionBook(server_id, num_partitions, node_map, edge_map, self.client_g)
         self.gpb.shared_memory(graph_name)
         self.add_part_policy(PartitionPolicy('node', server_id, self.gpb))
         self.add_part_policy(PartitionPolicy('edge', server_id, self.gpb))
