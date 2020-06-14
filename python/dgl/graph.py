@@ -3898,9 +3898,9 @@ class DGLGraph(DGLBaseGraph):
         >>> G = G.to(torch.device('cuda:0'))
         """
         for k in self.ndata.keys():
-            self.ndata[k] = F.copy_to(self.ndata[k], ctx)
+            self.ndata[k] = F.copy_to(self.ndata[k], ctx, **kwargs)
         for k in self.edata.keys():
-            self.edata[k] = F.copy_to(self.edata[k], ctx)
+            self.edata[k] = F.copy_to(self.edata[k], ctx, **kwargs)
         return self
     # pylint: enable=invalid-name
 
