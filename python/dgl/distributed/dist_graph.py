@@ -419,12 +419,7 @@ class DistGraph:
             The initializer.
         '''
         assert shape[0] == self.number_of_nodes()
-        names = self._ndata._get_names()
-        # TODO we need to fix this. We should be able to init ndata even when there is no node data.
-        assert len(names) > 0
-        # TODO we need to support user-defined function for data initialization.
-        ndata_name = _get_ndata_name(name)
-        self._client.init_data(ndata_name, shape, dtype, _get_ndata_name(names[0]))
+        self._client.init_data(_get_ndata_name(name), shape, dtype, 'node', self._gpb, initializer)
         self._ndata._add(name)
         self._node_embs[name] = SparseEmbedding(g, ndata_name)
 
