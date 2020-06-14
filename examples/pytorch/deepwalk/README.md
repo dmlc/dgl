@@ -12,27 +12,30 @@ The implementation includes multi-processing training with CPU and mixed trainin
 - PyTorch 1.5.0
 - DGL 0.4.3
 
-## How to run the code
 
-Format of a network file:
+## Input data
+Currently, we support two builtin dataset: youtube and blog. Use --data\_file youtube to select youtube dataset and --data\_file blog to select blog dataset.
+The data is avaliable at  https://data.dgl.ai/dataset/DeepWalk/youtube.zip and https://data.dgl.ai/dataset/DeepWalk/blog.zip
+The youtube.zip includes both youtube-net.txt, youtube-vocab.txt and youtube-label.txt; The blog.zip includes both blog-net.txt, blog-vocab.txt and blog-label.txt. 
+
+For other datasets please pass the full path to the trainer through --data\_file and the format of a network file should follow:
 ```
 1(node id) 2(node id)
 1 3
+1 4
+2 4
 ...
 ```
 
+## How to run the code
 To run the code:
 ```
-python3 deepwalk.py --net_file net.txt --emb_file emb.txt --adam --mix --lr 0.2 --num_procs 4 --batch_size 100 --negative 5
+python3 deepwalk.py --data_file youtube --output_emb_file emb.txt --adam --mix --lr 0.2 --gpus 0 1 2 3 --batch_size 100 --negative 5
 ```
 
 ## How to save the embedding
-
-Functions:
-```
-SkipGramModel.save_embedding(dataset, file_name)
-SkipGramModel.save_embedding_txt(dataset, file_name)
-```
+By default the trained embedding is saved under --output\_embe\_file FILE\_NAME as a numpy object.
+To save the trained embedding in raw format(txt format), please use --save\_in\_txt argument.
 
 ## Evaluation
 

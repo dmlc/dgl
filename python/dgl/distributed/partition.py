@@ -134,8 +134,8 @@ def load_partition(conf_file, part_id):
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
     assert 'node_map' in part_metadata, "cannot get the node map."
     assert 'edge_map' in part_metadata, "cannot get the edge map."
-    node_map = np.load(part_metadata['node_map'])
-    edge_map = np.load(part_metadata['edge_map'])
+    node_map = np.load(part_metadata['node_map'], allow_pickle=True)
+    edge_map = np.load(part_metadata['edge_map'], allow_pickle=True)
     meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map, edge_map, num_parts)
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
@@ -231,8 +231,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     out_path = os.path.abspath(out_path)
     node_part_file = os.path.join(out_path, "node_map")
     edge_part_file = os.path.join(out_path, "edge_map")
-    np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=False)
-    np.save(edge_part_file, edge_parts, allow_pickle=False)
+    np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=True)
+    np.save(edge_part_file, edge_parts, allow_pickle=True)
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
                      'num_edges': g.number_of_edges(),
