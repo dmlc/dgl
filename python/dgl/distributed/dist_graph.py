@@ -331,9 +331,9 @@ class DistGraph:
 
         self._num_nodes = 0
         self._num_edges = 0
-        for d in self._gpb.metadata():
-            self._num_nodes += int(d['num_nodes'])
-            self._num_edges += int(d['num_edges'])
+        for part_md in self._gpb.metadata():
+            self._num_nodes += int(part_md['num_nodes'])
+            self._num_edges += int(part_md['num_edges'])
 
 
     def init_ndata(self, ndata_name, shape, dtype):
