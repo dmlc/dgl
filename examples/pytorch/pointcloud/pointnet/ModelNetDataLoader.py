@@ -102,12 +102,3 @@ class ModelNetDataLoader(Dataset):
 
     def __getitem__(self, index):
         return self._get_item(index)
-
-if __name__ == '__main__':
-    import torch
-
-    data = ModelNetDataLoader('/data/modelnet40_normal_resampled/',split='train', fps=False, normal_channel=True,)
-    DataLoader = torch.utils.data.DataLoader(data, batch_size=12, shuffle=True)
-    for point,label in DataLoader:
-        print(point.shape)
-        print(label.shape)

@@ -111,11 +111,11 @@ class FixedRadiusNNGraph(nn.Module):
             dst = centroids[i].view(-1, 1).repeat(1, self.n_neighbor).view(-1)
 
             unified = torch.cat([src, dst])
-            uniq, idx, inv_idx = np.unique(unified.cpu().numpy(), return_index=True, return_inverse=True)
+            uniq, inv_idx = torch.unique(unified, return_inverse=True)
             src_idx = inv_idx[:src.shape[0]]
             dst_idx = inv_idx[src.shape[0]:]
 
-            g = dgl.DGLGraph((src_idx, dst_idx), readonly=True)
+            g = dgl.DGLGraph((src_idx.cpu(), dst_idx.cpu()), readonly=True)
             g.ndata['pos'] = pos[i][uniq]
             g.ndata['center'] = center[uniq]
             if feat is not None:

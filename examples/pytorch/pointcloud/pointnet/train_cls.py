@@ -57,6 +57,7 @@ def train(net, opt, scheduler, train_loader, dev):
     num_batches = 0
     total_correct = 0
     count = 0
+    loss_f = nn.CrossEntropyLoss()
     with tqdm.tqdm(train_loader, ascii=True) as tq:
         for data, label in tq:
             data = data.data.numpy()
@@ -71,7 +72,7 @@ def train(net, opt, scheduler, train_loader, dev):
             data, label = data.to(dev), label.to(dev).squeeze().long()
             opt.zero_grad()
             logits = net(data)
-            loss = nn.CrossEntropyLoss(logits, label)
+            loss = loss_f(logits, label)
             loss.backward()
             opt.step()
 
