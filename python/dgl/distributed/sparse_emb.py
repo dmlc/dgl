@@ -2,23 +2,31 @@
 
 from .. import backend as F
 
+def _get_ndata_name(name):
+    ''' This is to get the name of node data in the kvstore.
+
+    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
+    '''
+    return 'node:' + name
+
 class SparseEmbedding:
-    def __init__(self, g, name, embedding_dim):
-        # TODO I need to initialize embeddings.
-        g.init_node_emb(name, (g.number_of_nodes(), embedding_dim))
+    def __init__(self, g, name, shape, initializer):
+        assert shape[0] == g.number_of_nodes()
+        g._client.init_data(_get_ndata_name(name), shape, F.float32, 'node',
+                            g.get_partition_book(), initializer)
+        g._ndata._add(name)
+        g._node_embs.append(self)
+
         self._tensor = g.ndata[name]
         self._trace = []
 
     def __call__(self, idx):
         # This is pytorch way.
         emb = self._tensor[idx].requires_grad_(True)
-        self.trace.append((idx, emb))
+        self._trace.append((idx, emb))
         return emb
 
-    def reset_parameters(self):
-        pass
-
-def sparse_adagrad_optimize(name, ID, data, target):
+def sparse_adagrad_optimize(data_store, name, ID, data):
     ''' Update the embeddings with sparse Adagrad.
 
     This function runs on the KVStore server. It updates the gradients by scaling them
@@ -59,15 +67,16 @@ class SparseAdagrad:
             name = emb._tensor.name
             kv = emb._tensor.kvstore
             policy = emb._tensor.part_policy
-            kv.init_data(name + "_sum", (emb._tensor.shape[0],), emb._tensor.dtype,
+            kv.init_data(name + "_sum",
+                         (emb._tensor.shape[0],), emb._tensor.dtype,
                          policy.policy_str, policy.partition_book, init_state)
-        kv.register_push_handler(sparse_adagrad_optimize)
+            kv.register_push_handler(name, sparse_adagrad_optimize)
 
     def step(self):
         for emb in self._params:
             name = emb._tensor.name
             kv = emb._tensor.kvstore
-            trace = emb.trace
+            trace = emb._trace
             if len(trace) == 1:
                 kv.push(name, trace[0][0], trace[0][1].grad.data)
             else:
@@ -80,4 +89,4 @@ class SparseAdagrad:
                 grads = F.cat(grads, 0) * -self._lr
                 kv.push(name, idxs, grads)
             # Clean up the old traces.
-            emb.trace = []
+            emb._trace = []
