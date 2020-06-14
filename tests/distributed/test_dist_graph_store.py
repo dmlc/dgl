@@ -92,6 +92,16 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
     feats = g.edata['test1'][eids]
     assert np.all(F.asnumpy(feats) == 0)
 
+    # Test sparse emb
+    new_shape = (g.number_of_nodes(), 1)
+    g.init_node_emb('emb1', new_shape, emb_init)
+    optimizer = SparseAdagrad(g.get_node_embeddings(), lr=0.001)
+    emb = g.ndata['emb1']
+    feats = emb(nids)
+    loss = F.sum(feats + 1, 0)
+    loss.backward()
+    optimizer.step()
+
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
     g.ndata['test1'][nids] = new_feats
