@@ -154,6 +154,11 @@ class GraphPartitionBook:
         self._edge_size = len(self.partid2eids(self._part_id))
         self._node_size = len(self.partid2nids(self._part_id))
 
+    @property
+    def part_id(self):
+        """ The partition Id """
+        return self._part_id
+
     def shared_memory(self, graph_name):
         """Move data to shared memory.
 
@@ -390,6 +395,11 @@ class RangePartitionBook:
             part_info['num_nodes'] = int(nrange_end - nrange_start)
             part_info['num_edges'] = int(erange_end - erange_start)
             self._partition_meta_data.append(part_info)
+
+    @property
+    def part_id(self):
+        """ The partition Id """
+        return self._partid
 
     def shared_memory(self, graph_name):
         """Move data to shared memory.
@@ -632,17 +642,14 @@ class PartitionPolicy(object):
     ----------
     policy_str : str
         partition-policy string, e.g., 'edge' or 'node'.
-    part_id : int
-        partition ID
     partition_book : GraphPartitionBook or RangePartitionBook
         Main class storing the partition information
     """
-    def __init__(self, policy_str, part_id, partition_book):
+    def __init__(self, policy_str, partition_book):
         # TODO(chao): support more policies for HeteroGraph
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
-        assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
         self._policy_str = policy_str
-        self._part_id = part_id
+        self._part_id = partition_book.part_id
         self._partition_book = partition_book
 
     @property

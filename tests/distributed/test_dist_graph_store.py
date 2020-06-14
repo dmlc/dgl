@@ -13,6 +13,7 @@ from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
+from dgl.distributed import SparseAdagrad
 import backend as F
 import unittest
 import pickle
@@ -57,6 +58,9 @@ def run_server(graph_name, server_id, num_clients, shared_mem):
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
     g.start()
+
+def emb_init(shape, dtype):
+    return F.zeros(shape, dtype, F.cpu())
 
 def run_client(graph_name, part_id, num_nodes, num_edges):
     time.sleep(5)

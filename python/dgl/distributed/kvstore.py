@@ -900,7 +900,7 @@ class KVClient(object):
             raise RuntimeError("Data %s has already exists!" % name)
         if self._full_data_shape.__contains__(name):
             raise RuntimeError("Data shape %s has already exists!" % name)
-        self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+        self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
         shared_data = empty_shared_mem(name+'-kvdata-', False, \
             local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
@@ -930,7 +930,7 @@ class KVClient(object):
                 shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-                self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+                self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
                 self._pull_handlers[name] = default_pull_handler
                 self._push_handlers[name] = default_push_handler
         # Get full data shape across servers

@@ -1,4 +1,6 @@
+"""Define sparse embedding and optimizer."""
 
+from .. import backend as F
 
 class SparseEmbedding:
     def __init__(self, g, name, embedding_dim):
@@ -45,19 +47,24 @@ def sparse_adagrad_optimize(name, ID, data, target):
     std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
     embs.index_add_(0, grad_indices, grad_values / std_values)
 
+def init_state(shape, dtype):
+    return F.zeros(shape, dtype, F.cpu())
+
 class SparseAdagrad:
     def __init__(self, params, lr):
         self._params = params
         self._lr = lr
         # We need to register a state sum for each embedding in the kvstore.
-        for emb for params:
+        for emb in params:
             name = emb._tensor.name
             kv = emb._tensor.kvstore
-            kv.init_data(name=name + "_sum", (emb.shape[0],), emb.dtype, name)
-            # TODO we need to register a UDF to trigger optimizer for each push.
+            policy = emb._tensor.part_policy
+            kv.init_data(name + "_sum", (emb._tensor.shape[0],), emb._tensor.dtype,
+                         policy.policy_str, policy.partition_book, init_state)
+        kv.register_push_handler(sparse_adagrad_optimize)
 
     def step(self):
-        for emb for self._params:
+        for emb in self._params:
             name = emb._tensor.name
             kv = emb._tensor.kvstore
             trace = emb.trace
