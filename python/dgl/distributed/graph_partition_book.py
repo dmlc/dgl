@@ -523,8 +523,6 @@ class RangePartitionBook:
                 getting remote tensor of nid2localnid.')
 
         start = self._node_map[partid - 1] if partid > 0 else 0
-        end = self._node_map[partid]
-        assert F.sum((nids >= start) * (nids < end), 0) == len(nids)
         return nids - start
 
 
@@ -548,8 +546,6 @@ class RangePartitionBook:
                 getting remote tensor of eid2localeid.')
 
         start = self._edge_map[partid - 1] if partid > 0 else 0
-        end = self._edge_map[partid]
-        assert F.sum((eids >= start) * (eids < end), 0) == len(eids)
         return eids - start
 
 
