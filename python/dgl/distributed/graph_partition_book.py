@@ -106,8 +106,8 @@ class GraphPartitionBook:
         for partid in range(self._num_partitions):
             part_info = {}
             part_info['machine_id'] = partid
-            part_info['num_nodes'] = nid_count[partid]
-            part_info['num_edges'] = eid_count[partid]
+            part_info['num_nodes'] = int(nid_count[partid])
+            part_info['num_edges'] = int(eid_count[partid])
             self._partition_meta_data.append(part_info)
         # Get partid2nids
         self._partid2nids = []
@@ -345,9 +345,9 @@ class RangePartitionBook:
         partition id of current GraphPartitionBook
     num_parts : int
         number of total partitions
-    node_map : NumPy NDArray
+    node_map : tensor
         map global node id to partition id
-    edge_map : NumPy NDArray
+    edge_map : tensor
         map global edge id to partition id
     """
     def __init__(self, part_id, num_parts, node_map, edge_map):
@@ -355,8 +355,10 @@ class RangePartitionBook:
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._partid = part_id
         self._num_partitions = num_parts
-        self._node_map = node_map
-        self._edge_map = edge_map
+        node_map = utils.toindex(node_map)
+        edge_map = utils.toindex(edge_map)
+        self._node_map = node_map.tonumpy()
+        self._edge_map = edge_map.tonumpy()
         # Get meta data of GraphPartitionBook
         self._partition_meta_data = []
         for partid in range(self._num_partitions):
@@ -366,8 +368,8 @@ class RangePartitionBook:
             erange_end = edge_map[partid]
             part_info = {}
             part_info['machine_id'] = partid
-            part_info['num_nodes'] = nrange_end - nrange_start
-            part_info['num_edges'] = erange_end - erange_start
+            part_info['num_nodes'] = int(nrange_end - nrange_start)
+            part_info['num_edges'] = int(erange_end - erange_start)
             self._partition_meta_data.append(part_info)
 
     def shared_memory(self, graph_name):
