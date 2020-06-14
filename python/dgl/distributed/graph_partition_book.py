@@ -9,12 +9,12 @@ from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, 
 from .._ffi.ndarray import empty_shared_mem
 
 def _move_metadata_to_shared_mam(graph_name, num_nodes, num_edges, part_id,
-                                 num_partitions, node_map, edge_map):
-    ''' Move all metadata to the shared memory.
+                                 num_partitions, node_map, edge_map, is_range_part):
+    ''' Move all metadata of the partition book to the shared memory.
 
     We need these metadata to construct graph partition book.
     '''
-    meta = _to_shared_mem(F.tensor([num_nodes, num_edges,
+    meta = _to_shared_mem(F.tensor([int(is_range_part), num_nodes, num_edges,
                                     num_partitions, part_id]),
                           _get_ndata_path(graph_name, 'meta'))
     node_map = _to_shared_mem(node_map, _get_ndata_path(graph_name, 'node_map'))
@@ -27,25 +27,27 @@ def _get_shared_mem_metadata(graph_name):
     The metadata includes the number of nodes and the number of edges. In the future,
     we can add more information, especially for heterograph.
     '''
-    shape = (4,)
+    shape = (5,)
     dtype = F.int64
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
     dlpack = data.to_dlpack()
     meta = F.asnumpy(F.zerocopy_from_dlpack(dlpack))
-    num_nodes, num_edges, num_partitions, part_id = meta[0], meta[1], meta[2], meta[3]
+    is_range_part, num_nodes, num_edges, num_partitions, part_id = meta
 
     # Load node map
-    data = empty_shared_mem(_get_ndata_path(graph_name, 'node_map'), False, (num_nodes,), dtype)
+    length = num_partitions if is_range_part else num_nodes
+    data = empty_shared_mem(_get_ndata_path(graph_name, 'node_map'), False, (length,), dtype)
     dlpack = data.to_dlpack()
     node_map = F.zerocopy_from_dlpack(dlpack)
 
     # Load edge_map
-    data = empty_shared_mem(_get_edata_path(graph_name, 'edge_map'), False, (num_edges,), dtype)
+    length = num_partitions if is_range_part else num_edges
+    data = empty_shared_mem(_get_edata_path(graph_name, 'edge_map'), False, (length,), dtype)
     dlpack = data.to_dlpack()
     edge_map = F.zerocopy_from_dlpack(dlpack)
 
-    return part_id, num_partitions, node_map, edge_map
+    return is_range_part, part_id, num_partitions, node_map, edge_map
 
 
 def get_shared_mem_partition_book(graph_name, graph_part):
@@ -66,8 +68,11 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     GraphPartitionBook
         A graph partition book for a particular partition.
     '''
-    part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
-    return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
+    is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
+    if is_range_part == 1:
+        return RangePartitionBook(part_id, num_parts, node_map, edge_map)
+    else:
+        return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
 
 class GraphPartitionBook:
     """GraphPartitionBook is used to store parition information.
@@ -150,7 +155,7 @@ class GraphPartitionBook:
         """
         self._meta, self._nid2partid, self._eid2partid = _move_metadata_to_shared_mam(
             graph_name, self.num_nodes(), self.num_edges(), self._part_id, self._num_partitions,
-            self._nid2partid, self._eid2partid)
+            self._nid2partid, self._eid2partid, False)
 
     def num_partitions(self):
         """Return the number of partitions.
@@ -365,6 +370,17 @@ class RangePartitionBook:
             part_info['num_edges'] = erange_end - erange_start
             self._partition_meta_data.append(part_info)
 
+    def shared_memory(self, graph_name):
+        """Move data to shared memory.
+
+        Parameters
+        ----------
+        graph_name : str
+            The graph name
+        """
+        self._meta = _move_metadata_to_shared_mam(
+            graph_name, self.num_nodes(), self.num_edges(), self._partid,
+            self._num_partitions, F.tensor(self._node_map), F.tensor(self._edge_map), True)
 
     def num_partitions(self):
         """Return the number of partitions.
