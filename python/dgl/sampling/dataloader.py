@@ -8,6 +8,7 @@ from .. import backend as F
 from ..base import NID, EID
 from .. import utils
 
+# pylint: disable=unused-argument
 def assign_block_eids(block, frontier, block_id, g, seed_nodes, *args, **kwargs):
     """Assigns edge IDs from the original graph to the block.
 
@@ -276,7 +277,6 @@ class NodeDataLoader(object):
 
     def _sample(self, ntype, nids):
         seed_nodes = {ntype: nids}
-        blocks = []
         return self.block_sampler.sample_blocks(self.g, seed_nodes)
 
     def _get_dataloader_class(self, ntype):
