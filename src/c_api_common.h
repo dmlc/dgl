@@ -41,13 +41,6 @@ typedef void* CommunicatorHandle;
 // KVstore message handler type
 typedef void* KVMsgHandle;
 
-/*! \brief Enum type for bool value with unknown */
-enum BoolFlag {
-  kBoolUnknown = -1,
-  kBoolFalse = 0,
-  kBoolTrue = 1
-};
-
 /*!
  * \brief Convert a vector of NDArray to PackedFunc.
  */

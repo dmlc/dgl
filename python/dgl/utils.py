@@ -568,3 +568,33 @@ def check_eq_shape(input_):
         raise DGLError("The feature shape of source nodes: {} \
             should be equal to the feature shape of destination \
             nodes: {}.".format(src_feat_shape, dst_feat_shape))
+
+def retry_method_with_fix(fix_method):
+    """Decorator that executes a fix method before retrying again when the decorated method
+    fails once with any exception.
+
+    If the decorated method fails again, the execution fails with that exception.
+
+    Notes
+    -----
+    This decorator only works on class methods, and the fix function must also be a class method.
+    It would not work on functions.
+
+    Parameters
+    ----------
+    fix_func : callable
+        The fix method to execute.  It should not accept any arguments.  Its return values are
+        ignored.
+    """
+    def _creator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # pylint: disable=W0703,bare-except
+            try:
+                return func(self, *args, **kwargs)
+            except:
+                fix_method(self)
+                return func(self, *args, **kwargs)
+
+        return wrapper
+    return _creator

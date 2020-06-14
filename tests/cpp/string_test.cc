@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "../src/graph/network/common.h"
+#include "../src/rpc/network/common.h"
 
 using dgl::network::SplitStringUsing;
 using dgl::network::StringPrintf;

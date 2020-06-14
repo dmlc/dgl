@@ -1,5 +1,6 @@
 import dgl
 import sys
+import os
 import numpy as np
 from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
@@ -22,10 +23,10 @@ def test_graph_partition_book():
     num_parts = 4
     num_hops = 2
 
-    partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+    partition_graph(g, 'gpb_test', num_parts, '/tmp/gpb', num_hops=num_hops, part_method='metis')
 
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
+        part_g, node_feats, edge_feats, meta = load_partition('/tmp/gpb/gpb_test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
         gpb = GraphPartitionBook(part_id=i,
                                  num_parts=num_partitions,
@@ -46,4 +47,5 @@ def test_graph_partition_book():
 
 
 if __name__ == '__main__':
+    os.mkdir('/tmp/gpb')
     test_graph_partition_book()

@@ -1,5 +1,6 @@
 import dgl
 import sys
+import os
 import numpy as np
 from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
@@ -8,8 +9,10 @@ from dgl.distributed import partition_graph, load_partition
 import backend as F
 import unittest
 import pickle
+import random
 
 def create_random_graph(n):
+    random.seed(100)
     arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
@@ -20,10 +23,9 @@ def test_partition():
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
     num_parts = 4
     num_hops = 2
-
-    partition_graph(g, 'test', num_parts, '/tmp', num_hops=num_hops, part_method='metis')
+    partition_graph(g, 'test', num_parts, '/tmp/partition', num_hops=num_hops, part_method='metis')
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, meta = load_partition('/tmp/test.json', i)
+        part_g, node_feats, edge_feats, meta = load_partition('/tmp/partition/test.json', i)
         num_nodes, num_edges, node_map, edge_map, num_partitions = meta
 
         # Check the metadata
@@ -53,4 +55,5 @@ def test_partition():
 
 
 if __name__ == '__main__':
+    os.mkdir('/tmp/partition')
     test_partition()
