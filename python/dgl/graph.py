@@ -3840,6 +3840,10 @@ class DGLGraph(DGLBaseGraph):
         ----------
         readonly_state : bool, optional
             New readonly state of the graph, defaults to True.
+        
+        Returns
+        ----------
+        The current DGLGraph object
 
         Examples
         --------
@@ -3862,6 +3866,7 @@ class DGLGraph(DGLBaseGraph):
         """
         if readonly_state != self.is_readonly:
             self._graph.readonly(readonly_state)
+        return self
 
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'
