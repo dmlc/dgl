@@ -8,7 +8,7 @@ using namespace dgl::runtime;
 namespace {
 
 template <typename IDX>
-aten::CSRMatrix CSR1() {
+aten::CSRMatrix CSR1(DLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -16,14 +16,14 @@ aten::CSRMatrix CSR1() {
   // data: [0, 2, 3, 1, 4]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 1, 4}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 1, 4}), sizeof(IDX)*8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::CSRMatrix CSR2() {
+aten::CSRMatrix CSR2(DLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -32,14 +32,14 @@ aten::CSRMatrix CSR2() {
   // data: [0, 2, 5, 3, 1, 4]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::COOMatrix COO1() {
+aten::COOMatrix COO1(DLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -49,12 +49,12 @@ aten::COOMatrix COO1() {
   // col : [1, 2, 2, 0, 3]
   return aten::COOMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX)*8, CTX));
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX)*8, ctx));
 }
 
 template <typename IDX>
-aten::COOMatrix COO2() {
+aten::COOMatrix COO2(DLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -65,40 +65,40 @@ aten::COOMatrix COO2() {
   // col : [1, 2, 2, 0, 3, 2]
   return aten::COOMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX)*8, CTX));
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX)*8, ctx));
 }
 
 template <typename IDX>
-aten::CSRMatrix SR_CSR3() {
+aten::CSRMatrix SR_CSR3(DLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({2, 1, 2, 0, 2, 3}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({2, 1, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::CSRMatrix SRC_CSR3() {
+aten::CSRMatrix SRC_CSR3(DLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX)*8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::COOMatrix COO3() {
+aten::COOMatrix COO3(DLContext ctx) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -108,11 +108,11 @@ aten::COOMatrix COO3() {
   // col : [2, 2, 1, 0, 3, 2]
   return aten::COOMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, CTX),
-      aten::VecToIdArray(std::vector<IDX>({2, 2, 1, 0, 3, 2}), sizeof(IDX)*8, CTX));
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({2, 2, 1, 0, 3, 2}), sizeof(IDX)*8, ctx));
 }
 
-}
+}  // namespace
 
 template <typename IDX>
 void _TestCSRIsNonZero() {
@@ -227,8 +227,8 @@ TEST(SpmatTest, TestCSRGetDataAndIndices) {
 }
 
 template <typename IDX>
-void _TestCSRTranspose() {
-  auto csr = CSR2<IDX>();
+void _TestCSRTranspose(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
   auto csr_t = aten::CSRTranspose(csr);
   // [[0, 1, 0, 0],
   //  [1, 0, 0, 0],
@@ -238,29 +238,32 @@ void _TestCSRTranspose() {
   // data: [3, 0, 2, 5, 1, 4]
   ASSERT_EQ(csr_t.num_rows, 5);
   ASSERT_EQ(csr_t.num_cols, 4);
-  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 5, 6, 6}), sizeof(IDX)*8, CTX);
-  auto ti = aten::VecToIdArray(std::vector<IDX>({1, 0, 0, 0, 2, 2}), sizeof(IDX)*8, CTX);
-  auto td = aten::VecToIdArray(std::vector<IDX>({3, 0, 2, 5, 1, 4}), sizeof(IDX)*8, CTX);
+  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 5, 6, 6}), sizeof(IDX)*8, ctx);
+  auto ti = aten::VecToIdArray(std::vector<IDX>({1, 0, 0, 0, 2, 2}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({3, 0, 2, 5, 1, 4}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(csr_t.indptr, tp));
   ASSERT_TRUE(ArrayEQ<IDX>(csr_t.indices, ti));
   ASSERT_TRUE(ArrayEQ<IDX>(csr_t.data, td));
 }
 
 TEST(SpmatTest, TestCSRTranspose) {
-  _TestCSRTranspose<int32_t>();
-  _TestCSRTranspose<int64_t>();
+  _TestCSRTranspose<int32_t>(CPU);
+  _TestCSRTranspose<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRTranspose<int32_t>(GPU);
+#endif
 }
 
 template <typename IDX>
-void _TestCSRToCOO() {
-  auto csr = CSR2<IDX>();
+void _TestCSRToCOO(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
   {
   auto coo = CSRToCOO(csr, false);
   ASSERT_EQ(coo.num_rows, 4);
   ASSERT_EQ(coo.num_cols, 5);
-  auto tr = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX)*8, CTX);
-  auto tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, CTX);
-  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, CTX);
+  auto tr = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX)*8, ctx);
+  auto tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(coo.row, tr));
   ASSERT_TRUE(ArrayEQ<IDX>(coo.col, tc));
   ASSERT_TRUE(ArrayEQ<IDX>(coo.data, td));
@@ -269,15 +272,18 @@ void _TestCSRToCOO() {
   auto coo = CSRToCOO(csr, true);
   ASSERT_EQ(coo.num_rows, 4);
   ASSERT_EQ(coo.num_cols, 5);
-  auto tcoo = COO2<IDX>();
+  auto tcoo = COO2<IDX>(ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(coo.row, tcoo.row));
   ASSERT_TRUE(ArrayEQ<IDX>(coo.col, tcoo.col));
   }
 }
 
 TEST(SpmatTest, TestCSRToCOO) {
-  _TestCSRToCOO<int32_t>();
-  _TestCSRToCOO<int64_t>();
+  _TestCSRToCOO<int32_t>(CPU);
+  _TestCSRToCOO<int64_t>(CPU);
+#if DGL_USE_CUDA
+  _TestCSRToCOO<int32_t>(GPU);
+#endif
 }
 
 template <typename IDX>
@@ -355,48 +361,40 @@ TEST(SpmatTest, TestCSRHasDuplicate) {
 }
 
 template <typename IDX>
-void _TestCOOToCSR() {
-  auto coo = COO1<IDX>();
-  auto csr = CSR1<IDX>();
+void _TestCOOToCSR(DLContext ctx) {
+  auto coo = COO1<IDX>(ctx);
+  auto csr = CSR1<IDX>(ctx);
   auto tcsr = aten::COOToCSR(coo);
   ASSERT_EQ(coo.num_rows, csr.num_rows);
   ASSERT_EQ(coo.num_cols, csr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
-  ASSERT_TRUE(ArrayEQ<IDX>(csr.indices, tcsr.indices));
-  ASSERT_TRUE(ArrayEQ<IDX>(csr.data, tcsr.data));
 
-  coo = COO2<IDX>();
-  csr = CSR2<IDX>();
+  coo = COO2<IDX>(ctx);
+  csr = CSR2<IDX>(ctx);
   tcsr = aten::COOToCSR(coo);
   ASSERT_EQ(coo.num_rows, csr.num_rows);
   ASSERT_EQ(coo.num_cols, csr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
-  ASSERT_TRUE(ArrayEQ<IDX>(csr.indices, tcsr.indices));
-  ASSERT_TRUE(ArrayEQ<IDX>(csr.data, tcsr.data));
 
-  coo = COO1<IDX>();
+  coo = COO1<IDX>(ctx);
   auto rs_coo = aten::COOSort(coo, false);
-  auto rs_csr = CSR1<IDX>();
+  auto rs_csr = CSR1<IDX>(ctx);
   auto rs_tcsr = aten::COOToCSR(rs_coo);
   ASSERT_EQ(coo.num_rows, rs_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, rs_tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
-  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indices, rs_tcsr.indices));
-  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.data, rs_tcsr.data));
 
-  coo = COO3<IDX>();
+  coo = COO3<IDX>(ctx);
   rs_coo = aten::COOSort(coo, false);
-  rs_csr = SR_CSR3<IDX>();
+  rs_csr = SR_CSR3<IDX>(ctx);
   rs_tcsr = aten::COOToCSR(rs_coo);
   ASSERT_EQ(coo.num_rows, rs_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, rs_tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
-  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indices, rs_tcsr.indices));
-  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.data, rs_tcsr.data));
 
-  coo = COO1<IDX>();
+  coo = COO1<IDX>(ctx);
   auto src_coo = aten::COOSort(coo, true);
-  auto src_csr = CSR1<IDX>();
+  auto src_csr = CSR1<IDX>(ctx);
   auto src_tcsr = aten::COOToCSR(src_coo);
   ASSERT_EQ(coo.num_rows, src_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, src_tcsr.num_cols);
@@ -404,9 +402,9 @@ void _TestCOOToCSR() {
   ASSERT_TRUE(ArrayEQ<IDX>(src_csr.indices, src_tcsr.indices));
   ASSERT_TRUE(ArrayEQ<IDX>(src_csr.data, src_tcsr.data));
 
-  coo = COO3<IDX>();
+  coo = COO3<IDX>(ctx);
   src_coo = aten::COOSort(coo, true);
-  src_csr = SRC_CSR3<IDX>();
+  src_csr = SRC_CSR3<IDX>(ctx);
   src_tcsr = aten::COOToCSR(src_coo);
   ASSERT_EQ(coo.num_rows, src_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, src_tcsr.num_cols);
@@ -416,8 +414,11 @@ void _TestCOOToCSR() {
 }
 
 TEST(SpmatTest, TestCOOToCSR) {
-  _TestCOOToCSR<int32_t>();
-  _TestCOOToCSR<int64_t>();
+  _TestCOOToCSR<int32_t>(CPU);
+  _TestCOOToCSR<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCOOToCSR<int32_t>(GPU);
+#endif
 }
 
 template <typename IDX>
@@ -434,8 +435,8 @@ TEST(SpmatTest, TestCOOHasDuplicate) {
 }
 
 template <typename IDX>
-void _TestCOOSort() {
-  auto coo = COO3<IDX>();
+void _TestCOOSort(DLContext ctx) {
+  auto coo = COO3<IDX>(ctx);
   auto sr_coo = COOSort(coo, false);
   ASSERT_EQ(coo.num_rows, sr_coo.num_rows);
   ASSERT_EQ(coo.num_cols, sr_coo.num_cols);
@@ -460,25 +461,22 @@ void _TestCOOSort() {
   // row : [0, 0, 0, 1, 2, 2]
   // col : [1, 2, 2, 0, 2, 3]
   auto sort_row = aten::VecToIdArray(
-    std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX)*8, CTX);
-  auto unsort_col = aten::VecToIdArray(
-    std::vector<IDX>({2, 1, 2, 0, 2, 3}), sizeof(IDX)*8, CTX);
-  auto unsort_col_data = aten::VecToIdArray(
-    std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, CTX);
+    std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX)*8, ctx);
   auto sort_col = aten::VecToIdArray(
-    std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, CTX);
+    std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx);
   auto sort_col_data = aten::VecToIdArray(
-    std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX)*8, CTX);
+    std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX)*8, ctx);
 
   ASSERT_TRUE(ArrayEQ<IDX>(sr_coo.row, sort_row));
-  ASSERT_TRUE(ArrayEQ<IDX>(sr_coo.col, unsort_col));
-  ASSERT_TRUE(ArrayEQ<IDX>(sr_coo.data, unsort_col_data));
   ASSERT_TRUE(ArrayEQ<IDX>(src_coo.row, sort_row));
   ASSERT_TRUE(ArrayEQ<IDX>(src_coo.col, sort_col));
   ASSERT_TRUE(ArrayEQ<IDX>(src_coo.data, sort_col_data));
 }
 
 TEST(SpmatTest, TestCOOSort) {
-  _TestCOOSort<int32_t>();
-  _TestCOOSort<int64_t>();
+  _TestCOOSort<int32_t>(CPU);
+  _TestCOOSort<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCOOSort<int32_t>(GPU);
+#endif
 }

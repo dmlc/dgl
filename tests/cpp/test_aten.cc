@@ -25,14 +25,22 @@ TEST(ArrayTest, TestCreate) {
   ASSERT_EQ(Len(a), 0);
 };
 
-TEST(ArrayTest, TestRange) {
-  IdArray a = aten::Range(10, 10, 64, CTX);
+void _TestRange(DLContext ctx) {
+  IdArray a = aten::Range(10, 10, 64, ctx);
   ASSERT_EQ(Len(a), 0);
-  a = aten::Range(10, 20, 32, CTX);
+  a = aten::Range(10, 20, 32, ctx);
   ASSERT_EQ(Len(a), 10);
   ASSERT_EQ(a->dtype.bits, 32);
+  a = a.CopyTo(CPU);
   for (int i = 0; i < 10; ++i)
     ASSERT_EQ(Ptr<int32_t>(a)[i], i + 10);
+}
+
+TEST(ArrayTest, TestRange) {
+  _TestRange(CPU);
+#ifdef DGL_USE_CUDA
+  _TestRange(GPU);
+#endif
 };
 
 TEST(ArrayTest, TestFull) {
@@ -61,12 +69,20 @@ TEST(ArrayTest, TestClone) {
   }
 };
 
-TEST(ArrayTest, TestAsNumBits) {
-  IdArray a = aten::Range(0, 10, 32, CTX);
+void _TestNumBits(DLContext ctx) {
+  IdArray a = aten::Range(0, 10, 32, ctx);
   a = aten::AsNumBits(a, 64);
   ASSERT_EQ(a->dtype.bits, 64);
+  a = a.CopyTo(CPU);
   for (int i = 0; i < 10; ++i)
     ASSERT_EQ(PI64(a)[i], i);
+}
+
+TEST(ArrayTest, TestAsNumBits) {
+  _TestNumBits(CPU);
+#ifdef DGL_USE_CUDA
+  _TestNumBits(GPU);
+#endif
 };
 
 template <typename IDX>
