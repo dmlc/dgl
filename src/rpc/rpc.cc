@@ -426,7 +426,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
                                             ID->dtype,
                                             DLContext{kDLCPU, 0},
                                             raw_data);
-      NDArray tensor = dgl::aten::VecToIdArray(remote_ids[i]);
       msg.tensors.push_back(tensor);
       SendRPCMessage(msg, s_id);
       msg_count++;
