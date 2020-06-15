@@ -914,7 +914,9 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
             raise ValueError(
                 'Graph has more than one node type; please specify a dict for dst_nodes.')
         dst_nodes = {g.ntypes[0]: dst_nodes}
-    dst_nodes = {ntype: utils.toindex(nodes).tousertensor() for ntype, nodes in dst_nodes.items()}
+    dst_nodes = {
+        ntype: utils.toindex(nodes, g._idtype_str).tousertensor()
+        for ntype, nodes in dst_nodes.items()}
 
     # dst_nodes is now a dict
     dst_nodes_nd = []

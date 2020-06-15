@@ -59,7 +59,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
@@ -138,7 +138,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 

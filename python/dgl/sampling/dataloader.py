@@ -268,7 +268,9 @@ class NodeDataLoader(object):
             self.nids = {g.ntypes[0]: nids}
         else:
             self.nids = nids
-        self.nids = {k: utils.toindex(v).tousertensor() for k, v in self.nids.items()}
+        self.nids = {
+            k: utils.toindex(v, g._idtype_str).tousertensor()
+            for k, v in self.nids.items()}
         self.block_sampler = block_sampler
 
         self.dataloaders = {
