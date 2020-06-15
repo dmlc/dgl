@@ -372,13 +372,13 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   for (int64_t i = 0; i < ID_size; ++i) {
     int64_t p_id = part_id_data[i];
     if (p_id == local_machine_id) {
-      l_id = local_id_data[i];
+      int64_t l_id = local_id_data[i];
       local_ids.push_back(l_id);
       local_ids_orginal.push_back(i);
     } else {
       int64_t id = ID_data[i];
       remote_ids[p_id].push_back(id);
-      remote_ids_original.push_back(i);
+      remote_ids_original[p_id].push_back(i);
     }
   }
   // Send remote id
@@ -402,10 +402,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       int64_t id_data_size = remote_ids[i].size()*sizeof(int64_t);
       char* raw_data = new char[id_data_size];
       memcpy(raw_data, remote_ids[i].data(), id_data_size);
-      tensor = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
-                                    ID->dtype,
-                                    DLContext{kDLCPU, 0},
-                                    raw_data);
+      NDArray tensor = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
+                                            ID->dtype,
+                                            DLContext{kDLCPU, 0},
+                                            raw_data);
       msg.tensors.push_back(tensor);
       SendRPCMessage(msg, s_id);
       msg_count++;
@@ -424,7 +424,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     RPCMessage msg;
     RecvRPCMessage(&msg, 0);
     int part_id = msg.server_id / group_count;
-    char* data_char = static_cast<char*>(msg.tensors[0].data());
+    char* data_char = static_cast<char*>(msg.tensors[0].data);
     int64_t id_size = remote_ids[part_id].size();
     for (size_t n = 0; n < id_size; ++i) {
       memcpy(return_data + remote_ids_original[part_id][n] * row_size,
