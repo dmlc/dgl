@@ -175,7 +175,7 @@ class RelGraphConv(layers.Layer):
             idx = tf.range(edges.src['h'].shape[0])
             for etype in etypes:
                 loc = (edges.data['type'] == etype)
-                w = tf.reshape(weight[etype],
+                w = tf.reshape(self.weight[etype],
                                (self.num_bases, self.submat_in, self.submat_out))
                 src = tf.reshape(tf.boolean_mask(edges.src['h'], loc),
                                  (-1, self.num_bases, self.submat_in))
