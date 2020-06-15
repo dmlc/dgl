@@ -371,6 +371,7 @@ class DistGraph:
         self._edata = EdgeDataView(self)
         self._default_init_ndata = _default_init_data
         self._default_init_edata = _default_init_data
+        self._node_embs = []
 
         self._num_nodes = 0
         self._num_edges = 0
