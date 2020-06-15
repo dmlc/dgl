@@ -443,7 +443,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   }
   LOG(INFO) << "22222222";
   // Recv remote message
+  LOG(INFO) << "msg_count: " << msg_count;
   for (int i = 0; i < msg_count; ++i) {
+    LOG(INFO) << "i: " << i;
     RPCMessage msg;
     RecvRPCMessage(&msg, 0);
     int part_id = msg.server_id / group_count;
