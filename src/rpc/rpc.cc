@@ -349,8 +349,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCPartID")
   }
   std::vector<NDArray> res_tensors(machine_count*2);
   for (int i = 0; i < machine_count; ++i) {
-    res_tensors[i] = VecToIdArray<int64_t>(remote_ids[i]);
-    res_tensors[i+1] = VecToIdArray<int64_t>(remote_ids_original[i]);
+    res_tensors[i] = dgl::aten::VecToIdArray<int64_t>(remote_ids[i]);
+    res_tensors[i+1] = dgl::aten::VecToIdArray<int64_t>(remote_ids_original[i]);
   }
   *rv = res_tensors;
 });
