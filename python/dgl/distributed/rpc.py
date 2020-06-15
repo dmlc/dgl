@@ -874,6 +874,13 @@ def fast_pull(name, id_tensor, part_id, local_id, service_id,
     """
     msg_seq = incr_msg_seq()
     pickle_data = bytearray(pickle.dumps(([0], [name])))
+    part_id = _CAPI_DGLRPCPartID(F.zerocopy_to_dgl_ndarray(id_tensor),
+                                 F.zerocopy_to_dgl_ndarray(part_id),
+                                 machine_count)
+    for data in part_id:
+        print(data)
+    exit()
+    """
     res_tensor = _CAPI_DGLRPCFastPull(name,
                                       int(machine_id),
                                       int(machine_count),
@@ -882,11 +889,10 @@ def fast_pull(name, id_tensor, part_id, local_id, service_id,
                                       int(service_id),
                                       int(msg_seq),
                                       pickle_data,
-                                      F.zerocopy_to_dgl_ndarray(id_tensor),
-                                      F.zerocopy_to_dgl_ndarray(part_id),
-                                      F.zerocopy_to_dgl_ndarray(local_id),
+                                      part_id,
                                       F.zerocopy_to_dgl_ndarray(local_data))
     return F.zerocopy_from_dgl_ndarray(res_tensor)
+    """
 
 ############### Some basic services will be defined here #############
 

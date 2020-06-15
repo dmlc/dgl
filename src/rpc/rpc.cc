@@ -7,6 +7,7 @@
 
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/array.h>
 #include <dgl/zerocopy_serializer.h>
 #include "../c_api_common.h"
 
@@ -328,6 +329,30 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   managed_tensor->dl_tensor = tensor;
   managed_tensor->deleter = NaiveDeleter;
   return NDArray::FromDLPack(managed_tensor);
+}
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCPartID")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  NDArray ID = args[0];
+  NDArray part_id = args[1];
+  int machine_count = args[2];
+  int64_t* ID_data = static_cast<int64_t*>(ID->data);
+  int64_t* part_id_data = static_cast<int64_t*>(part_id->data);
+  int64_t ID_size = ID.GetSize() / sizeof(int64_t);
+  std::vector<std::vector<int64_t> > remote_ids(machine_count);
+  std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
+  for (int64_t i = 0; i < ID_size; ++i) {
+    int64_t p_id = part_id_data[i];
+    int64_t id = ID_data[i];
+    remote_ids[p_id].push_back(id);
+    remote_ids_original[p_id].push_back(i);
+  }
+  std::vector<NDArray> res_tensors(machine_count*2);
+  for (int i = 0; i < machine_count; ++i) {
+    res_tensors[i] = VecToIdArray<int64_t>(remote_ids[i]);
+    res_tensors[i+1] = VecToIdArray<int64_t>(remote_ids_original[i]);
+  }
+  *rv = res_tensors;
 }
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
