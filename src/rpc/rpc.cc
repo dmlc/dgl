@@ -442,20 +442,16 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   }
   // Recv remote message
   for (int i = 0; i < msg_count; ++i) {
-    LOG(INFO) << "aaaaaa";
     RPCMessage msg;
     RecvRPCMessage(&msg, 0);
-    LOG(INFO) << "bbbbbb";
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
-    LOG(INFO) << "cccccc";
     int64_t id_size = remote_ids[part_id].size();
-    for (size_t n = 0; n < id_size; ++i) {
+    for (size_t n = 0; n < id_size; ++n) {
       memcpy(return_data + remote_ids_original[part_id][n] * row_size,
              data_char + n * row_size,
              row_size);
     }
-    LOG(INFO) << "dddddd";
   }
   // Get final tensor
   local_data_shape[0] = ID_size;
