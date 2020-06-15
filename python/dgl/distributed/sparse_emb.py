@@ -35,20 +35,19 @@ def sparse_adagrad_optimize(data_store, name, ID, data):
 
     Parameters
     ----------
+    data_store : dict of data
+        all data in the kvstore.
     name : str
         data name
     ID : tensor
         a vector storing the ID list.
     data : tensor (mx.ndarray or torch.tensor)
         a tensor with the same row size of id
-    target : dict of data
-        all data in the kvstore.
     '''
-    # TODO are all indices local?
     grad_indices = ID
     grad_values = data
-    embs = target[name]
-    state_sum = target[name + "_sum"]
+    embs = data_store[name]
+    state_sum = data_store[name + "_sum"]
     grad_sum = (grad_values * grad_values).mean(1)
     state_sum.index_add_(0, grad_indices, grad_sum)
     std = state_sum[grad_indices]  # _sparse_mask
