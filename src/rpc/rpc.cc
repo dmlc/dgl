@@ -419,13 +419,14 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 #endif
       msg.server_id = s_id;
       msg.data = pickle_data;
-      int64_t id_data_size = remote_ids[i].size()*sizeof(int64_t);
-      char* raw_data = new char[id_data_size];
-      memcpy(raw_data, remote_ids[i].data(), id_data_size);
-      NDArray tensor = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
-                                            ID->dtype,
-                                            DLContext{kDLCPU, 0},
-                                            raw_data);
+      //int64_t id_data_size = remote_ids[i].size()*sizeof(int64_t);
+      //char* raw_data = new char[id_data_size];
+      //memcpy(raw_data, remote_ids[i].data(), id_data_size);
+      //NDArray tensor = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
+      //                                      ID->dtype,
+      //                                      DLContext{kDLCPU, 0},
+      //                                      raw_data);
+      NDArray tensor = dgl::aten::VecToIdArray(remote_ids[i]);
       msg.tensors.push_back(tensor);
       SendRPCMessage(msg, s_id);
       msg_count++;
