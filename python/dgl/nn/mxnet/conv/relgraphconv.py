@@ -57,7 +57,8 @@ class RelGraphConv(gluon.Block):
     self_loop : bool, optional
         True to include self loop message. Default: False
     low_mem : bool, optional
-        MXNet currently not support low mem RelGraphConv. Default: False
+        Use low-memory implementation. MXNet currently does not support this.
+        Default: False.
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
@@ -84,7 +85,7 @@ class RelGraphConv(gluon.Block):
         self.activation = activation
         self.self_loop = self_loop
 
-        assert low_mem is False, 'MXNet currently not support low mem RelGraphConv.'
+        assert low_mem is False, 'MXNet currently does not support low-memory implementation.'
 
         if regularizer == "basis":
             # add basis weights

@@ -147,8 +147,8 @@ class RelGraphConv(layers.Layer):
             msg = tf.zeros([edges.src['h'].shape[0], self.out_feat])
             idx = tf.range(edges.src['h'].shape[0])
             for etype in etypes:
-                loc = edges.data['type'] == tf.fill(edges.data['type'].shape[0], etype)
-                w = tf.gather(weight, etype)
+                loc = (edges.data['type'] == etype)
+                w = weight[etype]
                 src = tf.boolean_mask(edges.src['h'], loc)
                 sub_msg = tf.matmul(src, w)
                 indices = tf.reshape(tf.boolean_mask(idx, loc), (-1, 1))
@@ -174,8 +174,8 @@ class RelGraphConv(layers.Layer):
             msg = tf.zeros([edges.src['h'].shape[0], self.out_feat])
             idx = tf.range(edges.src['h'].shape[0])
             for etype in etypes:
-                loc = edges.data['type'] == tf.fill([edges.data['type'].shape[0]], etype)
-                w = tf.reshape(tf.gather(self.weight, etype),
+                loc = (edges.data['type'] == etype)
+                w = tf.reshape(weight[etype],
                                (self.num_bases, self.submat_in, self.submat_out))
                 src = tf.reshape(tf.boolean_mask(edges.src['h'], loc),
                                  (-1, self.num_bases, self.submat_in))
