@@ -331,7 +331,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   return NDArray::FromDLPack(managed_tensor);
 }
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalID")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetLocalPartitionData")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   NDArray ID = args[0];
   NDArray part_id = args[1];
