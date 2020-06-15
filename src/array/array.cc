@@ -642,38 +642,6 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
   CHECK_EQ(array->ctx, result->ctx) << "Array and The result should be on the same device.";
-/*
-  const DLDeviceType XPU = array->ctx.device_type;
-
-#ifdef DGL_USE_CUDA
-  ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
-    ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
-      if (XPU == kDLCPU) {
-        impl::FarthestPointSampler<kDLCPU, FloatType, IdType>(
-            array, batch_size, sample_points, dist, start_idx, result);
-      } else if (XPU == kDLGPU) {
-        impl::FarthestPointSampler<kDLGPU, FloatType, IdType>(
-            array, batch_size, sample_points, dist, start_idx, result);
-      } else {
-        LOG(FATAL) << "Incompatible array context. Currently only CPU/GPU are supported.";
-      }
-    });
-  });
-#else
-  ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
-    ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
-      if (XPU == kDLCPU) {
-        impl::FarthestPointSampler<kDLCPU, FloatType, IdType>(
-            array, batch_size, sample_points, dist, start_idx, result);
-      } else if (XPU == kDLGPU) {
-        LOG(FATAL) << "The install DGL is CPU-only. Please install the CUDA version or re-build.";
-      } else {
-        LOG(FATAL) << "Incompatible array context. Currently only CPU/GPU are supported.";
-      }
-    });
-  });
-#endif
-  */
 
   ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
     ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
