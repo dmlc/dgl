@@ -443,7 +443,7 @@ void CSRSort_(CSRMatrix* csr) {
 
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRReorder", {
     ret = impl::CSRReorder<XPU, IdType>(csr, new_row_ids, new_col_ids);
   });
   return ret;
@@ -451,7 +451,7 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArr
 
 COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOReorder", {
     ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
   });
   return ret;
