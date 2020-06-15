@@ -47,14 +47,12 @@ RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   // ignore timeout now
   CHECK_EQ(timeout, 0) << "rpc cannot support timeout now.";
-  LOG(INFO) << "00000000";
   network::Message rpc_meta_msg;
   int send_id;
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
   char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
   int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
-  LOG(INFO) << "1111111";
   // Recv real ndarray data
   std::vector<void* > buffer_list(ndarray_count);
   for (int i = 0; i < ndarray_count; ++i) {
@@ -63,11 +61,9 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
         &ndarray_data_msg, send_id), REMOVE_SUCCESS);
     buffer_list[i] = ndarray_data_msg.data;
   }
-  LOG(INFO) << "222222";
   StreamWithBuffer zc_read_strm(rpc_meta_msg.data, rpc_meta_msg.size-sizeof(int32_t), buffer_list);
   zc_read_strm.Read(msg);
   rpc_meta_msg.deallocator(&rpc_meta_msg);
-  LOG(INFO) << "333333";
   return kRPCSuccess;
 }
 
@@ -446,8 +442,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   }
   // Recv remote message
   for (int i = 0; i < msg_count; ++i) {
+    LOG(INFO) << "aaaaaa";
     RPCMessage msg;
     RecvRPCMessage(&msg, 0);
+    LOG(INFO) << "bbbbbb"
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
     int64_t id_size = remote_ids[part_id].size();
