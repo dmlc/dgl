@@ -55,13 +55,6 @@ class PullRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        print("--------------------")
-        print("server_id:")
-        print(kv_store.server_id)
-        print("name:")
-        print(self.name)
-        print("id_tensor:")
-        print(self.id_tensor)
         if kv_store.part_policy.__contains__(self.name) is False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
         if kv_store.data_store.__contains__(self.name) is False:
@@ -69,9 +62,6 @@ class PullRequest(rpc.Request):
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
         data = kv_store.pull_handler(kv_store.data_store, self.name, local_id)
         res = PullResponse(kv_store.server_id, data)
-        print("return res:")
-        print(res)
-        print("--------------------")
         return res
 
 KVSTORE_PUSH = 901232
