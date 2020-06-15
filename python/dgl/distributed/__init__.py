@@ -1,6 +1,6 @@
 """DGL distributed."""
 
-from .dist_graph import DistGraphServer, DistGraph, node_split, edge_split
+from .dist_graph import DistGraphServer, DistGraph, DistTensor, node_split, edge_split
 from .partition import partition_graph, load_partition, load_partition_book
 from .graph_partition_book import GraphPartitionBook, RangePartitionBook, PartitionPolicy
 from .sparse_emb import SparseAdagrad, SparseEmbedding
