@@ -411,7 +411,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg_count++;
     }
   }
-  char* return_data = new char[ID_size*row_size]
+  char* return_data = new char[ID_size*row_size];
   // Copy local data
 #pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
@@ -424,7 +424,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     RPCMessage msg;
     RecvRPCMessage(&msg, 0);
     int part_id = msg.server_id / group_count;
-    char* data_char = static_cast<char*>(msg.tensors[0].data);
+    char* data_char = static_cast<char*>(msg.tensors[0]->data);
     int64_t id_size = remote_ids[part_id].size();
     for (size_t n = 0; n < id_size; ++i) {
       memcpy(return_data + remote_ids_original[part_id][n] * row_size,
