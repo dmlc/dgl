@@ -1514,6 +1514,18 @@ class DGLHeteroGraph(object):
         (tensor([0, 1]), tensor([0, 2]))
         """
         check_same_dtype(self._idtype_str, eid)
+        if F.is_tensor(eid):
+            max_eid = F.max(eid, dim=0)
+        else:
+            max_eid = np.max(eid, axis=0)
+        max_valid_eid = self.number_of_edges(etype) - 1
+        valid_ids = max_eid <= max_valid_eid
+        if etype is None:
+            assert valid_ids, \
+                'Expect edge ids to be in [0, ..., {:d}], got {}'.format(max_valid_eid, max_eid)
+        else:
+            assert valid_ids, 'Expect edge ids to be in [0, ..., {:d}]' \
+                              ' for type {}, got {}'.format(max_valid_eid, etype, max_eid)
         eid = utils.toindex(eid, self._idtype_str)
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src.tousertensor(), dst.tousertensor()
@@ -4013,7 +4025,7 @@ class DGLHeteroGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
-    def to(self, ctx):  # pylint: disable=invalid-name
+    def to(self, ctx, **kwargs):  # pylint: disable=invalid-name
         """Move both ndata and edata to the targeted mode (cpu/gpu)
         Framework agnostic
 
