@@ -844,7 +844,7 @@ def finalize_server():
     finalize_receiver()
     print("Server (%d) shutdown." % get_rank())
 
-def fast_pull(name, id_tensor, part_id, local_id,
+def fast_pull(name, id_tensor, part_id, local_id, service_id,
               machine_count, group_count, machine_id,
               client_id, local_data):
     """Fast-pull api used by kvstore.
@@ -859,6 +859,8 @@ def fast_pull(name, id_tensor, part_id, local_id,
         partition ID of id_tensor
     local_id : tensor
         local ID of id_tensor
+    service_id : int
+        service_id of pull request
     machine_count : int
         total number of machine
     group_count : int
@@ -870,12 +872,15 @@ def fast_pull(name, id_tensor, part_id, local_id,
     local_data : tensor
         local data tensor
     """
+    msg_seq = incr_msg_seq()
     pickle_data = bytearray(pickle.dumps(([0], [name])))
     res_tensor = _CAPI_DGLRPCFastPull(name,
                                       int(machine_id),
                                       int(machine_count),
                                       int(group_count),
                                       int(client_id),
+                                      int(service_id),
+                                      int(msg_seq),
                                       pickle_data,
                                       F.zerocopy_to_dgl_ndarray(id_tensor),
                                       F.zerocopy_to_dgl_ndarray(part_id),

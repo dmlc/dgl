@@ -297,6 +297,39 @@ DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 
 //////////////////////////// KVStore ////////////////////////////
 
+static void NaiveDeleter(DLManagedTensor* managed_tensor) {
+  delete [] managed_tensor->dl_tensor.shape;
+  delete [] managed_tensor->dl_tensor.strides;
+  free(managed_tensor->dl_tensor.data);
+  delete managed_tensor;
+}
+
+NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
+                             DLDataType dtype,
+                             DLContext ctx,
+                             void* raw) {
+  DLTensor tensor;
+  tensor.ctx = ctx;
+  tensor.ndim = static_cast<int>(shape.size());
+  tensor.dtype = dtype;
+  tensor.shape = new int64_t[tensor.ndim];
+  for (int i = 0; i < tensor.ndim; ++i) {
+    tensor.shape[i] = shape[i];
+  }
+  tensor.strides = new int64_t[tensor.ndim];
+  for (int i = 0; i < tensor.ndim; ++i) {
+    tensor.strides[i] = 1;
+  }
+  for (int i = tensor.ndim - 2; i >= 0; --i) {
+    tensor.strides[i] = tensor.shape[i+1] * tensor.strides[i+1];
+  }
+  tensor.data = raw;
+  DLManagedTensor *managed_tensor = new DLManagedTensor();
+  managed_tensor->dl_tensor = tensor;
+  managed_tensor->deleter = NaiveDeleter;
+  return NDArray::FromDLPack(managed_tensor);
+}
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   // Input
@@ -305,11 +338,13 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   int machine_count = args[2];
   int group_count = args[3];
   int client_id = args[4];
-  std::string pickle_data = args[5];
-  NDArray ID = args[6];
-  NDArray part_id = args[7];
-  NDArray local_id = args[8];
-  NDArray local_data = args[9];
+  int service_id = args[5];
+  int msg_seq = args[6];
+  std::string pickle_data = args[7];
+  NDArray ID = args[8];
+  NDArray part_id = args[9];
+  NDArray local_id = args[10];
+  NDArray local_data = args[11];
   // Data
   int64_t ID_size = ID.GetSize() / sizeof(int64_t);
   int64_t* ID_data = static_cast<int64_t*>(ID->data);
@@ -351,18 +386,58 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   for (int i = 0; i < remote_ids.size(); ++i) {
     if (remote_ids[i].size() != 0) {
       RPCMessage msg;
-      msg.
-      msg.
-      msg.
-      SendRPCMessage(msg, server_id);
+      msg.service_id = service_id;
+      msg.msg_seq = msg_seq;
+      msg.client_id = client_id;
+      int lower = i*group_count;
+      int higher = (i+1)*group_count-1;
+#ifndef _WIN32  // windows does not support rand_r()
+      int s_id = (rand_r(&seed) % (higher-lower+1))+lower;
+#else
+      LOG(FATAL) << "KVStore does not support Windows yet.";
+#endif
+      msg.server_id = s_id;
+      msg.data = pickle_data;
+      int64_t raw_data_size = remote_ids[i].size()*sizeof(int64_t);
+      char* raw_data = new char[];
+      memcpy(raw_data, remote_ids[i].data(), raw_data_size);
+      tensor = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
+                                    ID->dtype,
+                                    DLContext{kDLCPU, 0},
+                                    raw_data);
+      msg.tensors.push_back(tensor);
+      SendRPCMessage(msg, s_id);
       msg_count++;
     }
   }
+  char* return_data = new char[ID_size*row_size]
   // Copy local data
-
+#pragma omp parallel for
+  for (int64_t i = 0; i < local_ids.size(); ++i) {
+    memcpy(return_data + local_ids_orginal[i] * row_size,
+           local_data_char + local_ids[i] * row_size,
+           row_size);
+  }
   // Recv remote message
-
+  for (int i = 0; i < msg_count; ++i) {
+    RPCMessage msg;
+    RecvRPCMessage(&msg, 0);
+    int part_id = msg.server_id / group_count;
+    char* data_char = static_cast<char*>(msg.tensors[0].data());
+    int64_t id_size = remote_ids[part_id].size();
+    for (size_t n = 0; n < id_size; ++i) {
+      memcpy(return_data + remote_ids_original[part_id][n] * row_size,
+             data_char + n * row_size,
+             row_size);
+    }
+  }
   // Get final tensor
+  local_data_shape[0] = ID_size;
+  NDArray res_tensor = CreateNDArrayFromRaw(local_data_shape,
+                                            local_data->dtype,
+                                            DLContext{kDLCPU, 0},
+                                            return_data);
+  *rv = res_tensor;
 });
 
 }  // namespace rpc

@@ -1018,7 +1018,7 @@ class KVClient(object):
         if self._pull_handler is default_pull_handler: # Use fast-pull
             part_id = self._part_policy[name].to_partid(id_tensor)
             local_id = self._part_policy[name].to_local(id_tensor)
-            return rpc.fast_pull(name, id_tensor, part_id, local_id,
+            return rpc.fast_pull(name, id_tensor, part_id, local_id, KVSTORE_PULL,
                                  self._machine_count,
                                  self._group_count,
                                  self._machine_id,
