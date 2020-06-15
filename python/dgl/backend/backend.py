@@ -269,7 +269,7 @@ def asnumpy(input):
     """
     pass
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     """Copy the given tensor to the context.
 
     Parameters
