@@ -7,6 +7,7 @@ from . import rpc
 from .graph_partition_book import PartitionPolicy
 
 from .. import backend as F
+from .. import utils
 from .._ffi.ndarray import empty_shared_mem
 
 ############################ Register KVStore Requsts and Responses ###############################
@@ -992,6 +993,8 @@ class KVClient(object):
             a tensor with the same row size of data ID
         """
         assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         assert F.shape(id_tensor)[0] == F.shape(data_tensor)[0], \
         'The data must has the same row size with ID.'
@@ -1040,6 +1043,8 @@ class KVClient(object):
             a data tensor with the same row size of id_tensor.
         """
         assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         if self._pull_handlers[name] is default_pull_handler: # Use fast-pull
             part_id = self._part_policy[name].to_partid(id_tensor)
