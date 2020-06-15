@@ -24,6 +24,11 @@ namespace utils {
 int FindNumThreads(int dim, int max_nthrs);
 
 /*
+ * !\brief Find number of blocks is smaller than nblks and max_nblks
+ */
+int FindNumBlocks(int nblks, int max_nblks);
+
+/*
  * !\brief Compute the total number of feature elements.
  */
 int64_t ComputeXLength(runtime::NDArray feat_array);
@@ -43,6 +48,9 @@ int64_t Prod(const std::vector<int64_t>& vec);
  */
 template <int XPU, typename DType>
 void Fill(const DLContext& ctx, DType* ptr, size_t length, DType val);
+
+template <typename DType>
+void IndexSelectGPU(const DType* val, const int32_t* idx, int64_t length, DType* out);
 
 /*
  * !\brief Create minigun CSR from two ndarrays.
