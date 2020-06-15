@@ -275,7 +275,7 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(
   const int64_t bits = NumBits();
   if (bits == 32) {
     return FlattenImpl<int32_t>(etypes);
-  } else if (bits == 64) {
+  } else {
     return FlattenImpl<int64_t>(etypes);
   }
 }
