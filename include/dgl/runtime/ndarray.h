@@ -207,7 +207,7 @@ class NDArray {
   /*!
    * \brief Get the number of elements in this array.
    */
-  int64_t Numel() const;
+  int64_t NumElements() const;
 
   /*!
    * \brief Create a NDArray backed by a dlpack tensor.

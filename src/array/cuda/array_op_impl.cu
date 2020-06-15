@@ -37,6 +37,8 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
   CHECK(high >= low) << "high must be bigger than low";
   const IdType length = high - low;
   IdArray ret = NewIdArray(length, ctx, sizeof(IdType) * 8);
+  if (length == 0)
+    return ret;
   IdType* ret_data = static_cast<IdType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = FindNumThreads(length, 1024);
@@ -64,7 +66,7 @@ template <DLDeviceType XPU, typename IdType>
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   const std::vector<int64_t> shape(arr->shape, arr->shape + arr->ndim);
   IdArray ret = IdArray::Empty(shape, DLDataType{kDLInt, bits, 1}, arr->ctx);
-  const int64_t length = ret.Numel();
+  const int64_t length = ret.NumElements();
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = FindNumThreads(length, 1024);
   int nb = (length + nt - 1) / nt;

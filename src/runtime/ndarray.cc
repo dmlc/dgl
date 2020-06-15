@@ -123,7 +123,7 @@ size_t NDArray::GetSize() const {
   return GetDataSize(data_->dl_tensor);
 }
 
-int64_t NDArray::Numel() const {
+int64_t NDArray::NumElements() const {
   int64_t size = 1;
   for (int i = 0; i < data_->dl_tensor.ndim; ++i) {
     size *= data_->dl_tensor.shape[i];

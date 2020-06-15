@@ -227,8 +227,8 @@ TEST(SpmatTest, TestCSRGetDataAndIndices) {
 }
 
 template <typename IDX>
-void _TestCSRTranspose() {
-  auto csr = CSR2<IDX>();
+void _TestCSRTranspose(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
   auto csr_t = aten::CSRTranspose(csr);
   // [[0, 1, 0, 0],
   //  [1, 0, 0, 0],
@@ -238,17 +238,20 @@ void _TestCSRTranspose() {
   // data: [3, 0, 2, 5, 1, 4]
   ASSERT_EQ(csr_t.num_rows, 5);
   ASSERT_EQ(csr_t.num_cols, 4);
-  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 5, 6, 6}), sizeof(IDX)*8, CTX);
-  auto ti = aten::VecToIdArray(std::vector<IDX>({1, 0, 0, 0, 2, 2}), sizeof(IDX)*8, CTX);
-  auto td = aten::VecToIdArray(std::vector<IDX>({3, 0, 2, 5, 1, 4}), sizeof(IDX)*8, CTX);
+  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 5, 6, 6}), sizeof(IDX)*8, ctx);
+  auto ti = aten::VecToIdArray(std::vector<IDX>({1, 0, 0, 0, 2, 2}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({3, 0, 2, 5, 1, 4}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(csr_t.indptr, tp));
   ASSERT_TRUE(ArrayEQ<IDX>(csr_t.indices, ti));
   ASSERT_TRUE(ArrayEQ<IDX>(csr_t.data, td));
 }
 
 TEST(SpmatTest, TestCSRTranspose) {
-  _TestCSRTranspose<int32_t>();
-  _TestCSRTranspose<int64_t>();
+  _TestCSRTranspose<int32_t>(CPU);
+  _TestCSRTranspose<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRTranspose<int32_t>(GPU);
+#endif
 }
 
 template <typename IDX>
