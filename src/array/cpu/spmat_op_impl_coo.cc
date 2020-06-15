@@ -427,6 +427,51 @@ template COOMatrix COOSliceMatrix<kDLCPU, int32_t>(
 template COOMatrix COOSliceMatrix<kDLCPU, int64_t>(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
+
+///////////////////////////// COOReorder /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
+                     runtime::NDArray new_col_id_arr) {
+  CHECK_SAME_DTYPE(coo.row, new_row_id_arr);
+  CHECK_SAME_DTYPE(coo.col, new_col_id_arr);
+
+  // Input COO
+  const IdType* in_rows = static_cast<IdType*>(coo.row->data);
+  const IdType* in_cols = static_cast<IdType*>(coo.col->data);
+  const IdType* in_data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
+  int64_t num_rows = coo.num_rows;
+  int64_t num_cols = coo.num_cols;
+  int64_t nnz = coo.row->shape[0];
+  CHECK_EQ(num_rows, new_row_id_arr->shape[0])
+      << "The new row Id array needs to be the same as the number of rows of COO";
+  CHECK_EQ(num_cols, new_col_id_arr->shape[0])
+      << "The new col Id array needs to be the same as the number of cols of COO";
+
+  // New row/col Ids.
+  const IdType* new_row_ids = static_cast<IdType*>(new_row_id_arr->data);
+  const IdType* new_col_ids = static_cast<IdType*>(new_col_id_arr->data);
+
+  // Output COO
+  NDArray out_row_arr = NDArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
+  NDArray out_col_arr = NDArray::Empty({nnz}, coo.col->dtype, coo.col->ctx);
+  NDArray out_data_arr = COOHasData(coo) ? coo.data : NullArray();
+  IdType *out_row = static_cast<IdType*>(out_row_arr->data);
+  IdType *out_col = static_cast<IdType*>(out_col_arr->data);
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < nnz; i++) {
+    out_row[i] = new_row_ids[in_rows[i]];
+    out_col[i] = new_col_ids[in_cols[i]];
+  }
+  return COOMatrix(num_rows, num_cols, out_row_arr, out_col_arr, out_data_arr);
+}
+
+template COOMatrix COOReorder<kDLCPU, int64_t>(COOMatrix csr, runtime::NDArray new_row_ids,
+                                               runtime::NDArray new_col_ids);
+template COOMatrix COOReorder<kDLCPU, int32_t>(COOMatrix csr, runtime::NDArray new_row_ids,
+                                               runtime::NDArray new_col_ids);
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl
