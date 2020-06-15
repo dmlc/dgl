@@ -80,5 +80,5 @@ def test_partition():
 
 
 if __name__ == '__main__':
-    os.mkdir('/tmp/partition')
+    os.makedirs('/tmp/partition', exist_ok=True)
     test_partition()
