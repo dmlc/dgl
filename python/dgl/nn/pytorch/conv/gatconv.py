@@ -4,27 +4,9 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from .... import graph, bipartite
 from ..softmax import edge_softmax
 from ..utils import Identity
 from ....utils import expand_as_pair
-
-def reinit_self_loop(g):
-    u, v = g.all_edges(order='eid')
-    # remove self loop
-    mask = u != v
-    u = u[mask]
-    v = v[mask]
-    # add self loop
-    u = th.cat([u, th.arange(g.number_of_dst_nodes())])
-    v = th.cat([v, th.arange(g.number_of_dst_nodes())])
-
-    if hasattr(g, 'ntypes') and len(g.ntypes) == 2:
-        assert g.ntypes[0] == g.ntypes[1], \
-                "bipartite graphs should not have with_self_loop as True"
-        return bipartite((u, v), num_nodes=(g.number_of_src_nodes(), g.number_of_dst_nodes()))
-    else:
-        return graph((u, v), num_nodes=g.number_of_nodes())
 
 # pylint: enable=W0235
 class GATConv(nn.Module):
@@ -117,12 +99,12 @@ class GATConv(nn.Module):
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
-    def forward(self, g, feat, with_self_loop=False):
+    def forward(self, graph, feat):
         r"""Compute graph attention network layer.
 
         Parameters
         ----------
-        g : DGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor or pair of torch.Tensor
             If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
@@ -136,19 +118,16 @@ class GATConv(nn.Module):
             The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
         """
-        if isinstance(feat, tuple):
-            h_src = self.feat_drop(feat[0])
-            h_dst = self.feat_drop(feat[1])
-            feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
-            feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
-        else:
-            h_src = h_dst = self.feat_drop(feat)
-            feat_src = feat_dst = self.fc(h_src).view(
-                -1, self._num_heads, self._out_feats)
-        if with_self_loop:
-            g = reinit_self_loop(g)
-
-        with g.local_scope():
+        with graph.local_scope():
+            if isinstance(feat, tuple):
+                h_src = self.feat_drop(feat[0])
+                h_dst = self.feat_drop(feat[1])
+                feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
+                feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
+            else:
+                h_src = h_dst = self.feat_drop(feat)
+                feat_src = feat_dst = self.fc(h_src).view(
+                    -1, self._num_heads, self._out_feats)
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:
@@ -161,17 +140,17 @@ class GATConv(nn.Module):
             # which further speeds up computation and saves memory footprint.
             el = (feat_src * self.attn_l).sum(dim=-1).unsqueeze(-1)
             er = (feat_dst * self.attn_r).sum(dim=-1).unsqueeze(-1)
-            g.srcdata.update({'ft': feat_src, 'el': el})
-            g.dstdata.update({'er': er})
+            graph.srcdata.update({'ft': feat_src, 'el': el})
+            graph.dstdata.update({'er': er})
             # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
-            g.apply_edges(fn.u_add_v('el', 'er', 'e'))
-            e = self.leaky_relu(g.edata.pop('e'))
+            graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
+            e = self.leaky_relu(graph.edata.pop('e'))
             # compute softmax
-            g.edata['a'] = self.attn_drop(edge_softmax(g, e))
+            graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
             # message passing
-            g.update_all(fn.u_mul_e('ft', 'a', 'm'),
+            graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                              fn.sum('m', 'ft'))
-            rst = g.dstdata['ft']
+            rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
                 resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
