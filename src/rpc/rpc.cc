@@ -353,7 +353,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCPartID")
     res_tensors[i+1] = VecToIdArray<int64_t>(remote_ids_original[i]);
   }
   *rv = res_tensors;
-}
+});
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
