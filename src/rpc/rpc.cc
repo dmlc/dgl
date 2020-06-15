@@ -401,6 +401,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       remote_ids_original[p_id].push_back(i);
     }
   }
+  LOG(INFO) << "00000000";
   // Send remote id
   int msg_count = 0;
   for (int i = 0; i < remote_ids.size(); ++i) {
@@ -432,6 +433,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   }
   char* return_data = new char[ID_size*row_size];
+  LOG(INFO) << "1111111";
   // Copy local data
 #pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
@@ -439,6 +441,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
            local_data_char + local_ids[i] * row_size,
            row_size);
   }
+  LOG(INFO) << "22222222";
   // Recv remote message
   for (int i = 0; i < msg_count; ++i) {
     RPCMessage msg;
@@ -452,12 +455,14 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
              row_size);
     }
   }
+  LOG(INFO) << "3333333";
   // Get final tensor
   local_data_shape[0] = ID_size;
   NDArray res_tensor = CreateNDArrayFromRaw(local_data_shape,
                                             local_data->dtype,
                                             DLContext{kDLCPU, 0},
                                             return_data);
+  LOG(INFO) << "444444";
   *rv = res_tensor;
 });
 
