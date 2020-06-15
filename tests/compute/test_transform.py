@@ -311,6 +311,7 @@ def check_metis_partition(g, extra_hops):
 def test_reorder_nodes():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
     new_nids = np.random.permutation(g.number_of_nodes())
+    # TODO(zhengda) we need to test both CSR and COO.
     new_g = dgl.transform.reorder_nodes(g, new_nids)
     new_in_deg = new_g.in_degrees()
     new_out_deg = new_g.out_degrees()

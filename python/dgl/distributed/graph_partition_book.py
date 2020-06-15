@@ -8,7 +8,7 @@ from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
 
-def _move_metadata_to_shared_mam(graph_name, num_nodes, num_edges, part_id,
+def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
                                  num_partitions, node_map, edge_map, is_range_part):
     ''' Move all metadata of the partition book to the shared memory.
 
@@ -27,6 +27,8 @@ def _get_shared_mem_metadata(graph_name):
     The metadata includes the number of nodes and the number of edges. In the future,
     we can add more information, especially for heterograph.
     '''
+    # The metadata has 5 elements: is_range_part, num_nodes, num_edges, num_partitions, part_id
+    # We might need to extend the list in the future.
     shape = (5,)
     dtype = F.int64
     dtype = DTYPE_DICT[dtype]
@@ -65,7 +67,7 @@ def get_shared_mem_partition_book(graph_name, graph_part):
 
     Returns
     -------
-    GraphPartitionBook
+    GraphPartitionBook or RangePartitionBook
         A graph partition book for a particular partition.
     '''
     is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
@@ -80,7 +82,7 @@ class GraphPartitionBook:
     Parameters
     ----------
     part_id : int
-        partition id of current GraphPartitionBook
+        partition id of current partition book
     num_parts : int
         number of total partitions
     node_map : tensor
@@ -99,7 +101,7 @@ class GraphPartitionBook:
         self._nid2partid = node_map.tousertensor()
         edge_map = utils.toindex(edge_map)
         self._eid2partid = edge_map.tousertensor()
-        # Get meta data of GraphPartitionBook
+        # Get meta data of the partition book.
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
         _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
@@ -153,7 +155,7 @@ class GraphPartitionBook:
         graph_name : str
             The graph name
         """
-        self._meta, self._nid2partid, self._eid2partid = _move_metadata_to_shared_mam(
+        self._meta, self._nid2partid, self._eid2partid = _move_metadata_to_shared_mem(
             graph_name, self._num_nodes(), self._num_edges(), self._part_id, self._num_partitions,
             self._nid2partid, self._eid2partid, False)
 
@@ -173,7 +175,6 @@ class GraphPartitionBook:
         The meta data includes:
 
         * The machine ID.
-        * The machine IP address.
         * Number of nodes and edges of each partition.
 
         Examples
@@ -337,12 +338,12 @@ class GraphPartitionBook:
 
 
 class RangePartitionBook:
-    """GraphPartitionBook is used to store parition information.
+    """RangePartitionBook is used to store parition information.
 
     Parameters
     ----------
     part_id : int
-        partition id of current GraphPartitionBook
+        partition id of current partition book
     num_parts : int
         number of total partitions
     node_map : tensor
@@ -359,7 +360,7 @@ class RangePartitionBook:
         edge_map = utils.toindex(edge_map)
         self._node_map = node_map.tonumpy()
         self._edge_map = edge_map.tonumpy()
-        # Get meta data of GraphPartitionBook
+        # Get meta data of the partition book
         self._partition_meta_data = []
         for partid in range(self._num_partitions):
             nrange_start = node_map[partid - 1] if partid > 0 else 0
@@ -380,7 +381,7 @@ class RangePartitionBook:
         graph_name : str
             The graph name
         """
-        self._meta = _move_metadata_to_shared_mam(
+        self._meta = _move_metadata_to_shared_mem(
             graph_name, self._num_nodes(), self._num_edges(), self._partid,
             self._num_partitions, F.tensor(self._node_map), F.tensor(self._edge_map), True)
 
@@ -411,7 +412,6 @@ class RangePartitionBook:
         The meta data includes:
 
         * The machine ID.
-        * The machine IP address.
         * Number of nodes and edges of each partition.
 
         Examples
@@ -521,7 +521,7 @@ class RangePartitionBook:
              local node IDs
         """
         if partid != self._partid:
-            raise RuntimeError('Now GraphPartitionBook does not support \
+            raise RuntimeError('Now RangePartitionBook does not support \
                 getting remote tensor of nid2localnid.')
 
         start = self._node_map[partid - 1] if partid > 0 else 0
@@ -544,7 +544,7 @@ class RangePartitionBook:
              local edge ids
         """
         if partid != self._partid:
-            raise RuntimeError('Now GraphPartitionBook does not support \
+            raise RuntimeError('Now RangePartitionBook does not support \
                 getting remote tensor of eid2localeid.')
 
         start = self._edge_map[partid - 1] if partid > 0 else 0
