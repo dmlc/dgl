@@ -115,7 +115,7 @@ def astype(input, ty):
 def asnumpy(input):
     return input.asnumpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
