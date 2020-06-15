@@ -1,6 +1,7 @@
 """Classes for heterogeneous graphs."""
 #pylint: disable= too-many-lines
 from collections import defaultdict
+from collections.abc import Mapping
 from contextlib import contextmanager
 import copy
 import networkx as nx
@@ -1892,9 +1893,12 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        nodes : dict[str->list or iterable]
+        nodes : list or dict[str->list or iterable]
             A dictionary mapping node types to node ID array for constructing
             subgraph. All nodes must exist in the graph.
+
+            If the graph only has one node type, one can just specify a list,
+            tensor, or any iterable of node IDs intead.
 
         Returns
         -------
@@ -1952,7 +1956,11 @@ class DGLHeteroGraph(object):
         --------
         edge_subgraph
         """
-        check_same_dtype(self._idtype_str, nodes)
+        if not isinstance(nodes, Mapping):
+            assert len(self.ntypes) == 1, \
+                'need a dict of node type and IDs for graph with multiple node types'
+            nodes = {self.ntypes[0]: nodes}
+        check_idtype_dict(self._idtype_str, nodes)
         induced_nodes = [utils.toindex(nodes.get(ntype, []), self._idtype_str)
                          for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -1975,6 +1983,9 @@ class DGLHeteroGraph(object):
 
             The edge types are characterized by triplets of
             ``(src type, etype, dst type)``.
+
+            If the graph only has one edge type, one can just specify a list,
+            tensor, or any iterable of edge IDs intead.
         preserve_nodes : bool
             Whether to preserve all nodes or not. If false, all nodes
             without edges will be removed. (Default: False)
@@ -2035,6 +2046,10 @@ class DGLHeteroGraph(object):
         --------
         subgraph
         """
+        if not isinstance(edges, Mapping):
+            assert len(self.canonical_etypes) == 1, \
+                'need a dict of edge type and IDs for graph with multiple edge types'
+            edges = {self.canonical_etypes[0]: edges}
         check_idtype_dict(self._idtype_str, edges)
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
