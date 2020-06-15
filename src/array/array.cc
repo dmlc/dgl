@@ -28,7 +28,7 @@ IdArray Clone(IdArray arr) {
 
 IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
   IdArray ret;
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Range", {
     if (nbits == 32) {
       ret = impl::Range<XPU, int32_t>(low, high, ctx);
     } else if (nbits == 64) {
@@ -42,7 +42,7 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
 
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
   IdArray ret;
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(ctx.device_type, XPU, "Full", {
     if (nbits == 32) {
       ret = impl::Full<XPU, int32_t>(val, length, ctx);
     } else if (nbits == 64) {
@@ -55,8 +55,13 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
 }
 
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
+  CHECK(bits == 32 || bits == 64)
+    << "Invalid ID type. Must be int32 or int64, but got int"
+    << static_cast<int>(bits) << ".";
+  if (arr->dtype.bits == bits)
+    return arr;
   IdArray ret;
-  ATEN_XPU_SWITCH(arr->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
     ATEN_ID_TYPE_SWITCH(arr->dtype, IdType, {
       ret = impl::AsNumBits<XPU, IdType>(arr, bits);
     });
@@ -68,7 +73,7 @@ IdArray Add(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
   CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Add", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Add>(lhs, rhs);
     });
@@ -80,7 +85,7 @@ IdArray Sub(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
   CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Sub", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Sub>(lhs, rhs);
     });
@@ -92,7 +97,7 @@ IdArray Mul(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
   CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Mul", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Mul>(lhs, rhs);
     });
@@ -104,7 +109,7 @@ IdArray Div(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
   CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Div", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Div>(lhs, rhs);
     });
@@ -114,7 +119,7 @@ IdArray Div(IdArray lhs, IdArray rhs) {
 
 IdArray Add(IdArray lhs, dgl_id_t rhs) {
   IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Add", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Add>(lhs, rhs);
     });
@@ -124,7 +129,7 @@ IdArray Add(IdArray lhs, dgl_id_t rhs) {
 
 IdArray Sub(IdArray lhs, dgl_id_t rhs) {
   IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Sub", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Sub>(lhs, rhs);
     });
@@ -134,7 +139,7 @@ IdArray Sub(IdArray lhs, dgl_id_t rhs) {
 
 IdArray Mul(IdArray lhs, dgl_id_t rhs) {
   IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Mul", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Mul>(lhs, rhs);
     });
@@ -144,7 +149,7 @@ IdArray Mul(IdArray lhs, dgl_id_t rhs) {
 
 IdArray Div(IdArray lhs, dgl_id_t rhs) {
   IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Div", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Div>(lhs, rhs);
     });
@@ -158,7 +163,7 @@ IdArray Add(dgl_id_t lhs, IdArray rhs) {
 
 IdArray Sub(dgl_id_t lhs, IdArray rhs) {
   IdArray ret;
-  ATEN_XPU_SWITCH(rhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(rhs->ctx.device_type, XPU, "Sub", {
     ATEN_ID_TYPE_SWITCH(rhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Sub>(lhs, rhs);
     });
@@ -172,7 +177,7 @@ IdArray Mul(dgl_id_t lhs, IdArray rhs) {
 
 IdArray Div(dgl_id_t lhs, IdArray rhs) {
   IdArray ret;
-  ATEN_XPU_SWITCH(rhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(rhs->ctx.device_type, XPU, "Div", {
     ATEN_ID_TYPE_SWITCH(rhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::Div>(lhs, rhs);
     });
@@ -182,7 +187,7 @@ IdArray Div(dgl_id_t lhs, IdArray rhs) {
 
 BoolArray LT(IdArray lhs, dgl_id_t rhs) {
   BoolArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "LT", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::BinaryElewise<XPU, IdType, arith::LT>(lhs, rhs);
     });
@@ -194,7 +199,7 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
   CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "HStack", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::HStack<XPU, IdType>(lhs, rhs);
     });
@@ -205,7 +210,7 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
   // TODO(BarclayII): check if array and index match in context
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
         ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
@@ -218,7 +223,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, uint64_t index) {
   ValueType ret = 0;
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ret = impl::IndexSelect<XPU, DType>(array, index);
     });
@@ -234,7 +239,7 @@ template double IndexSelect<double>(NDArray array, uint64_t index);
 
 NDArray Scatter(NDArray array, IdArray indices) {
   NDArray ret;
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "Scatter", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(indices->dtype, IdType, {
         ret = impl::Scatter<XPU, DType, IdType>(array, indices);
@@ -246,7 +251,7 @@ NDArray Scatter(NDArray array, IdArray indices) {
 
 NDArray Repeat(NDArray array, IdArray repeats) {
   NDArray ret;
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "Repeat", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(repeats->dtype, IdType, {
         ret = impl::Repeat<XPU, DType, IdType>(array, repeats);
@@ -258,7 +263,7 @@ NDArray Repeat(NDArray array, IdArray repeats) {
 
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
-  ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, "Relabel_", {
     ATEN_ID_TYPE_SWITCH(arrays[0]->dtype, IdType, {
       ret = impl::Relabel_<XPU, IdType>(arrays);
     });
@@ -269,7 +274,7 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 template<typename ValueType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value) {
   std::tuple<NDArray, IdArray, IdArray> ret;
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "Pack", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "array", {
       ret = impl::Pack<XPU, DType>(array, static_cast<DType>(pad_value));
     });
@@ -286,7 +291,7 @@ template std::tuple<NDArray, IdArray, IdArray> Pack<double>(NDArray, double);
 
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   std::pair<NDArray, IdArray> ret;
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "ConcatSlices", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "array", {
       ATEN_ID_TYPE_SWITCH(lengths->dtype, IdType, {
         ret = impl::ConcatSlices<XPU, DType, IdType>(array, lengths);
@@ -300,7 +305,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   bool ret = false;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;
@@ -308,7 +313,7 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
 
 NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;
@@ -316,7 +321,7 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
 
 bool CSRHasDuplicate(CSRMatrix csr) {
   bool ret = false;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRHasDuplicate", {
     ret = impl::CSRHasDuplicate<XPU, IdType>(csr);
   });
   return ret;
@@ -324,7 +329,7 @@ bool CSRHasDuplicate(CSRMatrix csr) {
 
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   int64_t ret = 0;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowNNZ", {
     ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   });
   return ret;
@@ -332,7 +337,7 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
 
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowNNZ", {
     ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   });
   return ret;
@@ -340,7 +345,7 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
 
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowColumnIndices", {
     ret = impl::CSRGetRowColumnIndices<XPU, IdType>(csr, row);
   });
   return ret;
@@ -348,7 +353,7 @@ NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
 
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowData", {
     ret = impl::CSRGetRowData<XPU, IdType>(csr, row);
   });
   return ret;
@@ -356,7 +361,7 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
 
 NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, row, col);
   });
   return ret;
@@ -364,7 +369,7 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
 
 NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -373,7 +378,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
 std::vector<NDArray> CSRGetDataAndIndices(
     CSRMatrix csr, NDArray rows, NDArray cols) {
   std::vector<NDArray> ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetDataAndIndices", {
     ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -381,8 +386,10 @@ std::vector<NDArray> CSRGetDataAndIndices(
 
 CSRMatrix CSRTranspose(CSRMatrix csr) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
-    ret = impl::CSRTranspose<XPU, IdType>(csr);
+  ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "CSRTranspose", {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRTranspose<XPU, IdType>(csr);
+    });
   });
   return ret;
 }
@@ -390,13 +397,13 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
   COOMatrix ret;
   if (data_as_order) {
-    ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {
+    ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "CSRToCOODataAsOrder", {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
         ret = impl::CSRToCOODataAsOrder<XPU, IdType>(csr);
       });
     });
   } else {
-    ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {
+    ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "CSRToCOO", {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
         ret = impl::CSRToCOO<XPU, IdType>(csr);
       });
@@ -407,7 +414,7 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
 
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, start, end);
   });
   return ret;
@@ -415,7 +422,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
 
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
   });
   return ret;
@@ -423,21 +430,21 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceMatrix", {
     ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
   });
   return ret;
 }
 
 void CSRSort_(CSRMatrix* csr) {
-  ATEN_CSR_SWITCH(*csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(*csr, XPU, IdType, "CSRSort_", {
     impl::CSRSort_<XPU, IdType>(csr);
   });
 }
 
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRRemove", {
     ret = impl::CSRRemove<XPU, IdType>(csr, entries);
   });
   return ret;
@@ -446,7 +453,7 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
-  ATEN_CSR_SWITCH(mat, XPU, IdType, {
+  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {
     if (IsNullArray(prob)) {
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
@@ -462,7 +469,7 @@ COOMatrix CSRRowWiseSampling(
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   COOMatrix ret;
-  ATEN_CSR_SWITCH(mat, XPU, IdType, {
+  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseTopk", {
     ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
       ret = impl::CSRRowWiseTopk<XPU, IdType, DType>(
           mat, rows, k, weight, ascending);
@@ -475,7 +482,7 @@ COOMatrix CSRRowWiseTopk(
 
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
   bool ret = false;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOIsNonZero", {
     ret = impl::COOIsNonZero<XPU, IdType>(coo, row, col);
   });
   return ret;
@@ -483,7 +490,7 @@ bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
 
 NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
   NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOIsNonZero", {
     ret = impl::COOIsNonZero<XPU, IdType>(coo, row, col);
   });
   return ret;
@@ -491,7 +498,7 @@ NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
 
 bool COOHasDuplicate(COOMatrix coo) {
   bool ret = false;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOHasDuplicate", {
     ret = impl::COOHasDuplicate<XPU, IdType>(coo);
   });
   return ret;
@@ -499,7 +506,7 @@ bool COOHasDuplicate(COOMatrix coo) {
 
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   int64_t ret = 0;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowNNZ", {
     ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
   });
   return ret;
@@ -507,7 +514,7 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
 
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray row) {
   NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowNNZ", {
     ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
   });
   return ret;
@@ -515,7 +522,7 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray row) {
 
 std::pair<NDArray, NDArray> COOGetRowDataAndIndices(COOMatrix coo, int64_t row) {
   std::pair<NDArray, NDArray> ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowDataAndIndices", {
     ret = impl::COOGetRowDataAndIndices<XPU, IdType>(coo, row);
   });
   return ret;
@@ -523,7 +530,7 @@ std::pair<NDArray, NDArray> COOGetRowDataAndIndices(COOMatrix coo, int64_t row) 
 
 NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
   NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetData", {
     ret = impl::COOGetData<XPU, IdType>(coo, row, col);
   });
   return ret;
@@ -532,31 +539,29 @@ NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
   std::vector<NDArray> ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetDataAndIndices", {
     ret = impl::COOGetDataAndIndices<XPU, IdType>(coo, rows, cols);
   });
   return ret;
 }
 
 COOMatrix COOTranspose(COOMatrix coo) {
-  COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
-    ret = impl::COOTranspose<XPU, IdType>(coo);
-  });
-  return ret;
+  return COOMatrix(coo.num_cols, coo.num_rows, coo.col, coo.row, coo.data);
 }
 
 CSRMatrix COOToCSR(COOMatrix coo) {
   CSRMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
-    ret = impl::COOToCSR<XPU, IdType>(coo);
+  ATEN_XPU_SWITCH_CUDA(coo.row->ctx.device_type, XPU, "COOToCSR", {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::COOToCSR<XPU, IdType>(coo);
+    });
   });
   return ret;
 }
 
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceRows", {
     ret = impl::COOSliceRows<XPU, IdType>(coo, start, end);
   });
   return ret;
@@ -564,7 +569,7 @@ COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
 
 COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceRows", {
     ret = impl::COOSliceRows<XPU, IdType>(coo, rows);
   });
   return ret;
@@ -572,7 +577,7 @@ COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
 
 COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOSliceMatrix", {
     ret = impl::COOSliceMatrix<XPU, IdType>(coo, rows, cols);
   });
   return ret;
@@ -580,15 +585,17 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
 
 COOMatrix COOSort(COOMatrix mat, bool sort_column) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(mat, XPU, IdType, {
-    ret = impl::COOSort<XPU, IdType>(mat, sort_column);
+  ATEN_XPU_SWITCH_CUDA(mat.row->ctx.device_type, XPU, "COOSort", {
+    ATEN_ID_TYPE_SWITCH(mat.row->dtype, IdType, {
+      ret = impl::COOSort<XPU, IdType>(mat, sort_column);
+    });
   });
   return ret;
 }
 
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COORemove", {
     ret = impl::COORemove<XPU, IdType>(coo, entries);
   });
   return ret;
@@ -597,7 +604,7 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
 COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(mat, XPU, IdType, {
+  ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseSampling", {
     if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
@@ -613,7 +620,7 @@ COOMatrix COORowWiseSampling(
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending) {
   COOMatrix ret;
-  ATEN_COO_SWITCH(mat, XPU, IdType, {
+  ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseTopk", {
     ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
       ret = impl::COORowWiseTopk<XPU, IdType, DType>(
           mat, rows, k, weight, ascending);
@@ -624,7 +631,7 @@ COOMatrix COORowWiseTopk(
 
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   std::pair<COOMatrix, IdArray> ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, {
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOCoalesce", {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
   });
   return ret;
