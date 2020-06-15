@@ -1332,7 +1332,7 @@ class DGLGraph(DGLBaseGraph):
 
         Notes
         -----
-        The nodes and edges in the graph would be re-indexed after the removal.
+        The edges in the graph would be re-indexed after the removal.  The nodes are preserved.
 
         Examples
         --------
