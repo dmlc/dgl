@@ -427,7 +427,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
                                             DLContext{kDLCPU, 0},
                                             raw_data);
       msg.tensors.push_back(tensor);
-      SendRPCMessage(msg, s_id);
+      SendRPCMessage(msg, msg.server_id);
       msg_count++;
     }
   }
