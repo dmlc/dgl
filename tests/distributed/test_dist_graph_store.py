@@ -101,9 +101,20 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
     emb = SparseEmbedding(g, 'emb1', new_shape, emb_init)
     optimizer = SparseAdagrad(g.get_node_embeddings(), lr=0.001)
     feats = emb(nids)
+    assert np.all(feats.detach().numpy() == np.zeros((len(nids), 1)))
     loss = F.sum(feats + 1, 0)
     loss.backward()
     optimizer.step()
+    feats = emb(nids)
+    assert np.all(feats.detach().numpy() == np.ones((len(nids), 1)))
+    rest = np.setdiff1d(np.arange(g.number_of_nodes()), nids)
+    feats1 = emb(rest)
+    assert np.all(feats1.detach().numpy() == np.zeros((len(rest), 1)))
+
+    policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
+    grad_sum = dgl.distributed.DistTensor(g, 'node:emb1_sum', policy)
+    assert np.all(grad_sum[nids].detach().numpy() == np.ones((len(nids), 1)))
+    assert np.all(grad_sum[rest].detach().numpy() == np.zeros((len(rest), 1)))
 
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())

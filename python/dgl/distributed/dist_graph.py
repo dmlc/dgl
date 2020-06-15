@@ -115,7 +115,7 @@ class DistTensor:
 
     Parameters
     ----------
-    kv : DistGraph
+    g : DistGraph
         The distributed graph object.
     name : string
         The name of the tensor.
