@@ -356,7 +356,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   std::vector<int64_t> local_data_shape;
   std::vector<std::vector<int64_t> > remote_ids(machine_count);
   std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
-  unsigned int seed = 314;
+  // Get row size (in bytes)
   int row_size = 1;
   for (int i = 0; i < local_data->ndim; ++i) {
     local_data_shape.push_back(local_data->shape[i]);
@@ -365,10 +365,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   }
   row_size *= (local_data->dtype.bits / 8);
-  size_t data_size = local_data.GetSize();
   CHECK_GT(local_data_shape.size(), 0);
-  CHECK_EQ(row_size * local_data_shape[0], data_size);
-  // Get local id and remote id
+  CHECK_EQ(row_size * local_data_shape[0], local_data.GetSize());
+  // Get local id (used in local machine) and
+  // remote id (send to remote machine)
   for (int64_t i = 0; i < ID_size; ++i) {
     int64_t p_id = part_id_data[i];
     if (p_id == local_machine_id) {
@@ -392,15 +392,16 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       int lower = i*group_count;
       int higher = (i+1)*group_count-1;
 #ifndef _WIN32  // windows does not support rand_r()
+      unsigned int seed = 314;
       int s_id = (rand_r(&seed) % (higher-lower+1))+lower;
 #else
       LOG(FATAL) << "KVStore does not support Windows yet.";
 #endif
       msg.server_id = s_id;
       msg.data = pickle_data;
-      int64_t raw_data_size = remote_ids[i].size()*sizeof(int64_t);
-      char* raw_data = new char[];
-      memcpy(raw_data, remote_ids[i].data(), raw_data_size);
+      int64_t id_data_size = remote_ids[i].size()*sizeof(int64_t);
+      char* raw_data = new char[id_data_size];
+      memcpy(raw_data, remote_ids[i].data(), id_data_size);
       tensor = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
                                     ID->dtype,
                                     DLContext{kDLCPU, 0},
