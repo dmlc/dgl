@@ -846,7 +846,7 @@ def finalize_server():
 
 def fast_pull(name, id_tensor, part_id, local_id, service_id,
               machine_count, group_count, machine_id,
-              client_id, local_data):
+              client_id, local_data, policy):
     """Fast-pull api used by kvstore.
 
     Parameters
@@ -871,16 +871,15 @@ def fast_pull(name, id_tensor, part_id, local_id, service_id,
         current client ID
     local_data : tensor
         local data tensor
+    policy : PartitionPolicy
+        store the partition information
     """
     msg_seq = incr_msg_seq()
     pickle_data = bytearray(pickle.dumps(([0], [name])))
-    part_id = _CAPI_DGLRPCPartID(F.zerocopy_to_dgl_ndarray(id_tensor),
-                                 F.zerocopy_to_dgl_ndarray(part_id),
-                                 machine_count)
-    for data in part_id:
-        print(data)
-    exit()
-    """
+    global_id = _CAPI_DGLRPCGetGlobalID(F.zerocopy_to_dgl_ndarray(id_tensor),
+                                        F.zerocopy_to_dgl_ndarray(part_id),
+                                        machine_id)
+    g2l_id = policy.to_local(global_id)
     res_tensor = _CAPI_DGLRPCFastPull(name,
                                       int(machine_id),
                                       int(machine_count),
@@ -890,9 +889,11 @@ def fast_pull(name, id_tensor, part_id, local_id, service_id,
                                       int(msg_seq),
                                       pickle_data,
                                       part_id,
+                                      F.zerocopy_to_dgl_ndarray(id_tensor),
+                                      F.zerocopy_to_dgl_ndarray(part_id),
+                                      F.zerocopy_to_dgl_ndarray(g2l_id),
                                       F.zerocopy_to_dgl_ndarray(local_data))
     return F.zerocopy_from_dgl_ndarray(res_tensor)
-    """
 
 ############### Some basic services will be defined here #############
 

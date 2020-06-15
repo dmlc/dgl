@@ -331,28 +331,22 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   return NDArray::FromDLPack(managed_tensor);
 }
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCPartID")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalID")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   NDArray ID = args[0];
   NDArray part_id = args[1];
-  int machine_count = args[2];
+  int local_machine_id = args[2];
   int64_t* ID_data = static_cast<int64_t*>(ID->data);
   int64_t* part_id_data = static_cast<int64_t*>(part_id->data);
   int64_t ID_size = ID.GetSize() / sizeof(int64_t);
-  std::vector<std::vector<int64_t> > remote_ids(machine_count);
-  std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
+  std::vector<int64_t> global_id;
   for (int64_t i = 0; i < ID_size; ++i) {
-    int64_t p_id = part_id_data[i];
-    int64_t id = ID_data[i];
-    remote_ids[p_id].push_back(id);
-    remote_ids_original[p_id].push_back(i);
+    if (part_id_data[i] == local_machine_id) {
+      global_id.push_back(ID_data[i]);
+    }
   }
-  std::vector<NDArray> res_tensors(machine_count*2);
-  for (int i = 0; i < machine_count; ++i) {
-    res_tensors[i] = dgl::aten::VecToIdArray<int64_t>(remote_ids[i]);
-    res_tensors[i+1] = dgl::aten::VecToIdArray<int64_t>(remote_ids_original[i]);
-  }
-  *rv = res_tensors;
+  res_tensor = dgl::aten::VecToIdArray<int64_t>(global_id);
+  *rv = res_tensor;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
@@ -368,13 +362,13 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   std::string pickle_data = args[7];
   NDArray ID = args[8];
   NDArray part_id = args[9];
-  NDArray local_id = args[10];
+  NDArray g2l_id = args[10];
   NDArray local_data = args[11];
   // Data
   int64_t ID_size = ID.GetSize() / sizeof(int64_t);
   int64_t* ID_data = static_cast<int64_t*>(ID->data);
   int64_t* part_id_data = static_cast<int64_t*>(part_id->data);
-  int64_t* local_id_data = static_cast<int64_t*>(local_id->data);
+  int64_t* g2l_id_data = static_cast<int64_t*>(g2l_id->data);
   char* local_data_char = static_cast<char*>(local_data->data);
   std::vector<int64_t> local_ids;
   std::vector<int64_t> local_ids_orginal;
@@ -394,10 +388,11 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   CHECK_EQ(row_size * local_data_shape[0], local_data.GetSize());
   // Get local id (used in local machine) and
   // remote id (send to remote machine)
+  int64_t idx = 0;
   for (int64_t i = 0; i < ID_size; ++i) {
     int64_t p_id = part_id_data[i];
     if (p_id == local_machine_id) {
-      int64_t l_id = local_id_data[i];
+      int64_t l_id = g2l_id_data[idx++];
       local_ids.push_back(l_id);
       local_ids_orginal.push_back(i);
     } else {
