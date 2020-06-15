@@ -445,7 +445,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     LOG(INFO) << "aaaaaa";
     RPCMessage msg;
     RecvRPCMessage(&msg, 0);
-    LOG(INFO) << "bbbbbb"
+    LOG(INFO) << "bbbbbb";
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
     int64_t id_size = remote_ids[part_id].size();
