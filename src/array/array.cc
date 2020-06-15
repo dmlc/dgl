@@ -629,6 +629,66 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
+///////////////////////// Graph Traverse  routines //////////////////////////
+Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, bool reversed) {
+  Frontiers ret;
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::BFSNodesFrontiers<XPU, IdType>(graph, source, reversed);
+    });
+  });
+  return ret;
+}
+
+Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, bool reversed) {
+  Frontiers ret;
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::BFSEdgesFrontiers<XPU, IdType>(graph, source, reversed);
+    });
+  });
+  return ret;
+}
+
+Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, bool reversed) {
+  Frontiers ret;
+  ATEN_XPU_SWITCH(graph->Context(), XPU, {
+    ATEN_ID_BITS_SWITCH(graph->NumBits(), IdType, {
+      ret = impl::TopologicalNodesFrontiers<XPU, IdType>(graph, reversed);
+    });
+  });
+  return ret;
+}
+
+Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, bool reversed) {
+  Frontiers ret;
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::DGLDFSEdges<XPU, IdType>(graph, source, reversed);
+    });
+  });
+  return ret;
+}
+Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
+                             IdArray source,
+                             const bool reversed,
+                             const bool has_reverse_edge,
+                             const bool has_nontree_edge,
+                             const bool return_labels) {
+  Frontiers ret;
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::DGLDFSLabeledEdges<XPU, IdType>(graph,
+                                                  source,
+                                                  reversed,
+                                                  has_reverse_edge,
+                                                  has_nontree_edge,
+                                                  return_labels);
+    });
+  });
+  return ret;
+}
+
 ///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
