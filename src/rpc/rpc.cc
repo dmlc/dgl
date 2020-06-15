@@ -418,6 +418,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       LOG(FATAL) << "KVStore does not support Windows yet.";
 #endif
       msg.server_id = s_id;
+      LOG(INFO) << "msg.client_id: " << msg.client_id << " msg.server_id: " << msg.server_id;
       msg.data = pickle_data;
       int64_t id_data_size = remote_ids[i].size()*sizeof(int64_t);
       char* raw_data = new char[id_data_size];
