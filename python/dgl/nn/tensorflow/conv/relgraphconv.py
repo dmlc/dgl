@@ -53,6 +53,10 @@ class RelGraphConv(layers.Layer):
         Activation function. Default: None
     self_loop : bool, optional
         True to include self loop message. Default: False
+    low_mem : bool, optional
+        True to use low memory implementation of relation message passing function. Default: False
+        This option trade speed with memory consumption, and will slowdown the forward/backward.
+        Turn it on when you encounter OOM problem during training or evaluation.
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
@@ -66,6 +70,7 @@ class RelGraphConv(layers.Layer):
                  bias=True,
                  activation=None,
                  self_loop=False,
+                 low_mem=False,
                  dropout=0.0):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
@@ -78,6 +83,7 @@ class RelGraphConv(layers.Layer):
         self.bias = bias
         self.activation = activation
         self.self_loop = self_loop
+        self.low_mem = low_mem
 
         xinit = tf.keras.initializers.glorot_uniform()
         zeroinit = tf.keras.initializers.zeros()
@@ -134,8 +140,22 @@ class RelGraphConv(layers.Layer):
         else:
             weight = self.weight
 
-        msg = utils.bmm_maybe_select(
-            edges.src['h'], weight, edges.data['type'])
+        # calculate msg @ W_r before put msg into edge
+        # if src is th.int64 we expect it is an index select
+        if edges.src['h'].dtype != tf.int64 and self.low_mem:
+            etypes, _ = tf.unique(edges.data['type'])
+            msg = tf.zeros([edges.src['h'].shape[0], self.out_feat])
+            idx = tf.range(edges.src['h'].shape[0])
+            for etype in etypes:
+                loc = (edges.data['type'] == etype)
+                w = weight[etype]
+                src = tf.boolean_mask(edges.src['h'], loc)
+                sub_msg = tf.matmul(src, w)
+                indices = tf.reshape(tf.boolean_mask(idx, loc), (-1, 1))
+                msg = tf.tensor_scatter_nd_update(msg, indices, sub_msg)
+        else:
+            msg = utils.bmm_maybe_select(
+                edges.src['h'], weight, edges.data['type'])
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
@@ -146,10 +166,28 @@ class RelGraphConv(layers.Layer):
                 len(edges.src['h'].shape) == 1):
             raise TypeError(
                 'Block decomposition does not allow integer ID feature.')
-        weight = tf.reshape(tf.gather(
-            self.weight, edges.data['type']), (-1, self.submat_in, self.submat_out))
-        node = tf.reshape(edges.src['h'], (-1, 1, self.submat_in))
-        msg = tf.reshape(tf.matmul(node, weight), (-1, self.out_feat))
+
+        # calculate msg @ W_r before put msg into edge
+        # if src is th.int64 we expect it is an index select
+        if self.low_mem:
+            etypes, _ = tf.unique(edges.data['type'])
+            msg = tf.zeros([edges.src['h'].shape[0], self.out_feat])
+            idx = tf.range(edges.src['h'].shape[0])
+            for etype in etypes:
+                loc = (edges.data['type'] == etype)
+                w = tf.reshape(self.weight[etype],
+                               (self.num_bases, self.submat_in, self.submat_out))
+                src = tf.reshape(tf.boolean_mask(edges.src['h'], loc),
+                                 (-1, self.num_bases, self.submat_in))
+                sub_msg = tf.einsum('abc,bcd->abd', src, w)
+                sub_msg = tf.reshape(sub_msg, (-1, self.out_feat))
+                indices = tf.reshape(tf.boolean_mask(idx, loc), (-1, 1))
+                msg = tf.tensor_scatter_nd_update(msg, indices, sub_msg)
+        else:
+            weight = tf.reshape(tf.gather(
+                self.weight, edges.data['type']), (-1, self.submat_in, self.submat_out))
+            node = tf.reshape(edges.src['h'], (-1, 1, self.submat_in))
+            msg = tf.reshape(tf.matmul(node, weight), (-1, self.out_feat))
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
