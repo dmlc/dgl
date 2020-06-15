@@ -1325,3 +1325,8 @@ def sync():
     that all computation is complete after this function call.
     """
     pass
+
+def attach_grad(tensor):
+    """ Attach gradients to the input tensor
+    """
+    pass

@@ -25,10 +25,6 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
 def randn(shape):
     return nd.random.randn(*shape)
 
-def attach_grad(x):
-    x.attach_grad()
-    return x
-
 def backward(x, head_gradient=None):
     x.backward(head_gradient)
 

@@ -576,3 +576,7 @@ def sync():
     that all computation is complete after this function call.
     """
     mx.nd.waitall()
+
+def attach_grad(tensor):
+    tensor.attach_grad()
+    return tensor

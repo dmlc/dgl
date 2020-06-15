@@ -36,8 +36,7 @@ class SparseEmbedding:
         self._trace = []
 
     def __call__(self, idx):
-        # This is pytorch way.
-        emb = self._tensor[idx].requires_grad_(True)
+        emb = F.attach_grad(self._tensor[idx])
         self._trace.append((idx, emb))
         return emb
 

@@ -486,3 +486,10 @@ def _reduce_grad(grad, shape):
 def sync():
     # Pytorch performs computation synchronously, so no need for synchronization.
     pass
+
+def attach_grad(x):
+    if x.grad is not None:
+        x.grad.zero_()
+        return x
+    else:
+        return x.requires_grad_()
