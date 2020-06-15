@@ -345,7 +345,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalID")
       global_id.push_back(ID_data[i]);
     }
   }
-  res_tensor = dgl::aten::VecToIdArray<int64_t>(global_id);
+  NDArray res_tensor = dgl::aten::VecToIdArray<int64_t>(global_id);
   *rv = res_tensor;
 });
 
