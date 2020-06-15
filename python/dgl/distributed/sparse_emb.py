@@ -99,6 +99,12 @@ class SparseAdagrad:
             kvstore.register_push_handler(name, sparse_adagrad_optimize)
 
     def step(self):
+        ''' The step function.
+
+        The step function is invoked at the end of every batch to push the gradients
+        of the sparse embeddings to the distributed kvstore and update the embeddings
+        in the kvstore.
+        '''
         for emb in self._params:
             name = emb._tensor.name
             kvstore = emb._tensor.kvstore
