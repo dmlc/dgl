@@ -129,7 +129,7 @@ def asnumpy(input):
         return input.numpy()
 
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     with tf.device(ctx):
         new_tensor = tf.identity(input)
     return new_tensor
