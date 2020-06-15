@@ -5,6 +5,7 @@ from tensorflow.keras import layers
 import numpy as np
 
 from .... import function as fn
+from ....utils import expand_as_pair
 
 # pylint: disable=W0235
 
