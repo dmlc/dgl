@@ -54,6 +54,10 @@ class PullRequest(rpc.Request):
         self.name, self.id_tensor = state
 
     def process_request(self, server_state):
+        print("name:")
+        print(self.name)
+        print("id_tensor:")
+        print(self.id_tensor)
         kv_store = server_state.kv_store
         if kv_store.part_policy.__contains__(self.name) is False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
