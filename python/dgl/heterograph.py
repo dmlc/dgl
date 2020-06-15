@@ -1513,6 +1513,9 @@ class DGLHeteroGraph(object):
         >>> g.find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 2]))
         """
+        if len(eid) == 0:
+            return F.tensor([], dtype=self.idtype), F.tensor([], dtype=self.idtype)
+
         check_same_dtype(self._idtype_str, eid)
         if F.is_tensor(eid):
             max_eid = F.max(eid, dim=0)

@@ -7,6 +7,7 @@ from mxnet import gluon
 
 from .... import function as fn
 from ....base import DGLError
+from ....utils import expand_as_pair
 
 class GraphConv(gluon.Block):
     r"""Apply graph convolution over an input signal.
@@ -109,8 +110,14 @@ class GraphConv(gluon.Block):
         ----------
         graph : DGLGraph
             The graph.
-        feat : mxnet.NDArray
-            The input feature.
+        feat : mxnet.NDArray or pair of mxnet.NDArray
+            If a single tensor is given, represents the input feature of shape :math:`(N, D_{in})`
+            where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tensors are given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+
+            Note that in the special case of graph convolutional networks, if a pair of
+            tensors is given, the latter element will not participate in computation.
         weight : torch.Tensor, optional
             Optional external weight tensor.
 
@@ -120,13 +127,15 @@ class GraphConv(gluon.Block):
             The output feature
         """
         with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
+
             if self._norm == 'both':
-                degs = graph.out_degrees().as_in_context(feat.context).astype('float32')
+                degs = graph.out_degrees().as_in_context(feat_src.context).astype('float32')
                 degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
                 norm = mx.nd.power(degs, -0.5)
-                shp = norm.shape + (1,) * (feat.ndim - 1)
+                shp = norm.shape + (1,) * (feat_src.ndim - 1)
                 norm = norm.reshape(shp)
-                feat = feat * norm
+                feat_src = feat_src * norm
 
             if weight is not None:
                 if self.weight is not None:
@@ -134,19 +143,19 @@ class GraphConv(gluon.Block):
                                    ' module has defined its own weight parameter. Please'
                                    ' create the module with flag weight=False.')
             else:
-                weight = self.weight.data(feat.context)
+                weight = self.weight.data(feat_src.context)
 
             if self._in_feats > self._out_feats:
                 # mult W first to reduce the feature size for aggregation.
                 if weight is not None:
-                    feat = mx.nd.dot(feat, weight)
-                graph.srcdata['h'] = feat
+                    feat_src = mx.nd.dot(feat_src, weight)
+                graph.srcdata['h'] = feat_src
                 graph.update_all(fn.copy_src(src='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.dstdata.pop('h')
             else:
                 # aggregate first then mult W
-                graph.srcdata['h'] = feat
+                graph.srcdata['h'] = feat_src
                 graph.update_all(fn.copy_src(src='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.dstdata.pop('h')
@@ -154,13 +163,13 @@ class GraphConv(gluon.Block):
                     rst = mx.nd.dot(rst, weight)
 
             if self._norm != 'none':
-                degs = graph.in_degrees().as_in_context(feat.context).astype('float32')
+                degs = graph.in_degrees().as_in_context(feat_dst.context).astype('float32')
                 degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
                 if self._norm == 'both':
                     norm = mx.nd.power(degs, -0.5)
                 else:
                     norm = 1.0 / degs
-                shp = norm.shape + (1,) * (feat.ndim - 1)
+                shp = norm.shape + (1,) * (feat_dst.ndim - 1)
                 norm = norm.reshape(shp)
                 rst = rst * norm
 

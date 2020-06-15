@@ -101,9 +101,17 @@ class RelGraphConvLayer(nn.Module):
         else:
             wdict = {}
         hs = self.conv(g, inputs, mod_kwargs=wdict)
+
+        if isinstance(inputs, tuple):
+            # minibatch training
+            inputs_dst = inputs[1]
+        else:
+            # full graph training
+            inputs_dst = inputs
+
         def _apply(ntype, h):
             if self.self_loop:
-                h = h + th.matmul(inputs[ntype], self.loop_weight)
+                h = h + th.matmul(inputs_dst[ntype], self.loop_weight)
             if self.bias:
                 h = h + self.h_bias
             if self.activation:
@@ -192,12 +200,16 @@ class EntityClassify(nn.Module):
             self_loop=self.use_self_loop))
 
     def forward(self, h=None, blocks=None):
-        if blocks is None:
-            # full graph training
-            blocks = [self.g] * len(self.layers)
         if h is None:
             # full graph training
             h = self.embed_layer()
-        for layer, block in zip(self.layers, blocks):
-            h = layer(block, h)
+        if blocks is None:
+            # full graph training
+            for layer in self.layers:
+                h = layer(self.g, h)
+        else:
+            # minibatch training
+            for layer, block in zip(self.layers, blocks):
+                h_dst = {k: v[:block.number_of_dst_nodes(k)] for k, v in h.items()}
+                h = layer(block, (h, h_dst))
         return h

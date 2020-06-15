@@ -89,8 +89,8 @@ class SAGEConv(layers.Layer):
         graph : DGLGraph
             The graph.
         feat : tf.Tensor or pair of tf.Tensor
-            If a single tensor is given, the input feature of shape :math:`(N, D_{in})` where
-            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a single tensor is given, represents the input feature of shape :math:`(N, D_{in})`
+            where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of tensors are given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
