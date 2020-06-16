@@ -637,22 +637,6 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
-/////////////////////////////////// Geometry Op ///////////////////////////////////
-
-void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
-    NDArray dist, IdArray start_idx, IdArray result) {
-  CHECK_EQ(array->ctx, result->ctx) << "Array and The result should be on the same device.";
-
-  ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
-    ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
-      ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "FarthestPointSampler", {
-        impl::FarthestPointSampler<XPU, FloatType, IdType>(
-            array, batch_size, sample_points, dist, start_idx, result);
-      });
-    });
-  });
-}
-
 ///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -701,18 +685,6 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLCreateSparseMatrix")
           ListValueToVector<IdArray>(indices),
           ListValueToVector<bool>(flags)));
     *rv = SparseMatrixRef(spmat);
-  });
-
-DGL_REGISTER_GLOBAL("geometry._CAPI_FarthestPointSampler")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const NDArray data = args[0];
-    const int64_t batch_size = args[1];
-    const int64_t sample_points = args[2];
-    NDArray dist = args[3];
-    IdArray start_idx = args[4];
-    IdArray result = args[5];
-
-    FarthestPointSampler(data, batch_size, sample_points, dist, start_idx, result);
   });
 
 }  // namespace aten

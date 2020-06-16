@@ -9,12 +9,8 @@
 
 namespace dgl {
 using runtime::NDArray;
-namespace aten {
+namespace geometry {
 namespace impl {
-
-inline int64_t get_index(int64_t dim1, int64_t dim2, int64_t dim) {
-  return dim1 * dim + dim2;
-}
 
 /*!
  * \brief Farthest Point Sampler without the need to compute all pairs of distance.
@@ -61,8 +57,8 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
         // compute the distance on dimensions
         FloatType one_dist = 0;
         for (auto d = 0; d < dim; d++) {
-          FloatType tmp = array_data[get_index(array_start + j, d, dim)] -
-              array_data[get_index(array_start + sample_idx, d, dim)];
+          FloatType tmp = array_data[(array_start + j) * dim + d] -
+              array_data[(array_start + sample_idx) * dim + d];
           one_dist += tmp * tmp;
         }
 
@@ -100,5 +96,5 @@ template void FarthestPointSampler<kDLCPU, double, int64_t>(
     NDArray dist, IdArray start_idx, IdArray result);
 
 }  // namespace impl
-}  // namespace aten
+}  // namespace geometry
 }  // namespace dgl

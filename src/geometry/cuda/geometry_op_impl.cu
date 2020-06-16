@@ -1,20 +1,18 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cuda/geometry_op_impl.cc
+ * \file geometry/cuda/geometry_op_impl.cc
  * \brief Geometry operator CUDA implementation
  */
 #include <dgl/array.h>
-#include <cstdio>
-#include <vector>
 
 #include "../../runtime/cuda/cuda_common.h"
 #include "../../c_api_common.h"
-#include "../array_op.h"
+#include "../geometry_op.h"
 
 #define THREADS 1024
 
 namespace dgl {
-namespace aten {
+namespace geometry {
 namespace impl {
 
 /*!
@@ -131,5 +129,5 @@ template void FarthestPointSampler<kDLGPU, double, int64_t>(
     NDArray dist, IdArray start_idx, IdArray result);
 
 }  // namespace impl
-}  // namespace aten
+}  // namespace geometry
 }  // namespace dgl
