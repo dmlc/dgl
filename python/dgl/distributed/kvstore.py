@@ -1034,7 +1034,7 @@ class KVClient(object):
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
-        if self._pull_handler is default_pull_handler: # Use fast-pull
+        if self._pull_handlers[name] is default_pull_handler: # Use fast-pull
             part_id = self._part_policy[name].to_partid(id_tensor)
             return rpc.fast_pull(name, id_tensor, part_id, KVSTORE_PULL,
                                  self._machine_count,
