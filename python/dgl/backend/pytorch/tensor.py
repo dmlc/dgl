@@ -87,13 +87,13 @@ def asnumpy(input):
     else:
         return input.cpu().detach().numpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
         if ctx.index is not None:
             th.cuda.set_device(ctx.index)
-        return input.cuda()
+        return input.cuda(**kwargs)
     else:
         raise RuntimeError('Invalid context', ctx)
 
@@ -248,6 +248,9 @@ def equal(x, y):
 
 def logical_not(input):
     return ~input
+
+def logical_and(input1, input2):
+    return input1 & input2
 
 def clone(input):
     return input.clone()

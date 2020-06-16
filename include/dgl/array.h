@@ -590,6 +590,14 @@ bool CSRHasDuplicate(CSRMatrix csr);
 void CSRSort_(CSRMatrix* csr);
 
 /*!
+ * \brief Reorder the rows and colmns according to the new row and column order.
+ * \param csr The input csr matrix.
+ * \param new_row_ids the new row Ids (the index is the old row Id)
+ * \param new_col_ids the new column Ids (the index is the old col Id).
+ */
+CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+/*!
  * \brief Remove entries from CSR matrix by entry indices (data indices)
  * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
  *         entries.
@@ -779,6 +787,14 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 /*!
+ * \brief Reorder the rows and colmns according to the new row and column order.
+ * \param csr The input coo matrix.
+ * \param new_row_ids the new row Ids (the index is the old row Id)
+ * \param new_col_ids the new column Ids (the index is the old col Id).
+ */
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+/*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.
@@ -890,14 +906,44 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  *   DeviceSpecificImplementation<XPU>(...);
  * });
  */
-#define ATEN_XPU_SWITCH(val, XPU, ...) do {                     \
+#define ATEN_XPU_SWITCH(val, XPU, op, ...) do {                 \
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
   } else {                                                      \
-    LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
+    LOG(FATAL) << "Operator " << (op) << " does not support "   \
+               << dgl::runtime::DeviceTypeCode2Str(val)         \
+               << " device.";                                   \
   }                                                             \
 } while (0)
+
+/*
+ * Dispatch according to device:
+ *
+ * XXX(minjie): temporary macro that allows CUDA operator
+ *
+ * ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+ *   // Now XPU is a placeholder for array->ctx.device_type
+ *   DeviceSpecificImplementation<XPU>(...);
+ * });
+ */
+#ifdef DGL_USE_CUDA
+#define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...) do {            \
+  if ((val) == kDLCPU) {                                        \
+    constexpr auto XPU = kDLCPU;                                \
+    {__VA_ARGS__}                                               \
+  } else if ((val) == kDLGPU) {                                 \
+    constexpr auto XPU = kDLGPU;                                \
+    {__VA_ARGS__}                                               \
+  } else {                                                      \
+    LOG(FATAL) << "Operator " << (op) << " does not support "   \
+               << dgl::runtime::DeviceTypeCode2Str(val)         \
+               << " device.";                                   \
+  }                                                             \
+} while (0)
+#else  // DGL_USE_CUDA
+#define ATEN_XPU_SWITCH_CUDA ATEN_XPU_SWITCH
+#endif  // DGL_USE_CUDA
 
 /*
  * Dispatch according to integral type (either int32 or int64):
@@ -1011,17 +1057,17 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 } while (0)
 
 // Macro to dispatch according to device context and index type.
-#define ATEN_CSR_SWITCH(csr, XPU, IdType, ...)              \
-  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, {       \
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, op, ...)            \
+  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, op, {   \
     ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {        \
-      {__VA_ARGS__}                                         \
-    });                                                     \
+      {__VA_ARGS__}                                           \
+    });                                                       \
   });
 
 // Macro to dispatch according to device context and index type.
-#define ATEN_COO_SWITCH(coo, XPU, IdType, ...)              \
-  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {           \
+#define ATEN_COO_SWITCH(coo, XPU, IdType, op, ...)          \
+  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, op, {    \
+    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {         \
       {__VA_ARGS__}                                         \
     });                                                     \
   });

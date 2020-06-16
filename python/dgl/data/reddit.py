@@ -20,6 +20,7 @@ class RedditDataset(object):
         self._zip_file_path = zip_file_path
         self._extract_dir = extract_dir
         self._self_loop_str = self_loop_str
+        self._load()
 
     def _download(self):
         download(self._url, path=self._zip_file_path)

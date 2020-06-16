@@ -1171,9 +1171,6 @@ def from_edge_list(elist, readonly):
     src_ids = utils.toindex(src)
     dst_ids = utils.toindex(dst)
     num_nodes = max(src.max(), dst.max()) + 1
-    min_nodes = min(src.min(), dst.min())
-    if min_nodes != 0:
-        raise DGLError('Invalid edge list. Nodes must start from 0.')
     return from_coo(num_nodes, src_ids, dst_ids, readonly)
 
 def map_to_subgraph_nid(induced_nodes, parent_nids):

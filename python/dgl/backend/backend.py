@@ -269,7 +269,7 @@ def asnumpy(input):
     """
     pass
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     """Copy the given tensor to the context.
 
     Parameters
@@ -980,6 +980,9 @@ def logical_not(input):
     Tensor
         The result
     """
+    pass
+
+def logical_and(input1, input2):
     pass
 
 def clone(input):
