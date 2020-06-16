@@ -313,6 +313,9 @@ def equal(x, y):
 def logical_not(input):
     return nd.logical_not(input)
 
+def logical_and(input1, input2):
+    return nd.logical_and(input1, input2)
+
 def clone(input):
     return input.copy()
 
