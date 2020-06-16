@@ -82,8 +82,7 @@ class DotGatConv(nn.Module):
         graph.edata['sa'] = edge_softmax(graph, graph.edata['a'])
 
         # Step 3. Broadcast softmax value to each edge, and then attention is done
-        graph.apply_edges(lambda edges: {'attn': edges.src['ft'] * \
-                                                 edges.data['sa'].unsqueeze(dim=0).T})
+        graph.apply_edges(fn.u_mul_e('ft', 'sa', 'attn'))
 
         # Step 4. Aggregate attention to dst,user nodes, so formula 7 is done
         graph.update_all(fn.copy_e('attn', 'm'), fn.sum('m', 'agg_u'))
