@@ -287,8 +287,8 @@ class NodeCollator(Collator):
     def dataset(self):
         return self._dataset
 
-    def collate(self, seed_nodes):
-        if isinstance(seed_nodes[0], tuple):
+    def collate(self, items):
+        if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
-            seed_nodes = utils.group_as_dict(seed_nodes)
-        return self.block_sampler.sample_blocks(self.g, seed_nodes)
+            items = utils.group_as_dict(items)
+        return self.block_sampler.sample_blocks(self.g, items)
