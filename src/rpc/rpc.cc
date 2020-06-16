@@ -393,8 +393,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   }
   local_data_shape[0] = ID_size;
-  NDArray res_tensor = NDArray::Empty(local_data_shape, 
-                                      local_data->dtype, 
+  NDArray res_tensor = NDArray::Empty(local_data_shape,
+                                      local_data->dtype,
                                       DLContext{kDLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
