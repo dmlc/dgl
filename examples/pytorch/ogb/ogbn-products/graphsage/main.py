@@ -140,7 +140,7 @@ def run(args, device, data):
 
     # Create PyTorch DataLoader for constructing blocks
     collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
-    dataloader = dgl.sampling.NodeDataLoader(
+    dataloader = DataLoader(
         collator.dataset,
         collate_fn=collator.collate,
         batch_size=args.batch_size,
