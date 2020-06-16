@@ -88,7 +88,7 @@ def init_zero_func(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
 def udf_push(target, name, id_tensor, data_tensor):
-    target[name] = F.scatter_row(target[name], id_tensor, data_tensor*data_tensor)    
+    target[name][id_tensor] = data_tensor * data_tensor 
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_partition_policy():
