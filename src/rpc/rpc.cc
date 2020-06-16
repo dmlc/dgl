@@ -414,10 +414,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 #ifndef _WIN32  // windows does not support rand_r()
       unsigned int seed = 314;
       int s_id = (rand_r(&seed) % (higher-lower+1))+lower;
+      msg.server_id = s_id;
 #else
       LOG(FATAL) << "KVStore does not support Windows yet.";
 #endif
-      msg.server_id = s_id;
       msg.data = pickle_data;
       NDArray tensor = dgl::aten::VecToIdArray<int64_t>(remote_ids[i]);
       msg.tensors.push_back(tensor);
