@@ -103,7 +103,7 @@ def main(args):
 
     # test sampler
     test_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)
-    test_blocks = val_sampler.sample_blocks(g, {category: test_idx})
+    test_blocks = test_sampler.sample_blocks(g, {category: test_idx})
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())

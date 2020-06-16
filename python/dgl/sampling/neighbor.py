@@ -217,7 +217,7 @@ class MultiLayerNeighborSampler(BlockSampler):
     ...      ('user', 'plays', 'game'): 4,
     ...      ('game', 'played-by', 'user'): 3}] * 3)
     """
-    def __init__(self, fanouts, replace=True, return_eids=False):
+    def __init__(self, fanouts, replace=False, return_eids=False):
         super().__init__()
 
         self.fanouts = fanouts
