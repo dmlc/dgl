@@ -55,12 +55,12 @@ class PullRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if self.name not in kv_store.part_policy:
+        if kv_store.part_policy.__contains__(self.name) is False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if self.name not in kv_store.data_store:
+        if kv_store.data_store.__contains__(self.name) is False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
-        data = kv_store.pull_handlers[self.name](kv_store.data_store, self.name, local_id)
+        data = kv_store.pull_handler(kv_store.data_store, self.name, local_id)
         res = PullResponse(kv_store.server_id, data)
         return res
 
@@ -93,13 +93,12 @@ class PushRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if self.name not in kv_store.part_policy:
+        if kv_store.part_policy.__contains__(self.name) is False:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if self.name not in kv_store.data_store:
+        if kv_store.data_store.__contains__(self.name) is False:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
-        kv_store.push_handlers[self.name](kv_store.data_store, self.name,
-                                          local_id, self.data_tensor)
+        kv_store.push_handler(kv_store.data_store, self.name, local_id, self.data_tensor)
 
 INIT_DATA = 901233
 INIT_MSG = 'Init'
@@ -245,19 +244,18 @@ class RegisterPullHandlerRequest(rpc.Request):
     pull_func : func
         UDF pull handler
     """
-    def __init__(self, name, pull_func):
-        self.name = name
+    def __init__(self, pull_func):
         self.pull_func = pull_func
 
     def __getstate__(self):
-        return self.name, self.pull_func
+        return self.pull_func
 
     def __setstate__(self, state):
-        self.name, self.pull_func = state
+        self.pull_func = state
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        kv_store.pull_handlers[self.name] = self.pull_func
+        kv_store.pull_handler = self.pull_func
         res = RegisterPullHandlerResponse(REGISTER_PULL_MSG)
         return res
 
@@ -290,19 +288,18 @@ class RegisterPushHandlerRequest(rpc.Request):
     push_func : func
         UDF push handler
     """
-    def __init__(self, name, push_func):
-        self.name = name
+    def __init__(self, push_func):
         self.push_func = push_func
 
     def __getstate__(self):
-        return self.name, self.push_func
+        return self.push_func
 
     def __setstate__(self, state):
-        self.name, self.push_func = state
+        self.push_func = state
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        kv_store.push_handlers[self.name] = self.push_func
+        kv_store.push_handler = self.push_func
         res = RegisterPushHandlerResponse(REGISTER_PUSH_MSG)
         return res
 
@@ -572,8 +569,8 @@ class KVServer(object):
         self._num_clients = num_clients
         self._barrier_count = 0
         # push and pull handler
-        self._push_handlers = {}
-        self._pull_handlers = {}
+        self._push_handler = default_push_handler
+        self._pull_handler = default_pull_handler
 
     @property
     def server_id(self):
@@ -611,14 +608,24 @@ class KVServer(object):
         return self._part_id
 
     @property
-    def push_handlers(self):
+    def push_handler(self):
         """Get push handler"""
-        return self._push_handlers
+        return self._push_handler
 
     @property
-    def pull_handlers(self):
+    def pull_handler(self):
         """Get pull handler"""
-        return self._pull_handlers
+        return self._pull_handler
+
+    @pull_handler.setter
+    def pull_handler(self, pull_handler):
+        """Set pull handler"""
+        self._pull_handler = pull_handler
+
+    @push_handler.setter
+    def push_handler(self, push_handler):
+        """Set push handler"""
+        self._push_handler = push_handler
 
     def is_backup_server(self):
         """Return True if current server is a backup server.
@@ -660,8 +667,6 @@ class KVServer(object):
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
         self._part_policy[name] = self.find_policy(policy_str)
-        self._pull_handlers[name] = default_pull_handler
-        self._push_handlers[name] = default_push_handler
 
     def find_policy(self, policy_str):
         """Find a partition policy from existing policy set
@@ -743,8 +748,8 @@ class KVClient(object):
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
         # push and pull handler
-        self._pull_handlers = {}
-        self._push_handlers = {}
+        self._pull_handler = default_pull_handler
+        self._push_handler = default_push_handler
 
     @property
     def client_id(self):
@@ -770,29 +775,18 @@ class KVClient(object):
             response = rpc.recv_response()
             assert response.msg == BARRIER_MSG
 
-    def register_push_handler(self, name, func):
-        """Register UDF push function.
+    def register_push_handler(self, func):
+        """Register UDF push function on server.
 
-        This UDF is triggered for every push. The signature of the UDF is
-
-        ```
-        def push_handler(data_store, name, local_offset, data)
-        ```
-
-        `data_store` is a dict that contains all tensors in the kvstore. `name` is the name
-        of the tensor where new data is pushed to. `local_offset` is the offset where new
-        data should be written in the tensor in the local partition. `data` is the new data
-        to be written.
+        client_0 will send this request to all servers, and the other
+        clients will just invoke the barrier() api.
 
         Parameters
         ----------
-        name : str
-            The name of the tensor
-        func : callable
-            The function to be called.
+        func : UDF push function
         """
         if self._client_id == 0:
-            request = RegisterPushHandlerRequest(name, func)
+            request = RegisterPushHandlerRequest(func)
             # send request to all the server nodes
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
@@ -800,31 +794,21 @@ class KVClient(object):
             for _ in range(self._server_count):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PUSH_MSG
-        self._push_handlers[name] = func
+        self._push_handler = func
         self.barrier()
 
-    def register_pull_handler(self, name, func):
-        """Register UDF pull function.
+    def register_pull_handler(self, func):
+        """Register UDF pull function on server.
 
-        This UDF is triggered for every pull. The signature of the UDF is
-
-        ```
-        def pull_handler(data_store, name, local_offset)
-        ```
-
-        `data_store` is a dict that contains all tensors in the kvstore. `name` is the name
-        of the tensor where new data is pushed to. `local_offset` is the offset where new
-        data should be written in the tensor in the local partition.
+        client_0 will send this request to all servers, and the other
+        clients will just invoke the barrier() api.
 
         Parameters
         ----------
-        name : str
-            The name of the tensor
-        func : callable
-            The function to be called.
+        func : UDF pull function
         """
         if self._client_id == 0:
-            request = RegisterPullHandlerRequest(name, func)
+            request = RegisterPullHandlerRequest(func)
             # send request to all the server nodes
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
@@ -832,7 +816,7 @@ class KVClient(object):
             for _ in range(self._server_namebook):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PULL_MSG
-        self._pull_handlers[name] = func
+        self._pull_handler = func
         self.barrier()
 
     def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
@@ -903,8 +887,6 @@ class KVClient(object):
         self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
         self._data_name_list.add(name)
         self._full_data_shape[name] = tuple(shape)
-        self._pull_handlers[name] = default_pull_handler
-        self._push_handlers[name] = default_push_handler
 
     def map_shared_data(self, partition_book):
         """Mapping shared-memory tensor from server to client.
@@ -925,8 +907,6 @@ class KVClient(object):
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
                 self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
-                self._pull_handlers[name] = default_pull_handler
-                self._push_handlers[name] = default_push_handler
         # Get full data shape across servers
         for name, meta in response.meta.items():
             if name not in self._data_name_list:
@@ -1015,7 +995,7 @@ class KVClient(object):
                 rpc.send_request_to_machine(machine_idx, request)
             start += count[idx]
         if local_id is not None: # local push
-            self._push_handlers[name](self._data_store, name, local_id, local_data)
+            self._push_handler(self._data_store, name, local_id, local_data)
 
     def pull(self, name, id_tensor):
         """Pull message from KVServer.
@@ -1032,49 +1012,58 @@ class KVClient(object):
         tensor
             a data tensor with the same row size of id_tensor.
         """
-        #TODO(chao) : add C++ rpc interface and add fast pull
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
-        # partition data
-        machine_id = self._part_policy[name].to_partid(id_tensor)
-        # sort index by machine id
-        sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
-        back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
-        id_tensor = id_tensor[sorted_id]
-        machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
-        # pull data from server by order
-        start = 0
-        pull_count = 0
-        local_id = None
-        for idx, machine_idx in enumerate(machine):
-            end = start + count[idx]
-            if start == end: # No data for target machine
-                continue
-            partial_id = id_tensor[start:end]
-            if machine_idx == self._machine_id: # local pull
-                # Note that DO NOT pull local data right now because we can overlap
-                # communication-local_pull here
-                local_id = self._part_policy[name].to_local(partial_id)
-            else: # pull data from remote server
-                request = PullRequest(name, partial_id)
-                rpc.send_request_to_machine(machine_idx, request)
-                pull_count += 1
-            start += count[idx]
-        # recv response
-        response_list = []
-        if local_id is not None: # local pull
-            local_data = self._pull_handlers[name](self._data_store, name, local_id)
-            server_id = self._main_server_id
-            local_response = PullResponse(server_id, local_data)
-            response_list.append(local_response)
-        # wait response from remote server nodes
-        for _ in range(pull_count):
-            remote_response = rpc.recv_response()
-            response_list.append(remote_response)
-        # sort response by server_id and concat tensor
-        response_list.sort(key=self._take_id)
-        data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
-        return data_tensor[back_sorted_id] # return data with original index order
+        if self._pull_handler is default_pull_handler: # Use fast-pull
+            part_id = self._part_policy[name].to_partid(id_tensor)
+            return rpc.fast_pull(name, id_tensor, part_id, KVSTORE_PULL,
+                                 self._machine_count,
+                                 self._group_count,
+                                 self._machine_id,
+                                 self._client_id,
+                                 self._data_store[name],
+                                 self._part_policy[name])
+        else:
+            # partition data
+            machine_id = self._part_policy[name].to_partid(id_tensor)
+            # sort index by machine id
+            sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
+            back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
+            id_tensor = id_tensor[sorted_id]
+            machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
+            # pull data from server by order
+            start = 0
+            pull_count = 0
+            local_id = None
+            for idx, machine_idx in enumerate(machine):
+                end = start + count[idx]
+                if start == end: # No data for target machine
+                    continue
+                partial_id = id_tensor[start:end]
+                if machine_idx == self._machine_id: # local pull
+                    # Note that DO NOT pull local data right now because we can overlap
+                    # communication-local_pull here
+                    local_id = self._part_policy[name].to_local(partial_id)
+                else: # pull data from remote server
+                    request = PullRequest(name, partial_id)
+                    rpc.send_request_to_machine(machine_idx, request)
+                    pull_count += 1
+                start += count[idx]
+            # recv response
+            response_list = []
+            if local_id is not None: # local pull
+                local_data = self._pull_handler(self._data_store, name, local_id)
+                server_id = self._main_server_id
+                local_response = PullResponse(server_id, local_data)
+                response_list.append(local_response)
+            # wait response from remote server nodes
+            for _ in range(pull_count):
+                remote_response = rpc.recv_response()
+                response_list.append(remote_response)
+            # sort response by server_id and concat tensor
+            response_list.sort(key=self._take_id)
+            data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
+            return data_tensor[back_sorted_id] # return data with original index order
 
     def _take_id(self, elem):
         """Used by sort response list

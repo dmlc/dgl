@@ -7,6 +7,7 @@
 
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/array.h>
 #include <dgl/zerocopy_serializer.h>
 #include "../c_api_common.h"
 
@@ -293,6 +294,165 @@ DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
     RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
   }
   *rv = st;
+});
+
+//////////////////////////// KVStore ////////////////////////////
+
+static void NaiveDeleter(DLManagedTensor* managed_tensor) {
+  delete [] managed_tensor->dl_tensor.shape;
+  delete [] managed_tensor->dl_tensor.strides;
+  free(managed_tensor->dl_tensor.data);
+  delete managed_tensor;
+}
+
+NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
+                             DLDataType dtype,
+                             DLContext ctx,
+                             void* raw) {
+  DLTensor tensor;
+  tensor.ctx = ctx;
+  tensor.ndim = static_cast<int>(shape.size());
+  tensor.dtype = dtype;
+  tensor.shape = new int64_t[tensor.ndim];
+  for (int i = 0; i < tensor.ndim; ++i) {
+    tensor.shape[i] = shape[i];
+  }
+  tensor.strides = new int64_t[tensor.ndim];
+  for (int i = 0; i < tensor.ndim; ++i) {
+    tensor.strides[i] = 1;
+  }
+  for (int i = tensor.ndim - 2; i >= 0; --i) {
+    tensor.strides[i] = tensor.shape[i+1] * tensor.strides[i+1];
+  }
+  tensor.data = raw;
+  DLManagedTensor *managed_tensor = new DLManagedTensor();
+  managed_tensor->dl_tensor = tensor;
+  managed_tensor->deleter = NaiveDeleter;
+  return NDArray::FromDLPack(managed_tensor);
+}
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetLocalPartitionData")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  NDArray ID = args[0];
+  NDArray part_id = args[1];
+  int local_machine_id = args[2];
+  int64_t* ID_data = static_cast<int64_t*>(ID->data);
+  int64_t* part_id_data = static_cast<int64_t*>(part_id->data);
+  int64_t ID_size = ID.GetSize() / sizeof(int64_t);
+  std::vector<int64_t> global_id;
+  for (int64_t i = 0; i < ID_size; ++i) {
+    if (part_id_data[i] == local_machine_id) {
+      global_id.push_back(ID_data[i]);
+    }
+  }
+  NDArray res_tensor = dgl::aten::VecToIdArray<int64_t>(global_id);
+  *rv = res_tensor;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  // Input
+  std::string name = args[0];
+  int local_machine_id = args[1];
+  int machine_count = args[2];
+  int group_count = args[3];
+  int client_id = args[4];
+  int service_id = args[5];
+  int msg_seq = args[6];
+  std::string pickle_data = args[7];
+  NDArray ID = args[8];
+  NDArray part_id = args[9];
+  NDArray g2l_id = args[10];
+  NDArray local_data = args[11];
+  // Data
+  int64_t ID_size = ID.GetSize() / sizeof(int64_t);
+  int64_t* ID_data = static_cast<int64_t*>(ID->data);
+  int64_t* part_id_data = static_cast<int64_t*>(part_id->data);
+  int64_t* g2l_id_data = static_cast<int64_t*>(g2l_id->data);
+  char* local_data_char = static_cast<char*>(local_data->data);
+  std::vector<int64_t> local_ids;
+  std::vector<int64_t> local_ids_orginal;
+  std::vector<int64_t> local_data_shape;
+  std::vector<std::vector<int64_t> > remote_ids(machine_count);
+  std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
+  // Get row size (in bytes)
+  int row_size = 1;
+  for (int i = 0; i < local_data->ndim; ++i) {
+    local_data_shape.push_back(local_data->shape[i]);
+    if (i != 0) {
+      row_size *= local_data->shape[i];
+    }
+  }
+  row_size *= (local_data->dtype.bits / 8);
+  CHECK_GT(local_data_shape.size(), 0);
+  CHECK_EQ(row_size * local_data_shape[0], local_data.GetSize());
+  // Get local id (used in local machine) and
+  // remote id (send to remote machine)
+  int64_t idx = 0;
+  for (int64_t i = 0; i < ID_size; ++i) {
+    int64_t p_id = part_id_data[i];
+    if (p_id == local_machine_id) {
+      int64_t l_id = g2l_id_data[idx++];
+      local_ids.push_back(l_id);
+      local_ids_orginal.push_back(i);
+    } else {
+      int64_t id = ID_data[i];
+      remote_ids[p_id].push_back(id);
+      remote_ids_original[p_id].push_back(i);
+    }
+  }
+  // Send remote id
+  int msg_count = 0;
+  for (int i = 0; i < remote_ids.size(); ++i) {
+    if (remote_ids[i].size() != 0) {
+      RPCMessage msg;
+      msg.service_id = service_id;
+      msg.msg_seq = msg_seq;
+      msg.client_id = client_id;
+      int lower = i*group_count;
+      int higher = (i+1)*group_count-1;
+#ifndef _WIN32  // windows does not support rand_r()
+      unsigned int seed = 314;
+      int s_id = (rand_r(&seed) % (higher-lower+1))+lower;
+      msg.server_id = s_id;
+#else
+      LOG(FATAL) << "KVStore does not support Windows yet.";
+#endif
+      msg.data = pickle_data;
+      NDArray tensor = dgl::aten::VecToIdArray<int64_t>(remote_ids[i]);
+      msg.tensors.push_back(tensor);
+      SendRPCMessage(msg, msg.server_id);
+      msg_count++;
+    }
+  }
+  char* return_data = new char[ID_size*row_size];
+  // Copy local data
+#pragma omp parallel for
+  for (int64_t i = 0; i < local_ids.size(); ++i) {
+    memcpy(return_data + local_ids_orginal[i] * row_size,
+           local_data_char + local_ids[i] * row_size,
+           row_size);
+  }
+  // Recv remote message
+  for (int i = 0; i < msg_count; ++i) {
+    RPCMessage msg;
+    RecvRPCMessage(&msg, 0);
+    int part_id = msg.server_id / group_count;
+    char* data_char = static_cast<char*>(msg.tensors[0]->data);
+    int64_t id_size = remote_ids[part_id].size();
+    for (size_t n = 0; n < id_size; ++n) {
+      memcpy(return_data + remote_ids_original[part_id][n] * row_size,
+             data_char + n * row_size,
+             row_size);
+    }
+  }
+  // Get final tensor
+  local_data_shape[0] = ID_size;
+  NDArray res_tensor = CreateNDArrayFromRaw(local_data_shape,
+                                            local_data->dtype,
+                                            DLContext{kDLCPU, 0},
+                                            return_data);
+  *rv = res_tensor;
 });
 
 }  // namespace rpc
