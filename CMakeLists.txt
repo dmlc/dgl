@@ -46,13 +46,19 @@ include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
 
 include(ExternalProject)
-ExternalProject_Add(googlehash
-  PREFIX googlehash
-  SOURCE_DIR ../third_party/googlehash/src
-  CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/googlehash/configure --prefix ${CMAKE_CURRENT_BINARY_DIR}/googlehash
-  BUILD_COMMAND make install
-)
-include_directories("${CMAKE_CURRENT_BINARY_DIR}/googlehash/include")
+
+if(MSVC)
+  include_directories("third_party/googlehash/src")
+  include_directories("third_party/googlehash/src/windows")
+else(MSVC)
+  ExternalProject_Add(googlehash
+    PREFIX googlehash
+    SOURCE_DIR ../third_party/googlehash/src
+    CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/googlehash/configure --prefix ${CMAKE_CURRENT_BINARY_DIR}/googlehash
+    BUILD_COMMAND make install
+  )
+  include_directories("${CMAKE_CURRENT_BINARY_DIR}/googlehash/include")
+endif(MSVC)
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -155,7 +161,9 @@ list(APPEND DGL_LINKER_LIBS metis)
 endif(NOT MSVC)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
-add_dependencies(dgl googlehash)
+if(NOT MSVC)
+  add_dependencies(dgl googlehash)
+endif(NOT MSVC)
 
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
