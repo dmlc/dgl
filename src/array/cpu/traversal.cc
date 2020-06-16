@@ -97,7 +97,7 @@ IdArray ComputeMergedSections(
 }  // namespace
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed) {
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
   VectorQueueWrapper<IdType> queue(&ids);
@@ -108,7 +108,7 @@ Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const b
         sections.push_back(queue.size());
       }
     };
-  BFSTraverseNodes<IdType>(graph, source, reversed, &queue, visit, make_frontier);
+  BFSTraverseNodes<IdType>(csr, source, &queue, visit, make_frontier);
 
   Frontiers front;
   front.ids = VecToIdArray(ids, sizeof(IdType) * 8);
@@ -116,11 +116,11 @@ Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const b
   return front;
 }
 
-template Frontiers BFSNodesFrontiers<kDLCPU, int32_t>(const GraphInterface&, IdArray, const bool);
-template Frontiers BFSNodesFrontiers<kDLCPU, int64_t>(const GraphInterface&, IdArray, const bool);
+template Frontiers BFSNodesFrontiers<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
+template Frontiers BFSNodesFrontiers<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed) {
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
   // NOTE: std::queue has no top() method.
@@ -136,7 +136,7 @@ Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const b
         sections.push_back(queue.size());
       }
     };
-  BFSTraverseEdges<IdType>(graph, source, reversed, &queue, visit, make_frontier);
+  BFSTraverseEdges<IdType>(csr, source, &queue, visit, make_frontier);
 
   Frontiers front;
   front.ids = VecToIdArray(ids, sizeof(IdType) * 8);
@@ -144,11 +144,11 @@ Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const b
   return front;
 }
 
-template Frontiers BFSEdgesFrontiers<kDLCPU, int32_t>(const GraphInterface&, IdArray, const bool);
-template Frontiers BFSEdgesFrontiers<kDLCPU, int64_t>(const GraphInterface&, IdArray, const bool);
+template Frontiers BFSEdgesFrontiers<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
+template Frontiers BFSEdgesFrontiers<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reversed) {
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
   VectorQueueWrapper<IdType> queue(&ids);
@@ -159,7 +159,7 @@ Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reve
         sections.push_back(queue.size());
       }
     };
-  TopologicalNodes<IdType>(graph, reversed, &queue, visit, make_frontier);
+  TopologicalNodes<IdType>(csr, &queue, visit, make_frontier);
 
   Frontiers front;
   front.ids = VecToIdArray(ids, sizeof(IdType) * 8);
@@ -167,18 +167,18 @@ Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reve
   return front;
 }
 
-template Frontiers TopologicalNodesFrontiers<kDLCPU, int32_t>(const GraphInterface&, const bool);
-template Frontiers TopologicalNodesFrontiers<kDLCPU, int64_t>(const GraphInterface&, const bool);
+template Frontiers TopologicalNodesFrontiers<kDLCPU, int32_t>(const CSRMatrix&);
+template Frontiers TopologicalNodesFrontiers<kDLCPU, int64_t>(const CSRMatrix&);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, const bool reversed) {
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   const int64_t len = source->shape[0];
   const IdType* src_data = static_cast<IdType*>(source->data);
   std::vector<std::vector<IdType>> edges(len);
 
   for (int64_t i = 0; i < len; ++i) {
     auto visit = [&] (IdType e, int tag) { edges[i].push_back(e); };
-    DFSLabeledEdges<IdType>(graph, src_data[i], reversed, false, false, visit);
+    DFSLabeledEdges<IdType>(csr, src_data[i], false, false, visit);
   }
 
   Frontiers front;
@@ -187,13 +187,12 @@ Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, const bool re
   return front;
 }
 
-template Frontiers DGLDFSEdges<kDLCPU, int32_t>(const GraphInterface&, IdArray, const bool);
-template Frontiers DGLDFSEdges<kDLCPU, int64_t>(const GraphInterface&, IdArray, const bool);
+template Frontiers DGLDFSEdges<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
+template Frontiers DGLDFSEdges<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
-                             const bool reversed,
                              const bool has_reverse_edge,
                              const bool has_nontree_edge,
                              const bool return_labels) {
@@ -213,7 +212,7 @@ Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
         tags[i].push_back(tag);
       }
     };
-    DFSLabeledEdges<IdType>(graph, src_data[i], reversed,
+    DFSLabeledEdges<IdType>(csr, src_data[i],
         has_reverse_edge, has_nontree_edge, visit);
   }
 
@@ -227,15 +226,13 @@ Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
   return front;
 }
 
-template Frontiers DGLDFSLabeledEdges<kDLCPU, int32_t>(const GraphInterface&,
+template Frontiers DGLDFSLabeledEdges<kDLCPU, int32_t>(const CSRMatrix&,
                                                        IdArray,
-                                                       const bool,
                                                        const bool,
                                                        const bool,
                                                        const bool);
-template Frontiers DGLDFSLabeledEdges<kDLCPU, int64_t>(const GraphInterface&,
+template Frontiers DGLDFSLabeledEdges<kDLCPU, int64_t>(const CSRMatrix&,
                                                        IdArray,
-                                                       const bool,
                                                        const bool,
                                                        const bool,
                                                        const bool);

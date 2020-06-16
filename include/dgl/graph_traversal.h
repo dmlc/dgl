@@ -7,7 +7,7 @@
 #define DGL_GRAPH_TRAVERSAL_H_
 
 #include "array.h"
-#include "graph_interface.h"
+#include "base_heterograph.h"
 
 namespace dgl {
 
@@ -34,13 +34,12 @@ struct Frontiers {
 
 namespace aten {
 
-Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed);
-Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed);
-Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reversed);
-Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, const bool reversed);
-Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
-                             const bool reversed,
                              const bool has_reverse_edge,
                              const bool has_nontree_edge,
                              const bool return_labels);

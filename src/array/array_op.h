@@ -198,21 +198,20 @@ COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed);
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed);
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reversed);
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, const bool reversed);
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
 
 template <DLDeviceType XPU, typename IdType>
-Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
-                             const bool reversed,
                              const bool has_reverse_edge,
                              const bool has_nontree_edge,
                              const bool return_labels);

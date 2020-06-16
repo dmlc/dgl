@@ -46,16 +46,18 @@ namespace impl {
  * \param make_frontier The function to indicate that a new froniter can be made;
  */
 template<typename IdType, typename Queue, typename VisitFn, typename FrontierFn>
-void BFSTraverseNodes(const GraphInterface& graph,
+void BFSTraverseNodes(const CSRMatrix& csr,
               IdArray source,
-              bool reversed,
               Queue* queue,
               VisitFn visit,
               FrontierFn make_frontier) {
   const int64_t len = source->shape[0];
-  const IdType* src_data = static_cast<IdType*>(source->data);
+  const IdType *src_data = static_cast<IdType*>(source->data);
 
-  std::vector<bool> visited(graph.NumVertices());
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  std::vector<bool> visited(num_nodes);
   for (int64_t i = 0; i < len; ++i) {
     const IdType u = src_data[i];
     visited[u] = true;
@@ -64,17 +66,17 @@ void BFSTraverseNodes(const GraphInterface& graph,
   }
   make_frontier();
 
-  const auto neighbor_iter = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
   while (!queue->empty()) {
     const size_t size = queue->size();
     for (size_t i = 0; i < size; ++i) {
       const IdType u = queue->top();
       queue->pop();
-      for (auto v : (graph.*neighbor_iter)(u)) {
+      for (auto idx = indptr_data[u]; idx < indptr_data[u+1]; ++idx) {
+        auto v = indices_data[idx];
         if (!visited[v]) {
           visited[v] = true;
           visit(v);
-          queue->push(static_cast<IdType>(v));
+          queue->push(v);
         }
       }
     }
@@ -110,16 +112,20 @@ void BFSTraverseNodes(const GraphInterface& graph,
  * \param make_frontier The function to indicate that a new frontier can be made;
  */
 template<typename IdType, typename Queue, typename VisitFn, typename FrontierFn>
-void BFSTraverseEdges(const GraphInterface& graph,
+void BFSTraverseEdges(const CSRMatrix& csr,
               IdArray source,
-              bool reversed,
               Queue* queue,
               VisitFn visit,
               FrontierFn make_frontier) {
   const int64_t len = source->shape[0];
   const IdType* src_data = static_cast<IdType*>(source->data);
 
-  std::vector<bool> visited(graph.NumVertices());
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+  const IdType *eid_data = static_cast<IdType *>(csr.data->data);
+
+  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  std::vector<bool> visited(num_nodes);
   for (int64_t i = 0; i < len; ++i) {
     const IdType u = src_data[i];
     visited[u] = true;
@@ -127,15 +133,14 @@ void BFSTraverseEdges(const GraphInterface& graph,
   }
   make_frontier();
 
-  const auto neighbor_iter = reversed? &GraphInterface::InEdgeVec : &GraphInterface::OutEdgeVec;
   while (!queue->empty()) {
     const size_t size = queue->size();
     for (size_t i = 0; i < size; ++i) {
       const IdType u = queue->top();
       queue->pop();
-      for (auto e : (graph.*neighbor_iter)(u)) {
-        const auto uv = graph.FindEdge(e);
-        const IdType v = static_cast<IdType>(reversed ? uv.first : uv.second);
+      for (auto idx = indptr_data[u]; idx < indptr_data[u+1]; ++idx) {
+        auto e = eid_data ? eid_data[idx] : idx;
+        const IdType v = indices_data[idx];
         if (!visited[v]) {
           visited[v] = true;
           visit(e);
@@ -172,17 +177,22 @@ void BFSTraverseEdges(const GraphInterface& graph,
  * \param make_frontier The function to indicate that a new froniter can be made;
  */
 template<typename IdType, typename Queue, typename VisitFn, typename FrontierFn>
-void TopologicalNodes(const GraphInterface& graph,
-                      bool reversed,
+void TopologicalNodes(const CSRMatrix& csr,
                       Queue* queue,
                       VisitFn visit,
                       FrontierFn make_frontier) {
-  const auto get_degree = reversed? &GraphInterface::OutDegree : &GraphInterface::InDegree;
-  const auto neighbor_iter = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
-  uint64_t num_visited_nodes = 0;
-  std::vector<uint64_t> degrees(graph.NumVertices(), 0);
-  for (uint64_t vid = 0; vid < graph.NumVertices(); ++vid) {
-    degrees[vid] = (graph.*get_degree)(vid);
+  int64_t num_visited_nodes = 0;
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+
+  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  const int64_t num_edges = csr.indices->shape[0];
+  std::vector<int64_t> degrees(num_nodes, 0);
+  for (int64_t eid = 0; eid < num_edges; ++eid) {
+    degrees[indices_data[eid]] ++;
+  }
+
+  for (int64_t vid = 0; vid < num_nodes; ++vid) {
     if (degrees[vid] == 0) {
       visit(vid);
       queue->push(static_cast<IdType>(vid));
@@ -196,10 +206,11 @@ void TopologicalNodes(const GraphInterface& graph,
     for (size_t i = 0; i < size; ++i) {
       const IdType u = queue->top();
       queue->pop();
-      for (auto v : (graph.*neighbor_iter)(u)) {
+      for (auto idx = indptr_data[u]; idx < indptr_data[u+1]; ++idx) {
+        const IdType v = indices_data[idx];
         if (--(degrees[v]) == 0) {
           visit(v);
-          queue->push(static_cast<IdType>(v));
+          queue->push(v);
           ++num_visited_nodes;
         }
       }
@@ -207,7 +218,7 @@ void TopologicalNodes(const GraphInterface& graph,
     make_frontier();
   }
 
-  if (num_visited_nodes != graph.NumVertices()) {
+  if (num_visited_nodes != num_nodes) {
     LOG(FATAL) << "Error in topological traversal: loop detected in the given graph.";
   }
 }
@@ -238,33 +249,37 @@ enum DFSEdgeTag {
  *              tag will be given as the arguments.
  */
 template<typename IdType, typename VisitFn>
-void DFSLabeledEdges(const GraphInterface& graph,
+void DFSLabeledEdges(const CSRMatrix& csr,
                      IdType source,
-                     bool reversed,
                      bool has_reverse_edge,
                      bool has_nontree_edge,
                      VisitFn visit) {
-  const auto succ = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
-  const auto out_edge = reversed? &GraphInterface::InEdgeVec : &GraphInterface::OutEdgeVec;
+                       
+  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  CHECK_GE(num_nodes, source) << "source " << source << 
+    " is out of range [0," << num_nodes << "]";
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+  const IdType *eid_data = static_cast<IdType *>(csr.data->data);
 
-  if ((graph.*succ)(source).size() == 0) {
+  if (indptr_data[source+1]-indptr_data[source] == 0) {
     // no out-going edges from the source node
     return;
   }
 
   typedef std::tuple<IdType, size_t, bool> StackEntry;
   std::stack<StackEntry> stack;
-  std::vector<bool> visited(graph.NumVertices());
+  std::vector<bool> visited(num_nodes);
   visited[source] = true;
   stack.push(std::make_tuple(source, 0, false));
   IdType u = 0;
-  size_t i = 0;
+  int64_t i = 0;
   bool on_tree = false;
 
   while (!stack.empty()) {
     std::tie(u, i, on_tree) = stack.top();
-    const IdType v = static_cast<IdType>((graph.*succ)(u)[i]);
-    const IdType uv = static_cast<IdType>((graph.*out_edge)(u)[i]);
+    const IdType v = indices_data[indptr_data[u] + i];
+    const IdType uv = eid_data ? eid_data[indptr_data[u] + i] : indptr_data[u] + i;
     if (visited[v]) {
       if (!on_tree && has_nontree_edge) {
         visit(uv, kNonTree);
@@ -273,7 +288,7 @@ void DFSLabeledEdges(const GraphInterface& graph,
       }
       stack.pop();
       // find next one.
-      if (i < (graph.*succ)(u).size() - 1) {
+      if (indptr_data[u] + i < indptr_data[u + 1] - 1) {
         stack.push(std::make_tuple(u, i+1, false));
       }
     } else {
@@ -281,7 +296,7 @@ void DFSLabeledEdges(const GraphInterface& graph,
       std::get<2>(stack.top()) = true;
       visit(uv, kForward);
       // expand
-      if ((graph.*succ)(v).size() > 0) {
+      if (indptr_data[v] + i < indptr_data[v + 1]) {
         stack.push(std::make_tuple(v, 0, false));
       }
     }

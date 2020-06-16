@@ -631,57 +631,71 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 }
 
 ///////////////////////// Graph Traverse  routines //////////////////////////
-Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed) {
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type ,source->ctx.device_type) << 
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) << 
+    "Graph and source should in the same dtype";
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
-      ret = impl::BFSNodesFrontiers<XPU, IdType>(graph, source, reversed);
+      ret = impl::BFSNodesFrontiers<XPU, IdType>(csr, source);
     });
   });
   return ret;
 }
 
-Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed) {
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
   Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type ,source->ctx.device_type) << 
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) << 
+    "Graph and source should in the same dtype";
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
-      ret = impl::BFSEdgesFrontiers<XPU, IdType>(graph, source, reversed);
+      ret = impl::BFSEdgesFrontiers<XPU, IdType>(csr, source);
     });
   });
   return ret;
 }
 
-Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reversed) {
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
   Frontiers ret;
-  ATEN_XPU_SWITCH(graph.Context().device_type, XPU, {
-    ATEN_ID_BITS_SWITCH(graph.NumBits(), IdType, {
-      ret = impl::TopologicalNodesFrontiers<XPU, IdType>(graph, reversed);
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(csr.indices->dtype, IdType, {
+      ret = impl::TopologicalNodesFrontiers<XPU, IdType>(csr);
     });
   });
   return ret;
 }
 
-Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, const bool reversed) {
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type ,source->ctx.device_type) << 
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) << 
+    "Graph and source should in the same dtype";
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
-      ret = impl::DGLDFSEdges<XPU, IdType>(graph, source, reversed);
+      ret = impl::DGLDFSEdges<XPU, IdType>(csr, source);
     });
   });
   return ret;
 }
-Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
-                             const bool reversed,
                              const bool has_reverse_edge,
                              const bool has_nontree_edge,
                              const bool return_labels) {
   Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type ,source->ctx.device_type) << 
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) << 
+    "Graph and source should in the same dtype";
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
-      ret = impl::DGLDFSLabeledEdges<XPU, IdType>(graph,
+      ret = impl::DGLDFSLabeledEdges<XPU, IdType>(csr,
                                                   source,
-                                                  reversed,
                                                   has_reverse_edge,
                                                   has_nontree_edge,
                                                   return_labels);
