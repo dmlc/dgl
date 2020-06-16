@@ -53,7 +53,6 @@ def test_bfs(n=100, gtype='int'):
     assert len(layers_dgl) == len(layers_nx)
     assert all(toset(x) == y for x, y in zip(layers_dgl, layers_nx))
 
-    print('fin bfs node')
     g_nx = nx.random_tree(n, seed=42)
     g = dgl.DGLGraph()
     g.from_networkx(g_nx)
@@ -67,7 +66,6 @@ def test_bfs(n=100, gtype='int'):
     edges_dgl = dgl.bfs_edges_generator(g, src)
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
-    print('fin bfs node')
 
 def test_topological_nodes(n=100, gtype='int'):
     g = dgl.DGLGraph()
