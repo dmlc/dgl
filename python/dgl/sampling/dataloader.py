@@ -1,10 +1,8 @@
 """Data loaders"""
 
-from functools import partial
-from itertools import chain
 from collections.abc import Mapping
+from abc import ABC, abstractproperty, abstractmethod
 from .. import transform
-from .. import backend as F
 from ..base import NID, EID
 from .. import utils
 
@@ -227,12 +225,28 @@ class BlockSampler(object):
         """Returns the number of blocks to generate (i.e. number of layers of the GNN)."""
         raise NotImplementedError
 
-class NodeDataLoader(object):
+class Collator(ABC):
     """
-    DGL data loader for training node classification or regression on a single graph.
+    Abstract DGL collator for training GNNs on downstream tasks stochastically.
 
-    This works similarly as the data loader class for each backend (e.g.
-    ``torch.utils.data.DataLoader`` for PyTorch).
+    Provides a ``dataset`` object containing the collection of all nodes or edges,
+    as well as a ``collate`` method that combines a set of items from ``dataset`` and
+    obtains the computation dependency graphs.
+    """
+    @abstractproperty
+    def dataset(self):
+        """Returns the dataset object of the collator."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def collate(self, items):
+        """Combines the items from the dataset object and obtains the computation
+        dependency graphs."""
+        raise NotImplementedError
+
+class NodeCollator(Collator):
+    """
+    DGL collator to combine training node classification or regression on a single graph.
 
     Parameters
     ----------
@@ -249,60 +263,32 @@ class NodeDataLoader(object):
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
     >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
-    >>> dataloader = dgl.sampling.NodeDataLoader(
-    ...     g, train_nid, sampler,
+    >>> collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
+    >>> dataloader = torch.utils.data.DataLoader(
+    ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for blocks in dataloader:
     ...     train_on(blocks)
     """
-    def __init__(
-            self,
-            g,
-            nids,
-            block_sampler,
-            **kwargs):
+    def __init__(self, g, nids, block_sampler):
         self.g = g
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
-            self.nids = {g.ntypes[0]: nids}
-        else:
-            self.nids = nids
-        self.nids = {
-            k: utils.toindex(v, g._idtype_str).tousertensor()
-            for k, v in self.nids.items()}
+        self.nids = nids
         self.block_sampler = block_sampler
 
-        self.dataloaders = {
-            ntype: self._get_dataloader_class(ntype)(self.nids[ntype], **kwargs)
-            for ntype in self.nids.keys()}
-
-    def _sample(self, ntype, nids):
-        seed_nodes = {ntype: nids}
-        return self.block_sampler.sample_blocks(self.g, seed_nodes)
-
-    def _get_dataloader_class(self, ntype):
-        backend_name = F.get_preferred_backend()
-        collator = partial(self._sample, ntype)
-
-        if backend_name == 'pytorch':
-            from torch.utils.data import DataLoader
-            return partial(DataLoader, collate_fn=collator)
-        elif backend_name == 'mxnet':
-            raise NotImplementedError(
-                'NeighborSamplerDataLoader for MXNet not implemented yet')
-        elif backend_name == 'tensorflow':
-            raise NotImplementedError(
-                'NeighborSamplerDataLoader for Tensorflow not implemented yet')
+        if isinstance(nids, Mapping):
+            self._dataset = utils.FlattenedDict(nids)
         else:
-            raise NotImplementedError('Unknown backend {}'.format(backend_name))
+            self._dataset = nids
 
-    def __iter__(self):
-        """Returns the iterator that iterates over all the nodes in batches and
-        yields the list of blocks.
-        """
-        return chain(*self.dataloaders.values())
+    @property
+    def dataset(self):
+        return self._dataset
 
-    def __len__(self):
-        """Return the number of batches to be generated."""
-        return sum(len(dl) for dl in self.dataloaders.values())
+    def collate(self, seed_nodes):
+        if isinstance(seed_nodes[0], tuple):
+            # returns a list of pairs: group them by node types into a dict
+            seed_nodes = utils.group_as_dict(seed_nodes)
+        return self.block_sampler.sample_blocks(self.g, seed_nodes)

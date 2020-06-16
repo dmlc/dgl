@@ -139,8 +139,10 @@ def run(args, device, data):
     sampler = dgl.sampling.MultiLayerNeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
 
     # Create PyTorch DataLoader for constructing blocks
+    collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
     dataloader = dgl.sampling.NodeDataLoader(
-        g, train_nid, sampler,
+        collator.dataset,
+        collate_fn=collator.collate,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,

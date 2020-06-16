@@ -89,8 +89,10 @@ def main(args):
 
     # train sampler
     sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    loader = dgl.sampling.NodeDataLoader(
-        g, {category: train_idx}, sampler,
+    collator = dgl.sampling.NodeCollator(g, {category: train_idx}, sampler)
+    loader = DataLoader(
+        collator.dataset,
+        collate_fn=collator.collate,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=0)
