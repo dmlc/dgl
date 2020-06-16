@@ -425,7 +425,11 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg_count++;
     }
   }
-  char* return_data = new char[ID_size*row_size];
+  local_data_shape[0] = ID_size;
+  NDArray res_tensor = NDArray::Empty(local_data_shape, 
+                                      local_data->dtype, 
+                                      DLContext{kDLCPU, 0});
+  char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
 #pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
@@ -446,12 +450,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
              row_size);
     }
   }
-  // Get final tensor
-  local_data_shape[0] = ID_size;
-  NDArray res_tensor = CreateNDArrayFromRaw(local_data_shape,
-                                            local_data->dtype,
-                                            DLContext{kDLCPU, 0},
-                                            return_data);
   *rv = res_tensor;
 });
 
