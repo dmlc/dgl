@@ -160,6 +160,14 @@ class GraphOp {
   static HaloSubgraph GetSubgraphWithHalo(GraphPtr graph, IdArray nodes, int num_hops);
 
   /*!
+   * \brief Reorder the nodes in the immutable graph.
+   * \param graph The input graph.
+   * \param new_order The node Ids in the new graph. The index in `new_order` is old node Ids.
+   * \return the graph with reordered node Ids
+   */
+  static GraphPtr ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order);
+
+  /*!
    * \brief Partition a graph with Metis.
    * The partitioning algorithm assigns each vertex to a partition.
    * \param graph The input graph
