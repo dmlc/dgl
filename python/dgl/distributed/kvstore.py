@@ -55,9 +55,9 @@ class PullRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if kv_store.part_policy.__contains__(self.name) is False:
+        if self.name not in kv_store.part_policy:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if kv_store.data_store.__contains__(self.name) is False:
+        if self.name not in kv_store.data_store:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
         data = kv_store.pull_handlers[self.name](kv_store.data_store, self.name, local_id)
@@ -93,9 +93,9 @@ class PushRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if kv_store.part_policy.__contains__(self.name) is False:
+        if self.name not in kv_store.part_policy:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
-        if kv_store.data_store.__contains__(self.name) is False:
+        if self.name not in kv_store.data_store:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
         kv_store.push_handlers[self.name](kv_store.data_store, self.name,
