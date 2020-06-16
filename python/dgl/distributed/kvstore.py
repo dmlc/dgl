@@ -99,7 +99,7 @@ class PushRequest(rpc.Request):
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         local_id = kv_store.part_policy[self.name].to_local(self.id_tensor)
         kv_store.push_handlers[self.name](kv_store.data_store, self.name,
-                               local_id, self.data_tensor)
+                                          local_id, self.data_tensor)
 
 INIT_DATA = 901233
 INIT_MSG = 'Init'
@@ -572,8 +572,8 @@ class KVServer(object):
         self._num_clients = num_clients
         self._barrier_count = 0
         # push and pull handler
-        self._push_handler = {}
-        self._pull_handler = {}
+        self._push_handlers = {}
+        self._pull_handlers = {}
 
     @property
     def server_id(self):
@@ -743,8 +743,8 @@ class KVClient(object):
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
         # push and pull handler
-        self._pull_handler = {}
-        self._push_handler = {}
+        self._pull_handlers = {}
+        self._push_handlers = {}
 
     @property
     def client_id(self):
@@ -815,7 +815,7 @@ class KVClient(object):
         `data_store` is a dict that contains all tensors in the kvstore. `name` is the name
         of the tensor where new data is pushed to. `local_offset` is the offset where new
         data should be written in the tensor in the local partition.
-        
+
         Parameters
         ----------
         name : str
