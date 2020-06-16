@@ -35,6 +35,9 @@ RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
   for (auto ptr : zc_write_strm.buffer_list()) {
     network::Message ndarray_data_msg;
     ndarray_data_msg.data = reinterpret_cast<char*>(ptr.data);
+    if (ptr.size == 0) {
+      LOG(FATAL) << "Cannot send a empty NDArray.";
+    }
     ndarray_data_msg.size = ptr.size;
     NDArray tensor = ptr.tensor;
     ndarray_data_msg.deallocator = [tensor](network::Message*) {};
