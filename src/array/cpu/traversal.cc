@@ -3,7 +3,8 @@
  * \file array/cpu/traversal.cc
  * \brief Graph traversal implementation
  */
-#include <dgl/packed_func_ext.h>
+
+#include <dgl/graph_traversal.h>
 #include <algorithm>
 #include <queue>
 #include "./traversal.h"
@@ -107,7 +108,7 @@ Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const b
         sections.push_back(queue.size());
       }
     };
-  BFSTraverseNodes(graph, source, reversed, &queue, visit, make_frontier);
+  BFSTraverseNodes<IdType>(graph, source, reversed, &queue, visit, make_frontier);
 
   Frontiers front;
   front.ids = VecToIdArray(ids, sizeof(IdType) * 8);
@@ -115,8 +116,8 @@ Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const b
   return front;
 }
 
-template Frontiers BFSNodesFrontiers<kDLCPU, int32_t>(const GraphInterface& graph, IdArray source, const bool reversed);
-template Frontiers BFSNodesFrontiers<kDLCPU, int64_t>(const GraphInterface& graph, IdArray source, const bool reversed);
+template Frontiers BFSNodesFrontiers<kDLCPU, int32_t>(const GraphInterface&, IdArray, const bool);
+template Frontiers BFSNodesFrontiers<kDLCPU, int64_t>(const GraphInterface&, IdArray, const bool);
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed) {
@@ -135,7 +136,7 @@ Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const b
         sections.push_back(queue.size());
       }
     };
-  BFSTraverseEdges(graph, source, reversed, &queue, visit, make_frontier);
+  BFSTraverseEdges<IdType>(graph, source, reversed, &queue, visit, make_frontier);
 
   Frontiers front;
   front.ids = VecToIdArray(ids, sizeof(IdType) * 8);
@@ -143,8 +144,8 @@ Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const b
   return front;
 }
 
-template Frontiers BFSEdgesFrontiers<kDLCPU, int32_t>(const GraphInterface& graph, IdArray source, const bool reversed);
-template Frontiers BFSEdgesFrontiers<kDLCPU, int64_t>(const GraphInterface& graph, IdArray source, const bool reversed);
+template Frontiers BFSEdgesFrontiers<kDLCPU, int32_t>(const GraphInterface&, IdArray, const bool);
+template Frontiers BFSEdgesFrontiers<kDLCPU, int64_t>(const GraphInterface&, IdArray, const bool);
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reversed) {
@@ -158,7 +159,7 @@ Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reve
         sections.push_back(queue.size());
       }
     };
-  TopologicalNodes(graph, reversed, &queue, visit, make_frontier);
+  TopologicalNodes<IdType>(graph, reversed, &queue, visit, make_frontier);
 
   Frontiers front;
   front.ids = VecToIdArray(ids, sizeof(IdType) * 8);
@@ -166,28 +167,28 @@ Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reve
   return front;
 }
 
-template Frontiers TopologicalNodesFrontiers<kDLCPU, int32_t>(const GraphInterface& graph, const bool reversed);
-template Frontiers TopologicalNodesFrontiers<kDLCPU, int64_t>(const GraphInterface& graph, const bool reversed);
+template Frontiers TopologicalNodesFrontiers<kDLCPU, int32_t>(const GraphInterface&, const bool);
+template Frontiers TopologicalNodesFrontiers<kDLCPU, int64_t>(const GraphInterface&, const bool);
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, const bool reversed) {
-    const int64_t len = source->shape[0];
-    const IdType* src_data = static_cast<IdType*>(source->data);
-    std::vector<std::vector<IdType>> edges(len);
+  const int64_t len = source->shape[0];
+  const IdType* src_data = static_cast<IdType*>(source->data);
+  std::vector<std::vector<IdType>> edges(len);
 
-    for (int64_t i = 0; i < len; ++i) {
-      auto visit = [&] (IdType e, int tag) { edges[i].push_back(e); };
-      DFSLabeledEdges(graph, src_data[i], reversed, false, false, visit);
-    }
+  for (int64_t i = 0; i < len; ++i) {
+    auto visit = [&] (IdType e, int tag) { edges[i].push_back(e); };
+    DFSLabeledEdges<IdType>(graph, src_data[i], reversed, false, false, visit);
+  }
 
-    Frontiers front;
-    front.ids = MergeMultipleTraversals(edges);
-    front.sections = ComputeMergedSections(edges);
-    return front
-  });
+  Frontiers front;
+  front.ids = MergeMultipleTraversals(edges);
+  front.sections = ComputeMergedSections(edges);
+  return front;
+}
 
-template Frontiers DGLDFSEdges<kDLCPU, int32_t>(const GraphInterface& graph, IdArray source, const bool reversed);
-template Frontiers DGLDFSEdges<kDLCPU, int64_t>(const GraphInterface& graph, IdArray source, const bool reversed);
+template Frontiers DGLDFSEdges<kDLCPU, int32_t>(const GraphInterface&, IdArray, const bool);
+template Frontiers DGLDFSEdges<kDLCPU, int64_t>(const GraphInterface&, IdArray, const bool);
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
@@ -196,49 +197,48 @@ Frontiers DGLDFSLabeledEdges(const GraphInterface& graph,
                              const bool has_reverse_edge,
                              const bool has_nontree_edge,
                              const bool return_labels) {
-    const int64_t len = source->shape[0];
-    const IdType* src_data = static_cast<IdType*>(source->data);
-    std::vector<std::vector<IdType>> edges(len);
-    std::vector<std::vector<int64_t>> tags;
+  const int64_t len = source->shape[0];
+  const IdType* src_data = static_cast<IdType*>(source->data);
+  std::vector<std::vector<IdType>> edges(len);
+  std::vector<std::vector<int64_t>> tags;
 
-    if (return_labels) {
-      tags.resize(len);
-    }
+  if (return_labels) {
+    tags.resize(len);
+  }
 
-    for (int64_t i = 0; i < len; ++i) {
-      auto visit = [&] (IdType e, int64_t tag) {
-        edges[i].push_back(e);
-        if (return_labels) {
-          tags[i].push_back(tag);
-        }
-      };
-      DFSLabeledEdges(graph, src_data[i], reversed,
-          has_reverse_edge, has_nontree_edge, visit);
-    }
+  for (int64_t i = 0; i < len; ++i) {
+    auto visit = [&] (IdType e, int64_t tag) {
+      edges[i].push_back(e);
+      if (return_labels) {
+        tags[i].push_back(tag);
+      }
+    };
+    DFSLabeledEdges<IdType>(graph, src_data[i], reversed,
+        has_reverse_edge, has_nontree_edge, visit);
+  }
 
-    Frontiers front;
-    front.ids = MergeMultipleTraversals(edges);
-    front.sections = ComputeMergedSections(edges);
-    if (return_labels) {
-      front.tags = MergeMultipleTraversals(tags);
-    }
+  Frontiers front;
+  front.ids = MergeMultipleTraversals(edges);
+  front.sections = ComputeMergedSections(edges);
+  if (return_labels) {
+    front.tags = MergeMultipleTraversals(tags);
+  }
 
-    return front
-  });
+  return front;
+}
 
-template Frontiers DGLDFSLabeledEdges<kDLCPU, int32_t>(const GraphInterface& graph,
-                                                       IdArray source,
-                                                       const bool reversed,
-                                                       const bool has_reverse_edge,
-                                                       const bool has_nontree_edge,
-                                                       const bool return_labels);
-template Frontiers DGLDFSLabeledEdges<kDLCPU, int64_t>(const GraphInterface& graph,
-                                                       IdArray source,
-                                                       const bool reversed,
-                                                       const bool has_reverse_edge,
-                                                       const bool has_nontree_edge,
-                                                       const bool return_labels);
-
+template Frontiers DGLDFSLabeledEdges<kDLCPU, int32_t>(const GraphInterface&,
+                                                       IdArray,
+                                                       const bool,
+                                                       const bool,
+                                                       const bool,
+                                                       const bool);
+template Frontiers DGLDFSLabeledEdges<kDLCPU, int64_t>(const GraphInterface&,
+                                                       IdArray,
+                                                       const bool,
+                                                       const bool,
+                                                       const bool,
+                                                       const bool);
 
 }  // namespace impl
 }  // namespace aten

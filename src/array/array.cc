@@ -4,6 +4,7 @@
  * \brief DGL array utilities implementation
  */
 #include <dgl/array.h>
+#include <dgl/graph_traversal.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include "../c_api_common.h"
@@ -630,7 +631,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 }
 
 ///////////////////////// Graph Traverse  routines //////////////////////////
-Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, bool reversed) {
+Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed) {
   Frontiers ret;
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
@@ -640,7 +641,7 @@ Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, bool re
   return ret;
 }
 
-Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, bool reversed) {
+Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, const bool reversed) {
   Frontiers ret;
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
@@ -650,17 +651,17 @@ Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, bool re
   return ret;
 }
 
-Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, bool reversed) {
+Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, const bool reversed) {
   Frontiers ret;
-  ATEN_XPU_SWITCH(graph->Context(), XPU, {
-    ATEN_ID_BITS_SWITCH(graph->NumBits(), IdType, {
+  ATEN_XPU_SWITCH(graph.Context().device_type, XPU, {
+    ATEN_ID_BITS_SWITCH(graph.NumBits(), IdType, {
       ret = impl::TopologicalNodesFrontiers<XPU, IdType>(graph, reversed);
     });
   });
   return ret;
 }
 
-Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, bool reversed) {
+Frontiers DGLDFSEdges(const GraphInterface& graph, IdArray source, const bool reversed) {
   Frontiers ret;
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
