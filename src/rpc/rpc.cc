@@ -298,39 +298,6 @@ DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 
 //////////////////////////// KVStore ////////////////////////////
 
-static void NaiveDeleter(DLManagedTensor* managed_tensor) {
-  delete [] managed_tensor->dl_tensor.shape;
-  delete [] managed_tensor->dl_tensor.strides;
-  free(managed_tensor->dl_tensor.data);
-  delete managed_tensor;
-}
-
-NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
-                             DLDataType dtype,
-                             DLContext ctx,
-                             void* raw) {
-  DLTensor tensor;
-  tensor.ctx = ctx;
-  tensor.ndim = static_cast<int>(shape.size());
-  tensor.dtype = dtype;
-  tensor.shape = new int64_t[tensor.ndim];
-  for (int i = 0; i < tensor.ndim; ++i) {
-    tensor.shape[i] = shape[i];
-  }
-  tensor.strides = new int64_t[tensor.ndim];
-  for (int i = 0; i < tensor.ndim; ++i) {
-    tensor.strides[i] = 1;
-  }
-  for (int i = tensor.ndim - 2; i >= 0; --i) {
-    tensor.strides[i] = tensor.shape[i+1] * tensor.strides[i+1];
-  }
-  tensor.data = raw;
-  DLManagedTensor *managed_tensor = new DLManagedTensor();
-  managed_tensor->dl_tensor = tensor;
-  managed_tensor->deleter = NaiveDeleter;
-  return NDArray::FromDLPack(managed_tensor);
-}
-
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetLocalPartitionData")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   NDArray ID = args[0];
