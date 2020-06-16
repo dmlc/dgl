@@ -272,7 +272,7 @@ class DistGraphServer(KVServer):
 
         # Load graph partition data.
         self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
-        _, _, node_map, edge_map, num_partitions = self.meta
+        self.total_num_nodes, self.total_num_edges, node_map, edge_map, num_partitions = self.meta
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
         # Init kvstore.
@@ -298,8 +298,8 @@ class DistGraphServer(KVServer):
         """ Start graph store server.
         """
         # start server
-        server_state = ServerState(kv_store=self)
-        start_server(server_id=0, ip_config=self.ip_config,
+        server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
+        start_server(server_id=self.server_id, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
 
 def _default_init_data(shape, dtype):
