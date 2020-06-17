@@ -409,6 +409,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
     dgl_id_t id_size = remote_ids[part_id].size();
+#pragma omp parallel for
     for (size_t n = 0; n < id_size; ++n) {
       memcpy(return_data + remote_ids_original[part_id][n] * row_size,
              data_char + n * row_size,
