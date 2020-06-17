@@ -6,6 +6,7 @@ from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
 from dgl.graph_index import create_graph_index
 from dgl.distributed import partition_graph, load_partition
+from dgl import function as fn
 import backend as F
 import unittest
 import pickle
@@ -21,6 +22,7 @@ def check_partition(reshuffle):
     g = create_random_graph(10000)
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
+    g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
     num_parts = 4
     num_hops = 2
 
@@ -48,6 +50,7 @@ def check_partition(reshuffle):
 
         # Check the node map.
         local_nodes = F.asnumpy(F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node']))
+        llocal_nodes = F.asnumpy(F.nonzero_1d(part_g.ndata['inner_node']))
         local_nodes1 = F.asnumpy(gpb.partid2nids(i))
         assert np.all(np.sort(local_nodes) == np.sort(local_nodes1))
 
@@ -56,12 +59,22 @@ def check_partition(reshuffle):
         local_edges1 = F.asnumpy(gpb.partid2eids(i))
         assert np.all(np.sort(local_edges) == np.sort(local_edges1))
 
+        if reshuffle:
+            part_g.ndata['feats'] = g.ndata['feats'][part_g.ndata['orig_id']]
+            # when we read node data from the original global graph, we should use orig_id.
+            local_nodes = F.asnumpy(F.boolean_mask(part_g.ndata['orig_id'], part_g.ndata['inner_node']))
+        else:
+            part_g.ndata['feats'] = g.ndata['feats'][part_g.ndata[dgl.NID]]
+        part_g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
+        assert F.allclose(g.ndata['h'][local_nodes], part_g.ndata['h'][llocal_nodes])
+
         for name in ['labels', 'feats']:
             assert name in node_feats
             assert node_feats[name].shape[0] == len(local_nodes)
             assert len(local_nodes) == len(node_feats[name])
             assert np.all(F.asnumpy(g.ndata[name])[local_nodes] == F.asnumpy(node_feats[name]))
         assert len(edge_feats) == 0
+
 
     if reshuffle:
         node_map = []
