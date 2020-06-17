@@ -397,7 +397,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
 #pragma omp parallel for
-  for (dgl_id_t i = 0; i < local_ids.size(); ++i) {
+  for (int64_t i = 0; i < local_ids.size(); ++i) {
     memcpy(return_data + local_ids_orginal[i] * row_size,
            local_data_char + local_ids[i] * row_size,
            row_size);
