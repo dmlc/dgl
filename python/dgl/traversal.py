@@ -121,8 +121,10 @@ def topological_nodes_generator(graph, reverse=False):
     >>> list(dgl.topological_nodes_generator(g))
     [tensor([0]), tensor([1]), tensor([2]), tensor([3, 4]), tensor([5])]
     """
-    assert isinstance(graph, DGLHeteroGraph), 'DGLGraph is deprecated, Please use DGLHeteroGraph'
-    assert len(graph.canonical_etypes) == 1, 'topological_nodes_generator only support homogeneous graph'
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'topological_nodes_generator only support homogeneous graph'
     gidx = graph._graph
     ret = _CAPI_DGLTopologicalNodes_v2(gidx, reverse)
     all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
