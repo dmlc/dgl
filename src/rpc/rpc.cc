@@ -5,6 +5,11 @@
  */
 #include "./rpc.h"
 
+#include <csignal>
+#if defined(__linux__)
+#include <unistd.h>
+#endif
+
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
@@ -288,6 +293,27 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
   }
   *rv = ret;
 });
+
+#if defined(__linux__)
+/*!
+ * \brief CtrlCHandler, exits if Ctrl+C is pressed
+ * \param s signal
+ */
+void CtrlCHandler(int s) {
+  LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";
+  exit(1);
+}
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleCtrlC")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  // Ctrl+C handler
+  struct sigaction sigIntHandler;
+  sigIntHandler.sa_handler = CtrlCHandler;
+  sigemptyset(&sigIntHandler.sa_mask);
+  sigIntHandler.sa_flags = 0;
+  sigaction(SIGINT, &sigIntHandler, nullptr);
+});
+#endif
 
 //////////////////////////// ServerState ////////////////////////////
 

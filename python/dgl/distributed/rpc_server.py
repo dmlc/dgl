@@ -35,6 +35,8 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
+    # HandleCtrlC Register for handling Ctrl+C event
+    rpc.register_ctrl_c()
     # Register some basic services
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,
