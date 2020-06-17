@@ -12,6 +12,11 @@
 #include <dgl/zerocopy_serializer.h>
 #include "../c_api_common.h"
 
+#include <csignal>
+#if defined(__linux__) || defined(__ANDROID__)
+#include <unistd.h>
+#endif
+
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
 
@@ -288,6 +293,27 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
   }
   *rv = ret;
 });
+
+#if defined(__linux__) || defined(__ANDROID__)
+/*!
+ * \brief CtrlCHandler, exits if Ctrl+C is pressed
+ * \param s signal
+ */
+void CtrlCHandler(int s) {
+  LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";
+  exit(1);
+}
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleCtrlC")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  // Ctrl+C handler
+  struct sigaction sigIntHandler;
+  sigIntHandler.sa_handler = CtrlCHandler;
+  sigemptyset(&sigIntHandler.sa_mask);
+  sigIntHandler.sa_flags = 0;
+  sigaction(SIGINT, &sigIntHandler, nullptr);
+});
+#endif
 
 //////////////////////////// ServerState ////////////////////////////
 

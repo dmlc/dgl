@@ -893,6 +893,11 @@ def fast_pull(name, id_tensor, part_id, service_id,
                                       F.zerocopy_to_dgl_ndarray(local_data))
     return F.zerocopy_from_dgl_ndarray(res_tensor)
 
+def register_ctrl_c():
+    """HandleCtrlC Register for handling Ctrl+C event.
+    """
+    _CAPI_DGLRPCHandleCtrlC()
+
 ############### Some basic services will be defined here #############
 
 CLIENT_REGISTER = 22451
