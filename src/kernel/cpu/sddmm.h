@@ -19,15 +19,15 @@ void SDDMMCsr(const BcastOff& bcast,
               const aten::CSRMatrix& csr,
               NDArray ufeat, NDArray vfeat, NDArray out) {
   const bool has_idx = !aten::IsNullArray(csr.data);
-  const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
-  const IdType* indices = static_cast<IdType*>(csr.indices->data);
-  const IdType* edges = has_idx?  static_cast<IdType*>(csr.data->data) : nullptr;
-  const DType* X = Op::use_lhs? static_cast<DType*>(ufeat->data) : nullptr;
-  const DType* Y = Op::use_rhs? static_cast<DType*>(vfeat->data) : nullptr;
+  const IdType* indptr = utils::GetPtr<IdType>(csr.indptr);
+  const IdType* indices = utils::GetPtr<IdType>(csr.indices);
+  const IdType* edges = utils::GetPtr<IdType>(csr.data);
+  const DType* X = utils::GetPtr<DType>(ufeat);
+  const DType* Y = utils::GetPtr<DType>(vfeat);
   int64_t dim = bcast.out_len,
           lhs_dim = bcast.lhs_len,
           rhs_dim = bcast.rhs_len;
-  DType* O = static_cast<DType*>(out->data);
+  DType* O = utils::GetPtr<DType>(out);
 #pragma omp parallel for
   for (IdType rid = 0; rid < csr.num_rows; ++rid) {
     const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
@@ -40,7 +40,7 @@ void SDDMMCsr(const BcastOff& bcast,
         const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
         const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim + lhs_add : nullptr;
         const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim + rhs_add : nullptr;
-        out_off[k] = Op::Call(lhs_off, rhs_off);
+        out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
       }
     }
   }
@@ -51,15 +51,15 @@ void SDDMMCoo(const BcastOff& bcast,
               const aten::COOMatrix& coo,
               NDArray ufeat, NDArray vfeat, NDArray out) {
   const bool has_idx = !aten::IsNullArray(coo.data);
-  const IdType* row = static_cast<IdType*>(coo.row->data);
-  const IdType* col = static_cast<IdType*>(coo.col->data);
-  const IdType* edges = has_idx? static_cast<IdType*>(coo.data->data) : nullptr;
-  const DType* X = Op::use_lhs? static_cast<DType*>(ufeat->data) : nullptr;
-  const DType* Y = Op::use_rhs? static_cast<DType*>(vfeat->data) : nullptr;
+  const IdType* row = utils::GetPtr<IdType>(coo.row);
+  const IdType* col = utils::GetPtr<IdType>(coo.col);
+  const IdType* edges = utils::GetPtr<IdType>(coo.data);
+  const DType* X = utils::GetPtr<DType>(ufeat);
+  const DType* Y = utils::GetPtr<DType>(vfeat);
   int64_t dim = bcast.out_len,
           lhs_dim = bcast.lhs_len,
           rhs_dim = bcast.rhs_len;
-  DType* O = static_cast<DType*>(out->data);
+  DType* O = utils::GetPtr<DType>(out);
   const int64_t nnz = coo.row->shape[0];
 #pragma omp parallel for
   for (IdType i = 0; i < nnz; ++i) {
@@ -72,7 +72,7 @@ void SDDMMCoo(const BcastOff& bcast,
       const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
       const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim + lhs_add : nullptr;
       const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim + rhs_add : nullptr;
-      out_off[k] = Op::Call(lhs_off, rhs_off);
+      out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
     }
   }
 }
