@@ -10,7 +10,9 @@ import numpy as np
 import backend as F
 import time
 from utils import get_local_usable_addr
+from pathlib import Path
 
+from dgl.distributed import DistGraphServer, DistGraph
 
 def myexcepthook(exctype, value, traceback):
     for p in mp.active_children():
@@ -48,39 +50,20 @@ class MockServerState:
         return self.hgraph.number_of_edges()
 
 
-def start_server(rank):
+def start_server(rank, tmpdir):
     import dgl
-    part_g, node_feats, edge_feats, meta = load_partition(
-        '/tmp/test.json', rank)
-    num_nodes, num_edges, node_map, edge_map, num_partitions = meta
-    gpb = GraphPartitionBook(part_id=rank,
-                             num_parts=num_partitions,
-                             node_map=node_map,
-                             edge_map=edge_map,
-                             part_graph=part_g)
-    server_state = MockServerState(part_g, rank, gpb)
-    dgl.distributed.start_server(server_id=rank,
-                                 ip_config='rpc_ip_config.txt',
-                                 num_clients=1,
-                                 server_state=server_state)
+    sys.stdout = open(str(os.getpid()) + ".out", "w")
+    print("start server =================================")
+    g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
+                        tmpdir / 'test_sampling.json')
+    g.start()
 
-
-def start_client(rank):
+def start_client(rank, tmpdir):
     import dgl
-    dgl.distributed.connect_to_server(ip_config='rpc_ip_config.txt')
-
-    part_g, node_feats, edge_feats, meta = load_partition(
-        '/tmp/test.json', rank)
-    num_nodes, num_edges, node_map, edge_map, num_partitions = meta
-    gpb = GraphPartitionBook(part_id=rank,
-                             num_parts=num_partitions,
-                             node_map=node_map,
-                             edge_map=edge_map,
-                             part_graph=part_g)
-
-    g = MochDistGraph(gpb, num_nodes)
+    g = DistGraph("rpc_sampling_ip_config.txt", "test_sampling")
     print("Pre sample")
-    results = sample_neighbors(g, [0, 10, 99], 3)
+    print(g.number_of_nodes())
+    results = sample_neighbors(g, [0, 10, 99, 66, 1024, 2008], 3)
     print("after sample")
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
@@ -88,42 +71,50 @@ def start_client(rank):
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-def test_rpc_sampling():
+def test_rpc_sampling(tmpdir):
     num_server = 3
-    ip_config = open("rpc_ip_config.txt", "w")
+    ip_config = open("rpc_sampling_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 3\n' % ip_addr)
+    ip_config.write('127.0.0.1 20060 1\n')
+    ip_config.write('127.0.0.1 20070 1\n')
+    ip_config.write('127.0.0.1 20080 1\n')
     ip_config.close()
     # sys.excepthook = myexcepthook
     # partition graph
     g = CitationGraphDataset("cora")[0]
     g.readonly()
+    print(g.idtype)
     num_parts = num_server
-    num_hops = 2
+    num_hops = 1
 
-    partition_graph(g, 'test', num_parts, '/tmp',
+    partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis')
 
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i,))
+        p = ctx.Process(target=start_server, args=(i, tmpdir))
         p.start()
         # time.sleep(1)
         pserver_list.append(p)
-
-    sampled_graph = start_client(0)
+    
+    time.sleep(3)
+    sampled_graph = start_client(0, tmpdir)
     print("Done sampling")
     for p in pserver_list:
         p.join()
 
     src, dst = sampled_graph.edges()
+    print(src)
+    print(dst)
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst).bool()))
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
 
-
 if __name__ == "__main__":
-    test_rpc_sampling()
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        tmpdirname = "/tmp/sampling"
+        test_rpc_sampling(Path(tmpdirname))

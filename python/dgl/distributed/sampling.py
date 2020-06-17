@@ -3,9 +3,11 @@ from .rpc import Request, Response, remote_call_to_machine
 from .dist_graph import DistGraph
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
-from .. import graph
+from ..convert import graph
 from ..base import NID, EID
 from .. import backend as F
+from ..heterograph import DGLHeteroGraph
+
 
 __all__ = ['sample_neighbors']
 
@@ -46,14 +48,21 @@ class SamplingRequest(Request):
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
-        local_ids = partition_book.nid2localnid(
-            F.tensor(self.seed_nodes), partition_book._part_id)
+        local_ids = F.astype(partition_book.nid2localnid(
+            F.tensor(self.seed_nodes, dtype=F.int64), partition_book._partid), F.int64)
+        # local_ids = self.seed_nodes
         sampled_graph = local_sample_neighbors(
             local_g, local_ids, self.fan_out, self.edge_dir, self.prob, self.replace)
         global_nid_mapping = local_g.ndata[NID]
         src, dst = sampled_graph.edges()
+        print(f"src:{src}")
+        print(f"dst:{dst}")
+        print(f"lgnn:{local_g.number_of_nodes()}")
         global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
         global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
+        
+        print(f"global src:{global_src}")
+        print(f"global dst:{global_dst}")
         res = SamplingResponse(global_src, global_dst, global_eids)
         return res
 
@@ -87,14 +96,16 @@ def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, repl
                              for _ in range(partition_book.num_partitions())]
     for pid, node in zip(partition_id, nodes):
         node_id_per_partition[pid].append(node)
-
+    print(node_id_per_partition)
     for pid, node_id in enumerate(node_id_per_partition):
         if len(node_id) != 0:
             req = SamplingRequest(
                 node_id, fanout, edge_dir=edge_dir, prob=prob, replace=replace)
             req_list.append((pid, req))
+    print(req_list)
     res_list = remote_call_to_machine(req_list)
-    return merge_graphs(res_list, g.total_num_nodes)
+    print(f"=============== numnodes {g.number_of_nodes()}")
+    return merge_graphs(res_list, g.number_of_nodes())
 
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SamplingResponse)
