@@ -251,4 +251,3 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
 
 }  // namespace traverse
 }  // namespace dgl
-

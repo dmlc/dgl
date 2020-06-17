@@ -656,9 +656,9 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 ///////////////////////// Graph Traverse  routines //////////////////////////
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   Frontiers ret;
-  CHECK_EQ(csr.indptr->ctx.device_type ,source->ctx.device_type) << 
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
     "Graph and source should in the same device context";
-  CHECK_EQ(csr.indices->dtype, source->dtype) << 
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
     "Graph and source should in the same dtype";
   ATEN_XPU_SWITCH(source->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
