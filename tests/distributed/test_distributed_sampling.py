@@ -20,40 +20,9 @@ def myexcepthook(exctype, value, traceback):
     # raise Exception("11111111111")
 
 
-class MochDistGraph:
-
-    def __init__(self, partition_book, num_nodes):
-        self.partition_book = partition_book
-        self.total_num_nodes = num_nodes
-
-    def get_partition_book(self):
-        return self.partition_book
-
-
-class MockServerState:
-
-    def __init__(self, g, rank, partition_book):
-        self.rank = rank
-        self.partition_book = partition_book
-        self.hgraph = dgl.as_heterograph(g)
-
-    @property
-    def graph(self):
-        return self.hgraph
-
-    @property
-    def total_num_nodes(self):
-        return self.hgraph.number_of_nodes()
-
-    @property
-    def total_num_edges(self):
-        return self.hgraph.number_of_edges()
-
 
 def start_server(rank, tmpdir):
     import dgl
-    sys.stdout = open(str(os.getpid()) + ".out", "w")
-    print("start server =================================")
     g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
                         tmpdir / 'test_sampling.json')
     g.start()
@@ -71,6 +40,7 @@ def start_client(rank, tmpdir):
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name != 'PyTorch', reason='Only support pytorch for now')
 def test_rpc_sampling(tmpdir):
     num_server = 3
     ip_config = open("rpc_sampling_ip_config.txt", "w")
@@ -88,14 +58,13 @@ def test_rpc_sampling(tmpdir):
     num_hops = 1
 
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis')
+                    num_hops=num_hops, part_method='metis', reshuffle=False)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir))
         p.start()
-        # time.sleep(1)
         pserver_list.append(p)
     
     time.sleep(3)
@@ -105,8 +74,6 @@ def test_rpc_sampling(tmpdir):
         p.join()
 
     src, dst = sampled_graph.edges()
-    print(src)
-    print(dst)
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst).bool()))
     eids = g.edge_ids(src, dst)

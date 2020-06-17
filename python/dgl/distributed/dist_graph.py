@@ -296,8 +296,6 @@ class DistGraphServer(KVServer):
         """
         # start serverß
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
-        print(f":L::::::::c {self.client_g.edges()[0].max()}, {self.client_g.edges()[1].max()}")
-        print(f":L::::::::o {self.original_g.edges()[0].max()}, {self.original_g.edges()[1].max()}")
         start_server(server_id=self.server_id, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
 
