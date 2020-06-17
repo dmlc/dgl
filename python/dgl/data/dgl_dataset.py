@@ -41,7 +41,7 @@ class DGLDataset(object):
         """
         pass
 
-    def save(selfs):
+    def save(self):
         r"""Save the processed dataset into files.
             Use dgl.utils.data.save_graphs to save dgl graph into files.
             Use dgl.utils.data.save_info to save extra dict information into files.
