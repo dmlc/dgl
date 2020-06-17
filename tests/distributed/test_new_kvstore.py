@@ -210,7 +210,9 @@ def start_client():
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # Register new push handler
-    kvclient.register_push_handler(udf_push)
+    kvclient.register_push_handler('data_0', udf_push)
+    kvclient.register_push_handler('data_1', udf_push)
+    kvclient.register_push_handler('data_2', udf_push)
     # Test push and pull
     kvclient.push(name='data_0',
                   id_tensor=id_tensor,
