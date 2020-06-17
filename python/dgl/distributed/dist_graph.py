@@ -294,7 +294,7 @@ class DistGraphServer(KVServer):
     def start(self):
         """ Start graph store server.
         """
-        # start serverß
+        # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
         start_server(server_id=self.server_id, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
