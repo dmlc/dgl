@@ -13,7 +13,7 @@
 #include "../c_api_common.h"
 
 #include <csignal>
-#if defined(__linux__) || defined(__ANDROID__)
+#if defined(__linux__)
 #include <unistd.h>
 #endif
 
@@ -294,7 +294,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
   *rv = ret;
 });
 
-#if defined(__linux__) || defined(__ANDROID__)
+#if defined(__linux__)
 /*!
  * \brief CtrlCHandler, exits if Ctrl+C is pressed
  * \param s signal
