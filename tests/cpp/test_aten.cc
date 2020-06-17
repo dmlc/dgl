@@ -158,17 +158,21 @@ TEST(ArrayTest, TestHStack) {
 }
 
 template <typename IDX>
-void _TestIndexSelect() {
-  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, CTX);
+void _TestIndexSelect(DLContext ctx) {
+  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
   ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
-  IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, CTX);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
   IdArray c = aten::IndexSelect(a, b);
   ASSERT_TRUE(ArrayEQ<IDX>(b, c));
 }
 
 TEST(ArrayTest, TestIndexSelect) {
-  _TestIndexSelect<int32_t>();
-  _TestIndexSelect<int64_t>();
+  _TestIndexSelect<int32_t>(CPU);
+  _TestIndexSelect<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestIndexSelect<int32_t>(GPU);
+  _TestIndexSelect<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>

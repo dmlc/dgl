@@ -196,8 +196,8 @@ BoolArray LT(IdArray lhs, dgl_id_t rhs) {
 
 IdArray HStack(IdArray lhs, IdArray rhs) {
   IdArray ret;
-  CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
-  CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
+  CHECK_SAME_CONTEXT(lhs, rhs);
+  CHECK_SAME_DTYPE(lhs, rhs);
   ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "HStack", {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::HStack<XPU, IdType>(lhs, rhs);
@@ -208,8 +208,10 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
 
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
-  // TODO(BarclayII): check if array and index match in context
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "IndexSelect", {
+  CHECK_SAME_CONTEXT(array, index);
+  CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
+  CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
         ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
@@ -221,8 +223,9 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, uint64_t index) {
+  CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
   ValueType ret = 0;
-  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "IndexSelect", {
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ret = impl::IndexSelect<XPU, DType>(array, index);
     });

@@ -219,4 +219,10 @@
     << (VAR1)->dtype << ")"                                                     \
     << ". But got " << (VAR2)->dtype;
 
+#define CHECK_SAME_CONTEXT(VAR1, VAR2)                                                      \
+  CHECK(VAR1->ctx == VAR2->ctx)                                                             \
+    << "Expected " << (#VAR2) << " to have the same device context as " << (#VAR1) << "("   \
+    << (VAR1)->ctx << ")"                                                                   \
+    << ". But got " << (VAR2)->ctx;
+
 #endif  // DGL_ATEN_MACRO_H_
