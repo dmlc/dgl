@@ -8,6 +8,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
+#include <dgl/random.h>
 #include <dgl/zerocopy_serializer.h>
 #include "../c_api_common.h"
 
@@ -380,14 +381,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg.msg_seq = msg_seq;
       msg.client_id = client_id;
       int lower = i*group_count;
-      int higher = (i+1)*group_count-1;
-#ifndef _WIN32  // windows does not support rand_r()
-      unsigned int seed = 314;
-      int s_id = (rand_r(&seed) % (higher-lower+1))+lower;
-      msg.server_id = s_id;
-#else
-      LOG(FATAL) << "KVStore does not support Windows yet.";
-#endif
+      int upper = (i+1)*group_count;
+      msg.server_id = RandInt(lower, upper);
       msg.data = pickle_data;
       NDArray tensor = dgl::aten::VecToIdArray<dgl_id_t>(remote_ids[i]);
       msg.tensors.push_back(tensor);
