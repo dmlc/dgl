@@ -355,8 +355,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   }
   row_size *= (local_data->dtype.bits / 8);
+  size_t data_size = local_data.GetSize();
   CHECK_GT(local_data_shape.size(), 0);
-  CHECK_EQ(row_size * local_data_shape[0], local_data.GetSize());
+  CHECK_EQ(row_size * local_data_shape[0], data_size);
   // Get local id (used in local machine) and
   // remote id (send to remote machine)
   dgl_id_t idx = 0;
@@ -364,9 +365,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     dgl_id_t p_id = part_id_data[i];
     if (p_id == local_machine_id) {
       dgl_id_t l_id = local_id_data[idx++];
+      CHECK_LT(l_id, local_data_shape[0]);
+      CHECK_GE(l_id, 0);
       local_ids.push_back(l_id);
       local_ids_orginal.push_back(i);
     } else {
+      CHECK_LT(p_id, machine_count) << "Invalid partition ID.";
       dgl_id_t id = ID_data[i];
       remote_ids[p_id].push_back(id);
       remote_ids_original[p_id].push_back(i);
@@ -398,6 +402,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   // Copy local data
 #pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
+    CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
+    CHECK_GE(data_size, local_ids[i] * row_size + row_size);
+    CHECK_GE(local_ids[i], 0);
     memcpy(return_data + local_ids_orginal[i] * row_size,
            local_data_char + local_ids[i] * row_size,
            row_size);
