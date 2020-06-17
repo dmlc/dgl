@@ -4,8 +4,6 @@
  * \brief DGL geometry utilities implementation
  */
 #include <dgl/array.h>
-#include <dgl/packed_func_ext.h>
-#include <dgl/runtime/container.h>
 #include <dgl/runtime/ndarray.h>
 #include "../c_api_common.h"
 #include "./geometry_op.h"
