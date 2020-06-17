@@ -60,13 +60,14 @@ def check_partition(reshuffle):
         assert np.all(np.sort(local_edges) == np.sort(local_edges1))
 
         if reshuffle:
-            part_g.ndata['feats'] = g.ndata['feats'][part_g.ndata['orig_id']]
+            part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata['orig_id'])
             # when we read node data from the original global graph, we should use orig_id.
             local_nodes = F.asnumpy(F.boolean_mask(part_g.ndata['orig_id'], part_g.ndata['inner_node']))
         else:
-            part_g.ndata['feats'] = g.ndata['feats'][part_g.ndata[dgl.NID]]
+            part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata[dgl.NID])
         part_g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
-        assert F.allclose(g.ndata['h'][local_nodes], part_g.ndata['h'][llocal_nodes])
+        assert F.allclose(F.gather_row(g.ndata['h'], local_nodes),
+                          F.gather_row(part_g.ndata['h'], llocal_nodes))
 
         for name in ['labels', 'feats']:
             assert name in node_feats
