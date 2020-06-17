@@ -22,13 +22,9 @@ void SDDMMCsr(const std::string& op,
   if (!aten::IsNullArray(vfeat))
     CHECK_EQ(vfeat->shape[0], csr.num_cols);
   CHECK_EQ(out->shape[0], csr.indices->shape[0]);
-  if (op == "dot") {
-    cpu::SDDMMDotCsr<IdType, DType>(csr, ufeat, vfeat, out);
-  } else {
-    SWITCH_OP(op, Op, {
-      cpu::SDDMMCsr<IdType, DType, Op>(bcast, csr, ufeat, vfeat, out);
-    });
-  }
+  SWITCH_OP(op, Op, {
+    cpu::SDDMMCsr<IdType, DType, Op>(bcast, csr, ufeat, vfeat, out);
+  });
 }
 
 template void SDDMMCsr<kDLCPU, int32_t, float>(
@@ -57,13 +53,9 @@ void SDDMMCoo(const std::string& op,
   if (!aten::IsNullArray(vfeat))
     CHECK_EQ(vfeat->shape[0], coo.num_cols);
   CHECK_EQ(out->shape[0], coo.row->shape[0]);
-  if (op == "dot") {
-    cpu::SDDMMDotCoo<IdType, DType>(coo, ufeat, vfeat, out);
-  } else {
-    SWITCH_OP(op, Op, {
-      cpu::SDDMMCoo<IdType, DType, Op>(bcast, coo, ufeat, vfeat, out);
-    });
-  }
+  SWITCH_OP(op, Op, {
+    cpu::SDDMMCoo<IdType, DType, Op>(bcast, coo, ufeat, vfeat, out);
+  });
 }
 
 template void SDDMMCoo<kDLCPU, int32_t, float>(
