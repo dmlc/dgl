@@ -78,6 +78,15 @@ def device_id(ctx):
     else:
         return ctx.index
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return th.device('cpu')
+    elif dev_type == 2:
+        return th.device('cuda', dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
+
 def astype(input, ty):
     return input.type(ty)
 

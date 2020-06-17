@@ -228,11 +228,45 @@ def context(input):
     pass
 
 def device_type(ctx):
-    """Return a str representing device type"""
+    """Return a str representing device type.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    str
+    """
     pass
 
 def device_id(ctx):
-    """Return device index"""
+    """Return device index.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    int
+    """
+    pass
+
+def to_backend_ctx(dglctx):
+    """Convert a DGL context object to a backend context.
+
+    Parameters
+    ----------
+    dglctx : DGLContext
+        DGL context object.
+
+    Returns
+    -------
+    ctx : framework-specific context object.
+    """
     pass
 
 def astype(input, ty):

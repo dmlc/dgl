@@ -753,10 +753,16 @@ def test_flatten(index_dtype):
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @parametrize_dtype
 def test_to_device(index_dtype):
-    hg = create_test_heterograph(index_dtype)
+    g = create_test_heterograph(index_dtype)
+    g.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
+    g.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cpu())
+    g.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
     if F.is_cuda_available():
-        hg = hg.to(F.cuda())
-        assert hg is not None
+        g1 = g.to(F.cuda())
+        print(g.device)
+        print(g1.device)
+        assert g1 is not None
+    assert False
 
 @parametrize_dtype
 def test_convert_bound(index_dtype):

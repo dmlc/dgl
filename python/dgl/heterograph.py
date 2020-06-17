@@ -4040,13 +4040,33 @@ class DGLHeteroGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
+    @property
+    def device(self):
+        """Get the device context of this graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> print(g.device)
+        device(type='cpu')
+        >>> g = g.to('cuda:0')
+        >>> print(g.device)
+        device(type='cuda', index=0)
+
+        Returns
+        -------
+        Device context object
+        """
+        return F.to_backend_ctx(self._graph.ctx)
+
     def to(self, ctx, **kwargs):  # pylint: disable=invalid-name
-        """Move both ndata and edata to the targeted mode (cpu/gpu)
-        Framework agnostic
+        """Move ndata, edata and graph structure to the targeted device context (cpu/gpu).
 
         Parameters
         ----------
-        ctx : framework-specific context object
+        ctx : framework-specific device context object
             The context to move data to.
 
         Returns
@@ -4062,15 +4082,23 @@ class DGLHeteroGraph(object):
         >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
-        >>> g = g.to(torch.device('cuda:0'))
+        >>> g1 = g.to(torch.device('cuda:0'))
+        >>> print(g1.device)
+        device(type='cuda', index=0)
+        >>> print(g.device)
+        device(type='cpu')
         """
-        for i in range(len(self._node_frames)):
-            for k in self._node_frames[i].keys():
-                self._node_frames[i][k] = F.copy_to(self._node_frames[i][k], ctx)
-        for i in range(len(self._edge_frames)):
-            for k in self._edge_frames[i].keys():
-                self._edge_frames[i][k] = F.copy_to(self._edge_frames[i][k], ctx)
-        return self
+        new_nframes = []
+        for i, nframe in enumerate(self._node_frames):
+            new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
+            new_nframes.append(FrameRef(Frame(new_feats)))
+        new_eframes = []
+        for i, eframe in enumerate(self._edge_frames):
+            new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
+            new_eframes.append(FrameRef(Frame(new_feats)))
+        new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
+        return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
+                              new_nframes, new_eframes)
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.

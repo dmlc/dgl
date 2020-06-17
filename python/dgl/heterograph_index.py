@@ -161,6 +161,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroDataType(self)
 
+    @property
     def ctx(self):
         """Return the context of this graph index.
 

@@ -116,6 +116,14 @@ def device_type(ctx):
 def device_id(ctx):
     return tf.DeviceSpec.from_string(ctx).device_index
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return "/cpu:0"
+    elif dev_type == 2:
+        return "/gpu:%d" % (dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
     return tf.cast(input, dtype=ty)
