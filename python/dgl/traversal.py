@@ -167,8 +167,10 @@ def dfs_edges_generator(graph, source, reverse=False):
     >>> list(dgl.dfs_edges_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4])]
     """
-    assert isinstance(graph, DGLHeteroGraph), 'DGLGraph is deprecated, Please use DGLHeteroGraph'
-    assert len(graph.canonical_etypes) == 1, 'dfs_edges_generator only support homogeneous graph'
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'dfs_edges_generator only support homogeneous graph'
     gidx = graph._graph
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLDFSEdges_v2(gidx, source.todgltensor(), reverse)
@@ -240,8 +242,10 @@ def dfs_labeled_edges_generator(
     (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2])),
     (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
     """
-    assert isinstance(graph, DGLHeteroGraph), 'DGLGraph is deprecated, Please use DGLHeteroGraph'
-    assert len(graph.canonical_etypes) == 1, 'dfs_labeled_edges_generator only support homogeneous graph'
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'dfs_labeled_edges_generator only support homogeneous graph'
     gidx = graph._graph
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLDFSLabeledEdges_v2(
