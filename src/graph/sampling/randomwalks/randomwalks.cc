@@ -51,7 +51,7 @@ std::pair<IdArray, TypeArray> RandomWalk(
 
   TypeArray vtypes;
   IdArray vids;
-  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "RandomWalk", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
       vids = impl::RandomWalk<XPU, IdxType>(hg, seeds, metapath, prob);
@@ -72,7 +72,7 @@ std::pair<IdArray, TypeArray> RandomWalkWithRestart(
 
   TypeArray vtypes;
   IdArray vids;
-  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "RandomWalkWithRestart", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
       vids = impl::RandomWalkWithRestart<XPU, IdxType>(hg, seeds, metapath, prob, restart_prob);
@@ -93,7 +93,7 @@ std::pair<IdArray, TypeArray> RandomWalkWithStepwiseRestart(
 
   TypeArray vtypes;
   IdArray vids;
-  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "RandomWalkWithStepwiseRestart", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
       vids = impl::RandomWalkWithStepwiseRestart<XPU, IdxType>(
