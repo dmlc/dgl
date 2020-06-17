@@ -296,32 +296,6 @@ class DGLArgs {
 };
 
 /*!
- * \brief Convert type code to its name
- * \param type_code The type code .
- * \return The name of type code.
- */
-inline const char* TypeCode2Str(int type_code);
-
-/*!
- * \brief convert a string to DGL type.
- * \param s The string to be converted.
- * \return The corresponding dgl type.
- */
-inline DGLType String2DGLType(std::string s);
-
-/*!
- * \brief convert a DGL type to string.
- * \param t The type to be converted.
- * \return The corresponding dgl type in string.
- */
-inline std::string DGLType2String(DGLType t);
-
-// macro to check type code.
-#define DGL_CHECK_TYPE_CODE(CODE, T)                           \
-  CHECK_EQ(CODE, T) << " expected "                            \
-  << TypeCode2Str(T) << " but get " << TypeCode2Str(CODE)      \
-
-/*!
  * \brief Type traits to mark if a class is dgl extension type.
  *
  * To enable extension type in C++ must be register () ed via marco.
@@ -826,83 +800,6 @@ class DGLRetValue : public DGLPODValue_ {
 };
 
 // implementation details
-inline const char* TypeCode2Str(int type_code) {
-  switch (type_code) {
-    case kDLInt: return "int";
-    case kDLUInt: return "uint";
-    case kDLFloat: return "float";
-    case kStr: return "str";
-    case kBytes: return "bytes";
-    case kHandle: return "handle";
-    case kNull: return "NULL";
-    case kObjectHandle: return "ObjectHandle";
-    case kArrayHandle: return "ArrayHandle";
-    case kDGLType: return "DGLType";
-    case kDGLContext: return "DGLContext";
-    case kFuncHandle: return "FunctionHandle";
-    case kModuleHandle: return "ModuleHandle";
-    case kNDArrayContainer: return "NDArrayContainer";
-    default: LOG(FATAL) << "unknown type_code="
-                        << static_cast<int>(type_code); return "";
-  }
-}
-
-#ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator<<(std::ostream& os, DGLType t) {  // NOLINT(*)
-  os << TypeCode2Str(t.code);
-  if (t.code == kHandle) return os;
-  os << static_cast<int>(t.bits);
-  if (t.lanes != 1) {
-    os << 'x' << static_cast<int>(t.lanes);
-  }
-  return os;
-}
-#endif
-
-inline std::string DGLType2String(DGLType t) {
-#ifndef _LIBCPP_SGX_NO_IOSTREAMS
-  std::ostringstream os;
-  os << t;
-  return os.str();
-#else
-  std::string repr = "";
-  repr += TypeCode2Str(t.code);
-  if (t.code == kHandle) return repr;
-  repr += std::to_string(static_cast<int>(t.bits));
-  if (t.lanes != 1) {
-    repr += "x" + std::to_string(static_cast<int>(t.lanes));
-  }
-  return repr;
-#endif
-}
-
-inline DGLType String2DGLType(std::string s) {
-  DGLType t;
-  t.bits = 32; t.lanes = 1;
-  const char* scan;
-  if (s.substr(0, 3) == "int") {
-    t.code = kDLInt;  scan = s.c_str() + 3;
-  } else if (s.substr(0, 4) == "uint") {
-    t.code = kDLUInt; scan = s.c_str() + 4;
-  } else if (s.substr(0, 5) == "float") {
-    t.code = kDLFloat; scan = s.c_str() + 5;
-  } else if (s.substr(0, 6) == "handle") {
-    t.code = kHandle;
-    t.bits = 64;  // handle uses 64 bit by default.
-    scan = s.c_str() + 6;
-  } else {
-    scan = s.c_str();
-    LOG(FATAL) << "unknown type " << s;
-  }
-  char* xdelim;  // emulate sscanf("%ux%u", bits, lanes)
-  uint8_t bits = static_cast<uint8_t>(strtoul(scan, &xdelim, 10));
-  if (bits != 0) t.bits = bits;
-  if (*xdelim == 'x') {
-    t.lanes = static_cast<uint16_t>(strtoul(xdelim + 1, nullptr, 10));
-  }
-  return t;
-}
-
 inline DGLArgValue DGLArgs::operator[](int i) const {
   CHECK_LT(i, num_args)
       << "not enough argument passed, "
