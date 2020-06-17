@@ -6,8 +6,6 @@ from . import register_service
 from ..convert import graph
 from ..base import NID, EID
 from .. import backend as F
-from ..heterograph import DGLHeteroGraph
-
 
 __all__ = ['sample_neighbors']
 
@@ -56,8 +54,9 @@ class SamplingRequest(Request):
         global_nid_mapping = local_g.ndata[NID]
         src, dst = sampled_graph.edges()
         global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
-        global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
-        
+        global_eids = F.gather_row(
+            local_g.edata[EID], sampled_graph.edata[EID])
+
         res = SamplingResponse(global_src, global_dst, global_eids)
         return res
 

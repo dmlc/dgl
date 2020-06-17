@@ -1,6 +1,5 @@
 """Server data"""
 
-from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
 from ..graph import DGLGraph
 from ..transform import as_heterograph
@@ -59,6 +58,7 @@ class ServerState:
 
     @property
     def graph(self):
+        """Get graph data."""
         return self._graph
 
     @graph.setter
@@ -69,20 +69,4 @@ class ServerState:
             self._graph = graph
 
 
-# Comment out for now, since no longer binding ServerState with C++ object
-# def get_server_state():
-#     """Get server state data.
-
-#     If the process is a server, this stores necessary
-#     server-side data. Otherwise, the process is a client and it stores a cache
-#     of the server co-located with the client (if available). When the client
-#     invokes a RPC to the co-located server, it can thus perform computation
-#     locally without an actual remote call.
-
-#     Returns
-#     -------
-#     ServerState
-#         Server state data
-#     """
-#     return _CAPI_DGLRPCGetServerState()
 _init_api("dgl.distributed.server_state")
