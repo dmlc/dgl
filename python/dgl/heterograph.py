@@ -4066,8 +4066,10 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        ctx : framework-specific device context object
+        ctx : Framework-specific device context object
             The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
 
         Returns
         -------
