@@ -85,6 +85,7 @@ from .. import backend as F
 from ..base import NID, EID
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
+from .graph_partition_book import GraphPartitionBook, RangePartitionBook
 
 def load_partition(conf_file, part_id):
     ''' Load data of a partition from the data path in the DistGraph server.
@@ -115,8 +116,8 @@ def load_partition(conf_file, part_id):
         All node features.
     dict of tensors
         All edge features.
-    (int, int, NumPy ndarray, Numpy ndarray))
-        The metadata of the global graph: number of nodes, number of edges, node map, edge map.
+    GraphPartitionBook
+        The global partition information.
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
@@ -134,24 +135,27 @@ def load_partition(conf_file, part_id):
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
     assert 'node_map' in part_metadata, "cannot get the node map."
     assert 'edge_map' in part_metadata, "cannot get the edge map."
-    node_map = np.load(part_metadata['node_map'], allow_pickle=True)
-    edge_map = np.load(part_metadata['edge_map'], allow_pickle=True)
-    meta = (part_metadata['num_nodes'], part_metadata['num_edges'], node_map, edge_map, num_parts)
+
+    # If this is a range partitioning, node_map actually stores a list, whose elements
+    # indicate the boundary of range partitioning. Otherwise, node_map stores a filename
+    # that contains node map in a NumPy array.
+    is_range_part = isinstance(part_metadata['node_map'], list)
+    node_map = part_metadata['node_map'] if is_range_part else np.load(part_metadata['node_map'])
+    edge_map = part_metadata['edge_map'] if is_range_part else np.load(part_metadata['edge_map'])
+    assert isinstance(node_map, list) == isinstance(edge_map, list), \
+            "The node map and edge map need to have the same format"
+
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    # TODO we need to fix this. DGL backend doesn't support boolean or byte.
-    # int64 is unnecessary.
-    node_map = F.zerocopy_from_numpy(node_map)
-    part_ids = F.gather_row(node_map, graph.ndata[NID])
-    graph.ndata['local_node'] = F.astype(part_ids == part_id, F.int64)
-    edge_map = F.zerocopy_from_numpy(edge_map)
-    part_ids = F.gather_row(edge_map, graph.edata[EID])
-    graph.edata['local_edge'] = F.astype(part_ids == part_id, F.int64)
+    if is_range_part:
+        gpb = RangePartitionBook(part_id, num_parts, np.array(node_map), np.array(edge_map))
+    else:
+        gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
+    return graph, node_feats, edge_feats, gpb
 
-    return graph, node_feats, edge_feats, meta
-
-def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis"):
+def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
+                    reshuffle=True):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -192,31 +196,37 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         The partition method. It supports "random" and "metis".
     out_path : str
         The path to store the files for all partitioned data.
+    reshuffle : bool
+        Reshuffle nodes and edges so that nodes and edges in a partition are in
+        contiguous Id range.
     '''
     if num_parts == 1:
         client_parts = {0: g}
         node_parts = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
         g.ndata[NID] = F.arange(0, g.number_of_nodes())
         g.edata[EID] = F.arange(0, g.number_of_edges())
+        g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int64, F.cpu())
+        g.edata['inner_edge'] = F.ones((g.number_of_edges(),), F.int64, F.cpu())
+        g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
     elif part_method == 'metis':
         node_parts = metis_partition_assignment(g, num_parts)
-        client_parts = partition_graph_with_halo(g, node_parts, num_hops)
+        client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     elif part_method == 'random':
         node_parts = dgl.random.choice(num_parts, g.number_of_nodes())
-        client_parts = partition_graph_with_halo(g, node_parts, num_hops)
+        client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
     # Let's calculate edge assignment.
     # TODO(zhengda) we should replace int64 with int16. int16 should be sufficient.
-    if num_parts > 1:
+    if not reshuffle:
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
         num_edges = 0
         lnodes_list = []      # The node ids of each partition
         ledges_list = []      # The edge Ids of each partition
         for part_id in range(num_parts):
             part = client_parts[part_id]
-            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'] == 1)
+            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'])
             local_edges = F.asnumpy(g.in_edges(local_nodes, form='eid'))
             edge_parts[local_edges] = part_id
             num_edges += len(local_edges)
@@ -224,23 +234,53 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             ledges_list.append(local_edges)
         assert num_edges == g.number_of_edges()
     else:
-        edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64)
+        num_edges = 0
+        num_nodes = 0
+        lnodes_list = []      # The node ids of each partition
+        ledges_list = []      # The edge Ids of each partition
+        for part_id in range(num_parts):
+            part = client_parts[part_id]
+            num_local_nodes = F.asnumpy(F.sum(part.ndata['inner_node'], 0))
+            # To get the edges in the input graph, we should use original node Ids.
+            local_nodes = F.boolean_mask(part.ndata['orig_id'], part.ndata['inner_node'])
+            num_local_edges = F.asnumpy(F.sum(g.in_degrees(local_nodes), 0))
+            num_edges += int(num_local_edges)
+            num_nodes += int(num_local_nodes)
+            lnodes_list.append(num_nodes)
+            ledges_list.append(num_edges)
+        assert num_edges == g.number_of_edges()
+        assert num_nodes == g.number_of_nodes()
 
     os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
     out_path = os.path.abspath(out_path)
-    node_part_file = os.path.join(out_path, "node_map")
-    edge_part_file = os.path.join(out_path, "edge_map")
-    np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=True)
-    np.save(edge_part_file, edge_parts, allow_pickle=True)
+
+    # Without reshuffling, we have to store the entire node/edge mapping in a file.
+    if not reshuffle:
+        node_part_file = os.path.join(out_path, "node_map")
+        edge_part_file = os.path.join(out_path, "edge_map")
+        np.save(node_part_file, F.asnumpy(node_parts), allow_pickle=False)
+        np.save(edge_part_file, edge_parts, allow_pickle=False)
+        node_map_val = node_part_file + ".npy"
+        edge_map_val = edge_part_file + ".npy"
+    else:
+        # With reshuffling, we can ensure that all nodes and edges are reshuffled
+        # and are in contiguous Id space.
+        if num_parts > 1:
+            node_map_val = lnodes_list
+            edge_map_val = ledges_list
+        else:
+            node_map_val = [g.number_of_nodes()]
+            edge_map_val = [g.number_of_edges()]
+
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
                      'num_edges': g.number_of_edges(),
                      'part_method': part_method,
                      'num_parts': num_parts,
                      'halo_hops': num_hops,
-                     'node_map': node_part_file + ".npy",
-                     'edge_map': edge_part_file + ".npy"}
+                     'node_map': node_map_val,
+                     'edge_map': edge_map_val}
     for part_id in range(num_parts):
         part = client_parts[part_id]
 
@@ -248,8 +288,15 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_feats = {}
         edge_feats = {}
         if num_parts > 1:
-            local_nodes = lnodes_list[part_id]
-            local_edges = ledges_list[part_id]
+            if reshuffle and part_id == 0:
+                local_nodes = F.arange(0, lnodes_list[part_id])
+                local_edges = F.arange(0, ledges_list[part_id])
+            elif reshuffle:
+                local_nodes = F.arange(lnodes_list[part_id - 1], lnodes_list[part_id])
+                local_edges = F.arange(ledges_list[part_id - 1], ledges_list[part_id])
+            else:
+                local_nodes = lnodes_list[part_id]
+                local_edges = ledges_list[part_id]
             print('part {} has {} nodes and {} edges.'.format(
                 part_id, part.number_of_nodes(), part.number_of_edges()))
             print('{} nodes and {} edges are inside the partition'.format(
