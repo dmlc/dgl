@@ -1,0 +1,222 @@
+/*!
+ *  Copyright (c) 2020 by Contributors
+ * \file array/cuda/spmat_op_impl.cu
+ * \brief Sparse matrix operator CPU implementation
+ */
+#include <dgl/array.h>
+#include <vector>
+#include <unordered_set>
+#include <numeric>
+#include "../../runtime/cuda/cuda_common.h"
+#include "../../cuda_utils.h"
+
+namespace dgl {
+
+using runtime::NDArray;
+
+namespace aten {
+namespace impl {
+
+///////////////////////////// CSRIsNonZero /////////////////////////////
+
+/*
+template <DLDeviceType XPU, typename IdType>
+bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
+  CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
+  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
+  const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
+  if (csr.sorted) {
+    const IdType *start = indices_data + indptr_data[row];
+    const IdType *end = indices_data + indptr_data[row + 1];
+    return std::binary_search(start, end, col);
+  } else {
+    for (IdType i = indptr_data[row]; i < indptr_data[row + 1]; ++i) {
+      if (indices_data[i] == col) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+template bool CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
+template bool CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
+
+template <DLDeviceType XPU, typename IdType>
+NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
+  CHECK_SAME_DTYPE(csr.indices, row);
+  CHECK_SAME_DTYPE(csr.indices, col);
+  const auto rowlen = row->shape[0];
+  const auto collen = col->shape[0];
+  const auto rstlen = std::max(rowlen, collen);
+  NDArray rst = NDArray::Empty({rstlen}, row->dtype, row->ctx);
+  IdType* rst_data = static_cast<IdType*>(rst->data);
+  const IdType* row_data = static_cast<IdType*>(row->data);
+  const IdType* col_data = static_cast<IdType*>(col->data);
+  const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
+  const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
+  for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
+    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j])? 1 : 0;
+  }
+  return rst;
+}
+
+template NDArray CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, NDArray, NDArray);
+*/
+
+///////////////////////////// CSRGetRowNNZ /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
+  const IdType cur = aten::IndexSelect<IdType>(csr.indptr, row);
+  const IdType next = aten::IndexSelect<IdType>(csr.indptr, row + 1);
+  return next - cur;
+}
+
+template int64_t CSRGetRowNNZ<kDLGPU, int32_t>(CSRMatrix, int64_t);
+template int64_t CSRGetRowNNZ<kDLGPU, int64_t>(CSRMatrix, int64_t);
+
+template <typename IdType>
+__global__ void _CSRGetRowNNZKernel(
+    const IdType* vid,
+    const IdType* indptr,
+    IdType* out,
+    int64_t length) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    const IdType vv = vid[tx];
+    out[tx] = indptr[vv + 1] - indptr[vv];
+    tx += stride_x;
+  }
+}
+
+template <DLDeviceType XPU, typename IdType>
+NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  const auto len = rows->shape[0];
+  const IdType* vid_data = static_cast<IdType*>(rows->data);
+  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
+  NDArray rst = NDArray::Empty({len}, rows->dtype, rows->ctx);
+  IdType* rst_data = static_cast<IdType*>(rst->data);
+  const int nt = cuda::FindNumThreads(len);
+  const int nb = (len + nt - 1) / nt;
+  _CSRGetRowNNZKernel<<<nb, nt, 0, thr_entry->stream>>>(
+      vid_data, indptr_data, rst_data, len);
+  return rst;
+}
+
+template NDArray CSRGetRowNNZ<kDLGPU, int32_t>(CSRMatrix, NDArray);
+template NDArray CSRGetRowNNZ<kDLGPU, int64_t>(CSRMatrix, NDArray);
+
+///////////////////////////// CSRGetRowColumnIndices /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
+  const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
+  const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
+  return csr.indices.CreateView({len}, csr.indices->dtype, offset);
+}
+
+template NDArray CSRGetRowColumnIndices<kDLGPU, int32_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowColumnIndices<kDLGPU, int64_t>(CSRMatrix, int64_t);
+
+///////////////////////////// CSRGetRowData /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
+  const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
+  const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
+  if (aten::CSRHasData(csr))
+    return csr.data.CreateView({len}, csr.data->dtype, offset);
+  else
+    return aten::Range(offset, offset + len, csr.indptr->dtype.bits, csr.indptr->ctx);
+}
+
+template NDArray CSRGetRowData<kDLGPU, int32_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowData<kDLGPU, int64_t>(CSRMatrix, int64_t);
+
+///////////////////////////// CSRSliceRows /////////////////////////////
+
+/*
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
+  const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
+  const int64_t num_rows = end - start;
+  const int64_t nnz = indptr[end] - indptr[start];
+  IdArray ret_indptr = IdArray::Empty({num_rows + 1}, csr.indptr->dtype, csr.indices->ctx);
+  IdType* r_indptr = static_cast<IdType*>(ret_indptr->data);
+  for (int64_t i = start; i < end + 1; ++i) {
+    r_indptr[i - start] = indptr[i] - indptr[start];
+  }
+  // indices and data can be view arrays
+  IdArray ret_indices = csr.indices.CreateView(
+      {nnz}, csr.indices->dtype, indptr[start] * sizeof(IdType));
+  IdArray ret_data;
+  if (CSRHasData(csr))
+    ret_data = csr.data.CreateView({nnz}, csr.data->dtype, indptr[start] * sizeof(IdType));
+  else
+    ret_data = aten::Range(indptr[start], indptr[end],
+                           csr.indptr->dtype.bits, csr.indptr->ctx);
+  return CSRMatrix(num_rows, csr.num_cols,
+                   ret_indptr, ret_indices, ret_data,
+                   csr.sorted);
+}
+
+template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
+
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
+  const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
+  const IdType* data = CSRHasData(csr)? static_cast<IdType*>(csr.data->data) : nullptr;
+  const auto len = rows->shape[0];
+  const IdType* rows_data = static_cast<IdType*>(rows->data);
+  int64_t nnz = 0;
+  for (int64_t i = 0; i < len; ++i) {
+    IdType vid = rows_data[i];
+    nnz += impl::CSRGetRowNNZ<XPU, IdType>(csr, vid);
+  }
+
+  CSRMatrix ret;
+  ret.num_rows = len;
+  ret.num_cols = csr.num_cols;
+  ret.indptr = NDArray::Empty({len + 1}, csr.indptr->dtype, csr.indices->ctx);
+  ret.indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
+  ret.data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
+  ret.sorted = csr.sorted;
+
+  IdType* ret_indptr_data = static_cast<IdType*>(ret.indptr->data);
+  IdType* ret_indices_data = static_cast<IdType*>(ret.indices->data);
+  IdType* ret_data = static_cast<IdType*>(ret.data->data);
+  ret_indptr_data[0] = 0;
+  for (int64_t i = 0; i < len; ++i) {
+    const IdType rid = rows_data[i];
+    // note: zero is allowed
+    ret_indptr_data[i + 1] = ret_indptr_data[i] + indptr_data[rid + 1] - indptr_data[rid];
+    std::copy(indices_data + indptr_data[rid], indices_data + indptr_data[rid + 1],
+              ret_indices_data + ret_indptr_data[i]);
+    if (data)
+      std::copy(data + indptr_data[rid], data + indptr_data[rid + 1],
+                ret_data + ret_indptr_data[i]);
+    else
+      std::iota(ret_data + ret_indptr_data[i], ret_data + ret_indptr_data[i + 1],
+                indptr_data[rid]);
+  }
+  return ret;
+}
+
+template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix , NDArray);
+template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix , NDArray);
+*/
+
+}  // namespace impl
+}  // namespace aten
+}  // namespace dgl

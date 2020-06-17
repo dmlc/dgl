@@ -183,6 +183,27 @@
     });                                                     \
   });
 
+// Macro to dispatch according to device context (allowing cuda)
+#ifdef DGL_USE_CUDA
+#define ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, op, ...)            \
+  ATEN_XPU_SWITCH_CUDA((csr).indptr->ctx.device_type, XPU, op, {   \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
+      {__VA_ARGS__}                                                \
+    });                                                            \
+  });
+
+// Macro to dispatch according to device context and index type.
+#define ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, op, ...)               \
+  ATEN_XPU_SWITCH_CUDA((coo).row->ctx.device_type, XPU, op, {    \
+    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {              \
+      {__VA_ARGS__}                                              \
+    });                                                          \
+  });
+#else  // DGL_USE_CUDA
+#define ATEN_CSR_SWITCH_CUDA ATEN_CSR_SWITCH
+#define ATEN_COO_SWITCH_CUDA ATEN_COO_SWITCH
+#endif  // DGL_USE_CUDA
+
 ///////////////////////// Array checks //////////////////////////
 
 #define IS_INT32(a)  \

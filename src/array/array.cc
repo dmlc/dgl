@@ -315,6 +315,10 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
 
 NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   NDArray ret;
+  CHECK_SAME_DTYPE(csr.indices, row);
+  CHECK_SAME_DTYPE(csr.indices, col);
+  CHECK_SAME_CONTEXT(csr.indices, row);
+  CHECK_SAME_CONTEXT(csr.indices, col);
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
@@ -331,7 +335,7 @@ bool CSRHasDuplicate(CSRMatrix csr) {
 
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   int64_t ret = 0;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowNNZ", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowNNZ", {
     ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   });
   return ret;
@@ -339,7 +343,9 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
 
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowNNZ", {
+  CHECK_SAME_DTYPE(csr.indices, row);
+  CHECK_SAME_CONTEXT(csr.indices, row);
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowNNZ", {
     ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   });
   return ret;
@@ -347,7 +353,7 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
 
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowColumnIndices", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowColumnIndices", {
     ret = impl::CSRGetRowColumnIndices<XPU, IdType>(csr, row);
   });
   return ret;
@@ -355,7 +361,7 @@ NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
 
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetRowData", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowData", {
     ret = impl::CSRGetRowData<XPU, IdType>(csr, row);
   });
   return ret;
@@ -371,6 +377,10 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
 
 NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   NDArray ret;
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  CHECK_SAME_DTYPE(csr.indices, cols);
+  CHECK_SAME_CONTEXT(csr.indices, rows);
+  CHECK_SAME_CONTEXT(csr.indices, cols);
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
   });
@@ -379,6 +389,10 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
 
 std::vector<NDArray> CSRGetDataAndIndices(
     CSRMatrix csr, NDArray rows, NDArray cols) {
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  CHECK_SAME_DTYPE(csr.indices, cols);
+  CHECK_SAME_CONTEXT(csr.indices, rows);
+  CHECK_SAME_CONTEXT(csr.indices, cols);
   std::vector<NDArray> ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetDataAndIndices", {
     ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
@@ -423,6 +437,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
 }
 
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  CHECK_SAME_CONTEXT(csr.indices, rows);
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
@@ -431,6 +447,10 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 }
 
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  CHECK_SAME_DTYPE(csr.indices, cols);
+  CHECK_SAME_CONTEXT(csr.indices, rows);
+  CHECK_SAME_CONTEXT(csr.indices, cols);
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceMatrix", {
     ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
