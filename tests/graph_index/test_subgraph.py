@@ -109,7 +109,7 @@ def test_node_subgraph_with_halo():
     inner_node = inner_node.asnumpy()
     inner_node_ids = np.nonzero(inner_node)[0]
     inner_node_ids = halo_subg.induced_nodes.tonumpy()[inner_node_ids]
-    assert np.all(inner_node_ids == np.sort(nodes))
+    assert np.all(np.sort(inner_node_ids) == np.sort(nodes))
 
     # Check if the inner edge labels are correct.
     inner_edge = inner_edge.asnumpy()
