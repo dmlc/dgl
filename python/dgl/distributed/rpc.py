@@ -874,9 +874,9 @@ def fast_pull(name, id_tensor, part_id, service_id,
     """
     msg_seq = incr_msg_seq()
     pickle_data = bytearray(pickle.dumps(([0], [name])))
-    global_id = _CAPI_DGLRPCGetLocalPartitionData(F.zerocopy_to_dgl_ndarray(id_tensor),
-                                                  F.zerocopy_to_dgl_ndarray(part_id),
-                                                  machine_id)
+    global_id = _CAPI_DGLRPCGetGlobalIDFromLocalPartition(F.zerocopy_to_dgl_ndarray(id_tensor),
+                                                          F.zerocopy_to_dgl_ndarray(part_id),
+                                                          machine_id)
     global_id = F.zerocopy_from_dgl_ndarray(global_id)
     g2l_id = policy.to_local(global_id)
     res_tensor = _CAPI_DGLRPCFastPull(name,

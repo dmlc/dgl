@@ -301,7 +301,7 @@ DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 
 //////////////////////////// KVStore ////////////////////////////
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetLocalPartitionData")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalIDFromLocalPartition")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   NDArray ID = args[0];
   NDArray part_id = args[1];
@@ -332,19 +332,19 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   std::string pickle_data = args[7];
   NDArray ID = args[8];
   NDArray part_id = args[9];
-  NDArray g2l_id = args[10];
+  NDArray local_id = args[10];
   NDArray local_data = args[11];
   // Data
-  int64_t ID_size = ID.GetSize() / sizeof(int64_t);
-  int64_t* ID_data = static_cast<int64_t*>(ID->data);
-  int64_t* part_id_data = static_cast<int64_t*>(part_id->data);
-  int64_t* g2l_id_data = static_cast<int64_t*>(g2l_id->data);
+  dgl_id_t ID_size = ID.GetSize() / sizeof(dgl_id_t);
+  dgl_id_t* ID_data = static_cast<dgl_id_t*>(ID->data);
+  dgl_id_t* part_id_data = static_cast<dgl_id_t*>(part_id->data);
+  dgl_id_t* local_id_data = static_cast<dgl_id_t*>(local_id->data);
   char* local_data_char = static_cast<char*>(local_data->data);
-  std::vector<int64_t> local_ids;
-  std::vector<int64_t> local_ids_orginal;
-  std::vector<int64_t> local_data_shape;
-  std::vector<std::vector<int64_t> > remote_ids(machine_count);
-  std::vector<std::vector<int64_t> > remote_ids_original(machine_count);
+  std::vector<dgl_id_t> local_ids;
+  std::vector<dgl_id_t> local_ids_orginal;
+  std::vector<dgl_id_t> local_data_shape;
+  std::vector<std::vector<dgl_id_t> > remote_ids(machine_count);
+  std::vector<std::vector<dgl_id_t> > remote_ids_original(machine_count);
   // Get row size (in bytes)
   int row_size = 1;
   for (int i = 0; i < local_data->ndim; ++i) {
@@ -358,15 +358,15 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   CHECK_EQ(row_size * local_data_shape[0], local_data.GetSize());
   // Get local id (used in local machine) and
   // remote id (send to remote machine)
-  int64_t idx = 0;
-  for (int64_t i = 0; i < ID_size; ++i) {
-    int64_t p_id = part_id_data[i];
+  dgl_id_t idx = 0;
+  for (dgl_id_t i = 0; i < ID_size; ++i) {
+    dgl_id_t p_id = part_id_data[i];
     if (p_id == local_machine_id) {
-      int64_t l_id = g2l_id_data[idx++];
+      dgl_id_t l_id = local_id_data[idx++];
       local_ids.push_back(l_id);
       local_ids_orginal.push_back(i);
     } else {
-      int64_t id = ID_data[i];
+      dgl_id_t id = ID_data[i];
       remote_ids[p_id].push_back(id);
       remote_ids_original[p_id].push_back(i);
     }
@@ -389,7 +389,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       LOG(FATAL) << "KVStore does not support Windows yet.";
 #endif
       msg.data = pickle_data;
-      NDArray tensor = dgl::aten::VecToIdArray<int64_t>(remote_ids[i]);
+      NDArray tensor = dgl::aten::VecToIdArray<dgl_id_t>(remote_ids[i]);
       msg.tensors.push_back(tensor);
       SendRPCMessage(msg, msg.server_id);
       msg_count++;
@@ -402,7 +402,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
 #pragma omp parallel for
-  for (int64_t i = 0; i < local_ids.size(); ++i) {
+  for (dgl_id_t i = 0; i < local_ids.size(); ++i) {
     memcpy(return_data + local_ids_orginal[i] * row_size,
            local_data_char + local_ids[i] * row_size,
            row_size);
@@ -413,7 +413,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     RecvRPCMessage(&msg, 0);
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
-    int64_t id_size = remote_ids[part_id].size();
+    dgl_id_t id_size = remote_ids[part_id].size();
     for (size_t n = 0; n < id_size; ++n) {
       memcpy(return_data + remote_ids_original[part_id][n] * row_size,
              data_char + n * row_size,
