@@ -382,7 +382,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg.client_id = client_id;
       int lower = i*group_count;
       int upper = (i+1)*group_count;
-      msg.server_id = RandInt(lower, upper);
+      msg.server_id = dgl::RandomEngine::ThreadLocal()->RandInt(lower, upper);
       msg.data = pickle_data;
       NDArray tensor = dgl::aten::VecToIdArray<dgl_id_t>(remote_ids[i]);
       msg.tensors.push_back(tensor);
