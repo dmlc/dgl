@@ -295,7 +295,7 @@ void DFSLabeledEdges(const CSRMatrix& csr,
       std::get<2>(stack.top()) = true;
       visit(uv, kForward);
       // expand
-      if (indptr_data[v] + i < indptr_data[v + 1]) {
+      if (indptr_data[v] < indptr_data[v + 1]) {
         stack.push(std::make_tuple(v, 0, false));
       }
     }
