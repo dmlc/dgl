@@ -30,13 +30,9 @@ struct BcastInfo {
   std::vector<int64_t> lhs_shape, lhs_stride;
   std::vector<int64_t> rhs_shape, rhs_stride;
   std::vector<int64_t> out_shape, out_stride;
-  std::vector<int64_t> lhs_offset, rhs_offset;
 
   int64_t data_len;
 };
-
-bool HasBcast(NDArray lhs, NDArray rhs);
-BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs);
 
 /*
  * !\brief Compute the feature shape after binary reduce computation.

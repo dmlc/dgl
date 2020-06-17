@@ -10,7 +10,6 @@
 #include <dgl/spfmt.h>
 
 #include "../c_api_common.h"
-#include "./binary_reduce.h"
 
 using namespace dgl::runtime;
 
@@ -41,48 +40,29 @@ void SpMM(const std::string& op, const std::string& reduce,
           NDArray out,
           std::vector<NDArray> out_aux,
           SparseFormat format) {
-  // TODO(minjie): fmt tuning
   if (GlobalSparseFormat::Get()->GetFormat() == SparseFormat::kCOO)
     format = SparseFormat::kCOO;
   else
     format = SparseFormat::kCSR;
-  if (!aten::IsNullArray(ufeat) && !aten::IsNullArray(efeat)
-      && HasBcast(ufeat, efeat)) {
-    const auto& bcast_info = CalcBcastInfo(op, ufeat, efeat);
-    ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
-      ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-        ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
-          if (format == SparseFormat::kCSR) {
-            SpMMBcastCsr<XPU, IdType, DType>(
-                op, reduce, bcast_info, graph->GetCSCMatrix(0),
-                ufeat, efeat, out, out_aux);
-          } else if (format == SparseFormat::kCOO) {
-            SpMMBcastCoo<XPU, IdType, DType>(
-                op, reduce, bcast_info, graph->GetCOOMatrix(0),
-                ufeat, efeat, out, out_aux);
-          } else {
-            LOG(FATAL) << "SpMM only supports CSR and COO foramts";
-          }
-        });
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
+        if (format == SparseFormat::kCSR) {
+          SpMMCsr<XPU, IdType, DType>(
+              op, reduce, bcast, graph->GetCSCMatrix(0),
+              ufeat, efeat, out, out_aux);
+        } else if (format == SparseFormat::kCOO) {
+          SpMMCoo<XPU, IdType, DType>(
+              op, reduce, bcast, graph->GetCOOMatrix(0),
+              ufeat, efeat, out, out_aux);
+        } else {
+          LOG(FATAL) << "SpMM only supports CSR and COO foramts";
+        }
       });
     });
-  } else {
-    ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
-      ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-        ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
-          if (format == SparseFormat::kCSR) {
-            SpMMCsr<XPU, IdType, DType>(op, reduce, graph->GetCSCMatrix(0),
-                                        ufeat, efeat, out, out_aux);
-          } else if (format == SparseFormat::kCOO) {
-            SpMMCoo<XPU, IdType, DType>(op, reduce, graph->GetCOOMatrix(0),
-                                        ufeat, efeat, out, out_aux);
-          } else {
-            LOG(FATAL) << "SpMM only supports CSR and COO foramts";
-          }
-        });
-      });
-    });
-  }
+  });
 }
 
 void SDDMM(const std::string& op,
@@ -92,48 +72,29 @@ void SDDMM(const std::string& op,
            NDArray out,
            std::vector<NDArray> out_aux,
            SparseFormat format) {
-  // TODO(minjie): fmt tuning
   if (GlobalSparseFormat::Get()->GetFormat() == SparseFormat::kCSR)
     format = SparseFormat::kCSR;
   else
     format = SparseFormat::kCOO;
-  if (!aten::IsNullArray(ufeat) && !aten::IsNullArray(efeat)
-      && HasBcast(ufeat, efeat)) {
-    const auto& bcast_info = CalcBcastInfo(op, ufeat, efeat);
-    ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
-      ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-        ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
-          if (format == SparseFormat::kCSR) {
-            SDDMMBcastCsr<XPU, IdType, DType>(
-                op, bcast_info, graph->GetCSRMatrix(0),
-                ufeat, efeat, out, out_aux);
-          } else if (format == SparseFormat::kCOO) {
-            SDDMMBcastCoo<XPU, IdType, DType>(
-                op, bcast_info, graph->GetCOOMatrix(0),
-                ufeat, efeat, out, out_aux);
-          } else {
-            LOG(FATAL) << "SDDMM only supports CSR and COO foramts";
-          }
-        });
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
+        if (format == SparseFormat::kCSR) {
+          SDDMMCsr<XPU, IdType, DType>(
+              op, bcast, graph->GetCSRMatrix(0),
+              ufeat, efeat, out, out_aux);
+        } else if (format == SparseFormat::kCOO) {
+          SDDMMCoo<XPU, IdType, DType>(
+              op, bcast, graph->GetCOOMatrix(0),
+              ufeat, efeat, out, out_aux);
+        } else {
+          LOG(FATAL) << "SDDMM only supports CSR and COO foramts";
+        }
       });
     });
-  } else {
-    ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
-      ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-        ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
-          if (format == SparseFormat::kCSR) {
-            SDDMMCsr<XPU, IdType, DType>(op, graph->GetCSRMatrix(0),
-                                         ufeat, efeat, out, out_aux);
-          } else if (format == SparseFormat::kCOO) {
-            SDDMMCoo<XPU, IdType, DType>(op, graph->GetCOOMatrix(0),
-                                         ufeat, efeat, out, out_aux);
-          } else {
-            LOG(FATAL) << "SDDMM only supports CSR and COO foramts";
-          }
-        });
-      });
-    });
-  }
+  });
 }
 
 DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpESum")

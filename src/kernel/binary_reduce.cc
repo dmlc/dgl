@@ -65,6 +65,95 @@ bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
   return true;
 }
 
+// Return true if broadcasting might be required to compute the element-wise
+// operation between the features of the two ndarrays.
+// The broadcasting semantic strictly follows numpy.
+// Note that the function could return true for invalid element-wise shapes
+// (e.g. lhs.shape = (N, 3), rhs.shape = (N, 5)). This is fine since
+// ``CalcBcastInfo`` will handle that.
+bool HasBcast(NDArray lhs, NDArray rhs) {
+  if (lhs->ndim != rhs->ndim) {
+    return true;
+  }
+  for (int i = 1; i < lhs->ndim; ++i) {
+    if (lhs->shape[i] != rhs->shape[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Compute auxiliary information of broadcasting dimensions.
+// The function preprocesses the feature shapes so that:
+//  - The first dimension (for graph) is removed.
+//  - Feature dimensions are aligned.
+//    e.g. (4,) and (3, 4) become (1, 4) and (3, 4)
+//  - Continuous non-broadcasting dimenions are flattened to reduce number of
+//    integers used to represent the feature shape.
+//    e.g. (4, 1, 3, 3) and (4, 5, 3, 3) become (4, 1, 9) and (4, 5, 9)
+//
+// See also: BcastInfo (kernel/binary_reduce.h)
+BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
+  BcastInfo ret;
+  const int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
+  int64_t accum = 0;
+  int j = 0;
+  // for dot operation: vector [dot] vector
+  // lhs_shape[ndim-1] == rhs_shape[ndim-1] = sizeof(vector)
+  // out_shape[ndim-1] = 1
+  if (op == binary_op::kDot) {
+    // get size of vector
+    ret.data_len = lhs->shape[lhs->ndim - 1];
+    // skip vector size dim
+    ++j;
+    ret.real_out_shape.push_back(ret.data_len);
+  } else {  // op != binary_op::kDot
+    ret.data_len = 1;
+  }
+
+  for (; j < max_ndim; ++j) {
+    const int dl = (lhs->ndim - 1 - j < 1)? 1 : lhs->shape[lhs->ndim - 1 - j];
+    const int dr = (rhs->ndim - 1 - j < 1)? 1 : rhs->shape[rhs->ndim - 1 - j];
+    if (dl != dr) {
+      if (dl != 1 && dr != 1) {
+        LOG(FATAL) << "Invalid broadcasting between feature shapes "
+          << ShapeString(lhs) << " and " << ShapeString(rhs);
+      }
+      if (accum != 0) {
+        ret.lhs_shape.push_back(accum);
+        ret.rhs_shape.push_back(accum);
+        ret.out_shape.push_back(accum);
+        accum = 0;
+      }
+      ret.lhs_shape.push_back(dl);
+      ret.rhs_shape.push_back(dr);
+      ret.out_shape.push_back(std::max(dl, dr));
+    } else {
+      if (accum == 0) {
+        accum = dl;
+      } else {
+        accum *= dl;
+      }
+    }
+    ret.real_out_shape.push_back(std::max(dl, dr));
+  }
+  if (accum != 0) {
+    ret.lhs_shape.push_back(accum);
+    ret.rhs_shape.push_back(accum);
+    ret.out_shape.push_back(accum);
+    accum = 0;
+  }
+  std::reverse(ret.real_out_shape.begin(), ret.real_out_shape.end());
+  std::reverse(ret.lhs_shape.begin(), ret.lhs_shape.end());
+  std::reverse(ret.rhs_shape.begin(), ret.rhs_shape.end());
+  std::reverse(ret.out_shape.begin(), ret.out_shape.end());
+  // stride
+  ret.lhs_stride = ComputeStride(ret.lhs_shape);
+  ret.rhs_stride = ComputeStride(ret.rhs_shape);
+  ret.out_stride = ComputeStride(ret.out_shape);
+  return ret;
+}
+
 // Function to convert an idarray to string
 std::string IdArrayToStr(IdArray arr) {
   arr = arr.CopyTo(DLContext{kDLCPU, 0});
@@ -180,117 +269,6 @@ class UnitGraphCSRWrapper : public CSRWrapper {
 };
 
 }  // namespace
-
-// Return true if broadcasting might be required to compute the element-wise
-// operation between the features of the two ndarrays.
-// The broadcasting semantic strictly follows numpy.
-// Note that the function could return true for invalid element-wise shapes
-// (e.g. lhs.shape = (N, 3), rhs.shape = (N, 5)). This is fine since
-// ``CalcBcastInfo`` will handle that.
-bool HasBcast(NDArray lhs, NDArray rhs) {
-  if (lhs->ndim != rhs->ndim) {
-    return true;
-  }
-  for (int i = 1; i < lhs->ndim; ++i) {
-    if (lhs->shape[i] != rhs->shape[i]) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// Compute auxiliary information of broadcasting dimensions.
-// The function preprocesses the feature shapes so that:
-//  - The first dimension (for graph) is removed.
-//  - Feature dimensions are aligned.
-//    e.g. (4,) and (3, 4) become (1, 4) and (3, 4)
-//  - Continuous non-broadcasting dimenions are flattened to reduce number of
-//    integers used to represent the feature shape.
-//    e.g. (4, 1, 3, 3) and (4, 5, 3, 3) become (4, 1, 9) and (4, 5, 9)
-//
-// See also: BcastInfo (kernel/binary_reduce.h)
-BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
-  BcastInfo ret;
-  const int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
-  int64_t accum = 0;
-  int j = 0;
-  // for dot operation: vector [dot] vector
-  // lhs_shape[ndim-1] == rhs_shape[ndim-1] = sizeof(vector)
-  // out_shape[ndim-1] = 1
-  if (op == binary_op::kDot) {
-    // get size of vector
-    ret.data_len = lhs->shape[lhs->ndim - 1];
-    // skip vector size dim
-    ++j;
-    ret.real_out_shape.push_back(ret.data_len);
-  } else {  // op != binary_op::kDot
-    ret.data_len = 1;
-  }
-
-  for (; j < max_ndim; ++j) {
-    const int dl = (lhs->ndim - 1 - j < 1)? 1 : lhs->shape[lhs->ndim - 1 - j];
-    const int dr = (rhs->ndim - 1 - j < 1)? 1 : rhs->shape[rhs->ndim - 1 - j];
-    if (dl != dr) {
-      if (dl != 1 && dr != 1) {
-        LOG(FATAL) << "Invalid broadcasting between feature shapes "
-          << ShapeString(lhs) << " and " << ShapeString(rhs);
-      }
-      if (accum != 0) {
-        ret.lhs_shape.push_back(accum);
-        ret.rhs_shape.push_back(accum);
-        ret.out_shape.push_back(accum);
-        accum = 0;
-      }
-      ret.lhs_shape.push_back(dl);
-      ret.rhs_shape.push_back(dr);
-      ret.out_shape.push_back(std::max(dl, dr));
-    } else {
-      if (accum == 0) {
-        accum = dl;
-      } else {
-        accum *= dl;
-      }
-    }
-    ret.real_out_shape.push_back(std::max(dl, dr));
-  }
-  if (accum != 0) {
-    ret.lhs_shape.push_back(accum);
-    ret.rhs_shape.push_back(accum);
-    ret.out_shape.push_back(accum);
-    accum = 0;
-  }
-  std::reverse(ret.real_out_shape.begin(), ret.real_out_shape.end());
-  std::reverse(ret.lhs_shape.begin(), ret.lhs_shape.end());
-  std::reverse(ret.rhs_shape.begin(), ret.rhs_shape.end());
-  std::reverse(ret.out_shape.begin(), ret.out_shape.end());
-  // stride
-  ret.lhs_stride = ComputeStride(ret.lhs_shape);
-  ret.rhs_stride = ComputeStride(ret.rhs_shape);
-  ret.out_stride = ComputeStride(ret.out_shape);
-
-  int len = 1;
-  for (int d = 0; d < ret.out_shape.size(); ++d)
-    len *= ret.out_shape[d];
-  ret.lhs_offset.resize(len, 0);
-  ret.rhs_offset.resize(len, 0);
-  // Compute bcast offset
-  for (int d = 0; d < ret.out_shape.size(); ++d) {
-    int64_t o_sh = ret.out_shape[d];
-    int64_t o_st = ret.out_stride[d];
-    int64_t rhs_sh = ret.rhs_shape[d];
-    int64_t rhs_st = ret.rhs_stride[d];
-    int64_t lhs_sh = ret.lhs_shape[d];
-    int64_t lhs_st = ret.lhs_stride[d];
-    for (int idx = 0; idx < len; ++idx) {
-      int64_t i = (idx / o_st) % o_sh;
-      if (rhs_sh > i)
-        ret.rhs_offset[idx] += i * rhs_st;
-      if (lhs_sh > i)
-        ret.lhs_offset[idx] += i * lhs_st;
-    }
-  }
-  return ret;
-}
 
 
 std::vector<int64_t> InferBinaryFeatureShape(

@@ -9,7 +9,7 @@
 #include <minigun/csr.h>
 #include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
-
+#include <dgl/array.h>
 #include <cstdlib>
 #include <vector>
 
@@ -53,6 +53,17 @@ template <typename DType>
 void IndexSelectGPU(const DType* val, const int32_t* idx, int64_t length, DType* out);
 
 /*
+ * !\brief get the raw pointer to the data in the given array.
+ * if array is a NullArray, return a nullptr.
+ */
+template <typename DType>
+inline DType* GetPtr(const runtime::NDArray& array) {
+  if (aten::IsNullArray(array))
+    return nullptr;
+  return static_cast<DType*>(array->data);
+}
+
+/*
  * !\brief Create minigun CSR from two ndarrays.
  */
 template <typename Idx>
@@ -64,6 +75,7 @@ minigun::Csr<Idx> CreateCsr(runtime::NDArray indptr, runtime::NDArray indices) {
   csr.column_indices.length = indices->shape[0];
   return csr;
 }
+
 
 }  // namespace utils
 }  // namespace kernel

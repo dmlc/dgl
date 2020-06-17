@@ -8,7 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
-#include "./binary_reduce.h"
+#include "./bcast.h"
 
 namespace dgl {
 namespace kernel {
@@ -23,6 +23,7 @@ void SpMM(const std::string& op, const std::string& reduce,
 
 template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
+             const BcastOff& bcast,
              const aten::CSRMatrix& csr,
              NDArray ufeat,
              NDArray efeat,
@@ -31,29 +32,12 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 
 template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,
+             const BcastOff& bcast,
              const aten::COOMatrix& coo,
              NDArray ufeat,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux);
-
-template <int XPU, typename IdType, typename DType>
-void SpMMBcastCsr(const std::string& op, const std::string& reduce,
-                  const BcastInfo& info,
-                  const aten::CSRMatrix& csr,
-                  NDArray ufeat,
-                  NDArray efeat,
-                  NDArray out,
-                  std::vector<NDArray> out_aux);
-
-template <int XPU, typename IdType, typename DType>
-void SpMMBcastCoo(const std::string& op, const std::string& reduce,
-                  const BcastInfo& info,
-                  const aten::COOMatrix& coo,
-                  NDArray ufeat,
-                  NDArray efeat,
-                  NDArray out,
-                  std::vector<NDArray> out_aux);
 
 void SDDMM(const std::string& op,
            HeteroGraphPtr graph,
@@ -65,6 +49,7 @@ void SDDMM(const std::string& op,
 
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
+              const BcastOff& bcast,
               const aten::CSRMatrix& csr,
               NDArray ufeat,
               NDArray efeat,
@@ -73,29 +58,12 @@ void SDDMMCsr(const std::string& op,
 
 template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
+              const BcastOff& bcast,
               const aten::COOMatrix& coo,
               NDArray ufeat,
               NDArray efeat,
               NDArray out,
               std::vector<NDArray> out_aux);
-
-template <int XPU, typename IdType, typename DType>
-void SDDMMBcastCsr(const std::string& op,
-                   const BcastInfo& info,
-                   const aten::CSRMatrix& csr,
-                   NDArray ufeat,
-                   NDArray efeat,
-                   NDArray out,
-                   std::vector<NDArray> out_aux);
-
-template <int XPU, typename IdType, typename DType>
-void SDDMMBcastCoo(const std::string& op,
-                   const BcastInfo& info,
-                   const aten::COOMatrix& coo,
-                   NDArray ufeat,
-                   NDArray efeat,
-                   NDArray out,
-                   std::vector<NDArray> out_aux);
 
 }  // namespace kernel
 }  // namespace dgl

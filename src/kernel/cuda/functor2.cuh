@@ -12,7 +12,7 @@ struct Add {
   static constexpr bool use_rhs = true;
   static constexpr bool reduce_last_dim = false;
   static __device__ __forceinline__ DType Call(
-      const DType *lhs, const DType *rhs, int64_t len_lhs = 1, int64_t len_rhs = 1) {
+      const DType *lhs, const DType *rhs, int64_t len = 1) {
     return lhs[0] + rhs[0];
   }
 };
@@ -23,7 +23,7 @@ struct Mul {
   static constexpr bool use_rhs = true;
   static constexpr bool reduce_last_dim = false;
   static __device__ __forceinline__ DType Call(
-      const DType *lhs, const DType *rhs, int64_t len_lhs = 1, int64_t len_rhs = 1) {
+      const DType *lhs, const DType *rhs, int64_t len = 1) {
     return lhs[0] * rhs[0];
   }
 };
@@ -34,7 +34,7 @@ struct CopyU {
   static constexpr bool use_rhs = false;
   static constexpr bool reduce_last_dim = false;
   static __device__ __forceinline__ DType Call(
-      const DType *lhs, const DType *rhs, int64_t len_lhs = 1, int64_t len_rhs = 1) {
+      const DType *lhs, const DType *rhs, int64_t len = 1) {
     return lhs[0];
   }
 };
@@ -45,7 +45,7 @@ struct CopyE {
   static constexpr bool use_rhs = true;
   static constexpr bool reduce_last_dim = false;
   static __device__ __forceinline__ DType Call(
-      const DType *lhs, const DType *rhs, int64_t len_lhs = 1, int64_t len_rhs = 1) {
+      const DType *lhs, const DType *rhs, int64_t len = 1) {
     return rhs[0];
   }
 };
@@ -56,9 +56,9 @@ struct Dot {
   static constexpr bool use_rhs = true;
   static constexpr bool reduce_last_dim = true;
   static __device__ __forceinline__ DType Call(
-      const DType *lhs, const DType *rhs, int64_t len_lhs = 1, int64_t len_rhs = 1) {
+      const DType *lhs, const DType *rhs, int64_t len = 1) {
     DType rst = static_cast<DType>(0);
-    for (int64_t i = 0; i < len_lhs; ++i) {
+    for (int64_t i = 0; i < len; ++i) {
       rst += lhs[i] * rhs[i];
     }
     return rst;
