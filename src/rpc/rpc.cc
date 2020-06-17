@@ -5,17 +5,17 @@
  */
 #include "./rpc.h"
 
+#include <csignal>
+#if defined(__linux__)
+#include <unistd.h>
+#endif
+
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/zerocopy_serializer.h>
 #include "../c_api_common.h"
-
-#include <csignal>
-#if defined(__linux__)
-#include <unistd.h>
-#endif
 
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
