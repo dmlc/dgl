@@ -342,7 +342,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   char* local_data_char = static_cast<char*>(local_data->data);
   std::vector<dgl_id_t> local_ids;
   std::vector<dgl_id_t> local_ids_orginal;
-  std::vector<dgl_id_t> local_data_shape;
+  std::vector<int64_t> local_data_shape;
   std::vector<std::vector<dgl_id_t> > remote_ids(machine_count);
   std::vector<std::vector<dgl_id_t> > remote_ids_original(machine_count);
   // Get row size (in bytes)
