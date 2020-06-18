@@ -1,5 +1,5 @@
 """Module for sparse matrix operators."""
-# pylint: disable = invalid name
+# pylint: disable= invalid-name
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
@@ -34,7 +34,7 @@ def infer_broadcast_shape(op, shp1, shp2):
     return rst[:-1] + (1,) if op == "dot" else rst
 
 def to_dgl_nd(x):
-    """Convert tensor/None to ndarray."""
+    """Convert framework-specific tensor/None to dgl ndarray."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
 op_mapping = {
