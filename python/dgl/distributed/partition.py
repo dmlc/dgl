@@ -180,7 +180,15 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     stored in a dictionary, in which the key is the edge data name and the value is a tensor.
 
     The graph structure of a partition is stored in a file with the DGLGraph format. The DGLGraph
-    contains the mapping of node/edge Ids to the Ids in the original graph.
+    contains the mapping of node/edge Ids to the Ids in the global graph. The mappings can be
+    accessed with `part.ndata[dgl.NID]` and `part.edata[dgl.NID]`, where `part` is the partition
+    graph structure. In addition to the mapping, the partition graph contains node data
+    ("inner_node" and "orig_id") and edge data ("inner_edge").
+
+    * "inner_node" indicates whether a node belongs to a partition.
+    * "inner_edge" indicates whether an edge belongs to a partition.
+    * "orig_id" exists when reshuffle=True. It indicates the original node Ids in the original
+    graph before reshuffling.
 
     Parameters
     ----------
@@ -221,35 +229,24 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     # TODO(zhengda) we should replace int64 with int16. int16 should be sufficient.
     if not reshuffle:
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
-        num_edges = 0
-        lnodes_list = []      # The node ids of each partition
-        ledges_list = []      # The edge Ids of each partition
-        for part_id in range(num_parts):
-            part = client_parts[part_id]
-            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'])
-            local_edges = F.asnumpy(g.in_edges(local_nodes, form='eid'))
-            edge_parts[local_edges] = part_id
-            num_edges += len(local_edges)
-            lnodes_list.append(local_nodes)
-            ledges_list.append(local_edges)
-        assert num_edges == g.number_of_edges()
-    else:
-        num_edges = 0
-        num_nodes = 0
-        lnodes_list = []      # The node ids of each partition
-        ledges_list = []      # The edge Ids of each partition
-        for part_id in range(num_parts):
-            part = client_parts[part_id]
-            num_local_nodes = F.asnumpy(F.sum(part.ndata['inner_node'], 0))
-            # To get the edges in the input graph, we should use original node Ids.
-            local_nodes = F.boolean_mask(part.ndata['orig_id'], part.ndata['inner_node'])
-            num_local_edges = F.asnumpy(F.sum(g.in_degrees(local_nodes), 0))
-            num_edges += int(num_local_edges)
-            num_nodes += int(num_local_nodes)
-            lnodes_list.append(num_nodes)
-            ledges_list.append(num_edges)
-        assert num_edges == g.number_of_edges()
-        assert num_nodes == g.number_of_nodes()
+    num_edges = 0
+    num_nodes = 0
+    lnodes_list = []      # The node ids of each partition
+    ledges_list = []      # The edge Ids of each partition
+    for part_id in range(num_parts):
+        part = client_parts[part_id]
+        # To get the edges in the input graph, we should use original node Ids.
+        data_name = 'orig_id' if reshuffle else NID
+        local_nodes = F.boolean_mask(part.ndata[data_name], part.ndata['inner_node'])
+        local_edges = g.in_edges(local_nodes, form='eid')
+        if not reshuffle:
+            edge_parts[F.asnumpy(local_edges)] = part_id
+        num_edges += len(local_edges)
+        num_nodes += len(local_nodes)
+        lnodes_list.append(local_nodes)
+        ledges_list.append(local_edges)
+    assert num_edges == g.number_of_edges()
+    assert num_nodes == g.number_of_nodes()
 
     os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
@@ -267,8 +264,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         # With reshuffling, we can ensure that all nodes and edges are reshuffled
         # and are in contiguous Id space.
         if num_parts > 1:
-            node_map_val = lnodes_list
-            edge_map_val = ledges_list
+            node_map_val = np.cumsum([len(lnodes) for lnodes in lnodes_list]).tolist()
+            edge_map_val = np.cumsum([len(ledges) for ledges in ledges_list]).tolist()
         else:
             node_map_val = [g.number_of_nodes()]
             edge_map_val = [g.number_of_edges()]
@@ -288,15 +285,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_feats = {}
         edge_feats = {}
         if num_parts > 1:
-            if reshuffle and part_id == 0:
-                local_nodes = F.arange(0, lnodes_list[part_id])
-                local_edges = F.arange(0, ledges_list[part_id])
-            elif reshuffle:
-                local_nodes = F.arange(lnodes_list[part_id - 1], lnodes_list[part_id])
-                local_edges = F.arange(ledges_list[part_id - 1], ledges_list[part_id])
-            else:
-                local_nodes = lnodes_list[part_id]
-                local_edges = ledges_list[part_id]
+            local_nodes = lnodes_list[part_id]
+            local_edges = ledges_list[part_id]
             print('part {} has {} nodes and {} edges.'.format(
                 part_id, part.number_of_nodes(), part.number_of_edges()))
             print('{} nodes and {} edges are inside the partition'.format(
