@@ -30,3 +30,4 @@ from .traversal import *
 from .transform import *
 from .propagate import *
 from .udf import NodeBatch, EdgeBatch
+from .kernel2 import gspmm, gsddmm

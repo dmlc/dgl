@@ -46,7 +46,6 @@ void SDDMM(const std::string& op,
            NDArray ufeat,
            NDArray efeat,
            NDArray out,
-           std::vector<NDArray> out_aux,
            SparseFormat format = SparseFormat::kAny);
 
 template <int XPU, typename IdType, typename DType>
@@ -55,8 +54,7 @@ void SDDMMCsr(const std::string& op,
               const aten::CSRMatrix& csr,
               NDArray ufeat,
               NDArray efeat,
-              NDArray out,
-              std::vector<NDArray> out_aux);
+              NDArray out);
 
 template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
@@ -64,8 +62,7 @@ void SDDMMCoo(const std::string& op,
               const aten::COOMatrix& coo,
               NDArray ufeat,
               NDArray efeat,
-              NDArray out,
-              std::vector<NDArray> out_aux);
+              NDArray out);
 
 }  // namespace kernel
 }  // namespace dgl

@@ -39,8 +39,7 @@ void SDDMMCsr(const std::string& op,
               const aten::CSRMatrix& csr,
               NDArray ufeat,
               NDArray vfeat,
-              NDArray out,
-              std::vector<NDArray> out_aux) {
+              NDArray out) {
   SWITCH_OP(op, Op, {
     cuda::SDDMMCsr<IdType, DType, Op>(bcast, csr, ufeat, vfeat, out);
   });
@@ -52,8 +51,7 @@ void SDDMMCoo(const std::string& op,
               const aten::COOMatrix& coo,
               NDArray ufeat,
               NDArray vfeat,
-              NDArray out,
-              std::vector<NDArray> out_aux) {
+              NDArray out) {
   SWITCH_OP(op, Op, {
     cuda::SDDMMCoo<IdType, DType, Op>(bcast, coo, ufeat, vfeat, out);
   });
@@ -61,29 +59,29 @@ void SDDMMCoo(const std::string& op,
 
 template void SDDMMCsr<kDLGPU, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCsr<kDLGPU, int64_t, float>(
     const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCsr<kDLGPU, int32_t, double>(
     const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCsr<kDLGPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 
 template void SDDMMCoo<kDLGPU, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCoo<kDLGPU, int64_t, float>(
     const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCoo<kDLGPU, int32_t, double>(
     const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCoo<kDLGPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out, std::vector<NDArray> out_aux);
+    NDArray ufeat, NDArray vfeat, NDArray out);
 
 }  // namespace kernel
 }  // namespace dgl

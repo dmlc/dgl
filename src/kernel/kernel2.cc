@@ -45,6 +45,7 @@ void SpMM(const std::string& op, const std::string& reduce,
   else
     format = SparseFormat::kCSR;
   */
+  format = SparseFormat::kCSR;
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
@@ -71,7 +72,6 @@ void SDDMM(const std::string& op,
            NDArray ufeat,
            NDArray efeat,
            NDArray out,
-           std::vector<NDArray> out_aux,
            SparseFormat format) {
   /*
   if (GlobalSparseFormat::Get()->GetFormat() == SparseFormat::kCSR)
@@ -79,6 +79,7 @@ void SDDMM(const std::string& op,
   else
     format = SparseFormat::kCOO;
   */
+  format = SparseFormat::kCOO;
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
@@ -87,11 +88,11 @@ void SDDMM(const std::string& op,
         if (format == SparseFormat::kCSR) {
           SDDMMCsr<XPU, IdType, DType>(
               op, bcast, graph->GetCSRMatrix(0),
-              ufeat, efeat, out, out_aux);
+              ufeat, efeat, out);
         } else if (format == SparseFormat::kCOO) {
           SDDMMCoo<XPU, IdType, DType>(
               op, bcast, graph->GetCOOMatrix(0),
-              ufeat, efeat, out, out_aux);
+              ufeat, efeat, out);
         } else {
           LOG(FATAL) << "SDDMM only supports CSR and COO foramts";
         }
@@ -99,6 +100,29 @@ void SDDMM(const std::string& op,
     });
   });
 }
+
+DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSpMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    const std::string reduce_op = args[2];
+    NDArray U = args[3];
+    NDArray E = args[4];
+    NDArray V = args[5];
+    NDArray ArgU = args[6];
+    NDArray ArgE = args[7];
+    SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
+  });
+
+DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSDDMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    NDArray U = args[2];
+    NDArray V = args[3];
+    NDArray E = args[4];
+    SDDMM(op, graph.sptr(), U, V, E);
+  });
 
 DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpESum")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -181,8 +205,7 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyU")
     NDArray X = args[1];
     NDArray Z = args[2];
     CheckCtx(graph->Context(), {X, Z}, {"U_data", "Out"});
-    SDDMM("copy_u", graph.sptr(), X, aten::NullArray(), Z, {
-      aten::NullArray(), aten::NullArray()});
+    SDDMM("copy_u", graph.sptr(), X, aten::NullArray(), Z);
   });
 
 DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpEMax")
@@ -221,7 +244,7 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpV")
     NDArray Y = args[3];
     NDArray Z = args[4];
     CheckCtx(graph->Context(), {X, Y, Z}, {"U_data", "V_data", "Out"});
-    SDDMM(op, graph.sptr(), X, Y, Z, {aten::NullArray(), aten::NullArray()});
+    SDDMM(op, graph.sptr(), X, Y, Z);
   });
 
 }  // namespace kernel
