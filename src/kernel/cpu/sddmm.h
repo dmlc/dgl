@@ -26,7 +26,8 @@ void SDDMMCsr(const BcastOff& bcast,
   const DType* Y = utils::GetPtr<DType>(vfeat);
   int64_t dim = bcast.out_len,
           lhs_dim = bcast.lhs_len,
-          rhs_dim = bcast.rhs_len;
+          rhs_dim = bcast.rhs_len,
+          reduce_size = bcast.reduce_size;
   DType* O = utils::GetPtr<DType>(out);
 #pragma omp parallel for
   for (IdType rid = 0; rid < csr.num_rows; ++rid) {
@@ -38,9 +39,11 @@ void SDDMMCsr(const BcastOff& bcast,
       for (int64_t k = 0; k < dim; ++k) {
         const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
         const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-        const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim + lhs_add : nullptr;
-        const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim + rhs_add : nullptr;
-        out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
+        const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim +\
+                               lhs_add * reduce_size : nullptr;
+        const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim +\
+                               rhs_add * reduce_size : nullptr;
+        out_off[k] = Op::Call(lhs_off, rhs_off, reduce_size);
       }
     }
   }
@@ -58,7 +61,8 @@ void SDDMMCoo(const BcastOff& bcast,
   const DType* Y = utils::GetPtr<DType>(vfeat);
   int64_t dim = bcast.out_len,
           lhs_dim = bcast.lhs_len,
-          rhs_dim = bcast.rhs_len;
+          rhs_dim = bcast.rhs_len,
+          reduce_size = bcast.reduce_size;
   DType* O = utils::GetPtr<DType>(out);
   const int64_t nnz = coo.row->shape[0];
 #pragma omp parallel for
@@ -70,8 +74,10 @@ void SDDMMCoo(const BcastOff& bcast,
     for (int64_t k = 0; k < dim; ++k) {
       const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
       const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-      const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim + lhs_add : nullptr;
-      const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim + rhs_add : nullptr;
+      const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim +\
+                             lhs_add * reduce_size : nullptr;
+      const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim +\
+                             rhs_add * reduce_size : nullptr;
       out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
     }
   }
@@ -88,11 +94,29 @@ struct Add {
 };
 
 template <typename DType>
+struct Sub {
+  static constexpr bool use_lhs = true;
+  static constexpr bool use_rhs = true;
+  inline static DType Call(const DType* lhs_off, const DType* rhs_off, int64_t len = 1) {
+    return *lhs_off - *rhs_off;
+  }
+};
+
+template <typename DType>
 struct Mul {
   static constexpr bool use_lhs = true;
   static constexpr bool use_rhs = true;
   inline static DType Call(const DType* lhs_off, const DType* rhs_off, int64_t len = 1) {
     return *lhs_off * *rhs_off;
+  }
+};
+
+template <typename DType>
+struct Div {
+  static constexpr bool use_lhs = true;
+  static constexpr bool use_rhs = true;
+  inline static DType Call(const DType* lhs_off, const DType* rhs_off, int64_t len = 1) {
+    return *lhs_off / *rhs_off;
   }
 };
 
@@ -132,8 +156,14 @@ struct Dot {
     if ((op) == "add") {                                            \
       typedef dgl::kernel::cpu::op::Add<DType> Op;                  \
       { __VA_ARGS__ }                                               \
+    } else if ((op) == "sub") {                                     \
+      typedef dgl::kernel::cpu::op::Sub<DType> Op;                  \
+      { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
       typedef dgl::kernel::cpu::op::Mul<DType> Op;                  \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "div") {                                     \
+      typedef dgl::kernel::cpu::op::Div<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
       typedef dgl::kernel::cpu::op::CopyLhs<DType> Op;              \

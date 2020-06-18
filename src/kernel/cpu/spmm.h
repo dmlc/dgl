@@ -203,11 +203,29 @@ struct Add {
 };
 
 template <typename DType>
+struct Sub {
+  static constexpr bool use_lhs = true;
+  static constexpr bool use_rhs = true;
+  inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
+    return *lhs_off - *rhs_off;
+  }
+};
+
+template <typename DType>
 struct Mul {
   static constexpr bool use_lhs = true;
   static constexpr bool use_rhs = true;
   inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
     return *lhs_off * *rhs_off;
+  }
+};
+
+template <typename DType>
+struct Div {
+  static constexpr bool use_lhs = true;
+  static constexpr bool use_rhs = true;
+  inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
+    return *lhs_off / *rhs_off;
   }
 };
 
@@ -252,8 +270,14 @@ struct Min {
     if ((op) == "add") {                                            \
       typedef dgl::kernel::cpu::op::Add<DType> Op;                  \
       { __VA_ARGS__ }                                               \
+    } else if ((op) == "sub") {                                     \
+      typedef dgl::kernel::cpu::op::Sub<DType> Op;                  \
+      { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
       typedef dgl::kernel::cpu::op::Mul<DType> Op;                  \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "div") {                                     \
+      typedef dgl::kernel::cpu::op::Div<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
       typedef dgl::kernel::cpu::op::CopyLhs<DType> Op;              \

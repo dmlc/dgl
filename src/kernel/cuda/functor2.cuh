@@ -23,6 +23,17 @@ struct Add {
 };
 
 template <typename DType>
+struct Sub {
+  static constexpr bool use_lhs = true;
+  static constexpr bool use_rhs = true;
+  static constexpr bool reduce_last_dim = false;
+  static __device__ __forceinline__ DType Call(
+      const DType *lhs, const DType *rhs, int64_t len = 1) {
+    return lhs[0] - rhs[0];
+  }
+};
+
+template <typename DType>
 struct Mul {
   static constexpr bool use_lhs = true;
   static constexpr bool use_rhs = true;
@@ -30,6 +41,17 @@ struct Mul {
   static __device__ __forceinline__ DType Call(
       const DType *lhs, const DType *rhs, int64_t len = 1) {
     return lhs[0] * rhs[0];
+  }
+};
+
+template <typename DType>
+struct Div {
+  static constexpr bool use_lhs = true;
+  static constexpr bool use_rhs = true;
+  static constexpr bool reduce_last_dim = false;
+  static __device__ __forceinline__ DType Call(
+      const DType *lhs, const DType *rhs, int64_t len = 1) {
+    return lhs[0] / rhs[0];
   }
 };
 

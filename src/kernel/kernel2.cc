@@ -111,6 +111,8 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSpMM")
     NDArray V = args[5];
     NDArray ArgU = args[6];
     NDArray ArgE = args[7];
+    CheckCtx(graph->Context(), {U, E, V, ArgU, ArgE},
+        {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
 
@@ -121,6 +123,7 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSDDMM")
     NDArray U = args[2];
     NDArray V = args[3];
     NDArray E = args[4];
+    CheckCtx(graph->Context(), {U, V, E}, {"U_data", "V_data", "out"});
     SDDMM(op, graph.sptr(), U, V, E);
   });
 

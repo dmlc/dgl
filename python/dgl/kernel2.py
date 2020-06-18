@@ -1,6 +1,8 @@
 from ._ffi.function import _init_api
 from .base import DGLError
+from .utils import to_dgl_context
 from . import backend as F
+import dgl.ndarray as nd
 
 def infer_broadcast_shape(op, shp1, shp2):
     """
@@ -29,7 +31,8 @@ def infer_broadcast_shape(op, shp1, shp2):
     rst = tuple(max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2))
     return rst[:-1] + (1,) if op == "dot" else rst
 
-to_dgl_nd = F.zerocopy_to_dgl_ndarray
+def to_dgl_nd(x):
+    return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
 op_mapping = {
     '+': 'add',
@@ -69,8 +72,8 @@ def gspmm(g, op, reduce_op, u, e):
         The result tensor.
     """
     op = op_mapping[op]
-    gidx = g._graph
     ctx = F.context(u) if u is not None else F.context(e)
+    gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
     dtype = F.dtype(u) if u is not None else F.dtype(e)
     use_u = (op != 'copy_e')
     use_e = (op != 'copy_u')
@@ -80,12 +83,8 @@ def gspmm(g, op, reduce_op, u, e):
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = (reduce_op == 'max' or reduce_op == 'min')
-    arg_u = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_u else F.zeros((0,), g.idtype, ctx)
-    arg_e = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_e else F.zeros((0,), g.idtype, ctx)
-    if u is None:
-        u = F.zeros((0,), g.idtype, ctx)
-    if e is None:
-        e = F.zeros((0,), g.idtype, ctx)
+    arg_u = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_u else None 
+    arg_e = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_e else None
     _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
             to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
             to_dgl_nd(arg_u), to_dgl_nd(arg_e))
@@ -114,11 +113,10 @@ def gsddmm(g, op, u, v):
     op = op_mapping[op]
     gidx = g._graph
     ctx = F.context(u)
+    gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
     dtype = F.dtype(u)
     u_shp = F.shape(u)
     v_shp = F.shape(v) if v is not None else (0,)
-    if v is None:
-        v = F.zeros((0,), g.idtype, ctx)
     e_shp = (g.number_of_edges(), ) +\
         infer_broadcast_shape(op, u_shp[1:], v_shp[1:])
     e = F.zeros(e_shp, dtype, ctx)

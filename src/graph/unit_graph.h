@@ -260,6 +260,9 @@ class UnitGraph : public BaseHeteroGraph {
 
   HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
 
+  // XXX(minjie): reverse the graph adjacency
+  UnitGraphPtr Reverse() const;
+
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
 

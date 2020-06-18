@@ -150,8 +150,14 @@ void CusparseCsrmm2(
     if ((op) == "add") {                                            \
       typedef dgl::kernel::cuda::binary::Add<DType> Op;             \
       { __VA_ARGS__ }                                               \
+    } else if ((op) == "sub") {                                            \
+      typedef dgl::kernel::cuda::binary::Sub<DType> Op;             \
+      { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
       typedef dgl::kernel::cuda::binary::Mul<DType> Op;             \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "div") {                                     \
+      typedef dgl::kernel::cuda::binary::Div<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
       typedef dgl::kernel::cuda::binary::CopyU<DType> Op;           \
