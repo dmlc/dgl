@@ -33,6 +33,9 @@ def _get_shared_mem_metadata(graph_name):
     dtype = F.int64
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
+    # If the shared memory array is empty, it means the meta doesn't exist in shared memory.
+    if len(data) == 0:
+        return None, None, None, None, None
     dlpack = data.to_dlpack()
     meta = F.asnumpy(F.zerocopy_from_dlpack(dlpack))
     is_range_part, num_nodes, num_edges, num_partitions, part_id = meta
@@ -71,7 +74,9 @@ def get_shared_mem_partition_book(graph_name, graph_part):
         A graph partition book for a particular partition.
     '''
     is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
-    if is_range_part == 1:
+    if is_range_part is None:
+        return None
+    elif is_range_part == 1:
         return RangePartitionBook(part_id, num_parts, node_map, edge_map)
     else:
         return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)

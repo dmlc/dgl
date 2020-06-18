@@ -5,6 +5,7 @@
  */
 #include <string.h>
 #include <dmlc/logging.h>
+#include <dgl/array.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
@@ -178,11 +179,14 @@ NDArray NDArray::EmptyShared(const std::string &name,
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
     ret.data_->dl_tensor.data = mem->CreateNew(size);
+    ret.data_->mem = mem;
+  } else if (!SharedMemory::Exist(name)) {
+    ret = aten::NullArray();
   } else {
     ret.data_->dl_tensor.data = mem->Open(size);
+    ret.data_->mem = mem;
   }
 
-  ret.data_->mem = mem;
 #else
   LOG(FATAL) << "Windows doesn't support NDArray with shared memory";
 #endif  // _WIN32
