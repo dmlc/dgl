@@ -900,7 +900,7 @@ class HeteroGraphIndex(ObjectBase):
         HeteroGraphIndex
         """
         g = self.get_relation_graph(etype)
-        return g.asbits(self.bits_needed(etype or 0)).copy_to(ctx)
+        return g.copy_to(ctx).asbits(self.bits_needed(etype or 0))
 
     def get_csr_shuffle_order(self, etype):
         """Return the edge shuffling order when a coo graph is converted to csr format
