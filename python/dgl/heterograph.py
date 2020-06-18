@@ -4091,11 +4091,11 @@ class DGLHeteroGraph(object):
         device(type='cpu')
         """
         new_nframes = []
-        for i, nframe in enumerate(self._node_frames):
+        for nframe in self._node_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
             new_nframes.append(FrameRef(Frame(new_feats)))
         new_eframes = []
-        for i, eframe in enumerate(self._edge_frames):
+        for eframe in self._edge_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats)))
         # TODO(minjie): replace the following line with the commented one to enable GPU graph.
