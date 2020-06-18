@@ -465,6 +465,31 @@ class BaseHeteroGraph : public runtime::Object {
     return nullptr;
   }
 
+  /*!
+   * \brief Sort the CSR matrix according to tag (a node feature)
+   * 
+   * In order to use biased neighbor sampler, it is necessary to sort the CSR by tag.
+   * After sorting, edges pointing to those nodes with the same tag will be arranged 
+   * in a consectuive range, which allows us to get neighbors with a given tag efficiently.
+   * 
+   * \return The split positions indicating range of different tags
+   */
+  virtual IdArray SortCSR_(dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
+
+  /*!
+   * \brief Sort the CSC matrix according to tag (a node feature)
+   * 
+   * \return The split positions indicating range of different tags
+   */
+  virtual IdArray SortCSC_(dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
+
+  /*! 
+  * \return The sorted copy of the graph and the split positions
+  */
+  virtual std::pair<HeteroGraphPtr, IdArray> SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
+
+  virtual std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
+
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
 

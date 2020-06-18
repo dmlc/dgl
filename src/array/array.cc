@@ -441,6 +441,16 @@ void CSRSort_(CSRMatrix* csr) {
   });
 }
 
+IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
+  IdArray ret;
+  ATEN_CSR_SWITCH(*csr, XPU, IdType, "CSRSortByTag_", {
+    ATEN_ID_TYPE_SWITCH(tag->dtype, TagType, {
+      ret = impl::CSRSortByTag_<XPU, IdType, TagType>(csr, tag, num_tags);
+    });
+  });  
+  return ret;
+}
+
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRRemove", {

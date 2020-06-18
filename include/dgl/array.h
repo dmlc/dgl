@@ -589,6 +589,33 @@ bool CSRHasDuplicate(CSRMatrix csr);
  */
 void CSRSort_(CSRMatrix* csr);
 
+/*！
+ * \brief Sort the colunm index according to a node feature called tag
+ * 
+ * \return the split positions of different tags
+ * 
+ * Example:
+ * indptr  = [0, 5, 8]
+ * indices = [0, 1, 2, 3, 4, 0, 1, 2]
+ * 
+ * tag     = [1, 1, 0, 2, 0]
+ * 
+ *  After CSRSortByTag_
+ * 
+ * indptr  = [0, 5, 8]
+ * indices = [2, 4, 0, 1, 3, 2, 0, 1]
+ * (tag)   = [0, 0, 1, 1, 2, 0, 1, 1]
+ *           ^    ^     ^  ^
+ *                         ^  ^     ^
+ * (the tag array itself is unchanged.)
+ *   
+ * Return:
+ * [0, 2, 4, 5, 0, 1, 3] (marked with ^)
+ * It is a flatten array produced by concatenating the split positions of all nodes
+ */
+IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
+
+
 /*!
  * \brief Remove entries from CSR matrix by entry indices (data indices)
  * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR

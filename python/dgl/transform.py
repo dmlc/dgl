@@ -39,7 +39,11 @@ __all__ = [
     'out_subgraph',
     'remove_edges',
     'as_immutable_graph',
-    'as_heterograph']
+    'as_heterograph',
+    'sort_csr_',
+    'sort_csc_',
+    'sort_csr',
+    'sort_csc']
 
 
 def pairwise_squared_distance(x):
@@ -1188,5 +1192,37 @@ def as_immutable_graph(hg):
     g.ndata.update(hg.ndata)
     g.edata.update(hg.edata)
     return g
+
+def sort_csr_(hg, tag=None):
+    # Currently only support Unitgraph
+    tag_data = hg.ndata[tag]
+    num_tags = int(F.max(tag_data, 0)) + 1
+    ret = _CAPI_DGLHeteroSortCSR_(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
+    return F.reshape(F.zerocopy_from_dgl_ndarray(ret), [-1, num_tags + 1])
+
+def sort_csc_(hg, tag=None):
+    # Currently only support Unitgraph
+    tag_data = hg.ndata[tag]
+    num_tags = int(F.max(tag_data, 0)) + 1
+    ret = _CAPI_DGLHeteroSortCSC_(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
+    return F.reshape(F.zerocopy_from_dgl_ndarray(ret), [-1, num_tags + 1])
+
+def sort_csr(hg, tag=None):
+    # Currently only support Unitgraph
+    tag_data = hg.ndata[tag]
+    num_tags = int(F.max(tag_data, 0)) + 1
+    gidx, split = [item.data for item in _CAPI_DGLHeteroSortCSR(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)]
+    split = F.reshape(F.zerocopy_from_dgl_ndarray(split), [-1, num_tags + 1])
+    new_g = DGLHeteroGraph(gidx, hg.ntypes, hg.etypes, hg._node_frames, hg._edge_frames)
+    return new_g, split
+
+def sort_csc(hg, tag=None):
+    # Currently only support Unitgraph
+    tag_data = hg.ndata[tag]
+    num_tags = int(F.max(tag_data, 0)) + 1
+    gidx, split = [item.data for item in _CAPI_DGLHeteroSortCSC(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)]
+    split = F.reshape(F.zerocopy_from_dgl_ndarray(split), [-1, num_tags + 1])
+    new_g = DGLHeteroGraph(gidx, hg.ntypes, hg.etypes, hg._node_frames, hg._edge_frames)
+    return new_g, split
 
 _init_api("dgl.transform")

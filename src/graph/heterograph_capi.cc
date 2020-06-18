@@ -531,4 +531,47 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
     *rv = GraphRef(hg->AsImmutableGraph());
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSR_")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    NDArray tag = args[2];
+    int64_t num_tag = args[3];
+    *rv = hg->SortCSR_(etype, tag, num_tag);
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSC_")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    NDArray tag = args[2];
+    int64_t num_tag = args[3];
+    *rv = hg->SortCSC_(etype, tag, num_tag);
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSR")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    NDArray tag = args[2];
+    int64_t num_tag = args[3];
+    List<Value> ret_list;
+    auto ret = hg->SortCSR(etype, tag, num_tag);
+    ret_list.push_back(Value(MakeValue(ret.first)));
+    ret_list.push_back(Value(MakeValue(ret.second)));
+    *rv = ret_list;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSC")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    NDArray tag = args[2];
+    int64_t num_tag = args[3];
+    List<Value> ret_list;
+    auto ret = hg->SortCSC(etype, tag, num_tag);
+    ret_list.push_back(Value(MakeValue(ret.first)));
+    ret_list.push_back(Value(MakeValue(ret.second)));
+    *rv = ret_list;
+  });
 }  // namespace dgl

@@ -416,6 +416,26 @@ class UnitGraph::COO : public BaseHeteroGraph {
     fs->Write(adj_);
   }
 
+  IdArray SortCSR_(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return aten::NullArray();
+  }
+
+  IdArray SortCSC_(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return aten::NullArray();
+  }
+
+  std::pair<HeteroGraphPtr, IdArray> SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return std::make_pair(nullptr, aten::NullArray());
+  }
+
+  std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return std::make_pair(nullptr, aten::NullArray());
+  }
+
  private:
   friend class Serializer;
 
@@ -777,7 +797,30 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     fs->Write(adj_);
   }
 
+  IdArray SortCSR_(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    return aten::CSRSortByTag_(&adj_, tag, num_tags);
+  }
 
+  IdArray SortCSC_(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    LOG(FATAL) << "Not enabled for CSR graph.";
+    return aten::NullArray();
+  }
+  
+  std::pair<HeteroGraphPtr, IdArray> SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    IdArray indptr = aten::Clone(adj_.indptr);
+    IdArray indices = aten::Clone(adj_.indices);
+    IdArray data = aten::Clone(adj_.data);
+    CSRMatrix new_csr = aten::CSRMatrix(adj_.num_rows, adj_.num_cols, indptr, indices, data);
+    IdArray split = aten::CSRSortByTag_(&new_csr, tag, num_tags);
+    HeteroGraphPtr new_g = std::make_shared<CSR>(meta_graph_, new_csr);
+    return std::make_pair(new_g, split);
+  }
+
+  std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+    LOG(FATAL) << "Not enabled for CSR graph.";
+    return std::make_pair(nullptr, aten::NullArray());
+  }
+  
  private:
   friend class Serializer;
 
@@ -1505,6 +1548,28 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
       LOG(FATAL) << "unsupported format code";
       break;
   }
+}
+
+IdArray UnitGraph::SortCSR_(dgl_type_t etype, IdArray tag, int64_t num_tags) {
+  return GetOutCSR()->SortCSR_(etype, tag, num_tags);
+}
+
+IdArray UnitGraph::SortCSC_(dgl_type_t etype, IdArray tag, int64_t num_tags) {
+  return GetInCSR()->SortCSR_(etype, tag, num_tags);
+}
+
+std::pair<HeteroGraphPtr, IdArray> UnitGraph::SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) {
+  auto ret = GetOutCSR()->SortCSR(etype, tag, num_tags);
+  CSRPtr out_csr = std::static_pointer_cast<CSR>(ret.first);
+  ret.first = UnitGraphPtr(new UnitGraph(meta_graph_, nullptr, out_csr, nullptr));
+  return ret;
+}
+
+std::pair<HeteroGraphPtr, IdArray> UnitGraph::SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) {
+  auto ret = GetOutCSR()->SortCSR(etype, tag, num_tags);
+  CSRPtr in_csr = std::static_pointer_cast<CSR>(ret.first);
+  ret.first = UnitGraphPtr(new UnitGraph(meta_graph_, in_csr, nullptr, nullptr));
+  return ret;
 }
 
 }  // namespace dgl
