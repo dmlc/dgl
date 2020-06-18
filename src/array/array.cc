@@ -706,7 +706,11 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLCreateSparseMatrix")
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const std::string name = args[0];
+#ifndef _WIN32
     *rv = SharedMemory::Exist(name);
+#else
+    *rv = false;
+#endif  // _WIN32
   });
 
 }  // namespace aten
