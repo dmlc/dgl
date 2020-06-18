@@ -93,7 +93,7 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
       row.Ptr<IdType>(), col.Ptr<IdType>(),
       row_stride, col_stride, rstlen,
       rst.Ptr<IdType>());
-  return rst;
+  return rst != -1;
 }
 
 template NDArray CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, NDArray, NDArray);
