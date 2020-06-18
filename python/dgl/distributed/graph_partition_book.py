@@ -7,6 +7,7 @@ from ..base import NID, EID
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
+from ..ndarray import exist_shared_mem_array
 
 def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
                                  num_partitions, node_map, edge_map, is_range_part):
@@ -70,6 +71,8 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     GraphPartitionBook or RangePartitionBook
         A graph partition book for a particular partition.
     '''
+    if not exist_shared_mem_array(_get_ndata_path(graph_name, 'meta')):
+        return None
     is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
     if is_range_part == 1:
         return RangePartitionBook(part_id, num_parts, node_map, edge_map)
