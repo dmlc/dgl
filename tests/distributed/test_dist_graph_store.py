@@ -157,7 +157,7 @@ def check_server_client(shared_mem):
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
-    #check_server_client(True)
+    check_server_client(True)
     check_server_client(False)
 
 def test_split():
