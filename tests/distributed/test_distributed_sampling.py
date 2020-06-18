@@ -40,9 +40,9 @@ def test_rpc_sampling(tmpdir):
     num_server = 3
     ip_config = open("rpc_sampling_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('127.0.0.1 20060 1\n')
-    ip_config.write('127.0.0.1 20070 1\n')
-    ip_config.write('127.0.0.1 20080 1\n')
+    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
     # sys.excepthook = myexcepthook
     # partition graph
