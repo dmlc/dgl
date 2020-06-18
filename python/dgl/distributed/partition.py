@@ -221,34 +221,24 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     # TODO(zhengda) we should replace int64 with int16. int16 should be sufficient.
     if not reshuffle:
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
-        num_edges = 0
-        lnodes_list = []      # The node ids of each partition
-        ledges_list = []      # The edge Ids of each partition
-        for part_id in range(num_parts):
-            part = client_parts[part_id]
-            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'])
-            local_edges = F.asnumpy(g.in_edges(local_nodes, form='eid'))
+    num_edges = 0
+    num_nodes = 0
+    lnodes_list = []      # The node ids of each partition
+    ledges_list = []      # The edge Ids of each partition
+    for part_id in range(num_parts):
+        part = client_parts[part_id]
+        # To get the edges in the input graph, we should use original node Ids.
+        data_name = 'orig_id' if reshuffle else NID
+        local_nodes = F.boolean_mask(part.ndata[data_name], part.ndata['inner_node'])
+        local_edges = F.asnumpy(g.in_edges(local_nodes, form='eid'))
+        if not reshuffle:
             edge_parts[local_edges] = part_id
-            num_edges += len(local_edges)
-            lnodes_list.append(local_nodes)
-            ledges_list.append(local_edges)
-        assert num_edges == g.number_of_edges()
-    else:
-        num_edges = 0
-        num_nodes = 0
-        lnodes_list = []      # The node ids of each partition
-        ledges_list = []      # The edge Ids of each partition
-        for part_id in range(num_parts):
-            part = client_parts[part_id]
-            # To get the edges in the input graph, we should use original node Ids.
-            local_nodes = F.boolean_mask(part.ndata['orig_id'], part.ndata['inner_node'])
-            local_edges = F.asnumpy(g.in_edges(local_nodes, form='eid'))
-            num_edges += len(local_edges)
-            num_nodes += len(local_nodes)
-            lnodes_list.append(local_nodes)
-            ledges_list.append(local_edges)
-        assert num_edges == g.number_of_edges()
-        assert num_nodes == g.number_of_nodes()
+        num_edges += len(local_edges)
+        num_nodes += len(local_nodes)
+        lnodes_list.append(local_nodes)
+        ledges_list.append(local_edges)
+    assert num_edges == g.number_of_edges()
+    assert num_nodes == g.number_of_nodes()
 
     os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
