@@ -339,6 +339,17 @@ class GraphPartitionBook:
         """
         return self._edge_size
 
+    @property
+    def partid(self):
+        """Get the current partition id
+
+        Return
+        ------
+        int
+            The partition id of current machine
+        """
+        return self._part_id
+
 
 class RangePartitionBook:
     """RangePartitionBook is used to store parition information.
@@ -592,6 +603,17 @@ class RangePartitionBook:
         range_start = self._edge_map[self._partid - 1] if self._partid > 0 else 0
         range_end = self._edge_map[self._partid]
         return range_end - range_start
+
+    @property
+    def partid(self):
+        """Get the current partition id
+
+        Return
+        ------
+        int
+            The partition id of current machine
+        """
+        return self._partid
 
 class PartitionPolicy(object):
     """Wrapper for GraphPartitionBook and RangePartitionBook.
