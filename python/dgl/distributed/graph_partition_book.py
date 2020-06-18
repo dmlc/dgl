@@ -7,6 +7,7 @@ from ..base import NID, EID
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
+from ..ndarray import exist_shared_mem_array
 
 def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
                                  num_partitions, node_map, edge_map, is_range_part):
@@ -33,9 +34,6 @@ def _get_shared_mem_metadata(graph_name):
     dtype = F.int64
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
-    # If the shared memory array is empty, it means the meta doesn't exist in shared memory.
-    if len(data) == 0:
-        return None, None, None, None, None
     dlpack = data.to_dlpack()
     meta = F.asnumpy(F.zerocopy_from_dlpack(dlpack))
     is_range_part, num_nodes, num_edges, num_partitions, part_id = meta
@@ -73,10 +71,10 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     GraphPartitionBook or RangePartitionBook
         A graph partition book for a particular partition.
     '''
-    is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
-    if is_range_part is None:
+    if not exist_shared_mem_array(_get_ndata_path(graph_name, 'meta')):
         return None
-    elif is_range_part == 1:
+    is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
+    if is_range_part == 1:
         return RangePartitionBook(part_id, num_parts, node_map, edge_map)
     else:
         return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)

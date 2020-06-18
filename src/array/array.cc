@@ -6,6 +6,7 @@
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/shared_mem.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
@@ -700,6 +701,12 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLCreateSparseMatrix")
           ListValueToVector<IdArray>(indices),
           ListValueToVector<bool>(flags)));
     *rv = SparseMatrixRef(spmat);
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const std::string name = args[0];
+    *rv = SharedMemory::Exist(name);
   });
 
 }  // namespace aten
