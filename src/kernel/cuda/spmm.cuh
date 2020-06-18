@@ -9,7 +9,6 @@
 #include "../utils.h"
 #include "../bcast.h"
 #include "atomic.cuh"
-#include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
 namespace kernel {
@@ -264,7 +263,6 @@ void SpMMCsr(
       );
   });
 }
-
 
 }  // namespace cuda
 }  // namespace kernel

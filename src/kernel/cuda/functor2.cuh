@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2020 by Contributors
+ * \file kernel/cuda/functor2.cuh
+ * \brief Functors for template on CUDA
+ */
 #ifndef DGL_KERNEL2_FUNCTOR_CUH_
 #define DGL_KERNEL2_FUNCTOR_CUH_
 
@@ -64,7 +69,6 @@ struct Dot {
     return rst;
   }
 };
-
 
 }   // end of namespace binary
 
@@ -155,10 +159,10 @@ struct Min {
   }
 };
 
-}   // end of namespace reduce
+}  // namespace reduce
 
-}
-}
-}
+}  // namespace cuda
+}  // namespace kernel
+}  // namespace dgl
 
 #endif  // DGL_KERNEL2_FUNCTOR_CUH_

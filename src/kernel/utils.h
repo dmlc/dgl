@@ -76,7 +76,6 @@ minigun::Csr<Idx> CreateCsr(runtime::NDArray indptr, runtime::NDArray indices) {
   return csr;
 }
 
-
 }  // namespace utils
 }  // namespace kernel
 }  // namespace dgl

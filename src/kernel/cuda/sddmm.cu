@@ -6,8 +6,6 @@
 #include "./sddmm.cuh"
 #include "./functor2.cuh"
 #include <dgl/array.h>
-#include "../binary_reduce.h"
-#include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
 namespace kernel {

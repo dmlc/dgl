@@ -234,9 +234,8 @@ void SDDMMCsr(
   });
 }
 
-
-}
-}
-}
+}  // namespace cuda
+}  // namespace kernel
+}  // namespace dgl
 
 #endif

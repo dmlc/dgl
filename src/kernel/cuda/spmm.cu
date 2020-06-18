@@ -146,8 +146,6 @@ void CusparseCsrmm2(
 }
 }  // namespace cusparse
 
-
-
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
