@@ -1,6 +1,5 @@
 """Sampling module"""
 from .rpc import Request, Response, remote_call_to_machine
-from .dist_graph import DistGraph
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
 from ..convert import graph
@@ -85,7 +84,8 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     req_list = []
     partition_book = dist_graph.get_partition_book()
 
-    partition_id = F.asnumpy(partition_book.nid2partid(F.tensor(nodes))).tolist()
+    partition_id = F.asnumpy(
+        partition_book.nid2partid(F.tensor(nodes))).tolist()
     node_id_per_partition = [[]
                              for _ in range(partition_book.num_partitions())]
     for pid, node in zip(partition_id, nodes):
@@ -100,8 +100,6 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     res_list = remote_call_to_machine(req_list)
     sampled_graph = merge_graphs(res_list, dist_graph.number_of_nodes())
     return sampled_graph
-    sampled_graph.ndata['orig_id'] = dist_graph.ndata['orig_id'][sampled_graph.ndata[dgl.NID]]
-
 
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SamplingResponse)
