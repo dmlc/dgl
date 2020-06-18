@@ -1,8 +1,10 @@
+"""Module for sparse matrix operators."""
+# pylint: disable = invalid name
+import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from .utils import to_dgl_context
 from . import backend as F
-import dgl.ndarray as nd
 
 def infer_broadcast_shape(op, shp1, shp2):
     """
@@ -27,11 +29,12 @@ def infer_broadcast_shape(op, shp1, shp2):
     for d1, d2 in zip(pad_shp1, pad_shp2):
         if d1 != d2 and d1 != 1 and d2 != 1:
             raise DGLError("Feature shapes {} and {} are not valid for broadcasting."
-                    .format(shp1, shp2))
+                           .format(shp1, shp2))
     rst = tuple(max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2))
     return rst[:-1] + (1,) if op == "dot" else rst
 
 def to_dgl_nd(x):
+    """Convert tensor/None to ndarray."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
 op_mapping = {
@@ -82,12 +85,12 @@ def gspmm(g, op, reduce_op, u, e):
     v_shp = (g.number_of_dst_nodes(), ) +\
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     v = F.zeros(v_shp, dtype, ctx)
-    use_cmp = (reduce_op == 'max' or reduce_op == 'min')
-    arg_u = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_u else None 
+    use_cmp = reduce_op in ['max', 'min']
+    arg_u = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_u else None
     arg_e = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_e else None
     _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
-            to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
-            to_dgl_nd(arg_u), to_dgl_nd(arg_e))
+                        to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
+                        to_dgl_nd(arg_u), to_dgl_nd(arg_e))
     return v, (arg_u, arg_e)
 
 def gsddmm(g, op, u, v):
