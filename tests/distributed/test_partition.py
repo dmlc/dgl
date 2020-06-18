@@ -49,10 +49,10 @@ def check_partition(reshuffle):
         assert np.all(F.asnumpy(local_eid) == np.arange(0, len(local_eid)))
 
         # Check the node map.
-        local_nodes = F.asnumpy(F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node']))
-        llocal_nodes = F.asnumpy(F.nonzero_1d(part_g.ndata['inner_node']))
-        local_nodes1 = F.asnumpy(gpb.partid2nids(i))
-        assert np.all(np.sort(local_nodes) == np.sort(local_nodes1))
+        local_nodes = F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node'])
+        llocal_nodes = F.nonzero_1d(part_g.ndata['inner_node'])
+        local_nodes1 = gpb.partid2nids(i)
+        assert np.all(np.sort(F.asnumpy(local_nodes)) == np.sort(F.asnumpy(local_nodes1)))
 
         # Check the edge map.
         local_edges = F.asnumpy(F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge']))
@@ -62,7 +62,7 @@ def check_partition(reshuffle):
         if reshuffle:
             part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata['orig_id'])
             # when we read node data from the original global graph, we should use orig_id.
-            local_nodes = F.asnumpy(F.boolean_mask(part_g.ndata['orig_id'], part_g.ndata['inner_node']))
+            local_nodes = F.boolean_mask(part_g.ndata['orig_id'], part_g.ndata['inner_node'])
         else:
             part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata[dgl.NID])
         part_g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
@@ -73,7 +73,7 @@ def check_partition(reshuffle):
             assert name in node_feats
             assert node_feats[name].shape[0] == len(local_nodes)
             assert len(local_nodes) == len(node_feats[name])
-            assert np.all(F.asnumpy(g.ndata[name])[local_nodes] == F.asnumpy(node_feats[name]))
+            assert np.all(F.asnumpy(g.ndata[name])[F.asnumpy(local_nodes)] == F.asnumpy(node_feats[name]))
         assert len(edge_feats) == 0
 
 
