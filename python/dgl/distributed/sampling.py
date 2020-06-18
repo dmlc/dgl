@@ -79,11 +79,11 @@ def merge_graphs(res_list, num_nodes):
     return g
 
 
-def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, replace=False):
+def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample neighbors"""
     assert edge_dir == 'in'
     req_list = []
-    partition_book = g.get_partition_book()
+    partition_book = dist_graph.get_partition_book()
 
     partition_id = F.asnumpy(partition_book.nid2partid(F.tensor(nodes))).tolist()
     node_id_per_partition = [[]
@@ -98,7 +98,10 @@ def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, repl
             req_list.append((pid, req))
     print(req_list)
     res_list = remote_call_to_machine(req_list)
-    return merge_graphs(res_list, g.number_of_nodes())
+    sampled_graph = merge_graphs(res_list, dist_graph.number_of_nodes())
+    return sampled_graph
+    sampled_graph.ndata['orig_id'] = dist_graph.ndata['orig_id'][sampled_graph.ndata[dgl.NID]]
+
 
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SamplingResponse)
