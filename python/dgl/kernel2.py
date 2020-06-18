@@ -31,32 +31,97 @@ def infer_broadcast_shape(op, shp1, shp2):
 
 to_dgl_nd = F.zerocopy_to_dgl_ndarray
 
+op_mapping = {
+    '+': 'add',
+    '-': 'sub',
+    '*': 'mul',
+    '/': 'div',
+    '.': 'dot',
+    'add': 'add',
+    'sub': 'sub',
+    'mul': 'mul',
+    'div': 'div',
+    'dot': 'dot',
+    'copy_u': 'copy_u',
+    'copy_e': 'copy_e'
+}
+
 def gspmm(g, op, reduce_op, u, e):
+    """ Generalized Sparse Matrix Multiplication interface.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``, ``copy_u``,
+        ``copy_e``, or their alias ``+``, ``-``, ``*``, ``/``, ``.``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    u : tensor or None
+        The feature on source nodes, could be None if op is ``copy_e``.
+    e : tensor or None
+        The feature on edges, could be None if op is ``copy_u``.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
+    op = op_mapping[op]
     gidx = g._graph
-    ctx = F.context(u)
+    ctx = F.context(u) if u is not None else F.context(e)
+    dtype = F.dtype(u) if u is not None else F.dtype(e)
     use_u = (op != 'copy_e')
     use_e = (op != 'copy_u')
     u_shp = F.shape(u) if use_u else (0,)
     e_shp = F.shape(e) if use_e else (0,)
     v_shp = (g.number_of_dst_nodes(), ) +\
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
-    v = F.zeros(v_shp, F.dtype(u), ctx)
+    v = F.zeros(v_shp, dtype, ctx)
     use_cmp = (reduce_op == 'max' or reduce_op == 'min')
     arg_u = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_u else F.zeros((0,), g.idtype, ctx)
     arg_e = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_e else F.zeros((0,), g.idtype, ctx)
+    if u is None:
+        u = F.zeros((0,), g.idtype, ctx)
+    if e is None:
+        e = F.zeros((0,), g.idtype, ctx)
     _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
             to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
             to_dgl_nd(arg_u), to_dgl_nd(arg_e))
     return v, (arg_u, arg_e)
 
 def gsddmm(g, op, u, v):
+    """ Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``, ``copy_u``,
+        or their alias ``+``, ``-``, ``*``, ``/``, ``.``.
+    u : tensor or None
+        The feature on source nodes.
+    v : tensor or None
+        The feature on destination, could be None if op is ``copy_u``.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
+    op = op_mapping[op]
     gidx = g._graph
     ctx = F.context(u)
+    dtype = F.dtype(u)
     u_shp = F.shape(u)
-    v_shp = F.shape(v)
+    v_shp = F.shape(v) if v is not None else (0,)
+    if v is None:
+        v = F.zeros((0,), g.idtype, ctx)
     e_shp = (g.number_of_edges(), ) +\
         infer_broadcast_shape(op, u_shp[1:], v_shp[1:])
-    e = F.zeros(e_shp, F.dtype(u), ctx)
+    e = F.zeros(e_shp, dtype, ctx)
     _CAPI_DGLKernelSDDMM(gidx, op, to_dgl_nd(u), to_dgl_nd(v), to_dgl_nd(e))
     return e
 
