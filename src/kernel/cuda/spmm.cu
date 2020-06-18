@@ -268,7 +268,7 @@ template void SpMMCoo<kDLGPU, int64_t, float>(
     const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int32_t, double>(
-    const std::string& op, const std::string& reduce, 
+    const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int64_t, double>(

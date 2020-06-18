@@ -6,8 +6,8 @@
 #ifndef DGL_KERNEL_CPU_SPMM_H_
 #define DGL_KERNEL_CPU_SPMM_H_
 
-#include <limits>
 #include <dgl/array.h>
+#include <limits>
 #include "../utils.h"
 #include "../bcast.h"
 
