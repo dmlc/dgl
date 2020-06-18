@@ -10,7 +10,7 @@ from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition
-from .graph_partition_book import GraphPartitionBook, PartitionPolicy, get_shared_mem_partition_book
+from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .rpc_client import connect_to_server
@@ -25,17 +25,16 @@ def _copy_graph_to_shared_mem(g, graph_name):
     new_g = DGLGraph(gidx)
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
-    local_node_path = _get_ndata_path(graph_name, 'local_node')
-    new_g.ndata['local_node'] = _to_shared_mem(g.ndata['local_node'],
-                                               local_node_path)
-    local_edge_path = _get_edata_path(graph_name, 'local_edge')
-    new_g.edata['local_edge'] = _to_shared_mem(g.edata['local_edge'], local_edge_path)
+    local_node_path = _get_ndata_path(graph_name, 'inner_node')
+    new_g.ndata['inner_node'] = _to_shared_mem(g.ndata['inner_node'], local_node_path)
+    local_edge_path = _get_edata_path(graph_name, 'inner_edge')
+    new_g.edata['inner_edge'] = _to_shared_mem(g.edata['inner_edge'], local_edge_path)
     new_g.ndata[NID] = _to_shared_mem(g.ndata[NID], _get_ndata_path(graph_name, NID))
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
     return new_g
 
-FIELD_DICT = {'local_node': F.int64,
-              'local_edge': F.int64,
+FIELD_DICT = {'inner_node': F.int64,
+              'inner_edge': F.int64,
               NID: F.int64,
               EID: F.int64}
 
@@ -99,8 +98,8 @@ def _get_graph_from_shared_mem(graph_name):
         return gidx
 
     g = DGLGraph(gidx)
-    g.ndata['local_node'] = _get_shared_mem_ndata(g, graph_name, 'local_node')
-    g.edata['local_edge'] = _get_shared_mem_edata(g, graph_name, 'local_edge')
+    g.ndata['inner_node'] = _get_shared_mem_ndata(g, graph_name, 'inner_node')
+    g.edata['inner_edge'] = _get_shared_mem_edata(g, graph_name, 'inner_edge')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
     return g
@@ -271,12 +270,10 @@ class DistGraphServer(KVServer):
         self.ip_config = ip_config
 
         # Load graph partition data.
-        self.client_g, node_feats, edge_feats, self.meta = load_partition(conf_file, server_id)
-        _, _, node_map, edge_map, num_partitions = self.meta
+        self.client_g, node_feats, edge_feats, self.gpb = load_partition(conf_file, server_id)
         self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
         # Init kvstore.
-        self.gpb = GraphPartitionBook(server_id, num_partitions, node_map, edge_map, self.client_g)
         self.gpb.shared_memory(graph_name)
         self.add_part_policy(PartitionPolicy('node', server_id, self.gpb))
         self.add_part_policy(PartitionPolicy('edge', server_id, self.gpb))
@@ -331,6 +328,12 @@ class DistGraph:
         self._edata = EdgeDataView(self)
         self._default_init_ndata = _default_init_data
         self._default_init_edata = _default_init_data
+
+        self._num_nodes = 0
+        self._num_edges = 0
+        for part_md in self._gpb.metadata():
+            self._num_nodes += int(part_md['num_nodes'])
+            self._num_edges += int(part_md['num_edges'])
 
 
     def init_ndata(self, ndata_name, shape, dtype):
@@ -425,11 +428,11 @@ class DistGraph:
 
     def number_of_nodes(self):
         """Return the number of nodes"""
-        return self._gpb.num_nodes()
+        return self._num_nodes
 
     def number_of_edges(self):
         """Return the number of edges"""
-        return self._gpb.num_edges()
+        return self._num_edges
 
     def node_attr_schemes(self):
         """Return the node feature and embedding schemes."""

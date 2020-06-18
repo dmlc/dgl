@@ -244,21 +244,15 @@ def test_partition_with_halo():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
+    # TODO(zhengda) Metis fails to partition a small graph.
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
-    subgs = dgl.transform.metis_partition(g, 4, 0)
-    num_inner_nodes = 0
-    num_inner_edges = 0
-    if subgs is not None:
-        for part_id, subg in subgs.items():
-            assert np.all(F.asnumpy(subg.ndata['inner_node']) == 1)
-            assert np.all(F.asnumpy(subg.edata['inner_edge']) == 1)
-            assert np.all(F.asnumpy(subg.ndata['part_id']) == part_id)
-            num_inner_nodes += subg.number_of_nodes()
-            num_inner_edges += subg.number_of_edges()
-        assert num_inner_nodes == g.number_of_nodes()
-        print(g.number_of_edges() - num_inner_edges)
+    check_metis_partition(g, 0)
+    check_metis_partition(g, 1)
+    check_metis_partition(g, 2)
 
-    subgs = dgl.transform.metis_partition(g, 4, 1)
+def check_metis_partition(g, extra_hops):
+    # partitions with 1-hop HALO nodes
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops)
     num_inner_nodes = 0
     num_inner_edges = 0
     if subgs is not None:
@@ -270,6 +264,76 @@ def test_metis_partition():
             assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
         assert num_inner_nodes == g.number_of_nodes()
         print(g.number_of_edges() - num_inner_edges)
+
+    if extra_hops == 0:
+        return
+
+    # partitions with 1-hop HALO nodes and reshuffling nodes
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops, reshuffle=True)
+    num_inner_nodes = 0
+    num_inner_edges = 0
+    edge_cnts = np.zeros((g.number_of_edges(),))
+    if subgs is not None:
+        for part_id, subg in subgs.items():
+            lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+            ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
+            num_inner_nodes += len(lnode_ids)
+            num_inner_edges += len(ledge_ids)
+            assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
+            nids = F.asnumpy(subg.ndata[dgl.NID])
+
+            # ensure the local node Ids are contiguous.
+            parent_ids = F.asnumpy(subg.ndata[dgl.NID])
+            parent_ids = parent_ids[:len(lnode_ids)]
+            assert np.all(parent_ids == np.arange(parent_ids[0], parent_ids[-1] + 1))
+
+            # count the local edges.
+            parent_ids = F.asnumpy(subg.edata[dgl.EID])[ledge_ids]
+            edge_cnts[parent_ids] += 1
+
+            orig_ids = subg.ndata['orig_id']
+            inner_node = F.asnumpy(subg.ndata['inner_node'])
+            for nid in range(subg.number_of_nodes()):
+                neighs = subg.predecessors(nid)
+                old_neighs1 = F.gather_row(orig_ids, neighs)
+                old_nid = F.asnumpy(orig_ids[nid])
+                old_neighs2 = g.predecessors(old_nid)
+                # If this is an inner node, it should have the full neighborhood.
+                if inner_node[nid]:
+                    assert np.all(np.sort(F.asnumpy(old_neighs1)) == np.sort(F.asnumpy(old_neighs2)))
+        # Normally, local edges are only counted once.
+        assert np.all(edge_cnts == 1)
+
+        assert num_inner_nodes == g.number_of_nodes()
+        print(g.number_of_edges() - num_inner_edges)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="It doesn't support GPU")
+def test_reorder_nodes():
+    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    new_nids = np.random.permutation(g.number_of_nodes())
+    # TODO(zhengda) we need to test both CSR and COO.
+    new_g = dgl.transform.reorder_nodes(g, new_nids)
+    new_in_deg = new_g.in_degrees()
+    new_out_deg = new_g.out_degrees()
+    in_deg = g.in_degrees()
+    out_deg = g.out_degrees()
+    new_in_deg1 = F.scatter_row(in_deg, F.tensor(new_nids), in_deg)
+    new_out_deg1 = F.scatter_row(out_deg, F.tensor(new_nids), out_deg)
+    assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
+    assert np.all(F.asnumpy(new_out_deg == new_out_deg1))
+    orig_ids = F.asnumpy(new_g.ndata['orig_id'])
+    for nid in range(new_g.number_of_nodes()):
+        neighs = F.asnumpy(new_g.successors(nid))
+        old_neighs1 = orig_ids[neighs]
+        old_nid = orig_ids[nid]
+        old_neighs2 = g.successors(old_nid)
+        assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
+
+        neighs = F.asnumpy(new_g.predecessors(nid))
+        old_neighs1 = orig_ids[neighs]
+        old_nid = orig_ids[nid]
+        old_neighs2 = g.predecessors(old_nid)
+        assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
@@ -615,6 +679,7 @@ def test_cast():
     assert F.array_equal(g2dst, gdst)
 
 if __name__ == '__main__':
+    test_reorder_nodes()
     # test_line_graph()
     # test_no_backtracking()
     # test_reverse()
@@ -627,7 +692,7 @@ if __name__ == '__main__':
     # test_remove_self_loop()
     # test_add_self_loop()
     # test_partition_with_halo()
-    # test_metis_partition()
+    test_metis_partition()
     # test_compact()
     # test_to_simple()
     # test_in_subgraph("int32")

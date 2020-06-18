@@ -117,6 +117,12 @@ template <DLDeviceType XPU, typename IdType, typename TagType>
 IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
 
 template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 
 // FloatType is the type of probability data.

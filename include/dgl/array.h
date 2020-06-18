@@ -617,6 +617,14 @@ IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
 
 
 /*!
+ * \brief Reorder the rows and colmns according to the new row and column order.
+ * \param csr The input csr matrix.
+ * \param new_row_ids the new row Ids (the index is the old row Id)
+ * \param new_col_ids the new column Ids (the index is the old col Id).
+ */
+CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+/*!
  * \brief Remove entries from CSR matrix by entry indices (data indices)
  * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
  *         entries.
@@ -804,6 +812,14 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
  *         entries.
  */
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
+
+/*!
+ * \brief Reorder the rows and colmns according to the new row and column order.
+ * \param csr The input coo matrix.
+ * \param new_row_ids the new row Ids (the index is the old row Id)
+ * \param new_col_ids the new column Ids (the index is the old col Id).
+ */
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.
