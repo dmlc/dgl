@@ -4098,7 +4098,9 @@ class DGLHeteroGraph(object):
         for i, eframe in enumerate(self._edge_frames):
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats)))
-        new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
+        # TODO(minjie): replace the following line with the commented one to enable GPU graph.
+        new_gidx = self._graph
+        #new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
         return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
                               new_nframes, new_eframes)
 

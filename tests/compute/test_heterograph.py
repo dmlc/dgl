@@ -762,7 +762,6 @@ def test_to_device(index_dtype):
         print(g.device)
         print(g1.device)
         assert g1 is not None
-    assert False
 
 @parametrize_dtype
 def test_convert_bound(index_dtype):

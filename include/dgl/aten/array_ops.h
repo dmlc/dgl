@@ -87,17 +87,39 @@ IdArray Sub(IdArray lhs, IdArray rhs);
 IdArray Mul(IdArray lhs, IdArray rhs);
 IdArray Div(IdArray lhs, IdArray rhs);
 
-IdArray Add(IdArray lhs, dgl_id_t rhs);
-IdArray Sub(IdArray lhs, dgl_id_t rhs);
-IdArray Mul(IdArray lhs, dgl_id_t rhs);
-IdArray Div(IdArray lhs, dgl_id_t rhs);
+IdArray Add(IdArray lhs, int64_t rhs);
+IdArray Sub(IdArray lhs, int64_t rhs);
+IdArray Mul(IdArray lhs, int64_t rhs);
+IdArray Div(IdArray lhs, int64_t rhs);
 
-IdArray Add(dgl_id_t lhs, IdArray rhs);
-IdArray Sub(dgl_id_t lhs, IdArray rhs);
-IdArray Mul(dgl_id_t lhs, IdArray rhs);
-IdArray Div(dgl_id_t lhs, IdArray rhs);
+IdArray Add(int64_t lhs, IdArray rhs);
+IdArray Sub(int64_t lhs, IdArray rhs);
+IdArray Mul(int64_t lhs, IdArray rhs);
+IdArray Div(int64_t lhs, IdArray rhs);
 
-BoolArray LT(IdArray lhs, dgl_id_t rhs);
+IdArray Neg(IdArray array);
+
+// XXX(minjie): currently using integer array for bool type
+IdArray GT(IdArray lhs, IdArray rhs);
+IdArray LT(IdArray lhs, IdArray rhs);
+IdArray GE(IdArray lhs, IdArray rhs);
+IdArray LE(IdArray lhs, IdArray rhs);
+IdArray EQ(IdArray lhs, IdArray rhs);
+IdArray NE(IdArray lhs, IdArray rhs);
+
+IdArray GT(IdArray lhs, int64_t rhs);
+IdArray LT(IdArray lhs, int64_t rhs);
+IdArray GE(IdArray lhs, int64_t rhs);
+IdArray LE(IdArray lhs, int64_t rhs);
+IdArray EQ(IdArray lhs, int64_t rhs);
+IdArray NE(IdArray lhs, int64_t rhs);
+
+IdArray GT(int64_t lhs, IdArray rhs);
+IdArray LT(int64_t lhs, IdArray rhs);
+IdArray GE(int64_t lhs, IdArray rhs);
+IdArray LE(int64_t lhs, IdArray rhs);
+IdArray EQ(int64_t lhs, IdArray rhs);
+IdArray NE(int64_t lhs, IdArray rhs);
 
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);

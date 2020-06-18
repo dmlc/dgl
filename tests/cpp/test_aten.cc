@@ -86,59 +86,106 @@ TEST(ArrayTest, TestAsNumBits) {
 };
 
 template <typename IDX>
-void _TestArith() {
+void _TestArith(DLContext ctx) {
   const int N = 100;
-  IdArray a = aten::Full(-10, N, sizeof(IDX)*8, CTX);
-  IdArray b = aten::Full(7, N, sizeof(IDX)*8, CTX);
+  IdArray a = aten::Full(-10, N, sizeof(IDX)*8, ctx);
+  IdArray b = aten::Full(7, N, sizeof(IDX)*8, ctx);
 
-  IdArray c = aten::Add(a, b);
+  IdArray c = a + b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -3);
-  c = aten::Sub(a, b);
+  c = a - b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -17);
-  c = aten::Mul(a, b);
+  c = a * b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -70);
-  c = aten::Div(a, b);
+  c = a / b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -1);
+  c = -a;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 10);
 
   const int val = -3;
   c = aten::Add(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -13);
   c = aten::Sub(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -7);
   c = aten::Mul(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 30);
   c = aten::Div(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 3);
   c = aten::Add(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 4);
   c = aten::Sub(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -10);
   c = aten::Mul(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -21);
   c = aten::Div(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 0);
 
-  a = aten::Range(0, N, sizeof(IDX)*8, CTX);
-  c = aten::LT(a, 50);
+  a = aten::Range(0, N, sizeof(IDX)*8, ctx);
+  c = a < 50;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i < 50));
+
+  c = a > 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i > 50));
+
+  c = a >= 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i >= 50));
+
+  c = a <= 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i <= 50));
+
+  c = a == 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i == 50));
+
+  c = a != 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i != 50));
+
 }
 
 TEST(ArrayTest, TestArith) {
-  _TestArith<int32_t>();
-  _TestArith<int64_t>();
+  _TestArith<int32_t>(CPU);
+  _TestArith<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestArith<int32_t>(GPU);
+  _TestArith<int64_t>(GPU);
+#endif
 };
 
 template <typename IDX>

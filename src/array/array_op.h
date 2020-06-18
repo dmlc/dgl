@@ -33,6 +33,9 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs);
 template <DLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdType lhs, IdArray rhs);
 
+template <DLDeviceType XPU, typename IdType, typename Op>
+IdArray UnaryElewise(IdArray array);
+
 template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2);
 

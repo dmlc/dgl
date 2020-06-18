@@ -41,7 +41,7 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
 
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
   IdArray ret;
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, "Full", {
+  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Full", {
     if (nbits == 32) {
       ret = impl::Full<XPU, int32_t>(val, length, ctx);
     } else if (nbits == 64) {
@@ -63,132 +63,6 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
   ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
     ATEN_ID_TYPE_SWITCH(arr->dtype, IdType, {
       ret = impl::AsNumBits<XPU, IdType>(arr, bits);
-    });
-  });
-  return ret;
-}
-
-IdArray Add(IdArray lhs, IdArray rhs) {
-  IdArray ret;
-  CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
-  CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Add", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Add>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Sub(IdArray lhs, IdArray rhs) {
-  IdArray ret;
-  CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
-  CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Sub", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Sub>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Mul(IdArray lhs, IdArray rhs) {
-  IdArray ret;
-  CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
-  CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Mul", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Mul>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Div(IdArray lhs, IdArray rhs) {
-  IdArray ret;
-  CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
-  CHECK_EQ(lhs->dtype, rhs->dtype) << "Both operands should have the same dtype";
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Div", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Div>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Add(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Add", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Add>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Sub(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Sub", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Sub>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Mul(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Mul", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Mul>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Div(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Div", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Div>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Add(dgl_id_t lhs, IdArray rhs) {
-  return Add(rhs, lhs);
-}
-
-IdArray Sub(dgl_id_t lhs, IdArray rhs) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(rhs->ctx.device_type, XPU, "Sub", {
-    ATEN_ID_TYPE_SWITCH(rhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Sub>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Mul(dgl_id_t lhs, IdArray rhs) {
-  return Mul(rhs, lhs);
-}
-
-IdArray Div(dgl_id_t lhs, IdArray rhs) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(rhs->ctx.device_type, XPU, "Div", {
-    ATEN_ID_TYPE_SWITCH(rhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::Div>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-BoolArray LT(IdArray lhs, dgl_id_t rhs) {
-  BoolArray ret;
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "LT", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::BinaryElewise<XPU, IdType, arith::LT>(lhs, rhs);
     });
   });
   return ret;
@@ -307,7 +181,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   bool ret = false;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRIsNonZero", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;
@@ -319,7 +193,7 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   CHECK_SAME_DTYPE(csr.indices, col);
   CHECK_SAME_CONTEXT(csr.indices, row);
   CHECK_SAME_CONTEXT(csr.indices, col);
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRIsNonZero", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;

@@ -115,20 +115,24 @@ aten::COOMatrix COO3(DLContext ctx) {
 }  // namespace
 
 template <typename IDX>
-void _TestCSRIsNonZero() {
-  auto csr = CSR1<IDX>();
+void _TestCSRIsNonZero(DLContext ctx) {
+  auto csr = CSR1<IDX>(ctx);
   ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
   ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
-  IdArray r = aten::VecToIdArray(std::vector<IDX>({2, 2, 0, 0}), sizeof(IDX)*8, CTX);
-  IdArray c = aten::VecToIdArray(std::vector<IDX>({1, 1, 1, 3}), sizeof(IDX)*8, CTX);
+  IdArray r = aten::VecToIdArray(std::vector<IDX>({2, 2, 0, 0}), sizeof(IDX)*8, ctx);
+  IdArray c = aten::VecToIdArray(std::vector<IDX>({1, 1, 1, 3}), sizeof(IDX)*8, ctx);
   IdArray x = aten::CSRIsNonZero(csr, r, c);
-  IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 0}), sizeof(IDX)*8, CTX);
+  IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 0}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
 
 TEST(SpmatTest, TestCSRIsNonZero) {
-  _TestCSRIsNonZero<int32_t>();
-  _TestCSRIsNonZero<int64_t>();
+  _TestCSRIsNonZero<int32_t>(CPU);
+  _TestCSRIsNonZero<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRIsNonZero<int32_t>(GPU);
+  _TestCSRIsNonZero<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
