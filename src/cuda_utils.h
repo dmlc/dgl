@@ -22,7 +22,7 @@ namespace cuda {
  * and is also power of two.
  */
 inline int FindNumThreads(int dim, int max_nthrs = CUDA_MAX_NUM_THREADS) {
-  CHECK(dim != 0);
+  CHECK_NE(dim, 0);
   int ret = max_nthrs;
   while (ret > dim) {
     ret = ret >> 1;
