@@ -85,7 +85,7 @@ def sample_neighbors(g: DistGraph, nodes, fanout, edge_dir='in', prob=None, repl
     req_list = []
     partition_book = g.get_partition_book()
 
-    partition_id = partition_book.nid2partid(F.tensor(nodes))
+    partition_id = F.asnumpy(partition_book.nid2partid(F.tensor(nodes))).tolist()
     node_id_per_partition = [[]
                              for _ in range(partition_book.num_partitions())]
     for pid, node in zip(partition_id, nodes):

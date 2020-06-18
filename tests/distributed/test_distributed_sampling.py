@@ -35,7 +35,7 @@ def start_client(rank, tmpdir):
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support pytorch for now')
+# @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support pytorch for now')
 def test_rpc_sampling(tmpdir):
     num_server = 3
     ip_config = open("rpc_sampling_ip_config.txt", "w")
@@ -70,7 +70,7 @@ def test_rpc_sampling(tmpdir):
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
-    assert np.all(F.asnumpy(g.has_edges_between(src, dst).bool()))
+    assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
