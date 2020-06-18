@@ -18,7 +18,7 @@ from dgl.distributed import DistGraphServer, DistGraph
 def start_server(rank, tmpdir):
     import dgl
     g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
-                        tmpdir / 'test_sampling.json', use_shared_mem=True)
+                        tmpdir / 'test_sampling.json')
     g.start()
 
 
@@ -27,7 +27,6 @@ def start_client(rank, tmpdir):
     g = DistGraph("rpc_sampling_ip_config.txt", "test_sampling")
     print("Pre sample")
     print(g.number_of_nodes())
-    # print(g.ndata['orig_id'])
     results = sample_neighbors(g, [0, 10, 99, 66, 1024, 2008], 3)
     print("after sample")
     dgl.distributed.shutdown_servers()
