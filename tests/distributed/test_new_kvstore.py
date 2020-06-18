@@ -7,7 +7,7 @@ import dgl
 import backend as F
 import unittest, pytest
 from dgl.graph_index import create_graph_index
-
+import multiprocessing as mp
 from numpy.testing import assert_array_equal
 
 if os.name != 'nt':
@@ -78,6 +78,9 @@ edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge',
                                               partition_book=gpb)
 
 data_0 = F.tensor([[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]], F.float32)
+data_0_1 = F.tensor([1.,2.,3.,4.,5.,6.], F.float32)
+data_0_2 = F.tensor([1,2,3,4,5,6], F.int32)
+data_0_3 = F.tensor([1,2,3,4,5,6], F.int64)
 data_1 = F.tensor([[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.],[2.,2.]], F.float32)
 data_2 = F.tensor([[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.],[0.,0.]], F.float32)
 
@@ -85,7 +88,7 @@ def init_zero_func(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
 def udf_push(target, name, id_tensor, data_tensor):
-    target[name] = F.scatter_row(target[name], id_tensor, data_tensor*data_tensor)    
+    target[name][id_tensor] = data_tensor * data_tensor 
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_partition_policy():
@@ -112,6 +115,9 @@ def start_server():
     kvserver.add_part_policy(node_policy)
     kvserver.add_part_policy(edge_policy)
     kvserver.init_data('data_0', 'node', data_0)
+    kvserver.init_data('data_0_1', 'node', data_0_1)
+    kvserver.init_data('data_0_2', 'node', data_0_2)
+    kvserver.init_data('data_0_3', 'node', data_0_3)
     # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver)
     dgl.distributed.start_server(server_id=0,
@@ -143,6 +149,9 @@ def start_client():
     name_list = kvclient.data_name_list()
     print(name_list)
     assert 'data_0' in name_list
+    assert 'data_0_1' in name_list
+    assert 'data_0_2' in name_list
+    assert 'data_0_3' in name_list
     assert 'data_1' in name_list
     assert 'data_2' in name_list
     # Test get_meta_data
@@ -151,16 +160,37 @@ def start_client():
     assert dtype == F.dtype(data_0)
     assert shape == F.shape(data_0)
     assert policy.policy_str == 'node'
+
+    meta = kvclient.get_data_meta('data_0_1')
+    dtype, shape, policy = meta
+    assert dtype == F.dtype(data_0_1)
+    assert shape == F.shape(data_0_1)
+    assert policy.policy_str == 'node'
+
+    meta = kvclient.get_data_meta('data_0_2')
+    dtype, shape, policy = meta
+    assert dtype == F.dtype(data_0_2)
+    assert shape == F.shape(data_0_2)
+    assert policy.policy_str == 'node'
+
+    meta = kvclient.get_data_meta('data_0_3')
+    dtype, shape, policy = meta
+    assert dtype == F.dtype(data_0_3)
+    assert shape == F.shape(data_0_3)
+    assert policy.policy_str == 'node'
+
     meta = kvclient.get_data_meta('data_1')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_1)
     assert shape == F.shape(data_1)
     assert policy.policy_str == 'edge'
+
     meta = kvclient.get_data_meta('data_2')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_2)
     assert shape == F.shape(data_2)
     assert policy.policy_str == 'node'
+
     # Test push and pull
     id_tensor = F.tensor([0,2,4], F.int64)
     data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
@@ -180,7 +210,9 @@ def start_client():
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # Register new push handler
-    kvclient.register_push_handler(udf_push)
+    kvclient.register_push_handler('data_0', udf_push)
+    kvclient.register_push_handler('data_1', udf_push)
+    kvclient.register_push_handler('data_2', udf_push)
     # Test push and pull
     kvclient.push(name='data_0',
                   id_tensor=id_tensor,
@@ -208,12 +240,14 @@ def test_kv_store():
     ip_addr = get_local_usable_addr()
     ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
-    pid = os.fork()
-    if pid == 0:
-        start_server()
-    else:
-        time.sleep(1)
-        start_client()
+    ctx = mp.get_context('spawn')
+    pserver = ctx.Process(target=start_server)
+    pclient = ctx.Process(target=start_client)
+    pserver.start()
+    time.sleep(1)
+    pclient.start()
+    pserver.join()
+    pclient.join()
 
 if __name__ == '__main__':
     test_partition_policy()
