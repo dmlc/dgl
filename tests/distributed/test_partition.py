@@ -22,7 +22,9 @@ def check_partition(reshuffle):
     g = create_random_graph(10000)
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
+    g.edata['feats'] = F.tensor(np.random.randn(g.number_of_edges(), 10))
     g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
+    g.update_all(fn.copy_edge('feats', 'msg'), fn.sum('msg', 'eh'))
     num_parts = 4
     num_hops = 2
 
@@ -55,27 +57,34 @@ def check_partition(reshuffle):
         assert np.all(np.sort(F.asnumpy(local_nodes)) == np.sort(F.asnumpy(local_nodes1)))
 
         # Check the edge map.
-        local_edges = F.asnumpy(F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge']))
-        local_edges1 = F.asnumpy(gpb.partid2eids(i))
-        assert np.all(np.sort(local_edges) == np.sort(local_edges1))
+        local_edges = F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge'])
+        local_edges1 = gpb.partid2eids(i)
+        assert np.all(np.sort(F.asnumpy(local_edges)) == np.sort(F.asnumpy(local_edges1)))
 
         if reshuffle:
             part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata['orig_id'])
+            part_g.edata['feats'] = F.gather_row(g.edata['feats'], part_g.edata['orig_id'])
             # when we read node data from the original global graph, we should use orig_id.
             local_nodes = F.boolean_mask(part_g.ndata['orig_id'], part_g.ndata['inner_node'])
+            local_edges = F.boolean_mask(part_g.edata['orig_id'], part_g.edata['inner_edge'])
         else:
             part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata[dgl.NID])
+            part_g.edata['feats'] = F.gather_row(g.edata['feats'], part_g.edata[dgl.NID])
         part_g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
+        part_g.update_all(fn.copy_edge('feats', 'msg'), fn.sum('msg', 'eh'))
         assert F.allclose(F.gather_row(g.ndata['h'], local_nodes),
                           F.gather_row(part_g.ndata['h'], llocal_nodes))
+        assert F.allclose(F.gather_row(g.ndata['eh'], local_nodes),
+                          F.gather_row(part_g.ndata['eh'], llocal_nodes))
 
         for name in ['labels', 'feats']:
             assert name in node_feats
             assert node_feats[name].shape[0] == len(local_nodes)
-            assert len(local_nodes) == len(node_feats[name])
             assert np.all(F.asnumpy(g.ndata[name])[F.asnumpy(local_nodes)] == F.asnumpy(node_feats[name]))
-        assert len(edge_feats) == 0
-
+        for name in ['feats']:
+            assert name in edge_feats
+            assert edge_feats[name].shape[0] == len(local_edges)
+            assert np.all(F.asnumpy(g.edata[name])[F.asnumpy(local_edges)] == F.asnumpy(edge_feats[name]))
 
     if reshuffle:
         node_map = []

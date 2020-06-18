@@ -230,7 +230,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         # To get the edges in the input graph, we should use original node Ids.
         data_name = 'orig_id' if reshuffle else NID
         local_nodes = F.boolean_mask(part.ndata[data_name], part.ndata['inner_node'])
-        local_edges = F.asnumpy(g.in_edges(local_nodes, form='eid'))
+        local_edges = g.in_edges(local_nodes, form='eid')
         if not reshuffle:
             edge_parts[local_edges] = part_id
         num_edges += len(local_edges)
