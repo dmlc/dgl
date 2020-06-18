@@ -186,8 +186,17 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickle")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef ref = args[0];
-    HeteroGraphPtr graph = ref->version ?
-      HeteroUnpickle(*ref.sptr()) : HeteroUnpickleOld(*ref.sptr());
+    HeteroGraphPtr graph;
+    switch(ref->version) {
+      case 0:
+        graph = HeteroUnpickleOld(*ref.sptr());
+        break;
+      case 1:
+        graph = HeteroUnpickle(*ref.sptr());
+        break;
+      default:
+        LOG(FATAL) << "Version can only be 0 or 1.";
+    }
     *rv = HeteroGraphRef(graph);
   });
 
