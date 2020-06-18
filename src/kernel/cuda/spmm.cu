@@ -184,7 +184,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           nullptr,
           static_cast<DType*>(out->data),
           x_length);
-    } else if (sizeof(IdType) == 4 && op == "mul" && efeat.Numel() == csr.indices->shape[0]) {
+    } else if (sizeof(IdType) == 4 && op == "mul" && efeat.NumElements() == csr.indices->shape[0]) {
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];

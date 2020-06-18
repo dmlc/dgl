@@ -7,7 +7,6 @@
 
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
-#include <dgl/spfmt.h>
 
 #include "../c_api_common.h"
 
@@ -40,13 +39,15 @@ void SpMM(const std::string& op, const std::string& reduce,
           NDArray out,
           std::vector<NDArray> out_aux,
           SparseFormat format) {
+  /*
   if (GlobalSparseFormat::Get()->GetFormat() == SparseFormat::kCOO)
     format = SparseFormat::kCOO;
   else
     format = SparseFormat::kCSR;
+  */
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
         if (format == SparseFormat::kCSR) {
@@ -72,13 +73,15 @@ void SDDMM(const std::string& op,
            NDArray out,
            std::vector<NDArray> out_aux,
            SparseFormat format) {
+  /*
   if (GlobalSparseFormat::Get()->GetFormat() == SparseFormat::kCSR)
     format = SparseFormat::kCSR;
   else
     format = SparseFormat::kCOO;
+  */
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, {
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
         if (format == SparseFormat::kCSR) {

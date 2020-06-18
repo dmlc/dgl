@@ -161,7 +161,7 @@ void SpMMCmpCoo(
   const int64_t nnz = coo.row->shape[0];
   // fill zero elements
 #pragma omp parallel for
-  for (IdType i = 0; i < out.Numel(); ++i) {
+  for (IdType i = 0; i < out.NumElements(); ++i) {
     O[i] = Cmp::zero;
   }
   // spmm
