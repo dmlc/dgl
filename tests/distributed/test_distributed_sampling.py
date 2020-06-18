@@ -33,12 +33,10 @@ def start_client(rank, tmpdir):
 
 
 def check_rpc_sampling(tmpdir):
-    num_server = 3
+    num_server = 2
     ip_config = open("rpc_sampling_ip_config.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
-    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
-    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+    for _ in range(num_server):
+        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
@@ -55,6 +53,7 @@ def check_rpc_sampling(tmpdir):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
     time.sleep(3)
@@ -79,12 +78,10 @@ def test_rpc_sampling():
         check_rpc_sampling(Path(tmpdirname))
 
 def check_rpc_sampling_shuffle(tmpdir):
-    num_server = 3
+    num_server = 2
     ip_config = open("rpc_sampling_ip_config.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
-    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
-    ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+    for _ in range(num_server):
+        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
     
     g = CitationGraphDataset("cora")[0]
@@ -100,6 +97,7 @@ def check_rpc_sampling_shuffle(tmpdir):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
     time.sleep(3)
