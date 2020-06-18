@@ -7,7 +7,6 @@
 #define DGL_KERNEL_CUDA_SDDMM_CUH_
 
 #include "../utils.h"
-#include "../binary_reduce_impl_decl.h"
 #include "../bcast.h"
 #include "atomic.cuh"
 #include "functor2.cuh"

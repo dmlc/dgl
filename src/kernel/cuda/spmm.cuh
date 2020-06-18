@@ -9,6 +9,7 @@
 #include "../utils.h"
 #include "../bcast.h"
 #include "atomic.cuh"
+#include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
 namespace kernel {
