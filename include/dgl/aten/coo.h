@@ -9,6 +9,8 @@
 
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
+#include <vector>
+#include <utility>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"

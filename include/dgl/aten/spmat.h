@@ -7,6 +7,7 @@
 #define DGL_ATEN_SPMAT_H_
 
 #include <string>
+#include <vector>
 #include "./types.h"
 #include "../runtime/object.h"
 

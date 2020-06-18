@@ -9,7 +9,9 @@
 #ifndef DGL_ATEN_ARRAY_OPS_H_
 #define DGL_ATEN_ARRAY_OPS_H_
 
+#include <algorithm>
 #include <utility>
+#include <vector>
 #include <tuple>
 #include "./types.h"
 
