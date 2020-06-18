@@ -6,9 +6,11 @@
 #ifndef DGL_KERNEL_KERNEL2_H_
 #define DGL_KERNEL_KERNEL2_H_
 
+#include "./bcast.h"
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
-#include "./bcast.h"
+#include <string>
+#include <vector>
 
 namespace dgl {
 namespace kernel {

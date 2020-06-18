@@ -4,6 +4,7 @@
  * \brief Broadcast related function implementations.
  */
 #include "bcast.h"
+#include <algorithm>
 
 namespace dgl {
 namespace kernel {

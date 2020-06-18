@@ -3,9 +3,9 @@
  * \file kernel/cuda/sddmm.cu
  * \brief SDDMM C APIs and definitions.
  */
+#include <dgl/array.h>
 #include "./sddmm.cuh"
 #include "./functor2.cuh"
-#include <dgl/array.h>
 
 namespace dgl {
 namespace kernel {
@@ -54,7 +54,7 @@ void SDDMMCoo(const std::string& op,
               NDArray vfeat,
               NDArray out,
               std::vector<NDArray> out_aux) {
- SWITCH_OP(op, Op, {
+  SWITCH_OP(op, Op, {
     cuda::SDDMMCoo<IdType, DType, Op>(bcast, coo, ufeat, vfeat, out);
   });
 }

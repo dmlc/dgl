@@ -41,16 +41,20 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 }
 
 template void SpMMCsr<kDLCPU, int32_t, float>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLCPU, int64_t, float>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLCPU, int32_t, double>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLCPU, int64_t, double>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 

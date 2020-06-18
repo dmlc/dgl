@@ -3,10 +3,9 @@
  * \file kernel/cuda/spmm.cu
  * \brief SPMM C APIs and definitions.
  */
-
+#include <dgl/array.h>
 #include "./spmm.cuh"
 #include "./functor2.cuh"
-#include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
@@ -244,29 +243,37 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
 }
 
 template void SpMMCsr<kDLGPU, int32_t, float>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLGPU, int64_t, float>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLGPU, int32_t, double>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLGPU, int64_t, double>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 template void SpMMCoo<kDLGPU, int32_t, float>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int64_t, float>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int32_t, double>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const std::string& reduce, 
+    const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int64_t, double>(
-    const std::string& op, const std::string& reduce, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const std::string& reduce,
+    const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 }  // namespace kernel

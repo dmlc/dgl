@@ -32,7 +32,8 @@ template void Fill<kDLGPU, float>(const DLContext& ctx, float* ptr, size_t lengt
 template void Fill<kDLGPU, double>(const DLContext& ctx, double* ptr, size_t length, double val);
 
 template <typename DType>
-__global__ void _IndexSelectKernel(const DType* val, const int32_t* idx, int64_t length, DType* out) {
+__global__ void _IndexSelectKernel(const DType* val, const int32_t* idx,
+    int64_t length, DType* out) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
@@ -49,8 +50,10 @@ void IndexSelectGPU(const DType* val, const int32_t* idx, int64_t length, DType*
   _IndexSelectKernel<<<nb, nt, 0, thr_entry->stream>>>(val, idx, length, out);
 }
 
-template void IndexSelectGPU<float>(const float* val, const int32_t* idx, int64_t length, float* out);
-template void IndexSelectGPU<double>(const double* val, const int32_t* idx, int64_t length, double* out);
+template void IndexSelectGPU<float>(const float* val, const int32_t* idx,
+    int64_t length, float* out);
+template void IndexSelectGPU<double>(const double* val, const int32_t* idx,
+    int64_t length, double* out);
 
 }  // namespace utils
 }  // namespace kernel

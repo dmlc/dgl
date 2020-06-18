@@ -3,12 +3,12 @@
  * \file kernel/cpu/sddmm.h
  * \brief SDDMM CPU kernel function header.
  */
-#ifndef DGL_KERNEL_CPU_SDDMM_CUH_
-#define DGL_KERNEL_CPU_SDDMM_CUH_
+#ifndef DGL_KERNEL_CPU_SDDMM_H_
+#define DGL_KERNEL_CPU_SDDMM_H_
 
+#include <dgl/array.h>
 #include "../utils.h"
 #include "../bcast.h"
-#include <dgl/array.h>
 
 namespace dgl {
 namespace kernel {
@@ -121,8 +121,8 @@ struct Dot {
   inline static DType Call(const DType* lhs_off, const DType* rhs_off, int64_t len = 1) {
     DType rst = 0;
     for (int64_t l = 0; l < len; ++l) {
-      rst += lhs_off[l] * rhs_off[l]; 
-    } 
+      rst += lhs_off[l] * rhs_off[l];
+    }
     return rst;
   }
 };
@@ -155,4 +155,4 @@ struct Dot {
 }  // namespace kernel
 }  // namespace dgl
 
-#endif  // DGL_KERNEL_CPU_SDDMM_CUH_
+#endif  // DGL_KERNEL_CPU_SDDMM_H_

@@ -3,12 +3,13 @@
  * \file kernel/cpu/spmm.h
  * \brief SPMM CPU kernel function header.
  */
-#ifndef DGL_KERNEL_CPU_SPMM_CUH_
-#define DGL_KERNEL_CPU_SPMM_CUH_
+#ifndef DGL_KERNEL_CPU_SPMM_H_
+#define DGL_KERNEL_CPU_SPMM_H_
 
+#include <limits>
+#include <dgl/array.h>
 #include "../utils.h"
 #include "../bcast.h"
-#include <dgl/array.h>
 
 namespace dgl {
 namespace kernel {
@@ -271,4 +272,4 @@ struct Min {
 }  // namespace kernel
 }  // namespace dgl
 
-#endif  // DGL_KERNEL_CPU_SPMM_CUH_
+#endif  // DGL_KERNEL_CPU_SPMM_H_
