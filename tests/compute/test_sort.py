@@ -54,6 +54,21 @@ def test_sort_inplace(index_dtype):
     assert(check_sort(csc, g.ndata['tag'], split))
 
 @parametrize_dtype
+def test_sort_inplace_bipartite(index_dtype):
+    num_nodes, num_adj, num_tags = 200, [20, 40], 5
+    g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
+    g = dgl.bipartite(g.edges(), index_dtype=index_dtype)
+    g.nodes['_U'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
+    g.nodes['_V'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_V')))
+    split = dgl.sort_csr_(g, 'tag')
+    csr = g.adjacency_matrix(etype='_E', transpose=True, scipy_fmt='csr')
+    assert(check_sort(csr, g.nodes['_V'].data['tag'], split))
+
+    split = dgl.sort_csc_(g, 'tag')
+    csc = g.adjacency_matrix(etype='_E', scipy_fmt='csr')
+    assert(check_sort(csc, g.nodes['_U'].data['tag'], split))
+
+@parametrize_dtype
 def test_sort_outplace(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
     g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
@@ -69,10 +84,39 @@ def test_sort_outplace(index_dtype):
     new_g, split = dgl.sort_csc(g, 'tag')
     old_csc = g.adjacency_matrix(scipy_fmt='csr')
     new_csc = new_g.adjacency_matrix(scipy_fmt='csr')
-    assert(check_sort(new_csc, g.ndata['tag'], split))
+    assert(check_sort(new_csc, new_g.ndata['tag'], split))
     assert(not check_sort(old_csc, g.ndata['tag'], split))
 
+@parametrize_dtype
+def test_sort_outplace_bipartite(index_dtype):
+    num_nodes, num_adj, num_tags = 200, [20, 40], 5
+    g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
+    g = dgl.bipartite(g.edges(), index_dtype=index_dtype)
+    utag = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
+    utag[0] = 1
+    utag[1] = 0
+
+    vtag = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
+    vtag[0] = 1
+    vtag[1] = 0
+
+    g.nodes['_V'].data['tag'] = vtag
+    g.nodes['_U'].data['tag'] = utag
+
+    new_g, split = dgl.sort_csr(g, 'tag')
+    old_csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    new_csr = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    assert(check_sort(new_csr, new_g.nodes['_V'].data['tag'], split))
+    assert(not check_sort(old_csr, g.nodes['_V'].data['tag'], split))
+
+    new_g, split = dgl.sort_csc(g, 'tag')
+    old_csc = g.adjacency_matrix(scipy_fmt='csr')
+    new_csc = new_g.adjacency_matrix(scipy_fmt='csr')
+    assert(check_sort(new_csc, new_g.nodes['_U'].data['tag'], split))
+    assert(not check_sort(old_csc, g.nodes['_U'].data['tag'], split))
+
 if __name__ == "__main__":
-    test_sort_inplace("int32")
-    test_sort_outplace("int32")
+    # test_sort_inplace("int32")
+    test_sort_outplace_bipartite("int32")
+    # test_sort_outplace("int32")
     # test_biased_sampling()

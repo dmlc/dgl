@@ -1263,22 +1263,25 @@ def as_immutable_graph(hg):
     return g
 
 def sort_csr_(hg, tag=None):
-    # Currently only support Unitgraph
-    tag_data = hg.ndata[tag]
+    if len(hg.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    tag_data = hg.ndata[tag] if len(hg.ntypes) == 1 else hg.nodes[hg.dsttypes[0]].data[tag]
     num_tags = int(F.max(tag_data, 0)) + 1
     ret = _CAPI_DGLHeteroSortCSR_(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
     return F.reshape(F.zerocopy_from_dgl_ndarray(ret), [-1, num_tags + 1])
 
 def sort_csc_(hg, tag=None):
-    # Currently only support Unitgraph
-    tag_data = hg.ndata[tag]
+    if len(hg.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    tag_data = hg.ndata[tag] if len(hg.ntypes) == 1 else hg.nodes[hg.srctypes[0]].data[tag]
     num_tags = int(F.max(tag_data, 0)) + 1
     ret = _CAPI_DGLHeteroSortCSC_(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
     return F.reshape(F.zerocopy_from_dgl_ndarray(ret), [-1, num_tags + 1])
 
 def sort_csr(hg, tag=None):
-    # Currently only support Unitgraph
-    tag_data = hg.ndata[tag]
+    if len(hg.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    tag_data = hg.ndata[tag] if len(hg.ntypes) == 1 else hg.nodes[hg.dsttypes[0]].data[tag]
     num_tags = int(F.max(tag_data, 0)) + 1
     gidx, split = [item.data for item in _CAPI_DGLHeteroSortCSR(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)]
     split = F.reshape(F.zerocopy_from_dgl_ndarray(split), [-1, num_tags + 1])
@@ -1286,8 +1289,9 @@ def sort_csr(hg, tag=None):
     return new_g, split
 
 def sort_csc(hg, tag=None):
-    # Currently only support Unitgraph
-    tag_data = hg.ndata[tag]
+    if len(hg.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    tag_data = hg.ndata[tag] if len(hg.ntypes) == 1 else hg.nodes[hg.srctypes[0]].data[tag]
     num_tags = int(F.max(tag_data, 0)) + 1
     gidx, split = [item.data for item in _CAPI_DGLHeteroSortCSC(hg._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)]
     split = F.reshape(F.zerocopy_from_dgl_ndarray(split), [-1, num_tags + 1])
