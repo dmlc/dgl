@@ -315,8 +315,11 @@ class DistGraph:
     training. All data of partitions are loaded by the DistGraph server.
 
     By default, `DistGraph` uses shared-memory to access the partition data in the local machine.
-    However, a user can disable shared memory by passing `disable_shared_mem=False` when creating
-    `DistGraphServer`. When shared-memory is disabled, a user has to pass a partition book.
+    This gives the best performance for distributed training when we run `DistGraphServer`
+    and `DistGraph` on the same machine. However, a user may want to run them in separate
+    machines. In this case, a user may want to disable shared memory by passing
+    `disable_shared_mem=False` when creating `DistGraphServer`. When shared-memory is disabled,
+    a user has to pass a partition book.
 
     Parameters
     ----------
