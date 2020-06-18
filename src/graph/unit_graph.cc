@@ -798,7 +798,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   IdArray SortCSR_(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
-    return aten::CSRSortByTag_(&adj_, tag, num_tags);
+    if (num_tags)
+      return aten::CSRSortByTag_(&adj_, tag, num_tags);
+    else {
+      aten::CSRSort_(&adj_);
+      return aten::NullArray();
+    }
   }
 
   IdArray SortCSC_(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
@@ -811,9 +816,14 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     IdArray indices = aten::Clone(adj_.indices);
     IdArray data = aten::Clone(adj_.data);
     CSRMatrix new_csr = aten::CSRMatrix(adj_.num_rows, adj_.num_cols, indptr, indices, data);
-    IdArray split = aten::CSRSortByTag_(&new_csr, tag, num_tags);
     HeteroGraphPtr new_g = std::make_shared<CSR>(meta_graph_, new_csr);
-    return std::make_pair(new_g, split);
+    if (num_tags) {
+      IdArray split = aten::CSRSortByTag_(&new_csr, tag, num_tags);
+      return std::make_pair(new_g, split);
+    } else {
+      aten::CSRSort_(&new_csr);
+      return std::make_pair(new_g, aten::NullArray());
+    }
   }
 
   std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) override {

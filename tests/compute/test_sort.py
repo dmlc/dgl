@@ -45,6 +45,10 @@ def test_sort_inplace(index_dtype):
     g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
     g.ndata['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
 
+    dgl.sort_csr_(g)
+    csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    assert(check_sort(csr))    
+
     dgl.sort_csr_(g, 'tag')
     csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(csr, g.ndata['tag'], g.ndata['_SPLIT']))
@@ -61,6 +65,14 @@ def test_sort_inplace_bipartite(index_dtype):
     g.nodes['_U'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
     g.nodes['_V'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_V')))
     
+    dgl.sort_csr_(g)
+    csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    assert(check_sort(csr))   
+
+    dgl.sort_csc_(g)
+    csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    assert(check_sort(csc))   
+
     dgl.sort_csr_(g, 'tag')
     csr = g.adjacency_matrix(etype='_E', transpose=True, scipy_fmt='csr')
     assert(check_sort(csr, g.nodes['_V'].data['tag'], g.nodes['_U'].data['_SPLIT']))
