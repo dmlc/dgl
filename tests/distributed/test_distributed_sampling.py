@@ -14,24 +14,20 @@ from pathlib import Path
 
 from dgl.distributed import DistGraphServer, DistGraph
 
-def myexcepthook(exctype, value, traceback):
-    for p in mp.active_children():
-        p.terminate()
-    # raise Exception("11111111111")
-
-
 
 def start_server(rank, tmpdir):
     import dgl
     g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
-                        tmpdir / 'test_sampling.json')
+                        tmpdir / 'test_sampling.json', use_shared_mem=True)
     g.start()
+
 
 def start_client(rank, tmpdir):
     import dgl
     g = DistGraph("rpc_sampling_ip_config.txt", "test_sampling")
     print("Pre sample")
     print(g.number_of_nodes())
+    # print(g.ndata['orig_id'])
     results = sample_neighbors(g, [0, 10, 99, 66, 1024, 2008], 3)
     print("after sample")
     dgl.distributed.shutdown_servers()
@@ -40,7 +36,7 @@ def start_client(rank, tmpdir):
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name != 'PyTorch', reason='Only support pytorch for now')
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support pytorch for now')
 def test_rpc_sampling(tmpdir):
     num_server = 3
     ip_config = open("rpc_sampling_ip_config.txt", "w")
@@ -66,7 +62,7 @@ def test_rpc_sampling(tmpdir):
         p = ctx.Process(target=start_server, args=(i, tmpdir))
         p.start()
         pserver_list.append(p)
-    
+
     time.sleep(3)
     sampled_graph = start_client(0, tmpdir)
     print("Done sampling")
@@ -79,6 +75,7 @@ def test_rpc_sampling(tmpdir):
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+
 
 if __name__ == "__main__":
     import tempfile

@@ -47,7 +47,7 @@ class SamplingRequest(Request):
         local_g = server_state.graph
         partition_book = server_state.partition_book
         local_ids = F.astype(partition_book.nid2localnid(
-            F.tensor(self.seed_nodes), partition_book._part_id), local_g.idtype)
+            F.tensor(self.seed_nodes), partition_book.partid), local_g.idtype)
         # local_ids = self.seed_nodes
         sampled_graph = local_sample_neighbors(
             local_g, local_ids, self.fan_out, self.edge_dir, self.prob, self.replace)

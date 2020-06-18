@@ -268,10 +268,11 @@ class DistGraphServer(KVServer):
         super(DistGraphServer, self).__init__(server_id=server_id, ip_config=ip_config,
                                               num_clients=num_clients)
         self.ip_config = ip_config
-
         # Load graph partition data.
-        self.client_g, node_feats, edge_feats, self.gpb = load_partition(conf_file, server_id)
-        # self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
+        self.client_g, node_feats, edge_feats, self.gpb = load_partition(
+            conf_file, server_id)
+        graph_name = "{}_{}".format(graph_name, self.part_id)
+        self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
         # Init kvstore.
         self.gpb.shared_memory(graph_name)
@@ -319,7 +320,7 @@ class DistGraph:
     def __init__(self, ip_config, graph_name):
         connect_to_server(ip_config=ip_config)
         self._client = KVClient(ip_config)
-
+        graph_name = "{}_{}".format(graph_name, self._client.machine_id)
         self._g = _get_graph_from_shared_mem(graph_name)
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
         self._client.barrier()
