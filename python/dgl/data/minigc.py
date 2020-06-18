@@ -1,13 +1,17 @@
 """A mini synthetic dataset for graph classification benchmark."""
-import math
+import math, os
 import networkx as nx
 import numpy as np
 
+from .dgl_dataset import DGLDataset
+from .. import backend as F
+from .utils import save_graphs, load_graphs, makedirs
 from ..graph import DGLGraph
+from ..graph import batch as graph_batch
 
 __all__ = ['MiniGCDataset']
 
-class MiniGCDataset(object):
+class MiniGCDataset(DGLDataset):
     """The dataset class.
 
     The datset contains 8 different types of graphs.
@@ -33,14 +37,18 @@ class MiniGCDataset(object):
     max_num_v: int
         Maximum number of nodes for graphs
     """
-    def __init__(self, num_graphs, min_num_v, max_num_v):
-        super(MiniGCDataset, self).__init__()
+    def __init__(self, num_graphs, min_num_v, max_num_v, verbose=False, seed=None):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
+        self.seed = seed
+        self.verbose = verbose
+        super(MiniGCDataset, self).__init__(name="minigc")
+
+    def process(self, root_path):
         self.graphs = []
         self.labels = []
-        self._generate()
+        self._generate(self.seed)
 
     def __len__(self):
         """Return the number of graphs in the dataset."""
@@ -61,12 +69,30 @@ class MiniGCDataset(object):
         """
         return self.graphs[idx], self.labels[idx]
 
+    def save(self):
+        """save the graph list and the labels"""
+        graph_path = os.path.join(self.raw_path, 'dgl_graph.bin')
+        # this check should be adeded into save_graphs
+        makedirs(self.raw_path)
+        save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
+        if self.verbose:
+            print('Done saving data into cached files.')
+
+    def load(self):
+        graphs, label_dict = load_graphs(os.path.join(self.raw_path, 'dgl_graph.bin'))
+        self.graphs = graphs
+        self.labels = label_dict['labels']
+        if self.verbose:
+            print('Done loading data into cached files.')
+
     @property
     def num_classes(self):
         """Number of classes."""
         return 8
 
-    def _generate(self):
+    def _generate(self, seed):
+        if seed is not None:
+            np.random.seed(seed)
         self._gen_cycle(self.num_graphs // 8)
         self._gen_star(self.num_graphs // 8)
         self._gen_wheel(self.num_graphs // 8)
@@ -81,6 +107,7 @@ class MiniGCDataset(object):
             # add self edges
             nodes = self.graphs[i].nodes()
             self.graphs[i].add_edges(nodes, nodes)
+        self.labels = F.tensor(np.array(self.labels).astype(np.int))
 
     def _gen_cycle(self, n):
         for _ in range(n):
