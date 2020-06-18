@@ -3,7 +3,7 @@ import unittest
 import os
 from dgl.data import CitationGraphDataset
 from dgl.distributed.sampling import sample_neighbors
-from dgl.distributed import partition_graph, load_partition, GraphPartitionBook
+from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
 import multiprocessing as mp
 import numpy as np
@@ -18,13 +18,14 @@ from dgl.distributed import DistGraphServer, DistGraph
 def start_server(rank, tmpdir):
     import dgl
     g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
-                        tmpdir / 'test_sampling.json')
+                        tmpdir / 'test_sampling.json', disable_shared_mem=True)
     g.start()
 
 
 def start_client(rank, tmpdir, shuffle):
     import dgl
-    dist_graph = DistGraph("rpc_sampling_ip_config.txt", "test_sampling")
+    _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', 0)
+    dist_graph = DistGraph("rpc_sampling_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     if shuffle:
         origin_id = dist_graph.ndata['orig_id']
@@ -34,9 +35,7 @@ def start_client(rank, tmpdir, shuffle):
     return sampled_graph
 
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-def test_rpc_sampling(tmpdir):
+def check_rpc_sampling(tmpdir):
     num_server = 3
     ip_config = open("rpc_sampling_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
@@ -73,6 +72,14 @@ def test_rpc_sampling(tmpdir):
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+def test_rpc_sampling():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        tmpdirname = "/tmp/sampling"
+        check_rpc_sampling(Path(tmpdirname))
 
 # Wait non shared memory graph store
 # @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
