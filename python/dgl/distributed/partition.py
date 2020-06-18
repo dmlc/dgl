@@ -184,7 +184,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     accessed with `part.ndata[dgl.NID]` and `part.edata[dgl.NID]`, where `part` is the partition
     graph structure. In addition to the mapping, the partition graph contains node data
     ("inner_node" and "orig_id") and edge data ("inner_edge").
-    
+
     * "inner_node" indicates whether a node belongs to a partition.
     * "inner_edge" indicates whether an edge belongs to a partition.
     * "orig_id" exists when reshuffle=True. It indicates the original node Ids in the original
