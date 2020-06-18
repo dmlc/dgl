@@ -187,7 +187,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef ref = args[0];
     HeteroGraphPtr graph;
-    switch(ref->version) {
+    switch (ref->version) {
       case 0:
         graph = HeteroUnpickleOld(*ref.sptr());
         break;
