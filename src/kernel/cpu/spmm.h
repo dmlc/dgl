@@ -101,9 +101,9 @@ void SpMMCmpCsr(
   const IdType* edges = has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* X = Op::use_lhs? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs? static_cast<DType*>(efeat->data) : nullptr;
-  int64_t dim = bcast.out_len,
-          lhs_dim = bcast.lhs_len,
-          rhs_dim = bcast.rhs_len;
+  const int64_t dim = bcast.out_len,
+                lhs_dim = bcast.lhs_len,
+                rhs_dim = bcast.rhs_len;
   DType* O = static_cast<DType*>(out->data);
   IdType* argX = Op::use_lhs? static_cast<IdType*>(argu->data) : nullptr;
   IdType* argW = Op::use_rhs? static_cast<IdType*>(arge->data) : nullptr;
@@ -153,9 +153,9 @@ void SpMMCmpCoo(
   const IdType* edges = has_idx? static_cast<IdType*>(coo.data->data) : nullptr;
   const DType* X = Op::use_lhs? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs? static_cast<DType*>(efeat->data) : nullptr;
-  int64_t dim = bcast.out_len,
-          lhs_dim = bcast.lhs_len,
-          rhs_dim = bcast.rhs_len;
+  const int64_t dim = bcast.out_len,
+                lhs_dim = bcast.lhs_len,
+                rhs_dim = bcast.rhs_len;
   DType* O = static_cast<DType*>(out->data);
   IdType* argX = Op::use_lhs? static_cast<IdType*>(argu->data) : nullptr;
   IdType* argW = Op::use_rhs? static_cast<IdType*>(arge->data) : nullptr;

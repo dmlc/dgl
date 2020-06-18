@@ -24,10 +24,10 @@ void SDDMMCsr(const BcastOff& bcast,
   const IdType* edges = utils::GetPtr<IdType>(csr.data);
   const DType* X = utils::GetPtr<DType>(ufeat);
   const DType* Y = utils::GetPtr<DType>(vfeat);
-  int64_t dim = bcast.out_len,
-          lhs_dim = bcast.lhs_len,
-          rhs_dim = bcast.rhs_len,
-          reduce_size = bcast.reduce_size;
+  const int64_t dim = bcast.out_len,
+                lhs_dim = bcast.lhs_len,
+                rhs_dim = bcast.rhs_len,
+                reduce_size = bcast.reduce_size;
   DType* O = utils::GetPtr<DType>(out);
 #pragma omp parallel for
   for (IdType rid = 0; rid < csr.num_rows; ++rid) {
@@ -59,10 +59,10 @@ void SDDMMCoo(const BcastOff& bcast,
   const IdType* edges = utils::GetPtr<IdType>(coo.data);
   const DType* X = utils::GetPtr<DType>(ufeat);
   const DType* Y = utils::GetPtr<DType>(vfeat);
-  int64_t dim = bcast.out_len,
-          lhs_dim = bcast.lhs_len,
-          rhs_dim = bcast.rhs_len,
-          reduce_size = bcast.reduce_size;
+  const int64_t dim = bcast.out_len,
+                lhs_dim = bcast.lhs_len,
+                rhs_dim = bcast.rhs_len,
+                reduce_size = bcast.reduce_size;
   DType* O = utils::GetPtr<DType>(out);
   const int64_t nnz = coo.row->shape[0];
 #pragma omp parallel for

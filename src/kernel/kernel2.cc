@@ -113,6 +113,7 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSpMM")
     NDArray ArgE = args[7];
     CheckCtx(graph->Context(), {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
+    CHECK_EQ(graph->NumEdgeTypes(), 1);
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
 
@@ -124,130 +125,8 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSDDMM")
     NDArray V = args[3];
     NDArray E = args[4];
     CheckCtx(graph->Context(), {U, V, E}, {"U_data", "V_data", "out"});
-    SDDMM(op, graph.sptr(), U, V, E);
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpESum")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const std::string op = args[0];
-    HeteroGraphRef graph = args[1];
-    NDArray X = args[2];
-    NDArray Y = args[3];
-    NDArray Z = args[4];
-    CheckCtx(graph->Context(), {X, Y, Z}, {"U_data", "E_data", "Out"});
     CHECK_EQ(graph->NumEdgeTypes(), 1);
-    SpMM(op, "sum", graph.sptr(), X, Y, Z, {});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyUSum")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef graph = args[0];
-    NDArray X = args[1];
-    NDArray Z = args[2];
-    CheckCtx(graph->Context(), {X, Z}, {"U_data", "Out"});
-    SpMM("copy_u", "sum", graph.sptr(), X, aten::NullArray(), Z, {});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyUMax")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef graph = args[0];
-    NDArray X = args[1];
-    NDArray Z = args[2];
-    NDArray argX = args[3];
-    CheckCtx(graph->Context(), {X, Z, argX}, {"U_data", "Out", "U_index"});
-    SpMM("copy_u", "max", graph.sptr(), X, aten::NullArray(),
-         Z, {argX, aten::NullArray()});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyUMin")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef graph = args[0];
-    NDArray X = args[1];
-    NDArray Z = args[2];
-    NDArray argX = args[3];
-    CheckCtx(graph->Context(), {X, Z, argX}, {"U_data", "Out", "U_index"});
-    SpMM("copy_u", "min", graph.sptr(), X, aten::NullArray(),
-         Z, {argX, aten::NullArray()});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyESum")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef graph = args[0];
-    NDArray Y = args[1];
-    NDArray Z = args[2];
-    CheckCtx(graph->Context(), {Y, Z}, {"E_data", "Out"});
-    SpMM("copy_e", "sum", graph.sptr(), aten::NullArray(), Y, Z, {
-      aten::NullArray(), aten::NullArray()});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyEMax")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef graph = args[0];
-    NDArray Y = args[1];
-    NDArray Z = args[2];
-    NDArray argY = args[3];
-    CheckCtx(graph->Context(), {Y, Z, argY}, {"E_data", "Out", "E_index"});
-    SpMM("copy_e", "max", graph.sptr(), aten::NullArray(), Y,
-         Z, {aten::NullArray(), argY});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyEMin")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef graph = args[0];
-    NDArray Y = args[1];
-    NDArray Z = args[2];
-    NDArray argY = args[3];
-    CheckCtx(graph->Context(), {Y, Z, argY}, {"E_data", "Out", "E_index"});
-    SpMM("copy_e", "min", graph.sptr(), aten::NullArray(), Y,
-         Z, {aten::NullArray(), argY});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelCopyU")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef graph = args[0];
-    NDArray X = args[1];
-    NDArray Z = args[2];
-    CheckCtx(graph->Context(), {X, Z}, {"U_data", "Out"});
-    SDDMM("copy_u", graph.sptr(), X, aten::NullArray(), Z);
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpEMax")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const std::string op = args[0];
-    HeteroGraphRef graph = args[1];
-    NDArray X = args[2];
-    NDArray Y = args[3];
-    NDArray Z = args[4];
-    NDArray argX = args[5];
-    NDArray argY = args[6];
-    CheckCtx(graph->Context(), {X, Y, Z, argX, argY},
-        {"U_data", "E_data", "Out", "U_index", "E_index"});
-    SpMM(op, "max", graph.sptr(), X, Y, Z, {argX, argY});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpEMin")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const std::string op = args[0];
-    HeteroGraphRef graph = args[1];
-    NDArray X = args[2];
-    NDArray Y = args[3];
-    NDArray Z = args[4];
-    NDArray argX = args[5];
-    NDArray argY = args[6];
-    CheckCtx(graph->Context(), {X, Y, Z, argX, argY},
-        {"U_data", "E_data", "Out", "U_index", "E_index"});
-    SpMM(op, "min", graph.sptr(), X, Y, Z, {argX, argY});
-  });
-
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelUOpV")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const std::string op = args[0];
-    HeteroGraphRef graph = args[1];
-    NDArray X = args[2];
-    NDArray Y = args[3];
-    NDArray Z = args[4];
-    CheckCtx(graph->Context(), {X, Y, Z}, {"U_data", "V_data", "Out"});
-    SDDMM(op, graph.sptr(), X, Y, Z);
+    SDDMM(op, graph.sptr(), U, V, E);
   });
 
 }  // namespace kernel
