@@ -4,6 +4,7 @@
  * \brief DGL array utilities implementation
  */
 #include <dgl/array.h>
+#include <dgl/graph_traversal.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/shared_mem.h>
@@ -649,6 +650,90 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   std::pair<COOMatrix, IdArray> ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOCoalesce", {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
+  });
+  return ret;
+}
+
+///////////////////////// Graph Traverse  routines //////////////////////////
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::BFSNodesFrontiers<XPU, IdType>(csr, source);
+    });
+  });
+  return ret;
+}
+
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::BFSEdgesFrontiers<XPU, IdType>(csr, source);
+    });
+  });
+  return ret;
+}
+
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
+  Frontiers ret;
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, "TopologicalNodesFrontiers", {
+    ATEN_ID_TYPE_SWITCH(csr.indices->dtype, IdType, {
+      ret = impl::TopologicalNodesFrontiers<XPU, IdType>(csr);
+    });
+  });
+  return ret;
+}
+
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "DGLDFSEdges", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::DGLDFSEdges<XPU, IdType>(csr, source);
+    });
+  });
+  return ret;
+}
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
+                             IdArray source,
+                             const bool has_reverse_edge,
+                             const bool has_nontree_edge,
+                             const bool return_labels) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "DGLDFSLabeledEdges", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::DGLDFSLabeledEdges<XPU, IdType>(csr,
+                                                  source,
+                                                  has_reverse_edge,
+                                                  has_nontree_edge,
+                                                  return_labels);
+    });
   });
   return ret;
 }
