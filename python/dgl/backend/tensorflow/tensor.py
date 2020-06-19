@@ -59,6 +59,8 @@ def cpu():
 def tensor(data, dtype=None):
     return tf.convert_to_tensor(data, dtype=dtype)
 
+def initialize_context():
+    tf.zeros(1)
 
 def as_scalar(data):
     return data.numpy().asscalar()
@@ -590,3 +592,5 @@ def _reduce_grad(grad, shape):
 def sync():
     context = context().context()
     context.async_wait()
+
+initialize_context()
