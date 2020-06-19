@@ -14,7 +14,7 @@ from data import MovieLens
 from model import IGMC
 from dataset import MovieLensDataset, collate_movielens 
 from torch.utils.data import DataLoader
-from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
+from utils import get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
 def ensemble_evaluate(args, net, ckpts_path):
     # Evaluate RMSE

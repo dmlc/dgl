@@ -1,10 +1,12 @@
 import os
-import dgl
 import random
-import numpy as np
 from collections import namedtuple
+import numpy as np
+
 import torch as th
 from torch.utils.data import Dataset
+
+import dgl
 
 MovieLensDataTuple = namedtuple('MovieLensDataTuple', ['g', 'g_label', 'x', 'etype', 'device'])
 

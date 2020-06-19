@@ -1,31 +1,40 @@
-"""NN modules"""
-import torch
+"""IGMC modules"""
+
+import torch as th 
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import init
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
 
-from utils import get_activation
+from dgl.nn.pytorch import RelGraphConv
 
-class IGMC(torch.nn.Module):
-    # The GNN model of Inductive Graph-based Matrix Completion. Use RGCN convolution + center-nodes readout.
-    def __init__(self, in_dim, gconv=dglnn.RelGraphConv, latent_dim=[32, 32, 32, 32], num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, force_undirected=False, side_features=False, n_side_features=0, multiply_by=1):
+class IGMC(nn.Module):
+    # The GNN model of Inductive Graph-based Matrix Completion. 
+    # Use RGCN convolution + center-nodes readout.
+    
+    def __init__(self, in_feats, gconv=RelGraphConv, latent_dim=[32, 32, 32, 32], 
+                num_relations=5, num_bases=2, regression=False, edge_drop=0.2, 
+                force_undirected=False, side_features=False, n_side_features=0, 
+                multiply_by=1):
         super(IGMC, self).__init__()
-        self.multiply_by = multiply_by
-        self.convs = torch.nn.ModuleList()
-        self.convs.append(gconv(in_dim, latent_dim[0], num_relations, num_bases=num_bases, self_loop=True))
+
         self.regression = regression
-        for i in range(0, len(latent_dim)-1):
-            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases=num_bases))
-        self.lin1 = nn.Linear(2*sum(latent_dim), 128)
+        self.edge_dropout = nn.Dropout(edge_drop)
+        self.force_undirected = force_undirected
         self.side_features = side_features
+        self.multiply_by = multiply_by
+
+        self.convs = th.nn.ModuleList()
+        self.convs.append(gconv(in_feats, latent_dim[0], num_relations, num_bases=num_bases, self_loop=True))
+        for i in range(0, len(latent_dim)-1):
+            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases=num_bases, self_loop=True))
+        
+        self.lin1 = nn.Linear(2 * sum(latent_dim), 128)
         if side_features:
-            self.lin1 = nn.Linear(2*sum(latent_dim)+n_side_features, 128)
+            self.lin1 = nn.Linear(2 * sum(latent_dim) + n_side_features, 128)
         if self.regression:
             self.lin2 = nn.Linear(128, 1)
         else:
             assert False
+            # self.lin2 = nn.Linear(128, n_classes)
     
     def reset_parameters(self):
         for conv in self.convs:
@@ -33,26 +42,28 @@ class IGMC(torch.nn.Module):
         self.lin1.reset_parameters()
         self.lin2.reset_parameters()
 
-    def __repr__(self):
-        return self.__class__.__name__
-
-    def forward(self, g):
-        # Don't drop for now
-        '''
-        if self.adj_dropout > 0:
-            edge_index, edge_type = dropout_adj(edge_index, edge_type, p=self.adj_dropout, force_undirected=self.force_undirected, num_nodes=len(x), training=self.training)
-        '''
+    def forward(self, block):
+        # TODO [zhoujf] add edge dropout feature
+        # if self.adj_dropout > 0:
+        #     edge_index, edge_type = dropout_adj(
+        #         edge_index, edge_type, p=self.adj_dropout, 
+        #         force_undirected=self.force_undirected, num_nodes=len(x), 
+        #         training=self.training
+        #     )
+        # block.edata['e'] = self.edge_dropout(block.edata['e']) # KeyError: 'e'
+        
         concat_states = []
-        x = g.ndata['x']
+        x = block.ndata['x']
         for conv in self.convs:
-            x = torch.tanh(conv(g, x, g.edata['etype']))
+            x = th.tanh(conv(block, x, block.edata['etype']))
             concat_states.append(x)
-        concat_states = torch.cat(concat_states, 1)
-        users = g.ndata['x'][:, 0] == 1
-        items = g.ndata['x'][:, 1] == 1
-        x = torch.cat([concat_states[users], concat_states[items]], 1)
-        if self.side_features:
-            x = torch.cat([x, data.u_feature, data.v_feature], 1)
+        concat_states = th.cat(concat_states, 1)
+        
+        users = block.ndata['x'][:, 0] == 1
+        items = block.ndata['x'][:, 1] == 1
+        x = th.cat([concat_states[users], concat_states[items]], 1)
+        # if self.side_features:
+        #     x = th.cat([x, data.u_feature, data.v_feature], 1)
 
         x = F.relu(self.lin1(x))
         x = F.dropout(x, p=0.5, training=self.training)
@@ -61,3 +72,7 @@ class IGMC(torch.nn.Module):
             return x[:, 0] * self.multiply_by
         else:
             assert False
+            # return F.log_softmax(x, dim=-1)
+
+    def __repr__(self):
+        return self.__class__.__name__
