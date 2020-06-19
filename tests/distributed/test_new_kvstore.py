@@ -88,7 +88,7 @@ def init_zero_func(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
 def udf_push(target, name, id_tensor, data_tensor):
-    target[name] = F.scatter_row(target[name], id_tensor, data_tensor*data_tensor)    
+    target[name][id_tensor] = data_tensor * data_tensor 
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_partition_policy():
@@ -119,7 +119,7 @@ def start_server():
     kvserver.init_data('data_0_2', 'node', data_0_2)
     kvserver.init_data('data_0_3', 'node', data_0_3)
     # start server
-    server_state = dgl.distributed.ServerState(kv_store=kvserver)
+    server_state = dgl.distributed.ServerState(kv_store=kvserver, local_g=None, partition_book=None)
     dgl.distributed.start_server(server_id=0,
                                  ip_config='kv_ip_config.txt',
                                  num_clients=1,
