@@ -330,7 +330,6 @@ class TreeSampler: public BaseSampler<Idx> {
     }
     return rst;
   }
-
 };
 
 };  // namespace utils

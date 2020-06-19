@@ -191,8 +191,9 @@ class RandomEngine {
    * \param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
-  void BiasedChoice(IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace = true); 
- 
+  void BiasedChoice(
+      IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace = true);
+
    /*!
    * \brief Pick random integers with different probability for different segments.
    *
@@ -205,7 +206,8 @@ class RandomEngine {
    * \param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
-  IdArray BiasedChoice(IdxType num, const IdxType *split, FloatArray bias, bool replace = true) {
+  IdArray BiasedChoice(
+      IdxType num, const IdxType *split, FloatArray bias, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
     IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
     BiasedChoice<IdxType>(num, split, bias, static_cast<IdxType*>(ret->data), replace);
