@@ -1,6 +1,6 @@
 /*!
- *  Copyright (c) 2018 by Contributors
- * \file graph/traversal.h
+ *  Copyright (c) 2020 by Contributors
+ * \file array/cpu/traversal.h
  * \brief Graph traversal routines.
  *
  * Traversal routines generate frontiers. Frontiers can be node frontiers or edge
@@ -8,8 +8,8 @@
  * list of nodes/edges (specified by their ids). An optional tag can be specified
  * for each node/edge (represented by an int value).
  */
-#ifndef DGL_GRAPH_TRAVERSAL_H_
-#define DGL_GRAPH_TRAVERSAL_H_
+#ifndef DGL_ARRAY_CPU_TRAVERSAL_H_
+#define DGL_ARRAY_CPU_TRAVERSAL_H_
 
 #include <dgl/graph_interface.h>
 #include <stack>
@@ -17,22 +17,23 @@
 #include <vector>
 
 namespace dgl {
-namespace traverse {
+namespace aten {
+namespace impl {
 
 /*!
  * \brief Traverse the graph in a breadth-first-search (BFS) order.
  *
  * The queue object must suffice following interface:
  *   Members:
- *   void push(dgl_id_t);  // push one node
- *   dgl_id_t top();       // get the first node
+ *   void push(IdType);  // push one node
+ *   IdType top();       // get the first node
  *   void pop();           // pop one node
  *   bool empty();         // return true if the queue is empty
  *   size_t size();        // return the size of the queue
- * For example, std::queue<dgl_id_t> is a valid queue type.
+ * For example, std::queue<IdType> is a valid queue type.
  *
  * The visit function must be compatible with following interface:
- *   void (*visit)(dgl_id_t );
+ *   void (*visit)(IdType );
  *
  * The frontier function must be compatible with following interface:
  *   void (*make_frontier)(void);
@@ -44,32 +45,34 @@ namespace traverse {
  * \param visit The function to call when a node is visited.
  * \param make_frontier The function to indicate that a new froniter can be made;
  */
-template<typename Queue, typename VisitFn, typename FrontierFn>
-void BFSNodes(const GraphInterface& graph,
+template<typename IdType, typename Queue, typename VisitFn, typename FrontierFn>
+void BFSTraverseNodes(const CSRMatrix& csr,
               IdArray source,
-              bool reversed,
               Queue* queue,
               VisitFn visit,
               FrontierFn make_frontier) {
   const int64_t len = source->shape[0];
-  const int64_t* src_data = static_cast<int64_t*>(source->data);
+  const IdType *src_data = static_cast<IdType*>(source->data);
 
-  std::vector<bool> visited(graph.NumVertices());
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+  const int64_t num_nodes = csr.num_rows;
+  std::vector<bool> visited(num_nodes);
   for (int64_t i = 0; i < len; ++i) {
-    const dgl_id_t u = src_data[i];
+    const IdType u = src_data[i];
     visited[u] = true;
     visit(u);
     queue->push(u);
   }
   make_frontier();
 
-  const auto neighbor_iter = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
   while (!queue->empty()) {
     const size_t size = queue->size();
     for (size_t i = 0; i < size; ++i) {
-      const dgl_id_t u = queue->top();
+      const IdType u = queue->top();
       queue->pop();
-      for (auto v : (graph.*neighbor_iter)(u)) {
+      for (auto idx = indptr_data[u]; idx < indptr_data[u+1]; ++idx) {
+        auto v = indices_data[idx];
         if (!visited[v]) {
           visited[v] = true;
           visit(v);
@@ -87,15 +90,15 @@ void BFSNodes(const GraphInterface& graph,
  *
  * The queue object must suffice following interface:
  *   Members:
- *   void push(dgl_id_t);  // push one node
- *   dgl_id_t top();       // get the first node
+ *   void push(IdType);  // push one node
+ *   IdType top();       // get the first node
  *   void pop();           // pop one node
  *   bool empty();         // return true if the queue is empty
  *   size_t size();        // return the size of the queue
- * For example, std::queue<dgl_id_t> is a valid queue type.
+ * For example, std::queue<IdType> is a valid queue type.
  *
  * The visit function must be compatible with following interface:
- *   void (*visit)(dgl_id_t );
+ *   void (*visit)(IdType );
  *
  * The frontier function must be compatible with following interface:
  *   void (*make_frontier)(void);
@@ -108,33 +111,36 @@ void BFSNodes(const GraphInterface& graph,
  *        The argument would be edge ID.
  * \param make_frontier The function to indicate that a new frontier can be made;
  */
-template<typename Queue, typename VisitFn, typename FrontierFn>
-void BFSEdges(const GraphInterface& graph,
+template<typename IdType, typename Queue, typename VisitFn, typename FrontierFn>
+void BFSTraverseEdges(const CSRMatrix& csr,
               IdArray source,
-              bool reversed,
               Queue* queue,
               VisitFn visit,
               FrontierFn make_frontier) {
   const int64_t len = source->shape[0];
-  const int64_t* src_data = static_cast<int64_t*>(source->data);
+  const IdType* src_data = static_cast<IdType*>(source->data);
 
-  std::vector<bool> visited(graph.NumVertices());
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+  const IdType *eid_data = static_cast<IdType *>(csr.data->data);
+
+  const int64_t num_nodes = csr.num_rows;
+  std::vector<bool> visited(num_nodes);
   for (int64_t i = 0; i < len; ++i) {
-    const dgl_id_t u = src_data[i];
+    const IdType u = src_data[i];
     visited[u] = true;
     queue->push(u);
   }
   make_frontier();
 
-  const auto neighbor_iter = reversed? &GraphInterface::InEdgeVec : &GraphInterface::OutEdgeVec;
   while (!queue->empty()) {
     const size_t size = queue->size();
     for (size_t i = 0; i < size; ++i) {
-      const dgl_id_t u = queue->top();
+      const IdType u = queue->top();
       queue->pop();
-      for (auto e : (graph.*neighbor_iter)(u)) {
-        const auto uv = graph.FindEdge(e);
-        const dgl_id_t v = (reversed ? uv.first : uv.second);
+      for (auto idx = indptr_data[u]; idx < indptr_data[u+1]; ++idx) {
+        auto e = eid_data ? eid_data[idx] : idx;
+        const IdType v = indices_data[idx];
         if (!visited[v]) {
           visited[v] = true;
           visit(e);
@@ -151,15 +157,15 @@ void BFSEdges(const GraphInterface& graph,
  *
  * The queue object must suffice following interface:
  *   Members:
- *   void push(dgl_id_t);  // push one node
- *   dgl_id_t top();       // get the first node
+ *   void push(IdType);  // push one node
+ *   IdType top();       // get the first node
  *   void pop();           // pop one node
  *   bool empty();         // return true if the queue is empty
  *   size_t size();        // return the size of the queue
- * For example, std::queue<dgl_id_t> is a valid queue type.
+ * For example, std::queue<IdType> is a valid queue type.
  *
  * The visit function must be compatible with following interface:
- *   void (*visit)(dgl_id_t );
+ *   void (*visit)(IdType );
  *
  * The frontier function must be compatible with following interface:
  *   void (*make_frontier)(void);
@@ -170,21 +176,26 @@ void BFSEdges(const GraphInterface& graph,
  * \param visit The function to call when a node is visited.
  * \param make_frontier The function to indicate that a new froniter can be made;
  */
-template<typename Queue, typename VisitFn, typename FrontierFn>
-void TopologicalNodes(const GraphInterface& graph,
-                      bool reversed,
+template<typename IdType, typename Queue, typename VisitFn, typename FrontierFn>
+void TopologicalNodes(const CSRMatrix& csr,
                       Queue* queue,
                       VisitFn visit,
                       FrontierFn make_frontier) {
-  const auto get_degree = reversed? &GraphInterface::OutDegree : &GraphInterface::InDegree;
-  const auto neighbor_iter = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
-  uint64_t num_visited_nodes = 0;
-  std::vector<uint64_t> degrees(graph.NumVertices(), 0);
-  for (dgl_id_t vid = 0; vid < graph.NumVertices(); ++vid) {
-    degrees[vid] = (graph.*get_degree)(vid);
+  int64_t num_visited_nodes = 0;
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+
+  const int64_t num_nodes = csr.num_rows;
+  const int64_t num_edges = csr.indices->shape[0];
+  std::vector<int64_t> degrees(num_nodes, 0);
+  for (int64_t eid = 0; eid < num_edges; ++eid) {
+    degrees[indices_data[eid]]++;
+  }
+
+  for (int64_t vid = 0; vid < num_nodes; ++vid) {
     if (degrees[vid] == 0) {
       visit(vid);
-      queue->push(vid);
+      queue->push(static_cast<IdType>(vid));
       ++num_visited_nodes;
     }
   }
@@ -193,9 +204,10 @@ void TopologicalNodes(const GraphInterface& graph,
   while (!queue->empty()) {
     const size_t size = queue->size();
     for (size_t i = 0; i < size; ++i) {
-      const dgl_id_t u = queue->top();
+      const IdType u = queue->top();
       queue->pop();
-      for (auto v : (graph.*neighbor_iter)(u)) {
+      for (auto idx = indptr_data[u]; idx < indptr_data[u+1]; ++idx) {
+        const IdType v = indices_data[idx];
         if (--(degrees[v]) == 0) {
           visit(v);
           queue->push(v);
@@ -206,7 +218,7 @@ void TopologicalNodes(const GraphInterface& graph,
     make_frontier();
   }
 
-  if (num_visited_nodes != graph.NumVertices()) {
+  if (num_visited_nodes != num_nodes) {
     LOG(FATAL) << "Error in topological traversal: loop detected in the given graph.";
   }
 }
@@ -236,34 +248,37 @@ enum DFSEdgeTag {
  * \param visit The function to call when an edge is visited; the edge id and its
  *              tag will be given as the arguments.
  */
-template<typename VisitFn>
-void DFSLabeledEdges(const GraphInterface& graph,
-                     dgl_id_t source,
-                     bool reversed,
+template<typename IdType, typename VisitFn>
+void DFSLabeledEdges(const CSRMatrix& csr,
+                     IdType source,
                      bool has_reverse_edge,
                      bool has_nontree_edge,
                      VisitFn visit) {
-  const auto succ = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
-  const auto out_edge = reversed? &GraphInterface::InEdgeVec : &GraphInterface::OutEdgeVec;
+  const int64_t num_nodes = csr.num_rows;
+  CHECK_GE(num_nodes, source) << "source " << source <<
+    " is out of range [0," << num_nodes << "]";
+  const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
+  const IdType *eid_data = static_cast<IdType *>(csr.data->data);
 
-  if ((graph.*succ)(source).size() == 0) {
+  if (indptr_data[source+1]-indptr_data[source] == 0) {
     // no out-going edges from the source node
     return;
   }
 
-  typedef std::tuple<dgl_id_t, size_t, bool> StackEntry;
+  typedef std::tuple<IdType, size_t, bool> StackEntry;
   std::stack<StackEntry> stack;
-  std::vector<bool> visited(graph.NumVertices());
+  std::vector<bool> visited(num_nodes);
   visited[source] = true;
   stack.push(std::make_tuple(source, 0, false));
-  dgl_id_t u = 0;
-  size_t i = 0;
+  IdType u = 0;
+  int64_t i = 0;
   bool on_tree = false;
 
   while (!stack.empty()) {
     std::tie(u, i, on_tree) = stack.top();
-    const dgl_id_t v = (graph.*succ)(u)[i];
-    const dgl_id_t uv = (graph.*out_edge)(u)[i];
+    const IdType v = indices_data[indptr_data[u] + i];
+    const IdType uv = eid_data ? eid_data[indptr_data[u] + i] : indptr_data[u] + i;
     if (visited[v]) {
       if (!on_tree && has_nontree_edge) {
         visit(uv, kNonTree);
@@ -272,7 +287,7 @@ void DFSLabeledEdges(const GraphInterface& graph,
       }
       stack.pop();
       // find next one.
-      if (i < (graph.*succ)(u).size() - 1) {
+      if (indptr_data[u] + i < indptr_data[u + 1] - 1) {
         stack.push(std::make_tuple(u, i+1, false));
       }
     } else {
@@ -280,15 +295,15 @@ void DFSLabeledEdges(const GraphInterface& graph,
       std::get<2>(stack.top()) = true;
       visit(uv, kForward);
       // expand
-      if ((graph.*succ)(v).size() > 0) {
+      if (indptr_data[v] < indptr_data[v + 1]) {
         stack.push(std::make_tuple(v, 0, false));
       }
     }
   }
 }
 
-}  // namespace traverse
+}  // namespace impl
+}  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_TRAVERSAL_H_
-
+#endif  // DGL_ARRAY_CPU_TRAVERSAL_H_
