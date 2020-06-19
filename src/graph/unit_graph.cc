@@ -73,8 +73,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     : BaseHeteroGraph(metagraph), adj_(coo) {
     // Data index should not be inherited. Edges in COO format are always
     // assigned ids from 0 to num_edges - 1.
-    CHECK(!COOHasData(coo)) << "[BUG] COO should not contain data.";
-    adj_.data = aten::NullArray();
+    // CHECK(!COOHasData(coo)) << "[BUG] COO should not contain data.";
+    // adj_.data = aten::NullArray();
   }
 
   inline dgl_type_t SrcType() const {

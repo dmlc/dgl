@@ -39,12 +39,7 @@ void SpMM(const std::string& op, const std::string& reduce,
           NDArray out,
           std::vector<NDArray> out_aux,
           SparseFormat format) {
-  /*
-  if (GlobalSparseFormat::Get()->GetFormat() == SparseFormat::kCOO)
-    format = SparseFormat::kCOO;
-  else
-    format = SparseFormat::kCSR;
-  */
+  // TODO(zihao): format tuning
   format = SparseFormat::kCSR;
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
@@ -73,12 +68,7 @@ void SDDMM(const std::string& op,
            NDArray efeat,
            NDArray out,
            SparseFormat format) {
-  /*
-  if (GlobalSparseFormat::Get()->GetFormat() == SparseFormat::kCSR)
-    format = SparseFormat::kCSR;
-  else
-    format = SparseFormat::kCOO;
-  */
+  // TODO(zihao): format tuning
   format = SparseFormat::kCOO;
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
