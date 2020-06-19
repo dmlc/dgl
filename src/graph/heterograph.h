@@ -228,14 +228,16 @@ class HeteroGraph : public BaseHeteroGraph {
     return relation_graphs_[etype]->SortCSC_(etype, tag, num_tags);
   }
 
-  std::pair<HeteroGraphPtr, IdArray> SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+  std::pair<HeteroGraphPtr, IdArray> SortCSR(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) override {
     return relation_graphs_[etype]->SortCSR(etype, tag, num_tags);
   }
 
-  std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+  std::pair<HeteroGraphPtr, IdArray> SortCSC(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) override {
     return relation_graphs_[etype]->SortCSC(etype, tag, num_tags);
   }
-  
+
  private:
   // To create empty class
   friend class Serializer;

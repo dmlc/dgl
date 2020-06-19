@@ -449,7 +449,7 @@ IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
     ATEN_ID_TYPE_SWITCH(tag->dtype, TagType, {
       ret = impl::CSRSortByTag_<XPU, IdType, TagType>(csr, tag, num_tags);
     });
-  });  
+  });
   return ret;
 }
 

@@ -486,9 +486,11 @@ class BaseHeteroGraph : public runtime::Object {
   /*! 
   * \return The sorted copy of the graph and the split positions
   */
-  virtual std::pair<HeteroGraphPtr, IdArray> SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
+  virtual std::pair<HeteroGraphPtr, IdArray> SortCSR(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
 
-  virtual std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
+  virtual std::pair<HeteroGraphPtr, IdArray> SortCSC(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) = 0;
 
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);

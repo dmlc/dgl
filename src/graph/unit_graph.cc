@@ -426,12 +426,14 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return aten::NullArray();
   }
 
-  std::pair<HeteroGraphPtr, IdArray> SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+  std::pair<HeteroGraphPtr, IdArray> SortCSR(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) override {
     LOG(FATAL) << "Not enabled for COO graph";
     return std::make_pair(nullptr, aten::NullArray());
   }
 
-  std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+  std::pair<HeteroGraphPtr, IdArray> SortCSC(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) override {
     LOG(FATAL) << "Not enabled for COO graph";
     return std::make_pair(nullptr, aten::NullArray());
   }
@@ -811,7 +813,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return aten::NullArray();
   }
   
-  std::pair<HeteroGraphPtr, IdArray> SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+  std::pair<HeteroGraphPtr, IdArray> SortCSR(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) override {
     IdArray indptr = aten::Clone(adj_.indptr);
     IdArray indices = aten::Clone(adj_.indices);
     IdArray data = aten::Clone(adj_.data);
@@ -826,7 +829,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  std::pair<HeteroGraphPtr, IdArray> SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
+  std::pair<HeteroGraphPtr, IdArray> SortCSC(
+      dgl_type_t etype, IdArray tag, int64_t num_tags) override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return std::make_pair(nullptr, aten::NullArray());
   }
@@ -1568,14 +1572,16 @@ IdArray UnitGraph::SortCSC_(dgl_type_t etype, IdArray tag, int64_t num_tags) {
   return GetInCSR()->SortCSR_(etype, tag, num_tags);
 }
 
-std::pair<HeteroGraphPtr, IdArray> UnitGraph::SortCSR(dgl_type_t etype, IdArray tag, int64_t num_tags) {
+std::pair<HeteroGraphPtr, IdArray> UnitGraph::SortCSR(
+    dgl_type_t etype, IdArray tag, int64_t num_tags) {
   auto ret = GetOutCSR()->SortCSR(etype, tag, num_tags);
   CSRPtr out_csr = std::static_pointer_cast<CSR>(ret.first);
   ret.first = UnitGraphPtr(new UnitGraph(meta_graph_, nullptr, out_csr, nullptr));
   return ret;
 }
 
-std::pair<HeteroGraphPtr, IdArray> UnitGraph::SortCSC(dgl_type_t etype, IdArray tag, int64_t num_tags) {
+std::pair<HeteroGraphPtr, IdArray> UnitGraph::SortCSC(
+    dgl_type_t etype, IdArray tag, int64_t num_tags) {
   auto ret = GetOutCSR()->SortCSR(etype, tag, num_tags);
   CSRPtr in_csr = std::static_pointer_cast<CSR>(ret.first);
   ret.first = UnitGraphPtr(new UnitGraph(meta_graph_, in_csr, nullptr, nullptr));

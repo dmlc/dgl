@@ -610,7 +610,7 @@ IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
   NDArray split = NewIdArray(num_rows * (num_tags + 1), csr->indptr->ctx, csr->indptr->dtype.bits);
   auto split_data = static_cast<IdType *>(split->data);
 
-  #pragma omp parallel for 
+  #pragma omp parallel for
   for (IdType src = 0 ; src < num_rows ; ++src) {
     IdType start = indptr_data[src];
     IdType end = indptr_data[src + 1];
@@ -643,10 +643,14 @@ IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
   return split;
 }
 
-template IdArray CSRSortByTag_<kDLCPU, int64_t, int64_t>(CSRMatrix* csr, IdArray tag, int64_t num_tags);
-template IdArray CSRSortByTag_<kDLCPU, int64_t, int32_t>(CSRMatrix* csr, IdArray tag, int64_t num_tags);
-template IdArray CSRSortByTag_<kDLCPU, int32_t, int64_t>(CSRMatrix* csr, IdArray tag, int64_t num_tags);
-template IdArray CSRSortByTag_<kDLCPU, int32_t, int32_t>(CSRMatrix* csr, IdArray tag, int64_t num_tags);
+template IdArray CSRSortByTag_<kDLCPU, int64_t, int64_t>(
+    CSRMatrix* csr, IdArray tag, int64_t num_tags);
+template IdArray CSRSortByTag_<kDLCPU, int64_t, int32_t>(
+    CSRMatrix* csr, IdArray tag, int64_t num_tags);
+template IdArray CSRSortByTag_<kDLCPU, int32_t, int64_t>(
+    CSRMatrix* csr, IdArray tag, int64_t num_tags);
+template IdArray CSRSortByTag_<kDLCPU, int32_t, int32_t>(
+    CSRMatrix* csr, IdArray tag, int64_t num_tags);
 
 ///////////////////////////// CSRReorder /////////////////////////////
 
