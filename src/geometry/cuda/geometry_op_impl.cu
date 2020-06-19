@@ -76,7 +76,17 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
     dist_max_ht[thread_idx] = dist_max;
     dist_argmax_ht[thread_idx] = dist_argmax;
 
-    // Parallel Reduction
+    /*
+     * \brief Parallel Reduction
+     *
+     * Suppose the maximum is dist_max_ht[k], where 0 <= k < THREAD.
+     * After loop at j = 1, the maximum is propagated to [k-1].
+     * After loop at j = 2, the maximum is propagated to the range [k-3] to [k].
+     * After loop at j = 4, the maximum is propagated to the range [k-7] to [k].
+     * After loop at any j < THREADS, we can see [k - 2*j + 1] to [k] are all covered by the maximum.
+     * The max value of j is at least floor(THREAD / 2), and it is sufficient to cover [0] with the maximum.
+     */
+
     for (auto j = 1; j < THREADS; j *= 2) {
       __syncthreads();
       if ((thread_idx + j) < THREADS && dist_max_ht[thread_idx] < dist_max_ht[thread_idx + j]) {
