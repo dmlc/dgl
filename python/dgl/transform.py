@@ -1293,12 +1293,13 @@ def sort_csr_(g, tag=None, split="_SPLIT"):
     srctype = g.srctypes[0]
     dsttype = g.dsttypes[0]
     if tag is None:
-        tag_data = F.tensor([], dtype=int)
+        tag_arr = nd.NULL["int32"]
         num_tags = 0
     else:
         tag_data = g.nodes[dsttype].data[tag]
         num_tags = int(F.max(tag_data, 0)) + 1
-    ret = _CAPI_DGLHeteroSortCSR_(g._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
+        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
+    ret = _CAPI_DGLHeteroSortCSR_(g._graph, 0, tag_arr, num_tags)
     if tag is not None:
         ret = F.zerocopy_from_dgl_ndarray(ret)
         g.nodes[srctype].data[split] = F.reshape(ret, [-1, num_tags + 1])
@@ -1327,12 +1328,13 @@ def sort_csc_(g, tag=None, split="_SPLIT"):
     srctype = g.srctypes[0]
     dsttype = g.dsttypes[0]
     if tag is None:
-        tag_data = F.tensor([], dtype=int)
+        tag_arr = nd.NULL["int32"]
         num_tags = 0
     else:
         tag_data = g.nodes[srctype].data[tag]
         num_tags = int(F.max(tag_data, 0)) + 1
-    ret = _CAPI_DGLHeteroSortCSC_(g._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
+        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
+    ret = _CAPI_DGLHeteroSortCSC_(g._graph, 0, tag_arr, num_tags)
     if tag is not None:
         ret = F.zerocopy_from_dgl_ndarray(ret)
         g.nodes[dsttype].data[split] = F.reshape(ret, [-1, num_tags + 1])
@@ -1365,12 +1367,13 @@ def sort_csr(g, tag=None, split="_SPLIT"):
     srctype = g.srctypes[0]
     dsttype = g.dsttypes[0]
     if tag is None:
-        tag_data = F.tensor([], dtype=int)
+        tag_arr = nd.NULL["int32"]
         num_tags = 0
     else:
         tag_data = g.nodes[dsttype].data[tag]
         num_tags = int(F.max(tag_data, 0)) + 1
-    ret = _CAPI_DGLHeteroSortCSR(g._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
+        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
+    ret = _CAPI_DGLHeteroSortCSR(g._graph, 0, tag_arr, num_tags)
     gidx, split_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
                    if frame is None else FrameRef(frame.clone())
@@ -1412,12 +1415,13 @@ def sort_csc(g, tag=None, split="_SPLIT"):
     srctype = g.srctypes[0]
     dsttype = g.dsttypes[0]
     if tag is None:
-        tag_data = F.tensor([], dtype=int)
+        tag_arr = nd.NULL["int32"]
         num_tags = 0
     else:
         tag_data = g.nodes[srctype].data[tag]
         num_tags = int(F.max(tag_data, 0)) + 1
-    ret = _CAPI_DGLHeteroSortCSC(g._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
+        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
+    ret = _CAPI_DGLHeteroSortCSC(g._graph, 0, tag_arr, num_tags)
     gidx, split_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
                    if frame is None else FrameRef(frame.clone())
