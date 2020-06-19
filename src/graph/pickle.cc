@@ -18,7 +18,7 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   states.num_nodes_per_type = graph->NumVerticesPerType();
   states.adjs.resize(graph->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kAny);
+    SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kCoo);
     states.adjs[etype] = std::make_shared<SparseMatrix>();
     switch (fmt) {
       case SparseFormat::kCOO:
