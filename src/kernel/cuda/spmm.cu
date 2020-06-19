@@ -110,9 +110,6 @@ void CusparseCsrmm2(
   if (!A_data) {
     valptr = static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
     utils::Fill<kDLGPU>(ctx, valptr, nnz, static_cast<DType>(1.));
-  } else if (!aten::IsNullArray(csr.data)) {
-    valptr = static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
-    utils::IndexSelectGPU(A_data, static_cast<int32_t*>(csr.data->data), nnz, valptr);
   }
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
@@ -193,6 +190,8 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
+      if (!aten::IsNullArray(csr.data))
+        efeat = aten::IndexSelect(efeat, csr.data);
       cusparse::CusparseCsrmm2<DType>(
           ufeat->ctx, csr,
           static_cast<DType*>(ufeat->data),
