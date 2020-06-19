@@ -227,3 +227,18 @@ TEST(RandomTest, TestUniformChoice) {
   _TestUniformChoice<int32_t>(re);
   _TestUniformChoice<int64_t>(re);
 }
+
+template <typename Idx, typename TagType, typename FloatType>
+void _TestBiasedChoice(RandomEngine* re) {
+  re->SetSeed(42);
+  // basic test
+  {
+    Idx sample_num = 1000;
+    Idx population = 10000;
+    std::vector<Idx> split({0, population/2 ,population});
+    std::vector<FloatType> bias({1, 3});
+
+    IdArray rst = re->UniformChoice<Idx>(0, 100, true);
+    ASSERT_EQ(rst->shape[0], 0);
+  }
+}

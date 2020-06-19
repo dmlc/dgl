@@ -179,20 +179,38 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Pick random integers from population by uniform distribution.
+   * \brief Pick random integers with different probability for different segments.
    *
    * If replace is false, num must not be larger than population.
    *
    * \tparam IdxType Return integer type
    * \param num Number of integers to choose
-   * \param split Split positions of different tags
-   * \param bias Weights of different tags
+   * \param split Split positions of different segments
+   * \param bias Weights of different segments
    * \param out The output buffer to write selected indices.
    * \param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
   void BiasedChoice(IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace = true); 
  
+   /*!
+   * \brief Pick random integers with different probability for different segments.
+   *
+   * If replace is false, num must not be larger than population.
+   *
+   * \tparam IdxType Return integer type
+   * \param num Number of integers to choose
+   * \param split Split positions of different segments
+   * \param bias Weights of different segments
+   * \param replace If true, choose with replacement.
+   */
+  template <typename IdxType, typename FloatType>
+  IdArray BiasedChoice(IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace = true) {
+    IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
+    BiasedChoice<IdxType>(IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace = true);
+    return ret;
+  }
+
  private:
   std::default_random_engine rng_;
 };

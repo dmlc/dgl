@@ -117,12 +117,12 @@ void RandomEngine::BiasedChoice(
       out[i] = RandInt(tag_num_nodes) + split[tag];
     }
   } else {
-    utils::TreeSampler<IdxType, FloatType, false> sampler(this, prob);
+    utils::TreeSampler<int64_t, FloatType, false> sampler(this, prob);
     CHECK_GE(total_node_num, num) << "Cannot take more sample than population when 'replace=false'";
     // we use hash set here. Maybe in the future we should support reservoir algorithm
     std::vector<std::unordered_set<IdxType>> selected(num_tags);
     for (IdxType i = 0 ; i < num ; ++i) {
-      IdxType tag = sampler.DrawAndUpdate(bias_data); 
+      int64_t tag = sampler.DrawAndUpdate(bias_data); 
       bool inserted = false;
       IdxType tag_num_nodes = split[tag+1] - split[tag];
       IdxType selected_node;
