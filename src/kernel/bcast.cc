@@ -9,6 +9,8 @@
 namespace dgl {
 namespace kernel {
 
+namespace {
+
 bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
   if (op == "copy_u" || op == "copy_e")
     return false;
@@ -21,10 +23,16 @@ bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
   return false;
 }
 
+}
+
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
   BcastOff rst;
-  rst.lhs_len = lhs->strides[0];
-  rst.rhs_len = rhs->strides[0];
+  rst.lhs_len = 1;
+  rst.rhs_len = 1;
+  for (int i = 1; i < lhs->ndim; ++i)
+    rst.lhs_len *= lhs->shape[i];
+  for (int i = 1; i < rhs->ndim; ++i)
+    rst.rhs_len *= rhs->shape[i];
   rst.use_bcast = UseBcast(op, lhs, rhs);
   rst.reduce_size = 1;
   if (rst.use_bcast) {
@@ -58,6 +66,10 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
       rst.out_len /= rst.reduce_size;
     }
   }
+  std::cout << "lhs_len: " << rst.lhs_len << " " <<
+    "rhs_len: " << rst.rhs_len << " " <<
+    "out_len: " << rst.out_len << " " <<
+    "reduce_size: " << rst.reduce_size << std::endl;
   return rst;
 }
 

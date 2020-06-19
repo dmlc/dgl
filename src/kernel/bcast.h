@@ -15,13 +15,18 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace kernel {
 
+/*!
+ * \brief: Broadcast information.
+ */
 struct BcastOff {
   std::vector<int64_t> lhs_offset, rhs_offset;
   bool use_bcast;
   int64_t lhs_len, rhs_len, out_len, reduce_size;
 };
 
-bool HasBcast1(NDArray lhs, NDArray rhs);
+/*!
+ * \brief: Compute broadcast information given operator and operands.
+ */
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs);
 
 }   // namespace kernel
