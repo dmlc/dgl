@@ -19,16 +19,16 @@ void SDDMMCsr(const BcastOff& bcast,
               const aten::CSRMatrix& csr,
               NDArray ufeat, NDArray vfeat, NDArray out) {
   const bool has_idx = !aten::IsNullArray(csr.data);
-  const IdType* indptr = utils::GetPtr<IdType>(csr.indptr);
-  const IdType* indices = utils::GetPtr<IdType>(csr.indices);
-  const IdType* edges = utils::GetPtr<IdType>(csr.data);
-  const DType* X = utils::GetPtr<DType>(ufeat);
-  const DType* Y = utils::GetPtr<DType>(vfeat);
+  const IdType* indptr = csr.indptr.Ptr<IdType>();
+  const IdType* indices = csr.indices.Ptr<IdType>();
+  const IdType* edges = csr.data.Ptr<IdType>();
+  const DType* X = ufeat.Ptr<DType>();
+  const DType* Y = vfeat.Ptr<DType>();
   const int64_t dim = bcast.out_len,
                 lhs_dim = bcast.lhs_len,
                 rhs_dim = bcast.rhs_len,
                 reduce_size = bcast.reduce_size;
-  DType* O = utils::GetPtr<DType>(out);
+  DType* O = out.Ptr<DType>();
 #pragma omp parallel for
   for (IdType rid = 0; rid < csr.num_rows; ++rid) {
     const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
@@ -54,16 +54,16 @@ void SDDMMCoo(const BcastOff& bcast,
               const aten::COOMatrix& coo,
               NDArray ufeat, NDArray vfeat, NDArray out) {
   const bool has_idx = !aten::IsNullArray(coo.data);
-  const IdType* row = utils::GetPtr<IdType>(coo.row);
-  const IdType* col = utils::GetPtr<IdType>(coo.col);
-  const IdType* edges = utils::GetPtr<IdType>(coo.data);
-  const DType* X = utils::GetPtr<DType>(ufeat);
-  const DType* Y = utils::GetPtr<DType>(vfeat);
+  const IdType* row = coo.row.Ptr<IdType>();
+  const IdType* col = coo.col.Ptr<IdType>();
+  const IdType* edges = coo.data.Ptr<IdType>();
+  const DType* X = ufeat.Ptr<DType>();
+  const DType* Y = vfeat.Ptr<DType>();
   const int64_t dim = bcast.out_len,
                 lhs_dim = bcast.lhs_len,
                 rhs_dim = bcast.rhs_len,
                 reduce_size = bcast.reduce_size;
-  DType* O = utils::GetPtr<DType>(out);
+  DType* O = out.Ptr<DType>();
   const int64_t nnz = coo.row->shape[0];
 #pragma omp parallel for
   for (IdType i = 0; i < nnz; ++i) {

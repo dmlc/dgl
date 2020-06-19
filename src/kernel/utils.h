@@ -50,17 +50,6 @@ template <int XPU, typename DType>
 void Fill(const DLContext& ctx, DType* ptr, size_t length, DType val);
 
 /*
- * !\brief get the raw pointer to the data in the given array.
- * if array is a NullArray, return a nullptr.
- */
-template <typename DType>
-inline DType* GetPtr(const runtime::NDArray& array) {
-  if (aten::IsNullArray(array))
-    return nullptr;
-  return static_cast<DType*>(array->data);
-}
-
-/*
  * !\brief Create minigun CSR from two ndarrays.
  */
 template <typename Idx>

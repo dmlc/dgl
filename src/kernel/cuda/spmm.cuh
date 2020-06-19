@@ -176,16 +176,16 @@ void SpMMCoo(
     const dgl::aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
-  Idx *row = utils::GetPtr<Idx>(coo.row),
-      *col = utils::GetPtr<Idx>(coo.col),
-      *edge_map = utils::GetPtr<Idx>(coo.data);
-  DType *ufeat_data = utils::GetPtr<DType>(ufeat),
-        *efeat_data = utils::GetPtr<DType>(efeat),
-        *out_data = utils::GetPtr<DType>(out);
-  Idx *argu_data = utils::GetPtr<Idx>(argu),
-      *arge_data = utils::GetPtr<Idx>(arge);
+  const Idx *row = coo.row.Ptr<Idx>(),
+            *col = coo.col.Ptr<Idx>(),
+            *edge_map = coo.data.Ptr<Idx>();
+  const DType *ufeat_data = ufeat.Ptr<DType>(),
+              *efeat_data = efeat.Ptr<DType>();
+  DType *out_data = out.Ptr<DType>();
+  Idx *argu_data = argu.Ptr<Idx>(),
+      *arge_data = arge.Ptr<Idx>();
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  int64_t N = coo.num_rows, M = coo.num_cols, E = coo.row->shape[0];
+  const int64_t N = coo.num_rows, M = coo.num_cols, E = coo.row->shape[0];
 
   int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
   int64_t len = bcast.out_len,
@@ -230,14 +230,14 @@ void SpMMCsr(
     const dgl::aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
-  const Idx *indptr = utils::GetPtr<Idx>(csr.indptr);
-  const Idx *indices = utils::GetPtr<Idx>(csr.indices);
-  const Idx *edge_map = utils::GetPtr<Idx>(csr.data);
-  const DType *ufeat_data = utils::GetPtr<DType>(ufeat);
-  const DType *efeat_data = utils::GetPtr<DType>(efeat);
-  DType *out_data = utils::GetPtr<DType>(out);
-  Idx* argu_data = utils::GetPtr<Idx>(argu);
-  Idx* arge_data = utils::GetPtr<Idx>(arge);
+  const Idx *indptr = csr.indptr.Ptr<Idx>();
+  const Idx *indices = csr.indices.Ptr<Idx>();
+  const Idx *edge_map = csr.data.Ptr<Idx>();
+  const DType *ufeat_data = ufeat.Ptr<DType>();
+  const DType *efeat_data = efeat.Ptr<DType>();
+  DType *out_data = out.Ptr<DType>();
+  Idx* argu_data = argu.Ptr<Idx>();
+  Idx* arge_data = arge.Ptr<Idx>();
 
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 

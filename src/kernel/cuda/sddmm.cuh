@@ -157,12 +157,12 @@ void SDDMMCoo(
     NDArray ufeat,
     NDArray vfeat,
     NDArray out) {
-  const Idx *row = utils::GetPtr<Idx>(coo.row);
-  const Idx *col = utils::GetPtr<Idx>(coo.col);
-  const Idx *edge_map = utils::GetPtr<Idx>(coo.data);
-  const DType *ufeat_data = utils::GetPtr<DType>(ufeat);
-  const DType *vfeat_data = utils::GetPtr<DType>(vfeat);
-  DType *out_data = utils::GetPtr<DType>(out);
+  const Idx *row = coo.row.Ptr<Idx>();
+  const Idx *col = coo.col.Ptr<Idx>();
+  const Idx *edge_map = coo.data.Ptr<Idx>();
+  const DType *ufeat_data = ufeat.Ptr<DType>();
+  const DType *vfeat_data = vfeat.Ptr<DType>();
+  DType *out_data = out.Ptr<DType>();
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 
   int64_t *ubcast_off = nullptr, *vbcast_off = nullptr;
@@ -199,12 +199,12 @@ void SDDMMCsr(
     NDArray ufeat,
     NDArray vfeat,
     NDArray out) {
-  const Idx *indptr = utils::GetPtr<Idx>(csr.indptr);
-  const Idx *indices = utils::GetPtr<Idx>(csr.indices);
-  const Idx *edge_map = utils::GetPtr<Idx>(csr.data);
-  const DType *ufeat_data = utils::GetPtr<DType>(ufeat);
-  const DType *vfeat_data = utils::GetPtr<DType>(vfeat);
-  DType *out_data = utils::GetPtr<DType>(out);
+  const Idx *indptr = csr.indptr.Ptr<Idx>();
+  const Idx *indices = csr.indices.Ptr<Idx>();
+  const Idx *edge_map = csr.data.Ptr<Idx>();
+  const DType *ufeat_data = ufeat.Ptr<DType>();
+  const DType *vfeat_data = vfeat.Ptr<DType>();
+  DType *out_data = out.Ptr<DType>();
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int64_t N = csr.num_rows, M = csr.num_cols, E = csr.indices->shape[0];
 
