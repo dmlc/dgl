@@ -84,7 +84,7 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   
   // The row and column field have already been reordered
   // according to data, thus the data field will be deprecated.
-  coo.data = nullptr;
+  coo.data = aten::NullArray();
   return coo;
 }
 
