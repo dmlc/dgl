@@ -16,14 +16,14 @@ udf_apply_edges = {
     'sub': lambda edges: {'m': edges.src['x'] - edges.dst['y']},
     'mul': lambda edges: {'m': edges.src['x'] * edges.dst['y']},
     'div': lambda edges: {'m': edges.src['x'] / edges.dst['y']},
-    'dot': lambda edges: {'m': F.sum(edges.src['x'] * edges.dst['y'], 1, keepdims=True)},
+    'dot': lambda edges: {'m': F.sum(edges.src['x'] * edges.dst['y'], -1, keepdims=True)},
     'copy_u': lambda edges: {'m': edges.src['x']},
 }
 
 udf_reduce = {
     'sum': lambda nodes: {'v': F.sum(nodes.mailbox['m'], 1)},
-    'min': lambda nodes: {'v': F.min(nodes.mailbox['m'], 1)[0]},
-    'max': lambda nodes: {'v': F.max(nodes.mailbox['m'], 1)[0]}
+    'min': lambda nodes: {'v': F.min(nodes.mailbox['m'], 1)},
+    'max': lambda nodes: {'v': F.max(nodes.mailbox['m'], 1)}
 }
 
 def test_spmm():

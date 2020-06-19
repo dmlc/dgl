@@ -158,8 +158,8 @@ def div(a, b):
     return a / b
 
 
-def sum(x, dim):
-    return tf.reduce_sum(x, axis=dim)
+def sum(x, dim, keepdims=False):
+    return tf.reduce_sum(x, axis=dim, keepdims=keepdims)
 
 
 def max(x, dim):
