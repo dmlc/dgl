@@ -179,6 +179,16 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   return ret;
 }
 
+IdArray CumSum(IdArray array, bool prepend_zero) {
+  IdArray ret;
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "CumSum", {
+    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+      ret = impl::CumSum<XPU, IdType>(array, prepend_zero);
+    });
+  });
+  return ret;
+}
+
 ///////////////////////// CSR routines //////////////////////////
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {

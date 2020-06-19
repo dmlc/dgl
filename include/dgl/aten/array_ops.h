@@ -238,6 +238,22 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
  */
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
+/*!
+ * \brief Return the cumulative summation (or inclusive sum) of the input array.
+ *
+ * The first element out[0] is equal to the first element of the input array
+ * array[0]. The rest elements are defined recursively, out[i] = out[i-1] + array[i].
+ * Hence, the result array length is the same as the input array length.
+ *
+ * If prepend_zero is true, then the first element is zero and the result array
+ * length is the input array length plus one. This is useful for creating
+ * an indptr array over a count array.
+ *
+ * \param array The 1D input array.
+ * \return Array after cumsum.
+ */
+IdArray CumSum(IdArray array, bool prepend_zero = false);
+
 // inline implementations
 template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,

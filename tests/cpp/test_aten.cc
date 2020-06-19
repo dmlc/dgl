@@ -239,3 +239,41 @@ TEST(ArrayTest, TestRelabel_) {
   _TestRelabel_<int32_t>();
   _TestRelabel_<int64_t>();
 }
+
+template <typename IDX>
+void _TestCumSum(DLContext ctx) {
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}),
+      sizeof(IDX)*8, ctx);
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({8, 14, 21, 26, 29, 29, 38}),
+        sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({0, 8, 14, 21, 26, 29, 29, 38}),
+        sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a, true);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+  a = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+}
+
+TEST(ArrayTest, CumSum) {
+  _TestCumSum<int32_t>(CPU);
+  _TestCumSum<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCumSum<int32_t>(GPU);
+  _TestCumSum<int64_t>(GPU);
+#endif
+}

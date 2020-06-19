@@ -166,9 +166,8 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
 
 /*!
  * \brief Slice rows of the given matrix and return.
- * \param csr CSR matrix
- * \param start Start row id (inclusive)
- * \param end End row id (exclusive)
+ *
+ * The sliced row IDs are relabeled to starting from zero.
  *
  * Examples:
  * num_rows = 4
@@ -182,6 +181,11 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
  * num_cols = 4
  * indptr = [0, 1, 1]
  * indices = [2]
+ *
+ * \param csr CSR matrix
+ * \param start Start row id (inclusive)
+ * \param end End row id (exclusive)
+ * \return sliced rows stored in a CSR matrix
  */
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
@@ -191,6 +195,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  *
  * In numpy notation, given matrix M, row index array I, col index array J
  * This function returns the submatrix M[I, J].
+ *
+ * The sliced row and column IDs are relabeled to starting from zero.
  *
  * \param csr The input csr matrix
  * \param rows The row index to select

@@ -61,6 +61,9 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value);
 template <DLDeviceType XPU, typename DType, typename IdType>
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
+template <DLDeviceType XPU, typename IdType>
+IdArray CumSum(IdArray array, bool prepend_zero);
+
 // sparse arrays
 
 template <DLDeviceType XPU, typename IdType>
