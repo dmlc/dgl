@@ -98,6 +98,11 @@ def save_graphs(filename, g_list, labels=None):
     >>> save_graphs("./data.bin", [g1, g2], graph_labels)
 
     """
+    assert not os.path.isdir(filename), "filename %s is an existing directory."%(filename)
+    _path, _file = os.path.split(filename)
+    if not os.path.exists(_path):
+        os.makedirs(_path)
+
     if isinstance(g_list, DGLGraph):
         g_list = [g_list]
     if (labels is not None) and (len(labels) != 0):

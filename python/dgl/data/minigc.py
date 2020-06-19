@@ -77,8 +77,6 @@ class MiniGCDataset(DGLDataset):
     def save(self):
         """save the graph list and the labels"""
         graph_path = os.path.join(self.raw_path, 'dgl_graph.bin')
-        # this check should be adeded into save_graphs
-        makedirs(self.raw_path)
         save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
         if self.verbose:
             print('Done saving data into cached files.')
