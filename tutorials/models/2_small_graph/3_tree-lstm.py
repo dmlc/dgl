@@ -88,7 +88,7 @@ def plot_tree(g):
             node_color=[[.5, .5, .5]], arrowsize=4)
     plt.show()
 
-#plot_tree(graph.to_networkx())
+plot_tree(graph.to_networkx())
 
 #################################################################################
 # You can read more about the definition of :func:`~dgl.batch`, or

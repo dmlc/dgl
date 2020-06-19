@@ -34,10 +34,62 @@ struct Frontiers {
 
 namespace aten {
 
+/*!
+ * \brief Traverse the graph in a breadth-first-search (BFS) order.
+ *
+ * \param csr The input csr matrix.
+ * \param sources Source nodes.
+ * \return A Frontiers object containing the search result
+ */
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
+
+/*!
+ * \brief Traverse the graph in a breadth-first-search (BFS) order, returning
+ *        the edges of the BFS tree.
+ *
+ * \param csr The input csr matrix.
+ * \param sources Source nodes.
+ * \return A Frontiers object containing the search result
+ */
 Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
+
+/*!
+ * \brief Traverse the graph in topological order.
+ *
+ * \param csr The input csr matrix.
+ * \return A Frontiers object containing the search result
+ */
 Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
+
+/*!
+ * \brief Traverse the graph in a depth-first-search (DFS) order.
+ *
+ * \param csr The input csr matrix.
+ * \param sources Source nodes.
+ * \return A Frontiers object containing the search result
+ */
 Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
+
+/*!
+ * \brief Traverse the graph in a depth-first-search (DFS) order and return the
+ *        recorded edge tag if return_labels is specified.
+ *
+ * The traversal visit edges in its DFS order. Edges have three tags:
+ * FORWARD(0), REVERSE(1), NONTREE(2)
+ *
+ * A FORWARD edge is one in which `u` has been visisted but `v` has not.
+ * A REVERSE edge is one in which both `u` and `v` have been visisted and the edge
+ * is in the DFS tree.
+ * A NONTREE edge is one in which both `u` and `v` have been visisted but the edge
+ * is NOT in the DFS tree.
+ *
+ * \param csr The input csr matrix.
+ * \param sources Source nodes.
+ * \param has_reverse_edge If true, REVERSE edges are included
+ * \param has_nontree_edge If true, NONTREE edges are included
+ * \param return_labels If true, return the recorded edge tags.
+ * \return A Frontiers object containing the search result
+ */
 Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
                              const bool has_reverse_edge,

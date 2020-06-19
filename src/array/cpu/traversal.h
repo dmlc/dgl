@@ -56,7 +56,7 @@ void BFSTraverseNodes(const CSRMatrix& csr,
 
   const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
   const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
-  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  const int64_t num_nodes = csr.num_rows;
   std::vector<bool> visited(num_nodes);
   for (int64_t i = 0; i < len; ++i) {
     const IdType u = src_data[i];
@@ -124,7 +124,7 @@ void BFSTraverseEdges(const CSRMatrix& csr,
   const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
   const IdType *eid_data = static_cast<IdType *>(csr.data->data);
 
-  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  const int64_t num_nodes = csr.num_rows;
   std::vector<bool> visited(num_nodes);
   for (int64_t i = 0; i < len; ++i) {
     const IdType u = src_data[i];
@@ -185,7 +185,7 @@ void TopologicalNodes(const CSRMatrix& csr,
   const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
   const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
 
-  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  const int64_t num_nodes = csr.num_rows;
   const int64_t num_edges = csr.indices->shape[0];
   std::vector<int64_t> degrees(num_nodes, 0);
   for (int64_t eid = 0; eid < num_edges; ++eid) {
@@ -254,7 +254,7 @@ void DFSLabeledEdges(const CSRMatrix& csr,
                      bool has_reverse_edge,
                      bool has_nontree_edge,
                      VisitFn visit) {
-  const int64_t num_nodes = csr.indptr->shape[0]-1;
+  const int64_t num_nodes = csr.num_rows;
   CHECK_GE(num_nodes, source) << "source " << source <<
     " is out of range [0," << num_nodes << "]";
   const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
