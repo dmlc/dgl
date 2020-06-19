@@ -1376,10 +1376,10 @@ def sort_csr(g, tag=None, split="_SPLIT"):
     ret = _CAPI_DGLHeteroSortCSR(g._graph, 0, tag_arr, num_tags)
     gidx, split_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                   if frame is None else FrameRef(frame.clone())
+                   if frame is None else frame.clone()
                    for i, frame in enumerate(g._node_frames)]
     edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                   if frame is None else FrameRef(frame.clone())
+                   if frame is None else frame.clone()
                    for i, frame in enumerate(g._edge_frames)]
     new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
     if tag is not None:
@@ -1424,10 +1424,10 @@ def sort_csc(g, tag=None, split="_SPLIT"):
     ret = _CAPI_DGLHeteroSortCSC(g._graph, 0, tag_arr, num_tags)
     gidx, split_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                   if frame is None else FrameRef(frame.clone())
+                   if frame is None else frame.clone()
                    for i, frame in enumerate(g._node_frames)]
     edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                   if frame is None else FrameRef(frame.clone())
+                   if frame is None else frame.clone()
                    for i, frame in enumerate(g._edge_frames)]
     new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
     if tag is not None:

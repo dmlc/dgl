@@ -19,9 +19,13 @@ def create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype):
     dst = np.concatenate(dst)
     return dgl.graph((src, dst), index_dtype=index_dtype)
 
-def check_sort(spm, tag_arr = None, split = None):
+def check_sort(spm, tag_arr=None, split=None):
     if tag_arr is None:
         tag_arr = np.arange(spm.shape[0])
+    else:
+        tag_arr = F.zerocopy_to_numpy(tag_arr)
+    if split is not None:
+        split = F.zerocopy_to_numpy(split)
     for i in range(spm.shape[0]):
         row = spm.getrow(i)
         dst = row.nonzero()[1]
@@ -86,14 +90,12 @@ def test_sort_outplace(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
     g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
     g.ndata['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
-    g.ndata['tag'][0] = 1
-    g.ndata['tag'][1] = 0
     new_g = dgl.sort_csr(g, 'tag')
+
     old_csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     new_csr = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(new_csr, new_g.ndata['tag'], new_g.ndata["_SPLIT"]))
     assert(not check_sort(old_csr, g.ndata['tag']))
-
     new_g = dgl.sort_csc(g, 'tag')
     old_csc = g.adjacency_matrix(scipy_fmt='csr')
     new_csc = new_g.adjacency_matrix(scipy_fmt='csr')
@@ -105,16 +107,11 @@ def test_sort_outplace_bipartite(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
     g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
     g = dgl.bipartite(g.edges(), index_dtype=index_dtype)
-    utag = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
-    utag[0] = 1
-    utag[1] = 0
+    utag = np.random.choice(num_tags, g.number_of_nodes('_U'))
+    vtag = np.random.choice(num_tags, g.number_of_nodes('_U'))
 
-    vtag = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
-    vtag[0] = 1
-    vtag[1] = 0
-
-    g.nodes['_V'].data['tag'] = vtag
-    g.nodes['_U'].data['tag'] = utag
+    g.nodes['_V'].data['tag'] = F.tensor(vtag)
+    g.nodes['_U'].data['tag'] = F.tensor(utag)
 
     new_g = dgl.sort_csr(g, 'tag')
     old_csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
@@ -133,5 +130,3 @@ if __name__ == "__main__":
     test_sort_inplace_bipartite("int32")
     test_sort_outplace("int32")
     test_sort_outplace_bipartite("int32")
-
-    # test_biased_sampling()
