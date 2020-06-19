@@ -9,6 +9,7 @@ import scipy.sparse as sp
 import backend as F
 
 import itertools
+from utils import parametrize_dtype
 
 np.random.seed(42)
 
@@ -16,7 +17,8 @@ def toset(x):
     # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
 
-def test_bfs(n=100, gtype='int'):
+@parametrize_dtype
+def test_bfs(index_dtype, n=100):
     def _bfs_nx(g_nx, src):
         edges = nx.bfs_edges(g_nx, src)
         layers_nx = [set([src])]
@@ -41,7 +43,7 @@ def test_bfs(n=100, gtype='int'):
     g = dgl.DGLGraph()
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     g.from_scipy_sparse_matrix(a)
-    if gtype == 'int':
+    if index_dtype == 'int32':
         g = dgl.graph(g.edges()).int()
     else:
         g = dgl.graph(g.edges()).long()
@@ -56,7 +58,7 @@ def test_bfs(n=100, gtype='int'):
     g_nx = nx.random_tree(n, seed=42)
     g = dgl.DGLGraph()
     g.from_networkx(g_nx)
-    if gtype == 'int':
+    if index_dtype == 'int32':
         g = dgl.graph(g.edges()).int()
     else:
         g = dgl.graph(g.edges()).long()
@@ -67,12 +69,13 @@ def test_bfs(n=100, gtype='int'):
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
-def test_topological_nodes(n=100, gtype='int'):
+@parametrize_dtype
+def test_topological_nodes(index_dtype, n=100):
     g = dgl.DGLGraph()
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     b = sp.tril(a, -1).tocoo()
     g.from_scipy_sparse_matrix(b)
-    if gtype == 'int':
+    if index_dtype == 'int32':
         g = dgl.graph(g.edges()).int()
     else:
         g = dgl.graph(g.edges()).long()
@@ -98,11 +101,12 @@ def test_topological_nodes(n=100, gtype='int'):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
-def test_dfs_labeled_edges(example=False, gtype='int'):
+@parametrize_dtype
+def test_dfs_labeled_edges(index_dtype, example=False):
     dgl_g = dgl.DGLGraph()
     dgl_g.add_nodes(6)
     dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])
-    if gtype == 'int':
+    if index_dtype == 'int32':
         dgl_g = dgl.graph(dgl_g.edges()).int()
     else:
         dgl_g = dgl.graph(dgl_g.edges()).long()
@@ -137,10 +141,6 @@ def test_dfs_labeled_edges(example=False, gtype='int'):
         assert False
 
 if __name__ == '__main__':
-    test_bfs(gtype='int')
-    test_topological_nodes(gtype='int')
-    test_dfs_labeled_edges(gtype='int')
-
-    test_bfs(gtype='long')
-    test_topological_nodes(gtype='long')
-    test_dfs_labeled_edges(gtype='long')
+    test_bfs(index_dtype='int32')
+    test_topological_nodes(index_dtype='int32')
+    test_dfs_labeled_edges(index_dtype='int32')
