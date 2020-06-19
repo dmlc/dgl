@@ -42,13 +42,13 @@ class MiniGCDataset(DGLDataset):
     seed : int, default is None
         Random seed for data generation
     """
-    def __init__(self, num_graphs, min_num_v, max_num_v, verbose=False, seed=None):
+    def __init__(self, num_graphs, min_num_v, max_num_v, verbose=False, seed=None, **kwargs):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
         self.seed = seed
         self.verbose = verbose
-        super(MiniGCDataset, self).__init__(name="minigc")
+        super(MiniGCDataset, self).__init__(name="minigc", **kwargs)
 
     def process(self, root_path):
         self.graphs = []
@@ -76,13 +76,13 @@ class MiniGCDataset(DGLDataset):
 
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.raw_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
         save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
         if self.verbose:
             print('Done saving data into cached files.')
 
     def load(self):
-        graphs, label_dict = load_graphs(os.path.join(self.raw_path, 'dgl_graph.bin'))
+        graphs, label_dict = load_graphs(os.path.join(self.save_path, 'dgl_graph.bin'))
         self.graphs = graphs
         self.labels = label_dict['labels']
         if self.verbose:
