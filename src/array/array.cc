@@ -4,8 +4,10 @@
  * \brief DGL array utilities implementation
  */
 #include <dgl/array.h>
+#include <dgl/graph_traversal.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/shared_mem.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
@@ -652,6 +654,90 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
+///////////////////////// Graph Traverse  routines //////////////////////////
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSNodesFrontiers", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::BFSNodesFrontiers<XPU, IdType>(csr, source);
+    });
+  });
+  return ret;
+}
+
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "BFSEdgesFrontiers", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::BFSEdgesFrontiers<XPU, IdType>(csr, source);
+    });
+  });
+  return ret;
+}
+
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
+  Frontiers ret;
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, "TopologicalNodesFrontiers", {
+    ATEN_ID_TYPE_SWITCH(csr.indices->dtype, IdType, {
+      ret = impl::TopologicalNodesFrontiers<XPU, IdType>(csr);
+    });
+  });
+  return ret;
+}
+
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "DGLDFSEdges", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::DGLDFSEdges<XPU, IdType>(csr, source);
+    });
+  });
+  return ret;
+}
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
+                             IdArray source,
+                             const bool has_reverse_edge,
+                             const bool has_nontree_edge,
+                             const bool return_labels) {
+  Frontiers ret;
+  CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
+    "Graph and source should in the same device context";
+  CHECK_EQ(csr.indices->dtype, source->dtype) <<
+    "Graph and source should in the same dtype";
+  CHECK_EQ(csr.num_rows, csr.num_cols) <<
+    "Graph traversal can only work on square-shaped CSR.";
+  ATEN_XPU_SWITCH(source->ctx.device_type, XPU, "DGLDFSLabeledEdges", {
+    ATEN_ID_TYPE_SWITCH(source->dtype, IdType, {
+      ret = impl::DGLDFSLabeledEdges<XPU, IdType>(csr,
+                                                  source,
+                                                  has_reverse_edge,
+                                                  has_nontree_edge,
+                                                  return_labels);
+    });
+  });
+  return ret;
+}
+
 ///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -700,6 +786,16 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLCreateSparseMatrix")
           ListValueToVector<IdArray>(indices),
           ListValueToVector<bool>(flags)));
     *rv = SparseMatrixRef(spmat);
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const std::string name = args[0];
+#ifndef _WIN32
+    *rv = SharedMemory::Exist(name);
+#else
+    *rv = false;
+#endif  // _WIN32
   });
 
 }  // namespace aten
