@@ -20,7 +20,7 @@ class NodeApplyModule(nn.Module):
         h = self.linear(node.data['h'])
         if self.activation:
             h = self.activation(h)
-        return {'h': h}
+        return h
 
 
 class ChebConv(nn.Module):
@@ -122,27 +122,26 @@ class ChebConv(nn.Module):
             # broadcast from (B, 1) to (N, 1)
             lambda_max = broadcast_nodes(graph, lambda_max)
 
-            # X_0(f)
+            # X_0 is the raw feature, Xt refers to the concatenation of X_0, X_1, ... X_t
             Xt = X_0 = feat
 
             # X_1(f)
             if self._k > 1:
                 re_norm = 2. / lambda_max
                 h = unnLaplacian(X_0, D_sqrt, graph)
-
                 X_1 = - re_norm * h + X_0 * (re_norm - 1)
+                # Concatenate Xt and X_1
                 Xt = th.cat((Xt, X_1), 1)
 
             # Xi(x), i = 2...k
             for _ in range(2, self._k):
                 h = unnLaplacian(X_1, D_sqrt, graph)
                 X_i = - 2 * re_norm * h + X_1 * 2 * (re_norm - 1) - X_0
-
+                # Concatenate Xt and X_i
                 Xt = th.cat((Xt, X_i), 1)
                 X_1, X_0 = X_i, X_1
 
             # forward pass
-            graph.ndata['h'] = Xt
-            graph.apply_nodes(func=self.apply_mod)
+            h = self.apply_mod(Xt)
 
-            return graph.ndata.pop('h')
+            return h
