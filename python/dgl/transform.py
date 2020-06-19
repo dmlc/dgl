@@ -1297,7 +1297,7 @@ def sort_csr_(g, tag=None, split="_SPLIT"):
         num_tags = 0
     else:
         tag_data = g.nodes[dsttype].data[tag]
-        num_tags = int(F.max(tag_data, 0)) + 1
+        num_tags = F.as_scalar(F.max(tag_data, 0)) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSR_(g._graph, 0, tag_arr, num_tags)
     if tag is not None:
@@ -1332,7 +1332,7 @@ def sort_csc_(g, tag=None, split="_SPLIT"):
         num_tags = 0
     else:
         tag_data = g.nodes[srctype].data[tag]
-        num_tags = int(F.max(tag_data, 0)) + 1
+        num_tags = F.as_scalar(F.max(tag_data, 0)) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSC_(g._graph, 0, tag_arr, num_tags)
     if tag is not None:
@@ -1371,7 +1371,7 @@ def sort_csr(g, tag=None, split="_SPLIT"):
         num_tags = 0
     else:
         tag_data = g.nodes[dsttype].data[tag]
-        num_tags = int(F.max(tag_data, 0)) + 1
+        num_tags = F.as_scalar(F.max(tag_data, 0)) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSR(g._graph, 0, tag_arr, num_tags)
     gidx, split_arr = [item.data for item in ret]
@@ -1419,7 +1419,7 @@ def sort_csc(g, tag=None, split="_SPLIT"):
         num_tags = 0
     else:
         tag_data = g.nodes[srctype].data[tag]
-        num_tags = int(F.max(tag_data, 0)) + 1
+        num_tags = F.as_scalar(F.max(tag_data, 0)) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSC(g._graph, 0, tag_arr, num_tags)
     gidx, split_arr = [item.data for item in ret]
