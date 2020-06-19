@@ -127,9 +127,9 @@ def prepare_mp(g):
     trainers.
     This is a workaround before full shared memory support on heterogeneous graphs.
     """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
+    g.request_format('csr')
+    g.request_format('coo')
+    g.request_format('csc')
 
 def compute_acc(pred, labels):
     """
@@ -182,8 +182,6 @@ def run(args, device, data):
     # Define model and optimizer
     model = GAT(in_feats, args.num_hidden, n_classes, args.num_layers, num_heads, F.relu, args.dropout)
     model = model.to(device)
-    loss_fcn = nn.CrossEntropyLoss()
-    loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
     # Training loop
@@ -209,7 +207,7 @@ def run(args, device, data):
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
+            loss = F.nll_loss(batch_pred, batch_labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
