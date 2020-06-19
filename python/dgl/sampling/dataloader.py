@@ -33,15 +33,15 @@ class BlockSampler(object):
     The default implementation of :py:meth:`~dgl.sampling.BlockSampler.sample_blocks` is
     to repeat ``__len__`` times the following:
 
-    * Obtain a message passing dependency graph (frontier) with the same nodes as the original
-      graph but only the edges involved in message passing on the last layer.
+    * Obtain a frontier with the same nodes as the original graph but only the edges
+      involved in message passing on the last layer.
       This is done with :py:meth:`~dgl.sampling.BlockSampler.sample_frontier`.
 
     * Postprocess the obtained frontier (e.g. by removing edges connecting training node pairs).
       One can add such postprocessors via
       :py:meth:`~dgl.sampling.BlockSampler.add_frontier_postprocessor`.
 
-    * Convert the dependency graph into a block.
+    * Convert the frontier into a block.
 
     * Postprocess the block (e.g. by assigning edge IDs).  One can add such postprocessors via
       :py:meth:`~dgl.sampling.BlockSampler.add_block_postprocessor`.
@@ -54,6 +54,10 @@ class BlockSampler(object):
 
     * Override both :py:meth:`~dgl.sampling.BlockSampler.__len__` method and
       :py:meth:`~dgl.sampling.BlockSampler.sample_frontier` method.
+
+    See also
+    --------
+    For the concept of frontiers and blocks, please refer to User Guide Section 6.
     """
     def __init__(self):
         self._frontier_postprocessors = []
@@ -156,7 +160,7 @@ class BlockSampler(object):
 
     def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
         """
-        Generate the message passing dependency graph given the output nodes.
+        Generate the frontier given the output nodes.
 
         Parameters
         ----------
@@ -177,13 +181,16 @@ class BlockSampler(object):
         -------
         DGLHeteroGraph
             The frontier generated for the current layer.
+
+        See also
+        --------
+        For the concept of frontiers and blocks, please refer to User Guide Section 6.
         """
         raise NotImplementedError
 
     def sample_blocks(self, g, seed_nodes, *args, **kwargs):
         """
-        Generate the computation dependency graphs as a list of blocks given the
-        output nodes.
+        Generate the a list of blocks given the output nodes.
 
         Parameters
         ----------
@@ -202,11 +209,15 @@ class BlockSampler(object):
         -------
         list[DGLHeteroGraph]
             The blocks generated for computing the multi-layer GNN output.
+
+        See also
+        --------
+        For the concept of frontiers and blocks, please refer to User Guide Section 6.
         """
         blocks = []
         for block_id in reversed(range(len(self))):
             frontier = self.sample_frontier(block_id, g, seed_nodes, *args, **kwargs)
-            # Removing edges from message passing dependency for link prediction training falls
+            # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
             frontier = self._postprocess_frontier(
                 frontier, block_id, g, seed_nodes, *args, **kwargs)
@@ -231,7 +242,11 @@ class Collator(ABC):
 
     Provides a ``dataset`` object containing the collection of all nodes or edges,
     as well as a ``collate`` method that combines a set of items from ``dataset`` and
-    obtains the computation dependency graphs.
+    obtains the blocks.
+
+    See also
+    --------
+    For the concept of blocks, please refer to User Guide Section 6.
     """
     @abstractproperty
     def dataset(self):
@@ -240,8 +255,12 @@ class Collator(ABC):
 
     @abstractmethod
     def collate(self, items):
-        """Combines the items from the dataset object and obtains the computation
-        dependency graphs."""
+        """Combines the items from the dataset object and obtains the list of blocks.
+
+        See also
+        --------
+        For the concept of blocks, please refer to User Guide Section 6.
+        """
         raise NotImplementedError
 
 class NodeCollator(Collator):
