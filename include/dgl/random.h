@@ -178,6 +178,21 @@ class RandomEngine {
     return ret;
   }
 
+  /*!
+   * \brief Pick random integers from population by uniform distribution.
+   *
+   * If replace is false, num must not be larger than population.
+   *
+   * \tparam IdxType Return integer type
+   * \param num Number of integers to choose
+   * \param split Split positions of different tags
+   * \param bias Weights of different tags
+   * \param out The output buffer to write selected indices.
+   * \param replace If true, choose with replacement.
+   */
+  template <typename IdxType, typename FloatType>
+  void BiasedChoice(IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace = true); 
+ 
  private:
   std::default_random_engine rng_;
 };
