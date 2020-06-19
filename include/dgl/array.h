@@ -606,11 +606,11 @@ void CSRSort_(CSRMatrix* csr);
  * indices = [2, 4, 0, 1, 3, 2, 0, 1]
  * (tag)   = [0, 0, 1, 1, 2, 0, 1, 1]
  *           ^    ^     ^  ^
- *                         ^  ^     ^
+ *                         ^  ^     ^^
  * (the tag array itself is unchanged.)
  *   
  * Return:
- * [0, 2, 4, 5, 0, 1, 3] (marked with ^)
+ * [0, 2, 4, 5, 0, 1, 3, 3] (marked with ^)
  * It is a flatten array produced by concatenating the split positions of all nodes
  */
 IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
