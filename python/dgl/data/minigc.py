@@ -6,8 +6,9 @@ import numpy as np
 from .dgl_dataset import DGLDataset
 from .utils import save_graphs, load_graphs, makedirs
 from .. import backend as F
-from ..convert import graph
+from ..graph import DGLGraph
 from ..graph import batch as graph_batch
+from ..transform import add_self_loop
 
 __all__ = ['MiniGCDataset']
 
@@ -107,9 +108,8 @@ class MiniGCDataset(DGLDataset):
         self._gen_circular_ladder(self.num_graphs - len(self.graphs))
         # preprocess
         for i in range(self.num_graphs):
-            self.graphs[i] = graph(self.graphs[i])
-            # add self edges
-            dgl.add_self_loop(self.graphs[i])
+            # convert to DGLGraph, and add self loops
+            self.graphs[i] = add_self_loop(DGLGraph(self.graphs[i]))
         self.labels = F.tensor(np.array(self.labels).astype(np.int))
 
     def _gen_cycle(self, n):
