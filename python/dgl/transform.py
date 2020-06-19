@@ -16,7 +16,7 @@ from .convert import graph, bipartite
 from . import utils
 from .base import EID, NID
 from . import ndarray as nd
-from .frame import Frame, FrameRef, frame_like
+from .frame import Frame, FrameRef
 
 
 __all__ = [
@@ -1265,8 +1265,8 @@ def as_immutable_graph(hg):
 
 def sort_csr_(g, tag=None, split="_SPLIT"):
     """Sort the (out)CSR matrix of the graph inplace
-    
-    After sorting, edges whose destination shares the same tag will be arranged in 
+
+    After sorting, edges whose destination shares the same tag will be arranged in
     a consecutive range. The COO matrix, in CSR and edge ids remain unchanged.
     Currently, it only support homograph and bipartite graph.
 
@@ -1278,7 +1278,7 @@ def sort_csr_(g, tag=None, split="_SPLIT"):
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
     split: str
-        The name of the node feature to store split positions of different tags in the 
+        The name of the node feature to store split positions of different tags in the
         adjancency list.
 
         For example, if the adjancy list looks like this after sorting:
@@ -1305,8 +1305,8 @@ def sort_csr_(g, tag=None, split="_SPLIT"):
 
 def sort_csc_(g, tag=None, split="_SPLIT"):
     """Sort the CSC(in CSR) matrix of the graph inplace
-    
-    After sorting, edges whose source shares the same tag will be arranged in 
+
+    After sorting, edges whose source shares the same tag will be arranged in
     a consecutive range. The COO matrix, out CSR and edge ids remain unchanged.
     Currently, it only support homograph and bipartite graph.
 
@@ -1317,7 +1317,6 @@ def sort_csc_(g, tag=None, split="_SPLIT"):
     tag : str
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
-    
     split : str
         The name of the node feature to store split positions of different tags in the
         adjancency list.
@@ -1340,7 +1339,7 @@ def sort_csc_(g, tag=None, split="_SPLIT"):
 
 def sort_csr(g, tag=None, split="_SPLIT"):
     """A copy of the given graph whose (out)CSR matrix is sorted.
-    
+
     The outplace version of sort_csr_
     Node frames and edges frames are shallow copy of the original graph.
 
@@ -1374,18 +1373,18 @@ def sort_csr(g, tag=None, split="_SPLIT"):
     ret = _CAPI_DGLHeteroSortCSR(g._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
     gidx, split_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                if frame is None else FrameRef(frame.clone())
-                for i, frame in enumerate(g._node_frames)]
+                   if frame is None else FrameRef(frame.clone())
+                   for i, frame in enumerate(g._node_frames)]
     edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                if frame is None else FrameRef(frame.clone())
-                for i, frame in enumerate(g._edge_frames)]
+                   if frame is None else FrameRef(frame.clone())
+                   for i, frame in enumerate(g._edge_frames)]
     new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
     if tag is not None:
         split_arr = F.reshape(F.zerocopy_from_dgl_ndarray(split_arr), [-1, num_tags + 1])
         new_g.nodes[srctype].data[split] = split_arr
     return new_g
 
-def sort_csc(g, tag=None, split = "_SPLIT"):
+def sort_csc(g, tag=None, split="_SPLIT"):
     """A copy of the given graph whose CSC(in CSR) matrix is sorted.
     
     The outplace version of sort_csc_
@@ -1421,11 +1420,11 @@ def sort_csc(g, tag=None, split = "_SPLIT"):
     ret = _CAPI_DGLHeteroSortCSC(g._graph, 0, F.zerocopy_to_dgl_ndarray(tag_data), num_tags)
     gidx, split_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                if frame is None else FrameRef(frame.clone())
-                for i, frame in enumerate(g._node_frames)]
+                   if frame is None else FrameRef(frame.clone())
+                   for i, frame in enumerate(g._node_frames)]
     edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                if frame is None else FrameRef(frame.clone())
-                for i, frame in enumerate(g._edge_frames)]
+                   if frame is None else FrameRef(frame.clone())
+                   for i, frame in enumerate(g._edge_frames)]
     new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
     if tag is not None:
         split_arr = F.reshape(F.zerocopy_from_dgl_ndarray(split_arr), [-1, num_tags + 1])
