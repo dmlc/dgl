@@ -130,7 +130,7 @@ class NDArray {
   /*! \return the data pointer with type. */
   template <typename T>
   inline T* Ptr() const {
-    if (!defined())
+    if (!defined() || operator->()->shape[0] == 0)
       return nullptr;
     else
       return static_cast<T*>(operator->()->data);
