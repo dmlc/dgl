@@ -210,7 +210,7 @@ class RandomEngine {
       IdxType num, const IdxType *split, FloatArray bias, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
     IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
-    BiasedChoice<IdxType>(num, split, bias, static_cast<IdxType*>(ret->data), replace);
+    BiasedChoice<IdxType, FloatType>(num, split, bias, static_cast<IdxType*>(ret->data), replace);
     return ret;
   }
 
