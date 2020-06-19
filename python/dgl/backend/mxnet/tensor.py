@@ -109,6 +109,15 @@ def device_type(ctx):
 def device_id(ctx):
     return ctx.device_id
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return mx.cpu()
+    elif dev_type == 2:
+        return mx.gpu(dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
+
 def astype(input, ty):
     return nd.cast(input, ty)
 
