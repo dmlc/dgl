@@ -800,9 +800,9 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   IdArray SortCSR_(dgl_type_t etype, IdArray tag, int64_t num_tags) override {
-    if (num_tags)
+    if (num_tags) {
       return aten::CSRSortByTag_(&adj_, tag, num_tags);
-    else {
+    } else {
       aten::CSRSort_(&adj_);
       return aten::NullArray();
     }
@@ -812,7 +812,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return aten::NullArray();
   }
-  
+
   std::pair<HeteroGraphPtr, IdArray> SortCSR(
       dgl_type_t etype, IdArray tag, int64_t num_tags) override {
     IdArray indptr = aten::Clone(adj_.indptr);
@@ -834,7 +834,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return std::make_pair(nullptr, aten::NullArray());
   }
-  
+
  private:
   friend class Serializer;
 
