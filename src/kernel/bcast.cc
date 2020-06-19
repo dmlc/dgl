@@ -23,7 +23,7 @@ bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
   return false;
 }
 
-}
+}  // namespace
 
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
   BcastOff rst;
@@ -73,5 +73,5 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
   return rst;
 }
 
-}   // namespace kernel
-}   // namespace dgl
+}  // namespace kernel
+}  // namespace dgl
