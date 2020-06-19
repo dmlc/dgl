@@ -28,7 +28,8 @@ def data_type_dict():
             'int8'    : np.int8,
             'int16'   : np.int16,
             'int32'   : np.int32,
-            'int64'   : np.int64}
+            'int64'   : np.int64,
+            'bool'    : np.bool}
 
 def cpu():
     return mx.cpu()
@@ -108,13 +109,22 @@ def device_type(ctx):
 def device_id(ctx):
     return ctx.device_id
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return mx.cpu()
+    elif dev_type == 2:
+        return mx.gpu(dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
+
 def astype(input, ty):
     return nd.cast(input, ty)
 
 def asnumpy(input):
     return input.asnumpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
@@ -312,6 +322,12 @@ def equal(x, y):
 def logical_not(input):
     return nd.logical_not(input)
 
+def logical_and(input1, input2):
+    return nd.logical_and(input1, input2)
+
+def clone(input):
+    return input.copy()
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
@@ -334,11 +350,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop):
+def arange(start, stop, dtype="int64"):
     if start >= stop:
-        return nd.array([], dtype=np.int64)
+        return nd.array([], dtype=data_type_dict()[dtype])
     else:
-        return nd.arange(start, stop, dtype=np.int64)
+        return nd.arange(start, stop, dtype=data_type_dict()[dtype])
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)

@@ -18,13 +18,15 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 </p>
 
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
-*03/31/2020*: The new **v0.4.3 release** includes official TensorFlow support, with 15 popular GNN modules. DGL-KE and DGL-LifeSci, two packages for knowledge graph embedding and chemi- and bio-informatics respectively, have graduated as standalone packages and can be installed by pip and conda. The new release provides full support of graph sampling on heterogeneous graphs, with multi-GPU acceleration. See our [new feature walkthrough](https://www.dgl.ai/release/2020/04/01/release.html) and [release note](https://github.com/dmlc/dgl/releases/tag/0.4.3).
+**06/11/2020**: Amazon Shanghai AI Lab and AWS Deep Engine Science team working along with academic collaborators from the University of Minnesota, The Ohio State University, and Hunan University have created the **[Drug Repurposing Knowledge Graph (DRKG)](https://github.com/gnn4dr/DRKG)** and a set of machine learning tools, [DGL-KE](https://github.com/awslabs/dgl-ke), that can be used to prioritize drugs for repurposing studies. 
+DRKG is a comprehensive biological knowledge graph that relates human genes, compounds, biological processes, drug side effects, diseases and symptoms. DRKG includes, curates, and normalizes information from six publicly available databases and data that were collected from recent publications related to Covid-19. It has 97,238 entities belonging to 13 types of entities, and 5,874,261 triplets belonging to 107 types of relations. 
+More about the dataset is in this [blogpost](https://www.dgl.ai/news/2020/06/09/covid.html).
 
-*03/02/2020*: **Check out this cool paper: [Benchmarking Graph Neural Networks](https://arxiv.org/abs/2003.00982)!**  It includes a DGL-based benchmark framework for novel medium-scale graph datasets, covering mathematical modeling, computer vision, chemistry and combinatorial problems.  See [repo here](https://github.com/graphdeeplearning/benchmarking-gnns).
+**03/31/2020**: The new **v0.4.3 release** includes official TensorFlow support, with 15 popular GNN modules. DGL-KE and DGL-LifeSci, two packages for knowledge graph embedding and chemi- and bio-informatics respectively, have graduated as standalone packages and can be installed by pip and conda. The new release provides full support of graph sampling on heterogeneous graphs, with multi-GPU acceleration. See our [new feature walkthrough](https://www.dgl.ai/release/2020/04/01/release.html) and [release note](https://github.com/dmlc/dgl/releases/tag/0.4.3).
 
 ## Using DGL
 
-**A data scientist** may want to apply a pre-trained model to your data right away. For this you can use DGL's [Application packages, formally *Model Zoo*](https://github.com/dmlc/dgl/tree/master/apps). Application packages are developed for domain applications, as is the case for [DGL-LifeScience](https://github.com/dmlc/dgl/tree/master/apps/life_sci). We will soon add model zoo for knowledge graph embedding learning and recommender systems. Here's how you will use a pretrained model:
+**A data scientist** may want to apply a pre-trained model to your data right away. For this you can use DGL's [Application packages, formally *Model Zoo*](https://github.com/dmlc/dgl/tree/master/apps). Application packages are developed for domain applications, as is the case for [DGL-LifeScience](https://github.com/awslabs/dgl-lifesci). We will soon add model zoo for knowledge graph embedding learning and recommender systems. Here's how you will use a pretrained model:
 ```python
 from dgllife.data import Tox21
 from dgllife.model import load_pretrained
@@ -148,7 +150,7 @@ Overall there are 30+ models implemented by using DGL:
 - [TensorFlow](https://github.com/dmlc/dgl/tree/master/examples/tensorflow)
 
 ### DGL for domain applications
-- [DGL-LifeSci](https://github.com/dmlc/dgl/tree/master/apps/life_sci), previously DGL-Chem
+- [DGL-LifeSci](https://github.com/awslabs/dgl-lifesci), previously DGL-Chem
 - [DGL-KE](https://github.com/awslabs/dgl-ke)
 - DGL-RecSys(coming soon)
 
@@ -181,6 +183,7 @@ conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
 conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
+conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 ```
 
 ### Using pip
@@ -193,6 +196,7 @@ conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 | CUDA 9.2  | `pip install --pre dgl-cu92`  | `pip install dgl-cu92`  |
 | CUDA 10.0 | `pip install --pre dgl-cu100` | `pip install dgl-cu100` |
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
+| CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
 
 ### Built from source code
 

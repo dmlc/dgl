@@ -50,7 +50,16 @@ class GraphIndex(ObjectBase):
         """The pickle state of GraphIndex is defined as a triplet
         (number_of_nodes, readonly, src_nodes, dst_nodes)
         """
-        num_nodes, readonly, src, dst = state
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
+        if isinstance(state, tuple) and len(state) == 5:
+            dgl_warning("The object is pickled pre-0.4.2.  Multigraph flag is ignored in 0.4.3")
+            num_nodes, _, readonly, src, dst = state
+        elif isinstance(state, tuple) and len(state) == 4:
+            # post-0.4.3.
+            num_nodes, readonly, src, dst = state
+        else:
+            raise IOError('Unrecognized storage format.')
 
         self._cache = {}
         self._readonly = readonly
@@ -864,6 +873,21 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLGraphContext(self)
 
+    @property
+    def dtype(self):
+        """Return the index dtype
+
+        Returns
+        ----------
+        str
+            The dtype of graph index
+        """
+        bits = self.nbits()
+        if bits == 32:
+            return "int32"
+        else:
+            return "int64"
+
     def copy_to(self, ctx):
         """Copy this immutable graph index to the given device context.
 
@@ -1025,6 +1049,11 @@ def from_csr(indptr, indices, direction):
     indices : Tensor
         column index array in the CSR format
     direction : str
+
+    Returns
+    ------
+    GraphIndex
+        The graph index
         the edge direction. Either "in" or "out".
     """
     indptr = utils.toindex(indptr)
@@ -1042,6 +1071,11 @@ def from_shared_mem_graph_index(shared_mem_name):
     ----------
     shared_mem_name : string
         the name of shared memory
+
+    Returns
+    ------
+    GraphIndex
+        The graph index
     """
     return _CAPI_DGLGraphCSRCreateMMap(shared_mem_name)
 
@@ -1137,9 +1171,6 @@ def from_edge_list(elist, readonly):
     src_ids = utils.toindex(src)
     dst_ids = utils.toindex(dst)
     num_nodes = max(src.max(), dst.max()) + 1
-    min_nodes = min(src.min(), dst.min())
-    if min_nodes != 0:
-        raise DGLError('Invalid edge list. Nodes must start from 0.')
     return from_coo(num_nodes, src_ids, dst_ids, readonly)
 
 def map_to_subgraph_nid(induced_nodes, parent_nids):

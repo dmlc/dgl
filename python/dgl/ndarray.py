@@ -90,16 +90,20 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
-def null():
-    """Return a ndarray representing null value. It can be safely converted
-    to other backend tensors.
+def exist_shared_mem_array(name):
+    """ Check the existence of shared-memory array.
+
+    Parameters
+    ----------
+    name : str
+        The name of the shared-memory array.
 
     Returns
     -------
-    NDArray
-        A null array
+    bool
+        The existence of the array
     """
-    return array(_np.array([], dtype=_np.int64))
+    return _CAPI_DGLExistSharedMemArray(name)
 
 class SparseFormat:
     """Format code"""
@@ -185,3 +189,10 @@ class SparseMatrix(ObjectBase):
 
 _set_class_ndarray(NDArray)
 _init_api("dgl.ndarray")
+
+# An array representing null (no value) that can be safely converted to
+# other backend tensors.
+NULL = {
+    "int64": array(_np.array([], dtype=_np.int64)),
+    "int32": array(_np.array([], dtype=_np.int32))
+}

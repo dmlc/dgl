@@ -130,13 +130,13 @@ class Sequential(nn.Sequential):
     >>>     def __init__(self):
     >>>         super().__init__()
     >>>     def forward(self, graph, n_feat, e_feat):
-    >>>         graph = graph.local_var()
-    >>>         graph.ndata['h'] = n_feat
-    >>>         graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-    >>>         n_feat += graph.ndata['h']
-    >>>         graph.apply_edges(fn.u_add_v('h', 'h', 'e'))
-    >>>         e_feat += graph.edata['e']
-    >>>         return n_feat, e_feat
+    >>>         with graph.local_scope():
+    >>>             graph.ndata['h'] = n_feat
+    >>>             graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+    >>>             n_feat += graph.ndata['h']
+    >>>             graph.apply_edges(fn.u_add_v('h', 'h', 'e'))
+    >>>             e_feat += graph.edata['e']
+    >>>             return n_feat, e_feat
     >>>
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(3)
@@ -169,11 +169,11 @@ class Sequential(nn.Sequential):
     >>>     def __init__(self):
     >>>         super().__init__()
     >>>     def forward(self, graph, n_feat):
-    >>>         graph = graph.local_var()
-    >>>         graph.ndata['h'] = n_feat
-    >>>         graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-    >>>         n_feat += graph.ndata['h']
-    >>>         return n_feat.view(graph.number_of_nodes() // 2, 2, -1).sum(1)
+    >>>         with graph.local_scope():
+    >>>             graph.ndata['h'] = n_feat
+    >>>             graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+    >>>             n_feat += graph.ndata['h']
+    >>>             return n_feat.view(graph.number_of_nodes() // 2, 2, -1).sum(1)
     >>>
     >>> g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05))
     >>> g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2))

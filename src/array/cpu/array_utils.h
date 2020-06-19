@@ -10,9 +10,9 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
+#include "../../c_api_common.h"
 
 namespace dgl {
-
 namespace aten {
 
 /*!
@@ -118,8 +118,7 @@ struct PairHash {
   }
 };
 
-};  // namespace aten
-
-};  // namespace dgl
+}  // namespace aten
+}  // namespace dgl
 
 #endif  // DGL_ARRAY_CPU_ARRAY_UTILS_H_

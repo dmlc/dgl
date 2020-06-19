@@ -75,7 +75,7 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
     return std::make_pair(-1, true);
 
   FloatArray prob_etype = prob[etype];
-  IdxType idx;
+  IdxType idx = 0;
   if (IsNullArray(prob_etype)) {
     // empty probability array; assume uniform
     idx = RandomEngine::ThreadLocal()->RandInt(size);

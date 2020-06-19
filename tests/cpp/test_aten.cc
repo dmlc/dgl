@@ -25,14 +25,22 @@ TEST(ArrayTest, TestCreate) {
   ASSERT_EQ(Len(a), 0);
 };
 
-TEST(ArrayTest, TestRange) {
-  IdArray a = aten::Range(10, 10, 64, CTX);
+void _TestRange(DLContext ctx) {
+  IdArray a = aten::Range(10, 10, 64, ctx);
   ASSERT_EQ(Len(a), 0);
-  a = aten::Range(10, 20, 32, CTX);
+  a = aten::Range(10, 20, 32, ctx);
   ASSERT_EQ(Len(a), 10);
   ASSERT_EQ(a->dtype.bits, 32);
+  a = a.CopyTo(CPU);
   for (int i = 0; i < 10; ++i)
     ASSERT_EQ(Ptr<int32_t>(a)[i], i + 10);
+}
+
+TEST(ArrayTest, TestRange) {
+  _TestRange(CPU);
+#ifdef DGL_USE_CUDA
+  _TestRange(GPU);
+#endif
 };
 
 TEST(ArrayTest, TestFull) {
@@ -61,68 +69,123 @@ TEST(ArrayTest, TestClone) {
   }
 };
 
-TEST(ArrayTest, TestAsNumBits) {
-  IdArray a = aten::Range(0, 10, 32, CTX);
+void _TestNumBits(DLContext ctx) {
+  IdArray a = aten::Range(0, 10, 32, ctx);
   a = aten::AsNumBits(a, 64);
   ASSERT_EQ(a->dtype.bits, 64);
+  a = a.CopyTo(CPU);
   for (int i = 0; i < 10; ++i)
     ASSERT_EQ(PI64(a)[i], i);
+}
+
+TEST(ArrayTest, TestAsNumBits) {
+  _TestNumBits(CPU);
+#ifdef DGL_USE_CUDA
+  _TestNumBits(GPU);
+#endif
 };
 
 template <typename IDX>
-void _TestArith() {
+void _TestArith(DLContext ctx) {
   const int N = 100;
-  IdArray a = aten::Full(-10, N, sizeof(IDX)*8, CTX);
-  IdArray b = aten::Full(7, N, sizeof(IDX)*8, CTX);
+  IdArray a = aten::Full(-10, N, sizeof(IDX)*8, ctx);
+  IdArray b = aten::Full(7, N, sizeof(IDX)*8, ctx);
 
-  IdArray c = aten::Add(a, b);
+  IdArray c = a + b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -3);
-  c = aten::Sub(a, b);
+  c = a - b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -17);
-  c = aten::Mul(a, b);
+  c = a * b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -70);
-  c = aten::Div(a, b);
+  c = a / b;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -1);
+  c = -a;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 10);
 
   const int val = -3;
   c = aten::Add(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -13);
   c = aten::Sub(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -7);
   c = aten::Mul(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 30);
   c = aten::Div(a, val);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 3);
   c = aten::Add(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 4);
   c = aten::Sub(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -10);
   c = aten::Mul(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], -21);
   c = aten::Div(val, b);
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 0);
 
-  a = aten::Range(0, N, sizeof(IDX)*8, CTX);
-  c = aten::LT(a, 50);
+  a = aten::Range(0, N, sizeof(IDX)*8, ctx);
+  c = a < 50;
+  c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i < 50));
+
+  c = a > 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i > 50));
+
+  c = a >= 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i >= 50));
+
+  c = a <= 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i <= 50));
+
+  c = a == 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i == 50));
+
+  c = a != 50;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], (int)(i != 50));
+
 }
 
 TEST(ArrayTest, TestArith) {
-  _TestArith<int32_t>();
-  _TestArith<int64_t>();
+  _TestArith<int32_t>(CPU);
+  _TestArith<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestArith<int32_t>(GPU);
+  _TestArith<int64_t>(GPU);
+#endif
 };
 
 template <typename IDX>
@@ -142,17 +205,21 @@ TEST(ArrayTest, TestHStack) {
 }
 
 template <typename IDX>
-void _TestIndexSelect() {
-  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, CTX);
+void _TestIndexSelect(DLContext ctx) {
+  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
   ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
-  IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, CTX);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
   IdArray c = aten::IndexSelect(a, b);
   ASSERT_TRUE(ArrayEQ<IDX>(b, c));
 }
 
 TEST(ArrayTest, TestIndexSelect) {
-  _TestIndexSelect<int32_t>();
-  _TestIndexSelect<int64_t>();
+  _TestIndexSelect<int32_t>(CPU);
+  _TestIndexSelect<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestIndexSelect<int32_t>(GPU);
+  _TestIndexSelect<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>

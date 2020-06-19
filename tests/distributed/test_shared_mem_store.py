@@ -5,6 +5,7 @@ As a result, we decide to disable this test until we fixed the bug.
 """
 import dgl
 import sys
+import os
 import random
 import time
 import numpy as np
@@ -101,6 +102,7 @@ def server_func(num_workers, graph_name, server_init):
     server_init.value = 1
     g.run()
 
+@unittest.skipIf(True, reason="skip this test")
 def test_init():
     manager = Manager()
     return_dict = manager.dict()
@@ -168,6 +170,7 @@ def check_compute_func(worker_id, graph_name, return_dict):
         print(e, file=sys.stderr)
         traceback.print_exc()
 
+@unittest.skipIf(True, reason="skip this test")
 def test_compute():
     manager = Manager()
     return_dict = manager.dict()
@@ -215,6 +218,7 @@ def check_sync_barrier(worker_id, graph_name, return_dict):
         print(e, file=sys.stderr)
         traceback.print_exc()
 
+@unittest.skipIf(True, reason="skip this test")
 def test_sync_barrier():
     manager = Manager()
     return_dict = manager.dict()
@@ -275,6 +279,7 @@ def check_mem(gidx, cond_v, shared_v):
     cond_v.notify()
     cond_v.release()
 
+@unittest.skipIf(True, reason="skip this test")
 def test_copy_shared_mem():
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
     gidx = dgl.graph_index.create_graph_index(csr, True)
@@ -288,8 +293,9 @@ def test_copy_shared_mem():
     p1.join()
     p2.join()
 
-if __name__ == '__main__':
-    test_copy_shared_mem()
-    test_init()
-    test_sync_barrier()
-    test_compute()
+# Skip test this file
+#if __name__ == '__main__':
+#    test_copy_shared_mem()
+#    test_init()
+#    test_sync_barrier()
+#    test_compute()

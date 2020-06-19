@@ -62,6 +62,13 @@ class Column(object):
         The initial data of the column.
     scheme : Scheme, optional
         The scheme of the column. Will be inferred if not provided.
+
+    Attributes
+    ----------
+    data : Tensor
+        The data of the column.
+    scheme : Scheme
+        The scheme of the column.
     """
     def __init__(self, data, scheme=None):
         self.data = data
@@ -164,6 +171,10 @@ class Column(object):
         feats = F.copy_to(feats, F.context(self.data))
         self.data = F.cat([self.data, feats], dim=0)
 
+    def clone(self):
+        """Return a deepcopy of this column."""
+        return Column(F.clone(self.data), self.scheme)
+
     @staticmethod
     def create(data):
         """Create a new column using the given data."""
@@ -255,6 +266,8 @@ class Frame(MutableMapping):
     def set_remote_init_builder(self, builder):
         """Set an initializer builder to create a remote initializer for a new column to a frame.
 
+        NOTE(minjie): This is a temporary solution. Will be replaced by KVStore in the future.
+
         The builder is a callable that returns an initializer. The returned initializer
         is also a callable that returns a tensor given a local tensor and tensor name.
 
@@ -267,6 +280,8 @@ class Frame(MutableMapping):
 
     def get_remote_initializer(self, name):
         """Get a remote initializer.
+
+        NOTE(minjie): This is a temporary solution. Will be replaced by KVStore in the future.
 
         Parameters
         ----------
@@ -478,6 +493,46 @@ class Frame(MutableMapping):
         """Return the keys."""
         return self._columns.keys()
 
+    def clone(self):
+        """Return a clone of this frame.
+
+        The clone frame does not share the underlying storage with this frame,
+        i.e., adding or removing columns will not be visible to each other. However,
+        they still share the tensor contents so any mutable operation on the column
+        tensor are visible to each other. Hence, the function does not allocate extra
+        tensor memory. Use :func:`~dgl.Frame.deepclone` for cloning
+        a frame that does not share any data.
+
+        Returns
+        -------
+        Frame
+            A cloned frame.
+        """
+        newframe = Frame(self._columns, self._num_rows)
+        newframe._initializers = self._initializers
+        newframe._remote_init_builder = self._remote_init_builder
+        newframe._default_initializer = self._default_initializer
+        return newframe
+
+    def deepclone(self):
+        """Return a deep clone of this frame.
+
+        The clone frame has an copy of this frame and any modification to the clone frame
+        is not visible to this frame. The function allocate new tensors and copy the contents
+        from this frame. Use :func:`~dgl.Frame.clone` for cloning a frame that does not
+        allocate extra tensor memory.
+
+        Returns
+        -------
+        Frame
+            A deep-cloned frame.
+        """
+        newframe = Frame({k : col.clone() for k, col in self._columns.items()}, self._num_rows)
+        newframe._initializers = self._initializers
+        newframe._remote_init_builder = self._remote_init_builder
+        newframe._default_initializer = self._default_initializer
+        return newframe
+
 class FrameRef(MutableMapping):
     """Reference object to a frame on a subset of rows.
 
@@ -537,6 +592,8 @@ class FrameRef(MutableMapping):
 
     def set_remote_init_builder(self, builder):
         """Set an initializer builder to create a remote initializer for a new column to a frame.
+
+        NOTE(minjie): This is a temporary solution. Will be replaced by KVStore in the future.
 
         The builder is a callable that returns an initializer. The returned initializer
         is also a callable that returns a tensor given a local tensor and tensor name.
@@ -864,6 +921,34 @@ class FrameRef(MutableMapping):
     def is_span_whole_column(self):
         """Return whether this refers to all the rows."""
         return self.is_contiguous() and self.num_rows == self._frame.num_rows
+
+    def clone(self):
+        """Return a new reference to a clone of the underlying frame.
+
+        Returns
+        -------
+        FrameRef
+            A cloned frame reference.
+
+        See Also
+        --------
+        dgl.Frame.clone
+        """
+        return FrameRef(self._frame.clone(), self._index)
+
+    def deepclone(self):
+        """Return a new reference to a deep clone of the underlying frame.
+
+        Returns
+        -------
+        FrameRef
+            A deep-cloned frame reference.
+
+        See Also
+        --------
+        dgl.Frame.deepclone
+        """
+        return FrameRef(self._frame.deepclone(), self._index)
 
     def _getrows(self, query):
         """Internal function to convert from the local row ids to the row ids of the frame.

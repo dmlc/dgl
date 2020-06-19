@@ -4,6 +4,7 @@ import scipy.sparse as sp
 import numpy as np
 import os, sys
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 
@@ -14,14 +15,25 @@ class RedditDataset(object):
         if self_loop:
             self_loop_str = "_self_loop"
         zip_file_path = os.path.join(download_dir, "reddit{}.zip".format(self_loop_str))
-        download(_get_dgl_url("dataset/reddit{}.zip".format(self_loop_str)), path=zip_file_path)
         extract_dir = os.path.join(download_dir, "reddit{}".format(self_loop_str))
-        extract_archive(zip_file_path, extract_dir)
+        self._url = _get_dgl_url("dataset/reddit{}.zip".format(self_loop_str))
+        self._zip_file_path = zip_file_path
+        self._extract_dir = extract_dir
+        self._self_loop_str = self_loop_str
+        self._load()
+
+    def _download(self):
+        download(self._url, path=self._zip_file_path)
+        extract_archive(self._zip_file_path, self._extract_dir)
+
+    @retry_method_with_fix(_download)
+    def _load(self):
         # graph
-        coo_adj = sp.load_npz(os.path.join(extract_dir, "reddit{}_graph.npz".format(self_loop_str)))
+        coo_adj = sp.load_npz(os.path.join(
+            self._extract_dir, "reddit{}_graph.npz".format(self._self_loop_str)))
         self.graph = DGLGraph(coo_adj, readonly=True)
         # features and labels
-        reddit_data = np.load(os.path.join(extract_dir, "reddit_data.npz"))
+        reddit_data = np.load(os.path.join(self._extract_dir, "reddit_data.npz"))
         self.features = reddit_data["feature"]
         self.labels = reddit_data["label"]
         self.num_labels = 41

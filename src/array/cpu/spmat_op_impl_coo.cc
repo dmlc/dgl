@@ -106,6 +106,7 @@ template int64_t COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
+  CHECK_SAME_DTYPE(coo.col, rows);
   const auto len = rows->shape[0];
   const IdType* vid_data = static_cast<IdType*>(rows->data);
   NDArray rst = NDArray::Empty({len}, rows->dtype, rows->ctx);
@@ -171,10 +172,13 @@ template NDArray COOGetData<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 ///////////////////////////// COOGetDataAndIndices /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-std::vector<NDArray> COOGetDataAndIndices(
-    COOMatrix coo, NDArray rows, NDArray cols) {
+std::vector<NDArray> COOGetDataAndIndices(COOMatrix coo, NDArray rows,
+                                          NDArray cols) {
+  CHECK_SAME_DTYPE(coo.col, rows);
+  CHECK_SAME_DTYPE(coo.col, cols);
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
+  const int64_t len = std::max(rowlen, collen);
 
   CHECK((rowlen == collen) || (rowlen == 1) || (collen == 1))
     << "Invalid row and col id array.";
@@ -190,16 +194,44 @@ std::vector<NDArray> COOGetDataAndIndices(
 
   std::vector<IdType> ret_rows, ret_cols;
   std::vector<IdType> ret_data;
+  ret_rows.reserve(len);
+  ret_cols.reserve(len);
+  ret_data.reserve(len);
 
-  for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
-    const IdType row_id = row_data[i], col_id = col_data[j];
-    CHECK(row_id >= 0 && row_id < coo.num_rows) << "Invalid row index: " << row_id;
-    CHECK(col_id >= 0 && col_id < coo.num_cols) << "Invalid col index: " << col_id;
-    for (int64_t k = 0; k < coo.row->shape[0]; ++k) {
-      if (coo_row_data[k] == row_id && coo_col_data[k] == col_id) {
+  // NOTE(BarclayII): With a small number of lookups, linear scan is faster.
+  // The threshold 200 comes from benchmarking both algorithms on a P3.8x instance.
+  // I also tried sorting plus binary search.  The speed gain is only significant for
+  // medium-sized graphs and lookups, so I didn't include it.
+  if (len >= 200) {
+    // TODO(BarclayII) Ideally we would want to cache this object.  However I'm not sure
+    // what is the best way to do so since this object is valid for CPU only.
+    std::unordered_multimap<std::pair<IdType, IdType>, IdType, PairHash> pair_map;
+    pair_map.reserve(coo.row->shape[0]);
+    for (int64_t k = 0; k < coo.row->shape[0]; ++k)
+      pair_map.emplace(std::make_pair(coo_row_data[k], coo_col_data[k]), data ? data[k]: k);
+
+    for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
+      const IdType row_id = row_data[i], col_id = col_data[j];
+      CHECK(row_id >= 0 && row_id < coo.num_rows) << "Invalid row index: " << row_id;
+      CHECK(col_id >= 0 && col_id < coo.num_cols) << "Invalid col index: " << col_id;
+      auto range = pair_map.equal_range({row_id, col_id});
+      for (auto it = range.first; it != range.second; ++it) {
         ret_rows.push_back(row_id);
         ret_cols.push_back(col_id);
-        ret_data.push_back(data ? data[k] : k);
+        ret_data.push_back(it->second);
+      }
+    }
+  } else {
+    for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
+      const IdType row_id = row_data[i], col_id = col_data[j];
+      CHECK(row_id >= 0 && row_id < coo.num_rows) << "Invalid row index: " << row_id;
+      CHECK(col_id >= 0 && col_id < coo.num_cols) << "Invalid col index: " << col_id;
+      for (int64_t k = 0; k < coo.row->shape[0]; ++k) {
+        if (coo_row_data[k] == row_id && coo_col_data[k] == col_id) {
+          ret_rows.push_back(row_id);
+          ret_cols.push_back(col_id);
+          ret_data.push_back(data ? data[k] : k);
+        }
       }
     }
   }
@@ -394,6 +426,51 @@ template COOMatrix COOSliceMatrix<kDLCPU, int32_t>(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 template COOMatrix COOSliceMatrix<kDLCPU, int64_t>(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+
+///////////////////////////// COOReorder /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
+                     runtime::NDArray new_col_id_arr) {
+  CHECK_SAME_DTYPE(coo.row, new_row_id_arr);
+  CHECK_SAME_DTYPE(coo.col, new_col_id_arr);
+
+  // Input COO
+  const IdType* in_rows = static_cast<IdType*>(coo.row->data);
+  const IdType* in_cols = static_cast<IdType*>(coo.col->data);
+  const IdType* in_data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
+  int64_t num_rows = coo.num_rows;
+  int64_t num_cols = coo.num_cols;
+  int64_t nnz = coo.row->shape[0];
+  CHECK_EQ(num_rows, new_row_id_arr->shape[0])
+      << "The new row Id array needs to be the same as the number of rows of COO";
+  CHECK_EQ(num_cols, new_col_id_arr->shape[0])
+      << "The new col Id array needs to be the same as the number of cols of COO";
+
+  // New row/col Ids.
+  const IdType* new_row_ids = static_cast<IdType*>(new_row_id_arr->data);
+  const IdType* new_col_ids = static_cast<IdType*>(new_col_id_arr->data);
+
+  // Output COO
+  NDArray out_row_arr = NDArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
+  NDArray out_col_arr = NDArray::Empty({nnz}, coo.col->dtype, coo.col->ctx);
+  NDArray out_data_arr = COOHasData(coo) ? coo.data : NullArray();
+  IdType *out_row = static_cast<IdType*>(out_row_arr->data);
+  IdType *out_col = static_cast<IdType*>(out_col_arr->data);
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < nnz; i++) {
+    out_row[i] = new_row_ids[in_rows[i]];
+    out_col[i] = new_col_ids[in_cols[i]];
+  }
+  return COOMatrix(num_rows, num_cols, out_row_arr, out_col_arr, out_data_arr);
+}
+
+template COOMatrix COOReorder<kDLCPU, int64_t>(COOMatrix csr, runtime::NDArray new_row_ids,
+                                               runtime::NDArray new_col_ids);
+template COOMatrix COOReorder<kDLCPU, int32_t>(COOMatrix csr, runtime::NDArray new_row_ids,
+                                               runtime::NDArray new_col_ids);
 
 }  // namespace impl
 }  // namespace aten

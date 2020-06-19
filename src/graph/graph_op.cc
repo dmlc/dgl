@@ -403,7 +403,13 @@ GraphPtr GraphOp::ToBidirectedImmutableGraph(GraphPtr g) {
 HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hops) {
   const dgl_id_t *nid = static_cast<dgl_id_t *>(nodes->data);
   const auto id_len = nodes->shape[0];
+  // A map contains all nodes in the subgraph.
+  // The key is the old node Ids, the value indicates whether a node is a inner
+  // node.
   std::unordered_map<dgl_id_t, bool> all_nodes;
+  // The old Ids of all nodes. We want to preserve the order of the nodes in the
+  // vector. The first few nodes are the inner nodes in the subgraph.
+  std::vector<dgl_id_t> old_node_ids(nid, nid + id_len);
   std::vector<std::vector<dgl_id_t>> outer_nodes(num_hops);
   for (int64_t i = 0; i < id_len; i++)
     all_nodes[nid[i]] = true;
@@ -436,6 +442,7 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
     auto it = all_nodes.find(src_data[i]);
     if (it == all_nodes.end() && num_hops > 0) {
       all_nodes[src_data[i]] = false;
+      old_node_ids.push_back(src_data[i]);
       outer_nodes[0].push_back(src_data[i]);
     }
   }
@@ -461,22 +468,14 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
       auto it = all_nodes.find(src_data[i]);
       if (it == all_nodes.end()) {
         all_nodes[src_data[i]] = false;
+        old_node_ids.push_back(src_data[i]);
         outer_nodes[k].push_back(src_data[i]);
       }
     }
   }
 
-  // We assign new Ids to the nodes in the subgraph. We ensure that nodes
-  // with smaller Ids in the original graph will also get smaller Ids in
-  // the subgraph.
-
-  // Move all nodes to a vector.
-  std::vector<dgl_id_t> old_node_ids;
-  old_node_ids.reserve(all_nodes.size());
-  for (auto it = all_nodes.begin(); it != all_nodes.end(); it++) {
-    old_node_ids.push_back(it->first);
-  }
-  std::sort(old_node_ids.begin(), old_node_ids.end());
+  // We assign new Ids to the nodes in the subgraph. We ensure that the HALO
+  // nodes are behind the input nodes.
   std::unordered_map<dgl_id_t, dgl_id_t> old2new;
   for (size_t i = 0; i < old_node_ids.size(); i++) {
     old2new[old_node_ids[i]] = i;
@@ -508,6 +507,32 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   return halo_subg;
 }
 
+GraphPtr GraphOp::ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order) {
+  CSRPtr in_csr, out_csr;
+  COOPtr coo;
+  // We only need to reorder one of the graph structure.
+  if (ig->HasInCSR()) {
+    in_csr = ig->GetInCSR();
+    auto csrmat = in_csr->ToCSRMatrix();
+    auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
+    in_csr = CSRPtr(new CSR(new_csrmat.indptr, new_csrmat.indices, new_csrmat.data));
+  } else if (ig->HasOutCSR()) {
+    out_csr = ig->GetOutCSR();
+    auto csrmat = out_csr->ToCSRMatrix();
+    auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
+    out_csr = CSRPtr(new CSR(new_csrmat.indptr, new_csrmat.indices, new_csrmat.data));
+  } else {
+    coo = ig->GetCOO();
+    auto coomat = coo->ToCOOMatrix();
+    auto new_coomat = aten::COOReorder(coomat, new_order, new_order);
+    coo = COOPtr(new COO(ig->NumVertices(), new_coomat.row, new_coomat.col));
+  }
+  if (in_csr || out_csr)
+    return GraphPtr(new ImmutableGraph(in_csr, out_csr));
+  else
+    return GraphPtr(new ImmutableGraph(coo));
+}
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef graph = args[0];
@@ -537,6 +562,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
       part_nodes.push_back(it->second);
     }
     auto graph_ptr = std::dynamic_pointer_cast<ImmutableGraph>(graph.sptr());
+    CHECK(graph_ptr) << "The input graph has to be an immutable graph";
     // When we construct subgraphs, we only access in-edges.
     // We need to make sure the in-CSR exists. Otherwise, we'll
     // try to construct in-CSR in openmp for loop, which will lead
@@ -573,6 +599,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerNodes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   SubgraphRef g = args[0];
   auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
+  CHECK(gptr) << "The input graph has to be immutable graph";
   *rv = gptr->inner_nodes;
 });
 
@@ -580,6 +607,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   SubgraphRef g = args[0];
   auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
+  CHECK(gptr) << "The input graph has to be immutable graph";
   *rv = gptr->inner_edges;
 });
 
@@ -640,6 +668,42 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     *rv = GraphOp::ToBidirectedMutableGraph(g.sptr());
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLReorderGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    const IdArray new_order = args[1];
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(gptr) << "The input graph has to be immutable graph";
+    *rv = GraphOp::ReorderImmutableGraph(gptr, new_order);
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLReassignEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef graph = args[0];
+    bool is_incsr = args[1];
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(graph.sptr());
+    CHECK(gptr) << "We can only reassign edge Ids on immutable graphs";
+    CSRPtr csr = is_incsr ? gptr->GetInCSR() : gptr->GetOutCSR();
+    auto csrmat = csr->ToCSRMatrix();
+    int64_t num_edges = csrmat.data->shape[0];
+    IdArray new_data = IdArray::Empty({num_edges}, csrmat.data->dtype, csrmat.data->ctx);
+    // Return the original edge Ids.
+    *rv = new_data;
+    // TODO(zhengda) I need to invalidate out-CSR and COO.
+
+    // Generate new edge Ids.
+    // TODO(zhengda) after assignment, we actually don't need to store them
+    // physically.
+    ATEN_ID_TYPE_SWITCH(new_data->dtype, IdType, {
+      IdType *typed_new_data = static_cast<IdType*>(new_data->data);
+      IdType *typed_data = static_cast<IdType*>(csrmat.data->data);
+      for (int64_t i = 0; i < num_edges; i++) {
+        typed_new_data[i] = typed_data[i];
+        typed_data[i] = i;
+      }
+    });
   });
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")

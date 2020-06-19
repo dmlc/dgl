@@ -347,7 +347,7 @@ void csrwrapper_switch(DGLArgValue argval,
     fn(wrapper);
   } else if (argval.IsObjectType<HeteroGraphRef>()) {
     HeteroGraphRef g = argval;
-    auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g.sptr());
+    auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g->GetRelationGraph(0));
     CHECK_NOTNULL(bgptr);
     UnitGraphCSRWrapper wrapper(bgptr.get());
     fn(wrapper);

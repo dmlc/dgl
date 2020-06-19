@@ -235,12 +235,58 @@ HeteroSubgraph HeteroGraph::EdgeSubgraph(
   }
 }
 
-FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etypes) const {
+HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
+  auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
+  CHECK_NOTNULL(hgindex);
+  std::vector<HeteroGraphPtr> rel_graphs;
+  for (auto g : hgindex->relation_graphs_) {
+    rel_graphs.push_back(UnitGraph::AsNumBits(g, bits));
+  }
+  return HeteroGraphPtr(new HeteroGraph(hgindex->meta_graph_, rel_graphs,
+                                        hgindex->num_verts_per_type_));
+}
+
+HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+  if (ctx == g->Context()) {
+    return g;
+  }
+  auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
+  CHECK_NOTNULL(hgindex);
+  std::vector<HeteroGraphPtr> rel_graphs;
+  for (auto g : hgindex->relation_graphs_) {
+    rel_graphs.push_back(UnitGraph::CopyTo(g, ctx));
+  }
+  return HeteroGraphPtr(new HeteroGraph(hgindex->meta_graph_, rel_graphs,
+                                        hgindex->num_verts_per_type_));
+}
+
+HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {
+  std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
+    auto relgraph = std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(etype));
+    format_rels[etype] = relgraph->GetGraphInFormat(restrict_format);
+  }
+  return HeteroGraphPtr(new HeteroGraph(
+    meta_graph_, format_rels, NumVerticesPerType()));
+}
+
+FlattenedHeteroGraphPtr HeteroGraph::Flatten(
+    const std::vector<dgl_type_t>& etypes) const {
+  const int64_t bits = NumBits();
+  if (bits == 32) {
+    return FlattenImpl<int32_t>(etypes);
+  } else {
+    return FlattenImpl<int64_t>(etypes);
+  }
+}
+
+template <class IdType>
+FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& etypes) const {
   std::unordered_map<dgl_type_t, size_t> srctype_offsets, dsttype_offsets;
   size_t src_nodes = 0, dst_nodes = 0;
-  std::vector<dgl_id_t> result_src, result_dst;
+  std::vector<IdType> result_src, result_dst;
   std::vector<dgl_type_t> induced_srctype, induced_etype, induced_dsttype;
-  std::vector<dgl_id_t> induced_srcid, induced_eid, induced_dstid;
+  std::vector<IdType> induced_srcid, induced_eid, induced_dstid;
   std::vector<dgl_type_t> srctype_set, dsttype_set;
 
   // XXXtype_offsets contain the mapping from node type and number of nodes after this
@@ -261,7 +307,6 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
       dsttype_set.push_back(dsttype);
     }
   }
-
   // Sort the node types so that we can compare the sets and decide whether a homograph
   // should be returned.
   std::sort(srctype_set.begin(), srctype_set.end());
@@ -301,9 +346,9 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
 
     EdgeArray edges = Edges(etype);
     size_t num_edges = NumEdges(etype);
-    const dgl_id_t* edges_src_data = static_cast<const dgl_id_t*>(edges.src->data);
-    const dgl_id_t* edges_dst_data = static_cast<const dgl_id_t*>(edges.dst->data);
-    const dgl_id_t* edges_eid_data = static_cast<const dgl_id_t*>(edges.id->data);
+    const IdType* edges_src_data = static_cast<const IdType*>(edges.src->data);
+    const IdType* edges_dst_data = static_cast<const IdType*>(edges.dst->data);
+    const IdType* edges_eid_data = static_cast<const IdType*>(edges.id->data);
     // TODO(gq) Use concat?
     for (size_t i = 0; i < num_edges; ++i) {
       result_src.push_back(edges_src_data[i] + srctype_offset);
