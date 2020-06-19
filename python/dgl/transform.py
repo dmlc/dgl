@@ -1386,7 +1386,7 @@ def sort_csr(g, tag=None, split="_SPLIT"):
 
 def sort_csc(g, tag=None, split="_SPLIT"):
     """A copy of the given graph whose CSC(in CSR) matrix is sorted.
-    
+
     The outplace version of sort_csc_
     Node frames and edges frames are shallow copy of the original graph.
 
