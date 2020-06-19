@@ -43,6 +43,7 @@ def check_sort(spm, tag_arr=None, split=None):
                 split_ptr = tag_arr[dst[j+1]]
     return True
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
 def test_sort_inplace(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
@@ -61,6 +62,7 @@ def test_sort_inplace(index_dtype):
     csc = g.adjacency_matrix(scipy_fmt='csr')
     assert(check_sort(csc, g.ndata['tag'], g.ndata['_SPLIT']))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
 def test_sort_inplace_bipartite(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
@@ -85,6 +87,7 @@ def test_sort_inplace_bipartite(index_dtype):
     csc = g.adjacency_matrix(etype='_E', scipy_fmt='csr')
     assert(check_sort(csc, g.nodes['_U'].data['tag'],  g.nodes['_V'].data['_SPLIT']))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
 def test_sort_outplace(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
@@ -102,6 +105,7 @@ def test_sort_outplace(index_dtype):
     assert(check_sort(new_csc, new_g.ndata['tag'], new_g.ndata["_SPLIT"]))
     assert(not check_sort(old_csc, g.ndata['tag']))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
 def test_sort_outplace_bipartite(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
