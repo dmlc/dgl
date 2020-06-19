@@ -4,9 +4,9 @@ import networkx as nx
 import numpy as np
 
 from .dgl_dataset import DGLDataset
-from .. import backend as F
 from .utils import save_graphs, load_graphs, makedirs
-from ..graph import DGLGraph
+from .. import backend as F
+from ..convert import graph
 from ..graph import batch as graph_batch
 
 __all__ = ['MiniGCDataset']
@@ -36,6 +36,10 @@ class MiniGCDataset(DGLDataset):
         Minimum number of nodes for graphs
     max_num_v: int
         Maximum number of nodes for graphs
+    verbose : bool
+        Whether to print out progress information
+    seed : int, default is None
+        Random seed for data generation
     """
     def __init__(self, num_graphs, min_num_v, max_num_v, verbose=False, seed=None):
         self.num_graphs = num_graphs
@@ -103,10 +107,9 @@ class MiniGCDataset(DGLDataset):
         self._gen_circular_ladder(self.num_graphs - len(self.graphs))
         # preprocess
         for i in range(self.num_graphs):
-            self.graphs[i] = DGLGraph(self.graphs[i])
+            self.graphs[i] = graph(self.graphs[i])
             # add self edges
-            nodes = self.graphs[i].nodes()
-            self.graphs[i].add_edges(nodes, nodes)
+            dgl.add_self_loop(self.graphs[i])
         self.labels = F.tensor(np.array(self.labels).astype(np.int))
 
     def _gen_cycle(self, n):
