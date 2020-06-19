@@ -106,15 +106,15 @@ class Identity(nn.Module):
 class Sequential(nn.Sequential):
     r"""A squential container for stacking graph neural network modules.
 
-    We support two modes: sequentially apply GNN modules on the same graph or
-    a list of given graphs. In the second case, the number of graphs equals the
+    We support two modes: sequentially apply GNN modules on 1) the same graph or
+    2) a list of given graphs. In the second case, the number of graphs equals the
     number of modules inside this container.
 
     Parameters
     ----------
     *args :
-        Sub-modules of type torch.nn.Module, will be added to the container in
-        the order they are passed in the constructor.
+        Sub-modules of torch.nn.Module that will be added to the container in
+        the order by which they are passed in the constructor.
 
     Examples
     --------
@@ -199,8 +199,8 @@ class Sequential(nn.Sequential):
 
         *feats :
             Input features.
-            The output of :math:`i`-th block should match that of the input
-            of :math:`(i+1)`-th block.
+            The output of the :math:`i`-th module should match the input
+            of the :math:`(i+1)`-th module in the sequential.
         """
         if isinstance(graph, list):
             for graph_i, module in zip(graph, self):

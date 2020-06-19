@@ -206,7 +206,7 @@ class GlobalAttentionPooling(nn.Module):
 
 class Set2Set(nn.Module):
     r"""Apply Set2Set (`Order Matters: Sequence to sequence for sets
-    <https://arxiv.org/pdf/1511.06391.pdf>`__) over the nodes in the graph.
+    <https://arxiv.org/pdf/1511.06391.pdf>`__) over the nodes in graphs.
 
     For each individual graph in the batch, set2set computes
 
@@ -252,13 +252,15 @@ class Set2Set(nn.Module):
             The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            :math:`N` is the number of nodes in the graph, and :math:`D` means
+            the size of features.
 
         Returns
         -------
         torch.Tensor
             The output feature with shape :math:`(B, D)`, where
-            :math:`B` refers to the batch size.
+            :math:`B` refers to the batch size, and  :math:`D` means
+            the size of features.
         """
         with graph.local_scope():
             batch_size = graph.batch_size

@@ -45,7 +45,7 @@ class KNNGraph(nn.Module):
         Returns
         -------
         DGLGraph
-            A DGLGraph with no features.
+            A DGLGraph without features.
         """
         return knn_graph(x, self.k)
 
@@ -54,10 +54,10 @@ class SegmentedKNNGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
     point sets with different number of points into a union of those graphs.
 
-    If a batch of point set is provided, then the point :math:`j` in point
+    If a batch of point sets is provided, then the point :math:`j` in the point
     set :math:`i` is mapped to graph node ID
     :math:`\sum_{p<i} |V_p| + j`, where :math:`|V_p|` means the number of
-    points in point set :math:`p`.
+    points in the point set :math:`p`.
 
     The predecessors of each node are the k-nearest neighbors of the
     corresponding point.
@@ -79,14 +79,14 @@ class SegmentedKNNGraph(nn.Module):
         ----------
         x : Tensor
             :math:`(M, D)` where :math:`M` means the total number of points
-            in all point sets.
+            in all point sets, and :math:`D` means the size of features.
         segs : iterable of int
             :math:`(N)` integers where :math:`N` means the number of point
-            sets.  The elements must sum up to :math:`M`.
+            sets.  The number of elements must sum up to :math:`M`.
 
         Returns
         -------
         DGLGraph
-            A DGLGraph with no features.
+            A DGLGraph without features.
         """
         return segmented_knn_graph(x, self.k, segs)

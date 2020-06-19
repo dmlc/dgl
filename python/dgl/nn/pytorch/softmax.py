@@ -137,7 +137,7 @@ def edge_softmax(graph, logits, eids=ALL):
     logits : torch.Tensor
         The input edge feature
     eids : torch.Tensor or ALL, optional
-        Edges on which to apply edge softmax. If ALL, apply edge
+        A list of edges on which to apply edge softmax. If ALL, apply edge
         softmax on all edges in the graph. Default: ALL.
 
     Returns
@@ -149,7 +149,7 @@ def edge_softmax(graph, logits, eids=ALL):
     -----
         * Input shape: :math:`(E, *, 1)` where * means any number of
           additional dimensions, :math:`E` equals the length of eids.
-          If eids is ALL, :math:`E` equals number of edges in the graph.
+          If the 'eids' is ALL, :math:`E` equals the number of edges in the graph.
         * Return shape: :math:`(E, *, 1)`
 
     Examples
@@ -182,7 +182,7 @@ def edge_softmax(graph, logits, eids=ALL):
         [0.3333],
         [0.3333]])
 
-    Apply edge softmax on first 4 edges of g:
+    Apply edge softmax on the first 4 edges of g:
 
     >>> edge_softmax(g, edata[:4], th.Tensor([0,1,2,3]))
     tensor([[1.0000],
