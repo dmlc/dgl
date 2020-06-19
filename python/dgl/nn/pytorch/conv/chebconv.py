@@ -8,21 +8,6 @@ from ....base import dgl_warning
 from .... import laplacian_lambda_max, broadcast_nodes, function as fn
 
 
-class NodeApplyModule(nn.Module):
-    """Update the node feature hv with ReLU(Whv+b)."""
-
-    def __init__(self, in_feats, out_feats, bias, k, activation):
-        super(NodeApplyModule, self).__init__()
-        self.linear = nn.Linear(k * in_feats, out_feats, bias)
-        self.activation = activation
-
-    def forward(self, node):
-        h = self.linear(node.data['h'])
-        if self.activation:
-            h = self.activation(h)
-        return h
-
-
 class ChebConv(nn.Module):
     r"""Chebyshev Spectral Graph Convolution layer from paper `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
@@ -64,12 +49,7 @@ class ChebConv(nn.Module):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self.activation = activation
-        self.apply_mod = NodeApplyModule(
-            in_feats,
-            out_feats,
-            bias,
-            self._k,
-            activation=self.activation)
+        self.linear = nn.Linear(k * in_feats, out_feats, bias)
 
     def forward(self, graph, feat, lambda_max=None):
         r"""Compute ChebNet layer.
@@ -141,7 +121,11 @@ class ChebConv(nn.Module):
                 Xt = th.cat((Xt, X_i), 1)
                 X_1, X_0 = X_i, X_1
 
-            # forward pass
-            h = self.apply_mod(Xt)
+            # linear proejection
+            h = self.linear(Xt)
+
+            # activation
+            if self.activation:
+                h = self.activation(h)
 
             return h
