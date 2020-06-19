@@ -1,5 +1,7 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
+import os
+
 from ..graph import DGLGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
@@ -96,6 +98,11 @@ def save_graphs(filename, g_list, labels=None):
     >>> save_graphs("./data.bin", [g1, g2], graph_labels)
 
     """
+    assert not os.path.isdir(filename), "filename %s is an existing directory."%(filename)
+    _path, _file = os.path.split(filename)
+    if not os.path.exists(_path):
+        os.makedirs(_path)
+
     if isinstance(g_list, DGLGraph):
         g_list = [g_list]
     if (labels is not None) and (len(labels) != 0):
@@ -138,6 +145,7 @@ def load_graphs(filename, idx_list=None):
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
+    assert os.path.exists(filename), "file %s does not exist."%(filename)
     metadata = _CAPI_DGLLoadGraphs(filename, idx_list, False)
     label_dict = {}
     for k, v in metadata.labels.items():

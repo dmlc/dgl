@@ -15,7 +15,7 @@ from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
-           'get_download_dir', 'Subset', 'split_dataset',
+           'get_download_dir', 'Subset', 'split_dataset', 'makedirs',
            'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors"]
 
 def loadtxt(path, delimiter, dtype=None):

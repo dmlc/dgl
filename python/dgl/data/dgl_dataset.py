@@ -21,10 +21,13 @@ class DGLDataset(object):
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
+    save_dir : str
+        Directory to save the processed dataset.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     """
-    def __init__(self, name, url=None, raw_dir=None, force_reload=False):
+    def __init__(self, name, url=None, raw_dir=None, save_dir=None, force_reload=False):
         self._name = name
         self._url = url
         self._force_reload = force_reload
@@ -32,6 +35,11 @@ class DGLDataset(object):
         # if no dir is provided, the default dgl download dir is used.
         if raw_dir is None:
             self._raw_dir = get_download_dir()
+        else:
+            self._raw_dir = raw_dir
+
+        if save_dir is None:
+            self._save_dir = self._raw_dir
 
         self._load()
 
@@ -121,11 +129,22 @@ class DGLDataset(object):
         """
         return os.path.join(self.raw_dir, self.name)
 
+    @property
+    def save_dir(self):
+        r"""Directory to save the processed dataset.
+        """
+        return self._save_dir
+
+    @property
+    def save_path(self):
+        r"""Path to save the processed dataset.
+        """
+        return os.path.join(self._save_dir, self.name)
+
     def __getitem__(self, idx):
         r"""Gets the data object at index.
         """
         raise NotImplementedError
-
 
     def __len__(self):
         r"""The number of examples in the dataset."""
@@ -146,6 +165,7 @@ class DGLBuiltinDataset(DGLDataset):
         super(DGLBuiltinDataset, self).__init__(name,
                                                 url=url,
                                                 raw_dir=None,
+                                                save_dir=None,
                                                 force_reload=force_reload)
 
     def download(self):
