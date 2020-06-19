@@ -14,7 +14,7 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
-'send_request_to_machine', 'remote_call_to_machine']
+'send_request_to_machine', 'remote_call_to_machine', 'fast_pull']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
@@ -843,6 +843,60 @@ def finalize_server():
     finalize_sender()
     finalize_receiver()
     print("Server (%d) shutdown." % get_rank())
+
+def fast_pull(name, id_tensor, part_id, service_id,
+              machine_count, group_count, machine_id,
+              client_id, local_data, policy):
+    """Fast-pull api used by kvstore.
+
+    Parameters
+    ----------
+    name : str
+        data name
+    id_tensor : tensor
+        data ID
+    part_id : tensor
+        partition ID of id_tensor
+    service_id : int
+        service_id of pull request
+    machine_count : int
+        total number of machine
+    group_count : int
+        total number of server inside machine
+    machine_id : int
+        current machine ID
+    client_id : int
+        current client ID
+    local_data : tensor
+        local data tensor
+    policy : PartitionPolicy
+        store the partition information
+    """
+    msg_seq = incr_msg_seq()
+    pickle_data = bytearray(pickle.dumps(([0], [name])))
+    global_id = _CAPI_DGLRPCGetGlobalIDFromLocalPartition(F.zerocopy_to_dgl_ndarray(id_tensor),
+                                                          F.zerocopy_to_dgl_ndarray(part_id),
+                                                          machine_id)
+    global_id = F.zerocopy_from_dgl_ndarray(global_id)
+    g2l_id = policy.to_local(global_id)
+    res_tensor = _CAPI_DGLRPCFastPull(name,
+                                      int(machine_id),
+                                      int(machine_count),
+                                      int(group_count),
+                                      int(client_id),
+                                      int(service_id),
+                                      int(msg_seq),
+                                      pickle_data,
+                                      F.zerocopy_to_dgl_ndarray(id_tensor),
+                                      F.zerocopy_to_dgl_ndarray(part_id),
+                                      F.zerocopy_to_dgl_ndarray(g2l_id),
+                                      F.zerocopy_to_dgl_ndarray(local_data))
+    return F.zerocopy_from_dgl_ndarray(res_tensor)
+
+def register_ctrl_c():
+    """HandleCtrlC Register for handling Ctrl+C event.
+    """
+    _CAPI_DGLRPCHandleCtrlC()
 
 ############### Some basic services will be defined here #############
 
