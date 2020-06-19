@@ -260,8 +260,8 @@ def to_backend_ctx(dglctx):
 
     Parameters
     ----------
-    dglctx : DGLContext
-        DGL context object.
+    dglctx : dgl.ndarray.DGLContext
+        DGL context object. See _ffi.runtime_types for definition.
 
     Returns
     -------

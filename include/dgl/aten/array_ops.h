@@ -160,6 +160,12 @@ NDArray Repeat(NDArray array, IdArray repeats);
  * Relabeling is done inplace. The mapping is created from the union
  * of the give arrays.
  *
+ * Example:
+ *
+ * Given two IdArrays [2, 3, 10, 0, 2] and [4, 10, 5], one possible return
+ * mapping is [2, 3, 10, 4, 0, 5], meaning the new ID 0 maps to the old ID
+ * 2, 1 maps to 3, so on and so forth.
+ *
  * \param arrays The id arrays to relabel.
  * \return mapping array M from new id to old id.
  */
