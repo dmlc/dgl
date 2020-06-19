@@ -12,6 +12,7 @@
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
+#include "./macro.h"
 
 namespace dgl {
 namespace aten {
@@ -51,8 +52,7 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
-    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
-        << "The indptr and indices arrays must have the same data type.";
+    CheckValidity();
   }
 
   /*! \brief constructor from SparseMatrix object */
@@ -63,8 +63,7 @@ struct CSRMatrix {
         indices(spmat.indices[1]),
         data(spmat.indices[2]),
         sorted(spmat.flags[0]) {
-    CHECK_EQ(indptr->dtype.bits, indices->dtype.bits)
-        << "The indptr and indices arrays must have the same data type.";
+    CheckValidity();
   }
 
   // Convert to a SparseMatrix object that can return to python.
@@ -84,6 +83,7 @@ struct CSRMatrix {
     CHECK(fs->Read(&indices)) << "Invalid indices";
     CHECK(fs->Read(&data)) << "Invalid data";
     CHECK(fs->Read(&sorted)) << "Invalid sorted";
+    CheckValidity();
     return true;
   }
 
@@ -95,6 +95,17 @@ struct CSRMatrix {
     fs->Write(indices);
     fs->Write(data);
     fs->Write(sorted);
+  }
+
+  inline void CheckValidity() const {
+    CHECK_SAME_DTYPE(indptr, indices);
+    CHECK_SAME_CONTEXT(indptr, indices);
+    if (!aten::IsNullArray(data)) {
+      CHECK_SAME_DTYPE(indptr, data);
+      CHECK_SAME_CONTEXT(indptr, data);
+    }
+    CHECK_NO_OVERFLOW(indptr->dtype, num_rows);
+    CHECK_NO_OVERFLOW(indptr->dtype, num_cols);
   }
 };
 

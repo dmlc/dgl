@@ -52,8 +52,6 @@ __global__ void _LinearSearchKernel(
 
 template <DLDeviceType XPU, typename IdType>
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
-  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
-  CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = csr.indptr->ctx;
   IdArray rows = aten::VecToIdArray<int64_t>({row}, sizeof(IdType) * 8, ctx);
@@ -103,7 +101,6 @@ template NDArray CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, NDArray, NDArray);
 
 template <DLDeviceType XPU, typename IdType>
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
-  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   const IdType cur = aten::IndexSelect<IdType>(csr.indptr, row);
   const IdType next = aten::IndexSelect<IdType>(csr.indptr, row + 1);
   return next - cur;
@@ -149,7 +146,6 @@ template NDArray CSRGetRowNNZ<kDLGPU, int64_t>(CSRMatrix, NDArray);
 
 template <DLDeviceType XPU, typename IdType>
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
-  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
   return csr.indices.CreateView({len}, csr.indices->dtype, offset);
@@ -162,7 +158,6 @@ template NDArray CSRGetRowColumnIndices<kDLGPU, int64_t>(CSRMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
-  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
   if (aten::CSRHasData(csr))

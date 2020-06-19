@@ -14,6 +14,7 @@
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
+#include "./macro.h"
 
 namespace dgl {
 namespace aten {
@@ -58,8 +59,7 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
-    CHECK_EQ(row->dtype.bits, col->dtype.bits)
-        << "The row and col arrays must have the same data type.";
+    CheckValidity();
   }
 
   /*! \brief constructor from SparseMatrix object */
@@ -71,8 +71,7 @@ struct COOMatrix {
         data(spmat.indices[2]),
         row_sorted(spmat.flags[0]),
         col_sorted(spmat.flags[1]) {
-    CHECK_EQ(row->dtype.bits, col->dtype.bits)
-        << "The row and col arrays must have the same data type.";
+    CheckValidity();
   }
 
   // Convert to a SparseMatrix object that can return to python.
@@ -93,6 +92,7 @@ struct COOMatrix {
     CHECK(fs->Read(&data)) << "Invalid data";
     CHECK(fs->Read(&row_sorted)) << "Invalid row_sorted";
     CHECK(fs->Read(&col_sorted)) << "Invalid col_sorted";
+    CheckValidity();
     return true;
   }
 
@@ -105,6 +105,17 @@ struct COOMatrix {
     fs->Write(data);
     fs->Write(row_sorted);
     fs->Write(col_sorted);
+  }
+
+  inline void CheckValidity() const {
+    CHECK_SAME_DTYPE(row, col);
+    CHECK_SAME_CONTEXT(row, col);
+    if (!aten::IsNullArray(data)) {
+      CHECK_SAME_DTYPE(row, data);
+      CHECK_SAME_CONTEXT(row, data);
+    }
+    CHECK_NO_OVERFLOW(row->dtype, num_rows);
+    CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
 };
 

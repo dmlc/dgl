@@ -243,6 +243,9 @@ def device_type(ctx):
 
 def device_id(ctx):
     """Return device index.
+
+    For CPU, the index does not matter. For GPU, the index means which GPU
+    device on the machine.
     
     Parameters
     ----------
@@ -252,6 +255,7 @@ def device_id(ctx):
     Returns
     -------
     int
+        The device index.
     """
     pass
 

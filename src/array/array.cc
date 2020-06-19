@@ -182,6 +182,8 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
 ///////////////////////// CSR routines //////////////////////////
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
+  CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   bool ret = false;
   ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
@@ -210,6 +212,7 @@ bool CSRHasDuplicate(CSRMatrix csr) {
 }
 
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   int64_t ret = 0;
   ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowNNZ", {
     ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
@@ -228,6 +231,7 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
 }
 
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   NDArray ret;
   ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowColumnIndices", {
     ret = impl::CSRGetRowColumnIndices<XPU, IdType>(csr, row);
@@ -236,6 +240,7 @@ NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
 }
 
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   NDArray ret;
   ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowData", {
     ret = impl::CSRGetRowData<XPU, IdType>(csr, row);
@@ -244,6 +249,8 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
 }
 
 NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
+  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
+  CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   NDArray ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, row, col);
@@ -305,6 +312,9 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
 }
 
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
+  CHECK(start >= 0 && start < csr.num_rows) << "Invalid start index: " << start;
+  CHECK(end >= 0 && end <= csr.num_rows) << "Invalid end index: " << end;
+  CHECK_GE(end, start);
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, start, end);

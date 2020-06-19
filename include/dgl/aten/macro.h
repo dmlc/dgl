@@ -246,4 +246,10 @@
     << (VAR1)->ctx << ")"                                                                   \
     << ". But got " << (VAR2)->ctx << ".";
 
+#define CHECK_NO_OVERFLOW(dtype, val)                                                  \
+  do {                                                                                 \
+    if (sizeof(val) == 8 && (dtype).bits == 32)                                        \
+      CHECK_LE((val), 0x7FFFFFFFL) << "int32 overflow for argument " << (#val) << "."; \
+  } while (0);
+
 #endif  // DGL_ATEN_MACRO_H_

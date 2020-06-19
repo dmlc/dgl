@@ -759,8 +759,6 @@ def test_to_device(index_dtype):
     g.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
     if F.is_cuda_available():
         g1 = g.to(F.cuda())
-        print(g.device)
-        print(g1.device)
         assert g1 is not None
 
 @parametrize_dtype
