@@ -7,6 +7,7 @@
 #define DGL_ARRAY_ARRAY_OP_H_
 
 #include <dgl/array.h>
+#include <dgl/graph_traversal.h>
 #include <vector>
 #include <tuple>
 #include <utility>
@@ -204,6 +205,25 @@ COOMatrix COORowWiseSamplingUniform(
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
+                             IdArray source,
+                             const bool has_reverse_edge,
+                             const bool has_nontree_edge,
+                             const bool return_labels);
 
 }  // namespace impl
 }  // namespace aten

@@ -573,5 +573,32 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSC")
     ret_list.push_back(Value(MakeValue(ret.first)));
     ret_list.push_back(Value(MakeValue(ret.second)));
     *rv = ret_list;
+});
+
+DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef metagraph = args[0];
+    std::set<int64_t> dst_set;
+    std::set<int64_t> src_set;
+
+    for (int64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
+      auto edge = metagraph->FindEdge(eid);
+      auto src = edge.first;
+      auto dst = edge.second;
+      dst_set.insert(dst);
+      if (dst_set.count(src))
+        return;
+    }
+
+    List<Value> srclist, dstlist;
+    List<List<Value>> ret_list;
+    for (auto dst : dst_set)
+      dstlist.push_back(Value(MakeValue(dst)));
+    for (int64_t nid = 0 ; nid < metagraph->NumVertices(); ++nid)
+      if (!dst_set.count(nid))
+        srclist.push_back(Value(MakeValue(nid)));
+    ret_list.push_back(srclist);
+    ret_list.push_back(dstlist);
+    *rv = ret_list;
   });
 }  // namespace dgl
