@@ -7,7 +7,12 @@ from torch import nn
 from ..capi import farthest_point_sampler
 
 class FarthestPointSampler(nn.Module):
-    """Farthest Point Sampler
+    """Farthest Point Sampler without the need to compute all pairs of distance.
+
+    In each batch, the algorithm starts with the sample index specified by ``start_idx``.
+    Then for each point, we maintain the minimum to-sample distance.
+    Finally, we pick the point with the maximum such distance.
+    This process will be repeated for ``sample_points`` - 1 times.
 
     Parameters
     ----------

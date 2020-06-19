@@ -10,6 +10,11 @@ from ..capi import farthest_point_sampler
 class FarthestPointSampler(nn.Block):
     """Farthest Point Sampler
 
+    In each batch, the algorithm starts with the sample index specified by ``start_idx``.
+    Then for each point, we maintain the minimum to-sample distance.
+    Finally, we pick the point with the maximum such distance.
+    This process will be repeated for ``sample_points`` - 1 times.
+
     Parameters
     ----------
     npoints : int
