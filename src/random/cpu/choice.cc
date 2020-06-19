@@ -118,7 +118,7 @@ void RandomEngine::BiasedChoice(
     }
   } else {
     utils::TreeSampler<int64_t, FloatType, false> sampler(this, prob);
-    CHECK_GE(total_node_num, num) 
+    CHECK_GE(total_node_num, num)
         << "Cannot take more sample than population when 'replace=false'";
     // we use hash set here. Maybe in the future we should support reservoir algorithm
     std::vector<std::unordered_set<IdxType>> selected(num_tags);
@@ -138,9 +138,13 @@ void RandomEngine::BiasedChoice(
   }
 }
 
-template void RandomEngine::BiasedChoice<int32_t, float>(int32_t, const int32_t*, FloatArray, int32_t*, bool);
-template void RandomEngine::BiasedChoice<int32_t, double>(int32_t, const int32_t*, FloatArray, int32_t*, bool);
-template void RandomEngine::BiasedChoice<int64_t, float>(int64_t, const int64_t*, FloatArray, int64_t*, bool);
-template void RandomEngine::BiasedChoice<int64_t, double>(int64_t, const int64_t*, FloatArray, int64_t*, bool);
+template void RandomEngine::BiasedChoice<int32_t, float>(
+    int32_t, const int32_t*, FloatArray, int32_t*, bool);
+template void RandomEngine::BiasedChoice<int32_t, double>(
+    int32_t, const int32_t*, FloatArray, int32_t*, bool);
+template void RandomEngine::BiasedChoice<int64_t, float>(
+    int64_t, const int64_t*, FloatArray, int64_t*, bool);
+template void RandomEngine::BiasedChoice<int64_t, double>(
+    int64_t, const int64_t*, FloatArray, int64_t*, bool);
 
 };  // namespace dgl
