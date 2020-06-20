@@ -131,9 +131,9 @@ def gsddmm(g, op, u, v):
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
 
-    .. math:: 
+    .. math::
         x_{e} = \phi(x_u, x_v), \forall (u,e,v)\in \mathcal{G}
-    
+
     where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
     :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
     is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
