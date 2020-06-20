@@ -11,11 +11,12 @@ class TAGConv(nn.Module):
     Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
 
     .. math::
-        \mathbf{X}^{\prime} = \sum_{k=0}^K \mathbf{D}^{-1/2} \mathbf{A}
-        \mathbf{D}^{-1/2}\mathbf{X} \mathbf{\Theta}_{k},
+        \mathbf{X}^{\prime} = \sum_{k=0}^K \math(bf{D}^{-1/2} \mathbf{A}
+        \mathbf{D}^{-1/2})^(k)\mathbf{X} \mathbf{\Theta}_{k},
 
-    where :math:`\mathbf{A}` denotes the adjacency matrix and
-    :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix.
+    where :math:`\mathbf{A}` denotes the adjacency matrix, 
+    :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix,
+    :math:`\mathbf{\Theta}_{k}` denotes the linear weights to sum the results of different hops together.
 
     Parameters
     ----------
@@ -24,7 +25,7 @@ class TAGConv(nn.Module):
     out_feats : int
         Output feature size.
     k: int, optional
-        Number of hops :math: `k`. (default: 2)
+        Number of hops :math:`k`. (default: 2)
     bias: bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
