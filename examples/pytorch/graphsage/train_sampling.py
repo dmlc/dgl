@@ -16,6 +16,8 @@ from dgl.data import RedditDataset
 import tqdm
 import traceback
 
+from load_graph import load_reddit, load_ogb
+
 #### Neighbor sampler
 
 class NeighborSampler(object):
@@ -248,17 +250,10 @@ if __name__ == '__main__':
         device = th.device('cpu')
 
     # load reddit data
-    data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    features = th.Tensor(data.features)
-    in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-    # Construct graph
-    g = dgl.graph(data.graph.all_edges())
-    g.ndata['features'] = features
-    g.ndata['labels'] = labels
+    g, n_classes = load_reddit()
+    in_feats = g.ndata['features'].shape[1]
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
     prepare_mp(g)
     # Pack data
     data = train_mask, val_mask, in_feats, n_classes, g
