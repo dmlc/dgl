@@ -16,7 +16,7 @@ namespace cpu {
 /*!
  * \brief CPU kernel of g-SDDMM on Csr format.
  * \param bcast Broadcast information.
- * \param coo The Csr matrix.
+ * \param csr The Csr matrix.
  * \param ufeat The feature on source nodes.
  * \param vfeat The feature on destination nodes.
  * \param out The result feature on edges.
