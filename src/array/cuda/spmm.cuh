@@ -196,7 +196,7 @@ void SpMMCoo(
           lhs_len = bcast.lhs_len,
           rhs_len = bcast.rhs_len;
 
-  int64_t out_size = len * out->shape[0];
+  int64_t out_size = out.NumElements();
   const int nt = FindNumThreads(out_size);
   const int nb = (out_size + nt - 1) / nt;
   _FillKernel<<<nt, nb, 0, thr_entry->stream>>>(out_data, out_size, ReduceOp::zero);

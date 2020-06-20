@@ -60,3 +60,4 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs);
 }   // namespace dgl
 
 #endif  // DGL_BCAST_H_
+

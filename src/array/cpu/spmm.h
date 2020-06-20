@@ -9,6 +9,7 @@
 #include <dgl/array.h>
 #include <dgl/bcast.h>
 #include <limits>
+#include <algorithm>
 
 namespace dgl {
 namespace aten {
@@ -206,10 +207,7 @@ void SpMMCmpCoo(
   IdType* argW = Op::use_rhs? static_cast<IdType*>(arge->data) : nullptr;
   const int64_t nnz = coo.row->shape[0];
   // fill zero elements
-#pragma omp parallel for
-  for (IdType i = 0; i < out.NumElements(); ++i) {
-    O[i] = Cmp::zero;
-  }
+  std::fill(O, O + out.NumElements(), Cmp::zero);
   // spmm
 #pragma omp parallel for
   for (IdType i = 0; i < nnz; ++i) {
