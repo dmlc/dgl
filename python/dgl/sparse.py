@@ -7,8 +7,7 @@ from .utils import to_dgl_context
 from . import backend as F
 
 def infer_broadcast_shape(op, shp1, shp2):
-    """
-    Check the shape validity, and infer the output shape given input shape and operator.
+    r"""Check the shape validity, and infer the output shape given input shape and operator.
     Note the both :attr:`shp1`, :attr:`shp2` and the returned shape are feature
     shapes (i.e. we remove the first dimension, which correspond to graph statistics
     such as number of nodes, number of edges, etc.).
@@ -68,7 +67,19 @@ op_mapping = {
 }
 
 def gspmm(g, op, reduce_op, u, e):
-    """ Generalized Sparse Matrix Multiplication interface.
+    r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
+    :attr:`op` on source node feature and edge feature, leads to a message on edge.
+    Then aggregates the message by :attr:`reduce_op` on destination nodes.
+
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+
+    Note that this function does not consider gradients.
 
     Parameters
     ----------
@@ -80,8 +91,7 @@ def gspmm(g, op, reduce_op, u, e):
     reduce_op : str
         Reduce operator, could be ``sum``, ``max``, ``min``.
     u : tensor or None
-        The feature on source nodes, could be None if op is ``copy_e``.
-    e : tensor or None
+        The feature on source nodes, could be None if op is ``copy_e``.  e : tensor or None
         The feature on edges, could be None if op is ``copy_u``.
 
     Returns
@@ -116,7 +126,19 @@ def gspmm(g, op, reduce_op, u, e):
     return v, (arg_u, arg_e)
 
 def gsddmm(g, op, u, v):
-    """ Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
+    takes the result of :attr:`op` on source node feature and destination node
+    feature, leads to a feature on edge.
+
+    .. math:: 
+        x_{e} = \phi(x_u, x_v), \forall (u,e,v)\in \mathcal{G}
+    
+    where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
+    :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
+    is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
+    we apply gsddmm on: :attr:`g`.
+
+    Note that this function does not consider gradients.
 
     Parameters
     ----------

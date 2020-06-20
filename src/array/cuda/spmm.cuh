@@ -54,10 +54,8 @@ __global__ void SpMMCooKernel(
       const int64_t lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int64_t rhs_add = UseBcast ? ebcast_off[tx] : tx;
       DType val = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
-      Idx* arguoff = (ReduceOp::require_arg && BinaryOp::use_lhs) ?
-        (arg_u + dst * out_len + tx): nullptr;
-      Idx* argeoff = (ReduceOp::require_arg && BinaryOp::use_rhs) ?
-        (arg_e + dst * out_len + tx): nullptr;
+      Idx* arguoff = nullptr;  // arguoff is not used in SpMMCoo.
+      Idx* argeoff = nullptr;  // argeoff is not used in SpMMCoo.
       ReduceOp::Call(outoff + tx, arguoff, argeoff, val, src, eid);
       tx += stride_x;
     }
