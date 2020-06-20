@@ -401,7 +401,6 @@ def serialize_to_payload(serializable):
 
 class PlaceHolder:
     """PlaceHolder object for deserialization"""
-    pass
 
 PLACEHOLDER = PlaceHolder()
 
