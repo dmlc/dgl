@@ -128,7 +128,9 @@ def run(args, device, data):
         #    eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
         #    print('Eval Acc {:.4f}'.format(eval_acc))
 
-    g.shut_down()
+    # clean up
+    dgl.distributed.shutdown_servers()
+    dgl.distributed.finalize_client()
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args):
