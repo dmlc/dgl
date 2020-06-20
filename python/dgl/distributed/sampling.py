@@ -1,11 +1,11 @@
 """Sampling module"""
+import numpy as np
 from .rpc import Request, Response, remote_call_to_machine
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
 from ..convert import graph
 from ..base import NID, EID
 from .. import backend as F
-import numpy as np
 
 __all__ = ['sample_neighbors']
 
@@ -90,7 +90,8 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
         node_id = np_nodes[partition_id == pid]
         if len(node_id) != 0:
             req = SamplingRequest(
-                F.zerocopy_from_numpy(node_id), fanout, edge_dir=edge_dir, prob=prob, replace=replace)
+                F.zerocopy_from_numpy(node_id), fanout, edge_dir=edge_dir,
+                prob=prob, replace=replace)
             req_list.append((pid, req))
     res_list = remote_call_to_machine(req_list)
     sampled_graph = merge_graphs(res_list, dist_graph.number_of_nodes())
