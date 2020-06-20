@@ -9,7 +9,6 @@ import tqdm
 import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.contrib import DistGraphServer, DistGraph
 from dgl.data.utils import load_graphs
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
@@ -24,9 +23,8 @@ from torch.utils.data import DataLoader
 from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate, load_subtensor
 
 def start_server(args):
-    server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
-    serv = DistGraphServer(args.id, server_namebook, args.num_client, args.graph_name,
-                           args.conf_path)
+    serv = dgl.distributed.DistGraphServer(args.id, args.ip_config, args.num_client,
+                                           args.graph_name, args.conf_path)
     serv.start()
 
 def run(args, device, data):
@@ -74,9 +72,14 @@ def run(args, device, data):
             tic_step = time.time()
             sample_time += tic_step - start
 
+            # The nodes for input lies at the LHS side of the first block.
+            # The nodes for output lies at the RHS side of the last block.
+            input_nodes = blocks[0].srcdata[dgl.NID]
+            seeds = blocks[-1].dstdata[dgl.NID]
+
             # Load the input features as well as output labels
             start = time.time()
-            batch_inputs, batch_labels = load_subtensor(g, blocks, device)
+            batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
             copy_time += time.time() - start
 
             num_seeds += len(blocks[-1].dstdata[dgl.NID])
@@ -130,29 +133,19 @@ def run(args, device, data):
 
 def main(args):
     th.distributed.init_process_group(backend='gloo')
-    server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
+    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name)
 
-    g = DistGraph(server_namebook, args.graph_name)
-    g.g = dgl.as_heterograph(g.g)
-
-    # We need to set random seed here. Otherwise, all processes have the same mini-batches.
-    th.manual_seed(g.rank())
-    train_mask = g.ndata['train_mask'][g.local_gnids].numpy()
-    val_mask = g.ndata['val_mask'][g.local_gnids].numpy()
-    test_mask = g.ndata['test_mask'][g.local_gnids].numpy()
-    print('part {}, train: {}, val: {}, test: {}'.format(g.rank,
-        np.sum(train_mask), np.sum(val_mask), np.sum(test_mask)), flush=True)
-
-    # TODO We don't have distributed sampler. These have to be local node Ids. 
-    train_nid = g.local_nids[train_mask == 1].long()
-    val_nid = g.local_nids[val_mask == 1].long()
-    test_nid = g.local_nids[test_mask == 1].long()
-    
+    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), g.rank())
+    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), g.rank())
+    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), g.rank())
+    print('part {}, train: {}, val: {}, test: {}'.format(g.rank(), len(train_nid),
+                                                         len(val_nid), len(test_nid)))
     device = th.device('cpu')
+    n_classes = len(th.unique(g.ndata['labels'][np.arange(g.number_of_nodes())]))
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
-    data = train_nid, val_nid, in_feats, args.n_classes, g
+    data = train_nid, val_nid, in_feats, n_classes, g
     run(args, device, data)
     print("parent ends")
 
