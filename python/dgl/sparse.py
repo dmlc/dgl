@@ -12,10 +12,14 @@ def infer_broadcast_shape(op, shp1, shp2):
     shapes (i.e. we remove the first dimension, which correspond to graph statistics
     such as number of nodes, number of edges, etc.).
 
+    We allow applying op on operands with different shapes, according to the
+    broadcasting semantics of Numpy/Scipy:
+    https://numpy.org/doc/stable/user/basics.broadcasting.html
+
     Parameters
     ----------
     op : str
-        The operator, could be `add`, `sub`, `mul`, `div`, `dot`, `copy_u`, `copy_e`.
+        The binary op's name, could be `add`, `sub`, `mul`, `div`, `dot`, `copy_u`, `copy_e`.
     shp1 : tuple[int]
         The shape of lhs operand.
     shp2 : tuple[int]
@@ -36,6 +40,7 @@ def infer_broadcast_shape(op, shp1, shp2):
         return shp1
     if op == "copy_e":
         return shp2
+    # operands are padded to have the same dimensionality with leading 1's.
     if len(shp1) > len(shp2):
         pad_shp2 = (1,) * (len(shp1) - len(shp2)) + shp2
     elif len(shp1) < len(shp2):
@@ -51,6 +56,7 @@ def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
+# map alias of operator name to its actually name that backend could recognize.
 op_mapping = {
     '+': 'add',
     '-': 'sub',
@@ -86,7 +92,7 @@ def gspmm(g, op, reduce_op, u, e):
     g : DGLHeteroGraph
         The input graph.
     op : str
-        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``, ``copy_u``,
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``, ``copy_u``,
         ``copy_e``, or their alias ``+``, ``-``, ``*``, ``/``, ``.``.
     reduce_op : str
         Reduce operator, could be ``sum``, ``max``, ``min``.
