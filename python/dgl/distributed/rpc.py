@@ -431,7 +431,7 @@ def deserialize_from_payload(cls, data, tensors):
         j = 0
         state_len = len(state)
         for i in range(state_len):
-            if state[i] is _placeholder:
+            if state[i] is PLACEHOLDER:
                 state[i] = tensors[j]
                 j += 1
     if len(state) == 1:
