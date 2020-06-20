@@ -35,7 +35,7 @@ class GraphConv(nn.Module):
     can be achieved by:
 
     >>> g = ... # some DGLGraph
-    >>> g.add_edges(g.nodes(), g.nodes())
+    >>> dgl.add_self_loop(g)
 
 
     Parameters

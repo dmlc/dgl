@@ -30,10 +30,18 @@ class RelGraphConv(nn.Module):
 
        W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
 
-    where :math:`B` is the number of bases.
+    where :math:`B` is the number of bases, :math:`V_b^{(l)}` are linearly combined with coefficients :math:`a_{rb}^{(l)}`.
 
     The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
     number of block diagonal matrices. We refer :math:`B` as the number of bases.
+    
+    The block regularization decomposes :math:`W_r` by:
+
+    .. math::
+
+       W_r^{(l)} = \oplus_{b=1}^B Q_{rb}^{(l)}
+
+    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block bases with shape :math:`\R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
 
     Parameters
     ----------
@@ -44,18 +52,20 @@ class RelGraphConv(nn.Module):
     num_rels : int
         Number of relations.
     regularizer : str
-        Which weight regularizer to use "basis" or "bdd"
+        Which weight regularizer to use "basis" or "bdd".
+        "basis" is short for basis-diagonal-decomposition.
+        "bdd" is short for block-diagonal-decomposition.
     num_bases : int, optional
         Number of bases. If is none, use number of relations. Default: None.
     bias : bool, optional
-        True if bias is added. Default: True
+        True if bias is added. Default: True.
     activation : callable, optional
-        Activation function. Default: None
+        Activation function. Default: None.
     self_loop : bool, optional
-        True to include self loop message. Default: False
+        True to include self loop message. Default: False.
     low_mem : bool, optional
-        True to use low memory implementation of relation message passing function. Default: False
-        This option trade speed with memory consumption, and will slowdown the forward/backward.
+        True to use low memory implementation of relation message passing function. Default: False.
+        This option trades speed with memory consumption, and will slowdown the forward/backward.
         Turn it on when you encounter OOM problem during training or evaluation.
     dropout : float, optional
         Dropout rate. Default: 0.0
@@ -208,7 +218,7 @@ class RelGraphConv(nn.Module):
         etypes : torch.Tensor
             Edge type tensor. Shape: :math:`(|E|,)`
         norm : torch.Tensor
-            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
+            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`.
 
         Returns
         -------
