@@ -22,11 +22,41 @@ inline void CheckCtx(
     const std::vector<NDArray>& arrays,
     const std::vector<std::string>& names) {
   for (size_t i = 0; i < arrays.size(); ++i) {
-    if (aten::IsNullArray(arrays[i]))
+    if (IsNullArray(arrays[i]))
       continue;
     CHECK_EQ(ctx, arrays[i]->ctx)
       << "Expected device context " << ctx << ". But got "
       << arrays[i]->ctx << " for " << names[i] << ".";
+  }
+}
+
+// Check whether input tensors are contiguous.
+inline void CheckContiguous(
+    const std::vector<NDArray>& arrays,
+    const std::vector<std::string>& names) {
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    if (IsNullArray(arrays[i]))
+      continue;
+    CHECK(arrays[i].IsContiguous())
+      << "Expect " << names[i] << " to be a contiguous tensor";
+  }
+}
+
+// Check whether input tensors have valid shape.
+inline void CheckShape(
+    const std::vector<uint64_t>& gdim,
+    const std::vector<int>& uev_idx,
+    const std::vector<NDArray>& arrays,
+    const std::vector<std::string>& names) {
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    if (IsNullArray(arrays[i]))
+      continue;
+    CHECK_GE(arrays[i]->ndim, 2)
+      << "Expect " << names[i] << " to have ndim >= 2";
+    CHECK_EQ(gdim[uev_idx[i]], arrays[i]->shape[0])
+      << "Expect " << names[i] << " to have size "
+      << gdim[uev_idx[i]] << " on the first dimension, "
+      << "but got " << arrays[i]->shape[0];
   }
 }
 
@@ -103,7 +133,17 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
     NDArray ArgE = args[7];
     CheckCtx(graph->Context(), {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
+    CheckContiguous({U, E, V, ArgU, ArgE},
+        {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     CHECK_EQ(graph->NumEdgeTypes(), 1);
+    auto pair = graph->meta_graph()->FindEdge(0);  // only one etype in the graph.
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    CheckShape(
+        {graph->NumVertices(src_vtype), graph->NumEdges(0), graph->NumVertices(dst_vtype)},
+        {0, 1, 2, 2, 2},
+        {U, E, V, ArgU, ArgE},
+        {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
 
@@ -114,8 +154,17 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
     NDArray U = args[2];
     NDArray V = args[3];
     NDArray E = args[4];
-    CheckCtx(graph->Context(), {U, V, E}, {"U_data", "V_data", "out"});
+    CheckCtx(graph->Context(), {U, V, E}, {"U_data", "V_data", "E_data"});
+    CheckContiguous({U, V, E}, {"U_data", "V_data", "E_data"});
     CHECK_EQ(graph->NumEdgeTypes(), 1);
+    auto pair = graph->meta_graph()->FindEdge(0);  // only one etype in the graph.
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    CheckShape(
+        {graph->NumVertices(src_vtype), graph->NumEdges(0), graph->NumVertices(dst_vtype)},
+        {0, 1, 2},
+        {U, E, V},
+        {"U_data", "E_data", "V_data"});
     SDDMM(op, graph.sptr(), U, V, E);
   });
 

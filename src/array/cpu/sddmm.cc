@@ -16,11 +16,6 @@ void SDDMMCsr(const std::string& op,
               NDArray ufeat,
               NDArray vfeat,
               NDArray out) {
-  if (!aten::IsNullArray(ufeat))
-    CHECK_EQ(ufeat->shape[0], csr.num_rows);
-  if (!aten::IsNullArray(vfeat))
-    CHECK_EQ(vfeat->shape[0], csr.num_cols);
-  CHECK_EQ(out->shape[0], csr.indices->shape[0]);
   SWITCH_OP(op, Op, {
     cpu::SDDMMCsr<IdType, DType, Op>(bcast, csr, ufeat, vfeat, out);
   });
@@ -46,11 +41,6 @@ void SDDMMCoo(const std::string& op,
               NDArray ufeat,
               NDArray vfeat,
               NDArray out) {
-  if (!aten::IsNullArray(ufeat))
-    CHECK_EQ(ufeat->shape[0], coo.num_rows);
-  if (!aten::IsNullArray(vfeat))
-    CHECK_EQ(vfeat->shape[0], coo.num_cols);
-  CHECK_EQ(out->shape[0], coo.row->shape[0]);
   SWITCH_OP(op, Op, {
     cpu::SDDMMCoo<IdType, DType, Op>(bcast, coo, ufeat, vfeat, out);
   });

@@ -8,16 +8,31 @@ from . import backend as F
 
 def infer_broadcast_shape(op, shp1, shp2):
     """
+    Check the shape validity, and infer the output shape given input shape and operator.
+    Note the both :attr:`shp1`, :attr:`shp2` and the returned shape are feature
+    shapes (i.e. we remove the first dimension, which correspond to graph statistics
+    such as number of nodes, number of edges, etc.).
+
     Parameters
     ----------
     op : str
+        The operator, could be `add`, `sub`, `mul`, `div`, `dot`, `copy_u`, `copy_e`.
     shp1 : tuple[int]
+        The shape of lhs operand.
     shp2 : tuple[int]
+        The shape of rhs operand.
+
     Returns
     -------
-    shape after broadcasting
+    tuple[int]
+        shape after broadcasting
     """
     pad_shp1, pad_shp2 = shp1, shp2
+    if op == "dot":
+        if shp1[-1] != shp2[-1]:
+            raise DGLError("Dot operator is only available for arrays with the "
+                           "same size on last dimension, but got {} and {}."
+                           .format(shp1, shp2))
     if op == "copy_u":
         return shp1
     if op == "copy_e":
@@ -74,6 +89,13 @@ def gspmm(g, op, reduce_op, u, e):
     tensor
         The result tensor.
     """
+    if u is not None:
+        if F.ndim(u) == 1:
+            u = F.unsqueeze(u, -1)
+    if e is not None:
+        if F.ndim(e) == 1:
+            e = F.unsqueeze(e, -1)
+
     op = op_mapping[op]
     ctx = F.context(u) if u is not None else F.context(e)
     gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
@@ -113,6 +135,13 @@ def gsddmm(g, op, u, v):
     tensor
         The result tensor.
     """
+    if u is not None:
+        if F.ndim(u) == 1:
+            u = F.unsqueeze(u, -1)
+    if v is not None:
+        if F.ndim(v) == 1:
+            v = F.unsqueeze(v, -1)
+
     op = op_mapping[op]
     gidx = g._graph
     ctx = F.context(u)
