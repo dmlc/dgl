@@ -3,8 +3,8 @@
  * \file dgl/aten/kernel.h
  * \brief Sparse matrix operators.
  */
-#ifndef DGL_ATEN_KERNEL_H_
-#define DGL_ATEN_KERNEL_H_
+#ifndef DGL_KERNEL_H_
+#define DGL_KERNEL_H_
 
 #include <string>
 #include <vector>
@@ -68,4 +68,4 @@ void SDDMMCoo(const std::string& op,
 }  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_ATEN_KERNEL_H_
+#endif  // DGL_KERNEL_H_

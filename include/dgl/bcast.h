@@ -3,8 +3,8 @@
  * \file dgl/aten/bcast.h
  * \brief Broadcast related function C++ header.
  */
-#ifndef DGL_ATEN_BCAST_H_
-#define DGL_ATEN_BCAST_H_
+#ifndef DGL_BCAST_H_
+#define DGL_BCAST_H_
 
 #include <string>
 #include <vector>
@@ -30,4 +30,4 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs);
 
 }   // namespace dgl
 
-#endif  // DGL_ATEN_BCAST_H_
+#endif  // DGL_BCAST_H_

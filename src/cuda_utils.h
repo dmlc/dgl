@@ -48,7 +48,7 @@ inline int FindNumBlocks(int nblks, int max_nblks = -1) {
       default_max_nblks = CUDA_MAX_NUM_BLOCKS_Z;
       break;
     default:
-      LOG(FATAL) << "Axis " << axis << " not recognized";     
+      LOG(FATAL) << "Axis " << axis << " not recognized";
       break;
   }
   if (max_nblks == -1)
