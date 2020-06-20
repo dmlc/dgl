@@ -5,6 +5,7 @@ from . import register_service
 from ..convert import graph
 from ..base import NID, EID
 from .. import backend as F
+import numpy as np
 
 __all__ = ['sample_neighbors']
 
@@ -46,7 +47,7 @@ class SamplingRequest(Request):
         local_g = server_state.graph
         partition_book = server_state.partition_book
         local_ids = F.astype(partition_book.nid2localnid(
-            F.tensor(self.seed_nodes), partition_book.partid), local_g.idtype)
+            self.seed_nodes, partition_book.partid), local_g.idtype)
         # local_ids = self.seed_nodes
         sampled_graph = local_sample_neighbors(
             local_g, local_ids, self.fan_out, self.edge_dir, self.prob, self.replace)
@@ -85,15 +86,12 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     partition_book = dist_graph.get_partition_book()
 
     partition_id = F.asnumpy(
-        partition_book.nid2partid(F.tensor(nodes))).tolist()
-    node_id_per_partition = [[]
-                             for _ in range(partition_book.num_partitions())]
-    for pid, node in zip(partition_id, nodes):
-        node_id_per_partition[pid].append(node)
-    for pid, node_id in enumerate(node_id_per_partition):
+        partition_book.nid2partid(F.tensor(nodes)))
+    for pid in range(partition_book.num_partitions()):
+        node_id = partition_id[partition_id == pid]
         if len(node_id) != 0:
             req = SamplingRequest(
-                node_id, fanout, edge_dir=edge_dir, prob=prob, replace=replace)
+                F.zerocopy_from_numpy(node_id), fanout, edge_dir=edge_dir, prob=prob, replace=replace)
             req_list.append((pid, req))
     res_list = remote_call_to_machine(req_list)
     sampled_graph = merge_graphs(res_list, dist_graph.number_of_nodes())
