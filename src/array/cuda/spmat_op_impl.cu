@@ -198,31 +198,29 @@ template NDArray CSRGetRowData<kDLGPU, int64_t>(CSRMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
-  const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const int64_t num_rows = end - start;
-  const int64_t nnz = indptr[end] - indptr[start];
-  IdArray ret_indptr = IdArray::Empty({num_rows + 1}, csr.indptr->dtype, csr.indices->ctx);
-  IdType* r_indptr = static_cast<IdType*>(ret_indptr->data);
-  for (int64_t i = start; i < end + 1; ++i) {
-    r_indptr[i - start] = indptr[i] - indptr[start];
-  }
+  const IdType st_pos = aten::IndexSelect<IdType>(csr.indptr, start);
+  const IdType ed_pos = aten::IndexSelect<IdType>(csr.indptr, end);
+  const IdType nnz = ed_pos - st_pos;
+  IdArray ret_indptr = aten::IndexSelect(csr.indptr, start, end + 1) - st_pos;
   // indices and data can be view arrays
   IdArray ret_indices = csr.indices.CreateView(
-      {nnz}, csr.indices->dtype, indptr[start] * sizeof(IdType));
+      {nnz}, csr.indices->dtype, st_pos * sizeof(IdType));
   IdArray ret_data;
   if (CSRHasData(csr))
-    ret_data = csr.data.CreateView({nnz}, csr.data->dtype, indptr[start] * sizeof(IdType));
+    ret_data = csr.data.CreateView({nnz}, csr.data->dtype, st_pos * sizeof(IdType));
   else
-    ret_data = aten::Range(indptr[start], indptr[end],
+    ret_data = aten::Range(st_pos, ed_pos,
                            csr.indptr->dtype.bits, csr.indptr->ctx);
   return CSRMatrix(num_rows, csr.num_cols,
                    ret_indptr, ret_indices, ret_data,
                    csr.sorted);
 }
 
-template CSRMatrix CSRSliceRows<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
-template CSRMatrix CSRSliceRows<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
 
+/*
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
@@ -267,7 +265,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
 template CSRMatrix CSRSliceRows<kDLCPU, int32_t>(CSRMatrix , NDArray);
 template CSRMatrix CSRSliceRows<kDLCPU, int64_t>(CSRMatrix , NDArray);
-
+*/
 
 }  // namespace impl
 }  // namespace aten

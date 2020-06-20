@@ -208,6 +208,8 @@ template <typename IDX>
 void _TestIndexSelect(DLContext ctx) {
   IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
   ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
+  ASSERT_TRUE(ArrayEQ<IDX>(aten::IndexSelect(a, 10, 20),
+        aten::Range(10, 20, sizeof(IDX)*8, ctx)));
   IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
   IdArray c = aten::IndexSelect(a, b);
   ASSERT_TRUE(ArrayEQ<IDX>(b, c));

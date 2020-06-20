@@ -303,8 +303,8 @@ TEST(SpmatTest, TestCSRToCOO) {
 }
 
 template <typename IDX>
-void _TestCSRSliceRows() {
-  auto csr = CSR2<IDX>();
+void _TestCSRSliceRows(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
   auto x = aten::CSRSliceRows(csr, 1, 4);
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -312,30 +312,35 @@ void _TestCSRSliceRows() {
   // data: [3, 1, 4]
   ASSERT_EQ(x.num_rows, 3);
   ASSERT_EQ(x.num_cols, 5);
-  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 3, 3}), sizeof(IDX)*8, CTX);
-  auto ti = aten::VecToIdArray(std::vector<IDX>({0, 2, 3}), sizeof(IDX)*8, CTX);
-  auto td = aten::VecToIdArray(std::vector<IDX>({3, 1, 4}), sizeof(IDX)*8, CTX);
+  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 3, 3}), sizeof(IDX)*8, ctx);
+  auto ti = aten::VecToIdArray(std::vector<IDX>({0, 2, 3}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({3, 1, 4}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
   ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
   ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
 
-  auto r = aten::VecToIdArray(std::vector<IDX>({0, 1, 3}), sizeof(IDX)*8, CTX);
+  auto r = aten::VecToIdArray(std::vector<IDX>({0, 1, 3}), sizeof(IDX)*8, ctx);
   x = aten::CSRSliceRows(csr, r);
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 0, 0, 0]]
   // data: [0, 2, 5, 3]
-  tp = aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 4}), sizeof(IDX)*8, CTX);
-  ti = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0}), sizeof(IDX)*8, CTX);
-  td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3}), sizeof(IDX)*8, CTX);
+  tp = aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 4}), sizeof(IDX)*8, ctx);
+  ti = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0}), sizeof(IDX)*8, ctx);
+  td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
   ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
   ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
 }
 
 TEST(SpmatTest, TestCSRSliceRows) {
-  _TestCSRSliceRows<int32_t>();
-  _TestCSRSliceRows<int64_t>();
+  _TestCSRSliceRows<int32_t>(CPU);
+  _TestCSRSliceRows<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  LOG(INFO) << "@@@";
+  _TestCSRSliceRows<int32_t>(GPU);
+  _TestCSRSliceRows<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>

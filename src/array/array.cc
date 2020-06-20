@@ -8,6 +8,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/shared_mem.h>
+#include <dgl/runtime/device_api.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
@@ -85,8 +86,8 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
   CHECK_SAME_CONTEXT(array, index);
+  CHECK_IS_ID_ARRAY(index);
   CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
-  CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
@@ -98,8 +99,10 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 }
 
 template<typename ValueType>
-ValueType IndexSelect(NDArray array, uint64_t index) {
+ValueType IndexSelect(NDArray array, int64_t index) {
   CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
+  CHECK(index >= 0 && index < array.NumElements())
+    << "Index " << index << " is out of bound.";
   ValueType ret = 0;
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
@@ -108,12 +111,30 @@ ValueType IndexSelect(NDArray array, uint64_t index) {
   });
   return ret;
 }
-template int32_t IndexSelect<int32_t>(NDArray array, uint64_t index);
-template int64_t IndexSelect<int64_t>(NDArray array, uint64_t index);
-template uint32_t IndexSelect<uint32_t>(NDArray array, uint64_t index);
-template uint64_t IndexSelect<uint64_t>(NDArray array, uint64_t index);
-template float IndexSelect<float>(NDArray array, uint64_t index);
-template double IndexSelect<double>(NDArray array, uint64_t index);
+template int32_t IndexSelect<int32_t>(NDArray array, int64_t index);
+template int64_t IndexSelect<int64_t>(NDArray array, int64_t index);
+template uint32_t IndexSelect<uint32_t>(NDArray array, int64_t index);
+template uint64_t IndexSelect<uint64_t>(NDArray array, int64_t index);
+template float IndexSelect<float>(NDArray array, int64_t index);
+template double IndexSelect<double>(NDArray array, int64_t index);
+
+NDArray IndexSelect(NDArray array, int64_t start, int64_t end) {
+  CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
+  CHECK(start >= 0 && start < array.NumElements())
+    << "Index " << start << " is out of bound.";
+  CHECK(end >= 0 && end <= array.NumElements())
+    << "Index " << end << " is out of bound.";
+  CHECK_LE(start, end);
+  auto device = runtime::DeviceAPI::Get(array->ctx);
+  const int64_t len = end - start;
+  NDArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
+  ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+    device->CopyDataFromTo(array->data, start * sizeof(DType),
+                           ret->data, 0, len * sizeof(DType),
+                           array->ctx, ret->ctx, array->dtype, nullptr);
+  });
+  return ret;
+}
 
 NDArray Scatter(NDArray array, IdArray indices) {
   NDArray ret;
@@ -326,7 +347,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   CHECK(end >= 0 && end <= csr.num_rows) << "Invalid end index: " << end;
   CHECK_GE(end, start);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, start, end);
   });
   return ret;

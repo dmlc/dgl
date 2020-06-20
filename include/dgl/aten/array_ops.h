@@ -131,8 +131,17 @@ IdArray HStack(IdArray arr1, IdArray arr2);
  * \tparam ValueType The type of return value.
  */
 template<typename ValueType>
-ValueType IndexSelect(NDArray array, uint64_t index);
+ValueType IndexSelect(NDArray array, int64_t index);
+
+/*!
+ * \brief Return the data under the index. In numpy notation, A[I]
+ */
 NDArray IndexSelect(NDArray array, IdArray index);
+
+/*!
+ * \brief Return the data from `start` (inclusive) to `end` (exclusive).
+ */
+NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
 
 /*!
  * \brief Permute the elements of an array according to given indices.

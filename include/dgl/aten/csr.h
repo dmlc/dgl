@@ -106,6 +106,7 @@ struct CSRMatrix {
     }
     CHECK_NO_OVERFLOW(indptr->dtype, num_rows);
     CHECK_NO_OVERFLOW(indptr->dtype, num_cols);
+    CHECK_EQ(indptr->shape[0], num_rows + 1);
   }
 };
 
