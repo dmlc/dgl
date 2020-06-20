@@ -399,6 +399,11 @@ def serialize_to_payload(serializable):
     data = bytearray(pickle.dumps((nonarray_pos, nonarray_state)))
     return data, array_state
 
+class PlaceHolder:
+    pass
+
+_placeholder = PlaceHolder()
+
 def deserialize_from_payload(cls, data, tensors):
     """Deserialize and reconstruct the object from payload.
 
@@ -419,14 +424,14 @@ def deserialize_from_payload(cls, data, tensors):
         De-serialized object of class cls.
     """
     pos, nonarray_state = pickle.loads(data)
-    state = [None] * (len(nonarray_state) + len(tensors))
+    state = [_placeholder] * (len(nonarray_state) + len(tensors))
     for i, no_state in zip(pos, nonarray_state):
         state[i] = no_state
     if len(tensors) != 0:
         j = 0
         state_len = len(state)
         for i in range(state_len):
-            if state[i] is None:
+            if state[i] is _placeholder:
                 state[i] = tensors[j]
                 j += 1
     if len(state) == 1:
@@ -621,6 +626,7 @@ def recv_request(timeout=0):
     if req_cls is None:
         raise DGLError('Got request message from service ID {}, '
                        'but no request class is registered.'.format(msg.service_id))
+    print(req_cls)
     req = deserialize_from_payload(req_cls, msg.data, msg.tensors)
     if msg.server_id != get_rank():
         raise DGLError('Got request sent to server {}, '
