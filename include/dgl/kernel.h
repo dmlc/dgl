@@ -16,7 +16,7 @@
 namespace dgl {
 namespace aten {
 
-/*
+/*!
  * \brief Generalized Sparse Matrix-Matrix Multiplication.
  * \param op The binary operator, could be `add`, `sub', `mul`, 'div',
  *        `copy_u`, `copy_e'.
@@ -38,7 +38,7 @@ void SpMM(const std::string& op, const std::string& reduce,
           std::vector<NDArray> out_aux,
           SparseFormat format = SparseFormat::kAny);
 
-/*
+/*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format.
  */
 template <int XPU, typename IdType, typename DType>
@@ -50,7 +50,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray out,
              std::vector<NDArray> out_aux);
 
-/*
+/*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Coo format.
  */
 template <int XPU, typename IdType, typename DType>
@@ -62,7 +62,7 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
              NDArray out,
              std::vector<NDArray> out_aux);
 
-/*
+/*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication.
  * \param op The binary operator, could be `add`, `sub', `mul`, 'div',
  *        `dot`, `copy_u`, `copy_e'.
@@ -79,7 +79,7 @@ void SDDMM(const std::string& op,
            NDArray out,
            SparseFormat format = SparseFormat::kAny);
 
-/*
+/*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr format.
  */
 template <int XPU, typename IdType, typename DType>
@@ -90,7 +90,7 @@ void SDDMMCsr(const std::string& op,
               NDArray efeat,
               NDArray out);
 
-/*
+/*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format.
  */
 template <int XPU, typename IdType, typename DType>

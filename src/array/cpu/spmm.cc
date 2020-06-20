@@ -9,6 +9,7 @@
 namespace dgl {
 namespace aten {
 
+/*! \brief Generalized SpMM on Csr format. */
 template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
@@ -52,7 +53,7 @@ template void SpMMCsr<kDLCPU, int64_t, double>(
     const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
-
+/*! \brief Generalized SpMM on Coo format. */
 template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,

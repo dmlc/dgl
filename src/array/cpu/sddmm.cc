@@ -9,6 +9,7 @@
 namespace dgl {
 namespace aten {
 
+/*! \brief Generalized SDDMM on Csr format. */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
@@ -34,6 +35,7 @@ template void SDDMMCsr<kDLCPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
 
+/*! \brief Generalized SDDMM on Coo format. */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,

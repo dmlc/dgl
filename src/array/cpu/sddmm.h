@@ -13,6 +13,17 @@ namespace dgl {
 namespace aten {
 namespace cpu {
 
+/*!
+ * \brief CPU kernel of g-SDDMM on Csr format.
+ * \param bcast Broadcast information.
+ * \param coo The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param vfeat The feature on destination nodes.
+ * \param out The result feature on edges.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes. To avoid possible data hazard,
+ *       we use atomic operators in this case.
+ */
 template <typename IdType, typename DType, typename Op>
 void SDDMMCsr(const BcastOff& bcast,
               const aten::CSRMatrix& csr,
@@ -48,6 +59,16 @@ void SDDMMCsr(const BcastOff& bcast,
   }
 }
 
+/*!
+ * \brief CPU kernel of g-SDDMM on Coo format.
+ * \param bcast Broadcast information.
+ * \param coo The COO matrix.
+ * \param ufeat The feature on source nodes.
+ * \param vfeat The feature on destination nodes.
+ * \param out The result feature on edges.
+ * \note it uses edge parallel strategy, different threads are responsible
+ *       for the computation of different edges.
+ */
 template <typename IdType, typename DType, typename Op>
 void SDDMMCoo(const BcastOff& bcast,
               const aten::COOMatrix& coo,
@@ -83,6 +104,8 @@ void SDDMMCoo(const BcastOff& bcast,
 }
 
 namespace op {
+
+//////////////////////////////// binary operators on CPU ////////////////////////////////
 template <typename DType>
 struct Add {
   static constexpr bool use_lhs = true;

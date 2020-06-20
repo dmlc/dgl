@@ -62,6 +62,7 @@ inline void CheckShape(
 
 }  // namespace
 
+/*! \brief Generalized Sparse Matrix-Matrix Multiplication. */ 
 void SpMM(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
           NDArray ufeat,
@@ -92,6 +93,7 @@ void SpMM(const std::string& op, const std::string& reduce,
   });
 }
 
+/*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMM(const std::string& op,
            HeteroGraphPtr graph,
            NDArray ufeat,

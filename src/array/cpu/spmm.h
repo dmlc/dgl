@@ -14,6 +14,16 @@ namespace dgl {
 namespace aten {
 namespace cpu {
 
+/*!
+ * \brief CPU kernel of SpMM on Csr format.
+ * \param bcast Broadcast information.
+ * \param coo The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes.
+ */
 template <typename IdType, typename DType, typename Op>
 void SpMMSumCsr(
     const BcastOff& bcast,
@@ -50,6 +60,17 @@ void SpMMSumCsr(
   }
 }
 
+/*!
+ * \brief CPU kernel of SpMM on Coo format.
+ * \param bcast Broadcast information.
+ * \param coo The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes. To avoid possible data hazard,
+ *       we use atomic operators in this case.
+ */
 template <typename IdType, typename DType, typename Op>
 void SpMMSumCoo(
     const BcastOff& bcast,
@@ -88,6 +109,16 @@ void SpMMSumCoo(
   }
 }
 
+/*!
+ * \brief CPU kernel of SpMM-Min/Max on Csr format.
+ * \param bcast Broadcast information.
+ * \param coo The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes.
+ */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsr(
     const BcastOff& bcast,
@@ -140,6 +171,17 @@ void SpMMCmpCsr(
   }
 }
 
+/*!
+ * \brief CPU kernel of SpMM-Min/Max on Coo format.
+ * \param bcast Broadcast information.
+ * \param coo The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes. To avoid possible data hazard,
+ *       we use atomic operators in this case.
+ */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCoo(
     const BcastOff& bcast,
@@ -192,6 +234,8 @@ void SpMMCmpCoo(
 }
 
 namespace op {
+
+//////////////////////////////// binary operators on CPU ////////////////////////////////
 template <typename DType>
 struct Add {
   static constexpr bool use_lhs = true;
@@ -246,6 +290,7 @@ struct CopyRhs {
   }
 };
 
+//////////////////////////////// Reduce operators on CPU ////////////////////////////////
 template <typename DType>
 struct Max {
   static constexpr DType zero = std::numeric_limits<DType>::lowest();
