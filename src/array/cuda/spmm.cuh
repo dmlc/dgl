@@ -1,28 +1,32 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cuda/spmm.cuh
+ * \file array/cuda/spmm.cuh
  * \brief SPMM CUDA kernel function header.
  */
-#ifndef DGL_KERNEL_CUDA_SPMM_CUH_
-#define DGL_KERNEL_CUDA_SPMM_CUH_
+#ifndef DGL_ARRAY_CUDA_SPMM_CUH_
+#define DGL_ARRAY_CUDA_SPMM_CUH_
 
-#include "../utils.h"
-#include "../bcast.h"
+#include <dgl/bcast.h>
 #include "macro.cuh"
 #include "atomic.cuh"
+#include "../../cuda_utils.h"
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
-namespace kernel {
+
+using namespace cuda;
+
+namespace aten {
 namespace cuda {
 
-template <typename T>
-__device__ __forceinline__ T _ldg(T* addr) {
-#if __CUDA_ARCH__ >= 350
-  return __ldg(addr);
-#else
-  return *addr;
-#endif
+template <typename DType>
+__global__ void _FillKernel(DType* ptr, size_t length, DType val) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    ptr[tx] = val;
+    tx += stride_x;
+  }
 }
 
 template <typename Idx, typename DType,
@@ -156,12 +160,16 @@ void SpMMCoo(
   int64_t len = bcast.out_len,
           lhs_len = bcast.lhs_len,
           rhs_len = bcast.rhs_len;
-  utils::Fill<kDLGPU, DType>(out->ctx, out_data, len * out->shape[0], ReduceOp::zero);
 
-  const int ntx = utils::FindNumThreads(len, 1024);
-  const int nty = 1024 / ntx;
+  int64_t out_size = len * out->shape[0];
+  const int nt = FindNumThreads(out_size);
+  const int nb = (out_size + nt - 1) / nt;
+  _FillKernel<<<nt, nb, 0, thr_entry->stream>>>(out_data, out_size, ReduceOp::zero);
+
+  const int ntx = FindNumThreads(len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
-  const int nby = utils::FindNumBlocks((E + nty - 1) / nty, 65535);
+  const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
   //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
@@ -210,10 +218,10 @@ void SpMMCsr(
   int64_t len = bcast.out_len,
           lhs_len = bcast.lhs_len,
           rhs_len = bcast.rhs_len;
-  const int ntx = utils::FindNumThreads(len, 1024);
-  const int nty = 1024 / ntx;
+  const int ntx = FindNumThreads(len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
-  const int nby = utils::FindNumBlocks((csr.num_rows + nty - 1) / nty, 65535);
+  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
   //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
@@ -231,7 +239,7 @@ void SpMMCsr(
 }
 
 }  // namespace cuda
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl
 
 #endif

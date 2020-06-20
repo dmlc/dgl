@@ -1,37 +1,37 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cuda/sddmm.cu
+ * \file array/cuda/sddmm.cu
  * \brief SDDMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include "./sddmm.cuh"
-#include "./functor2.cuh"
+#include "./functor.cuh"
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
-      typedef dgl::kernel::cuda::binary::Add<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Add<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "sub") {                                     \
-      typedef dgl::kernel::cuda::binary::Sub<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Sub<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
-      typedef dgl::kernel::cuda::binary::Mul<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Mul<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "div") {                                     \
-      typedef dgl::kernel::cuda::binary::Div<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Div<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
-      typedef dgl::kernel::cuda::binary::CopyU<DType> Op;           \
+      typedef dgl::aten::cuda::binary::CopyU<DType> Op;           \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_e") {                                  \
-      typedef dgl::kernel::cuda::binary::CopyE<DType> Op;           \
+      typedef dgl::aten::cuda::binary::CopyE<DType> Op;           \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \
-      typedef dgl::kernel::cuda::binary::Dot<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Dot<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SpMM/SDDMM binary operator: " << op;     \
@@ -89,5 +89,5 @@ template void SDDMMCoo<kDLGPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray vfeat, NDArray out);
 
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl

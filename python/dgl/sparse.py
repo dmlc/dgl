@@ -126,4 +126,4 @@ def gsddmm(g, op, u, v):
     _CAPI_DGLKernelSDDMM(gidx, op, to_dgl_nd(u), to_dgl_nd(v), to_dgl_nd(e))
     return e
 
-_init_api("dgl.kernel2")
+_init_api("dgl.sparse")

@@ -1,17 +1,42 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cuda/spmm.cu
+ * \file array/cuda/spmm.cu
  * \brief SPMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include "./spmm.cuh"
-#include "./functor2.cuh"
+#include "./functor.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
-namespace kernel {
+
+using namespace cuda;
+
+namespace aten {
 
 namespace cusparse {
+
+namespace {
+
+template <typename DType>
+__global__ void _FillKernel(DType* ptr, size_t length, DType val) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    ptr[tx] = val;
+    tx += stride_x;
+  }
+}
+
+template <typename DType>
+void _Fill(DType* ptr, size_t length, DType val) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  int nt = FindNumThreads(length);
+  int nb = (length + nt - 1) / nt; // on x-axis, no need to worry about upperbound.
+  _FillKernel<<<nb, nt, 0, thr_entry->stream>>>(ptr, length, val);
+}
+
+}
 
 template <typename DType>
 cusparseStatus_t Xcsrmm2(cusparseHandle_t handle, cusparseOperation_t transA,
@@ -109,7 +134,7 @@ void CusparseCsrmm2(
   DType* valptr = nullptr;
   if (!A_data) {
     valptr = static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
-    utils::Fill<kDLGPU>(ctx, valptr, nnz, static_cast<DType>(1.));
+    _Fill(valptr, nnz, static_cast<DType>(1.));
   }
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
@@ -145,22 +170,22 @@ void CusparseCsrmm2(
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
-      typedef dgl::kernel::cuda::binary::Add<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Add<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "sub") {                                            \
-      typedef dgl::kernel::cuda::binary::Sub<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Sub<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
-      typedef dgl::kernel::cuda::binary::Mul<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Mul<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "div") {                                     \
-      typedef dgl::kernel::cuda::binary::Div<DType> Op;             \
+      typedef dgl::aten::cuda::binary::Div<DType> Op;             \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
-      typedef dgl::kernel::cuda::binary::CopyU<DType> Op;           \
+      typedef dgl::aten::cuda::binary::CopyU<DType> Op;           \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_e") {                                  \
-      typedef dgl::kernel::cuda::binary::CopyE<DType> Op;           \
+      typedef dgl::aten::cuda::binary::CopyE<DType> Op;           \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op;     \
@@ -281,5 +306,5 @@ template void SpMMCoo<kDLGPU, int64_t, double>(
     const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl

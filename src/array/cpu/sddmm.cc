@@ -1,13 +1,13 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cpu/sddmm.cc
+ * \file aten/cpu/sddmm.cc
  * \brief SDDMM C APIs and definitions.
  */
 #include "./sddmm.h"
 #include <dgl/array.h>
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
@@ -69,5 +69,5 @@ template void SDDMMCoo<kDLCPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out);
 
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl

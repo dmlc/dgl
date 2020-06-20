@@ -7,7 +7,7 @@
 #include <dgl/array.h>
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 
 template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
@@ -106,5 +106,5 @@ template void SpMMCoo<kDLCPU, int64_t, double>(
     const BcastOff& bcast, const aten::COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl

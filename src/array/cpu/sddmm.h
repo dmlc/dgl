@@ -1,17 +1,16 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cpu/sddmm.h
+ * \file array/cpu/sddmm.h
  * \brief SDDMM CPU kernel function header.
  */
-#ifndef DGL_KERNEL_CPU_SDDMM_H_
-#define DGL_KERNEL_CPU_SDDMM_H_
+#ifndef DGL_ARRAY_CPU_SDDMM_H_
+#define DGL_ARRAY_CPU_SDDMM_H_
 
 #include <dgl/array.h>
-#include "../utils.h"
-#include "../bcast.h"
+#include <dgl/bcast.h>
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 namespace cpu {
 
 template <typename IdType, typename DType, typename Op>
@@ -154,25 +153,25 @@ struct Dot {
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
-      typedef dgl::kernel::cpu::op::Add<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Add<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "sub") {                                     \
-      typedef dgl::kernel::cpu::op::Sub<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Sub<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
-      typedef dgl::kernel::cpu::op::Mul<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Mul<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "div") {                                     \
-      typedef dgl::kernel::cpu::op::Div<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Div<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
-      typedef dgl::kernel::cpu::op::CopyLhs<DType> Op;              \
+      typedef dgl::aten::cpu::op::CopyLhs<DType> Op;              \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_e") {                                  \
-      typedef dgl::kernel::cpu::op::CopyRhs<DType> Op;              \
+      typedef dgl::aten::cpu::op::CopyRhs<DType> Op;              \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \
-      typedef dgl::kernel::cpu::op::Dot<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Dot<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SDDMM binary operator: " << op;     \
@@ -182,7 +181,7 @@ struct Dot {
 }  // namespace op
 
 }  // namespace cpu
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_KERNEL_CPU_SDDMM_H_
+#endif  // DGL_ARRAY_CPU_SDDMM_H_

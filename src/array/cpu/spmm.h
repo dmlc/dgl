@@ -1,18 +1,17 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cpu/spmm.h
+ * \file array/cpu/spmm.h
  * \brief SPMM CPU kernel function header.
  */
-#ifndef DGL_KERNEL_CPU_SPMM_H_
-#define DGL_KERNEL_CPU_SPMM_H_
+#ifndef DGL_ARRAY_CPU_SPMM_H_
+#define DGL_ARRAY_CPU_SPMM_H_
 
 #include <dgl/array.h>
+#include <dgl/bcast.h>
 #include <limits>
-#include "../utils.h"
-#include "../bcast.h"
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 namespace cpu {
 
 template <typename IdType, typename DType, typename Op>
@@ -268,22 +267,22 @@ struct Min {
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
-      typedef dgl::kernel::cpu::op::Add<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Add<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "sub") {                                     \
-      typedef dgl::kernel::cpu::op::Sub<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Sub<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
-      typedef dgl::kernel::cpu::op::Mul<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Mul<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "div") {                                     \
-      typedef dgl::kernel::cpu::op::Div<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Div<DType> Op;                  \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
-      typedef dgl::kernel::cpu::op::CopyLhs<DType> Op;              \
+      typedef dgl::aten::cpu::op::CopyLhs<DType> Op;              \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_e") {                                  \
-      typedef dgl::kernel::cpu::op::CopyRhs<DType> Op;              \
+      typedef dgl::aten::cpu::op::CopyRhs<DType> Op;              \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op;     \
@@ -293,7 +292,7 @@ struct Min {
 }  // namespace op
 
 }  // namespace cpu
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_KERNEL_CPU_SPMM_H_
+#endif  // DGL_ARRAY_CPU_SPMM_H_

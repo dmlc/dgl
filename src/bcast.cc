@@ -3,11 +3,10 @@
  * \file kernel/bcast.h
  * \brief Broadcast related function implementations.
  */
-#include "bcast.h"
+#include <dgl/bcast.h>
 #include <algorithm>
 
 namespace dgl {
-namespace kernel {
 
 namespace {
 
@@ -73,5 +72,4 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
   return rst;
 }
 
-}  // namespace kernel
 }  // namespace dgl

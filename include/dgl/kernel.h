@@ -1,19 +1,20 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/kernel2.h
- * \brief New sparse kernel
+ * \file dgl/aten/kernel.h
+ * \brief Sparse matrix operators.
  */
-#ifndef DGL_KERNEL_KERNEL2_H_
-#define DGL_KERNEL_KERNEL2_H_
+#ifndef DGL_ATEN_KERNEL_H_
+#define DGL_ATEN_KERNEL_H_
 
-#include <dgl/array.h>
-#include <dgl/base_heterograph.h>
 #include <string>
 #include <vector>
+
+#include "array.h"
 #include "./bcast.h"
+#include "./base_heterograph.h"
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 
 void SpMM(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
@@ -64,7 +65,7 @@ void SDDMMCoo(const std::string& op,
               NDArray efeat,
               NDArray out);
 
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_KERNEL_KERNEL2_H_
+#endif  // DGL_ATEN_KERNEL_H_

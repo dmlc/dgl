@@ -30,6 +30,44 @@ inline int FindNumThreads(int dim, int max_nthrs = CUDA_MAX_NUM_THREADS) {
   return ret;
 }
 
+/*
+ * !\brief Find number of blocks is smaller than nblks and max_nblks
+ * on the given axis ('x', 'y' or 'z').
+ */
+template <char axis>
+inline int FindNumBlocks(int nblks, int max_nblks = -1) {
+  int default_max_nblks = -1;
+  switch (axis) {
+    case 'x':
+      default_max_nblks = CUDA_MAX_NUM_BLOCKS_X;
+      break;
+    case 'y':
+      default_max_nblks = CUDA_MAX_NUM_BLOCKS_Y;
+      break;
+    case 'z':
+      default_max_nblks = CUDA_MAX_NUM_BLOCKS_Z;
+      break;
+    default:
+      LOG(FATAL) << "Axis " << axis << " not recognized";     
+      break;
+  }
+  if (max_nblks == -1)
+    max_nblks = default_max_nblks;
+  CHECK_NE(nblks, 0);
+  if (nblks < max_nblks)
+    return nblks;
+  return max_nblks;
+}
+
+template <typename T>
+__device__ __forceinline__ T _ldg(T* addr) {
+#if __CUDA_ARCH__ >= 350
+  return __ldg(addr);
+#else
+  return *addr;
+#endif
+}
+
 }  // namespace cuda
 }  // namespace dgl
 

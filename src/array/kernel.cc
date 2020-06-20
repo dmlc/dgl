@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/kernel2.cc
+ * \file array/kernel.cc
  * \brief New kernels
  */
-#include "./kernel2.h"
-
+#include <dgl/array.h>
+#include <dgl/kernel.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
 
@@ -13,7 +13,7 @@
 using namespace dgl::runtime;
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 namespace {
 
 // Check whether the given arguments have the same context.
@@ -91,7 +91,7 @@ void SDDMM(const std::string& op,
   });
 }
 
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSpMM")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
     const std::string op = args[1];
@@ -107,7 +107,7 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSpMM")
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
 
-DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSDDMM")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
     const std::string op = args[1];
@@ -119,5 +119,5 @@ DGL_REGISTER_GLOBAL("kernel2._CAPI_DGLKernelSDDMM")
     SDDMM(op, graph.sptr(), U, V, E);
   });
 
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl

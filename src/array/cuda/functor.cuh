@@ -1,13 +1,13 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cuda/functor2.cuh
+ * \file array/cuda/functor.cuh
  * \brief Functors for template on CUDA
  */
-#ifndef DGL_KERNEL2_FUNCTOR_CUH_
-#define DGL_KERNEL2_FUNCTOR_CUH_
+#ifndef DGL_ARRAY_CUDA_FUNCTOR_CUH_
+#define DGL_ARRAY_CUDA_FUNCTOR_CUH_
 
 namespace dgl {
-namespace kernel {
+namespace aten {
 namespace cuda {
 
 namespace binary {
@@ -184,7 +184,7 @@ struct Min {
 }  // namespace reduce
 
 }  // namespace cuda
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_KERNEL2_FUNCTOR_CUH_
+#endif  // DGL_ARRAY_CUDA_FUNCTOR_CUH_

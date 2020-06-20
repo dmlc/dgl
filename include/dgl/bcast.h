@@ -1,19 +1,18 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/bcast.h
+ * \file dgl/aten/bcast.h
  * \brief Broadcast related function C++ header.
  */
-#ifndef DGL_KERNEL_BCAST_H_
-#define DGL_KERNEL_BCAST_H_
+#ifndef DGL_ATEN_BCAST_H_
+#define DGL_ATEN_BCAST_H_
 
-#include <dgl/runtime/ndarray.h>
 #include <string>
 #include <vector>
+#include "./runtime/ndarray.h"
 
 using namespace dgl::runtime;
 
 namespace dgl {
-namespace kernel {
 
 /*!
  * \brief: Broadcast information.
@@ -29,7 +28,6 @@ struct BcastOff {
  */
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs);
 
-}   // namespace kernel
 }   // namespace dgl
 
-#endif  // DGL_KERNEL_BCAST_H_
+#endif  // DGL_ATEN_BCAST_H_

@@ -1,30 +1,24 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cuda/sddmm.cuh
+ * \file array/cuda/sddmm.cuh
  * \brief SDDMM CUDA kernel function header.
  */
-#ifndef DGL_KERNEL_CUDA_SDDMM_CUH_
-#define DGL_KERNEL_CUDA_SDDMM_CUH_
+#ifndef DGL_ARRAY_CUDA_SDDMM_CUH_
+#define DGL_ARRAY_CUDA_SDDMM_CUH_
 
-#include "../utils.h"
-#include "../bcast.h"
+#include <dgl/bcast.h>
 #include "macro.cuh"
 #include "atomic.cuh"
-#include "functor2.cuh"
+#include "functor.cuh"
+#include "../../cuda_utils.h"
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
-namespace kernel {
-namespace cuda {
 
-template <typename T>
-__device__ __forceinline__ T _ldg(T* addr) {
-#if __CUDA_ARCH__ >= 350
-  return __ldg(addr);
-#else
-  return *addr;
-#endif
-}
+using namespace cuda;
+
+namespace aten {
+namespace cuda {
 
 template <typename Idx, typename DType, typename BinaryOp,
           bool UseBcast = false, bool UseIdx = false>
@@ -138,10 +132,10 @@ void SDDMMCoo(
   int64_t reduce_dim = bcast.reduce_size;
 
   const int64_t nnz = coo.row->shape[0];
-  const int ntx = utils::FindNumThreads(len, 1024);
-  const int nty = 1024 / ntx;
+  const int ntx = FindNumThreads(len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
-  const int nby = utils::FindNumBlocks((nnz + nty - 1) / nty, 65535);
+  const int nby = FindNumBlocks<'y'>((nnz + nty - 1) / nty);
   //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
@@ -180,10 +174,10 @@ void SDDMMCsr(
           rhs_len = bcast.rhs_len;
   int64_t reduce_dim = bcast.reduce_size;
 
-  const int ntx = utils::FindNumThreads(len, 1024);
-  const int nty = 1024 / ntx;
+  const int ntx = FindNumThreads(len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
-  const int nby = utils::FindNumBlocks((E + nty - 1) / nty, 65535);
+  const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
 
@@ -200,7 +194,7 @@ void SDDMMCsr(
 }
 
 }  // namespace cuda
-}  // namespace kernel
+}  // namespace aten
 }  // namespace dgl
 
 #endif
