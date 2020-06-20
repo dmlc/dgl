@@ -79,7 +79,7 @@ def gspmm(g, op, reduce_op, u, e):
     operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
     :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
 
-    Note that this function does not consider gradients.
+    Note that this function does not handle gradients.
 
     Parameters
     ----------
@@ -91,7 +91,8 @@ def gspmm(g, op, reduce_op, u, e):
     reduce_op : str
         Reduce operator, could be ``sum``, ``max``, ``min``.
     u : tensor or None
-        The feature on source nodes, could be None if op is ``copy_e``.  e : tensor or None
+        The feature on source nodes, could be None if op is ``copy_e``.
+    e : tensor or None
         The feature on edges, could be None if op is ``copy_u``.
 
     Returns
@@ -138,7 +139,7 @@ def gsddmm(g, op, u, v):
     is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
     we apply gsddmm on: :attr:`g`.
 
-    Note that this function does not consider gradients.
+    Note that this function does not handle gradients.
 
     Parameters
     ----------
