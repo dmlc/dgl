@@ -170,8 +170,12 @@ __global__ void SpMMCsrKernel(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes.
- * \param arge Arg-Min/Max on edges.
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ *        correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max reducer.
+ * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ *        correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp>
@@ -238,8 +242,12 @@ void SpMMCoo(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes.
- * \param arge Arg-Min/Max on edges.
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ *        correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max reducer.
+ * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ *        correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp>
