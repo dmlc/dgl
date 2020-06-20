@@ -48,31 +48,6 @@ __global__ void _LinearSearchKernel(
   }
 }
 
-/*!
- * \brief Copy data segment to output buffers
- * 
- * For the i^th row r = row[i], copy the data from indptr[r] ~ indptr[r+1]
- * to the out_data from out_indptr[i] ~ out_indptr[i+1]
- */
-template <typename IdType, typename DType>
-__global__ void _SegmentCopyKernel(
-    const IdType* indptr, const DType* data,
-    const IdType* row, int64_t row_stride, int64_t length,
-    const IdType* out_indptr, DType* out_data) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int stride_x = gridDim.x * blockDim.x;
-  int rpos = tx;
-  while (tx < length) {
-    const IdType r = row[rpos];
-    const IdType out_off = out_indptr[tx];
-    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
-      out_data[out_off + i] = data[i];
-    }
-    rpos += row_stride;
-    tx += stride_x;
-  }
-}
-
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -220,52 +195,62 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
 template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
 template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
 
-/*
-template <DLDeviceType XPU, typename IdType>
-CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
-  CHECK_SAME_DTYPE(csr.indices, rows);
-  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
-  const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
-  const IdType* data = CSRHasData(csr)? static_cast<IdType*>(csr.data->data) : nullptr;
-  const auto len = rows->shape[0];
-  const IdType* rows_data = static_cast<IdType*>(rows->data);
-  int64_t nnz = 0;
-  for (int64_t i = 0; i < len; ++i) {
-    IdType vid = rows_data[i];
-    nnz += impl::CSRGetRowNNZ<XPU, IdType>(csr, vid);
+/*!
+ * \brief Copy data segment to output buffers
+ * 
+ * For the i^th row r = row[i], copy the data from indptr[r] ~ indptr[r+1]
+ * to the out_data from out_indptr[i] ~ out_indptr[i+1]
+ *
+ * If the provided `data` array is nullptr, write the read index to the out_data.
+ *
+ */
+template <typename IdType, typename DType>
+__global__ void _SegmentCopyKernel(
+    const IdType* indptr, const DType* data,
+    const IdType* row, int64_t row_stride, int64_t length,
+    const IdType* out_indptr, DType* out_data) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  int rpos = tx;
+  while (tx < length) {
+    const IdType r = row[rpos];
+    DType* out_buf = out_data + out_indptr[tx];
+    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
+      *(out_buf++) = data? data[i] : i;
+    }
+    rpos += row_stride;
+    tx += stride_x;
   }
-
-  CSRMatrix ret;
-  ret.num_rows = len;
-  ret.num_cols = csr.num_cols;
-  ret.indptr = NDArray::Empty({len + 1}, csr.indptr->dtype, csr.indices->ctx);
-  ret.indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
-  ret.data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
-  ret.sorted = csr.sorted;
-
-  IdType* ret_indptr_data = static_cast<IdType*>(ret.indptr->data);
-  IdType* ret_indices_data = static_cast<IdType*>(ret.indices->data);
-  IdType* ret_data = static_cast<IdType*>(ret.data->data);
-  ret_indptr_data[0] = 0;
-  for (int64_t i = 0; i < len; ++i) {
-    const IdType rid = rows_data[i];
-    // note: zero is allowed
-    ret_indptr_data[i + 1] = ret_indptr_data[i] + indptr_data[rid + 1] - indptr_data[rid];
-    std::copy(indices_data + indptr_data[rid], indices_data + indptr_data[rid + 1],
-              ret_indices_data + ret_indptr_data[i]);
-    if (data)
-      std::copy(data + indptr_data[rid], data + indptr_data[rid + 1],
-                ret_data + ret_indptr_data[i]);
-    else
-      std::iota(ret_data + ret_indptr_data[i], ret_data + ret_indptr_data[i + 1],
-                indptr_data[rid]);
-  }
-  return ret;
 }
 
-template CSRMatrix CSRSliceRows<kDLCPU, int32_t>(CSRMatrix , NDArray);
-template CSRMatrix CSRSliceRows<kDLCPU, int64_t>(CSRMatrix , NDArray);
-*/
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  const int64_t len = rows->shape[0];
+  IdArray ret_indptr = aten::CumSum(aten::CSRGetRowNNZ(csr, rows), true);
+  const int64_t nnz = aten::IndexSelect<IdType>(ret_indptr, len);
+
+  const int nt = cuda::FindNumThreads(len);
+  const int nb = (len + nt - 1) / nt;
+  // Copy indices.
+  IdArray ret_indices = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
+  _SegmentCopyKernel<<<nb, nt, 0, thr_entry->stream>>>(
+      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
+      rows.Ptr<IdType>(), 1, len,
+      ret_indptr.Ptr<IdType>(), ret_indices.Ptr<IdType>());
+  // Copy data.
+  IdArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
+  _SegmentCopyKernel<<<nb, nt, 0, thr_entry->stream>>>(
+      csr.indptr.Ptr<IdType>(), CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
+      rows.Ptr<IdType>(), 1, len,
+      ret_indptr.Ptr<IdType>(), ret_data.Ptr<IdType>());
+  return CSRMatrix(len, csr.num_cols,
+                   ret_indptr, ret_indices, ret_data,
+                   csr.sorted);
+}
+
+template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix , NDArray);
+template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix , NDArray);
 
 }  // namespace impl
 }  // namespace aten

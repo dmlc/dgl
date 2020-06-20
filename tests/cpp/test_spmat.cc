@@ -337,7 +337,6 @@ TEST(SpmatTest, TestCSRSliceRows) {
   _TestCSRSliceRows<int32_t>(CPU);
   _TestCSRSliceRows<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
-  LOG(INFO) << "@@@";
   _TestCSRSliceRows<int32_t>(GPU);
   _TestCSRSliceRows<int64_t>(GPU);
 #endif

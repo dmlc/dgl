@@ -627,6 +627,8 @@ dgl::runtime::NDArray operator <= (int64_t lhs, const dgl::runtime::NDArray& a2)
 dgl::runtime::NDArray operator == (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator != (int64_t lhs, const dgl::runtime::NDArray& a2);
 
+std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array);
+
 ///////////////// Operator overloading for DLDataType /////////////////
 
 /*! \brief Check whether two data types are the same.*/

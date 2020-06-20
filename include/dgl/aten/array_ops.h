@@ -263,6 +263,11 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  */
 IdArray CumSum(IdArray array, bool prepend_zero = false);
 
+/*!
+ * \brief Return a string that prints out some debug information.
+ */
+std::string ToDebugString(NDArray array);
+
 // inline implementations
 template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,

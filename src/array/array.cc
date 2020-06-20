@@ -9,6 +9,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/runtime/device_api.h>
+#include <sstream>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
@@ -210,6 +211,21 @@ IdArray CumSum(IdArray array, bool prepend_zero) {
   return ret;
 }
 
+std::string ToDebugString(NDArray array) {
+  std::ostringstream oss;
+  NDArray a = array.CopyTo(DLContext{kDLCPU, 0});
+  oss << "array([";
+  ATEN_DTYPE_SWITCH(a->dtype, DType, "array", {
+    for (int64_t i = 0; i < std::min(a.NumElements(), 10L); ++i) {
+      oss << a.Ptr<DType>()[i] << ", ";
+    }
+  });
+  if (a.NumElements() > 10)
+    oss << "...";
+  oss << "], dtype=" << array->dtype << ", ctx=" << array->ctx << ")";
+  return oss.str();
+}
+
 ///////////////////////// CSR routines //////////////////////////
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
@@ -357,7 +373,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
   });
   return ret;
@@ -738,3 +754,7 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
 
 }  // namespace aten
 }  // namespace dgl
+
+std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array) {
+  return os << dgl::aten::ToDebugString(array);
+}
