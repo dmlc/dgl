@@ -56,7 +56,6 @@ class SamplingRequest(Request):
         global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
         global_eids = F.gather_row(
             local_g.edata[EID], sampled_graph.edata[EID])
-
         res = SamplingResponse(global_src, global_dst, global_eids)
         return res
 
@@ -84,11 +83,11 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     assert edge_dir == 'in'
     req_list = []
     partition_book = dist_graph.get_partition_book()
-
+    np_nodes = np.array(nodes)
     partition_id = F.asnumpy(
-        partition_book.nid2partid(F.tensor(nodes)))
+        partition_book.nid2partid(F.tensor(np_nodes)))
     for pid in range(partition_book.num_partitions()):
-        node_id = partition_id[partition_id == pid]
+        node_id = np_nodes[partition_id == pid]
         if len(node_id) != 0:
             req = SamplingRequest(
                 F.zerocopy_from_numpy(node_id), fanout, edge_dir=edge_dir, prob=prob, replace=replace)

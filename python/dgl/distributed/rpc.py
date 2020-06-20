@@ -626,7 +626,6 @@ def recv_request(timeout=0):
     if req_cls is None:
         raise DGLError('Got request message from service ID {}, '
                        'but no request class is registered.'.format(msg.service_id))
-    print(req_cls)
     req = deserialize_from_payload(req_cls, msg.data, msg.tensors)
     if msg.server_id != get_rank():
         raise DGLError('Got request sent to server {}, '
