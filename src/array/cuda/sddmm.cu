@@ -13,25 +13,25 @@ namespace aten {
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
-      typedef dgl::aten::cuda::binary::Add<DType> Op;             \
+      typedef cuda::binary::Add<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "sub") {                                     \
-      typedef dgl::aten::cuda::binary::Sub<DType> Op;             \
+      typedef cuda::binary::Sub<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
-      typedef dgl::aten::cuda::binary::Mul<DType> Op;             \
+      typedef cuda::binary::Mul<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "div") {                                     \
-      typedef dgl::aten::cuda::binary::Div<DType> Op;             \
+      typedef cuda::binary::Div<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
-      typedef dgl::aten::cuda::binary::CopyU<DType> Op;           \
+      typedef cuda::binary::CopyU<DType> Op;                        \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_e") {                                  \
-      typedef dgl::aten::cuda::binary::CopyE<DType> Op;           \
+      typedef cuda::binary::CopyE<DType> Op;                        \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \
-      typedef dgl::aten::cuda::binary::Dot<DType> Op;             \
+      typedef cuda::binary::Dot<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SpMM/SDDMM binary operator: " << op;     \
@@ -39,6 +39,9 @@ namespace aten {
   } while (0)
 
 
+/*!
+ * \brief CUDA implementation of g-SDDMM on Csr format.
+ */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
@@ -51,6 +54,9 @@ void SDDMMCsr(const std::string& op,
   });
 }
 
+/*!
+ * \brief CUDA implementation of g-SDDMM on Coo format.
+ */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,

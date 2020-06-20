@@ -19,6 +19,11 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
+/*! 
+ * \brief CUDA Kernel of filling the vector started from ptr of size length
+ *        with val.
+ * \note internal use only.
+ */
 template <typename DType>
 __global__ void _FillKernel(DType* ptr, size_t length, DType val) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -29,6 +34,14 @@ __global__ void _FillKernel(DType* ptr, size_t length, DType val) {
   }
 }
 
+/*!
+ * \brief CUDA kernel of g-SpMM on Coo format.
+ * \note it uses edge parallel strategy, different threadblocks (on y-axis)
+ *       is responsible for the computation on different edges. Threadblocks
+ *       on the x-axis are responsible for the computation on different positions
+ *       in feature dimension.
+ *       To avoid possible data hazards, it uses atomic operators for reduction.
+ */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp,
           bool UseBcast = false, bool UseIdx = false>
@@ -63,6 +76,13 @@ __global__ void SpMMCooKernel(
   }
 }
 
+/*!
+ * \brief CUDA kernel to compute argu and arge in g-SpMM on Coo format.
+ * \note it uses edge parallel strategy, different threadblocks (on y-axis)
+ *       is responsible for the computation on different edges. Threadblocks
+ *       on the x-axis are responsible for the computation on different positions
+ *       in feature dimension.
+ */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp,
           bool UseBcast = false, bool UseIdx = false>
@@ -97,6 +117,13 @@ __global__ void ArgSpMMCooKernel(
   }
 }
 
+/*!
+ * \brief CUDA kernel of g-SpMM on Coo format.
+ * \note it uses node parallel strategy, different threadblocks (on y-axis)
+ *       is responsible for the computation on different destination nodes. 
+ *       Threadblocks on the x-axis are responsible for the computation on
+ *       different positions in feature dimension.
+ */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp,
           bool UseBcast = false, bool UseIdx = false>
@@ -136,6 +163,16 @@ __global__ void SpMMCsrKernel(
   }
 }
 
+/*!
+ * \brief CUDA implementation of g-SpMM on Coo format.
+ * \param bcast Broadcast information.
+ * \param coo The Coo matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \param argu Arg-Min/Max on source nodes.
+ * \param arge Arg-Min/Max on edges.
+ */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp>
 void SpMMCoo(
@@ -194,6 +231,16 @@ void SpMMCoo(
   });
 }
 
+/*!
+ * \brief CUDA implementation of g-SpMM on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \param argu Arg-Min/Max on source nodes.
+ * \param arge Arg-Min/Max on edges.
+ */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp>
 void SpMMCsr(

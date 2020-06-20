@@ -10,6 +10,7 @@ namespace dgl {
 namespace aten {
 namespace cuda {
 
+/////////////////////////////// CUDA binary operators ///////////////////////////////
 namespace binary {
 template <typename DType>
 struct Add {
@@ -94,6 +95,7 @@ struct Dot {
 
 }   // end of namespace binary
 
+/////////////////////////////// CUDA reduce operators ///////////////////////////////
 namespace reduce {
 template <typename Idx,
           typename DType,

@@ -13,30 +13,20 @@ namespace dgl {
 using namespace cuda;
 
 namespace aten {
-
-namespace cusparse {
-
 namespace {
 
-template <typename DType>
-__global__ void _FillKernel(DType* ptr, size_t length, DType val) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    ptr[tx] = val;
-    tx += stride_x;
-  }
-}
-
+/*! \brief Fill the vector started from ptr of size length with val */
 template <typename DType>
 void _Fill(DType* ptr, size_t length, DType val) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = FindNumThreads(length);
   int nb = (length + nt - 1) / nt;  // on x-axis, no need to worry about upperbound.
-  _FillKernel<<<nb, nt, 0, thr_entry->stream>>>(ptr, length, val);
+  cuda::_FillKernel<<<nb, nt, 0, thr_entry->stream>>>(ptr, length, val);
 }
 
 }  // namespace
+
+namespace cusparse {
 
 template <typename DType>
 cusparseStatus_t Xcsrmm2(cusparseHandle_t handle, cusparseOperation_t transA,
@@ -100,6 +90,7 @@ cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
       beta, B, ldb, C, ldc);
 }
 
+/*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType>
 void CusparseCsrmm2(
     const DLContext& ctx,
@@ -170,28 +161,33 @@ void CusparseCsrmm2(
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
-      typedef dgl::aten::cuda::binary::Add<DType> Op;             \
+      typedef cuda::binary::Add<DType> Op;                          \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "sub") {                                            \
-      typedef dgl::aten::cuda::binary::Sub<DType> Op;             \
+    } else if ((op) == "sub") {                                     \
+      typedef cuda::binary::Sub<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
-      typedef dgl::aten::cuda::binary::Mul<DType> Op;             \
+      typedef cuda::binary::Mul<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "div") {                                     \
-      typedef dgl::aten::cuda::binary::Div<DType> Op;             \
+      typedef cuda::binary::Div<DType> Op;                          \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
-      typedef dgl::aten::cuda::binary::CopyU<DType> Op;           \
+      typedef cuda::binary::CopyU<DType> Op;                        \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_e") {                                  \
-      typedef dgl::aten::cuda::binary::CopyE<DType> Op;           \
+      typedef cuda::binary::CopyE<DType> Op;                        \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op;     \
     }                                                               \
   } while (0)
 
+/*!
+ * \brief CUDA implementation of g-SpMM on Csr format.
+ * \note use cusparse if the reduce operator is `sum` and there is
+ *       no broadcast, use dgl's kernel in other cases.
+ */
 template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
@@ -244,6 +240,9 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   }
 }
 
+/*!
+ * \brief CUDA implementation of g-SpMM on Coo format.
+ */
 template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,

@@ -116,6 +116,8 @@ void SpMMSumCoo(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
+ * \param argu Arg-Min/Max on source nodes.
+ * \param arge Arg-Min/Max on edges.
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
@@ -178,6 +180,8 @@ void SpMMCmpCsr(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
+ * \param argu Arg-Min/Max on source nodes.
+ * \param arge Arg-Min/Max on edges.
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. To avoid possible data hazard,
  *       we use atomic operators in this case.

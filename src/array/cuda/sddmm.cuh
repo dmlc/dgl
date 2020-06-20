@@ -20,6 +20,13 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
+/*!
+ * \brief CUDA kernel of g-SDDMM on Coo format.
+ * \note it uses edge parallel strategy, different threadblocks (on y-axis)
+ *       is responsible for the computation on different edges. Threadblocks
+ *       on the x-axis are responsible for the computation on different positions
+ *       in feature dimension.
+ */
 template <typename Idx, typename DType, typename BinaryOp,
           bool UseBcast = false, bool UseIdx = false>
 __global__ void SDDMMCooKernel(
@@ -76,6 +83,15 @@ __device__ __forceinline__ Idx BinarySearchSrc(const Idx *array, Idx length, Idx
   }
 }
 
+/*!
+ * \brief CUDA kernel of g-SDDMM on Csr format.
+ * \note it uses edge parallel strategy, different threadblocks (on y-axis)
+ *       is responsible for the computation on different edges. Threadblocks
+ *       on the x-axis are responsible for the computation on different positions
+ *       in feature dimension.
+ *       To efficiently find the source node idx and destination node index of an 
+ *       given edge on Csr format, it uses binary search (time complexity O(log N)).
+ */
 template <typename Idx, typename DType, typename BinaryOp,
           bool UseBcast = false, bool UseIdx = false>
 __global__ void SDDMMCsrKernel(
@@ -110,6 +126,14 @@ __global__ void SDDMMCsrKernel(
   }
 }
 
+/*!
+ * \brief CUDA implementation of g-SDDMM on Coo format.
+ * \param bcast Broadcast information.
+ * \param coo The Coo matrix.
+ * \param ufeat The feature on source nodes.
+ * \param vfeat The feature on destination nodes.
+ * \param out The result feature on edges.
+ */
 template <typename Idx, typename DType, typename Op>
 void SDDMMCoo(
     const BcastOff& bcast,
@@ -152,14 +176,21 @@ void SDDMMCoo(
   });
 }
 
+/*!
+ * \brief CUDA implementation of g-SDDMM on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param vfeat The feature on destination nodes.
+ * \param out The result feature on edges.
+ */
 template <typename Idx, typename DType, typename Op>
 void SDDMMCsr(
     const BcastOff& bcast,
     const dgl::aten::CSRMatrix& csr,
     NDArray ufeat,
     NDArray vfeat,
-    NDArray out) {
-  const Idx *indptr = csr.indptr.Ptr<Idx>();
+    NDArray out) { const Idx *indptr = csr.indptr.Ptr<Idx>();
   const Idx *indices = csr.indices.Ptr<Idx>();
   const Idx *edge_map = csr.data.Ptr<Idx>();
   const DType *ufeat_data = ufeat.Ptr<DType>();
