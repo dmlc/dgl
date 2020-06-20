@@ -62,7 +62,7 @@ inline void CheckShape(
 
 }  // namespace
 
-/*! \brief Generalized Sparse Matrix-Matrix Multiplication. */ 
+/*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
 void SpMM(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
           NDArray ufeat,
