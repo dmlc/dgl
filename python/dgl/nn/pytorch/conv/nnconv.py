@@ -17,6 +17,8 @@ class NNConv(nn.Module):
         h_{i}^{l+1} = h_{i}^{l} + \mathrm{aggregate}\left(\left\{
         f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i) \right\}\right)
 
+    where :math:`e_{ij}` is the edge feature, :math:`f_\Theta` is a function with learnable parameters.
+
     Parameters
     ----------
     in_feats : int
