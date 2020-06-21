@@ -11,8 +11,10 @@ class SGConv(nn.Module):
     Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
 
     .. math::
-        H^{K} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K X \Theta^{l}
+        H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta^{l}
 
+    where :math:`\tilde{A}` is :math:`A` + :math:`I`. Thus the graph input is expected to have self-loop edges added.
+    
     Parameters
     ----------
     in_feats : int
@@ -25,7 +27,7 @@ class SGConv(nn.Module):
         If True, the module would cache
 
         .. math::
-            (\hat{D}^{-\frac{1}{2}}\hat{A}\hat{D}^{-\frac{1}{2}})^K X\Theta
+            (\tilde{D}^{-\frac{1}{2}}\tilde{A}\tilde{D}^{-\frac{1}{2}})^K X\Theta
 
         at the first forward call. This parameter should only be set to
         ``True`` in Transductive Learning setting.

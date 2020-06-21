@@ -14,8 +14,8 @@ class APPNPConv(nn.Module):
     .. math::
         H^{0} & = X
 
-        H^{t+1} & = (1-\alpha)\left(\hat{D}^{-1/2}
-        \hat{A} \hat{D}^{-1/2} H^{t}\right) + \alpha H^{0}
+        H^{t+1} & = (1-\alpha)\left(\tilde{D}^{-1/2}
+        \tilde{A} \tilde{D}^{-1/2} H^{t}\right) + \alpha H^{0}
 
     Parameters
     ----------
