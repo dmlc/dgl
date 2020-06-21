@@ -91,7 +91,9 @@ def knn_graph(x, k):
     src += per_sample_offset
     dst = F.reshape(dst, (-1,))
     src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+    adj = sparse.csr_matrix(
+        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
+        shape=(n_points, n_points))
 
     g = DGLGraph(adj, readonly=True)
     return g
@@ -819,15 +821,15 @@ def compact_graphs(graphs, always_preserve=None):
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
     graph_dtype = graphs[0]._idtype_str
-    graph_ctx = graphs[0]._graph.ctx()
+    graph_ctx = graphs[0]._graph.ctx
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
         assert graph_dtype == g._idtype_str, "Expect graph data type to be {}, but got {}".format(
             graph_dtype, g._idtype_str)
-        assert graph_ctx == g._graph.ctx(), "Expect graph device to be {}, but got {}".format(
-            graph_ctx, g._graph.ctx())
+        assert graph_ctx == g._graph.ctx, "Expect graph device to be {}, but got {}".format(
+            graph_ctx, g._graph.ctx)
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:

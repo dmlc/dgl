@@ -111,6 +111,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.register_service(rpc.SHUT_DOWN_SERVER,
                          rpc.ShutDownRequest,
                          None)
+    rpc.register_ctrl_c()
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
