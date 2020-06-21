@@ -11,7 +11,7 @@ class SGConv(nn.Module):
     Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
 
     .. math::
-        H^{l+1} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K H^{l} \Theta^{l}
+        H^{K} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K X \Theta^{l}
 
     Parameters
     ----------
@@ -74,7 +74,7 @@ class SGConv(nn.Module):
 
         Notes
         -----
-        If ``cache`` is se to True, ``feat`` and ``graph`` should not change during
+        If ``cache`` is set to True, ``feat`` and ``graph`` should not change during
         training, or you will get wrong results.
         """
         with graph.local_scope():
