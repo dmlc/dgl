@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <functional>
+#include <algorithm>
 
 namespace dgl {
 namespace aten {

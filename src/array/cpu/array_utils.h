@@ -13,14 +13,7 @@
 #include "../../c_api_common.h"
 #include "../third_party/phmap/parallel_hashmap/phmap.h"
 
-#define CHECK_SAME_DTYPE(VAR1, VAR2)                                          \
-  CHECK(VAR1->dtype == VAR2->dtype)                                           \
-    << "Expected " << (#VAR2) << " to be the same type as " << (#VAR1) << "(" \
-    << (VAR1)->dtype << ")"                                                     \
-    << ". But got " << (VAR2)->dtype;
-
 namespace dgl {
-
 namespace aten {
 
 /*!
@@ -126,8 +119,7 @@ struct PairHash {
   }
 };
 
-};  // namespace aten
-
-};  // namespace dgl
+}  // namespace aten
+}  // namespace dgl
 
 #endif  // DGL_ARRAY_CPU_ARRAY_UTILS_H_

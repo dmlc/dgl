@@ -12,7 +12,7 @@ import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
-from dgl.distributed import partition_graph, load_partition, GraphPartitionBook, node_split, edge_split
+from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
 import backend as F
 import unittest
 import pickle
@@ -51,14 +51,17 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
-def run_server(graph_name, server_id, num_clients):
+def run_server(graph_name, server_id, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
-                        '/tmp/dist_graph/{}.json'.format(graph_name))
+                        '/tmp/dist_graph/{}.json'.format(graph_name),
+                        disable_shared_mem=not shared_mem)
     print('start server', server_id)
     g.start()
 
-def run_client(graph_name, num_nodes, num_edges):
-    g = DistGraph("kv_ip_config.txt", graph_name)
+def run_client(graph_name, part_id, num_nodes, num_edges):
+    gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
+                              part_id, None)
+    g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
 
     # Test API
     assert g.number_of_nodes() == num_nodes
@@ -116,8 +119,7 @@ def run_client(graph_name, num_nodes, num_edges):
     dgl.distributed.finalize_client()
     print('end')
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
-def test_server_client():
+def check_server_client(shared_mem):
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -133,14 +135,14 @@ def test_server_client():
     serv_ps = []
     ctx = mp.get_context('spawn')
     for serv_id in range(1):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1))
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem))
         serv_ps.append(p)
         p.start()
 
     cli_ps = []
     for cli_id in range(1):
         print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, g.number_of_nodes(),
+        p = ctx.Process(target=run_client, args=(graph_name, cli_id, g.number_of_nodes(),
                                                  g.number_of_edges()))
         p.start()
         cli_ps.append(p)
@@ -152,6 +154,11 @@ def test_server_client():
         p.join()
 
     print('clients have terminated')
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
+def test_server_client():
+    check_server_client(True)
+    check_server_client(False)
 
 def test_split():
     prepare_dist()
