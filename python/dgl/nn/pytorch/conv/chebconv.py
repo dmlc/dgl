@@ -18,11 +18,11 @@ class ChebConv(nn.Module):
 
         Z^{0, l} &= H^{l}
 
-        Z^{1, l} &= \hat{L} \cdot H^{l}
+        Z^{1, l} &= \tilde{L} \cdot H^{l}
 
-        Z^{k, l} &= 2 \cdot \hat{L} \cdot Z^{k-1, l} - Z^{k-2, l}
+        Z^{k, l} &= 2 \cdot \tilde{L} \cdot Z^{k-1, l} - Z^{k-2, l}
 
-        \hat{L} &= 2\left(I - \hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2}\right)/\lambda_{max} - I
+        \tilde{L} &= 2\left(I - \tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2}\right)/\lambda_{max} - I
 
     Parameters
     ----------

@@ -49,7 +49,7 @@ class AGNNConv(nn.Module):
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
-            :math:`(N_{in}, *)` and :math:`(N_{out}, *})`, the the :math:`*` in the later
+            :math:`(N_{in}, *)` and :math:`(N_{out}, *)`, the the :math:`*` in the later
             tensor must equal the previous one.
 
         Returns
