@@ -20,6 +20,8 @@ class GMMConv(nn.Module):
 
         w_k(u) & = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
 
+    where :math:`\mu` denotes the pseudo-coordinates between a vertex and one of its neighbor, :math:`\Sigma_k^{-1}` and :math:`\mu_k` are learnable parameters representing the covariance matrix and mean vector of a Gaussian kernel.
+
     Parameters
     ----------
     in_feats : int
