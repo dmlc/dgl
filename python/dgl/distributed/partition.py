@@ -121,8 +121,6 @@ def load_partition(conf_file, part_id):
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
-    assert 'num_parts' in part_metadata, 'num_parts does not exist.'
-    num_parts = part_metadata['num_parts']
     assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
     part_files = part_metadata['part-{}'.format(part_id)]
     assert 'node_feats' in part_files, "the partition does not contain node features."
@@ -131,6 +129,34 @@ def load_partition(conf_file, part_id):
     node_feats = load_tensors(part_files['node_feats'])
     edge_feats = load_tensors(part_files['edge_feats'])
     graph = load_graphs(part_files['part_graph'])[0][0]
+
+    assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
+    assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
+
+    gpb = load_partition_book(conf_file, part_id, graph)
+    return graph, node_feats, edge_feats, gpb
+
+def load_partition_book(conf_file, part_id, graph=None):
+    ''' Load a graph partition book from the partition config file.
+
+    Parameters
+    ----------
+    conf_file : str
+        The path of the partition config file.
+    part_id : int
+        The partition Id.
+    graph : DGLGraph
+        The graph structure
+
+    Returns
+    -------
+    GraphPartitionBook
+        The global partition information.
+    '''
+    with open(conf_file) as conf_f:
+        part_metadata = json.load(conf_f)
+    assert 'num_parts' in part_metadata, 'num_parts does not exist.'
+    num_parts = part_metadata['num_parts']
     assert 'num_nodes' in part_metadata, "cannot get the number of nodes of the global graph."
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
     assert 'node_map' in part_metadata, "cannot get the node map."
@@ -145,14 +171,10 @@ def load_partition(conf_file, part_id):
     assert isinstance(node_map, list) == isinstance(edge_map, list), \
             "The node map and edge map need to have the same format"
 
-    assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
-    assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
-
     if is_range_part:
-        gpb = RangePartitionBook(part_id, num_parts, np.array(node_map), np.array(edge_map))
+        return RangePartitionBook(part_id, num_parts, np.array(node_map), np.array(edge_map))
     else:
-        gpb = GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
-    return graph, node_feats, edge_feats, gpb
+        return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True):
