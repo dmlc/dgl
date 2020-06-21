@@ -15,7 +15,11 @@ namespace geometry {
 
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
+
   CHECK_EQ(array->ctx, result->ctx) << "Array and the result should be on the same device.";
+  CHECK_EQ(array->shape[0], dist->shape[0]) << "Shape of array and dist mismatch";
+  CHECK_EQ(start_idx->shape[0], batch_size) << "Shape of start_idx and batch_size mismatch";
+  CHECK_EQ(result->shape[0], batch_size * sample_points) << "Invalid shape of result";
 
   ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
     ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
