@@ -4,10 +4,10 @@
  * \brief New kernels
  */
 #include <dgl/array.h>
-#include <dgl/kernel.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
 
+#include "kernel_decl.h"
 #include "../c_api_common.h"
 
 using namespace dgl::runtime;
@@ -146,7 +146,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
         {0, 1, 2, 2, 2},
         {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-    SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
+    SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE}, SparseFormat::kAny);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
@@ -167,7 +167,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
         {0, 1, 2},
         {U, E, V},
         {"U_data", "E_data", "V_data"});
-    SDDMM(op, graph.sptr(), U, V, E);
+    SDDMM(op, graph.sptr(), U, V, E, SparseFormat::kAny);
   });
 
 }  // namespace aten
