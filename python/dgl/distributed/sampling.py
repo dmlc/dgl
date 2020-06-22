@@ -89,9 +89,8 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     for pid in range(partition_book.num_partitions()):
         node_id = F.boolean_mask(np_nodes, partition_id == pid)
         if len(node_id) != 0:
-            req = SamplingRequest(
-                F.zerocopy_from_numpy(node_id), fanout, edge_dir=edge_dir,
-                prob=prob, replace=replace)
+            req = SamplingRequest(node_id, fanout, edge_dir=edge_dir,
+                                  prob=prob, replace=replace)
             req_list.append((pid, req))
     res_list = remote_call_to_machine(req_list)
     sampled_graph = merge_graphs(res_list, dist_graph.number_of_nodes())
