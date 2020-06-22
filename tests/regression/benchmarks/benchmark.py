@@ -28,9 +28,9 @@ mini_batch_tests = {
 for name in full_graph_tests:
     start = time.time()
     full_graph_tests[name](g)
-    print('full graph {}: {} seconds'.format(name, time.time() - start))
+    print('full_graph {} {} seconds'.format(name, time.time() - start))
 
 for name in mini_batch_tests:
     start = time.time()
     mini_batch_tests[name](g)
-    print('mini batch {}: {} seconds'.format(name, time.time() - start))
+    print('mini_batch {} {} seconds'.format(name, time.time() - start))
