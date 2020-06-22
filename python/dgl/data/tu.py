@@ -7,7 +7,7 @@ from .utils import download, extract_archive, get_download_dir, loadtxt
 from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
-class LegacyTUDataset(object):
+class LegacyTUDataset(DGLBuiltinDataset):
     """
     TUDataset contains lots of graph kernel datasets for graph classification.
     Use provided node feature by default. If no feature provided, use one-hot node label instead.
