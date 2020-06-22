@@ -717,8 +717,8 @@ class DGLHeteroGraph(object):
 
         If the graph has only one node type. The g.ndata directly represents the
         node data.
-        If the graph has multiple node type. The g.ndata is a dictionary of node
-        types and their corresponding node data.
+        If the graph has multiple node types, then g.ndata[feat][node_type] gives
+        the features associated with key feat for node_type-typed nodes.
 
         Examples
         --------
@@ -755,16 +755,10 @@ class DGLHeteroGraph(object):
     def srcdata(self):
         """Return the data view of all nodes in the SRC category.
 
-        Only works if the graph is either
-
-        * Uni-bipartite
-
-        * Non-uni-bipartite (in this case identical to :any:`DGLHeteroGraph.ndata`)
-
         If the SRC has only one node type. The g.srcdata directly represents the
         node data.
-        If the SRC has multiple node type. The g.srcdata is a dictionary of node
-        types and their corresponding node data.
+        If the SRC has multiple node types, then g.srcdata[feat][node_type] gives
+        the features associated with key feat for node_type-typed nodes.
 
         Examples
         --------
@@ -821,16 +815,10 @@ class DGLHeteroGraph(object):
     def dstdata(self):
         """Return the data view of all destination nodes.
 
-        Only works if the graph is either
-
-        * Uni-bipartite
-
-        * Non-uni-bipartite (in this case identical to :any:`DGLHeteroGraph.ndata`)
-
         If the DST has only one node type. The g.dstdata directly represents the
         node data.
-        If the DST has multiple node type. The g.dstdata is a dictionary of node
-        types and their corresponding node data.
+        If the DST has multiple node types, then g.dstdata[feat][node_type] gives
+        the features associated with key feat for node_type-typed nodes.
 
         Examples
         --------
@@ -909,8 +897,8 @@ class DGLHeteroGraph(object):
 
         If the graph has only one edge type. The g.edata directly represents the
         edge data.
-        If the graph has multiple edge type. The g.edata is a dictionary of edge
-        types and the corresponding edge data.
+        If the graph has multiple edge type, then g.edata[feat][edge_type] gives
+        the features associated with key feat for edge_type-typed edges.
 
         Note: When the graph has multiple edge type, The key used in g.edata should
         be canonical_etypes, i.e. (h_ntype, r_type, t_ntype).

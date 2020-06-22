@@ -312,6 +312,9 @@ class HeteroNodeDataView(MutableMapping):
                 ntid = self._graph.get_ntype_id(ntype)
                 self._graph._set_n_repr(ntid, self._nodes, {key : data})
         else:
+            assert isinstance(val, dict) is False, \
+                'The HeteroNodeDataView has only one node type. ' \
+                'please pass a tensor directly'
             self._graph._set_n_repr(self._ntid, self._nodes, {key : val})
 
     def __delitem__(self, key):
@@ -411,12 +414,15 @@ class HeteroEdgeDataView(MutableMapping):
         if self._multi_etype:
             assert isinstance(val, dict), \
                 'Current HeteroEdgeDataView has multiple edge types, ' \
-                'please passing the edge type and the corresponding data through a dict.'
+                'please pass the edge type and the corresponding data through a dict.'
 
             for (etype, data) in val.items():
                 etid = self._graph.get_etype_id(etype)
                 self._graph._set_e_repr(etid, self._edges, {key : data})
         else:
+            assert isinstance(val, dict) is False, \
+                'The HeteroEdgeDataView has only one edge type. ' \
+                'please pass a tensor directly'
             self._graph._set_e_repr(self._etid, self._edges, {key : val})
 
     def __delitem__(self, key):

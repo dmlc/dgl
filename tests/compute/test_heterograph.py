@@ -494,6 +494,31 @@ def test_inc(index_dtype):
 
 @parametrize_dtype
 def test_view(index_dtype):
+    # test single node type
+    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    f1 = F.randn((3, 6))
+    g.ndata['h'] = f1
+    f2 = g.nodes['user'].data['h']
+    assert F.array_equal(f1, f2)
+    fail = False
+    try:
+        g.ndata['h'] = {'user' : f1}
+    except Exception:
+        fail = True
+    assert fail
+
+    # test single edge type
+    f3 = F.randn((2, 4))
+    g.edata['h'] = f3
+    f4 = g.edges['follows'].data['h']
+    assert F.array_equal(f3, f4)
+    fail = False
+    try:
+        g.edata['h'] = {'follows' : f3}
+    except Exception:
+        fail = True
+    assert fail
+
     # test data view
     g = create_test_heterograph(index_dtype)
 
