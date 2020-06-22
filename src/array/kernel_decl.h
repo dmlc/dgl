@@ -62,7 +62,7 @@ void SDDMMCoo(const std::string& op,
               NDArray efeat,
               NDArray out);
 
-}  // namespace
-}  // namespace
+}  // namespace aten
+}  // namespace dgl
 
 #endif  // DGL_ARRAY_KERNEL_DECL_H_
