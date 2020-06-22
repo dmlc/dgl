@@ -715,7 +715,10 @@ class DGLHeteroGraph(object):
     def ndata(self):
         """Return the data view of all the nodes.
 
-        **Only works if the graph has one node type.**
+        If the graph has only one node type. The g.ndata directly represents the 
+        node data.
+        If the graph has multiple node type. The g.ndata is a dictionary of node 
+        types and the corresponding node data.
 
         Examples
         --------
@@ -727,13 +730,26 @@ class DGLHeteroGraph(object):
         >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
         >>> g.ndata['h'] = torch.zeros(3, 5)
 
+        To set features of all nodes in a heterogeneous graph
+        with multiple node types:
+
+        >>> g = dgl.graph([(0, 1), (1, 2), (1, 0)], 'user', 'like', 'movie')
+        >>> g.ndata['h'] = {'user': torch.zeros(2, 5), 
+                            'movie': torch.zeros(3, 5)}
+
         See Also
         --------
         nodes
         """
-        ntid = self.get_ntype_id(None)
-        ntype = self.ntypes[0]
-        return HeteroNodeDataView(self, ntype, ntid, ALL)
+        if len(self.ntypes == 1):
+            ntid = self.get_ntype_id(None)
+            ntype = self.ntypes[0]
+            return HeteroNodeDataView(self, ntype, ntid, ALL)
+        else:
+            ntids = [self.get_ntype_id(ntype) for ntype in self.ntypes]
+            ntypes = self.ntypes
+            return HeteroNodeDataView(self, ntypes, ntids, ALL)
+
 
     @property
     def srcdata(self):
@@ -859,7 +875,10 @@ class DGLHeteroGraph(object):
     def edata(self):
         """Return the data view of all the edges.
 
-        **Only works if the graph has one edge type.**
+        If the graph has only one edge type. The g.edata directly represents the 
+        edge data.
+        If the graph has multiple edge type. The g.edata is a dictionary of edge 
+        types and the corresponding edge data.
 
         Examples
         --------
@@ -871,11 +890,23 @@ class DGLHeteroGraph(object):
         >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
         >>> g.edata['h'] = torch.zeros(2, 5)
 
+        To set features of all edges in a heterogeneous graph
+        with multiple edge types:
+
+        >>> g0 = dgl.bipartite([(0, 1), (1, 0), (1, 1)], 'user', 'watches', 'movie')
+        >>> g1 = dgl.bipartite([(0, 0), (1, 1)], 'user', 'watches', 'TV')
+        >>> g = dgl.hetero_from_relations([g0, g1])
+        >>> g.edata['h'] = {('user', 'watches', 'movie'): torch.zeros(3, 5),
+                            ('user', 'watches', 'TV'): torch.zeros(2, 5)}
+
         See Also
         --------
         edges
         """
-        return HeteroEdgeDataView(self, None, ALL)
+        if len(self.canonical_etypes) == 1:
+            return HeteroEdgeDataView(self, None, ALL)
+        else:
+            return HeteroEdgeDataView(self, self.canonical_etypes, ALL)
 
     def _find_etypes(self, key):
         etypes = [
