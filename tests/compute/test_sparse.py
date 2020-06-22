@@ -1,6 +1,11 @@
 import dgl
+import pytest
 import networkx as nx
 import backend as F
+import numpy as np 
+
+def _unsqueeze_if_scalar(x):    # used in udf, to unsqueeze the feature if it's scalar
+    return x if F.ndim(x) > 1 else F.unsqueeze(x, -1)
 
 udf_msg = {
     'add': lambda edges: {'m': edges.src['x'] + edges.data['w']},
@@ -26,44 +31,81 @@ udf_reduce = {
     'max': lambda nodes: {'v': F.max(nodes.mailbox['m'], 1)}
 }
 
-def test_spmm():
-    nxg = nx.erdos_renyi_graph(100, 0.3)
-    for i in range(nxg.number_of_nodes()):
-        nxg.add_edge(i, i)
-    g = dgl.graph(nxg)
-    u = F.randn((g.number_of_nodes(), 1, 3, 1))
-    e = F.randn((g.number_of_edges(), 4, 1, 3))
-    g.ndata['x'] = u
-    g.edata['w'] = e
+graphs = [
+    dgl.rand_graph(30, 0),
+    dgl.rand_graph(100, 30),
+    dgl.rand_graph(100, 3000),
+    dgl.rand_bipartite(80, 160, 3000)
+]
 
-    for msg in ['add', 'sub', 'mul', 'div', 'copy_u', 'copy_e']:
-        for reducer in ['sum', 'min', 'max']:
-            print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
-            v = dgl.gspmm(g, msg, reducer, u, e)[0]
-            g.update_all(udf_msg[msg], udf_reduce[reducer])
-            v1 = g.ndata['v']
-            assert F.allclose(v, v1, rtol=1e-3, atol=1e-3)
-            print('passed')
+spmm_shapes = [
+    ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
+    ((5, 3, 1, 7), (1, 3, 7, 1)),
+    ((1, 3, 1), (4, 1, 3)),
+    ((3, 3), (1, 3)),
+    ((), (3,)),
+    ((3,), ()),
+    ((), ())
+]
 
-def test_sddmm():
-    nxg = nx.erdos_renyi_graph(100, 0.3)
-    for i in range(nxg.number_of_nodes()):
-        nxg.add_edge(i, i)
-    g = dgl.graph(nxg)
-    u = F.randn((g.number_of_nodes(), 1, 3, 4))
-    v = F.randn((g.number_of_nodes(), 3, 1, 4))
-    g.ndata['x'] = u
-    g.ndata['y'] = v
+sddmm_shapes = [
+    ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
+    ((5, 3, 1, 7), (1, 3, 7, 7)),
+    ((1, 3, 3), (4, 1, 3)),
+    ((3, 3), (1, 3)),
+    ((3,), (3,)),
+    ((), ())
+]
 
-    for msg in ['add', 'sub', 'mul', 'div', 'dot', 'copy_u']:
-        print('SDDMM(message func: {})'.format(msg))
-        e = dgl.gsddmm(g, msg, u, v)
-        g.apply_edges(udf_apply_edges[msg])
+@pytest.mark.parametrize('g', graphs)
+@pytest.mark.parametrize('shp', spmm_shapes)
+@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_u', 'copy_e'])
+@pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
+def test_spmm(g, shp, msg, reducer):
+    print(g)
+    u = F.randn((g.number_of_src_nodes(),) + shp[0])
+    e = F.randn((g.number_of_edges(),) + shp[1])
+    print('u shape: {}, e shape: {}'.format(F.shape(u), F.shape(e)))
+    g.srcdata['x'] = _unsqueeze_if_scalar(u)
+    g.edata['w'] = _unsqueeze_if_scalar(e)
+
+    print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
+    v = dgl.gspmm(g, msg, reducer, u, e)[0]
+    non_degree_indices = F.zerocopy_from_numpy(
+        np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
+    v = F.gather_row(v, non_degree_indices)
+    g.update_all(udf_msg[msg], udf_reduce[reducer])
+    if 'v' in g.dstdata:
+        v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
+        assert F.allclose(v, v1, rtol=1e-3, atol=1e-3)
+    print('passed')
+
+    g.srcdata.pop('x')
+    g.edata.pop('w')
+    if 'v' in g.dstdata: g.dstdata.pop('v')
+
+@pytest.mark.parametrize('g', graphs)
+@pytest.mark.parametrize('shp', sddmm_shapes)
+@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_u'])
+def test_sddmm(g, shp, msg):
+    if dgl.backend.backend_name == 'mxnet' and g.number_of_edges() == 0:
+        pytest.skip()   # mxnet do not support zero shape tensor
+    print(g)
+    u = F.randn((g.number_of_src_nodes(),) + shp[0])
+    v = F.randn((g.number_of_dst_nodes(),) + shp[1])
+    print('u shape: {}, v shape: {}'.format(F.shape(u), F.shape(v)))
+    g.srcdata['x'] = _unsqueeze_if_scalar(u)
+    g.dstdata['y'] = _unsqueeze_if_scalar(v)
+
+    print('SDDMM(message func: {})'.format(msg))
+    e = dgl.gsddmm(g, msg, u, v)
+    g.apply_edges(udf_apply_edges[msg])
+    if 'm' in g.edata:
         e1 = g.edata['m']
         assert F.allclose(e, e1, rtol=1e-3, atol=1e-3)
-        print('passed')
+    print('passed')
 
-if __name__ == '__main__':
-    test_spmm()
-    test_sddmm()
+    g.srcdata.pop('x')
+    g.dstdata.pop('y')
+    if 'm' in g.edata: g.edata.pop('m')
 
