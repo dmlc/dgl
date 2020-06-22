@@ -25,7 +25,7 @@ class DotGatConv(nn.Module):
         features into the same dimension, so that when compute note features' similarity,
         we can use dot-product.
 
-        Parameters
+    Parameters
     ----------
     in_feats : int, or pair of ints
         Input feature size.

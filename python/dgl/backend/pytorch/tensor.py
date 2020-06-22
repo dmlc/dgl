@@ -70,13 +70,23 @@ def context(input):
     return input.device
 
 def device_type(ctx):
-    return ctx.type
+    return th.device(ctx).type
 
 def device_id(ctx):
+    ctx = th.device(ctx)
     if ctx.index is None:
         return 0
     else:
         return ctx.index
+
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return th.device('cpu')
+    elif dev_type == 2:
+        return th.device('cuda', dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
     return input.type(ty)
@@ -87,13 +97,13 @@ def asnumpy(input):
     else:
         return input.cpu().detach().numpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
         if ctx.index is not None:
             th.cuda.set_device(ctx.index)
-        return input.cuda()
+        return input.cuda(**kwargs)
     else:
         raise RuntimeError('Invalid context', ctx)
 
@@ -248,6 +258,9 @@ def equal(x, y):
 
 def logical_not(input):
     return ~input
+
+def logical_and(input1, input2):
+    return input1 & input2
 
 def clone(input):
     return input.clone()

@@ -59,6 +59,8 @@ def cpu():
 def tensor(data, dtype=None):
     return tf.convert_to_tensor(data, dtype=dtype)
 
+def initialize_context():
+    tf.zeros(1)
 
 def as_scalar(data):
     return data.numpy().asscalar()
@@ -116,6 +118,14 @@ def device_type(ctx):
 def device_id(ctx):
     return tf.DeviceSpec.from_string(ctx).device_index
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return "/cpu:0"
+    elif dev_type == 2:
+        return "/gpu:%d" % (dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
     return tf.cast(input, dtype=ty)
@@ -129,7 +139,7 @@ def asnumpy(input):
         return input.numpy()
 
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     with tf.device(ctx):
         new_tensor = tf.identity(input)
     return new_tensor
@@ -349,6 +359,9 @@ def equal(x, y):
 
 def logical_not(input):
     return ~input
+
+def logical_and(input1, input2):
+    return tf.math.logical_and(input1, input2)
 
 def clone(input):
     # TF tensor is always immutable so returning the input is safe.
@@ -579,3 +592,5 @@ def _reduce_grad(grad, shape):
 def sync():
     context = context().context()
     context.async_wait()
+
+initialize_context()
