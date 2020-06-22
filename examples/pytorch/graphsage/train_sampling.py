@@ -15,6 +15,7 @@ from functools import wraps
 from dgl.data import RedditDataset
 import tqdm
 import traceback
+from pyinstrument import Profiler
 
 from load_graph import load_reddit, load_ogb
 
@@ -184,6 +185,8 @@ def run(args, device, data):
     # Training loop
     avg = 0
     iter_tput = []
+    profiler = Profiler()
+    profiler.start()
     for epoch in range(args.num_epochs):
         tic = time.time()
 
@@ -247,6 +250,8 @@ def run(args, device, data):
             eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
+    profiler.stop()
+    print(profiler.output_text(unicode=True, color=True))
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 if __name__ == '__main__':
