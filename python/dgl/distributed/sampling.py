@@ -84,11 +84,10 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     assert edge_dir == 'in'
     req_list = []
     partition_book = dist_graph.get_partition_book()
-    np_nodes = np.array(toindex(nodes).tonumpy())
-    partition_id = F.asnumpy(
-        partition_book.nid2partid(F.tensor(np_nodes)))
+    np_nodes = toindex(nodes).tousertensor()
+    partition_id = partition_book.nid2partid(np_nodes)
     for pid in range(partition_book.num_partitions()):
-        node_id = np_nodes[partition_id == pid]
+        node_id = F.boolean_mask(np_nodes, partition_id == pid)
         if len(node_id) != 0:
             req = SamplingRequest(
                 F.zerocopy_from_numpy(node_id), fanout, edge_dir=edge_dir,
