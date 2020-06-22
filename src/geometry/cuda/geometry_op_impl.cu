@@ -51,8 +51,8 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
 
     // the last sampled point
     int64_t sample_idx = (int64_t)(ret_data[ret_start + i]);
-    FloatType dist_max = (FloatType)(-1.);
-    int64_t dist_argmax = 0;
+    dist_argmax_ht[thread_idx] = 0;
+    dist_max_ht[thread_idx] = (FloatType)(-1.);
 
     // multi-thread distance calculation
     for (auto j = thread_idx; j < point_in_batch; j += THREADS) {
@@ -67,36 +67,24 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
         dist_data[array_start + j] = one_dist;
       }
 
-      if (dist_data[array_start + j] > dist_max) {
-        dist_argmax = j;
-        dist_max = dist_data[array_start + j];
+      if (dist_data[array_start + j] > dist_max_ht[thread_idx]) {
+        dist_argmax_ht[thread_idx] = j;
+        dist_max_ht[thread_idx] = dist_data[array_start + j];
       }
     }
 
-    dist_max_ht[thread_idx] = dist_max;
-    dist_argmax_ht[thread_idx] = dist_argmax;
-
-    /*
-     * \brief Parallel Reduction
-     *
-     * Suppose the maximum is dist_max_ht[k], where 0 <= k < THREAD.
-     * After loop at j = 1, the maximum is propagated to [k-1].
-     * After loop at j = 2, the maximum is propagated to the range [k-3] to [k].
-     * After loop at j = 4, the maximum is propagated to the range [k-7] to [k].
-     * After loop at any j < THREADS, we can see [k - 2*j + 1] to [k] are all covered by the maximum.
-     * The max value of j is at least floor(THREAD / 2), and it is sufficient to cover [0] with the maximum.
-     */
-
-    for (auto j = 1; j < THREADS; j *= 2) {
-      __syncthreads();
-      if ((thread_idx + j) < THREADS && dist_max_ht[thread_idx] < dist_max_ht[thread_idx + j]) {
-          dist_max_ht[thread_idx] = dist_max_ht[thread_idx + j];
-          dist_argmax_ht[thread_idx] = dist_argmax_ht[thread_idx + j];
-      }
-    }
+    __syncthreads();
 
     if (thread_idx == 0) {
-      ret_data[ret_start + i + 1] = (IdType)(dist_argmax_ht[0]);
+      FloatType best = dist_max_ht[0];
+      int64_t best_idx = dist_argmax_ht[0];
+      for (auto j = 1; j < THREADS; j++) {
+         if (dist_max_ht[j] > best)  {
+             best = dist_max_ht[j];
+             best_idx = dist_argmax_ht[j];
+         }
+      }
+      ret_data[ret_start + i + 1] = (IdType)(best_idx);
     }
   }
 }
