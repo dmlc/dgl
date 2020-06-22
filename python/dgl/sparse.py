@@ -121,7 +121,6 @@ def gspmm(g, op, reduce_op, u, e):
 
     op = op_mapping[op]
     ctx = F.context(u) if u is not None else F.context(e)
-    gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
     dtype = F.dtype(u) if u is not None else F.dtype(e)
     use_u = (op != 'copy_e')
     use_e = (op != 'copy_u')
@@ -133,9 +132,11 @@ def gspmm(g, op, reduce_op, u, e):
     use_cmp = reduce_op in ['max', 'min']
     arg_u = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_u else None
     arg_e = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_e else None
-    _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
-                        to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
-                        to_dgl_nd(arg_u), to_dgl_nd(arg_e))
+    if g.number_of_edges() > 0:
+        gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
+        _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
+                            to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
+                            to_dgl_nd(arg_u), to_dgl_nd(arg_e))
     return v, (arg_u, arg_e)
 
 def gsddmm(g, op, u, v):
@@ -182,16 +183,16 @@ def gsddmm(g, op, u, v):
             v = F.unsqueeze(v, -1)
 
     op = op_mapping[op]
-    gidx = g._graph
     ctx = F.context(u)
-    gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
     dtype = F.dtype(u)
     u_shp = F.shape(u)
     v_shp = F.shape(v) if v is not None else (0,)
     e_shp = (g.number_of_edges(), ) +\
         infer_broadcast_shape(op, u_shp[1:], v_shp[1:])
     e = F.zeros(e_shp, dtype, ctx)
-    _CAPI_DGLKernelSDDMM(gidx, op, to_dgl_nd(u), to_dgl_nd(v), to_dgl_nd(e))
+    if g.number_of_edges() > 0:
+        gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
+        _CAPI_DGLKernelSDDMM(gidx, op, to_dgl_nd(u), to_dgl_nd(v), to_dgl_nd(e))
     return e
 
 _init_api("dgl.sparse")

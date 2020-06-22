@@ -4,8 +4,17 @@ import networkx as nx
 import backend as F
 import numpy as np 
 
+np.random.seed(42)
+dgl.random.seed(42)
+
 def _unsqueeze_if_scalar(x):    # used in udf, to unsqueeze the feature if it's scalar
     return x if F.ndim(x) > 1 else F.unsqueeze(x, -1)
+
+def _rand_operand_1(shp):
+    return F.tensor(np.random.rand(*shp))
+
+def _rand_operand_2(shp):   # for division op, the divisor should be greater than 1
+    return F.tensor(np.random.rand(*shp) + 1)
 
 udf_msg = {
     'add': lambda edges: {'m': edges.src['x'] + edges.data['w']},
@@ -63,15 +72,15 @@ sddmm_shapes = [
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 def test_spmm(g, shp, msg, reducer):
     print(g)
-    u = F.randn((g.number_of_src_nodes(),) + shp[0])
-    e = F.randn((g.number_of_edges(),) + shp[1])
+    u = _rand_operand_1((g.number_of_src_nodes(),) + shp[0])
+    e = _rand_operand_2((g.number_of_edges(),) + shp[1])
     print('u shape: {}, e shape: {}'.format(F.shape(u), F.shape(e)))
     g.srcdata['x'] = _unsqueeze_if_scalar(u)
     g.edata['w'] = _unsqueeze_if_scalar(e)
 
     print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
     v = dgl.gspmm(g, msg, reducer, u, e)[0]
-    non_degree_indices = F.zerocopy_from_numpy(
+    non_degree_indices = F.tensor(
         np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
     v = F.gather_row(v, non_degree_indices)
     g.update_all(udf_msg[msg], udf_reduce[reducer])
@@ -91,8 +100,8 @@ def test_sddmm(g, shp, msg):
     if dgl.backend.backend_name == 'mxnet' and g.number_of_edges() == 0:
         pytest.skip()   # mxnet do not support zero shape tensor
     print(g)
-    u = F.randn((g.number_of_src_nodes(),) + shp[0])
-    v = F.randn((g.number_of_dst_nodes(),) + shp[1])
+    u = _rand_operand_1((g.number_of_src_nodes(),) + shp[0])
+    v = _rand_operand_2((g.number_of_dst_nodes(),) + shp[1])
     print('u shape: {}, v shape: {}'.format(F.shape(u), F.shape(v)))
     g.srcdata['x'] = _unsqueeze_if_scalar(u)
     g.dstdata['y'] = _unsqueeze_if_scalar(v)
