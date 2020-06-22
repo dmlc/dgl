@@ -1722,8 +1722,10 @@ def test_edges_order():
     ))
 
     src, dst = g.all_edges(order='srcdst')
-    assert F.array_equal(F.copy_to(src, F.cpu()), F.tensor([0, 0, 0, 1, 2]))
-    assert F.array_equal(F.copy_to(dst, F.cpu()), F.tensor([1, 1, 2, 2, 1]))
+    assert F.array_equal(F.copy_to(src, F.cpu()),
+                         F.copy_to(F.tensor([0, 0, 0, 1, 2]), F.cpu()))
+    assert F.array_equal(F.copy_to(dst, F.cpu()),
+                         F.copy_to(F.tensor([1, 1, 2, 2, 1]), F.cpu()))
 
 if __name__ == '__main__':
     # test_create()
