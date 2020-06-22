@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 import dgl
 import dgl.function as fn
+from dgl.geometry.pytorch import FarthestPointSampler
 
 '''
 Part of the code are adapted from
@@ -35,33 +36,6 @@ def index_points(points, idx):
     batch_indices = torch.arange(B, dtype=torch.long).to(device).view(view_shape).repeat(repeat_shape)
     new_points = points[batch_indices, idx, :]
     return new_points
-
-class FarthestPointSampler(nn.Module):
-    '''
-    Sample the farthest point iteratively
-    '''
-    def __init__(self, npoints):
-        super(FarthestPointSampler, self).__init__()
-        self.npoints = npoints
-
-    def forward(self, pos):
-        '''
-        Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
-        '''
-        device = pos.device
-        B, N, C = pos.shape
-        centroids = torch.zeros(B, self.npoints, dtype=torch.long).to(device)
-        distance = torch.ones(B, N).to(device) * 1e10
-        farthest = torch.randint(0, N, (B,), dtype=torch.long).to(device)
-        batch_indices = torch.arange(B, dtype=torch.long).to(device)
-        for i in range(self.npoints):
-            centroids[:, i] = farthest
-            centroid = pos[batch_indices, farthest, :].view(B, 1, C)
-            dist = torch.sum((pos - centroid) ** 2, -1)
-            mask = dist < distance
-            distance[mask] = dist[mask]
-            farthest = torch.max(distance, -1)[1]
-        return centroids
 
 class FixedRadiusNearNeighbors(nn.Module):
     '''
