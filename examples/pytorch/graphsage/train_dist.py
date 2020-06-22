@@ -19,6 +19,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
+from pyinstrument import Profiler
 
 from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate, load_subtensor
 
@@ -54,6 +55,8 @@ def run(args, device, data):
     # Training loop
     avg = 0
     iter_tput = []
+    profiler = Profiler()
+    profiler.start()
     for epoch in range(args.num_epochs):
         tic = time.time()
 
@@ -128,6 +131,8 @@ def run(args, device, data):
         #    eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
         #    print('Eval Acc {:.4f}'.format(eval_acc))
 
+    profiler.stop()
+    print(profiler.output_text(unicode=True, color=True))
     # clean up
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
