@@ -36,7 +36,9 @@ def get_friendster():
     df = pandas.read_csv('/tmp/com-friendster.ungraph.txt.gz', sep='\t', skiprows=4, header=None,
                          names=['src', 'dst'], compression='gzip')
     src = np.array(df['src'])
+    src = src - src.min()
     dst = np.array(df['dst'])
+    dst = dst - dst.min()
     print('construct friendster')
     return dgl.DGLGraph((src, dst), readonly=True)
 
