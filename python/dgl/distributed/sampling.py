@@ -5,6 +5,7 @@ from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
 from ..convert import graph
 from ..base import NID, EID
+from ..utils import toindex
 from .. import backend as F
 
 __all__ = ['sample_neighbors']
@@ -83,7 +84,7 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     assert edge_dir == 'in'
     req_list = []
     partition_book = dist_graph.get_partition_book()
-    np_nodes = np.array(nodes)
+    np_nodes = np.array(toindex(nodes).tonumpy())
     partition_id = F.asnumpy(
         partition_book.nid2partid(F.tensor(np_nodes)))
     for pid in range(partition_book.num_partitions()):
