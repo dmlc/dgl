@@ -45,7 +45,7 @@ namespace aten {
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
-              const aten::CSRMatrix& csr,
+              const CSRMatrix& csr,
               NDArray ufeat,
               NDArray vfeat,
               NDArray out) {
@@ -60,7 +60,7 @@ void SDDMMCsr(const std::string& op,
 template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
-              const aten::COOMatrix& coo,
+              const COOMatrix& coo,
               NDArray ufeat,
               NDArray vfeat,
               NDArray out) {
@@ -70,29 +70,29 @@ void SDDMMCoo(const std::string& op,
 }
 
 template void SDDMMCsr<kDLGPU, int32_t, float>(
-    const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCsr<kDLGPU, int64_t, float>(
-    const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCsr<kDLGPU, int32_t, double>(
-    const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCsr<kDLGPU, int64_t, double>(
-    const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray vfeat, NDArray out);
 
 template void SDDMMCoo<kDLGPU, int32_t, float>(
-    const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCoo<kDLGPU, int64_t, float>(
-    const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCoo<kDLGPU, int32_t, double>(
-    const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray vfeat, NDArray out);
 template void SDDMMCoo<kDLGPU, int64_t, double>(
-    const std::string& op, const BcastOff& bcast, const aten::COOMatrix& coo,
+    const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray vfeat, NDArray out);
 
 }  // namespace aten

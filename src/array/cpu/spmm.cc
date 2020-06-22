@@ -13,7 +13,7 @@ namespace aten {
 template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
-             const aten::CSRMatrix& csr,
+             const CSRMatrix& csr,
              NDArray ufeat,
              NDArray efeat,
              NDArray out,
@@ -38,26 +38,26 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 
 template void SpMMCsr<kDLCPU, int32_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLCPU, int64_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLCPU, int32_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLCPU, int64_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 /*! \brief Generalized SpMM on Coo format. */
 template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
-             const aten::COOMatrix& coo,
+             const COOMatrix& coo,
              NDArray ufeat,
              NDArray efeat,
              NDArray out,
@@ -82,19 +82,19 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
 
 template void SpMMCoo<kDLCPU, int32_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLCPU, int64_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLCPU, int32_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLCPU, int64_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 }  // namespace aten

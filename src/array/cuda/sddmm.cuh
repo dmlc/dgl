@@ -137,7 +137,7 @@ __global__ void SDDMMCsrKernel(
 template <typename Idx, typename DType, typename Op>
 void SDDMMCoo(
     const BcastOff& bcast,
-    const dgl::aten::COOMatrix& coo,
+    const COOMatrix& coo,
     NDArray ufeat,
     NDArray vfeat,
     NDArray out) {
@@ -163,8 +163,9 @@ void SDDMMCoo(
   //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(coo.data);
 
-  BCAST_IDX_CTX_SWITCH(bcast, edge_map, ufeat->ctx, ubcast_off, vbcast_off, {
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, vbcast_off, {
     SDDMMCooKernel<Idx, DType, Op, UseBcast, UseIdx>
       <<<nblks, nthrs, 0, thr_entry->stream>>>(
         ufeat_data, vfeat_data, out_data,
@@ -187,7 +188,7 @@ void SDDMMCoo(
 template <typename Idx, typename DType, typename Op>
 void SDDMMCsr(
     const BcastOff& bcast,
-    const dgl::aten::CSRMatrix& csr,
+    const CSRMatrix& csr,
     NDArray ufeat,
     NDArray vfeat,
     NDArray out) { const Idx *indptr = csr.indptr.Ptr<Idx>();
@@ -211,8 +212,9 @@ void SDDMMCsr(
   const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(csr.data);
 
-  BCAST_IDX_CTX_SWITCH(bcast, edge_map, ufeat->ctx, ubcast_off, vbcast_off, {
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, vbcast_off, {
     SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx>
       <<<nblks, nthrs, 0, thr_entry->stream>>>(
         ufeat_data, vfeat_data, out_data,

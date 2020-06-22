@@ -181,7 +181,7 @@ template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp>
 void SpMMCoo(
     const BcastOff& bcast,
-    const dgl::aten::COOMatrix& coo,
+    const COOMatrix& coo,
     NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
   const Idx *row = coo.row.Ptr<Idx>(),
@@ -212,8 +212,9 @@ void SpMMCoo(
   //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(coo.data);
 
-  BCAST_IDX_CTX_SWITCH(bcast, edge_map, ufeat->ctx, ubcast_off, ebcast_off, {
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
     SpMMCooKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>
       <<<nblks, nthrs, 0, thr_entry->stream>>>(
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
@@ -253,7 +254,7 @@ template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp>
 void SpMMCsr(
     const BcastOff& bcast,
-    const dgl::aten::CSRMatrix& csr,
+    const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
   const Idx *indptr = csr.indptr.Ptr<Idx>();
@@ -278,8 +279,9 @@ void SpMMCsr(
   //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(csr.data);
 
-  BCAST_IDX_CTX_SWITCH(bcast, edge_map, ufeat->ctx, ubcast_off, ebcast_off, {
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
     SpMMCsrKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>
       <<<nblks, nthrs, 0, thr_entry->stream>>>(
         ufeat_data, efeat_data, out_data, argu_data, arge_data,

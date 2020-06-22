@@ -94,7 +94,7 @@ cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
 template <typename DType>
 void CusparseCsrmm2(
     const DLContext& ctx,
-    const aten::CSRMatrix& csr,
+    const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
     int x_length) {
@@ -191,7 +191,7 @@ void CusparseCsrmm2(
 template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
-             const aten::CSRMatrix& csr,
+             const CSRMatrix& csr,
              NDArray ufeat,
              NDArray efeat,
              NDArray out,
@@ -211,8 +211,8 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
-      if (!aten::IsNullArray(csr.data))
-        efeat = aten::IndexSelect(efeat, csr.data);
+      if (!IsNullArray(csr.data))
+        efeat = IndexSelect(efeat, csr.data);
       cusparse::CusparseCsrmm2<DType>(
           ufeat->ctx, csr,
           static_cast<DType*>(ufeat->data),
@@ -222,7 +222,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
     } else {
       SWITCH_OP(op, Op, {
         cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
-            bcast, csr, ufeat, efeat, out, aten::NullArray(), aten::NullArray());
+            bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
       });
     }
   } else if (reduce == "max") {
@@ -246,7 +246,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
-             const aten::COOMatrix& coo,
+             const COOMatrix& coo,
              NDArray ufeat,
              NDArray efeat,
              NDArray out,
@@ -254,7 +254,7 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
   if (reduce == "sum") {
     SWITCH_OP(op, Op, {
       cuda::SpMMCoo<IdType, DType, Op, cuda::reduce::Sum<IdType, DType, true> > (
-          bcast, coo, ufeat, efeat, out, aten::NullArray(), aten::NullArray());
+          bcast, coo, ufeat, efeat, out, NullArray(), NullArray());
     });
   } else if (reduce == "max") {
     SWITCH_OP(op, Op, {
@@ -273,36 +273,36 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
 
 template void SpMMCsr<kDLGPU, int32_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLGPU, int64_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLGPU, int32_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCsr<kDLGPU, int64_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::CSRMatrix& csr,
+    const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 template void SpMMCoo<kDLGPU, int32_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int64_t, float>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int32_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 template void SpMMCoo<kDLGPU, int64_t, double>(
     const std::string& op, const std::string& reduce,
-    const BcastOff& bcast, const aten::COOMatrix& coo,
+    const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 }  // namespace aten

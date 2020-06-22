@@ -26,9 +26,9 @@ namespace cpu {
  */
 template <typename IdType, typename DType, typename Op>
 void SDDMMCsr(const BcastOff& bcast,
-              const aten::CSRMatrix& csr,
+              const CSRMatrix& csr,
               NDArray ufeat, NDArray vfeat, NDArray out) {
-  const bool has_idx = !aten::IsNullArray(csr.data);
+  const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
   const IdType* edges = csr.data.Ptr<IdType>();
@@ -71,9 +71,9 @@ void SDDMMCsr(const BcastOff& bcast,
  */
 template <typename IdType, typename DType, typename Op>
 void SDDMMCoo(const BcastOff& bcast,
-              const aten::COOMatrix& coo,
+              const COOMatrix& coo,
               NDArray ufeat, NDArray vfeat, NDArray out) {
-  const bool has_idx = !aten::IsNullArray(coo.data);
+  const bool has_idx = !IsNullArray(coo.data);
   const IdType* row = coo.row.Ptr<IdType>();
   const IdType* col = coo.col.Ptr<IdType>();
   const IdType* edges = coo.data.Ptr<IdType>();
@@ -176,28 +176,28 @@ struct Dot {
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
-      typedef dgl::aten::cpu::op::Add<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Add<DType> Op;                    \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "sub") {                                     \
-      typedef dgl::aten::cpu::op::Sub<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Sub<DType> Op;                    \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "mul") {                                     \
-      typedef dgl::aten::cpu::op::Mul<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Mul<DType> Op;                    \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "div") {                                     \
-      typedef dgl::aten::cpu::op::Div<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Div<DType> Op;                    \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_u") {                                  \
-      typedef dgl::aten::cpu::op::CopyLhs<DType> Op;              \
+      typedef dgl::aten::cpu::op::CopyLhs<DType> Op;                \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "copy_e") {                                  \
-      typedef dgl::aten::cpu::op::CopyRhs<DType> Op;              \
+      typedef dgl::aten::cpu::op::CopyRhs<DType> Op;                \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \
-      typedef dgl::aten::cpu::op::Dot<DType> Op;                  \
+      typedef dgl::aten::cpu::op::Dot<DType> Op;                    \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
-      LOG(FATAL) << "Unsupported SDDMM binary operator: " << op;     \
+      LOG(FATAL) << "Unsupported SDDMM binary operator: " << op;    \
     }                                                               \
   } while (0)
 
