@@ -8,7 +8,8 @@ from ....utils import expand_as_pair
 
 
 class DotGatConv(nn.Module):
-    r"""Apply dot product version of self attention in GCN.
+    r"""Apply dot product version of self attention in GCN as in
+    `Attention Is All You Need <https://arxiv.org/abs/1706.03762>`.
 
         .. math::
             h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i, j} h_j^{(l)}
@@ -23,6 +24,18 @@ class DotGatConv(nn.Module):
         where :math:`W_i` and :math:`W_j` transform node :math:`i`'s and node :math:`j`'s
         features into the same dimension, so that when compute note features' similarity,
         we can use dot-product.
+
+        Parameters
+    ----------
+    in_feats : int, or pair of ints
+        Input feature size.
+
+        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
+    out_feats : int
+        Output feature size.
     """
 
     def __init__(self,
