@@ -282,14 +282,14 @@ class HeteroNodeView(object):
 
 class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""
-    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes']
+    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes', '_multi_ntype']
 
     def __init__(self, graph, ntype, ntid, nodes):
         self._graph = graph
         self._ntype = ntype
         self._ntid = ntid
         self._nodes = nodes
-        self._multi_ntype = len(ntype) > 1
+        self._multi_ntype = isinstance(ntype, list)
 
     def __getitem__(self, key):
         if self._multi_ntype:
@@ -317,6 +317,8 @@ class HeteroNodeDataView(MutableMapping):
     def __delitem__(self, key):
         if self._multi_ntype:
             for ntid in self._ntid:
+                if self._graph._get_n_repr(ntid, ALL).get(key, None) is None:
+                    continue
                 self._graph._pop_n_repr(ntid, key)
         else: 
             self._graph._pop_n_repr(self._ntid, key)
@@ -383,7 +385,7 @@ class HeteroEdgeView(object):
 
 class HeteroEdgeDataView(MutableMapping):
     """The data view class when G.edata[etype] is called."""
-    __slots__ = ['_graph', '_etype', '_etid', '_edges']
+    __slots__ = ['_graph', '_etype', '_multi_etype', '_etid', '_edges']
 
     def __init__(self, graph, etype, edges):
         self._graph = graph
@@ -420,7 +422,9 @@ class HeteroEdgeDataView(MutableMapping):
     def __delitem__(self, key):
         if self._multi_etype:
             for etid in self._etid:
-                self._graph.pop_e_repr(etid, key)
+                if self._graph._get_e_repr(etid, ALL).get(key, None) is None:
+                    continue
+                self._graph._pop_e_repr(etid, key)
         else:
             self._graph._pop_e_repr(self._etid, key)
 
@@ -438,12 +442,12 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __repr__(self):
         if self._multi_etype:
-            ret = []
+            ret = {}
             for (i, etype) in enumerate(self._etype):
-                data = self._graph.get_e_repr(self._etid[i], self._edges)
+                data = self._graph._get_e_repr(self._etid[i], self._edges)
                 value = {key : data[key]
                          for key in self._graph._edge_frames[self._etid[i]]}
-                ret[ntype] = value
+                ret[etype] = value
             return repr(ret)
         else:
             data = self._graph._get_e_repr(self._etid, self._edges)

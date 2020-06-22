@@ -715,9 +715,9 @@ class DGLHeteroGraph(object):
     def ndata(self):
         """Return the data view of all the nodes.
 
-        If the graph has only one node type. The g.ndata directly represents the 
+        If the graph has only one node type. The g.ndata directly represents the
         node data.
-        If the graph has multiple node type. The g.ndata is a dictionary of node 
+        If the graph has multiple node type. The g.ndata is a dictionary of node
         types and the corresponding node data.
 
         Examples
@@ -734,14 +734,14 @@ class DGLHeteroGraph(object):
         with multiple node types:
 
         >>> g = dgl.graph([(0, 1), (1, 2), (1, 0)], 'user', 'like', 'movie')
-        >>> g.ndata['h'] = {'user': torch.zeros(2, 5), 
+        >>> g.ndata['h'] = {'user': torch.zeros(2, 5),
                             'movie': torch.zeros(3, 5)}
 
         See Also
         --------
         nodes
         """
-        if len(self.ntypes == 1):
+        if len(self.ntypes) == 1:
             ntid = self.get_ntype_id(None)
             ntype = self.ntypes[0]
             return HeteroNodeDataView(self, ntype, ntid, ALL)
@@ -875,9 +875,9 @@ class DGLHeteroGraph(object):
     def edata(self):
         """Return the data view of all the edges.
 
-        If the graph has only one edge type. The g.edata directly represents the 
+        If the graph has only one edge type. The g.edata directly represents the
         edge data.
-        If the graph has multiple edge type. The g.edata is a dictionary of edge 
+        If the graph has multiple edge type. The g.edata is a dictionary of edge
         types and the corresponding edge data.
 
         Examples

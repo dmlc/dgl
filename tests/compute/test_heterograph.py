@@ -502,6 +502,31 @@ def test_view(index_dtype):
     f2 = g.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
     assert F.array_equal(F.tensor(g.nodes('user')), F.arange(0, 3))
+    g.nodes['user'].data.pop('h')
+
+    # multi type ndata
+    f1 = F.randn((3, 6))
+    f2 = F.randn((2, 6))
+    fail = False
+    try:
+        g.ndata['h'] = f1
+    except Exception:
+        fail = True
+    assert fail
+    g.ndata['h'] = {'user' : f1,
+                    'game' : f2}
+    f3 = g.nodes['user'].data['h']
+    f4 = g.nodes['game'].data['h']
+    assert F.array_equal(f1, f3)
+    assert F.array_equal(f2, f4)
+    data = g.ndata['h']
+    assert F.array_equal(f1, data['user'])
+    assert F.array_equal(f2, data['game'])
+    # test repr
+    print(g.ndata)
+    g.ndata.pop('h')
+    # test repr
+    print(g.ndata)
 
     f3 = F.randn((2, 4))
     g.edges['user', 'follows', 'user'].data['h'] = f3
@@ -510,6 +535,27 @@ def test_view(index_dtype):
     assert F.array_equal(f3, f4)
     assert F.array_equal(f3, f5)
     assert F.array_equal(F.tensor(g.edges(etype='follows', form='eid')), F.arange(0, 2))
+    g.edges['follows'].data.pop('h')
+
+    f3 = F.randn((2, 4))
+    fail = False
+    try:
+        g.edata['h'] = f3
+    except Exception:
+        fail = True
+    assert fail
+    g.edata['h'] = {('user', 'follows', 'user') : f3}
+    f4 = g.edges['user', 'follows', 'user'].data['h']
+    f5 = g.edges['follows'].data['h']
+    assert F.array_equal(f3, f4)
+    assert F.array_equal(f3, f5)
+    data = g.edata['h']
+    assert F.array_equal(f3, data[('user', 'follows', 'user')])
+    # test repr
+    print(g.edata)
+    g.edata.pop('h')
+    # test repr
+    print(g.edata)
 
 @parametrize_dtype
 def test_view1(index_dtype):
@@ -1720,7 +1766,7 @@ if __name__ == '__main__':
     # test_hypersparse()
     # test_adj("int32")
     # test_inc()
-    # test_view()
+    test_view("int32")
     # test_view1("int32")
     # test_flatten()
     # test_convert_bound()
