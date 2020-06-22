@@ -64,4 +64,3 @@ def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges, restrict_format='any
                           num_nodes=(num_src_nodes, num_dst_nodes), validate=False,
                           restrict_format=restrict_format)
     return g
-
