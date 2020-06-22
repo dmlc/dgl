@@ -52,7 +52,10 @@ inline void CheckShape(
     if (IsNullArray(arrays[i]))
       continue;
     CHECK_GE(arrays[i]->ndim, 2)
-      << "Expect " << names[i] << " to have ndim >= 2";
+      << "Expect " << names[i] << " to have ndim >= 2, "
+      << "Note that for scalar feature we expand its "
+      << "dimension with an additional dimension of "
+      << "length one.";
     CHECK_EQ(gdim[uev_idx[i]], arrays[i]->shape[0])
       << "Expect " << names[i] << " to have size "
       << gdim[uev_idx[i]] << " on the first dimension, "

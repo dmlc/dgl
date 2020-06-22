@@ -105,6 +105,12 @@ def gspmm(g, op, reduce_op, u, e):
     -------
     tensor
         The result tensor.
+
+    Notes
+    -----
+    This function does not handle gradients, and for scalar input features,
+    we expand its dimension with an additional dimension of length one. (e.g.
+    (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
     if u is not None:
         if F.ndim(u) == 1:
@@ -145,8 +151,6 @@ def gsddmm(g, op, u, v):
     is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
     we apply gsddmm on: :attr:`g`.
 
-    Note that this function does not handle gradients.
-
     Parameters
     ----------
     g : DGLHeteroGraph
@@ -163,6 +167,12 @@ def gsddmm(g, op, u, v):
     -------
     tensor
         The result tensor.
+
+    Notes
+    -----
+    This function does not handle gradients, and for scalar input features,
+    we expand its dimension with an additional dimension of length one. (e.g.
+    (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
     if u is not None:
         if F.ndim(u) == 1:

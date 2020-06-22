@@ -21,8 +21,7 @@ namespace cpu {
  * \param vfeat The feature on destination nodes.
  * \param out The result feature on edges.
  * \note it uses node parallel strategy, different threads are responsible
- *       for the computation of different nodes. To avoid possible data hazard,
- *       we use atomic operators in this case.
+ *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
 void SDDMMCsr(const BcastOff& bcast,

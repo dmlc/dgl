@@ -38,10 +38,14 @@ struct BcastOff {
   bool use_bcast;
   /*!
    * \brief Auxiliary information for kernel computation 
-   * \note lhs_len refers to the left hand side operand size.
-   *       rhs_len refers to the right hand side operand size.
-   *       out_len refers to the size of output.
-   *       reduce_size refers to the reduction length (for op like dot).
+   * \note lhs_len refers to the left hand side operand length.
+   *       e.g. 15 for shape (1, 3, 5)
+   *       rhs_len refers to the right hand side operand length.
+   *       e.g. 15 for shape (3, 1, 5)
+   *       out_len refers to the output length.
+   *       e.g. 45 for shape (3, 3, 5)
+   *       reduce_size refers to the reduction size (for op like dot).
+   *       e.g. 1 for add, 5 for dot and lhs_shape,rhs_shape=(3,5)
    */
   int64_t lhs_len, rhs_len, out_len, reduce_size;
 };
