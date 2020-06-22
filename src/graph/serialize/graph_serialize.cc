@@ -147,10 +147,19 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GetFileVersion")
     *rv = static_cast<int64_t>(GetFileVersion(filename));
   });
 
-StorageMetaData LoadGraph_V0(const std::string &filename,
-                             std::vector<dgl_id_t> idx_list, bool onlyMeta) {
-                               
-                             }
+
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V0")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    std::string filename = args[0];
+    List<Value> idxs = args[1];
+    bool onlyMeta = args[2];
+    std::vector<dgl_id_t> idx_list(idxs.size());
+    for (uint64_t i = 0; i < idxs.size(); ++i) {
+      idx_list[i] = static_cast<dgl_id_t>(idxs[i]->data);
+    }
+    *rv = LoadDGLGraphFiles(filename, idx_list, onlyMeta);
+  });
+
 
 StorageMetaData LoadDGLGraphFiles(const std::string &filename,
                                   std::vector<dgl_id_t> idx_list,
