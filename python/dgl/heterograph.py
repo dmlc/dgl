@@ -910,7 +910,10 @@ class DGLHeteroGraph(object):
         If the graph has only one edge type. The g.edata directly represents the
         edge data.
         If the graph has multiple edge type. The g.edata is a dictionary of edge
-        types and the corresponding edge data.
+        types and the corresponding edge data. 
+
+        Note: When the graph has multiple edge type, The key used in g.edata should 
+        be canonical_etypes, i.e. (h_ntype, r_type, t_ntype).
 
         Examples
         --------

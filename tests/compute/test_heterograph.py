@@ -745,21 +745,14 @@ def test_view1(index_dtype):
     assert F.array_equal(f3, f4)
     assert F.array_equal(F.tensor(g.edges(form='eid')), F.arange(0, 2))
 
-    # test fail case
-    # fail due to multiple types
-    fail = False
-    try:
-        HG.ndata['h']
-    except dgl.DGLError:
-        fail = True
-    assert fail
-
-    fail = False
-    try:
-        HG.edata['h']
-    except dgl.DGLError:
-        fail = True
-    assert fail
+    # multiple types
+    ndata = HG.ndata['h']
+    assert isinstance(ndata, dict)
+    assert F.array_equal(ndata['user'], f2)
+    
+    edata = HG.edata['h']
+    assert isinstance(edata, dict)
+    assert F.array_equal(edata[('user', 'follows', 'user')], f4)
 
 @parametrize_dtype
 def test_flatten(index_dtype):
@@ -1826,7 +1819,7 @@ if __name__ == '__main__':
     # test_hypersparse()
     # test_adj("int32")
     # test_inc()
-    test_view("int32")
+    # test_view("int32")
     # test_view1("int32")
     # test_flatten()
     # test_convert_bound()
