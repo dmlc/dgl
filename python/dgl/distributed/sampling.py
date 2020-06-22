@@ -1,5 +1,4 @@
 """Sampling module"""
-import numpy as np
 from .rpc import Request, Response, remote_call_to_machine
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
