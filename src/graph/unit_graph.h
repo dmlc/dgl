@@ -129,7 +129,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   EdgeArray OutEdges(dgl_type_t etype, IdArray vids) const override;
 
-  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override;
+  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") override;
 
   uint64_t InDegree(dgl_type_t etype, dgl_id_t vid) const override;
 

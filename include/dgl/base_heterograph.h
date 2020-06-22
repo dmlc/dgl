@@ -256,7 +256,7 @@ class BaseHeteroGraph : public runtime::Object {
    * \param order The order of the returned edge list.
    * \return the id arrays of the two endpoints of the edges.
    */
-  virtual EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const = 0;
+  virtual EdgeArray Edges(dgl_type_t etype, const std::string &order = "") = 0;
 
   /*!
    * \brief Get the in degree of the given vertex.
@@ -454,7 +454,7 @@ class BaseHeteroGraph : public runtime::Object {
    * \param etypes The list of edge type IDs.
    * \return The flattened graph, with induced source/edge/destination types/IDs.
    */
-  virtual FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const {
+  virtual FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) {
     LOG(FATAL) << "Flatten operation unsupported";
     return nullptr;
   }

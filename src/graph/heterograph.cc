@@ -271,7 +271,7 @@ HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const
 }
 
 FlattenedHeteroGraphPtr HeteroGraph::Flatten(
-    const std::vector<dgl_type_t>& etypes) const {
+    const std::vector<dgl_type_t>& etypes) {
   const int64_t bits = NumBits();
   if (bits == 32) {
     return FlattenImpl<int32_t>(etypes);
@@ -281,7 +281,7 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(
 }
 
 template <class IdType>
-FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& etypes) const {
+FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& etypes) {
   std::unordered_map<dgl_type_t, size_t> srctype_offsets, dsttype_offsets;
   size_t src_nodes = 0, dst_nodes = 0;
   std::vector<IdType> result_src, result_dst;

@@ -257,7 +257,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return EdgeArray{row, coosubmat.col, coosubmat.data};
   }
 
-  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override {
+  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") override {
     CHECK(order.empty() || order == std::string("eid"))
       << "COO only support Edges of order \"eid\", but got \""
       << order << "\".";
@@ -629,10 +629,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return EdgeArray{row, coosubmat.col, coosubmat.data};
   }
 
-  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override {
+  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") override {
     CHECK(order.empty() || order == std::string("srcdst"))
       << "CSR only support Edges of order \"srcdst\","
       << " but got \"" << order << "\".";
+    if (!adj_.sorted)
+      aten::CSRSort_(&adj_);
     const auto& coo = aten::CSRToCOO(adj_, false);
     return EdgeArray{coo.row, coo.col, coo.data};
   }
@@ -936,7 +938,7 @@ EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
   return ptr->OutEdges(etype, vids);
 }
 
-EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
+EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) {
   SparseFormat fmt;
   if (order == std::string("eid")) {
     fmt = SelectFormat(SparseFormat::kCOO);

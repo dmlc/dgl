@@ -130,7 +130,7 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->OutEdges(0, vids);
   }
 
-  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override {
+  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") override {
     return GetRelationGraph(etype)->Edges(0, order);
   }
 
@@ -204,7 +204,7 @@ class HeteroGraph : public BaseHeteroGraph {
 
   HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
 
-  FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
+  FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) override;
 
   GraphPtr AsImmutableGraph() const override;
 
@@ -240,7 +240,7 @@ class HeteroGraph : public BaseHeteroGraph {
   * \return pointer of FlattenedHeteroGraphh
   */
   template <class IdType>
-  FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
+  FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes);
 };
 
 }  // namespace dgl
