@@ -991,6 +991,13 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
 
+    def reverse(self):
+        """
+        Reverse the graph adjacency
+        XXX(minjie): only work for unitgraph
+        """
+        return _CAPI_DGLHeteroReverse(self)
+
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):
