@@ -69,6 +69,34 @@ TEST(ZeroCopySerialize, NDArray) {
   zc_read_strm.Read(&loadtensor2);
 }
 
+TEST(ZeroCopySerialize, ZeroShapeNDArray) {
+  auto tensor1 = VecToIdArray<int64_t>({6, 6, 5, 7});
+  auto tensor2 = VecToIdArray<int64_t>({});
+  auto tensor3 = VecToIdArray<int64_t>({6, 6, 2, 7});
+  std::vector<NDArray> ndvec;
+  ndvec.push_back(tensor1);
+  ndvec.push_back(tensor2);
+  ndvec.push_back(tensor3);
+
+  std::string zerocopy_blob;
+  StreamWithBuffer zc_write_strm(&zerocopy_blob, true);
+  zc_write_strm.Write(ndvec);
+
+  std::vector<void *> new_ptr_list;
+  // Use memcpy to mimic remote machine reconstruction
+  for (auto ptr : zc_write_strm.buffer_list()) {
+    auto new_ptr = malloc(ptr.size);
+    memcpy(new_ptr, ptr.data, ptr.size);
+    new_ptr_list.emplace_back(new_ptr);
+  }
+
+  std::vector<NDArray> ndvec_read;
+  StreamWithBuffer zc_read_strm(&zerocopy_blob, new_ptr_list);
+  zc_read_strm.Read(&ndvec_read);
+  EXPECT_EQ(ndvec_read[1]->ndim, 1);
+  EXPECT_EQ(ndvec_read[1]->shape[0], 0);
+}
+
 TEST(ZeroCopySerialize, SharedMem) {
   auto tensor1 = VecToIdArray<int64_t>({1, 2, 5, 3});
   DLDataType dtype = {kDLInt, 64, 1};
