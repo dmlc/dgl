@@ -158,8 +158,8 @@ def load_subtensor(g, seeds, input_nodes, device):
 def run(args, device, data):
     # Unpack data
     train_mask, val_mask, in_feats, n_classes, g = data
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
+    train_nid = th.nonzero(train_mask, as_tuple=True)[0]
+    val_nid = th.nonzero(val_mask, as_tuple=True)[0]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
@@ -272,7 +272,8 @@ if __name__ == '__main__':
         device = th.device('cpu')
 
     # load reddit data
-    g, n_classes = load_reddit()
+    g, n_classes = load_ogb('ogbn-products')
+    g = dgl.as_heterograph(g)
     in_feats = g.ndata['features'].shape[1]
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
