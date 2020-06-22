@@ -718,7 +718,7 @@ class DGLHeteroGraph(object):
         If the graph has only one node type. The g.ndata directly represents the
         node data.
         If the graph has multiple node type. The g.ndata is a dictionary of node
-        types and the corresponding node data.
+        types and their corresponding node data.
 
         Examples
         --------
@@ -757,10 +757,14 @@ class DGLHeteroGraph(object):
 
         Only works if the graph is either
 
-        * Uni-bipartite and has one node type in the SRC category.
+        * Uni-bipartite
 
-        * Non-uni-bipartite and has only one node type (in this case identical to
-        :any:`DGLHeteroGraph.ndata`)
+        * Non-uni-bipartite (in this case identical to :any:`DGLHeteroGraph.ndata`)
+
+        If the SRC has only one node type. The g.srcdata directly represents the
+        node data.
+        If the SRC has multiple node type. The g.srcdata is a dictionary of node
+        types and their corresponding node data.
 
         Examples
         --------
@@ -785,6 +789,17 @@ class DGLHeteroGraph(object):
         True
         >>> g.srcdata['h'] = torch.zeros(2, 5)
 
+        To set features of source nodes with different node type in a graph:
+
+        >>> g = dgl.heterograph({
+        ...     ('game', 'liked-by', 'user'), [(1, 0), (2, 1)],
+        ...     ('book', 'liked-by', 'user'), [(1, 0), (0, 1)],
+        ...     })
+        >>> print(g.is_unibipartite)
+        True
+        >>> g.srcdata['h'] = {'game' : torch.zeros(3, 5),
+                              'book' : torch.zeros(2, 5)}
+
         Notes
         -----
         This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
@@ -793,13 +808,14 @@ class DGLHeteroGraph(object):
         --------
         nodes
         """
-        err_msg = (
-            'srcdata is only allowed when there is only one %s type.' %
-            ('SRC' if self.is_unibipartite else 'node'))
-        assert len(self.srctypes) == 1, err_msg
-        ntype = self.srctypes[0]
-        ntid = self.get_ntype_id_from_src(ntype)
-        return HeteroNodeDataView(self, ntype, ntid, ALL)
+        if len(self.srctypes) == 1:
+            ntype = self.srctypes[0]
+            ntid = self.get_ntype_id_from_src(ntype)
+            return HeteroNodeDataView(self, ntype, ntid, ALL)
+        else:
+            ntypes = self.srctypes
+            ntids = [self.get_ntype_id_from_src(ntype) for ntype in ntypes]
+            return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
     @property
     def dstdata(self):
@@ -807,10 +823,14 @@ class DGLHeteroGraph(object):
 
         Only works if the graph is either
 
-        * Uni-bipartite and has one node type in the SRC category.
+        * Uni-bipartite
 
-        * Non-uni-bipartite and has only one node type (in this case identical to
-        :any:`DGLHeteroGraph.ndata`)
+        * Non-uni-bipartite (in this case identical to :any:`DGLHeteroGraph.ndata`)
+
+        If the DST has only one node type. The g.dstdata directly represents the
+        node data.
+        If the DST has multiple node type. The g.dstdata is a dictionary of node
+        types and their corresponding node data.
 
         Examples
         --------
@@ -835,6 +855,17 @@ class DGLHeteroGraph(object):
         True
         >>> g.dstdata['h'] = torch.zeros(3, 5)
 
+        To set features of dst nodes with different node type in a graph:
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'), [(0, 1), (1, 2)],
+        ...     ('user', 'reads', 'book'), [(0, 1), (1, 0)],
+        ...     })
+        >>> print(g.is_unibipartite)
+        True
+        >>> g.dstdata['h'] = {'game' : torch.zeros(3, 5),
+                              'book' : torch.zeros(2, 5)}
+
         Notes
         -----
         This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
@@ -843,13 +874,14 @@ class DGLHeteroGraph(object):
         --------
         nodes
         """
-        err_msg = (
-            'dstdata is only allowed when there is only one %s type.' %
-            ('DST' if self.is_unibipartite else 'node'))
-        assert len(self.dsttypes) == 1, err_msg
-        ntype = self.dsttypes[0]
-        ntid = self.get_ntype_id_from_dst(ntype)
-        return HeteroNodeDataView(self, ntype, ntid, ALL)
+        if len(self.dsttypes) == 1:
+            ntype = self.dsttypes[0]
+            ntid = self.get_ntype_id_from_dst(ntype)
+            return HeteroNodeDataView(self, ntype, ntid, ALL)
+        else:
+            ntypes = self.dsttypes
+            ntids = [self.get_ntype_id_from_dst(ntype) for ntype in ntypes]
+            return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
     @property
     def edges(self):

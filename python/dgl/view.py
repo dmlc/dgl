@@ -320,7 +320,7 @@ class HeteroNodeDataView(MutableMapping):
                 if self._graph._get_n_repr(ntid, ALL).get(key, None) is None:
                     continue
                 self._graph._pop_n_repr(ntid, key)
-        else: 
+        else:
             self._graph._pop_n_repr(self._ntid, key)
 
     def __len__(self):

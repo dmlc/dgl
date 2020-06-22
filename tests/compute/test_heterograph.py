@@ -557,6 +557,66 @@ def test_view(index_dtype):
     # test repr
     print(g.edata)
 
+    # test srcdata
+    f1 = F.randn((3, 6))
+    g.srcnodes['user'].data['h'] = f1       # ok
+    f2 = g.srcnodes['user'].data['h']
+    assert F.array_equal(f1, f2)
+    assert F.array_equal(F.tensor(g.srcnodes('user')), F.arange(0, 3))
+    g.srcnodes['user'].data.pop('h')
+
+    # multi type ndata
+    f1 = F.randn((3, 6))
+    f2 = F.randn((2, 6))
+    fail = False
+    try:
+        g.srcdata['h'] = f1
+    except Exception:
+        fail = True
+    assert fail
+    g.srcdata['h'] = {'user' : f1,
+                      'developer' : f2}
+    f3 = g.srcnodes['user'].data['h']
+    f4 = g.srcnodes['developer'].data['h']
+    assert F.array_equal(f1, f3)
+    assert F.array_equal(f2, f4)
+    data = g.srcdata['h']
+    assert F.array_equal(f1, data['user'])
+    assert F.array_equal(f2, data['developer'])
+    # test repr
+    print(g.srcdata)
+    g.srcdata.pop('h')
+
+    # test dstdata
+    f1 = F.randn((3, 6))
+    g.dstnodes['user'].data['h'] = f1       # ok
+    f2 = g.dstnodes['user'].data['h']
+    assert F.array_equal(f1, f2)
+    assert F.array_equal(F.tensor(g.dstnodes('user')), F.arange(0, 3))
+    g.dstnodes['user'].data.pop('h')
+
+    # multi type ndata
+    f1 = F.randn((3, 6))
+    f2 = F.randn((2, 6))
+    fail = False
+    try:
+        g.dstdata['h'] = f1
+    except Exception:
+        fail = True
+    assert fail
+    g.dstdata['h'] = {'user' : f1,
+                      'game' : f2}
+    f3 = g.dstnodes['user'].data['h']
+    f4 = g.dstnodes['game'].data['h']
+    assert F.array_equal(f1, f3)
+    assert F.array_equal(f2, f4)
+    data = g.dstdata['h']
+    assert F.array_equal(f1, data['user'])
+    assert F.array_equal(f2, data['game'])
+    # test repr
+    print(g.dstdata)
+    g.dstdata.pop('h')
+
 @parametrize_dtype
 def test_view1(index_dtype):
     # test relation view
