@@ -109,13 +109,22 @@ def device_type(ctx):
 def device_id(ctx):
     return ctx.device_id
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return mx.cpu()
+    elif dev_type == 2:
+        return mx.gpu(dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
+
 def astype(input, ty):
     return nd.cast(input, ty)
 
 def asnumpy(input):
     return input.asnumpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
@@ -312,6 +321,9 @@ def equal(x, y):
 
 def logical_not(input):
     return nd.logical_not(input)
+
+def logical_and(input1, input2):
+    return nd.logical_and(input1, input2)
 
 def clone(input):
     return input.copy()

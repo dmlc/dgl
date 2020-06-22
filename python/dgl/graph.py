@@ -1332,7 +1332,7 @@ class DGLGraph(DGLBaseGraph):
 
         Notes
         -----
-        The nodes and edges in the graph would be re-indexed after the removal.
+        The edges in the graph would be re-indexed after the removal.  The nodes are preserved.
 
         Examples
         --------
@@ -3872,7 +3872,7 @@ class DGLGraph(DGLBaseGraph):
                           edata=str(self.edge_attr_schemes()))
 
     # pylint: disable=invalid-name
-    def to(self, ctx):
+    def to(self, ctx, **kwargs):
         """Move both ndata and edata to the targeted mode (cpu/gpu)
         Framework agnostic
 
@@ -3898,9 +3898,9 @@ class DGLGraph(DGLBaseGraph):
         >>> G = G.to(torch.device('cuda:0'))
         """
         for k in self.ndata.keys():
-            self.ndata[k] = F.copy_to(self.ndata[k], ctx)
+            self.ndata[k] = F.copy_to(self.ndata[k], ctx, **kwargs)
         for k in self.edata.keys():
-            self.edata[k] = F.copy_to(self.edata[k], ctx)
+            self.edata[k] = F.copy_to(self.edata[k], ctx, **kwargs)
         return self
     # pylint: enable=invalid-name
 
