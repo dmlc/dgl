@@ -424,6 +424,7 @@ def deserialize_from_payload(cls, data, tensors):
         De-serialized object of class cls.
     """
     pos, nonarray_state = pickle.loads(data)
+    # Use _PLACEHOLDER to distinguish with other deserizliaed elements
     state = [_PLACEHOLDER] * (len(nonarray_state) + len(tensors))
     for i, no_state in zip(pos, nonarray_state):
         state[i] = no_state
