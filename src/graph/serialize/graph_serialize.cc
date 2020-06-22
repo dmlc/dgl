@@ -32,6 +32,7 @@
  *
  */
 #include "graph_serialize.h"
+#include "dmlc/logging.h"
 
 #include <dgl/graph_op.h>
 #include <dgl/immutable_graph.h>
@@ -55,6 +56,7 @@ using dgl::runtime::NDArray;
 using dgl::serialize::GraphData;
 using dgl::serialize::GraphDataObject;
 using dmlc::SeekStream;
+using dmlc::Stream;
 using std::vector;
 
 namespace dmlc {
@@ -128,6 +130,28 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataEdgeTensors")
     *rv = rvmap;
   });
 
+uint64_t GetFileVersion(const std::string &filename) {
+  auto fs = Stream::Create(filename.c_str(), "r", true);
+  CHECK(fs) << "File " << filename << " not found";
+  uint64_t magicNum, graphType, version;
+  fs->Read(&magicNum);
+  fs->Read(&graphType);
+  fs->Read(&version);
+  CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
+  return version;
+}
+
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GetFileVersion")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    std::string filename = args[0];
+    *rv = static_cast<int64_t>(GetFileVersion(filename));
+  });
+
+StorageMetaData LoadGraph_V0(const std::string &filename,
+                             std::vector<dgl_id_t> idx_list, bool onlyMeta) {
+                               
+                             }
+
 StorageMetaData LoadDGLGraphFiles(const std::string &filename,
                                   std::vector<dgl_id_t> idx_list,
                                   bool onlyMeta) {
@@ -137,8 +161,8 @@ StorageMetaData LoadDGLGraphFiles(const std::string &filename,
   // Read DGL MetaData
   uint64_t magicNum, graphType, version;
   fs->Read(&magicNum);
-  fs->Read(&graphType);
   fs->Read(&version);
+  fs->Read(&graphType);
   fs->Seek(4096);
 
   CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
