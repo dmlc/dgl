@@ -291,3 +291,4 @@ void DFSLabeledEdges(const GraphInterface& graph,
 }  // namespace dgl
 
 #endif  // DGL_GRAPH_TRAVERSAL_H_
+

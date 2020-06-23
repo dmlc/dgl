@@ -119,59 +119,58 @@ class GraphConv(gluon.Block):
         mxnet.NDArray
             The output feature
         """
-        graph = graph.local_var()
-
-        if self._norm == 'both':
-            degs = graph.out_degrees().as_in_context(feat.context).astype('float32')
-            degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
-            norm = mx.nd.power(degs, -0.5)
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = norm.reshape(shp)
-            feat = feat * norm
-
-        if weight is not None:
-            if self.weight is not None:
-                raise DGLError('External weight is provided while at the same time the'
-                               ' module has defined its own weight parameter. Please'
-                               ' create the module with flag weight=False.')
-        else:
-            weight = self.weight.data(feat.context)
-
-        if self._in_feats > self._out_feats:
-            # mult W first to reduce the feature size for aggregation.
-            if weight is not None:
-                feat = mx.nd.dot(feat, weight)
-            graph.srcdata['h'] = feat
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.dstdata.pop('h')
-        else:
-            # aggregate first then mult W
-            graph.srcdata['h'] = feat
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.dstdata.pop('h')
-            if weight is not None:
-                rst = mx.nd.dot(rst, weight)
-
-        if self._norm != 'none':
-            degs = graph.in_degrees().as_in_context(feat.context).astype('float32')
-            degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
+        with graph.local_scope():
             if self._norm == 'both':
+                degs = graph.out_degrees().as_in_context(feat.context).astype('float32')
+                degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
                 norm = mx.nd.power(degs, -0.5)
+                shp = norm.shape + (1,) * (feat.ndim - 1)
+                norm = norm.reshape(shp)
+                feat = feat * norm
+
+            if weight is not None:
+                if self.weight is not None:
+                    raise DGLError('External weight is provided while at the same time the'
+                                   ' module has defined its own weight parameter. Please'
+                                   ' create the module with flag weight=False.')
             else:
-                norm = 1.0 / degs
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = norm.reshape(shp)
-            rst = rst * norm
+                weight = self.weight.data(feat.context)
 
-        if self.bias is not None:
-            rst = rst + self.bias.data(rst.context)
+            if self._in_feats > self._out_feats:
+                # mult W first to reduce the feature size for aggregation.
+                if weight is not None:
+                    feat = mx.nd.dot(feat, weight)
+                graph.srcdata['h'] = feat
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.dstdata.pop('h')
+            else:
+                # aggregate first then mult W
+                graph.srcdata['h'] = feat
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.dstdata.pop('h')
+                if weight is not None:
+                    rst = mx.nd.dot(rst, weight)
 
-        if self._activation is not None:
-            rst = self._activation(rst)
+            if self._norm != 'none':
+                degs = graph.in_degrees().as_in_context(feat.context).astype('float32')
+                degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
+                if self._norm == 'both':
+                    norm = mx.nd.power(degs, -0.5)
+                else:
+                    norm = 1.0 / degs
+                shp = norm.shape + (1,) * (feat.ndim - 1)
+                norm = norm.reshape(shp)
+                rst = rst * norm
 
-        return rst
+            if self.bias is not None:
+                rst = rst + self.bias.data(rst.context)
+
+            if self._activation is not None:
+                rst = self._activation(rst)
+
+            return rst
 
     def __repr__(self):
         summary = 'GraphConv('

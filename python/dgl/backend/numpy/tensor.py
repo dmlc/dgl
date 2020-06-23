@@ -194,8 +194,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return np.sort(input), np.argsort(input)
 
-def arange(start, stop):
-    return np.arange(start, stop, dtype=np.int64)
+def arange(start, stop, dtype="int64"):
+    return np.arange(start, stop, dtype=getattr(np, dtype))
 
 def rand_shuffle(arr):
     copy = np.copy(arr)

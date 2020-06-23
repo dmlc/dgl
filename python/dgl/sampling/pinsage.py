@@ -178,6 +178,7 @@ class PinSAGESampler(RandomWalkNeighborSampler):
     Examples
     --------
     Generate a random bidirectional bipartite graph with 3000 "A" nodes and 5000 "B" nodes.
+
     >>> g = scipy.sparse.random(3000, 5000, 0.003)
     >>> G = dgl.heterograph({
     ...     ('A', 'AB', 'B'): g,
@@ -185,10 +186,12 @@ class PinSAGESampler(RandomWalkNeighborSampler):
 
     Then we create a PinSAGE neighbor sampler that samples a graph of node type "A".  Each
     node would have (a maximum of) 10 neighbors.
+
     >>> sampler = dgl.sampling.PinSAGESampler(G, 'A', 'B', 3, 0.5, 200, 10)
 
     This is how we select the neighbors for node #0, #1 and #2 of type "A" according to
     PinSAGE algorithm:
+
     >>> seeds = torch.LongTensor([0, 1, 2])
     >>> frontier = sampler(seeds)
     >>> frontier.all_edges(form='uv')

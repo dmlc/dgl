@@ -10,6 +10,7 @@ from .backend import load_backend, backend_name
 from . import function
 from . import contrib
 from . import container
+from . import distributed
 from . import random
 from . import sampling
 
@@ -29,3 +30,4 @@ from .traversal import *
 from .transform import *
 from .propagate import *
 from .udf import NodeBatch, EdgeBatch
+from .sparse import gspmm, gsddmm

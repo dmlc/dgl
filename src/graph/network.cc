@@ -15,10 +15,10 @@
 
 #include <unordered_map>
 
-#include "./network/communicator.h"
-#include "./network/socket_communicator.h"
-#include "./network/msg_queue.h"
-#include "./network/common.h"
+#include "../rpc/network/communicator.h"
+#include "../rpc/network/socket_communicator.h"
+#include "../rpc/network/msg_queue.h"
+#include "../rpc/network/common.h"
 
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
@@ -31,7 +31,7 @@ namespace network {
 static void NaiveDeleter(DLManagedTensor* managed_tensor) {
   delete [] managed_tensor->dl_tensor.shape;
   delete [] managed_tensor->dl_tensor.strides;
-  delete [] managed_tensor->dl_tensor.data;
+  free(managed_tensor->dl_tensor.data);
   delete managed_tensor;
 }
 
@@ -498,14 +498,17 @@ static void send_kv_message(network::Sender* sender,
   CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
   if (kv_msg->msg_type != kFinalMsg &&
       kv_msg->msg_type != kBarrierMsg &&
-      kv_msg->msg_type != kIPIDMsg) {
+      kv_msg->msg_type != kIPIDMsg &&
+      kv_msg->msg_type != kGetShapeMsg) {
     // Send ArrayMeta
     ArrayMeta meta(kv_msg->msg_type);
-    if (kv_msg->msg_type != kInitMsg) {
+    if (kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       meta.AddArray(kv_msg->id);
     }
     if (kv_msg->msg_type != kPullMsg &&
-        kv_msg->msg_type != kInitMsg) {
+        kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       meta.AddArray(kv_msg->data);
     }
     if (kv_msg->msg_type != kPullMsg &&
@@ -523,7 +526,9 @@ static void send_kv_message(network::Sender* sender,
     }
     CHECK_EQ(sender->Send(send_meta_msg, recv_id), ADD_SUCCESS);
     // Send ID NDArray
-    if (kv_msg->msg_type != kInitMsg) {
+    if (kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       Message send_id_msg;
       send_id_msg.data = static_cast<char*>(kv_msg->id->data);
       send_id_msg.size = kv_msg->id.GetSize();
@@ -535,7 +540,9 @@ static void send_kv_message(network::Sender* sender,
     }
     // Send data NDArray
     if (kv_msg->msg_type != kPullMsg &&
-        kv_msg->msg_type != kInitMsg) {
+        kv_msg->msg_type != kInitMsg &&
+        kv_msg->msg_type != kGetShapeMsg &&
+        kv_msg->msg_type != kGetShapeBackMsg) {
       Message send_data_msg;
       send_data_msg.data = static_cast<char*>(kv_msg->data->data);
       send_data_msg.size = kv_msg->data.GetSize();
@@ -571,7 +578,8 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   recv_kv_msg.deallocator(&recv_kv_msg);
   if (kv_msg->msg_type == kFinalMsg ||
       kv_msg->msg_type == kBarrierMsg ||
-      kv_msg->msg_type == kIPIDMsg) {
+      kv_msg->msg_type == kIPIDMsg ||
+      kv_msg->msg_type == kGetShapeMsg) {
     return kv_msg;
   }
   // Recv ArrayMeta
@@ -580,7 +588,8 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   ArrayMeta meta(recv_meta_msg.data, recv_meta_msg.size);
   recv_meta_msg.deallocator(&recv_meta_msg);
   // Recv ID NDArray
-  if (kv_msg->msg_type != kInitMsg) {
+  if (kv_msg->msg_type != kInitMsg &&
+      kv_msg->msg_type != kGetShapeBackMsg) {
     Message recv_id_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_id_msg, send_id), REMOVE_SUCCESS);
     CHECK_EQ(meta.data_shape_[0], 1);
@@ -593,7 +602,8 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
   }
   // Recv Data NDArray
   if (kv_msg->msg_type != kPullMsg &&
-      kv_msg->msg_type != kInitMsg) {
+      kv_msg->msg_type != kInitMsg &&
+      kv_msg->msg_type != kGetShapeBackMsg) {
     Message recv_data_msg;
     CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
     int64_t ndim = meta.data_shape_[2];
@@ -644,18 +654,23 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
       std::string name = args[args_count++];
       kv_msg.name = name;
       if (kv_msg.msg_type != kIPIDMsg &&
-          kv_msg.msg_type != kInitMsg) {
+          kv_msg.msg_type != kInitMsg &&
+          kv_msg.msg_type != kGetShapeMsg &&
+          kv_msg.msg_type != kGetShapeBackMsg) {
         kv_msg.id = args[args_count++];
       }
       if (kv_msg.msg_type != kPullMsg &&
           kv_msg.msg_type != kIPIDMsg &&
-          kv_msg.msg_type != kInitMsg) {
+          kv_msg.msg_type != kInitMsg &&
+          kv_msg.msg_type != kGetShapeMsg &&
+          kv_msg.msg_type != kGetShapeBackMsg) {
         kv_msg.data = args[args_count++];
       }
       if (kv_msg.msg_type != kIPIDMsg &&
           kv_msg.msg_type != kPullMsg &&
           kv_msg.msg_type != kPushMsg &&
-          kv_msg.msg_type != kPullBackMsg) {
+          kv_msg.msg_type != kPullBackMsg &&
+          kv_msg.msg_type != kGetShapeMsg) {
         kv_msg.shape = args[args_count++];
       }
     }
@@ -751,6 +766,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     row_size *= (local_data->dtype.bits / 8);
+    size_t data_size = local_data.GetSize();
+    CHECK_GT(local_data_shape.size(), 0);
+    CHECK_EQ(row_size * local_data_shape[0], data_size);
     // Get local id and remote id
     if (str_flag.compare("has_g2l") == 0) {
       NDArray g2l = args[11];
@@ -760,9 +778,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         int64_t part_id = pb_data[id];
         if (part_id == local_machine_id) {
           int64_t local_id = g2l_data[id];
+          CHECK_LT(local_id, local_data_shape[0]);
+          CHECK_GE(local_id, 0);
           local_ids.push_back(local_id);
           local_ids_orginal.push_back(i);
         } else {
+          CHECK_LT(part_id, machine_count) << "invalid partition ID";
           remote_ids[part_id].push_back(id);
           remote_ids_original[part_id].push_back(i);
         }
@@ -772,6 +793,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         int64_t id = ID_data[i];
         int64_t part_id = pb_data[id];
         if (part_id == local_machine_id) {
+          CHECK_LT(id, local_data_shape[0]);
+          CHECK_GE(id, 0);
           local_ids.push_back(id);
           local_ids_orginal.push_back(i);
         } else {
@@ -807,6 +830,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     // Copy local data
 #pragma omp parallel for
     for (int64_t i = 0; i < local_ids.size(); ++i) {
+      CHECK_GE(ID_size*row_size, local_ids_orginal[i] * row_size + row_size);
+      CHECK_GE(data_size, local_ids[i] * row_size + row_size);
+      CHECK_GE(local_ids[i], 0);
       memcpy(return_data + local_ids_orginal[i] * row_size,
              local_data_char + local_ids[i] * row_size,
              row_size);

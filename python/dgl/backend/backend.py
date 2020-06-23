@@ -28,6 +28,7 @@ def data_type_dict():
     int16
     int32
     int64
+    bool
 
     This function will be called only *once* during the initialization fo the
     backend module. The returned dictionary will become the attributes of the
@@ -227,11 +228,49 @@ def context(input):
     pass
 
 def device_type(ctx):
-    """Return a str representing device type"""
+    """Return a str representing device type.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    str
+    """
     pass
 
 def device_id(ctx):
-    """Return device index"""
+    """Return device index.
+
+    For CPU, the index does not matter. For GPU, the index means which GPU
+    device on the machine.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    int
+        The device index.
+    """
+    pass
+
+def to_backend_ctx(dglctx):
+    """Convert a DGL context object to a backend context.
+
+    Parameters
+    ----------
+    dglctx : dgl.ndarray.DGLContext
+        DGL context object. See _ffi.runtime_types for definition.
+
+    Returns
+    -------
+    ctx : framework-specific context object.
+    """
     pass
 
 def astype(input, ty):
@@ -268,7 +307,7 @@ def asnumpy(input):
     """
     pass
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     """Copy the given tensor to the context.
 
     Parameters
@@ -981,6 +1020,24 @@ def logical_not(input):
     """
     pass
 
+def logical_and(input1, input2):
+    pass
+
+def clone(input):
+    """Return a clone of the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        Input tensor.
+
+    Returns
+    -------
+    Tensor
+        A clone tensor.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1057,7 +1114,7 @@ def sort_1d(input):
     """
     pass
 
-def arange(start, stop):
+def arange(start, stop, dtype):
     """Create a 1D range int64 tensor.
 
     Parameters
@@ -1066,6 +1123,8 @@ def arange(start, stop):
         The range start.
     stop : int
         The range stop.
+    dtype: str
+        The dtype of result tensor
 
     Returns
     -------

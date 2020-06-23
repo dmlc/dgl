@@ -10,9 +10,10 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
+#include "../../c_api_common.h"
+#include "../third_party/phmap/parallel_hashmap/phmap.h"
 
 namespace dgl {
-
 namespace aten {
 
 /*!
@@ -51,7 +52,7 @@ class IdHashMap {
     const int64_t len = ids->shape[0];
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
-      // std::unorderd_map::insert assures that an insertion will not happen if the
+      // phmap::flat_hash_map::insert assures that an insertion will not happen if the
       // key already exists.
       oldv2newv_.insert({id, oldv2newv_.size()});
       filter_[id & kFilterMask] = true;
@@ -105,7 +106,7 @@ class IdHashMap {
   // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
   std::vector<bool> filter_;
   // The hashmap from old vid to new vid
-  std::unordered_map<IdType, IdType> oldv2newv_;
+  phmap::flat_hash_map<IdType, IdType> oldv2newv_;
 };
 
 /*
@@ -118,8 +119,7 @@ struct PairHash {
   }
 };
 
-};  // namespace aten
-
-};  // namespace dgl
+}  // namespace aten
+}  // namespace dgl
 
 #endif  // DGL_ARRAY_CPU_ARRAY_UTILS_H_

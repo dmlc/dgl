@@ -13,7 +13,7 @@ from ... import ndarray as nd
 from ... import kernel as K
 from ...function.base import TargetCode
 
-if os.getenv("USE_OFFICIAL_TFDLPACK", False):
+if not os.getenv("USE_TFDLPACK", False):
     if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
         raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
 
@@ -21,7 +21,7 @@ if os.getenv("USE_OFFICIAL_TFDLPACK", False):
         return tf.experimental.dlpack.to_dlpack(input)
 
     def zerocopy_from_dlpack(dlpack_tensor):
-        # TODO(Jinjing): Tensorflow requires memory to be 64-bit aligned. We check the
+        # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
         #   alignment and make a copy if needed. The functionality is better in TF's main repo.
         aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
         return tf.experimental.dlpack.from_dlpack(aligned)
@@ -50,7 +50,8 @@ def data_type_dict():
             'int8': tf.int8,
             'int16': tf.int16,
             'int32': tf.int32,
-            'int64': tf.int64}
+            'int64': tf.int64,
+            'bool' : tf.bool}
 
 def cpu():
     return "/cpu:0"
@@ -58,6 +59,8 @@ def cpu():
 def tensor(data, dtype=None):
     return tf.convert_to_tensor(data, dtype=dtype)
 
+def initialize_context():
+    tf.zeros(1)
 
 def as_scalar(data):
     return data.numpy().asscalar()
@@ -77,8 +80,10 @@ def sparse_matrix(data, index, shape, force_format=False):
     if fmt != 'coo':
         raise TypeError(
             'Tensorflow backend only supports COO format. But got %s.' % fmt)
-    spmat = tf.SparseTensor(indices=tf.transpose(
-        index[1], (1, 0)), values=data, dense_shape=shape)
+    # tf.SparseTensor only supports int64 indexing,
+    # therefore manually casting to int64 when input in int32
+    spmat = tf.SparseTensor(indices=tf.cast(tf.transpose(
+        index[1], (1, 0)), tf.int64), values=data, dense_shape=shape)
     return spmat, None
 
 
@@ -113,6 +118,14 @@ def device_type(ctx):
 def device_id(ctx):
     return tf.DeviceSpec.from_string(ctx).device_index
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return "/cpu:0"
+    elif dev_type == 2:
+        return "/gpu:%d" % (dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
     return tf.cast(input, dtype=ty)
@@ -126,7 +139,7 @@ def asnumpy(input):
         return input.numpy()
 
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     with tf.device(ctx):
         new_tensor = tf.identity(input)
     return new_tensor
@@ -347,6 +360,12 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def logical_and(input1, input2):
+    return tf.math.logical_and(input1, input2)
+
+def clone(input):
+    # TF tensor is always immutable so returning the input is safe.
+    return input
 
 def unique(input):
     return tf.unique(input).y
@@ -368,9 +387,9 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop):
+def arange(start, stop, dtype="int64"):
     with tf.device("/cpu:0"):
-        t = tf.range(start, stop, dtype=tf.int64)
+        t = tf.range(start, stop, dtype=data_type_dict()[dtype])
     return t
 
 
@@ -573,3 +592,5 @@ def _reduce_grad(grad, shape):
 def sync():
     context = context().context()
     context.async_wait()
+
+initialize_context()

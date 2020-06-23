@@ -9,6 +9,7 @@ import backend as F
 import dgl.function as fn
 import pickle
 import io
+import unittest
 
 def _assert_is_identical(g, g2):
     assert g.is_readonly == g2.is_readonly
@@ -257,6 +258,26 @@ def test_pickling_heterograph():
     new_g = _reconstruct_pickle(g)
     _assert_is_identical_hetero(g, new_g)
 
+@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")
+def test_pickling_heterograph_index_compatibility():
+    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
+    wishes_nx = nx.DiGraph()
+    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
+    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
+    wishes_nx.add_edge('u0', 'g1', id=0)
+    wishes_nx.add_edge('u2', 'g0', id=1)
+
+    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
+    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game')
+    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+
+    with open("tests/compute/hetero_pickle_old.pkl", "rb") as f:
+        gi = pickle.load(f)
+        f.close()
+    new_g = dgl.DGLHeteroGraph(gi, g.ntypes, g.etypes)
+    _assert_is_identical_hetero(g, new_g)
 
 if __name__ == '__main__':
     test_pickling_index()

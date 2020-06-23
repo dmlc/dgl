@@ -29,7 +29,28 @@ class HeteroGraphIndex(ObjectBase):
 
     def __setstate__(self, state):
         self._cache = {}
-        self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
+
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
+        if isinstance(state, HeteroPickleStates):
+            # post-0.4.3
+            self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
+        elif isinstance(state, tuple) and len(state) == 3:
+            # pre-0.4.2
+            metagraph, number_of_nodes, edges = state
+
+            self._cache = {}
+            # loop over etypes and recover unit graphs
+            rel_graphs = []
+            for i, edges_per_type in enumerate(edges):
+                src_ntype, dst_ntype = metagraph.find_edge(i)
+                num_src = number_of_nodes[src_ntype]
+                num_dst = number_of_nodes[dst_ntype]
+                src_id, dst_id, _ = edges_per_type
+                rel_graphs.append(create_unitgraph_from_coo(
+                    1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, "any"))
+            self.__init_handle_by_constructor__(
+                _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 
     @property
     def metagraph(self):
@@ -129,6 +150,7 @@ class HeteroGraphIndex(ObjectBase):
         _CAPI_DGLHeteroClear(self)
         self._cache.clear()
 
+    @property
     def dtype(self):
         """Return the data type of this graph index.
 
@@ -139,6 +161,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroDataType(self)
 
+    @property
     def ctx(self):
         """Return the context of this graph index.
 
@@ -148,16 +171,6 @@ class HeteroGraphIndex(ObjectBase):
             The context of the graph.
         """
         return _CAPI_DGLHeteroContext(self)
-
-    def nbits(self):
-        """Return the number of integer bits used in the storage (32 or 64).
-
-        Returns
-        -------
-        int
-            The number of bits.
-        """
-        return _CAPI_DGLHeteroNumBits(self)
 
     def bits_needed(self, etype):
         """Return the number of integer bits needed to represent the unitgraph graph.
@@ -298,7 +311,7 @@ class HeteroGraphIndex(ObjectBase):
             0-1 array indicating existence
         """
         vid_array = vids.todgltensor()
-        return utils.toindex(_CAPI_DGLHeteroHasVertices(self, int(ntype), vid_array))
+        return utils.toindex(_CAPI_DGLHeteroHasVertices(self, int(ntype), vid_array), self.dtype)
 
     def has_edge_between(self, etype, u, v):
         """Return true if the edge exists.
@@ -339,7 +352,7 @@ class HeteroGraphIndex(ObjectBase):
         u_array = u.todgltensor()
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLHeteroHasEdgesBetween(
-            self, int(etype), u_array, v_array))
+            self, int(etype), u_array, v_array), self.dtype)
 
     def predecessors(self, etype, v):
         """Return the predecessors of the node.
@@ -359,7 +372,7 @@ class HeteroGraphIndex(ObjectBase):
             Array of predecessors
         """
         return utils.toindex(_CAPI_DGLHeteroPredecessors(
-            self, int(etype), int(v)))
+            self, int(etype), int(v)), self.dtype)
 
     def successors(self, etype, v):
         """Return the successors of the node.
@@ -379,7 +392,7 @@ class HeteroGraphIndex(ObjectBase):
             Array of successors
         """
         return utils.toindex(_CAPI_DGLHeteroSuccessors(
-            self, int(etype), int(v)))
+            self, int(etype), int(v)), self.dtype)
 
     def edge_id(self, etype, u, v):
         """Return the id array of all edges between u and v.
@@ -399,7 +412,7 @@ class HeteroGraphIndex(ObjectBase):
             The edge id array.
         """
         return utils.toindex(_CAPI_DGLHeteroEdgeId(
-            self, int(etype), int(u), int(v)))
+            self, int(etype), int(u), int(v)), self.dtype)
 
     def edge_ids(self, etype, u, v):
         """Return a triplet of arrays that contains the edge IDs.
@@ -426,9 +439,9 @@ class HeteroGraphIndex(ObjectBase):
         v_array = v.todgltensor()
         edge_array = _CAPI_DGLHeteroEdgeIds(self, int(etype), u_array, v_array)
 
-        src = utils.toindex(edge_array(0))
-        dst = utils.toindex(edge_array(1))
-        eid = utils.toindex(edge_array(2))
+        src = utils.toindex(edge_array(0), self.dtype)
+        dst = utils.toindex(edge_array(1), self.dtype)
+        eid = utils.toindex(edge_array(2), self.dtype)
 
         return src, dst, eid
 
@@ -454,9 +467,9 @@ class HeteroGraphIndex(ObjectBase):
         eid_array = eid.todgltensor()
         edge_array = _CAPI_DGLHeteroFindEdges(self, int(etype), eid_array)
 
-        src = utils.toindex(edge_array(0))
-        dst = utils.toindex(edge_array(1))
-        eid = utils.toindex(edge_array(2))
+        src = utils.toindex(edge_array(0), self.dtype)
+        dst = utils.toindex(edge_array(1), self.dtype)
+        eid = utils.toindex(edge_array(2), self.dtype)
 
         return src, dst, eid
 
@@ -486,9 +499,9 @@ class HeteroGraphIndex(ObjectBase):
         else:
             v_array = v.todgltensor()
             edge_array = _CAPI_DGLHeteroInEdges_2(self, int(etype), v_array)
-        src = utils.toindex(edge_array(0))
-        dst = utils.toindex(edge_array(1))
-        eid = utils.toindex(edge_array(2))
+        src = utils.toindex(edge_array(0), self.dtype)
+        dst = utils.toindex(edge_array(1), self.dtype)
+        eid = utils.toindex(edge_array(2), self.dtype)
         return src, dst, eid
 
     def out_edges(self, etype, v):
@@ -517,9 +530,9 @@ class HeteroGraphIndex(ObjectBase):
         else:
             v_array = v.todgltensor()
             edge_array = _CAPI_DGLHeteroOutEdges_2(self, int(etype), v_array)
-        src = utils.toindex(edge_array(0))
-        dst = utils.toindex(edge_array(1))
-        eid = utils.toindex(edge_array(2))
+        src = utils.toindex(edge_array(0), self.dtype)
+        dst = utils.toindex(edge_array(1), self.dtype)
+        eid = utils.toindex(edge_array(2), self.dtype)
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
@@ -552,9 +565,9 @@ class HeteroGraphIndex(ObjectBase):
         src = edge_array(0)
         dst = edge_array(1)
         eid = edge_array(2)
-        src = utils.toindex(src)
-        dst = utils.toindex(dst)
-        eid = utils.toindex(eid)
+        src = utils.toindex(src, self.dtype)
+        dst = utils.toindex(dst, self.dtype)
+        eid = utils.toindex(eid, self.dtype)
         return src, dst, eid
 
     def in_degree(self, etype, v):
@@ -594,7 +607,7 @@ class HeteroGraphIndex(ObjectBase):
             The in degree array.
         """
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLHeteroInDegrees(self, int(etype), v_array))
+        return utils.toindex(_CAPI_DGLHeteroInDegrees(self, int(etype), v_array), self.dtype)
 
     def out_degree(self, etype, v):
         """Return the out degree of the node.
@@ -633,7 +646,7 @@ class HeteroGraphIndex(ObjectBase):
             The out degree array.
         """
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLHeteroOutDegrees(self, int(etype), v_array))
+        return utils.toindex(_CAPI_DGLHeteroOutDegrees(self, int(etype), v_array), self.dtype)
 
     def adjacency_matrix(self, etype, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
@@ -672,18 +685,20 @@ class HeteroGraphIndex(ObjectBase):
         ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
-            indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
-            indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
-            shuffle = utils.toindex(rst(2))
+            indptr = F.copy_to(utils.toindex(rst(0), self.dtype).tousertensor(), ctx)
+            indices = F.copy_to(utils.toindex(rst(1), self.dtype).tousertensor(), ctx)
+            shuffle = utils.toindex(rst(2), self.dtype)
             dat = F.ones(nnz, dtype=F.float32, ctx=ctx)  # FIXME(minjie): data type
             spmat = F.sparse_matrix(dat, ('csr', indices, indptr), (nrows, ncols))[0]
             return spmat, shuffle
         elif fmt == "coo":
-            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            idx = F.copy_to(utils.toindex(rst(0), self.dtype).tousertensor(), ctx)
             idx = F.reshape(idx, (2, nnz))
             dat = F.ones((nnz,), dtype=F.float32, ctx=ctx)
-            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (nrows, ncols))
-            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            adj, shuffle_idx = F.sparse_matrix(
+                dat, ('coo', idx), (nrows, ncols))
+            shuffle_idx = utils.toindex(
+                shuffle_idx, self.dtype) if shuffle_idx is not None else None
             return adj, shuffle_idx
         else:
             raise Exception("unknown format")
@@ -732,12 +747,12 @@ class HeteroGraphIndex(ObjectBase):
         ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
-            indptr = utils.toindex(rst(0)).tonumpy()
-            indices = utils.toindex(rst(1)).tonumpy()
+            indptr = utils.toindex(rst(0), self.dtype).tonumpy()
+            indices = utils.toindex(rst(1), self.dtype).tonumpy()
             data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
             return scipy.sparse.csr_matrix((data, indices, indptr), shape=(nrows, ncols))
         elif fmt == 'coo':
-            idx = utils.toindex(rst(0)).tonumpy()
+            idx = utils.toindex(rst(0), self.dtype).tonumpy()
             row, col = np.reshape(idx, (2, nnz))
             data = np.arange(0, nnz) if return_edge_ids else np.ones_like(row)
             return scipy.sparse.coo_matrix((data, (row, col)), shape=(nrows, ncols))
@@ -886,7 +901,7 @@ class HeteroGraphIndex(ObjectBase):
         HeteroGraphIndex
         """
         g = self.get_relation_graph(etype)
-        return g.asbits(self.bits_needed(etype or 0)).copy_to(ctx)
+        return g.copy_to(ctx).asbits(self.bits_needed(etype or 0))
 
     def get_csr_shuffle_order(self, etype):
         """Return the edge shuffling order when a coo graph is converted to csr format
@@ -906,7 +921,76 @@ class HeteroGraphIndex(ObjectBase):
         order = csr(2)
         rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
         rev_order = rev_csr(2)
-        return utils.toindex(order), utils.toindex(rev_order)
+        return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
+
+    def format_in_use(self, etype):
+        """Return the sparse formats in use of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+
+        Returns
+        -------
+        list of string : return all the formats currently in use (could be multiple).
+        """
+        format_code = _CAPI_DGLHeteroGetFormatInUse(self, etype)
+        ret = []
+        if format_code & 1:
+            ret.append('coo')
+        format_code >>= 1
+        if format_code & 1:
+            ret.append('csr')
+        format_code >>= 1
+        if format_code & 1:
+            ret.append('csc')
+        return ret
+
+    def restrict_format(self, etype):
+        """Return restrict sparse format of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+
+        Returns
+        -------
+        string : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
+        """
+        ret = _CAPI_DGLHeteroGetRestrictFormat(self, etype)
+        return ret
+
+    def request_format(self, sparse_format, etype):
+        """Create a sparse matrix representation in given format immediately.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+        sparse_format : str
+            ``'coo'``, ``'csr'``, or ``'csc'``
+        """
+        _CAPI_DGLHeteroRequestFormat(self, sparse_format, etype)
+
+    def to_format(self, restrict_format):
+        """Return a clone graph index but stored in the given sparse format.
+
+        If 'any' is given, the restrict formats of the returned graph index
+        is relaxed.
+
+        Parameters
+        ----------
+        restrict_format : str
+            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
+
+        Returns
+        -------
+        A new graph index.
+        """
+        return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
+
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):
@@ -933,7 +1017,7 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced nodes
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedVertices(self)
-        return [utils.toindex(v.data) for v in ret]
+        return [utils.toindex(v.data, self.graph.dtype) for v in ret]
 
     @property
     def induced_edges(self):
@@ -946,7 +1030,8 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced edges
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
-        return [utils.toindex(v.data) for v in ret]
+        return [utils.toindex(v.data, self.graph.dtype) for v in ret]
+
 
 #################################################################
 # Creators
@@ -1082,45 +1167,53 @@ class FlattenedHeteroGraph(ObjectBase):
 class HeteroPickleStates(ObjectBase):
     """Pickle states object class in C++ backend."""
     @property
-    def metagraph(self):
-        """Metagraph
+    def version(self):
+        """Version number
 
         Returns
         -------
-        GraphIndex
-            Metagraph structure
+        int
+            version number
         """
-        return _CAPI_DGLHeteroPickleStatesGetMetagraph(self)
+        return _CAPI_DGLHeteroPickleStatesGetVersion(self)
 
     @property
-    def num_nodes_per_type(self):
-        """Number of nodes per edge type
+    def meta(self):
+        """Meta info
 
         Returns
         -------
-        Tensor
-            Array of number of nodes for each type
+        bytearray
+            Serialized meta info
         """
-        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLHeteroPickleStatesGetNumVertices(self))
+        return bytearray(_CAPI_DGLHeteroPickleStatesGetMeta(self))
 
     @property
-    def adjs(self):
-        """Adjacency matrices of all the relation graphs
+    def arrays(self):
+        """Arrays representing the graph structure (COO or CSR)
 
         Returns
         -------
-        list of dgl.ndarray.SparseMatrix
-            Adjacency matrices
+        list of dgl.ndarray.NDArray
+            Arrays
         """
-        return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
+        num_arr = _CAPI_DGLHeteroPickleStatesGetArraysNum(self)
+        arr_func = _CAPI_DGLHeteroPickleStatesGetArrays(self)
+        return [arr_func(i) for i in range(num_arr)]
 
     def __getstate__(self):
-        return self.metagraph, self.num_nodes_per_type, self.adjs
+        arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
+        return self.version, self.meta, arrays
 
     def __setstate__(self, state):
-        metagraph, num_nodes_per_type, adjs = state
-        num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
-        self.__init_handle_by_constructor__(
-            _CAPI_DGLCreateHeteroPickleStates, metagraph, num_nodes_per_type, adjs)
-
+        if isinstance(state[0], int):
+            _, meta, arrays = state
+            arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
+            self.__init_handle_by_constructor__(
+                _CAPI_DGLCreateHeteroPickleStates, meta, arrays)
+        else:
+            metagraph, num_nodes_per_type, adjs = state
+            num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
+            self.__init_handle_by_constructor__(
+                _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
 _init_api("dgl.heterograph_index")

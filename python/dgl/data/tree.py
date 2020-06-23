@@ -14,6 +14,7 @@ import os
 from .. import backend as F
 from ..graph import DGLGraph
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 
 __all__ = ['SSTBatch', 'SST']
 
@@ -55,14 +56,17 @@ class SST(object):
         self.pretrained_file = 'glove.840B.300d.txt' if mode == 'train' else ''
         self.pretrained_emb = None
         self.vocab_file = '{}/sst/vocab.txt'.format(self.dir) if vocab_file is None else vocab_file
-        download(_get_dgl_url(_urls['sst']), path=self.zip_file_path)
-        extract_archive(self.zip_file_path, '{}/sst'.format(self.dir))
         self.trees = []
         self.num_classes = 5
         print('Preprocessing...')
         self._load()
         print('Dataset creation finished. #Trees:', len(self.trees))
 
+    def _download(self):
+        download(_get_dgl_url(_urls['sst']), path=self.zip_file_path)
+        extract_archive(self.zip_file_path, '{}/sst'.format(self.dir))
+
+    @retry_method_with_fix(_download)
     def _load(self):
         from nltk.corpus.reader import BracketParseCorpusReader
         # load vocab file

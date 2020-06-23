@@ -103,12 +103,15 @@ file(GLOB DGL_SRC
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
+  src/geometry/*.cc
+  src/geometry/cpu/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1
   src/api/*.cc
   src/graph/*.cc
   src/scheduler/*.cc
+  src/rpc/*.cc
 )
 
 list(APPEND DGL_SRC ${DGL_SRC_1})

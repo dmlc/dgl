@@ -56,6 +56,9 @@ class RelGraphConv(gluon.Block):
         Activation function. Default: None
     self_loop : bool, optional
         True to include self loop message. Default: False
+    low_mem : bool, optional
+        Use low-memory implementation. MXNet currently does not support this.
+        Default: False.
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
@@ -68,6 +71,7 @@ class RelGraphConv(gluon.Block):
                  bias=True,
                  activation=None,
                  self_loop=False,
+                 low_mem=False,
                  dropout=0.0):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
@@ -80,6 +84,8 @@ class RelGraphConv(gluon.Block):
         self.bias = bias
         self.activation = activation
         self.self_loop = self_loop
+
+        assert low_mem is False, 'MXNet currently does not support low-memory implementation.'
 
         if regularizer == "basis":
             # add basis weights

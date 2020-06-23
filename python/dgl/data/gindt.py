@@ -13,6 +13,7 @@ import numpy as np
 from .. import backend as F
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 _url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
@@ -48,7 +49,7 @@ class GINDataset(object):
 
         self.name = name  # MUTAG
         self.ds_name = 'nig'
-        self.extract_dir = self._download()
+        self.extract_dir = self._get_extract_dir()
         self.file = self._file_path()
 
         self.self_loop = self_loop
@@ -101,20 +102,22 @@ class GINDataset(object):
         """
         return self.graphs[idx], self.labels[idx]
 
+    def _get_extract_dir(self):
+        return os.path.join(get_download_dir(), "{}".format(self.ds_name))
+
     def _download(self):
         download_dir = get_download_dir()
         zip_file_path = os.path.join(
             download_dir, "{}.zip".format(self.ds_name))
         # TODO move to dgl host _get_dgl_url
         download(_url, path=zip_file_path)
-        extract_dir = os.path.join(
-            download_dir, "{}".format(self.ds_name))
+        extract_dir = self._get_extract_dir()
         extract_archive(zip_file_path, extract_dir)
-        return extract_dir
 
     def _file_path(self):
         return os.path.join(self.extract_dir, "dataset", self.name, "{}.txt".format(self.name))
 
+    @retry_method_with_fix(_download)
     def _load(self):
         """ Loads input dataset from dataset/NAME/NAME.txt file
 
@@ -220,7 +223,7 @@ class GINDataset(object):
                     # but usually no features means no labels, fine.
                     g.ndata['label'] = g.in_degrees()
                     # extracting unique node labels
-                    nlabel_set = nlabel_set.union(set(g.ndata['label']))
+                    nlabel_set = nlabel_set.union(set([F.as_scalar(nl) for nl in g.ndata['label']]))
 
                 nlabel_set = list(nlabel_set)
                 # in case the labels/degrees are not continuous number
@@ -237,7 +240,7 @@ class GINDataset(object):
             for g in self.graphs:
                 g.ndata['attr'] = np.zeros((
                     g.number_of_nodes(), len(label2idx)))
-                g.ndata['attr'][:, [label2idx[F.as_scalar(nl)] for nl in g.ndata['label']]] = 1
+                g.ndata['attr'][range(g.number_of_nodes()), [label2idx[F.as_scalar(nl)] for nl in g.ndata['label']]] = 1
 
         # after load, get the #classes and #dim
         self.gclasses = len(self.glabel_dict)

@@ -117,45 +117,45 @@ class GATConv(nn.Block):
             The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
         """
-        graph = graph.local_var()
-        if isinstance(feat, tuple):
-            h_src = self.feat_drop(feat[0])
-            h_dst = self.feat_drop(feat[1])
-            feat_src = self.fc_src(h_src).reshape(
-                -1, self._num_heads, self._out_feats)
-            feat_dst = self.fc_dst(h_dst).reshape(
-                -1, self._num_heads, self._out_feats)
-        else:
-            h_src = h_dst = self.feat_drop(feat)
-            feat_src = feat_dst = self.fc(h_src).reshape(
-                -1, self._num_heads, self._out_feats)
-        # NOTE: GAT paper uses "first concatenation then linear projection"
-        # to compute attention scores, while ours is "first projection then
-        # addition", the two approaches are mathematically equivalent:
-        # We decompose the weight vector a mentioned in the paper into
-        # [a_l || a_r], then
-        # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
-        # Our implementation is much efficient because we do not need to
-        # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
-        # addition could be optimized with DGL's built-in function u_add_v,
-        # which further speeds up computation and saves memory footprint.
-        el = (feat_src * self.attn_l.data(feat_src.context)).sum(axis=-1).expand_dims(-1)
-        er = (feat_dst * self.attn_r.data(feat_src.context)).sum(axis=-1).expand_dims(-1)
-        graph.srcdata.update({'ft': feat_src, 'el': el})
-        graph.dstdata.update({'er': er})
-        # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
-        graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
-        e = self.leaky_relu(graph.edata.pop('e'))
-        # compute softmax
-        graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
-        graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
-                         fn.sum('m', 'ft'))
-        rst = graph.dstdata['ft']
-        # residual
-        if self.res_fc is not None:
-            resval = self.res_fc(h_dst).reshape(h_dst.shape[0], -1, self._out_feats)
-            rst = rst + resval
-        # activation
-        if self.activation:
-            rst = self.activation(rst)
-        return rst
+        with graph.local_scope():
+            if isinstance(feat, tuple):
+                h_src = self.feat_drop(feat[0])
+                h_dst = self.feat_drop(feat[1])
+                feat_src = self.fc_src(h_src).reshape(
+                    -1, self._num_heads, self._out_feats)
+                feat_dst = self.fc_dst(h_dst).reshape(
+                    -1, self._num_heads, self._out_feats)
+            else:
+                h_src = h_dst = self.feat_drop(feat)
+                feat_src = feat_dst = self.fc(h_src).reshape(
+                    -1, self._num_heads, self._out_feats)
+            # NOTE: GAT paper uses "first concatenation then linear projection"
+            # to compute attention scores, while ours is "first projection then
+            # addition", the two approaches are mathematically equivalent:
+            # We decompose the weight vector a mentioned in the paper into
+            # [a_l || a_r], then
+            # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
+            # Our implementation is much efficient because we do not need to
+            # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
+            # addition could be optimized with DGL's built-in function u_add_v,
+            # which further speeds up computation and saves memory footprint.
+            el = (feat_src * self.attn_l.data(feat_src.context)).sum(axis=-1).expand_dims(-1)
+            er = (feat_dst * self.attn_r.data(feat_src.context)).sum(axis=-1).expand_dims(-1)
+            graph.srcdata.update({'ft': feat_src, 'el': el})
+            graph.dstdata.update({'er': er})
+            # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
+            graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
+            e = self.leaky_relu(graph.edata.pop('e'))
+            # compute softmax
+            graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
+            graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
+                             fn.sum('m', 'ft'))
+            rst = graph.dstdata['ft']
+            # residual
+            if self.res_fc is not None:
+                resval = self.res_fc(h_dst).reshape(h_dst.shape[0], -1, self._out_feats)
+                rst = rst + resval
+            # activation
+            if self.activation:
+                rst = self.activation(rst)
+            return rst
