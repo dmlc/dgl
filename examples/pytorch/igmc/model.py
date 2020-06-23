@@ -17,7 +17,7 @@ class IGMC(nn.Module):
         super(IGMC, self).__init__()
 
         self.regression = regression
-        self.edge_drop = nn.Dropout(edge_dropout)
+        self.edge_dropout = edge_dropout
         self.force_undirected = force_undirected
         self.side_features = side_features
         self.multiply_by = multiply_by
@@ -43,15 +43,8 @@ class IGMC(nn.Module):
         self.lin2.reset_parameters()
 
     def forward(self, block):
-        # TODO [zhoujf] add edge dropout feature
-        # if self.adj_dropout > 0:
-        #     edge_index, edge_type = dropout_adj(
-        #         edge_index, edge_type, p=self.adj_dropout, 
-        #         force_undirected=self.force_undirected, num_nodes=len(x), 
-        #         training=self.training
-        #     )
-        # block.edata['e'] = self.edge_drop(block.edata['e']) # KeyError: 'e'
-        
+        block = edge_drop(block, self.edge_dropout, self.force_undirected, self.training)
+
         concat_states = []
         x = block.ndata['x']
         for conv in self.convs:
@@ -76,3 +69,32 @@ class IGMC(nn.Module):
 
     def __repr__(self):
         return self.__class__.__name__
+
+# XXX [zhoujf] slower than dropout_link fn that directly manipulates on array
+def edge_drop(dgl_graph, edge_dropout=0.2, force_undirected=False, training=True):
+    assert edge_dropout >= 0.0 and edge_dropout <= 1.0, 'Invalid dropout rate.'
+
+    if not training:
+        return dgl_graph
+
+    # cal dropout mask
+    src, dst = dgl_graph.edges()
+    n_edges = dgl_graph.number_of_edges() // 2 if force_undirected else dgl_graph.number_of_edges()
+
+    mask = src.new_full((n_edges, ), 1 - edge_dropout, dtype=th.float)
+    mask = th.bernoulli(mask).to(th.bool)
+    if force_undirected:
+        mask = th.concat([mask, mask], axis=0)
+        
+    src, dst = src[mask], dst[mask]
+    edges_to_keep = dgl_graph.edge_ids(src, dst)
+    # the pair of first user and movie nodes may be isolated
+    subgraph = dgl_graph.edge_subgraph(edges_to_keep, preserve_nodes=True)
+
+    # restore node and edge features
+    for k in dgl_graph.ndata.keys():
+        subgraph.ndata[k] = dgl_graph.ndata[k][subgraph.parent_nid]
+    for k in dgl_graph.edata.keys():
+        subgraph.edata[k] = dgl_graph.edata[k][subgraph.parent_eid]
+
+    return subgraph

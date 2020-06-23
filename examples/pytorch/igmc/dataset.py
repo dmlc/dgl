@@ -23,8 +23,8 @@ class MovieLensDatasetStatic(Dataset):
 
     def __getitem__(self, idx):
         subgraph = self.subgraphs[idx]
-        if self.mode == 'train' and self.edge_dropout > 0:
-            subgraph = dropout_link(subgraph, self.edge_dropout, self.force_undirected)
+        # if self.mode == 'train' and self.edge_dropout > 0:
+        #     subgraph = dropout_link(subgraph, self.edge_dropout, self.force_undirected)
         try:
             return create_dgl_graph(subgraph)
         except:
@@ -61,41 +61,37 @@ class MovieLensDatasetDynamic(Dataset):
             g_label, (u, v), self.adj, 
             self.hop, self.sample_ratio, self.max_node_label, self.max_nodes_per_hop)
                     
-        if self.mode == 'train' and self.edge_dropout > 0:
-            subgraph = dropout_link(subgraph, self.edge_dropout, self.force_undirected)
+        # if self.mode == 'train' and self.edge_dropout > 0:
+        #     subgraph = dropout_link(subgraph, self.edge_dropout, self.force_undirected)
         try:
             return create_dgl_graph(subgraph)
         except:
             to_try = np.random.randint(0, len(self.subgraphs))
             return self.__getitem__(to_try)
 
-# TODO move these funtions to data.py, 
-# and let links2subgraphs() return a list of DGLGraph directly,
-# so as to employ dgl APIs
-def dropout_link(subgraph, edge_dropout=0.2, force_undirected=False):
-    assert edge_dropout >= 0.0 and edge_dropout <= 1.0, 'Invalid dropout rate.'
-    n_edges = subgraph['etype'].shape[0] // 2 if force_undirected else subgraph['etype'].shape[0]
+# def dropout_link(subgraph, edge_dropout=0.2, force_undirected=False):
+#     assert edge_dropout >= 0.0 and edge_dropout <= 1.0, 'Invalid dropout rate.'
+#     n_edges = subgraph['etype'].shape[0] // 2 if force_undirected else subgraph['etype'].shape[0]
     
-    drop_mask = np.random.binomial([np.ones(n_edges)],1-edge_dropout)[0].astype(np.bool)
+#     drop_mask = np.random.binomial([np.ones(n_edges)],1-edge_dropout)[0].astype(np.bool)
 
-    # DGL graph created with edge has to start with node 0, thus we force the first link to be valid
-    drop_mask[0] = True
-    if force_undirected:
-        drop_mask = np.concatenate([drop_mask, drop_mask], axis=0)
+#     # DGL graph created with edge has to start with node 0, thus we force the first link to be valid
+#     drop_mask[0] = True
+#     if force_undirected:
+#         drop_mask = np.concatenate([drop_mask, drop_mask], axis=0)
     
-    src, dst, etype = subgraph['src'][drop_mask], subgraph['dst'][drop_mask], subgraph['etype'][drop_mask]
+#     src, dst, etype = subgraph['src'][drop_mask], subgraph['dst'][drop_mask], subgraph['etype'][drop_mask]
 
-    max_node_idx = np.max(np.concatenate([src, dst])) + 1
-    x = subgraph['x'][:max_node_idx]
-    new_subgraph = {'g_label': subgraph['g_label'], 'src': src, 'dst': dst, 'etype': etype, 'x': x}
-    return new_subgraph
+#     max_node_idx = np.max(np.concatenate([src, dst])) + 1
+#     x = subgraph['x'][:max_node_idx]
+#     new_subgraph = {'g_label': subgraph['g_label'], 'src': src, 'dst': dst, 'etype': etype, 'x': x}
+#     return new_subgraph
 
 def create_dgl_graph(subgraph):
     g = dgl.DGLGraph((subgraph['src'], subgraph['dst']))
     return MovieLensDataTuple(g=g, g_label=subgraph['g_label'], 
                             x=subgraph['x'], etype=subgraph['etype'])
 
-# NOTE [zhoujf] the input is one subgraph but not blocks
 def collate_movielens(data):
     g_list, g_label, x, etype = map(list, zip(*data))
     g = dgl.batch(g_list)

@@ -91,8 +91,6 @@ def links2subgraphs(
 def subgraph_extraction_labeling(g_label, ind, adj, 
                                  hop=1, sample_ratio=1.0, max_node_label=3, max_nodes_per_hop=200):
     # extract the h-hop enclosing subgraph around link 'ind'
-    # TODO [zhoujf] check whether label starts from 0 or 1, and if subgraph is bidirected 
-
     dist = 0
     u_nodes, v_nodes = [ind[0]], [ind[1]]
     u_dist, v_dist = [0], [0]
@@ -123,15 +121,11 @@ def subgraph_extraction_labeling(g_label, ind, adj,
     # remove link between target nodes
     subgraph[0, 0] = 0
 
+    # reindex u and v, v nodes start after u
     u, v, r = sp.find(subgraph)
     v += len(u_nodes)
     r = r.astype(int)
 
-    # Constructing DGL graph
-    # v nodes start after u
-    # rating_graphs = []
-    # num_user, num_movie = adj.shape
-    
     # Add bidirection link
     src = np.concatenate([u, v])
     dst = np.concatenate([v, u])
