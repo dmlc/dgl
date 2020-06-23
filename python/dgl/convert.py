@@ -766,18 +766,20 @@ def to_homo(G):
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
                  validate=False, index_dtype=G._idtype_str)
-    retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
-    retg.ndata[NID] = F.cat(nids, 0)
-    retg.edata[ETYPE] = F.cat(etype_ids, 0)
-    retg.edata[EID] = F.cat(eids, 0)
 
-    # features
+    # copy features
     comb_nf = combine_frames(G._node_frames, range(len(G.ntypes)))
     comb_ef = combine_frames(G._edge_frames, range(len(G.etypes)))
     if comb_nf is not None:
         retg.ndata.update(comb_nf)
     if comb_ef is not None:
         retg.edata.update(comb_ef)
+
+    # assign node type and id mapping field.
+    retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
+    retg.ndata[NID] = F.cat(nids, 0)
+    retg.edata[ETYPE] = F.cat(etype_ids, 0)
+    retg.edata[EID] = F.cat(eids, 0)
 
     return retg
 
