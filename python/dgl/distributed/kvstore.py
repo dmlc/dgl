@@ -54,7 +54,6 @@ class PullRequest(rpc.Request):
         self.name, self.id_tensor = state
 
     def process_request(self, server_state):
-        print("len: %d" % len(self.id_tensor))
         kv_store = server_state.kv_store
         if self.name not in kv_store.part_policy:
             raise RuntimeError("KVServer cannot find partition policy with name: %s" % self.name)
