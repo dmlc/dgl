@@ -673,11 +673,12 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
   return ret;
 }
 
-std::vector<COOMatrix> DisjointPartitionHeteroBySizes(const COOMatrix coo,
-                                                      const uint64_t batch_size,
-                                                      const std::vector<uint64_t> edge_cumsum,
-                                                      const std::vector<uint64_t> src_vertex_cumsum,
-                                                      const std::vector<uint64_t> dst_vertex_cumsum) {
+std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
+  const COOMatrix coo,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> edge_cumsum,
+  const std::vector<uint64_t> src_vertex_cumsum,
+  const std::vector<uint64_t> dst_vertex_cumsum) {
   std::vector<COOMatrix> ret;
   ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, "DisjointPartitionHeteroBySizes", {
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
