@@ -10,8 +10,8 @@ from .sbm import SBMMixture
 from .reddit import RedditDataset
 from .ppi import PPIDataset, LegacyPPIDataset
 from .tu import TUDataset, LegacyTUDataset
-from .gnn_benckmark import AmazonCoBuy, CoraFull, Coauthor
-from .karate import KarateClubDataset
+from .gnn_benckmark import *
+from .karate import *
 from .gindt import GINDataset
 from .bitcoinotc import BitcoinOTC
 from .gdelt import GDELT
