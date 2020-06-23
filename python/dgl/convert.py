@@ -683,11 +683,6 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
                                    ntypes, ntype_count)})
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
-    for ntid, ntype in enumerate(hg.ntypes):
-        hg._node_frames[ntid][NID] = F.tensor(ntype2ngrp[ntype])
-
-    for etid in range(len(hg.canonical_etypes)):
-        hg._edge_frames[etid][EID] = F.tensor(edge_groups[etid])
 
     # features
     for key, data in G.ndata.items():
@@ -698,6 +693,12 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
         for etid in range(len(hg.canonical_etypes)):
             rows = F.copy_to(F.tensor(edge_groups[etid]), F.context(data))
             hg._edge_frames[etid][key] = F.gather_row(data, rows)
+
+    for ntid, ntype in enumerate(hg.ntypes):
+        hg._node_frames[ntid][NID] = F.tensor(ntype2ngrp[ntype])
+
+    for etid in range(len(hg.canonical_etypes)):
+        hg._edge_frames[etid][EID] = F.tensor(edge_groups[etid])
 
     return hg
 
@@ -766,18 +767,20 @@ def to_homo(G):
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
                  validate=False, index_dtype=G._idtype_str)
-    retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
-    retg.ndata[NID] = F.cat(nids, 0)
-    retg.edata[ETYPE] = F.cat(etype_ids, 0)
-    retg.edata[EID] = F.cat(eids, 0)
 
-    # features
+    # copy features
     comb_nf = combine_frames(G._node_frames, range(len(G.ntypes)))
     comb_ef = combine_frames(G._edge_frames, range(len(G.etypes)))
     if comb_nf is not None:
         retg.ndata.update(comb_nf)
     if comb_ef is not None:
         retg.edata.update(comb_ef)
+
+    # assign node type and id mapping field.
+    retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
+    retg.ndata[NID] = F.cat(nids, 0)
+    retg.edata[ETYPE] = F.cat(etype_ids, 0)
+    retg.edata[EID] = F.cat(eids, 0)
 
     return retg
 
