@@ -82,6 +82,9 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
       workspace));
   device->FreeWorkspace(row->ctx, workspace);
 
+  // The row and column field have already been reordered according
+  // to data, thus the data field will be deprecated.
+  coo.data = aten::NullArray();
   return coo;
 }
 
