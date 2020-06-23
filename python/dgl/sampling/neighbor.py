@@ -199,8 +199,9 @@ class MultiLayerNeighborSampler(BlockSampler):
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
     >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
-    >>> dataloader = dgl.sampling.NodeDataLoader(
-    ...     g, train_nid, sampler,
+    >>> collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
+    >>> dataloader = torch.utils.data.DataLoader(
+    ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for blocks in dataloader:
     ...     train_on(blocks)
