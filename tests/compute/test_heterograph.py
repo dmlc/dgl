@@ -1057,32 +1057,52 @@ def test_subgraph(index_dtype):
     sg2 = g.edge_subgraph({'follows': [1], 'plays': [1], 'wishes': [1]})
     _check_subgraph(g, sg2)
 
-    def _check_subgraph_single_ntype(g, sg):
+    def _check_subgraph_single_ntype(g, sg, preserve_nodes=False):
         assert sg.ntypes == g.ntypes
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
-        assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([1, 2], F.int64))
+
+        if not preserve_nodes:
+            assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
+                                 F.tensor([1, 2], F.int64))
+        else:
+            for ntype in sg.ntypes:
+                assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
                              F.tensor([1], F.int64))
-        assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
+
+        if not preserve_nodes:
+            assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'][1:2])
 
-    def _check_subgraph_single_etype(g, sg):
+    def _check_subgraph_single_etype(g, sg, preserve_nodes=False):
         assert sg.ntypes == g.ntypes
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
-        assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([0, 1], F.int64))
-        assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                             F.tensor([0], F.int64))
+
+        if not preserve_nodes:
+            assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
+                                 F.tensor([0, 1], F.int64))
+            assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
+                                 F.tensor([0], F.int64))
+        else:
+            for ntype in sg.ntypes:
+                assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
                              F.tensor([0, 1], F.int64))
 
     sg1_graph = g_graph.subgraph([1, 2])
     _check_subgraph_single_ntype(g_graph, sg1_graph)
+    sg1_graph = g_graph.edge_subgraph([1])
+    _check_subgraph_single_ntype(g_graph, sg1_graph)
+    sg1_graph = g_graph.edge_subgraph([1], preserve_nodes=True)
+    _check_subgraph_single_ntype(g_graph, sg1_graph, True)
     sg2_bipartite = g_bipartite.edge_subgraph([0, 1])
     _check_subgraph_single_etype(g_bipartite, sg2_bipartite)
+    sg2_bipartite = g_bipartite.edge_subgraph([0, 1], preserve_nodes=True)
+    _check_subgraph_single_etype(g_bipartite, sg2_bipartite, True)
 
     def _check_typed_subgraph1(g, sg):
         assert set(sg.ntypes) == {'user', 'game'}
