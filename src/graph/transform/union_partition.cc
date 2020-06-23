@@ -42,7 +42,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     src_offset_v.push_back(src_offset);
     dst_offset_v.push_back(dst_offset);
 
-    //prefer COO
+    // prefer COO
     if (FORMAT_HAS_COO(format)) {
       std::vector<aten::COOMatrix> coos;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
@@ -50,7 +50,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
         aten::COOMatrix coo = cg->GetCOOMatrix(etype);
         coos.push_back(coo);
       }
-        
+
       aten::COOMatrix res = aten::DisjointUnionCooGraph(coos,
                                                         src_offset_v,
                                                         dst_offset_v);

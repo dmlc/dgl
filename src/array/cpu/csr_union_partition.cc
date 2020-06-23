@@ -22,11 +22,11 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
     indices_offset[i] = total_indices;
     total_indices += csr.indices->shape[0];
   }
-  
+
   std::vector<IdType> result_indptr(src_offset[csrs.size()] + 1);
   std::vector<IdType> result_indices(total_indices);
   result_indptr[0] = 0;
-  
+
 #pragma omp parallel for
   for (size_t i = 0; i < csrs.size(); ++i) {
     aten::CSRMatrix csr = csrs[i];
@@ -35,7 +35,7 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
     CHECK(IsNullArray(csr.data)) <<
         "DisjointUnionCsrGraph does not support union CSRMatrix with eid mapping data";
 
-    //indptr offset start from 1
+    // indptr offset start from 1
     for (size_t j = 1; j <= csr.num_rows; ++j) {
         result_indptr[src_offset[i] + j] = indptr_data[j] + indices_offset[i];
     }

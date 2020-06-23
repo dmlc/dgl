@@ -16,7 +16,7 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
                                 const std::vector<uint64_t> dst_offset) {
   std::vector<int64_t> edge_offset(coos.size());
   int64_t total_edges = 0;
-  
+
   for (size_t i = 0; i < coos.size(); ++i) {
       aten::COOMatrix coo = coos[i];
       edge_offset[i] = total_edges;
@@ -30,7 +30,7 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
   for (size_t i = 0; i < coos.size(); ++i) {
     aten::COOMatrix coo = coos[i];
     int64_t num_edges = coo.row->shape[0];
-    
+
     const IdType* edges_src_data = static_cast<const IdType*>(coo.row->data);
     const IdType* edges_dst_data = static_cast<const IdType*>(coo.col->data);
     CHECK(IsNullArray(coo.data)) <<
@@ -38,7 +38,6 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
 
     // Loop over all edges
     for (size_t j = 0; j < num_edges; ++j) {
-      // TODO: Should use array operations to implement this.
       result_src[edge_offset[i] + j] = edges_src_data[j] + src_offset[i];
       result_dst[edge_offset[i] + j] = edges_dst_data[j] + dst_offset[i];
     }
@@ -58,11 +57,12 @@ template COOMatrix DisjointUnionCooGraph<kDLCPU, int64_t>(const std::vector<COOM
                                                           const std::vector<uint64_t>);
 
 template <DLDeviceType XPU, typename IdType>
-std::vector<COOMatrix> DisjointPartitionHeteroBySizes(const COOMatrix coo,
-                                                      const uint64_t batch_size,
-                                                      const std::vector<uint64_t> edge_cumsum,
-                                                      const std::vector<uint64_t> src_vertex_cumsum,
-                                                      const std::vector<uint64_t> dst_vertex_cumsum) {
+std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
+  const COOMatrix coo,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> edge_cumsum,
+  const std::vector<uint64_t> src_vertex_cumsum,
+  const std::vector<uint64_t> dst_vertex_cumsum) {
   const IdType* edges_src_data = static_cast<const IdType*>(coo.row->data);
   const IdType* edges_dst_data = static_cast<const IdType*>(coo.col->data);
   CHECK(IsNullArray(coo.data)) <<
@@ -86,14 +86,14 @@ std::vector<COOMatrix> DisjointPartitionHeteroBySizes(const COOMatrix coo,
   }
 }
 
-template std::vector<COOMatrix> 
+template std::vector<COOMatrix>
     DisjointPartitionHeteroBySizes<kDLCPU, int32_t>(const COOMatrix,
                                                     const uint64_t,
                                                     const std::vector<uint64_t>,
                                                     const std::vector<uint64_t>,
                                                     const std::vector<uint64_t>);
 
-template std::vector<COOMatrix> 
+template std::vector<COOMatrix>
     DisjointPartitionHeteroBySizes<kDLCPU, int64_t>(const COOMatrix,
                                                     const uint64_t,
                                                     const std::vector<uint64_t>,

@@ -653,7 +653,7 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
   COOMatrix ret;
   ATEN_XPU_SWITCH(coos[0].row->ctx.device_type, XPU, "DisjointUnionCooGraph", {
     ATEN_ID_TYPE_SWITCH(coos[0].row->dtype, IdType, {
-      ret = impl::DisjointUnionCooGraph<XPU, IdType>(coos, src_offset, dst_offset);                                           
+      ret = impl::DisjointUnionCooGraph<XPU, IdType>(coos, src_offset, dst_offset);                         
     });
   });
   return ret;
@@ -665,7 +665,7 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
   CSRMatrix ret;
   ATEN_XPU_SWITCH(csrs[0].indptr->ctx.device_type, XPU, "DisjointUnionCsrGraph", {
     ATEN_ID_TYPE_SWITCH(csrs[0].indices->dtype, IdType, {
-      ret = impl::DisjointUnionCsrGraph<XPU, IdType>(csrs, src_offset, dst_offset);                                           
+      ret = impl::DisjointUnionCsrGraph<XPU, IdType>(csrs, src_offset, dst_offset);                       
     });
   });
   return ret;
@@ -683,7 +683,7 @@ std::vector<COOMatrix> DisjointPartitionHeteroBySizes(const COOMatrix coo,
                                                               batch_size,
                                                               edge_cumsum,
                                                               src_vertex_cumsum,
-                                                              dst_vertex_cumsum);                                           
+                                                              dst_vertex_cumsum);                    
     });
   });
   return ret;
