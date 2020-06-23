@@ -41,12 +41,10 @@ def torch_net_info(net, save_path=None):
     return info_str
 
 def links2subgraphs(
-        adj, label_values, 
-        # pool,
+        adj, # label_values, pool,
         train_indices, val_indices, test_indices, 
         train_labels, val_labels, test_labels, 
-        hop=1, sample_ratio=1.0, max_nodes_per_hop=None, max_node_label=None, 
-        user_feature=None, movie_feature=None, 
+        hop=1, sample_ratio=1.0, max_nodes_per_hop=200, max_node_label=3, 
         train_val=True, parallel=True):
     # extract enclosing subgraphs
     # if max_node_label is None:  # if not provided, infer from graphs
@@ -59,8 +57,7 @@ def links2subgraphs(
                 for u, v, g_label in zip(links[0], links[1], g_labels):
                     g = subgraph_extraction_labeling(
                         g_label, (u, v), adj, 
-                        hop, max_node_label, sample_ratio, max_nodes_per_hop, 
-                        user_feature, movie_feature, label_values)
+                        hop, sample_ratio, max_node_label, max_nodes_per_hop)
                     g_list.append(g) 
                     pbar.update(1)
         else:
@@ -68,8 +65,7 @@ def links2subgraphs(
             pool = mp.Pool(mp.cpu_count())
             results = pool.starmap_async(subgraph_extraction_labeling, 
                                         [(g_label, (u, v), adj, 
-                                          hop, max_node_label, sample_ratio, max_nodes_per_hop, 
-                                          user_feature, movie_feature, label_values) 
+                                          hop, sample_ratio, max_node_label, max_nodes_per_hop) 
                                           for u, v, g_label in zip(links[0], links[1], g_labels)])
             remaining = results._number_left
             pbar = tqdm(total=remaining)
@@ -93,9 +89,10 @@ def links2subgraphs(
     return train_graphs, val_graphs, test_graphs
 
 def subgraph_extraction_labeling(g_label, ind, adj, 
-                                 hop=1, max_node_label=3, sample_ratio=1.0, max_nodes_per_hop=None, 
-                                 u_features=None, v_features=None, class_values=None):
+                                 hop=1, sample_ratio=1.0, max_node_label=3, max_nodes_per_hop=200):
     # extract the h-hop enclosing subgraph around link 'ind'
+    # TODO [zhoujf] check whether label starts from 0 or 1, and if subgraph is bidirected 
+
     dist = 0
     u_nodes, v_nodes = [ind[0]], [ind[1]]
     u_dist, v_dist = [0], [0]
@@ -122,19 +119,18 @@ def subgraph_extraction_labeling(g_label, ind, adj,
         v_nodes = v_nodes + list(v_fringe)
         u_dist = u_dist + [dist] * len(u_fringe)
         v_dist = v_dist + [dist] * len(v_fringe)
-
     subgraph = adj[u_nodes, :][:, v_nodes]
-
     # remove link between target nodes
     subgraph[0, 0] = 0
+
     u, v, r = sp.find(subgraph)
     v += len(u_nodes)
     r = r.astype(int)
-    
+
     # Constructing DGL graph
     # v nodes start after u
-    rating_graphs = []
-    num_user, num_movie = adj.shape
+    # rating_graphs = []
+    # num_user, num_movie = adj.shape
     
     # Add bidirection link
     src = np.concatenate([u, v])
@@ -153,44 +149,16 @@ def subgraph_extraction_labeling(g_label, ind, adj,
     subgraph_info['x'] = np.concatenate([u_x, v_x], axis=0)
     
     return subgraph_info
- 
-    '''
-    # get node features
-    if u_features is not None:
-        u_features = u_features[u_nodes]
-    if v_features is not None:
-        v_features = v_features[v_nodes]
-    node_features = None
-    # Let's first try without node features
-    if False: 
-        # directly use padded node features
-        if u_features is not None and v_features is not None:
-            u_extended = np.concatenate([u_features, np.zeros([u_features.shape[0], v_features.shape[1]])], 1)
-            v_extended = np.concatenate([np.zeros([v_features.shape[0], u_features.shape[1]]), v_features], 1)
-            node_features = np.concatenate([u_extended, v_extended], 0)
-    if False:
-        # use identity features (one-hot encodings of node idxes)
-        u_ids = one_hot(u_nodes, A.shape[0]+A.shape[1])
-        v_ids = one_hot([x+A.shape[0] for x in v_nodes], A.shape[0]+A.shape[1])
-        node_ids = np.concatenate([u_ids, v_ids], 0)
-        #node_features = np.concatenate([node_features, node_ids], 1)
-        node_features = node_ids
-    if True:
-        # only output node features for the target user and item
-        if u_features is not None and v_features is not None:
-            node_features = [u_features[0], v_features[0]]
-    '''
-    #graph.nodes['user'].data['x'] = u_x
-    #graph.nodes['movie'].data['x'] = v_x
 
 def neighbors(fringe, adj, row=True):
+    # TODO [zhoujf] use sample_neighbors fn
     # find all 1-hop neighbors of nodes in fringe from A
     res = set()
     for node in fringe:
         if row:
             _, nei, _ = sp.find(adj[node, :])
         else:
-            _, nei, _ = sp.find(adj[:, node])
+            nei, _, _ = sp.find(adj[:, node])
         nei = set(nei)
         res = res.union(nei)
     return res

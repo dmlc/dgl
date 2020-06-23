@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from model import IGMC
 from data import MovieLens
-from dataset import MovieLensDataset, collate_movielens 
+from dataset import MovieLensDatasetStatic, MovieLensDatasetDynamic, collate_movielens 
 from utils import torch_total_param_num, torch_net_info, MetricLogger, links2subgraphs
 
 def evaluate(args, model, data_iter):
@@ -23,9 +23,9 @@ def evaluate(args, model, data_iter):
     res = []
     for idx, batch in enumerate(data_iter):
         graph = batch[0]
-        rating_gt = batch[1]
+        rating_gt = batch[1].to(args.device)
         with th.no_grad():
-            pred_ratings = model(graph)
+            pred_ratings = model(graph.to(args.device))
         rmse = ((pred_ratings - rating_gt) ** 2.).mean().item()
         res.append(rmse)
     return np.sqrt(np.mean(res))
@@ -45,17 +45,17 @@ def train(args):
     # pool = mp.Pool(mp.cpu_count())
     
     ### build the model
-    dataset_base = MovieLens(args.data_name, use_features=args.use_features, train_val=args.train_val,
+    dataset_base = MovieLens(args.data_name, train_val=args.train_val,
                              test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
 
     # multiply num_relations by 2 because now we have two types for u-v edge and v-u edge
     # NOTE: can't remember why we need add 2 for dim, need check
     model = IGMC(in_feats=(args.hop+1)*2,
                  latent_dim=[32, 32, 32, 32],
-                 num_relations=dataset_base.num_edge_types, 
+                 num_relations=dataset_base.num_rating, 
                  num_bases=4, 
                  regression=True, 
-                 edge_drop=args.edge_dropout,
+                 edge_dropout=args.edge_dropout,
                 #  side_features=args.use_features,
                 #  n_side_features=n_features,
                 #  multiply_by=args.multiply_by
@@ -84,29 +84,43 @@ def train(args):
     dur = []
     for epoch_idx in range(args.train_max_epoch):
         print ('Epoch', epoch_idx)
-
-        # Rebuild subgraph for each epoch to force 
-        train_graphs, val_graphs, test_graphs = links2subgraphs(
-                dataset_base.rating_mx_train, dataset_base.rating_values, # pool,
-                dataset_base.train_rating_pairs, dataset_base.valid_rating_pairs, dataset_base.test_rating_pairs,
-                dataset_base.train_rating_values, dataset_base.valid_rating_values, dataset_base.test_rating_values,
-                args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1,
-                user_feature=dataset_base.user_feature, movie_feature=dataset_base.movie_feature,
-                train_val=args.train_val, parallel=True)
-        train_dataset = MovieLensDataset(train_graphs, args.device, mode='train', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=collate_movielens)
-        val_dataset = MovieLensDataset(val_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
-        test_dataset = MovieLensDataset(test_graphs, args.device, mode='test', link_dropout=args.link_dropout, force_undirected=args.force_undirected)
-        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0, collate_fn=collate_movielens)
+        
+        if not args.dynamic_dataset:
+            # Rebuild subgraph for each epoch to force 
+            train_graphs, val_graphs, test_graphs = links2subgraphs(
+                    dataset_base.rating_mx_train, # dataset_base.rating_values, pool,
+                    dataset_base.train_rating_pairs, dataset_base.valid_rating_pairs, dataset_base.test_rating_pairs,
+                    dataset_base.train_rating_values, dataset_base.valid_rating_values, dataset_base.test_rating_values,
+                    args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1,
+                    train_val=args.train_val, parallel=True)
+            train_dataset = MovieLensDatasetStatic(train_graphs, mode='train', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+            train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8, collate_fn=collate_movielens)
+            val_dataset = MovieLensDatasetStatic(val_graphs, mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+            val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8, collate_fn=collate_movielens)
+            test_dataset = MovieLensDatasetStatic(test_graphs, mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+            test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8, collate_fn=collate_movielens)
+        else:
+            train_dataset = MovieLensDatasetDynamic(dataset_base.train_rating_pairs, dataset_base.train_rating_values, dataset_base.rating_mx_train, 
+                                args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1, 
+                                mode='train', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+            train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8, collate_fn=collate_movielens)
+            test_dataset = MovieLensDatasetDynamic(dataset_base.test_rating_pairs, dataset_base.test_rating_values, dataset_base.rating_mx_train, 
+                                args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1, 
+                                mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+            test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8, collate_fn=collate_movielens)
+            if args.train_val:
+                val_dataset = MovieLensDatasetDynamic(dataset_base.valid_rating_pairs, dataset_base.valid_rating_values, dataset_base.rating_mx_train, 
+                                args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1, 
+                                mode='valid', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+                val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8, collate_fn=collate_movielens)
 
         for iter_idx, batch in enumerate(train_loader):
             if iter_idx > 3:
                 t0 = time.time()
 
             model.train()
-            pred_ratings = model(batch[0])
-            train_gt_labels = batch[1]
+            pred_ratings = model(batch[0].to(args.device))
+            train_gt_labels = batch[1].to(args.device)
             loss = rating_loss_fn(pred_ratings, train_gt_labels).mean() + args.arr_lambda * adj_rating_reg(model)
             count_loss += loss.item() * pred_ratings.shape[0]
             optimizer.zero_grad()
@@ -182,7 +196,10 @@ def config():
     parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--train_valid_interval', type=int, default=1)
 
-    
+    parser.add_argument('--dynamic_dataset', action='store_true', default=False,
+                    help='if True, extract enclosing subgraphs on the fly instead of \
+                    storing in disk; works for large datasets that cannot fit into memory')
+
     # subgraph extraction settings
     parser.add_argument('--hop', default=1, metavar='S', 
                         help='enclosing subgraph hop number')
@@ -190,8 +207,8 @@ def config():
                         help='if < 1, subsample nodes per hop according to the ratio')
     parser.add_argument('--max_nodes_per_hop', type=int, default=10000, 
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
-    parser.add_argument('--use_features', action='store_true', default=False,
-                        help='whether to use node features (side information)')
+    # parser.add_argument('--use_features', action='store_true', default=False,
+    #                     help='whether to use node features (side information)')
     # parser.add_argument('--use_one_hot_fea', action='store_true', default=True)
     
     # edge dropout settings
@@ -211,7 +228,6 @@ def config():
     parser.add_argument('--train_min_lr', type=float, default=0.001)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
     parser.add_argument('--train_decay_epoch', type=int, default=50)
-    parser.add_argument('--link-dropout', type=float, default=0.2, help='link dropout rate')
     parser.add_argument('--train_val', action='store_true', default=True)
 
     args = parser.parse_args()

@@ -11,13 +11,13 @@ class IGMC(nn.Module):
     # Use RGCN convolution + center-nodes readout.
     
     def __init__(self, in_feats, gconv=RelGraphConv, latent_dim=[32, 32, 32, 32], 
-                num_relations=5, num_bases=2, regression=False, edge_drop=0.2, 
+                num_relations=5, num_bases=2, regression=False, edge_dropout=0.2, 
                 force_undirected=False, side_features=False, n_side_features=0, 
                 multiply_by=1):
         super(IGMC, self).__init__()
 
         self.regression = regression
-        self.edge_dropout = nn.Dropout(edge_drop)
+        self.edge_drop = nn.Dropout(edge_dropout)
         self.force_undirected = force_undirected
         self.side_features = side_features
         self.multiply_by = multiply_by
@@ -50,7 +50,7 @@ class IGMC(nn.Module):
         #         force_undirected=self.force_undirected, num_nodes=len(x), 
         #         training=self.training
         #     )
-        # block.edata['e'] = self.edge_dropout(block.edata['e']) # KeyError: 'e'
+        # block.edata['e'] = self.edge_drop(block.edata['e']) # KeyError: 'e'
         
         concat_states = []
         x = block.ndata['x']
