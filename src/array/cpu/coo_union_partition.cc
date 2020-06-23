@@ -16,15 +16,22 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
                                 const std::vector<uint64_t> dst_offset) {
   std::vector<int64_t> edge_offset(coos.size());
   int64_t total_edges = 0;
+  bool has_data = false;
 
   for (size_t i = 0; i < coos.size(); ++i) {
       aten::COOMatrix coo = coos[i];
       edge_offset[i] = total_edges;
       total_edges += coo.row->shape[0];
+
+      if (IsNullArray(coo.data) == false)
+        has_data = true;
   }
 
   std::vector<IdType> result_src(total_edges);
   std::vector<IdType> result_dst(total_edges);
+  std::vector<IdType> result_data;
+  if (has_data)
+    result_data.resize(total_edges);
 
 #pragma omp parallel for
   for (size_t i = 0; i < coos.size(); ++i) {
@@ -33,13 +40,20 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
 
     const IdType* edges_src_data = static_cast<const IdType*>(coo.row->data);
     const IdType* edges_dst_data = static_cast<const IdType*>(coo.col->data);
-    CHECK(IsNullArray(coo.data)) <<
-        "DisjointUnionCooGraph does not support union COOMatrix with eid mapping data";
+    const IdType* data = static_cast<const IdType*>(coo.data->data);
 
     // Loop over all edges
-    for (size_t j = 0; j < num_edges; ++j) {
+    for (int64_t j = 0; j < num_edges; ++j) {
       result_src[edge_offset[i] + j] = edges_src_data[j] + src_offset[i];
       result_dst[edge_offset[i] + j] = edges_dst_data[j] + dst_offset[i];
+    
+      if (has_data) {
+        if (data == nullptr) {
+          result_data[edge_offset[i] + j] = edge_offset[i] + j;
+        } else {
+          result_data[edge_offset[i] + j] = edge_offset[i] + data[j];
+        }
+      }
     }
   }
 
@@ -84,6 +98,8 @@ std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
         VecToIdArray(result_dst, sizeof(IdType) * 8));
     ret[g] = sub_coo;
   }
+
+  return ret;
 }
 
 template std::vector<COOMatrix>

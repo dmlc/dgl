@@ -25,6 +25,7 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
 
   std::vector<IdType> result_indptr(src_offset[csrs.size()] + 1);
   std::vector<IdType> result_indices(total_indices);
+  std::vector<IdType> result_data(total_indices);
   result_indptr[0] = 0;
 
 #pragma omp parallel for
@@ -32,25 +33,30 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
     aten::CSRMatrix csr = csrs[i];
     const IdType* indptr_data = static_cast<const IdType*>(csr.indptr->data);
     const IdType* indices_data = static_cast<const IdType*>(csr.indices->data);
-    CHECK(IsNullArray(csr.data)) <<
-        "DisjointUnionCsrGraph does not support union CSRMatrix with eid mapping data";
+    const IdType* data = static_cast<const IdType*>(csr.data->data);
 
     // indptr offset start from 1
-    for (size_t j = 1; j <= csr.num_rows; ++j) {
-        result_indptr[src_offset[i] + j] = indptr_data[j] + indices_offset[i];
+    for (int64_t j = 1; j <= csr.num_rows; ++j) {
+      result_indptr[src_offset[i] + j] = indptr_data[j] + indices_offset[i];
     }
 
     // Loop over all edges
-    for (size_t j = 0; j <= csr.indices->shape[0]; ++j) {
-        // node_id + node_shift_offset
-        result_indices[indices_offset[i] + j] = indices_data[j] + dst_offset[i];
+    for (int64_t j = 0; j < csr.indices->shape[0]; ++j) {
+      // node_id + node_shift_offset
+      result_indices[indices_offset[i] + j] = indices_data[j] + dst_offset[i];
+      if (data == nullptr) {
+        result_data[indices_offset[i] + j] = indices_offset[i] + j;
+      } else {
+        result_data[indices_offset[i] + j] = indices_offset[i] + data[j];
+      }
     }
   }
 
   return CSRMatrix(
     src_offset[csrs.size()], dst_offset[csrs.size()],
     VecToIdArray(result_indptr, sizeof(IdType) * 8),
-    VecToIdArray(result_indices, sizeof(IdType) * 8));
+    VecToIdArray(result_indices, sizeof(IdType) * 8),
+    VecToIdArray(result_data, sizeof(IdType) * 8));
 }
 
 template CSRMatrix DisjointUnionCsrGraph<kDLCPU, int32_t>(const std::vector<CSRMatrix>& csrs,
