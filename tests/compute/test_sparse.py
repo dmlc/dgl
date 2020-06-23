@@ -1,4 +1,5 @@
 import dgl
+import dgl.sparse
 import pytest
 import networkx as nx
 import backend as F
@@ -79,7 +80,7 @@ def test_spmm(g, shp, msg, reducer):
     g.edata['w'] = _unsqueeze_if_scalar(e)
 
     print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
-    v = dgl.gspmm(g, msg, reducer, u, e)[0]
+    v = dgl.sparse._gspmm(g, msg, reducer, u, e)[0]
     non_degree_indices = F.tensor(
         np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
     v = F.gather_row(v, non_degree_indices)
@@ -107,7 +108,7 @@ def test_sddmm(g, shp, msg):
     g.dstdata['y'] = _unsqueeze_if_scalar(v)
 
     print('SDDMM(message func: {})'.format(msg))
-    e = dgl.gsddmm(g, msg, u, v)
+    e = dgl.sparse._gsddmm(g, msg, u, v)
     g.apply_edges(udf_apply_edges[msg])
     if 'm' in g.edata:
         e1 = g.edata['m']

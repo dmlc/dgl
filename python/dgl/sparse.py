@@ -1,5 +1,7 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
+from __future__ import absolute_import
+
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
@@ -72,7 +74,7 @@ op_mapping = {
     'copy_e': 'copy_e'
 }
 
-def gspmm(g, op, reduce_op, u, e):
+def _gspmm(g, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
@@ -103,8 +105,11 @@ def gspmm(g, op, reduce_op, u, e):
 
     Returns
     -------
-    tensor
-        The result tensor.
+    tuple
+        The returned tuple is composed of two elements:
+        - The first element refers to the result tensor.
+        - The second element refers to a tuple composed of arg_u and arg_e
+          (which is useful when reducer is `min`/`max`).
 
     Notes
     -----
@@ -139,7 +144,7 @@ def gspmm(g, op, reduce_op, u, e):
                             to_dgl_nd(arg_u), to_dgl_nd(arg_e))
     return v, (arg_u, arg_e)
 
-def gsddmm(g, op, u, v):
+def _gsddmm(g, op, u, v):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.

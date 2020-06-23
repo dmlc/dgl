@@ -1311,7 +1311,7 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     """
     pass
 
-def gspmm(op, reduce_op, g, lhs_data, rhs_data, lhs_target='u', rhs_target='e', out_target='v'):
+def gspmm(g, op, reduce_op, lhs_data, rhs_data, lhs_target='u', rhs_target='e', out_target='v'):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
