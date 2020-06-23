@@ -561,7 +561,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
-///////////////////////// Graph Traverse  routines //////////////////////////
+///////////////////////// Graph Traverse routines //////////////////////////
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   Frontiers ret;
   CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
@@ -621,6 +621,7 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   });
   return ret;
 }
+
 Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
                              const bool has_reverse_edge,
@@ -644,6 +645,51 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
   });
   return ret;
 }
+
+///////////////////////// Graph Union/Partition routines //////////////////////////
+COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
+                                const std::vector<uint64_t> src_offset,
+                                const std::vector<uint64_t> dst_offset) {
+  COOMatrix ret;
+  ATEN_XPU_SWITCH(coos[0].row->ctx.device_type, XPU, "DisjointUnionCooGraph", {
+    ATEN_ID_TYPE_SWITCH(coos[0].row->dtype, IdType, {
+      ret = impl::DisjointUnionCooGraph<XPU, IdType>(coos, src_offset, dst_offset);                                           
+    });
+  });
+  return ret;
+}
+
+CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
+                                const std::vector<uint64_t> src_offset,
+                                const std::vector<uint64_t> dst_offset) {
+  CSRMatrix ret;
+  ATEN_XPU_SWITCH(csrs[0].indptr->ctx.device_type, XPU, "DisjointUnionCsrGraph", {
+    ATEN_ID_TYPE_SWITCH(csrs[0].indices->dtype, IdType, {
+      ret = impl::DisjointUnionCsrGraph<XPU, IdType>(csrs, src_offset, dst_offset);                                           
+    });
+  });
+  return ret;
+}
+
+std::vector<COOMatrix> DisjointPartitionHeteroBySizes(const COOMatrix coo,
+                                                      const uint64_t batch_size,
+                                                      const std::vector<uint64_t> edge_cumsum,
+                                                      const std::vector<uint64_t> src_vertex_cumsum,
+                                                      const std::vector<uint64_t> dst_vertex_cumsum) {
+  std::vector<COOMatrix> ret;
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, "DisjointPartitionHeteroBySizes", {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ret = impl::DisjointPartitionHeteroBySizes<XPU, IdType>(coo,
+                                                              batch_size,
+                                                              edge_cumsum,
+                                                              src_vertex_cumsum,
+                                                              dst_vertex_cumsum);                                           
+    });
+  });
+  return ret;
+}
+
+
 
 ///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")

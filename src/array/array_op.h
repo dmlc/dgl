@@ -140,6 +140,11 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
+                                const std::vector<uint64_t> src_offset,
+                                const std::vector<uint64_t> dst_offset);
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -205,6 +210,18 @@ COOMatrix COORowWiseSamplingUniform(
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
+                                const std::vector<uint64_t> src_offset,
+                                const std::vector<uint64_t> dst_offset);
+
+template <DLDeviceType XPU, typename IdType>
+std::vector<COOMatrix> DisjointPartitionHeteroBySizes(const COOMatrix coo,
+                                                      const uint64_t batch_size,
+                                                      const std::vector<uint64_t> edge_cumsum,
+                                                      const std::vector<uint64_t> src_vertex_cumsum,
+                                                      const std::vector<uint64_t> dst_vertex_cumsum);
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);

@@ -318,6 +318,17 @@ COOMatrix CSRRowWiseTopk(
     FloatArray weight,
     bool ascending = false);
 
+/*!
+ * \brief Union a list CSRMatrix into one CSRMatrix.
+ * \param csrs The input list of csr matrix.
+ * \param src_offset A list of integers recording src vertix id offset of each Matrix in csrs
+ * \param src_offset A list of integers recording dst vertix id offset of each Matrix in csrs
+ */
+CSRMatrix DisjointUnionCsrGraph(
+  const std::vector<CSRMatrix>& csrs,
+  const std::vector<uint64_t> src_offset,
+  const std::vector<uint64_t> dst_offset);
+
 }  // namespace aten
 }  // namespace dgl
 

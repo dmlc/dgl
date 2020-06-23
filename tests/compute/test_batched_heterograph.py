@@ -269,7 +269,7 @@ def test_batching_with_zero_nodes_edges(index_dtype):
     dgl.batch_hetero([g1, g2])
 
 if __name__ == '__main__':
-    test_batching_hetero_topology()
-    test_batching_hetero_and_batched_hetero_topology()
-    test_batched_features()
-    test_batching_with_zero_nodes_edges()
+    test_batching_hetero_topology('int32')
+    test_batching_hetero_and_batched_hetero_topology('int32')
+    test_batched_features('int32')
+    test_batching_with_zero_nodes_edges('int32')

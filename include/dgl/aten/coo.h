@@ -310,6 +310,24 @@ COOMatrix COORowWiseTopk(
     NDArray weight,
     bool ascending = false);
 
+/*!
+ * \brief Union a list COOMatrix into one COOMatrix.
+ * \param coos The input list of coo matrix.
+ * \param src_offset A list of integers recording src vertix id offset of each Matrix in coos
+ * \param src_offset A list of integers recording dst vertix id offset of each Matrix in coos
+ */
+COOMatrix DisjointUnionCooGraph(
+  const std::vector<COOMatrix>& coos,
+  const std::vector<uint64_t> src_offset,
+  const std::vector<uint64_t> dst_offset);
+
+std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
+  const COOMatrix coo,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> edge_cumsum,
+  const std::vector<uint64_t> src_vertex_cumsum,
+  const std::vector<uint64_t> dst_vertex_cumsum);
+
 }  // namespace aten
 }  // namespace dgl
 

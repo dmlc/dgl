@@ -8,6 +8,176 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
+HeteroGraphPtr DisjointUnionHeteroGraph2(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
+  CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";
+  std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
+  std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices(), 0);
+
+  // Loop over all canonical etypes
+  auto format = component_graphs[0]->GetRelationGraph(0)->GetFormatInUse();
+  auto restrict_format = component_graphs[0]->GetRelationGraph(0)->GetRestrictFormat();
+  for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
+    auto pair = meta_graph->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    std::vector<uint64_t> src_offset_v, dst_offset_v;
+    uint64_t src_offset = 0, dst_offset = 0;
+    HeteroGraphPtr rgptr = nullptr;
+
+    // do some preprocess
+    for (size_t i = 0; i < component_graphs.size(); ++i) {
+      const auto& cg = component_graphs[i];
+      CHECK_EQ(format, cg->GetRelationGraph(etype)->GetFormatInUse()) << \
+        "All batched graph should have same sparse format";
+      CHECK_EQ(restrict_format, cg->GetRelationGraph(etype)->GetRestrictFormat()) << \
+        "All batched graph should have same restrict_format format";
+      src_offset_v.push_back(src_offset);
+      dst_offset_v.push_back(dst_offset);
+
+      // Update offsets
+      src_offset += cg->NumVertices(src_vtype);
+      dst_offset += cg->NumVertices(dst_vtype);
+    }
+    src_offset_v.push_back(src_offset);
+    dst_offset_v.push_back(dst_offset);
+
+    //prefer COO
+    if (FORMAT_HAS_COO(format)) {
+      std::vector<aten::COOMatrix> coos;
+      for (size_t i = 0; i < component_graphs.size(); ++i) {
+        const auto& cg = component_graphs[i];
+        aten::COOMatrix coo = cg->GetCOOMatrix(etype);
+        coos.push_back(coo);
+      }
+        
+      aten::COOMatrix res = aten::DisjointUnionCooGraph(coos,
+                                                        src_offset_v,
+                                                        dst_offset_v);
+
+      rgptr = UnitGraph::CreateFromCOO(
+        (src_vtype == dst_vtype) ? 1 : 2, res,
+        ParseSparseFormat(restrict_format));
+    } else if (FORMAT_HAS_CSR(format)) {
+      std::vector<aten::CSRMatrix> csrs;
+      for (size_t i = 0; i < component_graphs.size(); ++i) {
+        const auto& cg = component_graphs[i];
+        aten::CSRMatrix csr = cg->GetCSRMatrix(etype);
+        csrs.push_back(csr);
+      }
+
+      aten::CSRMatrix res = aten::DisjointUnionCsrGraph(csrs,
+                                                        src_offset_v,
+                                                        dst_offset_v);
+
+      rgptr = UnitGraph::CreateFromCSR(
+        (src_vtype == dst_vtype) ? 1 : 2, res,
+        ParseSparseFormat(restrict_format));
+    } else if (FORMAT_HAS_CSC(format)) {
+      std::vector<aten::CSRMatrix> cscs;
+      for (size_t i = 0; i < component_graphs.size(); ++i) {
+        const auto& cg = component_graphs[i];
+        aten::CSRMatrix csc = cg->GetCSCMatrix(etype);
+        cscs.push_back(csc);
+      }
+
+      aten::CSRMatrix res = aten::DisjointUnionCsrGraph(cscs,
+                                                        dst_offset_v,
+                                                        src_offset_v);
+      rgptr = UnitGraph::CreateFromCSC(
+        (src_vtype == dst_vtype) ? 1 : 2, res,
+        ParseSparseFormat(restrict_format));
+    }
+    rel_graphs[etype] = rgptr;
+    num_nodes_per_type[src_vtype] = src_offset;
+    num_nodes_per_type[dst_vtype] = dst_offset;
+  }
+
+  return CreateHeteroGraph(meta_graph, rel_graphs, std::move(num_nodes_per_type));
+}
+
+std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
+    GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray vertex_sizes, IdArray edge_sizes) {
+  // Sanity check for vertex sizes
+  CHECK_EQ(vertex_sizes->dtype.bits, 64) << "dtype of vertex_sizes should be int64";
+  CHECK_EQ(edge_sizes->dtype.bits, 64) << "dtype of edge_sizes should be int64";
+  const uint64_t len_vertex_sizes = vertex_sizes->shape[0];
+  const uint64_t* vertex_sizes_data = static_cast<uint64_t*>(vertex_sizes->data);
+  const uint64_t num_vertex_types = meta_graph->NumVertices();
+  const uint64_t batch_size = len_vertex_sizes / num_vertex_types;
+
+  // Map vertex type to the corresponding node cum sum
+  std::vector<std::vector<uint64_t>> vertex_cumsum;
+  vertex_cumsum.resize(num_vertex_types);
+  // Loop over all vertex types
+  for (uint64_t vtype = 0; vtype < num_vertex_types; ++vtype) {
+    vertex_cumsum[vtype].push_back(0);
+    for (uint64_t g = 0; g < batch_size; ++g) {
+      // We've flattened the number of vertices in the batch for all types
+      vertex_cumsum[vtype].push_back(
+        vertex_cumsum[vtype][g] + vertex_sizes_data[vtype * batch_size + g]);
+    }
+    CHECK_EQ(vertex_cumsum[vtype][batch_size], batched_graph->NumVertices(vtype))
+      << "Sum of the given sizes must equal to the number of nodes for type " << vtype;
+  }
+
+  // Sanity check for edge sizes
+  const uint64_t* edge_sizes_data = static_cast<uint64_t*>(edge_sizes->data);
+  const uint64_t num_edge_types = meta_graph->NumEdges();
+  // Map edge type to the corresponding edge cum sum
+  std::vector<std::vector<uint64_t>> edge_cumsum;
+  edge_cumsum.resize(num_edge_types);
+  // Loop over all edge types
+  for (uint64_t etype = 0; etype < num_edge_types; ++etype) {
+    edge_cumsum[etype].push_back(0);
+    for (uint64_t g = 0; g < batch_size; ++g) {
+      // We've flattened the number of edges in the batch for all types
+      edge_cumsum[etype].push_back(
+        edge_cumsum[etype][g] + edge_sizes_data[etype * batch_size + g]);
+    }
+    CHECK_EQ(edge_cumsum[etype][batch_size], batched_graph->NumEdges(etype))
+      << "Sum of the given sizes must equal to the number of edges for type " << etype;
+  }
+
+  // Construct relation graphs for unbatched graphs
+  std::vector<std::vector<HeteroGraphPtr>> rel_graphs;
+  rel_graphs.resize(batch_size);
+  // Loop over all edge types
+  auto format = batched_graph->GetRelationGraph(0)->GetFormatInUse();
+  auto restrict_format = batched_graph->GetRelationGraph(0)->GetRestrictFormat();
+
+  CHECK(FORMAT_HAS_COO(format)) <<
+    "DisjointPartitionHeteroBySizes only support graph with COO format.";
+  for (uint64_t etype = 0; etype < num_edge_types; ++etype) {
+    auto pair = meta_graph->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+
+    aten::COOMatrix coo = batched_graph->GetCOOMatrix(etype);
+    auto res = aten::DisjointPartitionHeteroBySizes(coo,
+                                                    batch_size,
+                                                    edge_cumsum[etype],
+                                                    vertex_cumsum[src_vtype],
+                                                    vertex_cumsum[dst_vtype]);
+    for (uint64_t g = 0; g < batch_size; ++g) {
+      HeteroGraphPtr rgptr = UnitGraph::CreateFromCOO(
+        (src_vtype == dst_vtype) ? 1 : 2, res[g],
+        ParseSparseFormat(restrict_format));
+
+      rel_graphs[g].push_back(rgptr);
+    }
+  }
+
+  std::vector<HeteroGraphPtr> rst;
+  std::vector<int64_t> num_nodes_per_type(num_vertex_types);
+  for (uint64_t g = 0; g < batch_size; ++g) {
+    for (uint64_t i = 0; i < num_vertex_types; ++i)
+      num_nodes_per_type[i] = vertex_sizes_data[i * batch_size + g];
+    rst.push_back(CreateHeteroGraph(meta_graph, rel_graphs[g], num_nodes_per_type));
+  }
+  return rst;
+}
+
 template <class IdType>
 HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
