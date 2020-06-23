@@ -40,7 +40,7 @@ class FarthestPointSampler(nn.Module):
         B, N, C = pos.shape
         pos = pos.reshape(-1, C)
         dist = th.zeros((B * N), dtype=pos.dtype, device=device)
-        start_idx = th.randint(0, N - 1, (B, ), dtype=th.int, device=device)
-        result = th.zeros((self.npoints * B), dtype=th.int, device=device)
+        start_idx = th.randint(0, N - 1, (B, ), dtype=th.long, device=device)
+        result = th.zeros((self.npoints * B), dtype=th.long, device=device)
         farthest_point_sampler(pos, B, self.npoints, dist, start_idx, result)
         return result.reshape(B, self.npoints)

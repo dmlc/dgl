@@ -779,7 +779,7 @@ class DGLRetValue : public DGLPODValue_ {
   void Clear() {
     if (type_code_ == kNull) return;
     switch (type_code_) {
-      case kStr: delete ptr<std::string>(); break;
+      case kStr: case kBytes: delete ptr<std::string>(); break;
       case kFuncHandle: delete ptr<PackedFunc>(); break;
       case kModuleHandle: delete ptr<Module>(); break;
       case kObjectHandle: delete ptr<std::shared_ptr<Object> >(); break;
