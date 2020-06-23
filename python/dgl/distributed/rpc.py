@@ -399,6 +399,11 @@ def serialize_to_payload(serializable):
     data = bytearray(pickle.dumps((nonarray_pos, nonarray_state)))
     return data, array_state
 
+class PlaceHolder:
+    """PlaceHolder object for deserialization"""
+
+_PLACEHOLDER = PlaceHolder()
+
 def deserialize_from_payload(cls, data, tensors):
     """Deserialize and reconstruct the object from payload.
 
@@ -419,14 +424,15 @@ def deserialize_from_payload(cls, data, tensors):
         De-serialized object of class cls.
     """
     pos, nonarray_state = pickle.loads(data)
-    state = [None] * (len(nonarray_state) + len(tensors))
+    # Use _PLACEHOLDER to distinguish with other deserizliaed elements
+    state = [_PLACEHOLDER] * (len(nonarray_state) + len(tensors))
     for i, no_state in zip(pos, nonarray_state):
         state[i] = no_state
     if len(tensors) != 0:
         j = 0
         state_len = len(state)
         for i in range(state_len):
-            if state[i] is None:
+            if state[i] is _PLACEHOLDER:
                 state[i] = tensors[j]
                 j += 1
     if len(state) == 1:
