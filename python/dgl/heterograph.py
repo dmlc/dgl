@@ -17,6 +17,7 @@ from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from .udf import NodeBatch, EdgeBatch
+from ._ffi.function import _init_api
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
@@ -221,7 +222,10 @@ class DGLHeteroGraph(object):
                 self._canonical_etypes = [(ntypes[0][0], etypes[0], ntypes[1][0])]
         else:
             self._ntypes = ntypes
-            src_dst_map = find_src_dst_ntypes(self._ntypes, self._graph.metagraph)
+            if len(ntypes) == 1:
+                src_dst_map = None
+            else:
+                src_dst_map = find_src_dst_ntypes(self._ntypes, self._graph.metagraph)
             self._is_unibipartite = (src_dst_map is not None)
             if self._is_unibipartite:
                 self._srctypes_invmap, self._dsttypes_invmap = src_dst_map
@@ -232,8 +236,11 @@ class DGLHeteroGraph(object):
         # Handle edge types
         self._etypes = etypes
         if self._canonical_etypes is None:
-            self._canonical_etypes = make_canonical_etypes(
-                self._etypes, self._ntypes, self._graph.metagraph)
+            if (len(etypes) == 1 and len(ntypes) == 1):
+                self._canonical_etypes = [(ntypes[0], etypes[0], ntypes[0])]
+            else:
+                self._canonical_etypes = make_canonical_etypes(
+                    self._etypes, self._ntypes, self._graph.metagraph)
 
         # An internal map from etype to canonical etype tuple.
         # If two etypes have the same name, an empty tuple is stored instead to indicate
@@ -4043,14 +4050,36 @@ class DGLHeteroGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
+    @property
+    def device(self):
+        """Get the device context of this graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> print(g.device)
+        device(type='cpu')
+        >>> g = g.to('cuda:0')
+        >>> print(g.device)
+        device(type='cuda', index=0)
+
+        Returns
+        -------
+        Device context object
+        """
+        return F.to_backend_ctx(self._graph.ctx)
+
     def to(self, ctx, **kwargs):  # pylint: disable=invalid-name
-        """Move both ndata and edata to the targeted mode (cpu/gpu)
-        Framework agnostic
+        """Move ndata, edata and graph structure to the targeted device context (cpu/gpu).
 
         Parameters
         ----------
-        ctx : framework-specific context object
+        ctx : Framework-specific device context object
             The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
 
         Returns
         -------
@@ -4065,15 +4094,25 @@ class DGLHeteroGraph(object):
         >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
-        >>> g = g.to(torch.device('cuda:0'))
+        >>> g1 = g.to(torch.device('cuda:0'))
+        >>> print(g1.device)
+        device(type='cuda', index=0)
+        >>> print(g.device)
+        device(type='cpu')
         """
-        for i in range(len(self._node_frames)):
-            for k in self._node_frames[i].keys():
-                self._node_frames[i][k] = F.copy_to(self._node_frames[i][k], ctx)
-        for i in range(len(self._edge_frames)):
-            for k in self._edge_frames[i].keys():
-                self._edge_frames[i][k] = F.copy_to(self._edge_frames[i][k], ctx)
-        return self
+        new_nframes = []
+        for nframe in self._node_frames:
+            new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
+            new_nframes.append(FrameRef(Frame(new_feats)))
+        new_eframes = []
+        for eframe in self._edge_frames:
+            new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
+            new_eframes.append(FrameRef(Frame(new_feats)))
+        # TODO(minjie): replace the following line with the commented one to enable GPU graph.
+        new_gidx = self._graph
+        #new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
+        return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
+                              new_nframes, new_eframes)
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.
@@ -4478,7 +4517,9 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
         raise DGLError('Length of nodes type list must match the number of '
                        'nodes in the metagraph. {} vs {}'.format(
                            len(ntypes), metagraph.number_of_nodes()))
-    src, dst, eid = metagraph.edges()
+    if (len(etypes) == 1 and len(ntypes) == 1):
+        return [(ntypes[0], etypes[0], ntypes[0])]
+    src, dst, eid = metagraph.edges(order="eid")
     rst = [(ntypes[sid], etypes[eid], ntypes[did]) for sid, did, eid in zip(src, dst, eid)]
     return rst
 
@@ -4522,17 +4563,14 @@ def find_src_dst_ntypes(ntypes, metagraph):
         a dictionary from type name to type id. Return None if the graph is
         not uni-bipartite.
     """
-    src, dst, _ = metagraph.edges()
-    if set(src.tonumpy()).isdisjoint(set(dst.tonumpy())):
-        srctypes = {ntypes[tid] : tid for tid in src}
-        dsttypes = {ntypes[tid] : tid for tid in dst}
-        # handle isolated node types
-        for ntid, ntype in enumerate(ntypes):
-            if ntype not in srctypes and ntype not in dsttypes:
-                srctypes[ntype] = ntid
-        return srctypes, dsttypes
-    else:
+    ret = _CAPI_DGLFindSrcDstNtypes(metagraph)
+    if ret is None:
         return None
+    else:
+        src, dst = ret
+        srctypes = {ntypes[tid.data] : tid.data for tid in src}
+        dsttypes = {ntypes[tid.data] : tid.data for tid in dst}
+        return srctypes, dsttypes
 
 def infer_ntype_from_dict(graph, etype_dict):
     """Infer node type from dictionary of edge type to values.
@@ -4787,3 +4825,5 @@ def check_idtype_dict(graph_dtype, tensor_dict):
     """check whether the dtypes of tensors in dict are consistent with graph's dtype"""
     for _, v in tensor_dict.items():
         check_same_dtype(graph_dtype, v)
+
+_init_api("dgl.heterograph")
