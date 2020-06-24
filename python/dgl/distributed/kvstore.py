@@ -829,7 +829,7 @@ class KVClient(object):
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
             # recv response from all the server nodes
-            for _ in range(self._server_namebook):
+            for _ in range(self._server_count):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PULL_MSG
         self._pull_handlers[name] = func

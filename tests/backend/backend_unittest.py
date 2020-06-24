@@ -95,7 +95,7 @@ def div(a, b):
     """Compute a / b"""
     pass
 
-def sum(x, dim):
+def sum(x, dim, keepdims=False):
     """Computes the sum of array elements over given axes"""
     pass
 
