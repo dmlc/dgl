@@ -135,6 +135,9 @@ inline bool CSRHasData(CSRMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
+/*! \brief Whether the column indices of each row is sorted. */
+bool CSRIsSorted(CSRMatrix csr);
+
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
 /*!

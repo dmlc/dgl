@@ -88,6 +88,9 @@ template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
+bool CSRIsSorted(CSRMatrix csr);
+
+template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
 
 template <DLDeviceType XPU, typename IdType>

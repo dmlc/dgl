@@ -142,6 +142,12 @@ inline bool COOHasData(COOMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
+/*! \brief Whether the COO is row sorted */
+bool COOIsRowSorted(COOMatrix coo);
+
+/*! \brief Whether the COO is row sorted and the column indices of each row are sorted.*/
+bool COOIsSorted(COOMatrix coo);
+
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
 

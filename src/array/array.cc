@@ -295,6 +295,14 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   return ret;
 }
 
+bool CSRIsSorted(CSRMatrix csr) {
+  bool ret = false;
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsSorted", {
+    ret = impl::CSRIsSorted<XPU, IdType>(csr);
+  });
+  return ret;
+}
+
 NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
