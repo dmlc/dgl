@@ -36,10 +36,12 @@ class DGLDataset(object):
         if raw_dir is None:
             self._raw_dir = get_download_dir()
         else:
-            self._raw_dir = raw_dir
+            self._raw_dir = os.path.expanduser(raw_dir)
 
         if save_dir is None:
             self._save_dir = self._raw_dir
+        else:
+            self._save_dir = os.path.expanduser(save_dir)
 
         self._load()
 
@@ -89,7 +91,7 @@ class DGLDataset(object):
         self.download()
 
     def _load(self):
-        r"""Entry point from __init__ to load the dataset. 
+        r"""Entry point from __init__ to load the dataset.
             if the cache exists:
                 Load the dataset from saved dgl graph and information files.
             else:
@@ -103,7 +105,7 @@ class DGLDataset(object):
             self._download()
             self.process(self.raw_path)
             self.save()
-    
+
     @property
     def url(self):
         r"""Get url to download the raw dataset
@@ -171,7 +173,6 @@ class DGLBuiltinDataset(DGLDataset):
     def download(self):
         r""" Automatically download data and extract it.
         """
-        print(self.url)
-        zip_file_path='{}/{}.zip'.format(self.raw_dir, self.name)
+        zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
         download(self.url, path=zip_file_path)
         extract_archive(zip_file_path, self.raw_path)
