@@ -69,6 +69,6 @@ class KarateClubDataset(DGLDataset):
 
 class KarateClub(KarateClubDataset):
     def __init__(self):
-        dgl_warning('KarateClub will be deprecated in the future, use KarateClubDataset instead.',
+        dgl_warning('KarateClub is deprecated, use KarateClubDataset instead.',
                     DeprecationWarning, stacklevel=2)
         super(KarateClub, self).__init__()
