@@ -8,7 +8,14 @@ from collections import defaultdict
 def _check_neighbor_sampling_dataloader(g, nids, dl):
     seeds = defaultdict(list)
 
-    for blocks in dl:
+    for input_nodes, output_nodes, blocks in dl:
+        if len(g.ntypes) > 1:
+            for ntype in g.ntypes:
+                assert F.array_equal(input_nodes[ntype], blocks[0].srcnodes[ntype].data[dgl.NID])
+                assert F.array_equal(output_nodes[ntype], blocks[-1].dstnodes[ntype].data[dgl.NID])
+        else:
+            assert F.array_equal(input_nodes, blocks[0].srcdata[dgl.NID])
+            assert F.array_equal(output_nodes, blocks[-1].dstdata[dgl.NID])
         prev_dst = {ntype: None for ntype in g.ntypes}
         for block in blocks:
             for canonical_etype in block.canonical_etypes:
