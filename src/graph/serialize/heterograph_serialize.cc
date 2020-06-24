@@ -37,6 +37,7 @@
 #include <dmlc/type_traits.h>
 
 #include <algorithm>
+#include <array>
 #include <iostream>
 #include <string>
 #include <utility>

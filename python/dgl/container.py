@@ -89,7 +89,7 @@ class Value(ObjectBase):
 
 
 def convert_to_strmap(value):
-    """Support convert empty dict to str dict"""
+    """Convert a python dictionary to a dgl.contrainer.StrMap"""
     assert isinstance(value, dict), "Only support dict"
     if len(value) == 0:
         return _api_internal._EmptyStrMap()
