@@ -228,11 +228,49 @@ def context(input):
     pass
 
 def device_type(ctx):
-    """Return a str representing device type"""
+    """Return a str representing device type.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    str
+    """
     pass
 
 def device_id(ctx):
-    """Return device index"""
+    """Return device index.
+
+    For CPU, the index does not matter. For GPU, the index means which GPU
+    device on the machine.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    int
+        The device index.
+    """
+    pass
+
+def to_backend_ctx(dglctx):
+    """Convert a DGL context object to a backend context.
+
+    Parameters
+    ----------
+    dglctx : dgl.ndarray.DGLContext
+        DGL context object. See _ffi.runtime_types for definition.
+
+    Returns
+    -------
+    ctx : framework-specific context object.
+    """
     pass
 
 def astype(input, ty):

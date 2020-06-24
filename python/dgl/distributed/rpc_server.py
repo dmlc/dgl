@@ -78,24 +78,14 @@ def start_server(server_id, ip_config, num_clients, server_state, \
             rpc.send_response(client_id, register_res)
     # main service loop
     while True:
-        try:
-            req, client_id = rpc.recv_request()
-            res = req.process_request(server_state)
-            if res is not None:
-                if isinstance(res, list):
-                    for response in res:
-                        target_id, res_data = response
-                        rpc.send_response(target_id, res_data)
-                elif isinstance(res, str) and res == 'exit':
-                    break # break the loop and exit server
-                else:
-                    rpc.send_response(client_id, res)
-        except KeyboardInterrupt:
-            print("Exit kvserver!")
-            rpc.finalize_sender()
-            rpc.finalize_receiver()
-        except:
-            print("Error on kvserver!")
-            rpc.finalize_sender()
-            rpc.finalize_receiver()
-            raise
+        req, client_id = rpc.recv_request()
+        res = req.process_request(server_state)
+        if res is not None:
+            if isinstance(res, list):
+                for response in res:
+                    target_id, res_data = response
+                    rpc.send_response(target_id, res_data)
+            elif isinstance(res, str) and res == 'exit':
+                break # break the loop and exit server
+            else:
+                rpc.send_response(client_id, res)
