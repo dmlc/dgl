@@ -293,6 +293,7 @@ def test_serialize_heterograph_s3():
 
 
 if __name__ == "__main__":
+    pass
     # test_graph_serialize_with_feature()
     # test_graph_serialize_without_feature()
     # test_graph_serialize_with_labels()
