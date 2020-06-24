@@ -37,7 +37,7 @@ Neighborhood samplers for multilayer GNNs
 
 Data loaders for minibatch iteration
 ------------------------------------
-.. autoclass:: NodeDataLoader
+.. autoclass:: NodeCollator
 
 Abstract class for neighborhood sampler
 ---------------------------------------

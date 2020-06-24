@@ -273,7 +273,7 @@ class NodeCollator(Collator):
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : :ref:`BlockSampler`
+    block_sampler : :py:class:`~dgl.sampling.BlockSampler`
         The neighborhood sampler.
 
     Examples
