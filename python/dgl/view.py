@@ -282,17 +282,16 @@ class HeteroNodeView(object):
 
 class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""
-    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes', '_multi_ntype']
+    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes']
 
     def __init__(self, graph, ntype, ntid, nodes):
         self._graph = graph
         self._ntype = ntype
         self._ntid = ntid
         self._nodes = nodes
-        self._multi_ntype = isinstance(ntype, list)
 
     def __getitem__(self, key):
-        if self._multi_ntype:
+        if isinstance(self._ntype, list):
             ret = {}
             for (i, ntype) in enumerate(self._ntype):
                 value = self._graph._get_n_repr(self._ntid[i], self._nodes).get(key, None)
@@ -303,7 +302,7 @@ class HeteroNodeDataView(MutableMapping):
             return self._graph._get_n_repr(self._ntid, self._nodes)[key]
 
     def __setitem__(self, key, val):
-        if self._multi_ntype:
+        if isinstance(self._ntype, list):
             assert isinstance(val, dict), \
                 'Current HeteroNodeDataView has multiple node types, ' \
                 'please passing the node type and the corresponding data through a dict.'
@@ -318,7 +317,7 @@ class HeteroNodeDataView(MutableMapping):
             self._graph._set_n_repr(self._ntid, self._nodes, {key : val})
 
     def __delitem__(self, key):
-        if self._multi_ntype:
+        if isinstance(self._ntype, list):
             for ntid in self._ntid:
                 if self._graph._get_n_repr(ntid, ALL).get(key, None) is None:
                     continue
@@ -327,19 +326,19 @@ class HeteroNodeDataView(MutableMapping):
             self._graph._pop_n_repr(self._ntid, key)
 
     def __len__(self):
-        assert self._multi_ntype is False, \
+        assert isinstance(self._ntype, list) is False, \
             'Current HeteroNodeDataView has multiple node types, ' \
             'can not support len().'
         return len(self._graph._node_frames[self._ntid])
 
     def __iter__(self):
-        assert self._multi_ntype is False, \
+        assert isinstance(self._ntype, list) is False, \
             'Current HeteroNodeDataView has multiple node types, ' \
             'can not be iterated.'
         return iter(self._graph._node_frames[self._ntid])
 
     def __repr__(self):
-        if self._multi_ntype:
+        if isinstance(self._ntype, list):
             ret = {}
             for (i, ntype) in enumerate(self._ntype):
                 data = self._graph._get_n_repr(self._ntid[i], self._nodes)
@@ -388,19 +387,18 @@ class HeteroEdgeView(object):
 
 class HeteroEdgeDataView(MutableMapping):
     """The data view class when G.edata[etype] is called."""
-    __slots__ = ['_graph', '_etype', '_multi_etype', '_etid', '_edges']
+    __slots__ = ['_graph', '_etype', '_etid', '_edges']
 
     def __init__(self, graph, etype, edges):
         self._graph = graph
         self._etype = etype
-        self._multi_etype = isinstance(etype, list)
         self._etid = [self._graph.get_etype_id(t) for t in etype] \
-                     if self._multi_etype \
+                     if isinstance(etype, list) \
                      else self._graph.get_etype_id(etype)
         self._edges = edges
 
     def __getitem__(self, key):
-        if self._multi_etype:
+        if isinstance(self._etype, list):
             ret = {}
             for (i, etype) in enumerate(self._etype):
                 value = self._graph._get_e_repr(self._etid[i], self._edges).get(key, None)
@@ -411,7 +409,7 @@ class HeteroEdgeDataView(MutableMapping):
             return self._graph._get_e_repr(self._etid, self._edges)[key]
 
     def __setitem__(self, key, val):
-        if self._multi_etype:
+        if isinstance(self._etype, list):
             assert isinstance(val, dict), \
                 'Current HeteroEdgeDataView has multiple edge types, ' \
                 'please pass the edge type and the corresponding data through a dict.'
@@ -426,7 +424,7 @@ class HeteroEdgeDataView(MutableMapping):
             self._graph._set_e_repr(self._etid, self._edges, {key : val})
 
     def __delitem__(self, key):
-        if self._multi_etype:
+        if isinstance(self._etype, list):
             for etid in self._etid:
                 if self._graph._get_e_repr(etid, ALL).get(key, None) is None:
                     continue
@@ -435,19 +433,19 @@ class HeteroEdgeDataView(MutableMapping):
             self._graph._pop_e_repr(self._etid, key)
 
     def __len__(self):
-        assert self._multi_etype is False, \
+        assert isinstance(self._etype, list) is False, \
             'Current HeteroEdgeDataView has multiple edge types, ' \
             'can not support len().'
         return len(self._graph._edge_frames[self._etid])
 
     def __iter__(self):
-        assert self._multi_etype is False, \
+        assert isinstance(self._etype, list) is False, \
             'Current HeteroEdgeDataView has multiple edge types, ' \
             'can not be iterated.'
         return iter(self._graph._edge_frames[self._etid])
 
     def __repr__(self):
-        if self._multi_etype:
+        if isinstance(self._etype, list):
             ret = {}
             for (i, etype) in enumerate(self._etype):
                 data = self._graph._get_e_repr(self._etid[i], self._edges)
