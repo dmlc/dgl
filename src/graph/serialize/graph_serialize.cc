@@ -32,13 +32,13 @@
  *
  */
 #include "graph_serialize.h"
-#include "dmlc/logging.h"
 
 #include <dgl/graph_op.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/object.h>
 #include <dmlc/io.h>
+#include <dmlc/logging.h>
 #include <dmlc/type_traits.h>
 
 #include <algorithm>
