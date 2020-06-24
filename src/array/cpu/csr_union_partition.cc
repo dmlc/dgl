@@ -94,7 +94,7 @@ std::vector<CSRMatrix> DisjointPartitionCsrHeteroBySizes(
       result_indptr[sv] = indptr_data[src_vertex_cumsum[g] + sv] - edge_cumsum[g];
     }
 
-    for (uint64_t dv =0; dv <= num_edges; ++dv) {
+    for (uint64_t dv = 0; dv < num_edges; ++dv) {
       // dst idx = global_dnidx - dnidx_offset
       result_indices[dv] = indices_data[edge_cumsum[g] + dv] - dst_vertex_cumsum[g];
 
