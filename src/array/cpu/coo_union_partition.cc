@@ -34,7 +34,7 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
     result_data.resize(total_edges);
 
 #pragma omp parallel for
-  for (size_t i = 0; i < coos.size(); ++i) {
+  for (int64_t i = 0; i < coos.size(); ++i) {
     aten::COOMatrix coo = coos[i];
     int64_t num_edges = coo.row->shape[0];
 
@@ -85,7 +85,7 @@ std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
   ret.resize(batch_size);
 
 #pragma omp parallel for
-  for (uint64_t g = 0; g < batch_size; ++g) {
+  for (int64_t g = 0; g < batch_size; ++g) {
     std::vector<IdType> result_src, result_dst;
     for (uint64_t e = edge_cumsum[g]; e < edge_cumsum[g]; ++e) {
       result_src.push_back(edges_src_data[e] - src_vertex_cumsum[g]);

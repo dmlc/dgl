@@ -29,7 +29,7 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
   result_indptr[0] = 0;
 
 #pragma omp parallel for
-  for (size_t i = 0; i < csrs.size(); ++i) {
+  for (int64_t i = 0; i < csrs.size(); ++i) {
     aten::CSRMatrix csr = csrs[i];
     const IdType* indptr_data = static_cast<const IdType*>(csr.indptr->data);
     const IdType* indices_data = static_cast<const IdType*>(csr.indices->data);
