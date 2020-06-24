@@ -11,7 +11,6 @@ from . import ndarray as nd
 from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
-from .graph_index import _get_halo_subgraph_inner_edge
 from .graph import unbatch
 from .convert import graph, bipartite
 from . import utils
@@ -92,7 +91,9 @@ def knn_graph(x, k):
     src += per_sample_offset
     dst = F.reshape(dst, (-1,))
     src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+    adj = sparse.csr_matrix(
+        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
+        shape=(n_points, n_points))
 
     g = DGLGraph(adj, readonly=True)
     return g
@@ -549,9 +550,48 @@ def remove_self_loop(g):
     new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
     return new_g
 
-def partition_graph_with_halo(g, node_part, num_hops):
-    ''' This is to partition a graph. Each partition contains HALO nodes
-    so that we can generate NodeFlow in each partition correctly.
+def reorder_nodes(g, new_node_ids):
+    """ Generate a new graph with new node Ids.
+
+    We assign each node in the input graph with a new node Id. This results in
+    a new graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph
+    new_node_ids : a tensor
+        The new node Ids
+    Returns
+    -------
+    DGLGraph
+        The graph with new node Ids.
+    """
+    assert len(new_node_ids) == g.number_of_nodes(), \
+            "The number of new node ids must match #nodes in the graph."
+    new_node_ids = utils.toindex(new_node_ids)
+    sorted_ids, idx = F.sort_1d(new_node_ids.tousertensor())
+    assert F.asnumpy(sorted_ids[0]) == 0 \
+            and F.asnumpy(sorted_ids[-1]) == g.number_of_nodes() - 1, \
+            "The new node Ids are incorrect."
+    new_gidx = _CAPI_DGLReorderGraph(g._graph, new_node_ids.todgltensor())
+    new_g = DGLGraph(new_gidx)
+    new_g.ndata['orig_id'] = idx
+    return new_g
+
+def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
+    '''Partition a graph.
+
+    Based on the given node assignments for each partition, the function splits
+    the input graph into subgraphs. A subgraph may contain HALO nodes which does
+    not belong to the partition of a subgraph but are connected to the nodes
+    in the partition within a fixed number of hops.
+
+    If `reshuffle` is turned on, the function reshuffles node Ids and edge Ids
+    of the input graph before partitioning. After reshuffling, all nodes and edges
+    in a partition fall in a contiguous Id range in the input graph.
+    The partitioend subgraphs have node data 'orig_id', which stores the node Ids
+    in the original input graph.
 
     Parameters
     ------------
@@ -563,8 +603,11 @@ def partition_graph_with_halo(g, node_part, num_hops):
         needs to be the same as the number of nodes of the graph. Each element
         indicates the partition Id of a node.
 
-    num_hops: int
+    extra_cached_hops: int
         The number of hops a HALO node can be accessed.
+
+    reshuffle : bool
+        Resuffle nodes so that nodes in the same partition are in the same Id range.
 
     Returns
     --------
@@ -573,15 +616,41 @@ def partition_graph_with_halo(g, node_part, num_hops):
     '''
     assert len(node_part) == g.number_of_nodes()
     node_part = utils.toindex(node_part)
-    subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), num_hops)
+    if reshuffle:
+        node_part = node_part.tousertensor()
+        sorted_part, new2old_map = F.sort_1d(node_part)
+        new_node_ids = F.gather_row(F.arange(0, g.number_of_nodes()), new2old_map)
+        g = reorder_nodes(g, new_node_ids)
+        node_part = utils.toindex(sorted_part)
+        # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
+        # that all edges in a partition are in the contiguous Id space.
+        orig_eids = _CAPI_DGLReassignEdges(g._graph, True)
+        orig_eids = utils.toindex(orig_eids)
+        g.edata['orig_id'] = orig_eids.tousertensor()
+
+    subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), extra_cached_hops)
     subg_dict = {}
+    node_part = node_part.tousertensor()
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
-        inner_edge = _get_halo_subgraph_inner_edge(subg)
         subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
         subg.ndata['inner_node'] = inner_node
-        inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
+        subg.ndata['part_id'] = F.gather_row(node_part, subg.parent_nid)
+        if reshuffle:
+            subg.ndata['orig_id'] = F.gather_row(g.ndata['orig_id'], subg.ndata[NID])
+            subg.edata['orig_id'] = F.gather_row(g.edata['orig_id'], subg.edata[EID])
+
+        if extra_cached_hops >= 1:
+            inner_edge = F.zeros((subg.number_of_edges(),), F.int64, F.cpu())
+            inner_nids = F.nonzero_1d(subg.ndata['inner_node'])
+            # TODO(zhengda) we need to fix utils.toindex() to avoid the dtype cast below.
+            inner_nids = F.astype(inner_nids, F.int64)
+            inner_eids = subg.in_edges(inner_nids, form='eid')
+            inner_edge = F.scatter_row(inner_edge, inner_eids,
+                                       F.ones((len(inner_eids),), F.dtype(inner_edge), F.cpu()))
+        else:
+            inner_edge = F.ones((subg.number_of_edges(),), F.int64, F.cpu())
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
     return subg_dict
@@ -613,14 +682,23 @@ def metis_partition_assignment(g, k):
         node_part = utils.toindex(node_part)
         return node_part.tousertensor()
 
-def metis_partition(g, k, extra_cached_hops=0):
+def metis_partition(g, k, extra_cached_hops=0, reshuffle=False):
     ''' This is to partition a graph with Metis partitioning.
 
-    Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
-    to the partitions and their incoming edges.
+    Metis assigns vertices to partitions. This API constructs subgraphs with the vertices assigned
+    to the partitions and their incoming edges. A subgraph may contain HALO nodes which does
+    not belong to the partition of a subgraph but are connected to the nodes
+    in the partition within a fixed number of hops.
 
-    The partitioned graph is stored in DGLGraph. The DGLGraph has the `part_id`
-    node data that indicates the partition a node belongs to.
+    If `reshuffle` is turned on, the function reshuffles node Ids and edge Ids
+    of the input graph before partitioning. After reshuffling, all nodes and edges
+    in a partition fall in a contiguous Id range in the input graph.
+    The partitioend subgraphs have node data 'orig_id', which stores the node Ids
+    in the original input graph.
+
+    The partitioned subgraph is stored in DGLGraph. The DGLGraph has the `part_id`
+    node data that indicates the partition a node belongs to. The subgraphs do not contain
+    the node/edge data in the input graph.
 
     Parameters
     ------------
@@ -632,6 +710,9 @@ def metis_partition(g, k, extra_cached_hops=0):
 
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
+
+    reshuffle : bool
+        Resuffle nodes so that nodes in the same partition are in the same Id range.
 
     Returns
     --------
@@ -645,14 +726,8 @@ def metis_partition(g, k, extra_cached_hops=0):
     if len(node_part) == 0:
         return None
 
-    node_part = utils.toindex(node_part)
     # Then we split the original graph into parts based on the METIS partitioning results.
-    parts = partition_graph_with_halo(g, node_part, extra_cached_hops)
-    node_part = node_part.tousertensor()
-    for part_id in parts:
-        part = parts[part_id]
-        part.ndata['part_id'] = F.gather_row(node_part, part.parent_nid)
-    return parts
+    return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)
 
 def compact_graphs(graphs, always_preserve=None):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
@@ -746,15 +821,15 @@ def compact_graphs(graphs, always_preserve=None):
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
     graph_dtype = graphs[0]._idtype_str
-    graph_ctx = graphs[0]._graph.ctx()
+    graph_ctx = graphs[0]._graph.ctx
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
         assert graph_dtype == g._idtype_str, "Expect graph data type to be {}, but got {}".format(
             graph_dtype, g._idtype_str)
-        assert graph_ctx == g._graph.ctx(), "Expect graph device to be {}, but got {}".format(
-            graph_ctx, g._graph.ctx())
+        assert graph_ctx == g._graph.ctx, "Expect graph device to be {}, but got {}".format(
+            graph_ctx, g._graph.ctx)
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:
@@ -952,10 +1027,6 @@ def remove_edges(g, edge_ids):
     """Return a new graph with given edge IDs removed.
 
     The nodes are preserved.
-
-    Note: `remove_edges` is slow especially when removing a small number of edges from
-    a large graph. It creates a new graph with all remaining edges and return the new graph.
-    Please use it with caution especially when using it in mini-batch training.
 
     Parameters
     ----------

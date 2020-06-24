@@ -12,7 +12,7 @@ import multiprocessing as mp
 from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
-from dgl.distributed import partition_graph, load_partition, GraphPartitionBook, node_split, edge_split
+from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
 import backend as F
 import unittest
 import pickle
@@ -51,16 +51,17 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
-def run_server(graph_name, server_id, num_clients, barrier):
+def run_server(graph_name, server_id, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
-                        '/tmp/dist_graph/{}.json'.format(graph_name))
-    barrier.wait()
+                        '/tmp/dist_graph/{}.json'.format(graph_name),
+                        disable_shared_mem=not shared_mem)
     print('start server', server_id)
     g.start()
 
-def run_client(graph_name, barrier, num_nodes, num_edges):
-    barrier.wait()
-    g = DistGraph("kv_ip_config.txt", graph_name)
+def run_client(graph_name, part_id, num_nodes, num_edges):
+    gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
+                              part_id, None)
+    g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
 
     # Test API
     assert g.number_of_nodes() == num_nodes
@@ -118,8 +119,7 @@ def run_client(graph_name, barrier, num_nodes, num_edges):
     dgl.distributed.finalize_client()
     print('end')
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
-def test_server_client():
+def check_server_client(shared_mem):
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -132,19 +132,18 @@ def test_server_client():
 
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
-    barrier = mp.Barrier(2)
     serv_ps = []
     ctx = mp.get_context('spawn')
     for serv_id in range(1):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, barrier))
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem))
         serv_ps.append(p)
         p.start()
 
     cli_ps = []
     for cli_id in range(1):
         print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, barrier, g.number_of_nodes(),
-                                             g.number_of_edges()))
+        p = ctx.Process(target=run_client, args=(graph_name, cli_id, g.number_of_nodes(),
+                                                 g.number_of_edges()))
         p.start()
         cli_ps.append(p)
 
@@ -155,6 +154,11 @@ def test_server_client():
         p.join()
 
     print('clients have terminated')
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
+def test_server_client():
+    check_server_client(True)
+    check_server_client(False)
 
 def test_split():
     prepare_dist()
@@ -168,14 +172,8 @@ def test_split():
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, meta = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
-        num_nodes, num_edges, node_map, edge_map, num_partitions = meta
-        gpb = GraphPartitionBook(part_id=i,
-                                 num_parts=num_partitions,
-                                 node_map=node_map,
-                                 edge_map=edge_map,
-                                 part_graph=part_g)
-        local_nids = F.nonzero_1d(part_g.ndata['local_node'])
+        part_g, node_feats, edge_feats, gpb = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
+        local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
         nodes2 = node_split(node_mask, gpb, i)
@@ -184,7 +182,7 @@ def test_split():
         for n in nodes1:
             assert n in local_nids
 
-        local_eids = F.nonzero_1d(part_g.edata['local_edge'])
+        local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
         edges2 = edge_split(edge_mask, gpb, i)
@@ -200,6 +198,6 @@ def prepare_dist():
     ip_config.close()
 
 if __name__ == '__main__':
-    os.mkdir('/tmp/dist_graph')
-    test_split()
-    #test_server_client()
+    os.makedirs('/tmp/dist_graph', exist_ok=True)
+    #test_split()
+    test_server_client()

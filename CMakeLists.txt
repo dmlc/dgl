@@ -103,6 +103,8 @@ file(GLOB DGL_SRC
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
+  src/geometry/*.cc
+  src/geometry/cpu/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1

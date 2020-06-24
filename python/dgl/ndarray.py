@@ -90,6 +90,21 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
+def exist_shared_mem_array(name):
+    """ Check the existence of shared-memory array.
+
+    Parameters
+    ----------
+    name : str
+        The name of the shared-memory array.
+
+    Returns
+    -------
+    bool
+        The existence of the array
+    """
+    return _CAPI_DGLExistSharedMemArray(name)
+
 class SparseFormat:
     """Format code"""
     ANY = 0
