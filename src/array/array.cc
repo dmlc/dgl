@@ -400,7 +400,7 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
 }
 
 void CSRSort_(CSRMatrix* csr) {
-  ATEN_CSR_SWITCH(*csr, XPU, IdType, "CSRSort_", {
+  ATEN_CSR_SWITCH_CUDA(*csr, XPU, IdType, "CSRSort_", {
     impl::CSRSort_<XPU, IdType>(csr);
   });
 }
