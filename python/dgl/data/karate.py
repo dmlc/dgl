@@ -5,9 +5,8 @@ import networkx as nx
 
 from .dgl_dataset import DGLDataset
 from ..graph import DGLGraph
-from ..base import dgl_warning
 
-__all__ = ['KarateClubDataset', 'KarateClub']
+__all__ = ['KarateClubDataset']
 
 
 class KarateClubDataset(DGLDataset):
@@ -29,7 +28,7 @@ class KarateClubDataset(DGLDataset):
     Returns
     ===
     KarateClubDataset object with two properties:
-        graph: A Homogeneous graph contains the graph structure and node labels
+        graph: A Homogeneous graph contain the graph structure and node labels
         num_classes: number of node classes
 
     Examples
@@ -52,7 +51,6 @@ class KarateClubDataset(DGLDataset):
         g = DGLGraph(kc_graph)
         g.ndata['label'] = self.label
         self.graph = g
-        self.data = [g]
 
     @property
     def num_classes(self):
@@ -65,11 +63,3 @@ class KarateClubDataset(DGLDataset):
 
     def __len__(self):
         return 1
-
-
-class KarateClub(KarateClubDataset):
-    def __init__(self):
-        dgl_warning('KarateClub is deprecated, use KarateClubDataset instead.',
-                    DeprecationWarning, stacklevel=2)
-        super(KarateClub, self).__init__()
-
