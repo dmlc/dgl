@@ -109,8 +109,20 @@ bool SaveDGLGraphs(std::string filename, List<GraphData> graph_data,
   return true;
 }
 
-StorageMetaData LoadDGLGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
+StorageMetaData LoadDGLGraphs(const std::string &filename,
                               std::vector<dgl_id_t> idx_list, bool onlyMeta) {
+  auto fs = std::unique_ptr<SeekStream>(
+    SeekStream::CreateForRead(filename.c_str(), true));
+  CHECK(fs) << "Filename is invalid";
+  // Read DGL MetaData
+  uint64_t magicNum, graphType, version;
+  fs->Read(&magicNum);
+  fs->Read(&version);
+  fs->Read(&graphType);
+  fs->Seek(4096);
+
+  CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
+  CHECK_EQ(version, 1) << "Invalid DGL files";
   StorageMetaData metadata = StorageMetaData::Create();
   // Read Graph MetaData
   dgl_id_t num_graph;

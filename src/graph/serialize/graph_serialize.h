@@ -33,7 +33,7 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace serialize {
 
-enum GraphType {
+enum GraphType: uint64_t {
   kMutableGraph = 0ull,
   kImmutableGraph = 1ull,
   kHeteroGraph = 2ull
@@ -96,13 +96,13 @@ StorageMetaData LoadDGLGraphFiles(const std::string &filename,
                                   std::vector<dgl_id_t> idx_list,
                                   bool onlyMeta);
 
-StorageMetaData LoadDGLGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
+StorageMetaData LoadDGLGraphs(const std::string &filename,
                               std::vector<dgl_id_t> idx_list, bool onlyMeta);
 
 bool SaveDGLGraphs(std::string filename, List<GraphData> graph_data,
                    std::vector<NamedTensor> labels_list);
 
-StorageMetaData LoadHeteroGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
+std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
                                  std::vector<dgl_id_t> idx_list);
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g);

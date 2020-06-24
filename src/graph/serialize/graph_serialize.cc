@@ -77,7 +77,7 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_MakeGraphData")
     *rv = gd;
   });
 
-DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_DGLSaveGraphs")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_SaveDGLGraphs_V0")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<GraphData> graph_data = args[1];
@@ -92,17 +92,17 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_DGLSaveGraphs")
     SaveDGLGraphs(filename, graph_data, labels_list);
   });
 
-DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadDGLGraphFiles")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    List<Value> idxs = args[1];
-    bool onlyMeta = args[2];
-    std::vector<dgl_id_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++i) {
-      idx_list[i] = static_cast<dgl_id_t>(idxs[i]->data);
-    }
-    *rv = LoadDGLGraphFiles(filename, idx_list, onlyMeta);
-  });
+// DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadDGLGraphFiles")
+//   .set_body([](DGLArgs args, DGLRetValue *rv) {
+//     std::string filename = args[0];
+//     List<Value> idxs = args[1];
+//     bool onlyMeta = args[2];
+//     std::vector<dgl_id_t> idx_list(idxs.size());
+//     for (uint64_t i = 0; i < idxs.size(); ++i) {
+//       idx_list[i] = static_cast<dgl_id_t>(idxs[i]->data);
+//     }
+//     *rv = LoadDGLGraphFiles(filename, idx_list, onlyMeta);
+//   });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataGraphHandle")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
@@ -131,11 +131,10 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataEdgeTensors")
   });
 
 uint64_t GetFileVersion(const std::string &filename) {
-  auto fs = Stream::Create(filename.c_str(), "r", true);
+  auto fs = SeekStream::CreateForRead(filename.c_str(), false);
   CHECK(fs) << "File " << filename << " not found";
-  uint64_t magicNum, graphType, version;
+  uint64_t magicNum, version;
   fs->Read(&magicNum);
-  fs->Read(&graphType);
   fs->Read(&version);
   CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
   return version;
@@ -153,39 +152,17 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V0")
     std::string filename = args[0];
     List<Value> idxs = args[1];
     bool onlyMeta = args[2];
-    std::vector<dgl_id_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++i) {
-      idx_list[i] = static_cast<dgl_id_t>(idxs[i]->data);
-    }
-    *rv = LoadDGLGraphFiles(filename, idx_list, onlyMeta);
+    auto idx_list = ListValueToVector<dgl_id_t>(idxs);
+    *rv = LoadDGLGraphs(filename, idx_list, onlyMeta);
   });
 
-
-StorageMetaData LoadDGLGraphFiles(const std::string &filename,
-                                  std::vector<dgl_id_t> idx_list,
-                                  bool onlyMeta) {
-  auto fs = std::unique_ptr<SeekStream>(dynamic_cast<SeekStream *>(
-    SeekStream::CreateForRead(filename.c_str(), true)));
-  CHECK(fs) << "Filename is invalid";
-  // Read DGL MetaData
-  uint64_t magicNum, graphType, version;
-  fs->Read(&magicNum);
-  fs->Read(&version);
-  fs->Read(&graphType);
-  fs->Seek(4096);
-
-  CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
-  StorageMetaData ret;
-  if (version == 1 && graphType == kImmutableGraph) {
-    ret = LoadDGLGraphs(fs, idx_list, onlyMeta);
-  } else if (version == 2 && graphType == kHeteroGraph) {
-    ret = LoadHeteroGraphs(fs, idx_list);
-  } else {
-    LOG(FATAL) << "Invalid DGL graph file";
-  }
-
-  return ret;
-}
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V1")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    std::string filename = args[0];
+    List<Value> idxs = args[1];
+    auto idx_list = ListValueToVector<dgl_id_t>(idxs);
+    *rv = List<HeteroGraphData>(LoadHeteroGraphs(filename, idx_list));
+  });
 
 }  // namespace serialize
 }  // namespace dgl

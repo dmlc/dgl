@@ -116,7 +116,7 @@ def save_dglgraphs(filename, g_list, labels=None):
     else:
         label_dict = None
     gdata_list = [GraphData.create(g) for g in g_list]
-    _CAPI_DGLSaveGraphs(filename, gdata_list, label_dict)
+    _CAPI_SaveDGLGraphs_V0(filename, gdata_list, label_dict)
 
 
 def load_graphs(filename, idx_list=None, ignore_labels=False):
@@ -154,20 +154,56 @@ def load_graphs(filename, idx_list=None, ignore_labels=False):
     >>> glist = load_graphs("./data.bin", [0]) # glist will be [g1]
 
     """
+    version = _CAPI_GetFileVersion(filename)
+    if version == 1:
+        return load_graph_v0(filename, idx_list)
+    elif version == 2:
+        return load_graph_v1(filename, idx_list)
+    else:
+        raise Exception("Invalid DGL Version Number")
+
+def load_graph_v1(filename, idx_list=None):
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
-    metadata = _CAPI_LoadDGLGraphFiles(filename, idx_list, False)
+    heterograph_list = _CAPI_LoadGraphFiles_V1(filename, idx_list, False)
+    # label_dict = {}
+    # for k, v in metadata.labels.items():
+    #     label_dict[k] = F.zerocopy_from_dgl_ndarray(v.data)
+
+    return [gdata.get_graph() for gdata in heterograph_list]
+
+def load_graph_v0(filename, idx_list=None):
+    """
+    Load DGLGraphs from file
+    Parameters
+    ----------
+    filename: str
+        filename to load DGLGraphs
+    idx_list: list of int
+        list of index of graph to be loaded. If not specified, will
+        load all graphs from file
+    Returns
+    ----------
+    graph_list: list of immutable DGLGraphs
+    labels: dict of labels stored in file (empty dict returned if no
+    label stored)
+    Examples
+    ----------
+    Following the example in save_graphs.
+    >>> from dgl.data.utils import load_graphs
+    >>> glist, label_dict = load_graphs("./data.bin") # glist will be [g1, g2]
+    >>> glist, label_dict = load_graphs("./data.bin", [0]) # glist will be [g1]
+    """
+    if idx_list is None:
+        idx_list = []
+    assert isinstance(idx_list, list)
+    metadata = _CAPI_LoadGraphFiles_V0(filename, idx_list, False)
     label_dict = {}
-    if metadata.is_hetero:
-        g_list = [gdata.get_graph() for gdata in metadata.hetero_graph_data]
-        return g_list
-    else:
-        for k, v in metadata.labels.items():
-            label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
-        g_list = [gdata.get_graph()
-                  for gdata in metadata.graph_data]
-        return g_list, label_dict
+    for k, v in metadata.labels.items():
+        label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
+
+    return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
 
 
 def load_labels(filename):
@@ -193,7 +229,7 @@ def load_labels(filename):
     >>> label_dict = load_graphs("./data.bin")
 
     """
-    metadata = _CAPI_LoadDGLGraphFiles(filename, [], True)
+    metadata = _CAPI_LoadGraphFiles_V0(filename, [], True)
     label_dict = {}
     for k, v in metadata.labels.items():
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v)

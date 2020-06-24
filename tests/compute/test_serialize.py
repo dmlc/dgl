@@ -239,6 +239,12 @@ def test_serialize_old_heterograph_file():
     assert np.allclose(F.asnumpy(edges[0]), np.array([0, 1, 2]))
     assert np.allclose(F.asnumpy(edges[1]), np.array([1, 2, 3]))
 
+def create_old_heterograph_files():
+    path = os.path.join(
+        os.path.dirname(__file__), "data/hetero1.bin")
+    g_list0 = create_heterographs("int64") + create_heterographs("int32")
+    save_graphs(path, g_list0)
+
 
 def test_serialize_heterograph():
     f = tempfile.NamedTemporaryFile(delete=False)
@@ -269,7 +275,7 @@ def test_serialize_heterograph():
 if __name__ == "__main__":
     test_graph_serialize_with_feature()
     test_graph_serialize_without_feature()
-    # test_graph_serialize_with_labels()
+    test_graph_serialize_with_labels()
     test_serialize_tensors()
     test_serialize_empty_dict()
     test_load_old_files1()

@@ -44,55 +44,80 @@
 
 #include "../heterograph.h"
 #include "./graph_serialize.h"
+#include "./streamwithcount.h"
+#include "dmlc/memory_io.h"
 
 namespace dgl {
 namespace serialize {
 
 using namespace dgl::runtime;
 using dmlc::SeekStream;
+using dmlc::Stream;
+using dmlc::io::URI;
+using dmlc::io::FileSystem;
 
 bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata) {
-  auto fs = std::unique_ptr<SeekStream>(dynamic_cast<SeekStream *>(
-    SeekStream::Create(filename.c_str(), "w", true)));
-  CHECK(fs) << "File name is not a valid local file name";
+  auto fs = std::unique_ptr<StreamWithCount>(
+    StreamWithCount::Create(filename.c_str(), "w", false));
+  CHECK(fs->isValid()) << "File name " << filename << " is not a valid name";
 
   // Write DGL MetaData
   const uint64_t kVersion = 2;
-  fs->Write(kDGLSerializeMagic);
-  fs->Write(kVersion);
-  fs->Write(GraphType::kHeteroGraph);
-  fs->Seek(4096);
+  std::array<char, 4096> meta_buffer;
+
+  // Write metadata into char buffer with size 4096
+  dmlc::MemoryFixedSizeStream meta_fs_(meta_buffer.data(), 4096);
+  auto meta_fs = static_cast<Stream *>(&meta_fs_);
+  meta_fs->Write(kDGLSerializeMagic);
+  meta_fs->Write(kVersion);
+  meta_fs->Write(GraphType::kHeteroGraph);
+
+  // Write metadata into files
+  fs->Write(meta_buffer.data(), 4096);
 
   // Write Graph Meta Data
   uint64_t num_graph = hdata.size();
+  fs->Write(num_graph);
 
   std::vector<uint64_t> graph_indices(num_graph);
 
-  fs->Write(num_graph);
-  uint64_t indices_start_ptr = fs->Tell();
-  fs->Write(graph_indices);
-
   // Write HeteroGraphData
   for (uint64_t i = 0; i < num_graph; ++i) {
-    graph_indices[i] = fs->Tell();
+    graph_indices[i] = fs->count();
     HeteroGraphDataObject gdata = *hdata[i].as<HeteroGraphDataObject>();
     fs->Write(gdata);
   }
 
-  fs->Seek(indices_start_ptr);
-  fs->Write(graph_indices);
+  // Write indptr into string to count size
+  std::string indptr_blob;
+  dmlc::MemoryStringStream indptr_fs_(&indptr_blob);
+  auto indptr_fs = static_cast<Stream *>(&indptr_fs_);
+  indptr_fs->Write(graph_indices);
+
+  uint64_t indptr_buffer_size = indptr_blob.size();
+  fs->Write(indptr_blob);
+  fs->Write(indptr_buffer_size);
 
   return true;
 }
 
-StorageMetaData LoadHeteroGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
-                                 std::vector<dgl_id_t> idx_list) {
+std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
+                                              std::vector<dgl_id_t> idx_list) {
+  auto fs = std::unique_ptr<SeekStream>(
+    SeekStream::CreateForRead(filename.c_str(), false));
+  CHECK(fs) << "File name " << filename << " is not a valid name";
+  // Read DGL MetaData
+  uint64_t magicNum, graphType, version;
+  fs->Read(&magicNum);
+  fs->Read(&version);
+  fs->Read(&graphType);
+  fs->Seek(4096);
+
+  CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
+  CHECK_EQ(version, 2) << "Invalid GraphType";
+  CHECK_EQ(graphType, GraphType::kHeteroGraph) << "Invalid GraphType";
   uint64_t num_graph;
   CHECK(fs->Read(&num_graph)) << "Invalid num of graph";
-  std::vector<uint64_t> graph_indices(num_graph);
-  CHECK(fs->Read(&graph_indices)) << "Invalid graph indices";
-
-  StorageMetaData metadata = StorageMetaData::Create();
 
   std::vector<HeteroGraphData> gdata_refs;
   if (idx_list.empty()) {
@@ -105,8 +130,20 @@ StorageMetaData LoadHeteroGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
       gdata_refs.push_back(gdata);
     }
   } else {
+    uint64_t gdata_start_pos = fs->Tell();
     // Read Selected Graphss
     gdata_refs.reserve(idx_list.size());
+    URI uri(filename.c_str());
+    uint64_t filesize = FileSystem::GetInstance(uri)->GetPathInfo(uri).size;
+    fs->Seek(filesize-sizeof(uint64_t));
+    uint64_t indptr_buffer_size;
+    fs->Read(&indptr_buffer_size);
+
+    std::vector<uint64_t> graph_indices(num_graph);
+    fs->Seek(filesize-sizeof(uint64_t)-indptr_buffer_size);
+    fs->Read(&graph_indices);
+
+    fs->Seek(gdata_start_pos);
     // Would be better if idx_list is sorted. However the returned the graphs
     // should be the same order as the idx_list
     for (uint64_t i = 0; i < idx_list.size(); ++i) {
@@ -118,9 +155,7 @@ StorageMetaData LoadHeteroGraphs(const std::unique_ptr<dmlc::SeekStream> &fs,
     }
   }
 
-  metadata->SetHeteroGraphData(gdata_refs);
-
-  return metadata;
+  return gdata_refs;
 }
 
 DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_MakeHeteroGraphData")
