@@ -46,7 +46,7 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
     for (int64_t j = 0; j < num_edges; ++j) {
       result_src[edge_offset[i] + j] = edges_src_data[j] + src_offset[i];
       result_dst[edge_offset[i] + j] = edges_dst_data[j] + dst_offset[i];
-    
+
       if (has_data) {
         if (data == nullptr) {
           result_data[edge_offset[i] + j] = edge_offset[i] + j;
