@@ -16,17 +16,17 @@ import dgl
 from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 from model import EntityClassify, RelGraphEmbed
 
-def extract_embed(node_embed, block):
+def extract_embed(node_embed, input_nodes):
     emb = {}
-    for ntype in block.srctypes:
-        nid = block.srcnodes[ntype].data[dgl.NID]
+    for ntype, nid in input_nodes.items():
+        nid = input_nodes[ntype]
         emb[ntype] = node_embed[ntype][nid]
     return emb
 
 
-def evaluate(model, seeds, blocks, node_embed, labels, category, use_cuda):
+def evaluate(model, seeds, input_nodes, blocks, node_embed, labels, category, use_cuda):
     model.eval()
-    emb = extract_embed(node_embed, blocks[0])
+    emb = extract_embed(node_embed, input_nodes)
     lbl = labels[seeds]
     if use_cuda:
         emb = {k : e.cuda() for k, e in emb.items()}
@@ -118,10 +118,10 @@ def main(args):
         if epoch > 3:
             t0 = time.time()
 
-        for i, blocks in enumerate(loader):
-            seeds = blocks[-1].dstnodes[category].data[dgl.NID]
+        for i, (input_nodes, seeds, blocks) in enumerate(loader):
+            seeds = seeds[category]     # we only predict the nodes with type "category"
             batch_tic = time.time()
-            emb = extract_embed(node_embed, blocks[0])
+            emb = extract_embed(node_embed, input_nodes)
             lbl = labels[seeds]
             if use_cuda:
                 emb = {k : e.cuda() for k, e in emb.items()}

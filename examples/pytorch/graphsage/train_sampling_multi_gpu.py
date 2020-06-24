@@ -178,13 +178,14 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = dgl.sampling.MultiLayerNeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
 
     # Create PyTorch DataLoader for constructing blocks
+    collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
     dataloader = DataLoader(
-        dataset=train_nid.numpy(),
+        collator.dataset,
+        collate_fn=collator.collate,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
         num_workers=args.num_workers)
@@ -206,14 +207,9 @@ def run(proc_id, n_gpus, args, devices, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, blocks in enumerate(dataloader):
+        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
-
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
-            seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, dev_id)

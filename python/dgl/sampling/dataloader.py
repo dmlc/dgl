@@ -286,8 +286,8 @@ class NodeCollator(Collator):
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for blocks in dataloader:
-    ...     train_on(blocks)
+    >>> for input_nodes, output_nodes, blocks in dataloader:
+    ...     train_on(input_nodes, output_nodes, blocks)
     """
     def __init__(self, g, nids, block_sampler):
         self.g = g
@@ -307,7 +307,38 @@ class NodeCollator(Collator):
         return self._dataset
 
     def collate(self, items):
+        """Find the list of blocks necessary for computing the representation of given
+        nodes for a node classification/regression task.
+
+        Returns
+        -------
+        input_nodes : Tensor or dict[ntype, Tensor]
+            The input nodes necessary for computation in this minibatch.
+
+            If the original graph has multiple node types, return a dictionary of
+            node type names and node ID tensors.  Otherwise, return a single tensor.
+        output_nodes : Tensor or dict[ntype, Tensor]
+            The nodes whose representations are to be computed in this minibatch.
+
+            If the original graph has multiple node types, return a dictionary of
+            node type names and node ID tensors.  Otherwise, return a single tensor.
+        blocks : list[DGLHeteroGraph]
+            The list of blocks necessary for computing the representation.
+        """
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-        return self.block_sampler.sample_blocks(self.g, items)
+        blocks = self.block_sampler.sample_blocks(self.g, items)
+
+        if len(self.g.ntypes) == 1:
+            output_nodes = blocks[-1].dstdata[NID]
+            input_nodes = blocks[0].dstdata[NID]
+        else:
+            output_nodes = {
+                ntype: blocks[-1].dstnodes[ntype].data[NID]
+                for ntype in blocks[-1].dsttypes}
+            input_nodes = {
+                ntype: blocks[0].srcnodes[ntype].data[NID]
+                for ntype in blocks[0].srctypes}
+
+        return input_nodes, output_nodes, blocks
