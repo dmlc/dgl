@@ -11,10 +11,14 @@ import networkx as nx
 import scipy.sparse as sp
 import os, sys
 
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
 from ..utils import retry_method_with_fix
+from .. import backend as F
 from ..graph import DGLGraph
 from ..graph import batch as graph_batch
+
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 
 _urls = {
     'cora_v2' : 'dataset/cora_v2.zip',
@@ -29,7 +33,7 @@ def _pickle_load(pkl_file):
     else:
         return pkl.load(pkl_file)
 
-class CitationGraphDataset(object):
+class CitationGraphDataset(DGLBuiltinDataset):
     r"""The citation graph dataset, including cora, citeseer and pubmeb.
     Nodes mean authors and edges mean citation relationships.
 
@@ -37,8 +41,10 @@ class CitationGraphDataset(object):
     -----------
     name: str
       name can be 'cora', 'citeseer' or 'pubmed'.
+    verbose: bool
+      Whether to print out progress information. Default: False.
     """
-    def __init__(self, name):
+    def __init__(self, name, verbose=False):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
         # Previously we use the pre-processing in pygcn (https://github.com/tkipf/pygcn)
@@ -46,17 +52,11 @@ class CitationGraphDataset(object):
         if name.lower() == 'cora':
             name = 'cora_v2'
 
-        self.name = name
-        self.dir = get_download_dir()
-        self.zip_file_path='{}/{}.zip'.format(self.dir, name)
-        self._load()
+        url = _get_dgl_url(_urls[name])
+        self.verbose = verbose
+        super(CitationGraphDataset, self).__init__(name, url)
 
-    def _download_and_extract(self):
-        download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
-        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, self.name))
-
-    @retry_method_with_fix(_download_and_extract)
-    def _load(self):
+    def process(self, root_path):
         """Loads input data from gcn/data directory
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
@@ -75,7 +75,7 @@ class CitationGraphDataset(object):
         :param name: Dataset name
         :return: All data input files loaded (as well the training/test data).
         """
-        root = '{}/{}'.format(self.dir, self.name)
+        root = root_path
         objnames = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
         objects = []
         for i in range(len(objnames)):
@@ -113,36 +113,154 @@ class CitationGraphDataset(object):
         val_mask = _sample_mask(idx_val, labels.shape[0])
         test_mask = _sample_mask(idx_test, labels.shape[0])
 
-        self.graph = graph
-        self.features = _preprocess_features(features)
-        self.labels = labels
-        self.onehot_labels = onehot_labels
-        self.num_labels = onehot_labels.shape[1]
-        self.train_mask = train_mask
-        self.val_mask = val_mask
-        self.test_mask = test_mask
+        self._graph = graph
+        g = DGLGraph(graph)
+
+        if backend == 'mxnet':
+            g.ndata['train_mask'] = F.tensor(train_mask, dtype=F.data_type_dict['float32'])
+            g.ndata['val_mask'] = F.tensor(val_mask, dtype=F.data_type_dict['float32'])
+            g.ndata['test_mask'] = F.tensor(test_mask, dtype=F.data_type_dict['float32'])
+            g.ndata['label'] = F.tensor(labels, dtype=F.data_type_dict['float32'])
+        else:
+            g.ndata['train_mask'] = F.tensor(train_mask, dtype=F.data_type_dict['bool'])
+            g.ndata['val_mask'] = F.tensor(val_mask, dtype=F.data_type_dict['bool'])
+            g.ndata['test_mask'] = F.tensor(test_mask, dtype=F.data_type_dict['bool'])
+            g.ndata['label'] = F.tensor(labels)
+        g.ndata['feat'] = F.tensor(_preprocess_features(features))
+        self._num_labels = onehot_labels.shape[1]
+        self._g = g
 
         print('Finished data loading and preprocessing.')
-        print('  NumNodes: {}'.format(self.graph.number_of_nodes()))
-        print('  NumEdges: {}'.format(self.graph.number_of_edges()))
-        print('  NumFeats: {}'.format(self.features.shape[1]))
+        print('  NumNodes: {}'.format(self.g.number_of_nodes()))
+        print('  NumEdges: {}'.format(self.g.number_of_edges()))
+        print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
         print('  NumClasses: {}'.format(self.num_labels))
-        print('  NumTrainingSamples: {}'.format(len(np.nonzero(self.train_mask)[0])))
-        print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
-        print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
+        print('  NumTrainingSamples: {}'.format(
+            F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
+        print('  NumValidationSamples: {}'.format(
+            F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
+        print('  NumTestSamples: {}'.format(
+            F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
-        g = DGLGraph(self.graph)
-        g.ndata['train_mask'] = self.train_mask
-        g.ndata['val_mask'] = self.val_mask
-        g.ndata['test_mask'] = self.test_mask
-        g.ndata['label'] = self.labels
-        g.ndata['feat'] = self.features
-        return g
+        return self.g
 
     def __len__(self):
         return 1
+
+    def has_cache(self):
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        if os.path.exists(graph_path) and \
+            os.path.exists(info_path):
+            return True
+
+        return False
+
+    def save(self):
+        """save the graph list and the labels"""
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        save_graphs(str(graph_path), self.g)
+        save_info(str(info_path), {'num_labels': self.num_labels})
+        if self.verbose:
+            print('Done saving data into cached files.')
+
+    def load(self):
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        graphs, _ = load_graphs(str(graph_path))
+        print(info_path)
+        info = load_info(str(info_path))
+        if self.verbose:
+            print('Done loading data into cached files.')
+        self._g = graphs[0]
+        self._g.readonly(False)
+        self._num_labels = info['num_labels']
+
+        if backend != 'mxnet':
+            self._g.ndata['train_mask'] = \
+                F.tensor(self._g.ndata['train_mask'].numpy(), dtype=F.data_type_dict['bool'])
+            self._g.ndata['val_mask'] = \
+                F.tensor(self._g.ndata['val_mask'].numpy(), dtype=F.data_type_dict['bool'])
+            self._g.ndata['test_mask'] = \
+                F.tensor(self._g.ndata['test_mask'].numpy(), dtype=F.data_type_dict['bool'])
+
+        print('  NumNodes: {}'.format(self.g.number_of_nodes()))
+        print('  NumEdges: {}'.format(self.g.number_of_edges()))
+        print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
+        print('  NumClasses: {}'.format(self.num_labels))
+        print('  NumTrainingSamples: {}'.format(
+            F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
+        print('  NumValidationSamples: {}'.format(
+            F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
+        print('  NumTestSamples: {}'.format(
+            F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
+
+    @property
+    def save_name(self):
+        return self.name + '_dgl_graph'
+
+    @property
+    def g(self):
+        return self._g
+
+    @property
+    def num_labels(self):
+        return self._num_labels
+
+    """ Citation graph is used in many examples
+        We preserve these properties for compatability.
+    """
+    @property
+    def graph(self):
+        return self._graph
+
+    @property
+    def train_mask(self):
+        return self.g.ndata['train_mask']
+
+    @property
+    def val_mask(self):
+        return self.g.ndata['val_mask']
+
+    @property
+    def test_mask(self):
+        return self.g.ndata['test_mask']
+
+    @property
+    def labels(self):
+        return self.g.ndata['label']
+
+    @property
+    def features(self):
+        return self.g.ndata['feat']
+
+class CoraGraphDataset(CitationGraphDataset):
+    def __init__(self):
+        name = 'cora'
+
+        super(CoraGraphDataset, self).__init__(name)
+
+class CiteseerGraphDataset(CitationGraphDataset):
+    def __init__(self):
+        name = 'citeseer'
+
+        super(CiteseerGraphDataset, self).__init__(name)
+
+class PubmedGraphDataset(CitationGraphDataset):
+    def __init__(self):
+        name = 'pubmed'
+
+        super(PubmedGraphDataset, self).__init__(name)
+
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
@@ -167,15 +285,15 @@ def _sample_mask(idx, l):
     return mask
 
 def load_cora():
-    data = CitationGraphDataset('cora')
+    data = CoraGraphDataset()
     return data
 
 def load_citeseer():
-    data = CitationGraphDataset('citeseer')
+    data = CiteseerGraphDataset()
     return data
 
 def load_pubmed():
-    data = CitationGraphDataset('pubmed')
+    data = PubmedGraphDataset()
     return data
 
 class GCNSyntheticDataset(object):
