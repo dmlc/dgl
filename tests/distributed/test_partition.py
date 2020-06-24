@@ -45,19 +45,23 @@ def check_partition(reshuffle):
         part_sizes.append((gpb_meta[i]['num_nodes'], gpb_meta[i]['num_edges']))
 
         local_nid = gpb.nid2localnid(F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node']), i)
+        assert F.dtype(local_nid) in (F.int64, F.int32)
         assert np.all(F.asnumpy(local_nid) == np.arange(0, len(local_nid)))
         local_eid = gpb.eid2localeid(F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge']), i)
+        assert F.dtype(local_eid) in (F.int64, F.int32)
         assert np.all(F.asnumpy(local_eid) == np.arange(0, len(local_eid)))
 
         # Check the node map.
         local_nodes = F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node'])
         llocal_nodes = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nodes1 = gpb.partid2nids(i)
+        assert F.dtype(local_nodes1) in (F.int32, F.int64)
         assert np.all(np.sort(F.asnumpy(local_nodes)) == np.sort(F.asnumpy(local_nodes1)))
 
         # Check the edge map.
         local_edges = F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge'])
         local_edges1 = gpb.partid2eids(i)
+        assert F.dtype(local_edges1) in (F.int32, F.int64)
         assert np.all(np.sort(F.asnumpy(local_edges)) == np.sort(F.asnumpy(local_edges1)))
 
         if reshuffle:
@@ -93,8 +97,12 @@ def check_partition(reshuffle):
             edge_map.append(np.ones(num_edges) * i)
         node_map = np.concatenate(node_map)
         edge_map = np.concatenate(edge_map)
-        assert np.all(F.asnumpy(gpb.nid2partid(F.arange(0, len(node_map)))) == node_map)
-        assert np.all(F.asnumpy(gpb.eid2partid(F.arange(0, len(edge_map)))) == edge_map)
+        nid2pid = gpb.nid2partid(F.arange(0, len(node_map)))
+        assert F.dtype(nid2pid) in (F.int32, F.int64)
+        assert np.all(F.asnumpy(nid2pid) == node_map)
+        eid2pid = gpb.eid2partid(F.arange(0, len(edge_map)))
+        assert F.dtype(eid2pid) in (F.int32, F.int64)
+        assert np.all(F.asnumpy(eid2pid) == edge_map)
 
 def test_partition():
     check_partition(True)
