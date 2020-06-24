@@ -323,11 +323,29 @@ COOMatrix CSRRowWiseTopk(
  * \param csrs The input list of csr matrix.
  * \param src_offset A list of integers recording src vertix id offset of each Matrix in csrs
  * \param src_offset A list of integers recording dst vertix id offset of each Matrix in csrs
+ * \return The combined CSRMatrix.
  */
 CSRMatrix DisjointUnionCsrGraph(
   const std::vector<CSRMatrix>& csrs,
   const std::vector<uint64_t> src_offset,
   const std::vector<uint64_t> dst_offset);
+
+/*!
+ * \brief Split a CSRMatrix into multiple disjoin components.
+ *
+ * \param csr CSRMatrix to split.
+ * \param batch_size Number of disjoin components (Sub CSRMatrix)
+ * \param edge_cumsum Number of edges of each components
+ * \param src_vertex_cumsum Number of src vertices of each component.
+ * \param dst_vertex_cumsum Number of dst vertices of each component.
+ * \return A list of CSRMatrixes representing each disjoint components.
+ */
+std::vector<CSRMatrix> DisjointPartitionCsrHeteroBySizes(
+  const CSRMatrix csrs,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> edge_cumsum,
+  const std::vector<uint64_t> src_vertex_cumsum,
+  const std::vector<uint64_t> dst_vertex_cumsum);
 
 }  // namespace aten
 }  // namespace dgl

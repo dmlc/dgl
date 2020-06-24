@@ -457,12 +457,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes_v
     HeteroGraphRef hg = args[0];
     const IdArray vertex_sizes = args[1];
     const IdArray edge_sizes = args[2];
-    const int64_t bits = hg->NumBits();
     std::vector<HeteroGraphPtr> ret;
-    ATEN_ID_BITS_SWITCH(bits, IdType, {
-      ret = DisjointPartitionHeteroBySizes<IdType>(hg->meta_graph(), hg.sptr(),
-                                                   vertex_sizes, edge_sizes);
-    });
+    ret = DisjointPartitionHeteroBySizes2(hg->meta_graph(), hg.sptr(),
+                                          vertex_sizes, edge_sizes);
     List<HeteroGraphRef> ret_list;
     for (HeteroGraphPtr hgptr : ret) {
       ret_list.push_back(HeteroGraphRef(hgptr));

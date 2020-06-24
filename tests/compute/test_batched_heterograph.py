@@ -19,10 +19,11 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
 
     for ety in g1.canonical_etypes:
         assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
-        src1, dst1 = g1.all_edges(etype=ety)
-        src2, dst2 = g2.all_edges(etype=ety)
+        src1, dst1, eid1 = g1.all_edges(etype=ety, form='all')
+        src2, dst2, eid2 = g2.all_edges(etype=ety, form='all')
         assert F.allclose(src1, src2)
         assert F.allclose(dst1, dst2)
+        assert F.allclose(eid1, eid2)
 
     if node_attrs is not None:
         for nty in node_attrs.keys():
@@ -146,6 +147,11 @@ def test_batching_hetero_topology(index_dtype):
     assert list(F.asnumpy(dst)) == [0, 0, 1, 1, 2, 2, 3]
     assert list(F.asnumpy(eid)) == [0, 1, 2, 3, 4, 5, 6]
 
+    # Test unbatching graphs
+    g3, g4 = dgl.unbatch_hetero(bg)
+    check_equivalence_between_heterographs(g1, g3)
+    check_equivalence_between_heterographs(g2, g4)
+
     """Test batching two DGLHeteroGraphs with csc"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
@@ -193,6 +199,11 @@ def test_batching_hetero_topology(index_dtype):
     assert list(F.asnumpy(src)) == [0, 1, 2, 3, 4, 5, 6]
     assert list(F.asnumpy(dst)) == [0, 0, 1, 1, 2, 2, 3]
     assert list(F.asnumpy(eid)) == [0, 1, 2, 3, 4, 5, 6]
+
+    # Test unbatching graphs
+    g3, g4 = dgl.unbatch_hetero(bg)
+    check_equivalence_between_heterographs(g1, g3)
+    check_equivalence_between_heterographs(g2, g4)
 
 @parametrize_dtype
 def test_batching_hetero_and_batched_hetero_topology(index_dtype):

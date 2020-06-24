@@ -217,12 +217,20 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
                                 const std::vector<uint64_t> dst_offset);
 
 template <DLDeviceType XPU, typename IdType>
-std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
+std::vector<COOMatrix> DisjointPartitionCooHeteroBySizes(
     const COOMatrix coo,
     const uint64_t batch_size,
     const std::vector<uint64_t> edge_cumsum,
     const std::vector<uint64_t> src_vertex_cumsum,
     const std::vector<uint64_t> dst_vertex_cumsum);
+
+template <DLDeviceType XPU, typename IdType>
+std::vector<CSRMatrix> DisjointPartitionCsrHeteroBySizes(
+  const CSRMatrix csrs,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> edge_cumsum,
+  const std::vector<uint64_t> src_vertex_cumsum,
+  const std::vector<uint64_t> dst_vertex_cumsum);
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);

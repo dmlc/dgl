@@ -673,20 +673,39 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
   return ret;
 }
 
-std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
+std::vector<COOMatrix> DisjointPartitionCooHeteroBySizes(
   const COOMatrix coo,
   const uint64_t batch_size,
   const std::vector<uint64_t> edge_cumsum,
   const std::vector<uint64_t> src_vertex_cumsum,
   const std::vector<uint64_t> dst_vertex_cumsum) {
   std::vector<COOMatrix> ret;
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, "DisjointPartitionHeteroBySizes", {
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, "DisjointPartitionCooHeteroBySizes", {
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
-      ret = impl::DisjointPartitionHeteroBySizes<XPU, IdType>(coo,
-                                                              batch_size,
-                                                              edge_cumsum,
-                                                              src_vertex_cumsum,
-                                                              dst_vertex_cumsum);
+      ret = impl::DisjointPartitionCooHeteroBySizes<XPU, IdType>(coo,
+                                                                 batch_size,
+                                                                 edge_cumsum,
+                                                                 src_vertex_cumsum,
+                                                                 dst_vertex_cumsum);
+    });
+  });
+  return ret;
+}
+
+std::vector<CSRMatrix> DisjointPartitionCsrHeteroBySizes(
+  const CSRMatrix csr,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> edge_cumsum,
+  const std::vector<uint64_t> src_vertex_cumsum,
+  const std::vector<uint64_t> dst_vertex_cumsum) {
+  std::vector<CSRMatrix> ret;
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, "DisjointPartitionCsrHeteroBySizes", {
+    ATEN_ID_TYPE_SWITCH(csr.indices->dtype, IdType, {
+      ret = impl::DisjointPartitionCsrHeteroBySizes<XPU, IdType>(csr,
+                                                                 batch_size,
+                                                                 edge_cumsum,
+                                                                 src_vertex_cumsum,
+                                                                 dst_vertex_cumsum);
     });
   });
   return ret;

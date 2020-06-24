@@ -71,7 +71,7 @@ template COOMatrix DisjointUnionCooGraph<kDLCPU, int64_t>(const std::vector<COOM
                                                           const std::vector<uint64_t>);
 
 template <DLDeviceType XPU, typename IdType>
-std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
+std::vector<COOMatrix> DisjointPartitionCooHeteroBySizes(
   const COOMatrix coo,
   const uint64_t batch_size,
   const std::vector<uint64_t> edge_cumsum,
@@ -87,13 +87,14 @@ std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
 #pragma omp parallel for
   for (int64_t g = 0; g < batch_size; ++g) {
     std::vector<IdType> result_src, result_dst;
-    for (uint64_t e = edge_cumsum[g]; e < edge_cumsum[g]; ++e) {
+    for (uint64_t e = edge_cumsum[g]; e < edge_cumsum[g + 1]; ++e) {
       result_src.push_back(edges_src_data[e] - src_vertex_cumsum[g]);
       result_dst.push_back(edges_dst_data[e] - dst_vertex_cumsum[g]);
     }
 
     COOMatrix sub_coo = COOMatrix(
-        src_vertex_cumsum[batch_size], dst_vertex_cumsum[batch_size],
+        src_vertex_cumsum[g+1]-src_vertex_cumsum[g],
+        dst_vertex_cumsum[g+1]-dst_vertex_cumsum[g],
         VecToIdArray(result_src, sizeof(IdType) * 8),
         VecToIdArray(result_dst, sizeof(IdType) * 8));
     ret[g] = sub_coo;
@@ -103,18 +104,18 @@ std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
 }
 
 template std::vector<COOMatrix>
-    DisjointPartitionHeteroBySizes<kDLCPU, int32_t>(const COOMatrix,
-                                                    const uint64_t,
-                                                    const std::vector<uint64_t>,
-                                                    const std::vector<uint64_t>,
-                                                    const std::vector<uint64_t>);
+    DisjointPartitionCooHeteroBySizes<kDLCPU, int32_t>(const COOMatrix,
+                                                       const uint64_t,
+                                                       const std::vector<uint64_t>,
+                                                       const std::vector<uint64_t>,
+                                                       const std::vector<uint64_t>);
 
 template std::vector<COOMatrix>
-    DisjointPartitionHeteroBySizes<kDLCPU, int64_t>(const COOMatrix,
-                                                    const uint64_t,
-                                                    const std::vector<uint64_t>,
-                                                    const std::vector<uint64_t>,
-                                                    const std::vector<uint64_t>);
+    DisjointPartitionCooHeteroBySizes<kDLCPU, int64_t>(const COOMatrix,
+                                                       const uint64_t,
+                                                       const std::vector<uint64_t>,
+                                                       const std::vector<uint64_t>,
+                                                       const std::vector<uint64_t>);
 
 }  // namespace impl
 }  // namespace aten

@@ -314,13 +314,24 @@ COOMatrix COORowWiseTopk(
  * \param coos The input list of coo matrix.
  * \param src_offset A list of integers recording src vertix id offset of each Matrix in coos
  * \param src_offset A list of integers recording dst vertix id offset of each Matrix in coos
+ * \return The combined COOMatrix.
  */
 COOMatrix DisjointUnionCooGraph(
   const std::vector<COOMatrix>& coos,
   const std::vector<uint64_t> src_offset,
   const std::vector<uint64_t> dst_offset);
 
-std::vector<COOMatrix> DisjointPartitionHeteroBySizes(
+/*!
+ * \brief Split a COOMatrix into multiple disjoin components.
+ *
+ * \param coo COOMatrix to split.
+ * \param batch_size Number of disjoin components (Sub COOMatrix)
+ * \param edge_cumsum Number of edges of each components
+ * \param src_vertex_cumsum Number of src vertices of each component.
+ * \param dst_vertex_cumsum Number of dst vertices of each component.
+ * \return A list of COOMatrixes representing each disjoint components.
+ */
+std::vector<COOMatrix> DisjointPartitionCooHeteroBySizes(
   const COOMatrix coo,
   const uint64_t batch_size,
   const std::vector<uint64_t> edge_cumsum,
