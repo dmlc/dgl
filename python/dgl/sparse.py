@@ -74,6 +74,15 @@ op_mapping = {
     'copy_e': 'copy_e'
 }
 
+target_mapping = {
+    'u': 0,
+    'e': 1,
+    'v': 2,
+    'src': 0,
+    'edge': 1,
+    'dst': 2
+}
+
 def _gspmm(g, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
@@ -144,13 +153,13 @@ def _gspmm(g, op, reduce_op, u, e):
                             to_dgl_nd(arg_u), to_dgl_nd(arg_e))
     return v, (arg_u, arg_e)
 
-def _gsddmm(g, op, u, v):
+def _gsddmm(g, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
 
     .. math::
-        x_{e} = \phi(x_u, x_v), \forall (u,e,v)\in \mathcal{G}
+        x_{e} = \phi(x_u, x_e, x_v), \forall (u,e,v)\in \mathcal{G}
 
     where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
     :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
@@ -164,10 +173,16 @@ def _gsddmm(g, op, u, v):
     op : str
         Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``, ``copy_u``,
         or their alias ``+``, ``-``, ``*``, ``/``, ``.``.
-    u : tensor or None
-        The feature on source nodes.
-    v : tensor or None
-        The feature on destination, could be None if op is ``copy_u``.
+    lhs : tensor or None
+        Left hand operand.
+    rhs : tensor or None
+        Right hand operand.
+    lhs_target : str
+        The target of left hand operand, could be ``src``, ``edge``, ``dst``
+        or their alias ``u``, ``e``, ``v``.
+    rhs_target : str
+        The target of right hand operand, could be ``src``, ``edge``, ``dst``
+        or their alias ``u``, ``e``, ``v``.
 
     Returns
     -------
@@ -180,24 +195,27 @@ def _gsddmm(g, op, u, v):
     we expand its dimension with an additional dimension of length one. (e.g.
     (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
-    if u is not None:
-        if F.ndim(u) == 1:
-            u = F.unsqueeze(u, -1)
+    if lhs is not None:
+        if F.ndim(lhs) == 1:
+            lhs = F.unsqueeze(lhs, -1)
     if v is not None:
-        if F.ndim(v) == 1:
-            v = F.unsqueeze(v, -1)
+        if F.ndim(rhs) == 1:
+            rhs = F.unsqueeze(rhs, -1)
 
     op = op_mapping[op]
-    ctx = F.context(u)
-    dtype = F.dtype(u)
-    u_shp = F.shape(u)
-    v_shp = F.shape(v) if v is not None else (0,)
-    e_shp = (g.number_of_edges(), ) +\
-        infer_broadcast_shape(op, u_shp[1:], v_shp[1:])
-    e = F.zeros(e_shp, dtype, ctx)
+    lhs_target = target_mapping[lhs_target];
+    rhs_target = target_mapping[rhs_target];
+    ctx = F.context(lhs) if lhs is not None else F.context(rhs)
+    dtype = F.dtype(lhs) if lhs is not None else F.dtype(rhs)
+    lhs_shp = F.shape(lhs) if lhs is not None else (0,)
+    rhs_shp = F.shape(rhs) if rhs is not None else (0,)
+    out_shp = (g.number_of_edges(), ) +\
+        infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+    out = F.zeros(out_shp, dtype, ctx)
     if g.number_of_edges() > 0:
         gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
-        _CAPI_DGLKernelSDDMM(gidx, op, to_dgl_nd(u), to_dgl_nd(v), to_dgl_nd(e))
-    return e
+        _CAPI_DGLKernelSDDMM(gidx, op, to_dgl_nd(lhs), to_dgl_nd(rhs), to_dgl_nd(out),
+                             lhs_target, rhs_target)
+    return out
 
 _init_api("dgl.sparse")

@@ -1,8 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/kernel.cc
- * \brief New kernels
- */
+ * \brief New kernels */
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
@@ -99,13 +98,15 @@ void SpMM(const std::string& op, const std::string& reduce,
 /*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMM(const std::string& op,
            HeteroGraphPtr graph,
-           NDArray ufeat,
-           NDArray efeat,
+           NDArray lhs,
+           NDArray rhs,
            NDArray out,
+           char lhs_target,
+           char rhs_target,
            SparseFormat format) {
   // TODO(zihao): format tuning
   format = SparseFormat::kCOO;
-  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+  const auto& bcast = CalcBcastOff(op, ufeat, vfeat);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
@@ -113,11 +114,11 @@ void SDDMM(const std::string& op,
         if (format == SparseFormat::kCSR) {
           SDDMMCsr<XPU, IdType, DType>(
               op, bcast, graph->GetCSRMatrix(0),
-              ufeat, efeat, out);
+              lhs, rhs, out, lhs_target, rhs_target);
         } else if (format == SparseFormat::kCOO) {
           SDDMMCoo<XPU, IdType, DType>(
               op, bcast, graph->GetCOOMatrix(0),
-              ufeat, efeat, out);
+              lhs, rhs, out, lhs_target, rhs_target);
         } else {
           LOG(FATAL) << "SDDMM only supports CSR and COO foramts";
         }
@@ -156,21 +157,23 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
     const std::string op = args[1];
-    NDArray U = args[2];
-    NDArray V = args[3];
-    NDArray E = args[4];
-    CheckCtx(graph->Context(), {U, V, E}, {"U_data", "V_data", "E_data"});
-    CheckContiguous({U, V, E}, {"U_data", "V_data", "E_data"});
+    NDArray lhs = args[2];
+    NDArray rhs = args[3];
+    NDArray out = args[4];
+    int lhs_target = args[5];
+    int rhs_target = args[6];
+    CheckCtx(graph->Context(), {lhs, rhs, out}, {"lhs", "rhs", "out"});
+    CheckContiguous({lhs, rhs, out}, {"lhs", "rhs", "out"});
     CHECK_EQ(graph->NumEdgeTypes(), 1);
     auto pair = graph->meta_graph()->FindEdge(0);  // only one etype in the graph.
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
     CheckShape(
         {graph->NumVertices(src_vtype), graph->NumEdges(0), graph->NumVertices(dst_vtype)},
-        {0, 1, 2},
-        {U, E, V},
+        {lhs_target, rhs_target, 1},
+        {lhs, rhs, out},
         {"U_data", "E_data", "V_data"});
-    SDDMM(op, graph.sptr(), U, V, E, SparseFormat::kAny);
+    SDDMM(op, graph.sptr(), lhs, rhs, out, SparseFormat::kAny);
   });
 
 }  // namespace aten
