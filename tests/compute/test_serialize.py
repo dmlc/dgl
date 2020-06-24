@@ -271,14 +271,35 @@ def test_serialize_heterograph():
 
     os.unlink(path)
 
+@pytest.mark.skip(reason="lack of permission on CI")
+def test_serialize_heterograph_s3():
+    # f = tempfile.NamedTemporaryFile(delete=False)
+    path = "s3://dglci-data-test/graph2.bin"
+    # f.close()
+    g_list0 = create_heterographs("int64") + create_heterographs("int32")
+    save_graphs(path, g_list0)
+
+    g_list = load_graphs(path, [0, 2, 5])
+    assert g_list[0].idtype == F.int64
+    assert g_list[1].restrict_format() == 'csr'
+    assert np.allclose(
+        F.asnumpy(g_list[1].nodes['user'].data['hh']), np.ones((4, 5)))
+    assert np.allclose(
+        F.asnumpy(g_list[2].nodes['user'].data['hh']), np.ones((4, 5)))
+    edges = g_list[0]['follows'].edges()
+    assert np.allclose(F.asnumpy(edges[0]), np.array([0, 1, 2]))
+    assert np.allclose(F.asnumpy(edges[1]), np.array([1, 2, 3]))
+
+
 
 if __name__ == "__main__":
-    test_graph_serialize_with_feature()
-    test_graph_serialize_without_feature()
-    test_graph_serialize_with_labels()
-    test_serialize_tensors()
-    test_serialize_empty_dict()
-    test_load_old_files1()
-    test_load_old_files2()
-    test_serialize_heterograph()
-    test_serialize_old_heterograph_file()
+    # test_graph_serialize_with_feature()
+    # test_graph_serialize_without_feature()
+    # test_graph_serialize_with_labels()
+    # test_serialize_tensors()
+    # test_serialize_empty_dict()
+    # test_load_old_files1()
+    # test_load_old_files2()
+    # test_serialize_heterograph()
+    # test_serialize_heterograph_s3()
+    # test_serialize_old_heterograph_file()
