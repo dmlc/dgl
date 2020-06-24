@@ -716,7 +716,7 @@ class DGLHeteroGraph(object):
         """Return the data view of all the nodes.
 
         If the graph has only one node type, ``g.ndata['feat']`` gives
-        the node feature data under name ``'feat'``. 
+        the node feature data under name ``'feat'``.
         If the graph has multiple node types, then ``g.ndata['feat']``
         returns a dictionary where the key is the node type and the
         value is the node feature tensor. If the node type does not
@@ -750,7 +750,7 @@ class DGLHeteroGraph(object):
 
         >>> g = dgl.heterograph({('user', 'like', 'movie') : ([0, 1, 1], [1, 2, 0])})
         >>> g.ndata['h'] = {'user': torch.zeros(2, 5)}
-        >>> g.ndata['h'] 
+        >>> g.ndata['h']
         ... {'user': tensor([[0., 0., 0., 0., 0.],
         ...                  [0., 0., 0., 0., 0.]])}
         >>> # clean the feature 'h' and no node type contains 'h'
@@ -977,8 +977,8 @@ class DGLHeteroGraph(object):
         is the edge feature tensor. If the edge type does not have feature
         ``'feat'``, it is not included in the dictionary.
 
-        Note: When the graph has multiple edge type, The key used in 
-        ``g.edata['feat']`` should be the canonical_etypes, i.e. 
+        Note: When the graph has multiple edge type, The key used in
+        ``g.edata['feat']`` should be the canonical_etypes, i.e.
         (h_ntype, r_type, t_ntype).
 
         Examples
