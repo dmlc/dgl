@@ -332,7 +332,7 @@ class NodeCollator(Collator):
 
         if len(self.g.ntypes) == 1:
             output_nodes = blocks[-1].dstdata[NID]
-            input_nodes = blocks[0].dstdata[NID]
+            input_nodes = blocks[0].srcdata[NID]
         else:
             output_nodes = {
                 ntype: blocks[-1].dstnodes[ntype].data[NID]

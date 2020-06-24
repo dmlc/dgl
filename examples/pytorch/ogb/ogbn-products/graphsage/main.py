@@ -76,10 +76,8 @@ class SAGE(nn.Module):
                 collator.dataset, collate_fn=collator.collate,
                 shuffle=False, drop_last=False, batch_size=batch_size)
 
-            for blocks in tqdm.tqdm(dataloader):
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
-                input_nodes = block.srcdata[dgl.NID]
-                output_nodes = block.dstdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]

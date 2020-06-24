@@ -100,10 +100,16 @@ def main(args):
     # validation sampler
     val_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)
     val_blocks = val_sampler.sample_blocks(g, {category: val_idx})
+    val_input_nodes = {
+        ntype: val_blocks[0].srcnodes[ntype].data[dgl.NID]
+        for ntype in val_blocks[0].srctypes}
 
     # test sampler
     test_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)
     test_blocks = test_sampler.sample_blocks(g, {category: test_idx})
+    test_input_nodes = {
+        ntype: test_blocks[0].srcnodes[ntype].data[dgl.NID]
+        for ntype in test_blocks[0].srctypes}
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -138,14 +144,14 @@ def main(args):
         if epoch > 3:
             dur.append(time.time() - t0)
 
-        val_loss, val_acc = evaluate(model, val_idx, val_blocks, node_embed, labels, category, use_cuda)
+        val_loss, val_acc = evaluate(model, val_idx, val_input_nodes, val_blocks, node_embed, labels, category, use_cuda)
         print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
               format(epoch, val_acc, val_loss.item(), np.average(dur)))
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
-    test_loss, test_acc = evaluate(model, test_idx, test_blocks, node_embed, labels, category, use_cuda)
+    test_loss, test_acc = evaluate(model, test_idx, test_input_nodes, test_blocks, node_embed, labels, category, use_cuda)
     print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()
 

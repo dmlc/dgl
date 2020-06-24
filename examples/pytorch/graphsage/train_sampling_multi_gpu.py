@@ -92,11 +92,18 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
-                end = start + batch_size
-                batch_nodes = nodes[start:end]
-                block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                input_nodes = block.srcdata[dgl.NID]
+            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
+            collator = dgl.sampling.NodeCollator(g, th.arange(g.number_of_nodes()), sampler)
+            dataloader = DataLoader(
+                collator.dataset,
+                collate_fn=collator.collate,
+                batch_size=args.batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -105,7 +112,7 @@ class SAGE(nn.Module):
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[start:end] = h.cpu()
+                y[output_nodes] = h.cpu()
 
             x = y
         return y
