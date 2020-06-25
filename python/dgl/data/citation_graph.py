@@ -12,6 +12,7 @@ import scipy.sparse as sp
 import os, sys
 
 from .dgl_dataset import DGLBuiltinDataset
+from .utils import download, extract_archive, get_download_dir
 from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
 from ..utils import retry_method_with_fix
 from .. import backend as F
