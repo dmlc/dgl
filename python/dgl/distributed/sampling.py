@@ -141,8 +141,8 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     partition_book = dist_graph.get_partition_book()
     nodes = toindex(nodes).tousertensor()
     partition_id = partition_book.nid2partid(nodes)
-    res_list = []
     LocalSampledGraph = namedtuple('LocalSampledGraph', 'global_src global_dst global_eids')
+    local_nids = None
     for pid in range(partition_book.num_partitions()):
         node_id = F.boolean_mask(nodes, partition_id == pid)
         # We optimize the sampling on a local partition if the server and the client
@@ -150,18 +150,31 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
         # should reside in the local partition. If the server and the client
         # are not co-located, the client doesn't have a local partition.
         if pid == partition_book.partid and dist_graph.local_partition is not None:
-            src, dst, eids = _sample_neighbors(dist_graph.local_partition, partition_book,
-                                               node_id, fanout, edge_dir, prob, replace)
-            res_list.append(LocalSampledGraph(src, dst, eids))
+            assert local_nids is None
+            local_nids = node_id
         elif len(node_id) != 0:
             req = SamplingRequest(node_id, fanout, edge_dir=edge_dir,
                                   prob=prob, replace=replace)
             req_list.append((pid, req))
-    # TODO(zhengda) we need to optimize it further so that we can overlap sampling from
-    # the local partition and remote partitions.
+
+    # send requests to the remote machine.
+    num_res = 0
+    msgseq2pos = None
     if len(req_list) > 0:
-        results = remote_call_to_machine(req_list)
+        num_res, msgseq2pos = send_requests_to_machine(req_list)
+
+    # sample neighbors for the nodes in the local partition.
+    res_list = []
+    if local_nids is not None:
+        src, dst, eids = _sample_neighbors(dist_graph.local_partition, partition_book,
+                                           local_nids, fanout, edge_dir, prob, replace)
+        res_list.append(LocalSampledGraph(src, dst, eids))
+
+    # receive responses from remote machines.
+    if num_res > 0:
+        results = recv_responses(num_res, msgseq2pos)
         res_list.extend(results)
+
     sampled_graph = merge_graphs(res_list, dist_graph.number_of_nodes())
     return sampled_graph
 

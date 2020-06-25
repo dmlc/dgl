@@ -731,6 +731,44 @@ def remote_call(target_and_requests, timeout=0):
         all_res[msgseq2pos[msg.msg_seq]] = res
     return all_res
 
+def send_requests_to_machine(target_and_requests):
+    msgseq2pos = {}
+    num_res = 0
+    for pos, (target, request) in enumerate(target_and_requests):
+        # send request
+        service_id = request.service_id
+        msg_seq = incr_msg_seq()
+        client_id = get_rank()
+        server_id = target
+        data, tensors = serialize_to_payload(request)
+        msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
+        send_rpc_message(msg, server_id)
+        # check if has response
+        res_cls = get_service_property(service_id)[1]
+        if res_cls is not None:
+            num_res += 1
+            msgseq2pos[msg_seq] = pos
+    return num_res, msgseq2pos
+
+def recv_responses(num_res, msgseq2pos, timeout=0):
+    myrank = get_rank()
+    all_res = [None] * len(target_and_requests)
+    while num_res != 0:
+        # recv response
+        msg = recv_rpc_message(timeout)
+        num_res -= 1
+        _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
+        if res_cls is None:
+            raise DGLError('Got response message from service ID {}, '
+                           'but no response class is registered.'.format(msg.service_id))
+        res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
+        if msg.client_id != myrank:
+            raise DGLError('Got reponse of request sent by client {}, '
+                           'different from my rank {}!'.format(msg.client_id, myrank))
+        # set response
+        all_res[msgseq2pos[msg.msg_seq]] = res
+    return all_res
+
 def remote_call_to_machine(target_and_requests, timeout=0):
     """Invoke registered services on remote machine
     (which will ramdom select a server to process the request) and collect responses.
@@ -759,39 +797,8 @@ def remote_call_to_machine(target_and_requests, timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     # TODO(chao): handle timeout
-    all_res = [None] * len(target_and_requests)
-    msgseq2pos = {}
-    num_res = 0
-    myrank = get_rank()
-    for pos, (target, request) in enumerate(target_and_requests):
-        # send request
-        service_id = request.service_id
-        msg_seq = incr_msg_seq()
-        client_id = get_rank()
-        server_id = target
-        data, tensors = serialize_to_payload(request)
-        msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-        send_rpc_message(msg, server_id)
-        # check if has response
-        res_cls = get_service_property(service_id)[1]
-        if res_cls is not None:
-            num_res += 1
-            msgseq2pos[msg_seq] = pos
-    while num_res != 0:
-        # recv response
-        msg = recv_rpc_message(timeout)
-        num_res -= 1
-        _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
-        if res_cls is None:
-            raise DGLError('Got response message from service ID {}, '
-                           'but no response class is registered.'.format(msg.service_id))
-        res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-        if msg.client_id != myrank:
-            raise DGLError('Got reponse of request sent by client {}, '
-                           'different from my rank {}!'.format(msg.client_id, myrank))
-        # set response
-        all_res[msgseq2pos[msg.msg_seq]] = res
-    return all_res
+    num_res, msgseq2pos = send_requests_to_machine(target_and_requests)
+    return recv_response(num_res, msgseq2pos, timeout)
 
 def send_rpc_message(msg, target):
     """Send one message to the target server.
