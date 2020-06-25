@@ -17,3 +17,6 @@
 	path = third_party/cub
 	url = https://github.com/NVlabs/cub.git
 	branch = 1.8.0
+[submodule "third_party/phmap"]
+	path = third_party/phmap
+	url = https://github.com/greg7mdp/parallel-hashmap.git

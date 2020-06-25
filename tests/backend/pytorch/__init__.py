@@ -70,8 +70,8 @@ def mul(a, b):
 def div(a, b):
     return a / b
 
-def sum(x, dim):
-    return x.sum(dim)
+def sum(x, dim, keepdims=False):
+    return x.sum(dim, keepdims=keepdims)
 
 def max(x, dim):
     return x.max(dim)[0]

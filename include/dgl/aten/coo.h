@@ -25,7 +25,6 @@ struct CSRMatrix;
  * \brief Plain COO structure
  *
  * The data array stores integer ids for reading edge features.
-
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
