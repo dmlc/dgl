@@ -425,6 +425,17 @@ class DistGraph:
 
     @property
     def local_partition(self):
+        ''' Return the local partition on the client
+
+        DistGraph provides a global view of the distributed graph. Internally,
+        it may contains a partition of the graph if it is co-located with
+        the server. If there is no co-location, this returns None.
+
+        Returns
+        -------
+        DGLHeterograph
+            The local partition
+        '''
         return self._g
 
     @property

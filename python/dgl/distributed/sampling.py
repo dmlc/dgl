@@ -1,4 +1,6 @@
 """Sampling module"""
+from collections import namedtuple
+
 from .rpc import Request, Response, remote_call_to_machine
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
@@ -6,8 +8,6 @@ from ..convert import graph
 from ..base import NID, EID
 from ..utils import toindex
 from .. import backend as F
-
-from collections import namedtuple
 
 __all__ = ['sample_neighbors']
 
