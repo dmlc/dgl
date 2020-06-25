@@ -130,7 +130,7 @@ struct SwitchSrcDst<SelectDst> {
 // common binary functors
 template <typename DType>
 struct BinaryAdd {
-  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+  static DGLDEVICE DGLINLINE DType Call(const DType *lhs, const DType *rhs, int64_t len) {
     return lhs[0] + rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
@@ -143,7 +143,7 @@ struct BinaryAdd {
 
 template <typename DType>
 struct BinaryMul {
-  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+  static DGLDEVICE DGLINLINE DType Call(const DType *lhs, const DType *rhs, int64_t len) {
     return lhs[0] * rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
@@ -156,7 +156,7 @@ struct BinaryMul {
 
 template <typename DType>
 struct BinarySub {
-  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+  static DGLDEVICE DGLINLINE DType Call(const DType *lhs, const DType *rhs, int64_t len) {
     return lhs[0] - rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
@@ -169,7 +169,7 @@ struct BinarySub {
 
 template <typename DType>
 struct BinaryDiv {
-  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+  static DGLDEVICE DGLINLINE DType Call(const DType *lhs, const DType *rhs, int64_t len) {
     return lhs[0] / rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
@@ -182,7 +182,7 @@ struct BinaryDiv {
 
 template <typename DType>
 struct BinaryUseLhs {
-  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+  static DGLDEVICE DGLINLINE DType Call(const DType *lhs, const DType *rhs, int64_t len) {
     return lhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
@@ -195,7 +195,7 @@ struct BinaryUseLhs {
 
 template <typename DType>
 struct BinaryDot {
-  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+  static DGLDEVICE DGLINLINE DType Call(const DType *lhs, const DType *rhs, int64_t len) {
     DType out = 0;
     // simple vector dot vector
 #pragma unroll
