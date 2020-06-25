@@ -134,6 +134,7 @@ def run(args, device, data):
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
     # clean up
+    g._client.barrier()
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
