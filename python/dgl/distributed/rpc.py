@@ -752,7 +752,7 @@ def send_requests_to_machine(target_and_requests):
 
 def recv_responses(num_res, msgseq2pos, timeout=0):
     myrank = get_rank()
-    all_res = [None] * len(target_and_requests)
+    all_res = [None] * num_res
     while num_res != 0:
         # recv response
         msg = recv_rpc_message(timeout)

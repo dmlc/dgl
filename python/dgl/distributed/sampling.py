@@ -1,7 +1,7 @@
 """Sampling module"""
 from collections import namedtuple
 
-from .rpc import Request, Response, remote_call_to_machine
+from .rpc import Request, Response, remote_call_to_machine, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
 from ..convert import graph
