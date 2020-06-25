@@ -237,7 +237,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         g.edata[EID] = F.arange(0, g.number_of_edges())
         g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int64, F.cpu())
         g.edata['inner_edge'] = F.ones((g.number_of_edges(),), F.int64, F.cpu())
-        g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
+        if reshuffle:
+            g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
+            g.edata['orig_id'] = F.arange(0, g.number_of_edges())
     elif part_method == 'metis':
         node_parts = metis_partition_assignment(g, num_parts)
         client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
