@@ -4,7 +4,9 @@
  * \brief Sort COO index
  */
 #include <dgl/array.h>
+#include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
+#include "../../cuda_utils.h"
 
 namespace dgl {
 
@@ -12,6 +14,8 @@ using runtime::NDArray;
 
 namespace aten {
 namespace impl {
+
+///////////////////////////// COOSort_ /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
@@ -98,6 +102,69 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
 template void COOSort_<kDLGPU, int32_t>(COOMatrix* coo, bool sort_column);
 template void COOSort_<kDLGPU, int64_t>(COOMatrix* coo, bool sort_column);
 
+///////////////////////////// COOIsSorted /////////////////////////////
+
+template <typename IdType>
+__global__ void _COOIsSortedKernel(
+    const IdType* row, const IdType* col,
+    int64_t nnz, int8_t* row_sorted, int8_t* col_sorted) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < nnz) {
+    if (tx == 0) {
+      row_sorted[0] = 1;
+      col_sorted[0] = 1;
+    } else {
+      row_sorted[tx] = static_cast<int8_t>(row[i - 1] <= row[i]);
+      col_sorted[tx] = static_cast<int8_t>(
+          row[i - 1] < row[i] || col[i - 1] <= col[i]);
+    }
+    tx += stride_x;
+  }
+}
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
+  const int64_t nnz = coo.row->shape[0];
+  const auto& ctx = csr.indptr->ctx;
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  auto device = runtime::DeviceAPI::Get(ctx);
+  IdType* row = ;
+  IdType* col = coo.col.Ptr<IdType>();
+  // We allocate a workspace of 2*nnz bytes. It wastes a little bit memory but should
+  // be fine.
+  int8_t* row_sorted = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
+  int8_t* col_sorted = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
+  const int nt = cuda::FindNumThreads(nnz);
+  const int nb = (nnz + nt - 1) / nt;
+  _COOIsSortedKernel<<<nb, nt, 0, thr_entry->stream>>>(
+      coo.row.Ptr<IdType>(), coo.col.Ptr<IdType>(),
+      nnz, row_sorted, col_sorted);
+
+  // reduce row flags
+  int8_t* row_flag = static_cast<int8_t*>(device->AllocWorkspace(ctx, 1));
+  size_t workspace_size = 0;
+  CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, row_sorted, row_flag, nnz));
+  void* workspace = device->AllocWorkspace(ctx, workspace_size);
+  CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, row_sorted, row_flag, nnz));
+
+  // TODO
+
+  // reduce col flags
+  int8_t* col_flag = static_cast<int8_t*>(device->AllocWorkspace(ctx, 1));
+
+  device->FreeWorkspace(ctx, row_flag);
+  device->FreeWorkspace(ctx, col_flag);
+  device->FreeWorkspace(ctx, row_sorted);
+  device->FreeWorkspace(ctx, col_sorted);
+  
+  if (!row_sorted)
+    col_sorted = false;
+  return {row_sorted, col_sorted};
+}
+
+template std::pair<bool, bool> COOIsSorted<kDLGPU, int32_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDLGPU, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

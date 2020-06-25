@@ -196,6 +196,9 @@ template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* mat, bool sort_column);
 
 template <DLDeviceType XPU, typename IdType>
+std::pair<bool, bool> COOIsSorted(COOMatrix coo);
+
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 // FloatType is the type of probability data.

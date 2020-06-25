@@ -142,11 +142,16 @@ inline bool COOHasData(COOMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
-/*! \brief Whether the COO is row sorted */
-bool COOIsRowSorted(COOMatrix coo);
-
-/*! \brief Whether the COO is row sorted and the column indices of each row are sorted.*/
-bool COOIsSorted(COOMatrix coo);
+/*!
+ * \brief Check whether the COO is sorted.
+ *
+ * It returns two flags: one for whether the row is sorted;
+ * the other for whether the columns of each row is sorted
+ * if the first flag is true.
+ *
+ * Complexity: O(NNZ)
+ */
+std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
@@ -208,6 +213,8 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
  * The function sorts row indices in ascending order. If sort_column is true,
  * col indices are sorted in ascending order too. The data array of the returned COOMatrix
  * stores the shuffled index which could be used to fetch edge data.
+ *
+ * Complexity: O(N*log(N)), where N is the number of nonzeros.
  *
  * \param mat The coo matrix to sort.
  * \param sort_column True if column index should be sorted too.

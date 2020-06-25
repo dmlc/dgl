@@ -570,6 +570,16 @@ void COOSort_(COOMatrix* mat, bool sort_column) {
   });
 }
 
+std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
+  if (coo.row->shape[0] == 0)
+    return {true, true};
+  std::pair<bool, bool> ret;
+  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOIsSorted", {
+    ret = impl::COOIsSorted<XPU, IdType>(coo);
+  });
+  return ret;
+}
+
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COORemove", {

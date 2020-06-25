@@ -54,7 +54,7 @@ bool CSRIsSorted(CSRMatrix csr) {
   size_t workspace_size = 0;
   CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, flags, rst, csr.num_rows));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, flags, rst, csr.num_rows));
+  CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, flags, rst, csr.num_rows));
   int8_t cpu_rst = 0;
   CUDA_CALL(cudaMemcpy(rst, &cpu_rst, 1, cudaMemcpyHostToDevice));
   device->FreeWorkspace(ctx, workspace);

@@ -160,6 +160,8 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
+///////////////////////////// COOSort_ /////////////////////////////
+
 template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
   const int64_t nnz = coo->row->shape[0];
@@ -203,6 +205,28 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
 
 template void COOSort_<kDLCPU, int32_t>(COOMatrix*, bool);
 template void COOSort_<kDLCPU, int64_t>(COOMatrix*, bool);
+
+
+///////////////////////////// COOIsSorted /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
+  const int64_t nnz = coo.row->shape[0];
+  IdType* row = coo.row.Ptr<IdType>();
+  IdType* col = coo.col.Ptr<IdType>();
+  bool row_sorted = true;
+  bool col_sorted = true;
+  for (int64_t i = 1; row_sorted && i < nnz; ++i) {
+    row_sorted = (row[i - 1] <= row[i]);
+    col_sorted = col_sorted && (row[i - 1] < row[i] || col[i - 1] <= col[i]);
+  }
+  if (!row_sorted)
+    col_sorted = false;
+  return {row_sorted, col_sorted};
+}
+
+template std::pair<bool, bool> COOIsSorted<kDLCPU, int32_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDLCPU, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten
