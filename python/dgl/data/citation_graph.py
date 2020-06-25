@@ -17,6 +17,7 @@ from ..utils import retry_method_with_fix
 from .. import backend as F
 from ..graph import DGLGraph
 from ..graph import batch as graph_batch
+from ..convert import to_networkx
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 
@@ -126,7 +127,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
             g.ndata['val_mask'] = F.tensor(val_mask, dtype=F.data_type_dict['bool'])
             g.ndata['test_mask'] = F.tensor(test_mask, dtype=F.data_type_dict['bool'])
             g.ndata['label'] = F.tensor(labels)
-        g.ndata['feat'] = F.tensor(_preprocess_features(features))
+        g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_labels = onehot_labels.shape[1]
         self._g = g
 
@@ -182,7 +183,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         if self.verbose:
             print('Done loading data into cached files.')
         self._g = graphs[0]
-        self._graph = dgl.to_networkx(self._g)
+        self._graph = to_networkx(self._g)
         self._g.readonly(False)
         self._num_labels = info['num_labels']
 
@@ -245,18 +246,153 @@ class CitationGraphDataset(DGLBuiltinDataset):
         return self.g.ndata['feat']
 
 class CoraGraphDataset(CitationGraphDataset):
+    r""" Cora citation network dataset.
+    
+    Nodes mean paper and edges mean citation 
+    relationships. Each node has a predefined 
+    feature with 1433 dimensions. The dataset is 
+    designed for the node classification task. 
+    The task is to predict the category of 
+    certain paper.
+
+    Statistics
+    ===
+    Nodes: 2708
+    Edges: 10556
+    Number of Classes: 7
+    Label Split: Train: 140 ,Valid: 500, Test: 1000
+    
+    Returns
+    ===
+    CoraDataset object with two properties:
+        graph: A Homogeneous graph containing the 
+            graph structure, node features and labels.
+        num_of_class: number of paper categories for 
+            the classification task.
+    
+    Examples
+    ===
+    
+    >>> dataset = CoraDataset()
+    >>> g = dataset.graph
+    >>> num_class = g.num_of_class
+    >>>
+    >>> # get node feature
+    >>> feat = g.ndata['feat']
+    >>> 
+    >>> # get data split
+    >>> train_mask = g.ndata['train_mask']
+    >>> val_mask = g.ndata['val_mask']
+    >>> test_mask = g.ndata['test_mask']
+    >>>
+    >>> # get labels
+    >>> label = g.ndata['label']
+    >>>
+    >>> # Train, Validation and Test
+    
+    """
     def __init__(self):
         name = 'cora'
 
         super(CoraGraphDataset, self).__init__(name)
 
 class CiteseerGraphDataset(CitationGraphDataset):
+    r""" Citeseer citation network dataset.
+    
+    Nodes mean scientific publications and edges 
+    mean citation relationships. Each node has a 
+    predefined feature with 3703 dimensions. The 
+    dataset is designed for the node classification 
+    task. The task is to predict the category of 
+    certain publication.
+
+    Statistics
+    ===
+    Nodes: 3327
+    Edges: 9228
+    Number of Classes: 6
+    Label Split: Train: 120 ,Valid: 500, Test: 1000
+    
+    Returns
+    ===
+    CiteseerDataset object with two properties:
+        graph: A Homogeneous graph containing the 
+            graph structure, node features and labels.
+        num_of_class: number of publication categories 
+            for the classification task.
+    
+    Examples
+    ===
+    
+    >>> dataset = CiteseerDataset()
+    >>> g = dataset.graph
+    >>> num_class = g.num_of_class
+    >>>
+    >>> # get node feature
+    >>> feat = g.ndata['feat']
+    >>> 
+    >>> # get data split
+    >>> train_mask = g.ndata['train_mask']
+    >>> val_mask = g.ndata['val_mask']
+    >>> test_mask = g.ndata['test_mask']
+    >>>
+    >>> # get labels
+    >>> label = g.ndata['label']
+    >>>
+    >>> # Train, Validation and Test
+    
+    """
     def __init__(self):
         name = 'citeseer'
 
         super(CiteseerGraphDataset, self).__init__(name)
 
 class PubmedGraphDataset(CitationGraphDataset):
+    r""" Pubmed citation network dataset.
+    
+    Nodes mean scientific publications and edges 
+    mean citation relationships. Each node has a 
+    predefined feature with 500 dimensions. The 
+    dataset is designed for the node classification 
+    task. The task is to predict the category of 
+    certain publication.
+
+    Statistics
+    ===
+    Nodes: 19717
+    Edges: 88651
+    Number of Classes: 3
+    Label Split: Train: 60 ,Valid: 500, Test: 1000
+    
+    Returns
+    ===
+    PubmedDataset object with two properties:
+        graph: A Homogeneous graph containing the 
+            graph structure, node features and labels.
+        num_of_class: number of publication categories 
+            for the classification task.
+    
+    Examples
+    ===
+    
+    >>> dataset = PubmedDataset()
+    >>> g = dataset.graph
+    >>> num_class = g.num_of_class
+    >>>
+    >>> # get node feature
+    >>> feat = g.ndata['feat']
+    >>> 
+    >>> # get data split
+    >>> train_mask = g.ndata['train_mask']
+    >>> val_mask = g.ndata['val_mask']
+    >>> test_mask = g.ndata['test_mask']
+    >>>
+    >>> # get labels
+    >>> label = g.ndata['label']
+    >>>
+    >>> # Train, Validation and Test
+    
+    """
     def __init__(self):
         name = 'pubmed'
 
