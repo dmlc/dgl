@@ -141,11 +141,12 @@ def run(args, device, data):
 
 def main(args):
     #th.distributed.init_process_group(backend='gloo')
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name)
+    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, args.num_client)
 
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), g.rank())
-    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), g.rank())
-    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), g.rank())
+    print('client rank:', g.rank())
+    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), args.num_client, g.rank())
+    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), args.num_client, g.rank())
+    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), args.num_client, g.rank())
     print('part {}, train: {}, val: {}, test: {}'.format(g.rank(), len(train_nid),
                                                          len(val_nid), len(test_nid)))
     device = th.device('cpu')
