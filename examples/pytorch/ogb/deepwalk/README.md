@@ -19,20 +19,18 @@ python3 deepwalk.py --data_file ogbl-collab-net.txt --save_in_pt --output_emb_fi
 
 
 ## Score
-All runs:
-<br>Highest Train: 74.83 ± 4.79
-<br>Highest Valid: 40.03 ± 2.98
-<br>  Final Train: 74.51 ± 4.92
-<br>   Final Test: 31.13 ± 2.47
+Hits@10
+<br>&emsp;Highest Train: 74.83 ± 4.79
+<br>&emsp;Highest Valid: 40.03 ± 2.98
+<br>&emsp;&emsp;Final Train: 74.51 ± 4.92
+<br>&emsp;&emsp;Final Test: 31.13 ± 2.47
 <br>Hits@50
-<br>All runs:
-<br>Highest Train: 98.83 ± 0.15
-<br>Highest Valid: 60.61 ± 0.32
-<br>  Final Train: 98.74 ± 0.17
-<br>   Final Test: 50.37 ± 0.34
+<br>&emsp;Highest Train: 98.83 ± 0.15
+<br>&emsp;Highest Valid: 60.61 ± 0.32
+<br>&emsp;&emsp;Final Train: 98.74 ± 0.17
+<br>&emsp;&emsp;Final Test: 50.37 ± 0.34
 <br>Hits@100
-<br>All runs:
-<br>Highest Train: 99.86 ± 0.04
-<br>Highest Valid: 66.64 ± 0.32
-<br>  Final Train: 99.84 ± 0.06
-<br>   Final Test: 56.88 ± 0.37
+<br>&emsp;Highest Train: 99.86 ± 0.04
+<br>&emsp;Highest Valid: 66.64 ± 0.32
+<br>&emsp;&emsp;Final Train: 99.84 ± 0.06
+<br>&emsp;&emsp;Final Test: 56.88 ± 0.37
