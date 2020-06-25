@@ -182,6 +182,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         if self.verbose:
             print('Done loading data into cached files.')
         self._g = graphs[0]
+        self._graph = dgl.to_networkx(self._g)
         self._g.readonly(False)
         self._num_labels = info['num_labels']
 
