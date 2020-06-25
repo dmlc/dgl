@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
+from .heterograph import DGLHeteroGraph
 
 __all__ = ['bfs_nodes_generator', 'bfs_edges_generator',
            'topological_nodes_generator',
@@ -14,7 +15,7 @@ def bfs_nodes_generator(graph, source, reverse=False):
 
     Parameters
     ----------
-    graph : DGLGraph
+    graph : DGLHeteroGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -35,14 +36,18 @@ def bfs_nodes_generator(graph, source, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.bfs_nodes_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([2, 3]), tensor([4, 5])]
     """
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'bfs_nodes_generator only support homogeneous graph'
     gidx = graph._graph
-    source = utils.toindex(source)
-    ret = _CAPI_DGLBFSNodes(gidx, source.todgltensor(), reverse)
-    all_nodes = utils.toindex(ret(0)).tousertensor()
+    source = utils.toindex(source, dtype=graph._idtype_str)
+    ret = _CAPI_DGLBFSNodes_v2(gidx, source.todgltensor(), reverse)
+    all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
     node_frontiers = F.split(all_nodes, sections, dim=0)
@@ -53,7 +58,7 @@ def bfs_edges_generator(graph, source, reverse=False):
 
     Parameters
     ----------
-    graph : DGLGraph
+    graph : DGLHeteroGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -75,14 +80,18 @@ def bfs_edges_generator(graph, source, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.bfs_edges_generator(g, 0))
     [tensor([0]), tensor([1, 2]), tensor([4, 5])]
     """
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'bfs_edges_generator only support homogeneous graph'
     gidx = graph._graph
-    source = utils.toindex(source)
-    ret = _CAPI_DGLBFSEdges(gidx, source.todgltensor(), reverse)
-    all_edges = utils.toindex(ret(0)).tousertensor()
+    source = utils.toindex(source, dtype=graph._idtype_str)
+    ret = _CAPI_DGLBFSEdges_v2(gidx, source.todgltensor(), reverse)
+    all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
     edge_frontiers = F.split(all_edges, sections, dim=0)
@@ -93,7 +102,7 @@ def topological_nodes_generator(graph, reverse=False):
 
     Parameters
     ----------
-    graph : DGLGraph
+    graph : DGLHeteroGraph
         The graph object.
     reverse : bool, optional
         If True, traverse following the in-edge direction.
@@ -112,13 +121,17 @@ def topological_nodes_generator(graph, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.topological_nodes_generator(g))
     [tensor([0]), tensor([1]), tensor([2]), tensor([3, 4]), tensor([5])]
     """
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'topological_nodes_generator only support homogeneous graph'
     gidx = graph._graph
-    ret = _CAPI_DGLTopologicalNodes(gidx, reverse)
-    all_nodes = utils.toindex(ret(0)).tousertensor()
+    ret = _CAPI_DGLTopologicalNodes_v2(gidx, reverse)
+    all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
     return F.split(all_nodes, sections, dim=0)
@@ -133,7 +146,7 @@ def dfs_edges_generator(graph, source, reverse=False):
 
     Parameters
     ----------
-    graph : DGLGraph
+    graph : DGLHeteroGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -156,14 +169,18 @@ def dfs_edges_generator(graph, source, reverse=False):
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
-    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.dfs_edges_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4])]
     """
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'dfs_edges_generator only support homogeneous graph'
     gidx = graph._graph
-    source = utils.toindex(source)
-    ret = _CAPI_DGLDFSEdges(gidx, source.todgltensor(), reverse)
-    all_edges = utils.toindex(ret(0)).tousertensor()
+    source = utils.toindex(source, dtype=graph._idtype_str)
+    ret = _CAPI_DGLDFSEdges_v2(gidx, source.todgltensor(), reverse)
+    all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
     return F.split(all_edges, sections, dim=0)
@@ -195,7 +212,7 @@ def dfs_labeled_edges_generator(
 
     Parameters
     ----------
-    graph : DGLGraph
+    graph : DGLHeteroGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -226,21 +243,25 @@ def dfs_labeled_edges_generator(
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
-    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.dfs_labeled_edges_generator(g, 0, has_nontree_edge=True))
     (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2])),
     (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
     """
+    assert isinstance(graph, DGLHeteroGraph), \
+        'DGLGraph is deprecated, Please use DGLHeteroGraph'
+    assert len(graph.canonical_etypes) == 1, \
+        'dfs_labeled_edges_generator only support homogeneous graph'
     gidx = graph._graph
-    source = utils.toindex(source)
-    ret = _CAPI_DGLDFSLabeledEdges(
+    source = utils.toindex(source, dtype=graph._idtype_str)
+    ret = _CAPI_DGLDFSLabeledEdges_v2(
         gidx,
         source.todgltensor(),
         reverse,
         has_reverse_edge,
         has_nontree_edge,
         return_labels)
-    all_edges = utils.toindex(ret(0)).tousertensor()
+    all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
     if return_labels:
         all_labels = utils.toindex(ret(1)).tousertensor()

@@ -127,6 +127,14 @@ class NDArray {
   inline const DLTensor* operator->() const;
   /*! \return True if the ndarray is contiguous. */
   bool IsContiguous() const;
+  /*! \return the data pointer with type. */
+  template <typename T>
+  inline T* Ptr() const {
+    if (!defined())
+      return nullptr;
+    else
+      return static_cast<T*>(operator->()->data);
+  }
   /*!
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
@@ -574,6 +582,50 @@ inline std::string DGLType2String(DGLType t) {
 namespace dmlc {
 DMLC_DECLARE_TRAITS(has_saveload, dgl::runtime::NDArray, true);
 }  // namespace dmlc
+
+///////////////// Operator overloading for NDArray /////////////////
+dgl::runtime::NDArray operator + (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator + (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator + (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator - (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator * (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator / (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& array);
+
+dgl::runtime::NDArray operator > (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator < (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator >= (const dgl::runtime::NDArray& a1,
+                                   const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator <= (const dgl::runtime::NDArray& a1,
+                                   const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator == (const dgl::runtime::NDArray& a1,
+                                   const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator != (const dgl::runtime::NDArray& a1,
+                                   const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator > (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator < (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator >= (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator <= (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator == (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator != (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator > (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator < (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator >= (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator <= (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator == (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator != (int64_t lhs, const dgl::runtime::NDArray& a2);
 
 ///////////////// Operator overloading for DLDataType /////////////////
 

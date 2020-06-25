@@ -108,7 +108,7 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server():
-    server_state = dgl.distributed.ServerState(None)
+    server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
                                  ip_config='rpc_ip_config.txt', 

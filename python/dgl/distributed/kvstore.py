@@ -829,7 +829,7 @@ class KVClient(object):
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
             # recv response from all the server nodes
-            for _ in range(self._server_namebook):
+            for _ in range(self._server_count):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PULL_MSG
         self._pull_handlers[name] = func
@@ -1032,49 +1032,58 @@ class KVClient(object):
         tensor
             a data tensor with the same row size of id_tensor.
         """
-        #TODO(chao) : add C++ rpc interface and add fast pull
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
-        # partition data
-        machine_id = self._part_policy[name].to_partid(id_tensor)
-        # sort index by machine id
-        sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
-        back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
-        id_tensor = id_tensor[sorted_id]
-        machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
-        # pull data from server by order
-        start = 0
-        pull_count = 0
-        local_id = None
-        for idx, machine_idx in enumerate(machine):
-            end = start + count[idx]
-            if start == end: # No data for target machine
-                continue
-            partial_id = id_tensor[start:end]
-            if machine_idx == self._machine_id: # local pull
-                # Note that DO NOT pull local data right now because we can overlap
-                # communication-local_pull here
-                local_id = self._part_policy[name].to_local(partial_id)
-            else: # pull data from remote server
-                request = PullRequest(name, partial_id)
-                rpc.send_request_to_machine(machine_idx, request)
-                pull_count += 1
-            start += count[idx]
-        # recv response
-        response_list = []
-        if local_id is not None: # local pull
-            local_data = self._pull_handlers[name](self._data_store, name, local_id)
-            server_id = self._main_server_id
-            local_response = PullResponse(server_id, local_data)
-            response_list.append(local_response)
-        # wait response from remote server nodes
-        for _ in range(pull_count):
-            remote_response = rpc.recv_response()
-            response_list.append(remote_response)
-        # sort response by server_id and concat tensor
-        response_list.sort(key=self._take_id)
-        data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
-        return data_tensor[back_sorted_id] # return data with original index order
+        if self._pull_handlers[name] is default_pull_handler: # Use fast-pull
+            part_id = self._part_policy[name].to_partid(id_tensor)
+            return rpc.fast_pull(name, id_tensor, part_id, KVSTORE_PULL,
+                                 self._machine_count,
+                                 self._group_count,
+                                 self._machine_id,
+                                 self._client_id,
+                                 self._data_store[name],
+                                 self._part_policy[name])
+        else:
+            # partition data
+            machine_id = self._part_policy[name].to_partid(id_tensor)
+            # sort index by machine id
+            sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
+            back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
+            id_tensor = id_tensor[sorted_id]
+            machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
+            # pull data from server by order
+            start = 0
+            pull_count = 0
+            local_id = None
+            for idx, machine_idx in enumerate(machine):
+                end = start + count[idx]
+                if start == end: # No data for target machine
+                    continue
+                partial_id = id_tensor[start:end]
+                if machine_idx == self._machine_id: # local pull
+                    # Note that DO NOT pull local data right now because we can overlap
+                    # communication-local_pull here
+                    local_id = self._part_policy[name].to_local(partial_id)
+                else: # pull data from remote server
+                    request = PullRequest(name, partial_id)
+                    rpc.send_request_to_machine(machine_idx, request)
+                    pull_count += 1
+                start += count[idx]
+            # recv response
+            response_list = []
+            if local_id is not None: # local pull
+                local_data = self._pull_handlers[name](self._data_store, name, local_id)
+                server_id = self._main_server_id
+                local_response = PullResponse(server_id, local_data)
+                response_list.append(local_response)
+            # wait response from remote server nodes
+            for _ in range(pull_count):
+                remote_response = rpc.recv_response()
+                response_list.append(remote_response)
+            # sort response by server_id and concat tensor
+            response_list.sort(key=self._take_id)
+            data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
+            return data_tensor[back_sorted_id] # return data with original index order
 
     def _take_id(self, elem):
         """Used by sort response list

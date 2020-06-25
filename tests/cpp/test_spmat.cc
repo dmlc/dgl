@@ -115,74 +115,90 @@ aten::COOMatrix COO3(DLContext ctx) {
 }  // namespace
 
 template <typename IDX>
-void _TestCSRIsNonZero() {
-  auto csr = CSR1<IDX>();
+void _TestCSRIsNonZero(DLContext ctx) {
+  auto csr = CSR1<IDX>(ctx);
   ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
   ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
-  IdArray r = aten::VecToIdArray(std::vector<IDX>({2, 2, 0, 0}), sizeof(IDX)*8, CTX);
-  IdArray c = aten::VecToIdArray(std::vector<IDX>({1, 1, 1, 3}), sizeof(IDX)*8, CTX);
+  IdArray r = aten::VecToIdArray(std::vector<IDX>({2, 2, 0, 0}), sizeof(IDX)*8, ctx);
+  IdArray c = aten::VecToIdArray(std::vector<IDX>({1, 1, 1, 3}), sizeof(IDX)*8, ctx);
   IdArray x = aten::CSRIsNonZero(csr, r, c);
-  IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 0}), sizeof(IDX)*8, CTX);
+  IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 0}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
 
 TEST(SpmatTest, TestCSRIsNonZero) {
-  _TestCSRIsNonZero<int32_t>();
-  _TestCSRIsNonZero<int64_t>();
+  _TestCSRIsNonZero<int32_t>(CPU);
+  _TestCSRIsNonZero<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRIsNonZero<int32_t>(GPU);
+  _TestCSRIsNonZero<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
-void _TestCSRGetRowNNZ() {
-  auto csr = CSR2<IDX>();
+void _TestCSRGetRowNNZ(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
   ASSERT_EQ(aten::CSRGetRowNNZ(csr, 0), 3);
   ASSERT_EQ(aten::CSRGetRowNNZ(csr, 3), 0);
-  IdArray r = aten::VecToIdArray(std::vector<IDX>({0, 3}), sizeof(IDX)*8, CTX);
+  IdArray r = aten::VecToIdArray(std::vector<IDX>({0, 3}), sizeof(IDX)*8, ctx);
   IdArray x = aten::CSRGetRowNNZ(csr, r);
-  IdArray tx = aten::VecToIdArray(std::vector<IDX>({3, 0}), sizeof(IDX)*8, CTX);
+  IdArray tx = aten::VecToIdArray(std::vector<IDX>({3, 0}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
 
 TEST(SpmatTest, TestCSRGetRowNNZ) {
-  _TestCSRGetRowNNZ<int32_t>();
-  _TestCSRGetRowNNZ<int64_t>();
+  _TestCSRGetRowNNZ<int32_t>(CPU);
+  _TestCSRGetRowNNZ<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRGetRowNNZ<int32_t>(GPU);
+  _TestCSRGetRowNNZ<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
-void _TestCSRGetRowColumnIndices() {
-  auto csr = CSR2<IDX>();
+void _TestCSRGetRowColumnIndices(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
   auto x = aten::CSRGetRowColumnIndices(csr, 0);
-  auto tx = aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX)*8, CTX);
+  auto tx = aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
   x = aten::CSRGetRowColumnIndices(csr, 1);
-  tx = aten::VecToIdArray(std::vector<IDX>({0}), sizeof(IDX)*8, CTX);
+  tx = aten::VecToIdArray(std::vector<IDX>({0}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
   x = aten::CSRGetRowColumnIndices(csr, 3);
-  tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, CTX);
+  tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
 
 TEST(SpmatTest, TestCSRGetRowColumnIndices) {
-  _TestCSRGetRowColumnIndices<int32_t>();
-  _TestCSRGetRowColumnIndices<int64_t>();
+  _TestCSRGetRowColumnIndices<int32_t>(CPU);
+  _TestCSRGetRowColumnIndices<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRGetRowColumnIndices<int32_t>(GPU);
+  _TestCSRGetRowColumnIndices<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
-void _TestCSRGetRowData() {
-  auto csr = CSR2<IDX>();
+void _TestCSRGetRowData(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
   auto x = aten::CSRGetRowData(csr, 0);
-  auto tx = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, CTX);
+  auto tx = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
   x = aten::CSRGetRowData(csr, 1);
-  tx = aten::VecToIdArray(std::vector<IDX>({3}), sizeof(IDX)*8, CTX);
+  tx = aten::VecToIdArray(std::vector<IDX>({3}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
   x = aten::CSRGetRowData(csr, 3);
-  tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, CTX);
+  tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
 
 TEST(SpmatTest, TestCSRGetRowData) {
-  _TestCSRGetRowData<int32_t>();
-  _TestCSRGetRowData<int64_t>();
+  _TestCSRGetRowData<int32_t>(CPU);
+  _TestCSRGetRowData<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRGetRowData<int32_t>(GPU);
+  _TestCSRGetRowData<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
