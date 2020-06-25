@@ -158,6 +158,10 @@ class NDArray {
    */
   inline NDArray CopyTo(const DLContext& ctx) const;
   /*!
+   * \brief Return a new array with a copy of the content.
+   */
+  inline NDArray Clone() const;
+  /*!
    * \brief Load NDArray from stream
    * \param stream The input data stream
    * \return Whether load is successful
@@ -408,6 +412,12 @@ inline NDArray NDArray::CopyTo(const DLContext& ctx) const {
                       dptr->dtype, ctx);
   this->CopyTo(ret);
   return ret;
+}
+
+inline NDArray NDArray::Clone() const {
+  CHECK(data_ != nullptr);
+  const DLTensor* dptr = operator->();
+  return this->CopyTo(dptr->ctx);
 }
 
 inline int NDArray::use_count() const {

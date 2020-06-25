@@ -213,7 +213,10 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 bool CSRHasDuplicate(CSRMatrix csr);
 
 /*!
- * \brief Sort the column index at each row in the ascending order.
+ * \brief Sort the column index at each row in ascending order in-place.
+ *
+ * Only the indices and data arrays (if available) will be mutated. The indptr array
+ * stays the same.
  *
  * Examples:
  * num_rows = 4
@@ -227,6 +230,20 @@ bool CSRHasDuplicate(CSRMatrix csr);
  * indices = [0, 1, 1, 2, 3]
  */
 void CSRSort_(CSRMatrix* csr);
+
+/*!
+ * \brief Sort the column index at each row in ascending order.
+ *
+ * Return a new CSR matrix with sorted column indices and data arrays.
+ */
+inline CSRMatrix CSRSort(CSRMatrix csr) {
+  CSRMatrix ret(csr.num_rows, csr.num_cols,
+                csr.indptr, csr.indices.Clone(),
+                CSRHasData(csr)? csr.data.Clone() : csr.data,
+                csr.sorted);
+  CSRSort_(&ret);
+  return ret;
+}
 
 /*!
  * \brief Reorder the rows and colmns according to the new row and column order.

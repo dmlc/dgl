@@ -193,7 +193,7 @@ template <DLDeviceType XPU, typename IdType>
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COOSort(COOMatrix mat, bool sort_column);
+void COOSort_(COOMatrix* mat, bool sort_column);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);

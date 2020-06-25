@@ -203,6 +203,18 @@ bool COOHasDuplicate(COOMatrix coo);
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 /*!
+ * \brief Sort the indices of a COO matrix in-place.
+ *
+ * The function sorts row indices in ascending order. If sort_column is true,
+ * col indices are sorted in ascending order too. The data array of the returned COOMatrix
+ * stores the shuffled index which could be used to fetch edge data.
+ *
+ * \param mat The coo matrix to sort.
+ * \param sort_column True if column index should be sorted too.
+ */
+void COOSort_(COOMatrix* mat, bool sort_column = false);
+
+/*!
  * \brief Sort the indices of a COO matrix.
  *
  * The function sorts row indices in ascending order. If sort_column is true,
@@ -213,7 +225,14 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
  * \param sort_column True if column index should be sorted too.
  * \return COO matrix with index sorted.
  */
-COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
+inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
+  COOMatrix ret(mat.num_rows, mat.num_cols,
+                mat.row.Clone(), mat.col.Clone(),
+                COOHasData(mat)? mat.data.Clone() : mat.data,
+                mat.row_sorted, mat.col_sorted);
+  COOSort_(&ret, sort_column);
+  return ret;
+}
 
 /*!
  * \brief Remove entries from COO matrix by entry indices (data indices)

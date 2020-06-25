@@ -562,14 +562,12 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
   return ret;
 }
 
-COOMatrix COOSort(COOMatrix mat, bool sort_column) {
-  COOMatrix ret;
-  ATEN_XPU_SWITCH_CUDA(mat.row->ctx.device_type, XPU, "COOSort", {
-    ATEN_ID_TYPE_SWITCH(mat.row->dtype, IdType, {
-      ret = impl::COOSort<XPU, IdType>(mat, sort_column);
+void COOSort_(COOMatrix* mat, bool sort_column) {
+  ATEN_XPU_SWITCH_CUDA(mat->row->ctx.device_type, XPU, "COOSort_", {
+    ATEN_ID_TYPE_SWITCH(mat->row->dtype, IdType, {
+      impl::COOSort_<XPU, IdType>(mat, sort_column);
     });
   });
-  return ret;
 }
 
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
