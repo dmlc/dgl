@@ -4,7 +4,6 @@
  * \brief Sort COO index
  */
 #include <dgl/array.h>
-#include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
@@ -131,35 +130,21 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   auto device = runtime::DeviceAPI::Get(ctx);
   // We allocate a workspace of 2*nnz bytes. It wastes a little bit memory but should
   // be fine.
-  int8_t* row_sorted = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
-  int8_t* col_sorted = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
+  int8_t* row_flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
+  int8_t* col_flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
   const int nt = cuda::FindNumThreads(nnz);
   const int nb = (nnz + nt - 1) / nt;
   _COOIsSortedKernel<<<nb, nt, 0, thr_entry->stream>>>(
       coo.row.Ptr<IdType>(), coo.col.Ptr<IdType>(),
-      nnz, row_sorted, col_sorted);
+      nnz, row_flags, col_flags);
 
-  // reduce row flags
-  int8_t* row_flag = static_cast<int8_t*>(device->AllocWorkspace(ctx, 1));
-  size_t workspace_size = 0;
-  CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, row_sorted, row_flag, nnz));
-  void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, row_sorted, row_flag, nnz));
+  const bool row_sorted = cuda::AllTrue(row_flags, nnz, ctx);
+  const bool col_sorted = row_sorted? cuda::AllTrue(col_flags, nnz, ctx) : false;
 
-  // TODO
-
-  // reduce col flags
-  int8_t* col_flag = static_cast<int8_t*>(device->AllocWorkspace(ctx, 1));
-
-  device->FreeWorkspace(ctx, row_flag);
-  device->FreeWorkspace(ctx, col_flag);
-  device->FreeWorkspace(ctx, row_sorted);
-  device->FreeWorkspace(ctx, col_sorted);
+  device->FreeWorkspace(ctx, row_flags);
+  device->FreeWorkspace(ctx, col_flags);
   
-  //if (!row_sorted)
-    //col_sorted = false;
-  //return {row_sorted, col_sorted};
-  return {true, true};
+  return {row_sorted, col_sorted};
 }
 
 template std::pair<bool, bool> COOIsSorted<kDLGPU, int32_t>(COOMatrix coo);

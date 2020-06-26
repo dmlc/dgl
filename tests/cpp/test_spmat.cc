@@ -480,12 +480,37 @@ TEST(SpmatTest, TestCOOHasDuplicate) {
 template <typename IDX>
 void _TestCOOSort(DLContext ctx) {
   auto coo = COO3<IDX>(ctx);
+  
   auto sr_coo = COOSort(coo, false);
   ASSERT_EQ(coo.num_rows, sr_coo.num_rows);
   ASSERT_EQ(coo.num_cols, sr_coo.num_cols);
+  ASSERT_TRUE(sr_coo.row_sorted);
+  auto flags = COOIsSorted(sr_coo);
+  ASSERT_TRUE(flags.first);
+  flags = COOIsSorted(coo);  // original coo should stay the same
+  ASSERT_FALSE(flags.first);
+  ASSERT_FALSE(flags.second);
+
   auto src_coo = COOSort(coo, true);
   ASSERT_EQ(coo.num_rows, src_coo.num_rows);
   ASSERT_EQ(coo.num_cols, src_coo.num_cols);
+  ASSERT_TRUE(src_coo.row_sorted);
+  ASSERT_TRUE(src_coo.col_sorted);
+  flags = COOIsSorted(src_coo);
+  ASSERT_TRUE(flags.first);
+  ASSERT_TRUE(flags.second);
+
+  // sort inplace
+  COOSort_(&coo);
+  ASSERT_TRUE(coo.row_sorted);
+  flags = COOIsSorted(coo);
+  ASSERT_TRUE(flags.first);
+  COOSort_(&coo, true);
+  ASSERT_TRUE(coo.row_sorted);
+  ASSERT_TRUE(coo.col_sorted);
+  flags = COOIsSorted(coo);
+  ASSERT_TRUE(flags.first);
+  ASSERT_TRUE(flags.second);
 
   // COO3
   // [[0, 1, 2, 0, 0],
@@ -516,7 +541,7 @@ void _TestCOOSort(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(src_coo.data, sort_col_data));
 }
 
-TEST(SpmatTest, TestCOOSort) {
+TEST(SpmatTest, COOSort) {
   _TestCOOSort<int32_t>(CPU);
   _TestCOOSort<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
