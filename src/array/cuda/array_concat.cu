@@ -20,7 +20,7 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
     len += arrays[i]->shape[0];
   }
 
-  NDArray ret = NDArray::Empty({len}, 
+  NDArray ret = NDArray::Empty({len},
                                arrays[0]->dtype,
                                arrays[0]->ctx);
   char* data = static_cast<char*>(ret->data);

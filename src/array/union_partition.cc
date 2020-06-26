@@ -200,7 +200,7 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
                                                edge_cumsum[g+1],
                                                csr.indices->dtype.bits,
                                                csr.indices->ctx)) - dst_vertex_cumsum[g];
-  
+
     IdArray result_data = NullArray();
     // has data index array
     if (IsNullArray(csr.data) == false) {

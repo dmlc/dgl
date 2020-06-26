@@ -227,10 +227,10 @@ void _TestRelabel_() {
   IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, CTX);
   IdArray b = aten::VecToIdArray(std::vector<IDX>({4, 5, 6}), sizeof(IDX)*8, CTX);
   IdArray tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6}), sizeof(IDX)*8, CTX);
-  IdArray c = aten::Concat(std::vector<Idarray>{a, b});
+  IdArray c = aten::Concat(std::vector<IdArray>{a, b});
   ASSERT_TRUE(ArrayEQ<IDX>(c, tc));
-  IdArray d = aten::Concat(std::vector<Idarray>{a, b, c});
-  IdArray td = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 4, 5, 6, 1, 2, 3, 4, 5, 6}),
+  IdArray d = aten::Concat(std::vector<IdArray>{a, b, c});
+  IdArray td = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6}),
                                   sizeof(IDX)*8, CTX);
   ASSERT_TRUE(ArrayEQ<IDX>(d, td));
 }
@@ -250,14 +250,14 @@ void _TestConcat(DLContext ctx) {
 }
 
 TEST(ArrayTest, TestConcat) {
-  _TestConcat<int32_t>();
-  _TestConcat<int64_t>();
-  _TestConcat<float>();
-  _TestConcat<double>();
+  _TestConcat<int32_t>(CPU);
+  _TestConcat<int64_t>(CPU);
+  _TestConcat<float>(CPU);
+  _TestConcat<double>(CPU);
 #ifdef DGL_USE_CUDA
   _TestConcat<int32_t>(GPU);
   _TestConcat<int64_t>(GPU);
-  _TestConcat<float>();
-  _TestConcat<double>();
+  _TestConcat<float>(GPU);
+  _TestConcat<double>(GPU);
 #endif
 }

@@ -351,9 +351,7 @@ COOMatrix CSRRowWiseTopk(
  * \return The combined CSRMatrix.
  */
 CSRMatrix DisjointUnionCsrGraph(
-  const std::vector<CSRMatrix>& csrs,
-  const std::vector<uint64_t> src_offset,
-  const std::vector<uint64_t> dst_offset);
+  const std::vector<CSRMatrix>& csrs);
 
 /*!
  * \brief Split a CSRMatrix into multiple disjoin components.

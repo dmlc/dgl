@@ -18,7 +18,7 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
     len += arrays[i]->shape[0];
   }
 
-  NDArray ret = NDArray::Empty({len}, 
+  NDArray ret = NDArray::Empty({len},
                                arrays[0]->dtype,
                                arrays[0]->ctx);
   DType* data = static_cast<DType*>(ret->data);
