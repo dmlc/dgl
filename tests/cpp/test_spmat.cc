@@ -384,6 +384,13 @@ template <typename IDX>
 void _TestCSRSort(DLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   ASSERT_FALSE(aten::CSRIsSorted(csr));
+  auto csr1 = aten::CSRSort(csr);
+  ASSERT_FALSE(aten::CSRIsSorted(csr));
+  ASSERT_TRUE(aten::CSRIsSorted(csr1));
+  ASSERT_TRUE(csr1.sorted);
+  aten::CSRSort_(&csr);
+  ASSERT_TRUE(aten::CSRIsSorted(csr));
+  ASSERT_TRUE(csr.sorted);
   csr = CSR2<IDX>(ctx);
   ASSERT_TRUE(aten::CSRIsSorted(csr));
 }
@@ -393,7 +400,6 @@ TEST(SpmatTest, CSRSort) {
   _TestCSRSort<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRSort<int32_t>(GPU);
-  _TestCSRSort<int64_t>(GPU);
 #endif
 }
 

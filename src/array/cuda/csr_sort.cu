@@ -65,6 +65,39 @@ void CSRSort_(CSRMatrix* csr) {
   }
   CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
 
+  NDArray indptr = csr->indptr;
+  NDArray indices = csr->indices;
+  const auto& ctx = indptr->ctx;
+  const int64_t nnz = indices->shape[0];
+  if (!aten::CSRHasData(*csr))
+    csr->data = aten::Range(0, nnz, indices->dtype.bits, ctx);
+  NDArray data = csr->data;
+
+  size_t workspace_size = 0;
+  CUSPARSE_CALL(cusparseXcsrsort_bufferSizeExt(
+      thr_entry->cusparse_handle,
+      csr->num_rows, csr->num_cols, nnz,
+      indptr.Ptr<int32_t>(), indices.Ptr<int32_t>(),
+      &workspace_size));
+  void* workspace = device->AllocWorkspace(ctx, workspace_size);
+
+  cusparseMatDescr_t descr;
+  CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
+  CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
+  CUSPARSE_CALL(cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO));
+  CUSPARSE_CALL(cusparseXcsrsort(
+      thr_entry->cusparse_handle,
+      csr->num_rows, csr->num_cols, nnz,
+      descr,
+      indptr.Ptr<int32_t>(), indices.Ptr<int32_t>(),
+      data.Ptr<int32_t>(),
+      workspace));
+
+  csr->sorted = true;
+
+  // free resources
+  CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
+  device->FreeWorkspace(ctx, workspace);
 }
 
 template void CSRSort_<kDLGPU, int32_t>(CSRMatrix* csr);
