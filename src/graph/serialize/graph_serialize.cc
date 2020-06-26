@@ -131,7 +131,8 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataEdgeTensors")
   });
 
 uint64_t GetFileVersion(const std::string &filename) {
-  auto fs = SeekStream::CreateForRead(filename.c_str(), false);
+  auto fs = std::unique_ptr<SeekStream>(
+    SeekStream::CreateForRead(filename.c_str(), false));
   CHECK(fs) << "File " << filename << " not found";
   uint64_t magicNum, version;
   fs->Read(&magicNum);
@@ -145,7 +146,6 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GetFileVersion")
     std::string filename = args[0];
     *rv = static_cast<int64_t>(GetFileVersion(filename));
   });
-
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V0")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
