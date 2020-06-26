@@ -123,7 +123,7 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs) {
 
   for (size_t i = 0; i < csrs.size(); ++i) {
     aten::CSRMatrix csr = csrs[i];
-    IdArray indptr = csr.indptr + src_offset;
+    IdArray indptr = csr.indptr + indices_offset;
     IdArray indices = csr.indices + dst_offset;
     if (i > 0)
       indptr = IndexSelect(indptr,
@@ -180,9 +180,9 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
     if (g == 0) {
       result_indptr = IndexSelect(csr.indptr,
                                   Range(0,
-                                        src_vertex_cumsum[g+1] + 1,
+                                        src_vertex_cumsum[1] + 1,
                                         csr.indptr->dtype.bits,
-                                        csr.indptr->ctx)) + edge_cumsum[g];
+                                        csr.indptr->ctx)) - edge_cumsum[0];
     } else {
       IdArray result_indptr_0 = Full(0, 1,
                                     csr.indptr->dtype.bits,
@@ -191,7 +191,7 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
                                   Range(src_vertex_cumsum[g] + 1,
                                         src_vertex_cumsum[g+1] + 1,
                                         csr.indptr->dtype.bits,
-                                        csr.indptr->ctx)) + edge_cumsum[g];
+                                        csr.indptr->ctx)) - edge_cumsum[g];
       result_indptr = Concat(std::vector<IdArray>({result_indptr_0, result_indptr}));
     }
 
@@ -206,7 +206,7 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
     if (IsNullArray(csr.data) == false) {
       result_data = IndexSelect(csr.data,
                                 Range(edge_cumsum[g],
-                                      edge_cumsum[g + 1],
+                                      edge_cumsum[g+1],
                                       csr.data->dtype.bits,
                                       csr.data->ctx)) - edge_cumsum[g];
     }
