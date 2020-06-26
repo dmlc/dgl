@@ -617,17 +617,12 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     assert len(node_part) == g.number_of_nodes()
     node_part = utils.toindex(node_part)
     if reshuffle:
-        node_part = node_part.tonumpy()
+        node_part = node_part.tousertensor()
+        sorted_part, new2old_map = F.sort_1d(node_part)
         new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
-        # Here we ensure that nodes in a partition are assigned with contiguous node ids.
-        start = 0
-        num_parts = np.max(node_part) + 1
-        for i in range(num_parts):
-            end = start + np.sum(node_part == i)
-            new_node_ids[node_part == i] = np.arange(start, end)
-            start = end
+        F.scatter_row_inplace(new_node_ids, new2old_map, F.arange(0, g.number_of_nodes()))
         g = reorder_nodes(g, new_node_ids)
-        node_part = utils.toindex(np.sort(node_part))
+        node_part = utils.toindex(sorted_part)
         # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
         # that all edges in a partition are in the contiguous Id space.
         orig_eids = _CAPI_DGLReassignEdges(g._graph, True)
