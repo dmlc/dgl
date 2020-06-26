@@ -10,6 +10,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <memory>
 
 #include "communicator.h"
 #include "msg_queue.h"

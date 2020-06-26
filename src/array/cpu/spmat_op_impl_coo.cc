@@ -286,7 +286,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     int64_t j = 0;
     for (int64_t i = 0; i < N; ++i) {
       const int64_t k = j;
-      for (; j < NNZ && row_data[j] == i; ++j);
+      for (; j < NNZ && row_data[j] == i; ++j) {}
       Bp[i + 1] = Bp[i] + j - k;
     }
 

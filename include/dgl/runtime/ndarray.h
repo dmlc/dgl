@@ -11,6 +11,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "c_runtime_api.h"
 #include "dlpack/dlpack.h"

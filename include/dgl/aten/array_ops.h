@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 #include <tuple>
+#include <string>
 #include "./types.h"
 
 namespace dgl {

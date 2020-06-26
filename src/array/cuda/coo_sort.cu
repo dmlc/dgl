@@ -143,7 +143,7 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
 
   device->FreeWorkspace(ctx, row_flags);
   device->FreeWorkspace(ctx, col_flags);
-  
+
   return {row_sorted, col_sorted};
 }
 
