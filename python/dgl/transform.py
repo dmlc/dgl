@@ -615,7 +615,6 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
     assert len(node_part) == g.number_of_nodes()
-    orig_node_part = node_part
     node_part = utils.toindex(node_part)
     if reshuffle:
         node_part = node_part.tonumpy()
