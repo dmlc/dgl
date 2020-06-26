@@ -1,7 +1,7 @@
 """Sampling module"""
 from collections import namedtuple
 
-from .rpc import Request, Response, remote_call_to_machine, send_requests_to_machine, recv_responses
+from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from . import register_service
 from ..convert import graph
@@ -97,6 +97,7 @@ def merge_graphs(res_list, num_nodes):
     g.edata[EID] = eid_tensor
     return g
 
+LocalSampledGraph = namedtuple('LocalSampledGraph', 'global_src global_dst global_eids')
 
 def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
@@ -141,7 +142,6 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
     partition_book = dist_graph.get_partition_book()
     nodes = toindex(nodes).tousertensor()
     partition_id = partition_book.nid2partid(nodes)
-    LocalSampledGraph = namedtuple('LocalSampledGraph', 'global_src global_dst global_eids')
     local_nids = None
     for pid in range(partition_book.num_partitions()):
         node_id = F.boolean_mask(nodes, partition_id == pid)

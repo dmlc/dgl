@@ -732,6 +732,24 @@ def remote_call(target_and_requests, timeout=0):
     return all_res
 
 def send_requests_to_machine(target_and_requests):
+    """ Send requests to the remote machines.
+
+    This operation isn't block. It returns immediately once it sends all requests.
+
+    Parameters
+    ----------
+    target_and_requests : list[(int, Request)]
+        A list of requests and the machine they should be sent to.
+    timeout : int, optional
+        The timeout value in milliseconds. If zero, wait indefinitely.
+
+    Returns
+    -------
+    num_res : int
+        The number of responses
+    msgseq2pos : dict
+        map the message sequence number to its position in the input list.
+    """
     msgseq2pos = {}
     num_res = 0
     for pos, (target, request) in enumerate(target_and_requests):
@@ -751,6 +769,26 @@ def send_requests_to_machine(target_and_requests):
     return num_res, msgseq2pos
 
 def recv_responses(num_res, msgseq2pos, timeout=0):
+    """ Receive responses
+
+    The operation is blocking -- it returns when it receives all responses
+    or it times out.
+
+    Parameters
+    ----------
+    num_res : int
+        The number of responses
+    msgseq2pos : dict
+        map the message sequence number to its position in the input list.
+    timeout : int, optional
+        The timeout value in milliseconds. If zero, wait indefinitely.
+
+    Returns
+    -------
+    list[Response]
+        Responses for each target-request pair. If the request does not have
+        response, None is placed.
+    """
     myrank = get_rank()
     all_res = [None] * num_res
     while num_res != 0:
@@ -798,7 +836,7 @@ def remote_call_to_machine(target_and_requests, timeout=0):
     """
     # TODO(chao): handle timeout
     num_res, msgseq2pos = send_requests_to_machine(target_and_requests)
-    return recv_response(num_res, msgseq2pos, timeout)
+    return recv_responses(num_res, msgseq2pos, timeout)
 
 def send_rpc_message(msg, target):
     """Send one message to the target server.
