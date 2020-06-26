@@ -246,7 +246,7 @@ def test_partition_with_halo():
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
-        assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'][lnode_ids])) == node_ids)
+        assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
