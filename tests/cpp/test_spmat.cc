@@ -419,6 +419,7 @@ void _TestCOOToCSR(DLContext ctx) {
   ASSERT_EQ(coo.num_cols, csr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
 
+  // Convert from row sorted coo
   coo = COO1<IDX>(ctx);
   auto rs_coo = aten::COOSort(coo, false);
   auto rs_csr = CSR1<IDX>(ctx);
@@ -426,6 +427,8 @@ void _TestCOOToCSR(DLContext ctx) {
   ASSERT_EQ(coo.num_rows, rs_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, rs_tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.indices, rs_coo.col));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.data, rs_coo.data));
 
   coo = COO3<IDX>(ctx);
   rs_coo = aten::COOSort(coo, false);
@@ -434,16 +437,20 @@ void _TestCOOToCSR(DLContext ctx) {
   ASSERT_EQ(coo.num_rows, rs_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, rs_tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.indices, rs_coo.col));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.data, rs_coo.data));
 
+  // Convert from col sorted coo
   coo = COO1<IDX>(ctx);
   auto src_coo = aten::COOSort(coo, true);
   auto src_csr = CSR1<IDX>(ctx);
   auto src_tcsr = aten::COOToCSR(src_coo);
   ASSERT_EQ(coo.num_rows, src_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, src_tcsr.num_cols);
-  ASSERT_TRUE(ArrayEQ<IDX>(src_csr.indptr, src_tcsr.indptr));
-  //ASSERT_TRUE(ArrayEQ<IDX>(src_csr.indices, src_tcsr.indices));
-  //ASSERT_TRUE(ArrayEQ<IDX>(src_csr.data, src_tcsr.data));
+  ASSERT_TRUE(src_tcsr.sorted);
+  ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.indptr, src_csr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.indices, src_coo.col));
+  ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.data, src_coo.data));
 
   coo = COO3<IDX>(ctx);
   src_coo = aten::COOSort(coo, true);
@@ -451,12 +458,13 @@ void _TestCOOToCSR(DLContext ctx) {
   src_tcsr = aten::COOToCSR(src_coo);
   ASSERT_EQ(coo.num_rows, src_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, src_tcsr.num_cols);
-  ASSERT_TRUE(ArrayEQ<IDX>(src_csr.indptr, src_tcsr.indptr));
-  //ASSERT_TRUE(ArrayEQ<IDX>(src_csr.indices, src_tcsr.indices));
-  //ASSERT_TRUE(ArrayEQ<IDX>(src_csr.data, src_tcsr.data));
+  ASSERT_TRUE(src_tcsr.sorted);
+  ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.indptr, src_csr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.indices, src_coo.col));
+  ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.data, src_coo.data));
 }
 
-TEST(SpmatTest, TestCOOToCSR) {
+TEST(SpmatTest, COOToCSR) {
   _TestCOOToCSR<int32_t>(CPU);
   _TestCOOToCSR<int64_t>(CPU);
 #ifdef DGL_USE_CUDA

@@ -172,6 +172,20 @@ COOMatrix COOTranspose(COOMatrix coo);
  * the result CSR matrix stores a shuffle index for how the entries
  * will be reordered in CSR. The i^th entry in the result CSR corresponds
  * to the CSR.data[i] th entry in the input COO.
+ *
+ * Conversion complexity: O(nnz)
+ *
+ * - The function first check whether the input COO matrix is sorted
+ *   using a linear scan.
+ * - If the COO matrix is row sorted, the conversion can be done very
+ *   efficiently in a sequential scan. The result indices and data arrays 
+ *   are directly equal to the column and data arrays from the input.
+ * - If the COO matrix is further column sorted, the result CSR is
+ *   also column sorted.
+ * - Otherwise, the conversion is more costly but still is O(nnz).
+ *
+ * \param coo Input COO matrix.
+ * \return CSR matrix.
  */
 CSRMatrix COOToCSR(COOMatrix coo);
 

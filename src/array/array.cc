@@ -402,6 +402,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
 }
 
 void CSRSort_(CSRMatrix* csr) {
+  if (csr->sorted)
+    return;
   ATEN_CSR_SWITCH_CUDA(*csr, XPU, IdType, "CSRSort_", {
     impl::CSRSort_<XPU, IdType>(csr);
   });
@@ -565,6 +567,8 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
 }
 
 void COOSort_(COOMatrix* mat, bool sort_column) {
+  if ((mat->row_sorted && !sort_column) || mat->col_sorted)
+    return;
   ATEN_XPU_SWITCH_CUDA(mat->row->ctx.device_type, XPU, "COOSort_", {
     ATEN_ID_TYPE_SWITCH(mat->row->dtype, IdType, {
       impl::COOSort_<XPU, IdType>(mat, sort_column);
