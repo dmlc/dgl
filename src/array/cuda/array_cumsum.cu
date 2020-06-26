@@ -6,7 +6,7 @@
 #include <dgl/array.h>
 #include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
-#include "../../cuda_utils.h"
+#include "./utils.h"
 
 namespace dgl {
 using runtime::NDArray;

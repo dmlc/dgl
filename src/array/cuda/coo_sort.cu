@@ -6,7 +6,7 @@
 #include <dgl/array.h>
 #include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
-#include "../../cuda_utils.h"
+#include "./utils.h"
 
 namespace dgl {
 
@@ -115,9 +115,9 @@ __global__ void _COOIsSortedKernel(
       row_sorted[0] = 1;
       col_sorted[0] = 1;
     } else {
-      row_sorted[tx] = static_cast<int8_t>(row[i - 1] <= row[i]);
+      row_sorted[tx] = static_cast<int8_t>(row[tx - 1] <= row[tx]);
       col_sorted[tx] = static_cast<int8_t>(
-          row[i - 1] < row[i] || col[i - 1] <= col[i]);
+          row[tx - 1] < row[tx] || col[tx - 1] <= col[tx]);
     }
     tx += stride_x;
   }
@@ -126,11 +126,9 @@ __global__ void _COOIsSortedKernel(
 template <DLDeviceType XPU, typename IdType>
 std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
-  const auto& ctx = csr.indptr->ctx;
+  const auto& ctx = coo.row->ctx;
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(ctx);
-  IdType* row = ;
-  IdType* col = coo.col.Ptr<IdType>();
   // We allocate a workspace of 2*nnz bytes. It wastes a little bit memory but should
   // be fine.
   int8_t* row_sorted = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
@@ -158,9 +156,10 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   device->FreeWorkspace(ctx, row_sorted);
   device->FreeWorkspace(ctx, col_sorted);
   
-  if (!row_sorted)
-    col_sorted = false;
-  return {row_sorted, col_sorted};
+  //if (!row_sorted)
+    //col_sorted = false;
+  //return {row_sorted, col_sorted};
+  return {true, true};
 }
 
 template std::pair<bool, bool> COOIsSorted<kDLGPU, int32_t>(COOMatrix coo);

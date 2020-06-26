@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file cuda_utils.h
+ * \file array/cuda/utils.h
  * \brief Utilities for CUDA kernels.
  */
-#ifndef DGL_CUDA_UTILS_H_
-#define DGL_CUDA_UTILS_H_
+#ifndef DGL_ARRAY_CUDA_UTILS_H_
+#define DGL_ARRAY_CUDA_UTILS_H_
 
 #include <dmlc/logging.h>
 
@@ -71,4 +71,4 @@ __device__ __forceinline__ T _ldg(T* addr) {
 }  // namespace cuda
 }  // namespace dgl
 
-#endif  // DGL_CUDA_UTILS_H_
+#endif  // DGL_ARRAY_CUDA_UTILS_H_

@@ -6,7 +6,7 @@
 #include <dgl/array.h>
 #include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
-#include "../../cuda_utils.h"
+#include "./utils.h"
 
 namespace dgl {
 
@@ -25,13 +25,11 @@ __global__ void _SegmentIsSorted(
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < num_rows) {
-    const IdType r = indptr[tx];
-    const IdType len = indptr[r + 1] - indptr[r];
     bool f = true;
-    for (IdType i = 1; f && i < len; ++i) {
+    for (IdType i = indptr[tx] + 1; f && i < indptr[tx + 1]; ++i) {
       f = (indices[i - 1] <= indices[i]);
     }
-    flags[r] = static_cast<int8_t>(f);
+    flags[tx] = static_cast<int8_t>(f);
     tx += stride_x;
   }
 }
@@ -56,7 +54,7 @@ bool CSRIsSorted(CSRMatrix csr) {
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, flags, rst, csr.num_rows));
   int8_t cpu_rst = 0;
-  CUDA_CALL(cudaMemcpy(rst, &cpu_rst, 1, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(&cpu_rst, rst, 1, cudaMemcpyDeviceToHost));
   device->FreeWorkspace(ctx, workspace);
   device->FreeWorkspace(ctx, rst);
   device->FreeWorkspace(ctx, flags);
