@@ -827,9 +827,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     char *return_data = new char[ID_size*row_size];
+    const int64_t local_ids_size = local_ids.size();
     // Copy local data
 #pragma omp parallel for
-    for (size_t i = 0; i < local_ids.size(); ++i) {
+    for (int64_t i = 0; i < local_ids_size; ++i) {
       CHECK_GE(ID_size*row_size, local_ids_orginal[i] * row_size + row_size);
       CHECK_GE(data_size, local_ids[i] * row_size + row_size);
       CHECK_GE(local_ids[i], 0);

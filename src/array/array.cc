@@ -218,7 +218,7 @@ std::string ToDebugString(NDArray array) {
   NDArray a = array.CopyTo(DLContext{kDLCPU, 0});
   oss << "array([";
   ATEN_DTYPE_SWITCH(a->dtype, DType, "array", {
-    for (int64_t i = 0; i < std::min(a.NumElements(), 10L); ++i) {
+    for (int64_t i = 0; i < std::min<int64_t>(a.NumElements(), 10L); ++i) {
       oss << a.Ptr<DType>()[i] << ", ";
     }
   });
@@ -298,6 +298,8 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
 }
 
 bool CSRIsSorted(CSRMatrix csr) {
+  if (csr.indices->shape[0] <= 1)
+    return true;
   bool ret = false;
   ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsSorted", {
     ret = impl::CSRIsSorted<XPU, IdType>(csr);
