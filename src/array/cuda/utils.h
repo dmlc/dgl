@@ -7,6 +7,7 @@
 #define DGL_ARRAY_CUDA_UTILS_H_
 
 #include <dmlc/logging.h>
+#include <dlpack/dlpack.h>
 
 namespace dgl {
 namespace cuda {
@@ -67,6 +68,17 @@ __device__ __forceinline__ T _ldg(T* addr) {
   return *addr;
 #endif
 }
+
+/*!
+ * \brief Return true if the given bool flag array is all true.
+ * The input bool array is in int8_t type so it is aligned with byte address.
+ *
+ * \param flags The bool array.
+ * \param length The length.
+ * \param ctx Device context.
+ * \return True if all the flags are true.
+ */
+bool AllTrue(int8_t* flags, int64_t length, const DLContext& ctx);
 
 }  // namespace cuda
 }  // namespace dgl

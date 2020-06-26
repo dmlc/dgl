@@ -4,7 +4,6 @@
  * \brief Sort COO index
  */
 #include <dgl/array.h>
-#include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
@@ -47,18 +46,9 @@ bool CSRIsSorted(CSRMatrix csr) {
   _SegmentIsSorted<<<nb, nt, 0, thr_entry->stream>>>(
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       csr.num_rows, flags);
-  int8_t* rst = static_cast<int8_t*>(device->AllocWorkspace(ctx, 1));
-  // Call CUB's reduction
-  size_t workspace_size = 0;
-  CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, flags, rst, csr.num_rows));
-  void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, flags, rst, csr.num_rows));
-  int8_t cpu_rst = 0;
-  CUDA_CALL(cudaMemcpy(&cpu_rst, rst, 1, cudaMemcpyDeviceToHost));
-  device->FreeWorkspace(ctx, workspace);
-  device->FreeWorkspace(ctx, rst);
+  bool ret = cuda::AllTrue(flags, csr.num_rows, ctx);
   device->FreeWorkspace(ctx, flags);
-  return cpu_rst == 1;
+  return ret;
 }
 
 template bool CSRIsSorted<kDLGPU, int32_t>(CSRMatrix csr);

@@ -392,9 +392,7 @@ TEST(SpmatTest, CSRSort) {
   _TestCSRSort<int32_t>(CPU);
   _TestCSRSort<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
-  LOG(INFO) << "@@@";
   _TestCSRSort<int32_t>(GPU);
-  LOG(INFO) << "@@@";
   _TestCSRSort<int64_t>(GPU);
 #endif
 }
