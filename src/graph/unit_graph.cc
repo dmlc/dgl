@@ -1278,8 +1278,8 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
         const_cast<UnitGraph*>(this)->in_csr_ = ret;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      auto newadj = aten::COOToCSR(aten::COOTranspose(coo_->adj()));
-      //aten::CSRSort_(&newadj);
+      const auto& newadj = aten::CSRSort(aten::COOToCSR(
+            aten::COOTranspose(coo_->adj())));
       ret = std::make_shared<CSR>(meta_graph(), newadj);
       if (inplace)
         const_cast<UnitGraph*>(this)->in_csr_ = ret;
@@ -1298,15 +1298,13 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   CSRPtr ret = out_csr_;
   if (!out_csr_) {
     if (in_csr_) {
-      auto newadj = aten::CSRTranspose(in_csr_->adj());
-      //aten::CSRSort_(&newadj);
+      const auto& newadj = aten::CSRSort(aten::CSRTranspose(in_csr_->adj()));
       ret = std::make_shared<CSR>(meta_graph(), newadj);
       if (inplace)
         const_cast<UnitGraph*>(this)->out_csr_ = ret;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      auto newadj = aten::COOToCSR(coo_->adj());
-      //aten::CSRSort_(&newadj);
+      const auto& newadj = aten::CSRSort(aten::COOToCSR(coo_->adj()));
       ret = std::make_shared<CSR>(meta_graph(), newadj);
       if (inplace)
         const_cast<UnitGraph*>(this)->out_csr_ = ret;

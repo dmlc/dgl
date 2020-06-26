@@ -1741,7 +1741,7 @@ if __name__ == '__main__':
     # test_adj("int32")
     # test_inc()
     # test_view()
-    # test_view1("int32")
+    test_view1("int32")
     # test_flatten()
     # test_convert_bound()
     # test_convert()
@@ -1759,4 +1759,3 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
-    test_format()
