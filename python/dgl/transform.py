@@ -620,6 +620,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     if reshuffle:
         node_part = node_part.tonumpy()
         new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
+        # Here we ensure that nodes in a partition are assigned with contiguous node ids.
         start = 0
         num_parts = np.max(node_part) + 1
         for i in range(num_parts):
