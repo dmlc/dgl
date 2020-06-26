@@ -159,6 +159,15 @@ CSRMatrix CSRTranspose(CSRMatrix csr);
 
 /*!
  * \brief Convert CSR matrix to COO matrix.
+ *
+ * Complexity: O(nnz)
+ * 
+ * - If data_as_order is false, the column and data arrays of the
+ *   result COO are equal to the indices and data arrays of the
+ *   input CSR. The result COO is also row sorted.
+ * - If the input CSR is further sorted, the result COO is also
+ *   column sorted.
+ *
  * \param csr Input csr matrix
  * \param data_as_order If true, the data array in the input csr matrix contains the order
  *                      by which the resulting COO tuples are stored. In this case, the

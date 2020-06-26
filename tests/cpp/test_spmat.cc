@@ -277,12 +277,23 @@ void _TestCSRToCOO(DLContext ctx) {
   auto coo = CSRToCOO(csr, false);
   ASSERT_EQ(coo.num_rows, 4);
   ASSERT_EQ(coo.num_cols, 5);
+  ASSERT_TRUE(coo.row_sorted);
   auto tr = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX)*8, ctx);
-  auto tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx);
-  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(coo.row, tr));
-  ASSERT_TRUE(ArrayEQ<IDX>(coo.col, tc));
-  ASSERT_TRUE(ArrayEQ<IDX>(coo.data, td));
+  ASSERT_TRUE(ArrayEQ<IDX>(coo.col, csr.indices));
+  ASSERT_TRUE(ArrayEQ<IDX>(coo.data, csr.data));
+
+  // convert from sorted csr
+  auto s_csr = CSRSort(csr);
+  coo = CSRToCOO(s_csr, false);
+  ASSERT_EQ(coo.num_rows, 4);
+  ASSERT_EQ(coo.num_cols, 5);
+  ASSERT_TRUE(coo.row_sorted);
+  ASSERT_TRUE(coo.col_sorted);
+  tr = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(coo.row, tr));
+  ASSERT_TRUE(ArrayEQ<IDX>(coo.col, s_csr.indices));
+  ASSERT_TRUE(ArrayEQ<IDX>(coo.data, s_csr.data));
   }
   {
   auto coo = CSRToCOO(csr, true);
@@ -294,7 +305,7 @@ void _TestCSRToCOO(DLContext ctx) {
   }
 }
 
-TEST(SpmatTest, TestCSRToCOO) {
+TEST(SpmatTest, CSRToCOO) {
   _TestCSRToCOO<int32_t>(CPU);
   _TestCSRToCOO<int64_t>(CPU);
 #if DGL_USE_CUDA
