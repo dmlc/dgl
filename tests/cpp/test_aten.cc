@@ -224,18 +224,40 @@ TEST(ArrayTest, TestIndexSelect) {
 
 template <typename IDX>
 void _TestRelabel_() {
-  IdArray a = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, CTX);
-  IdArray b = aten::VecToIdArray(std::vector<IDX>({20, 5, 6}), sizeof(IDX)*8, CTX);
-  IdArray c = aten::Relabel_({a, b});
-  IdArray ta = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, CTX);
-  IdArray tb = aten::VecToIdArray(std::vector<IDX>({1, 3, 4}), sizeof(IDX)*8, CTX);
-  IdArray tc = aten::VecToIdArray(std::vector<IDX>({0, 20, 10, 5, 6}), sizeof(IDX)*8, CTX);
-  ASSERT_TRUE(ArrayEQ<IDX>(a, ta));
-  ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, CTX);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({4, 5, 6}), sizeof(IDX)*8, CTX);
+  IdArray tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6}), sizeof(IDX)*8, CTX);
+  IdArray c = aten::Concat(std::vector<Idarray>{a, b});
   ASSERT_TRUE(ArrayEQ<IDX>(c, tc));
+  IdArray d = aten::Concat(std::vector<Idarray>{a, b, c});
+  IdArray td = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 4, 5, 6, 1, 2, 3, 4, 5, 6}),
+                                  sizeof(IDX)*8, CTX);
+  ASSERT_TRUE(ArrayEQ<IDX>(d, td));
 }
 
 TEST(ArrayTest, TestRelabel_) {
   _TestRelabel_<int32_t>();
   _TestRelabel_<int64_t>();
+}
+
+template <typename IDX>
+void _TestConcat(DLContext ctx) {
+  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
+  ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
+  IdArray c = aten::IndexSelect(a, b);
+  ASSERT_TRUE(ArrayEQ<IDX>(b, c));
+}
+
+TEST(ArrayTest, TestConcat) {
+  _TestConcat<int32_t>();
+  _TestConcat<int64_t>();
+  _TestConcat<float>();
+  _TestConcat<double>();
+#ifdef DGL_USE_CUDA
+  _TestConcat<int32_t>(GPU);
+  _TestConcat<int64_t>(GPU);
+  _TestConcat<float>();
+  _TestConcat<double>();
+#endif
 }

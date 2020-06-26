@@ -171,6 +171,19 @@ NDArray Repeat(NDArray array, IdArray repeats);
  */
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
+/*!
+ * \brief concatenate the given id arrays to one array
+ *
+ * Example:
+ *
+ * Given two IdArrays [2, 3, 10, 0, 2] and [4, 10, 5]
+ * Return [2, 3, 10, 0, 2, 4, 10, 5]
+ *
+ * \param arrays The id arrays to concatenate.
+ * \return concatenated array.
+ */
+NDArray Concat(const std::vector<IdArray>& arrays);
+
 /*!\brief Return whether the array is a valid 1D int array*/
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
   return arr->ndim == 1 && arr->dtype.code == kDLInt;

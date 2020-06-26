@@ -311,18 +311,75 @@ COOMatrix COORowWiseTopk(
 
 /*!
  * \brief Union a list COOMatrix into one COOMatrix.
+ *
+ * Examples:
+ *
+ * A = [[0, 0, 1,
+ *       1, 0, 1,
+ *       0, 1, 0]]
+ *
+ * B = [[0, 0,
+ *       1, 0]]
+ *
+ * COOMatrix_A.num_rows : 3
+ * COOMatrix_A.num_cols : 3
+ * COOMatrix_B.num_rows : 2
+ * COOMatrix_B.num_cols : 2
+ *
+ * C = DisjointUnionCooGraph({A, B});
+ *
+ * C = [[0, 0, 1, 0, 0,
+ *       1, 0, 1, 0, 0,
+ *       0, 1, 0, 0, 0,
+ *       0, 0, 0, 0, 0,
+ *       0, 0, 0, 1, 0]]
+ * COOMatrix_C.num_rows : 5
+ * COOMatrix_C.num_cols : 5
+ *
  * \param coos The input list of coo matrix.
  * \param src_offset A list of integers recording src vertix id offset of each Matrix in coos
  * \param src_offset A list of integers recording dst vertix id offset of each Matrix in coos
  * \return The combined COOMatrix.
  */
 COOMatrix DisjointUnionCooGraph(
-  const std::vector<COOMatrix>& coos,
-  const std::vector<uint64_t> src_offset,
-  const std::vector<uint64_t> dst_offset);
+  const std::vector<COOMatrix>& coos);
 
 /*!
  * \brief Split a COOMatrix into multiple disjoin components.
+ *
+ * Examples:
+ *
+ * C = [[0, 0, 1, 0, 0,
+ *       1, 0, 1, 0, 0,
+ *       0, 1, 0, 0, 0,
+ *       0, 0, 0, 0, 0,
+ *       0, 0, 0, 1, 0,
+ *       0, 0, 0, 0, 1]]
+ * COOMatrix_C.num_rows : 6
+ * COOMatrix_C.num_cols : 5
+ *
+ * batch_size : 2
+ * edge_cumsum : [0, 4, 6]
+ * src_vertex_cumsum : [0, 3, 6]
+ * dst_vertex_cumsum : [0, 3, 5]
+ *
+ * ret = DisjointPartitionCooBySizes(C,
+ *                                   batch_size,
+ *                                   edge_cumsum,
+ *                                   src_vertex_cumsum,
+ *                                   dst_vertex_cumsum)
+ *
+ * A = [[0, 0, 1,
+ *       1, 0, 1,
+ *       0, 1, 0]]
+ * COOMatrix_A.num_rows : 3
+ * COOMatrix_A.num_cols : 3
+ *
+ * B = [[0, 0,
+ *       1, 0,
+ *       0, 1]]
+ * COOMatrix_B.num_rows : 3
+ * COOMatrix_B.num_cols : 2
  *
  * \param coo COOMatrix to split.
  * \param batch_size Number of disjoin components (Sub COOMatrix)
@@ -331,7 +388,7 @@ COOMatrix DisjointUnionCooGraph(
  * \param dst_vertex_cumsum Number of dst vertices of each component.
  * \return A list of COOMatrixes representing each disjoint components.
  */
-std::vector<COOMatrix> DisjointPartitionCooHeteroBySizes(
+std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const COOMatrix coo,
   const uint64_t batch_size,
   const std::vector<uint64_t> edge_cumsum,

@@ -151,6 +151,17 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
   return ret;
 }
 
+NDArray Concat(const std::vector<IdArray>& arrays) {
+  IdArray ret;
+  ATEN_XPU_SWITCH_CUDA(arrays[0]->ctx.device_type, XPU, "Concat", {
+    ATEN_DTYPE_SWITCH(arrays[0]->dtype, DType, "array", {
+      return impl::Concat<XPU, DType>(arrays);
+    });
+  });
+
+  return ret;
+}
+
 template<typename ValueType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value) {
   std::tuple<NDArray, IdArray, IdArray> ret;
@@ -647,70 +658,6 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
   });
   return ret;
 }
-
-///////////////////////// Graph Union/Partition routines //////////////////////////
-COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos,
-                                const std::vector<uint64_t> src_offset,
-                                const std::vector<uint64_t> dst_offset) {
-  COOMatrix ret;
-  ATEN_XPU_SWITCH(coos[0].row->ctx.device_type, XPU, "DisjointUnionCooGraph", {
-    ATEN_ID_TYPE_SWITCH(coos[0].row->dtype, IdType, {
-      ret = impl::DisjointUnionCooGraph<XPU, IdType>(coos, src_offset, dst_offset);
-    });
-  });
-  return ret;
-}
-
-CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs,
-                                const std::vector<uint64_t> src_offset,
-                                const std::vector<uint64_t> dst_offset) {
-  CSRMatrix ret;
-  ATEN_XPU_SWITCH(csrs[0].indptr->ctx.device_type, XPU, "DisjointUnionCsrGraph", {
-    ATEN_ID_TYPE_SWITCH(csrs[0].indices->dtype, IdType, {
-      ret = impl::DisjointUnionCsrGraph<XPU, IdType>(csrs, src_offset, dst_offset);
-    });
-  });
-  return ret;
-}
-
-std::vector<COOMatrix> DisjointPartitionCooHeteroBySizes(
-  const COOMatrix coo,
-  const uint64_t batch_size,
-  const std::vector<uint64_t> edge_cumsum,
-  const std::vector<uint64_t> src_vertex_cumsum,
-  const std::vector<uint64_t> dst_vertex_cumsum) {
-  std::vector<COOMatrix> ret;
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, "DisjointPartitionCooHeteroBySizes", {
-    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
-      ret = impl::DisjointPartitionCooHeteroBySizes<XPU, IdType>(coo,
-                                                                 batch_size,
-                                                                 edge_cumsum,
-                                                                 src_vertex_cumsum,
-                                                                 dst_vertex_cumsum);
-    });
-  });
-  return ret;
-}
-
-std::vector<CSRMatrix> DisjointPartitionCsrHeteroBySizes(
-  const CSRMatrix csr,
-  const uint64_t batch_size,
-  const std::vector<uint64_t> edge_cumsum,
-  const std::vector<uint64_t> src_vertex_cumsum,
-  const std::vector<uint64_t> dst_vertex_cumsum) {
-  std::vector<CSRMatrix> ret;
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, "DisjointPartitionCsrHeteroBySizes", {
-    ATEN_ID_TYPE_SWITCH(csr.indices->dtype, IdType, {
-      ret = impl::DisjointPartitionCsrHeteroBySizes<XPU, IdType>(csr,
-                                                                 batch_size,
-                                                                 edge_cumsum,
-                                                                 src_vertex_cumsum,
-                                                                 dst_vertex_cumsum);
-    });
-  });
-  return ret;
-}
-
 
 
 ///////////////////////// C APIs /////////////////////////

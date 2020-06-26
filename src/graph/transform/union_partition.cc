@@ -51,9 +51,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
         coos.push_back(coo);
       }
 
-      aten::COOMatrix res = aten::DisjointUnionCooGraph(coos,
-                                                        src_offset_v,
-                                                        dst_offset_v);
+      aten::COOMatrix res = aten::DisjointUnionCooGraph(coos);
 
       rgptr = UnitGraph::CreateFromCOO(
         (src_vtype == dst_vtype) ? 1 : 2, res,
@@ -152,11 +150,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
       const dgl_type_t src_vtype = pair.first;
       const dgl_type_t dst_vtype = pair.second;
       aten::COOMatrix coo = batched_graph->GetCOOMatrix(etype);
-      auto res = aten::DisjointPartitionCooHeteroBySizes(coo,
-                                                         batch_size,
-                                                         edge_cumsum[etype],
-                                                         vertex_cumsum[src_vtype],
-                                                         vertex_cumsum[dst_vtype]);
+      auto res = aten::DisjointPartitionCooBySizes(coo,
+                                                   batch_size,
+                                                   edge_cumsum[etype],
+                                                   vertex_cumsum[src_vtype],
+                                                   vertex_cumsum[dst_vtype]);
       for (uint64_t g = 0; g < batch_size; ++g) {
         HeteroGraphPtr rgptr = UnitGraph::CreateFromCOO(
           (src_vtype == dst_vtype) ? 1 : 2, res[g],
@@ -171,11 +169,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
       const dgl_type_t src_vtype = pair.first;
       const dgl_type_t dst_vtype = pair.second;
       aten::CSRMatrix csr = batched_graph->GetCSRMatrix(etype);
-      auto res = aten::DisjointPartitionCsrHeteroBySizes(csr,
-                                                         batch_size,
-                                                         edge_cumsum[etype],
-                                                         vertex_cumsum[src_vtype],
-                                                         vertex_cumsum[dst_vtype]);
+      auto res = aten::DisjointPartitionCsrBySizes(csr,
+                                                   batch_size,
+                                                   edge_cumsum[etype],
+                                                   vertex_cumsum[src_vtype],
+                                                   vertex_cumsum[dst_vtype]);
       for (uint64_t g = 0; g < batch_size; ++g) {
         HeteroGraphPtr rgptr = UnitGraph::CreateFromCSR(
           (src_vtype == dst_vtype) ? 1 : 2, res[g],
@@ -190,11 +188,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
       const dgl_type_t src_vtype = pair.first;
       const dgl_type_t dst_vtype = pair.second;
       aten::CSRMatrix csc = batched_graph->GetCSCMatrix(etype);
-      auto res = aten::DisjointPartitionCsrHeteroBySizes(csc,
-                                                         batch_size,
-                                                         edge_cumsum[etype],
-                                                         vertex_cumsum[dst_vtype],
-                                                         vertex_cumsum[src_vtype]);
+      auto res = aten::DisjointPartitionCsrBySizes(csc,
+                                                   batch_size,
+                                                   edge_cumsum[etype],
+                                                   vertex_cumsum[dst_vtype],
+                                                   vertex_cumsum[src_vtype]);
       for (uint64_t g = 0; g < batch_size; ++g) {
         HeteroGraphPtr rgptr = UnitGraph::CreateFromCSC(
           (src_vtype == dst_vtype) ? 1 : 2, res[g],

@@ -320,6 +320,31 @@ COOMatrix CSRRowWiseTopk(
 
 /*!
  * \brief Union a list CSRMatrix into one CSRMatrix.
+ *
+ * Examples:
+ *
+ * A = [[0, 0, 1,
+ *       1, 0, 1,
+ *       0, 1, 0]]
+ *
+ * B = [[0, 0,
+ *       1, 0]]
+ *
+ * CSRMatrix_A.num_rows : 3
+ * CSRMatrix_A.num_cols : 3
+ * CSRMatrix_B.num_rows : 2
+ * CSRMatrix_B.num_cols : 2
+ *
+ * C = DisjointUnionCsrGraph({A, B});
+ *
+ * C = [[0, 0, 1, 0, 0,
+ *       1, 0, 1, 0, 0,
+ *       0, 1, 0, 0, 0,
+ *       0, 0, 0, 0, 0,
+ *       0, 0, 0, 1, 0]]
+ * CSRMatrix_C.num_rows : 5
+ * CSRMatrix_C.num_cols : 5
+ *
  * \param csrs The input list of csr matrix.
  * \param src_offset A list of integers recording src vertix id offset of each Matrix in csrs
  * \param src_offset A list of integers recording dst vertix id offset of each Matrix in csrs
@@ -333,6 +358,40 @@ CSRMatrix DisjointUnionCsrGraph(
 /*!
  * \brief Split a CSRMatrix into multiple disjoin components.
  *
+ * Examples:
+ *
+ * C = [[0, 0, 1, 0, 0,
+ *       1, 0, 1, 0, 0,
+ *       0, 1, 0, 0, 0,
+ *       0, 0, 0, 0, 0,
+ *       0, 0, 0, 1, 0,
+ *       0, 0, 0, 0, 1]]
+ * CSRMatrix_C.num_rows : 6
+ * CSRMatrix_C.num_cols : 5
+ *
+ * batch_size : 2
+ * edge_cumsum : [0, 4, 6]
+ * src_vertex_cumsum : [0, 3, 6]
+ * dst_vertex_cumsum : [0, 3, 5]
+ *
+ * ret = DisjointPartitionCsrBySizes(C,
+ *                                   batch_size,
+ *                                   edge_cumsum,
+ *                                   src_vertex_cumsum,
+ *                                   dst_vertex_cumsum)
+ *
+ * A = [[0, 0, 1,
+ *       1, 0, 1,
+ *       0, 1, 0]]
+ * CSRMatrix_A.num_rows : 3
+ * CSRMatrix_A.num_cols : 3
+ *
+ * B = [[0, 0,
+ *       1, 0,
+ *       0, 1]]
+ * CSRMatrix_B.num_rows : 3
+ * CSRMatrix_B.num_cols : 2
+ *
  * \param csr CSRMatrix to split.
  * \param batch_size Number of disjoin components (Sub CSRMatrix)
  * \param edge_cumsum Number of edges of each components
@@ -340,7 +399,7 @@ CSRMatrix DisjointUnionCsrGraph(
  * \param dst_vertex_cumsum Number of dst vertices of each component.
  * \return A list of CSRMatrixes representing each disjoint components.
  */
-std::vector<CSRMatrix> DisjointPartitionCsrHeteroBySizes(
+std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
   const CSRMatrix csrs,
   const uint64_t batch_size,
   const std::vector<uint64_t> edge_cumsum,
