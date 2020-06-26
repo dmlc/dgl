@@ -3,6 +3,7 @@ server and clients."""
 import abc
 import pickle
 import random
+import numpy as np
 
 from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
@@ -745,13 +746,10 @@ def send_requests_to_machine(target_and_requests):
 
     Returns
     -------
-    num_res : int
-        The number of responses
     msgseq2pos : dict
         map the message sequence number to its position in the input list.
     """
     msgseq2pos = {}
-    num_res = 0
     for pos, (target, request) in enumerate(target_and_requests):
         # send request
         service_id = request.service_id
@@ -764,20 +762,20 @@ def send_requests_to_machine(target_and_requests):
         # check if has response
         res_cls = get_service_property(service_id)[1]
         if res_cls is not None:
-            num_res += 1
             msgseq2pos[msg_seq] = pos
-    return num_res, msgseq2pos
+    return msgseq2pos
 
-def recv_responses(num_res, msgseq2pos, timeout=0):
+def recv_responses(msgseq2pos, timeout=0):
     """ Receive responses
+
+    It returns the responses in the same order as the requests. The order of requests
+    are stored in msgseq2pos.
 
     The operation is blocking -- it returns when it receives all responses
     or it times out.
 
     Parameters
     ----------
-    num_res : int
-        The number of responses
     msgseq2pos : dict
         map the message sequence number to its position in the input list.
     timeout : int, optional
@@ -790,7 +788,9 @@ def recv_responses(num_res, msgseq2pos, timeout=0):
         response, None is placed.
     """
     myrank = get_rank()
-    all_res = [None] * num_res
+    size = np.max(list(msgseq2pos.values())) + 1
+    all_res = [None] * size
+    num_res = len(msgseq2pos)
     while num_res != 0:
         # recv response
         msg = recv_rpc_message(timeout)
@@ -835,8 +835,8 @@ def remote_call_to_machine(target_and_requests, timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     # TODO(chao): handle timeout
-    num_res, msgseq2pos = send_requests_to_machine(target_and_requests)
-    return recv_responses(num_res, msgseq2pos, timeout)
+    msgseq2pos = send_requests_to_machine(target_and_requests)
+    return recv_responses(msgseq2pos, timeout)
 
 def send_rpc_message(msg, target):
     """Send one message to the target server.

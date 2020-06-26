@@ -158,10 +158,9 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
             req_list.append((pid, req))
 
     # send requests to the remote machine.
-    num_res = 0
     msgseq2pos = None
     if len(req_list) > 0:
-        num_res, msgseq2pos = send_requests_to_machine(req_list)
+        msgseq2pos = send_requests_to_machine(req_list)
 
     # sample neighbors for the nodes in the local partition.
     res_list = []
@@ -171,8 +170,8 @@ def sample_neighbors(dist_graph, nodes, fanout, edge_dir='in', prob=None, replac
         res_list.append(LocalSampledGraph(src, dst, eids))
 
     # receive responses from remote machines.
-    if num_res > 0:
-        results = recv_responses(num_res, msgseq2pos)
+    if msgseq2pos is not None:
+        results = recv_responses(msgseq2pos)
         res_list.extend(results)
 
     sampled_graph = merge_graphs(res_list, dist_graph.number_of_nodes())
