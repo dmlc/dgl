@@ -13,8 +13,20 @@ name = args.name
 dataset = PygLinkPropPredDataset(name=name)
 data = dataset[0]
 
+try:
+    weighted = data.edge_weight
+    weighted = True
+except:
+    weighted = False
+
+
 with open(name + "-net.txt", "w") as f:
     for i in range(data.edge_index.shape[1]):
-        f.write(str(data.edge_index[0][i].item()) + " "\
-            +str(data.edge_index[1][i].item()) + " "\
-            +str(data.edge_weight[i].item()) + "\n")
+        if weighted:
+            f.write(str(data.edge_index[0][i].item()) + " "\
+                +str(data.edge_index[1][i].item()) + " "\
+                +str(data.edge_weight[i].item()) + "\n")
+        else:
+            f.write(str(data.edge_index[0][i].item()) + " "\
+                +str(data.edge_index[1][i].item()) + " "\
+                +"1\n")
