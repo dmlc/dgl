@@ -688,6 +688,16 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     sym_g = to_bidirected(g, readonly=True)
     vwgt = []
+    # To balance the node types in each partition, we can take advantage of the vertex weights
+    # in Metis. When vertex weights are provided, Metis will tries to generate partitions with
+    # balanced vertex weights. A vertex can be assigned with multiple weights. The vertex weights
+    # are stored in a vector of N * w elements, where N is the number of vertices and w
+    # is the number of weights per vertex. Metis tries to balance the first weight, and then
+    # the second weight, and so on.
+    # When balancing node types, we use the first weight to indicate the first node type.
+    # if a node belongs to the first node type, its weight is set to 1; otherwise, 0.
+    # Similary, we set the second weight for the second node type and so on. The number
+    # of weights is the same as the number of node types.
     if balance_ntypes is not None:
         assert len(balance_ntypes) == g.number_of_nodes(), \
                 "The length of balance_ntypes should be equal to #nodes in the graph"
@@ -696,8 +706,12 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         uniq_ntypes = F.unique(balance_ntypes)
         for ntype in uniq_ntypes:
             vwgt.append(F.astype(balance_ntypes == ntype, F.int64))
+
+    # When balancing edges in partitions, we use in-degree as one of the weights.
     if balance_edges:
         vwgt.append(F.astype(g.in_degrees(), F.int64))
+
+    # The vertex weights have to be stored in a vector.
     if len(vwgt) > 0:
         vwgt = F.stack(vwgt, 1)
         shape = (np.prod(F.shape(vwgt),),)
@@ -706,6 +720,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     else:
         vwgt = F.zeros((0,), F.int64, F.cpu())
         vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
+
     node_part = _CAPI_DGLMetisPartition(sym_g._graph, k, vwgt)
     if len(node_part) == 0:
         return None
