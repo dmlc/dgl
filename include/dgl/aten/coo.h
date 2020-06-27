@@ -326,7 +326,7 @@ COOMatrix COORowWiseTopk(
  * COOMatrix_B.num_rows : 2
  * COOMatrix_B.num_cols : 2
  *
- * C = DisjointUnionCooGraph({A, B});
+ * C = DisjointUnionCoo({A, B});
  *
  * C = [[0, 0, 1, 0, 0,
  *       1, 0, 1, 0, 0,
@@ -341,7 +341,7 @@ COOMatrix COORowWiseTopk(
  * \param src_offset A list of integers recording dst vertix id offset of each Matrix in coos
  * \return The combined COOMatrix.
  */
-COOMatrix DisjointUnionCooGraph(
+COOMatrix DisjointUnionCoo(
   const std::vector<COOMatrix>& coos);
 
 /*!
@@ -389,11 +389,11 @@ COOMatrix DisjointUnionCooGraph(
  * \return A list of COOMatrixes representing each disjoint components.
  */
 std::vector<COOMatrix> DisjointPartitionCooBySizes(
-  const COOMatrix coo,
+  const COOMatrix &coo,
   const uint64_t batch_size,
-  const std::vector<uint64_t> edge_cumsum,
-  const std::vector<uint64_t> src_vertex_cumsum,
-  const std::vector<uint64_t> dst_vertex_cumsum);
+  const std::vector<uint64_t> &edge_cumsum,
+  const std::vector<uint64_t> &src_vertex_cumsum,
+  const std::vector<uint64_t> &dst_vertex_cumsum);
 
 }  // namespace aten
 }  // namespace dgl

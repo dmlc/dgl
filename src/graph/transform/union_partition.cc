@@ -15,8 +15,6 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
   std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices(), 0);
 
   // Loop over all canonical etypes
-  auto format = component_graphs[0]->GetRelationGraph(0)->GetFormatInUse();
-  auto restrict_format = component_graphs[0]->GetRelationGraph(0)->GetRestrictFormat();
   for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -24,18 +22,27 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     uint64_t src_offset = 0, dst_offset = 0;
     HeteroGraphPtr rgptr = nullptr;
 
+    // ALL = CSC | CSR | COO
+    dgl_format_code_t format = (1 << (SparseFormat2Code(SparseFormat::kCOO)-1)) |
+                              (1 << (SparseFormat2Code(SparseFormat::kCSR)-1)) |
+                              (1 << (SparseFormat2Code(SparseFormat::kCSC)-1));
     // do some preprocess
     for (size_t i = 0; i < component_graphs.size(); ++i) {
       const auto& cg = component_graphs[i];
-      CHECK_EQ(format, cg->GetRelationGraph(etype)->GetFormatInUse()) << \
-        "All batched graph should have same sparse format";
-      CHECK_EQ(restrict_format, cg->GetRelationGraph(etype)->GetRestrictFormat()) << \
-        "All batched graph should have same restrict_format format";
+      const std::string restrict_format = cg->GetRelationGraph(etype)->GetRestrictFormat();
+      const SparseFormat curr_format = ParseSparseFormat(restrict_format);
 
+      if (curr_format == SparseFormat::kCOO ||
+          curr_format == SparseFormat::kCSR ||
+          curr_format == SparseFormat::kCSC)
+        format &=(1 << (SparseFormat2Code(curr_format)-1));
+    
       // Update offsets
       src_offset += cg->NumVertices(src_vtype);
       dst_offset += cg->NumVertices(dst_vtype);
     }
+    CHECK_GT(format, 0) << "The conjunction of restrict_format of the relation graphs under " <<
+      etype << "should not be None.";
 
     // prefer COO
     if (FORMAT_HAS_COO(format)) {
@@ -46,11 +53,11 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
         coos.push_back(coo);
       }
 
-      aten::COOMatrix res = aten::DisjointUnionCooGraph(coos);
+      aten::COOMatrix res = aten::DisjointUnionCoo(coos);
 
       rgptr = UnitGraph::CreateFromCOO(
         (src_vtype == dst_vtype) ? 1 : 2, res,
-        ParseSparseFormat(restrict_format));
+        SparseFormat::kAny);
     } else if (FORMAT_HAS_CSR(format)) {
       std::vector<aten::CSRMatrix> csrs;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
@@ -59,11 +66,11 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
         csrs.push_back(csr);
       }
 
-      aten::CSRMatrix res = aten::DisjointUnionCsrGraph(csrs);
+      aten::CSRMatrix res = aten::DisjointUnionCsr(csrs);
 
       rgptr = UnitGraph::CreateFromCSR(
         (src_vtype == dst_vtype) ? 1 : 2, res,
-        ParseSparseFormat(restrict_format));
+        SparseFormat::kAny);
     } else if (FORMAT_HAS_CSC(format)) {
       std::vector<aten::CSRMatrix> cscs;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
@@ -72,10 +79,10 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
         cscs.push_back(csc);
       }
 
-      aten::CSRMatrix res = aten::DisjointUnionCsrGraph(cscs);
+      aten::CSRMatrix res = aten::DisjointUnionCsr(cscs);
       rgptr = UnitGraph::CreateFromCSC(
         (src_vtype == dst_vtype) ? 1 : 2, res,
-        ParseSparseFormat(restrict_format));
+        SparseFormat::kAny);
     }
     rel_graphs[etype] = rgptr;
     num_nodes_per_type[src_vtype] = src_offset;
@@ -187,7 +194,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
       for (uint64_t g = 0; g < batch_size; ++g) {
         HeteroGraphPtr rgptr = UnitGraph::CreateFromCSC(
           (src_vtype == dst_vtype) ? 1 : 2, res[g],
-          ParseSparseFormat(restrict_format));
+          SparseFormat::kAny);
 
         rel_graphs[g].push_back(rgptr);
       }

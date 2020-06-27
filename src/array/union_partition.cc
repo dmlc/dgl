@@ -9,22 +9,32 @@
 namespace dgl {
 namespace aten {
 ///////////////////////// COO Based Operations/////////////////////////
-COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos) {
+COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
+  CHECK(coos.size() > 1) <<
+    "The length of input COOMatrix vector should be larger than 1";
   uint64_t src_offset = 0, dst_offset = 0;
   int64_t edge_data_offset = 0;
   bool has_data = false;
+  bool row_sorted = true;
+  bool col_sorted = true;
 
   // check if data index array
   for (size_t i = 0; i < coos.size(); ++i) {
-      if (IsNullArray(coos[i].data) == false)
-        has_data = true;
+    CHECK_SAME_DTYPE(coos[0].row, coos[i].row);
+    CHECK_SAME_CONTEXT(coos[0].row, coos[i].row);
+    has_data |= COOHasData(coos[i]);
   }
 
   std::vector<IdArray> res_src;
   std::vector<IdArray> res_dst;
   std::vector<IdArray> res_data;
+  res_src.resize(coos.size());
+  res_dst.resize(coos.size());
+
   for (size_t i = 0; i < coos.size(); ++i) {
-    aten::COOMatrix coo = coos[i];
+    const aten::COOMatrix &coo = coos[i];
+    row_sorted &= coo.row_sorted;
+    col_sorted &= coo.col_sorted;
     IdArray edges_src = coo.row + src_offset;
     IdArray edges_dst = coo.col + dst_offset;
     res_src.push_back(edges_src);
@@ -35,7 +45,7 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos) {
     // any one of input coo has data index array
     if (has_data) {
       IdArray edges_data;
-      if (IsNullArray(coo.data)) {
+      if (COOHasData(coo) == false) {
         edges_data = Range(edge_data_offset,
                            edge_data_offset + coo.row->shape[0],
                            coo.row->dtype.bits,
@@ -50,25 +60,26 @@ COOMatrix DisjointUnionCooGraph(const std::vector<COOMatrix>& coos) {
 
   IdArray result_src = Concat(res_src);
   IdArray result_dst = Concat(res_dst);
-  IdArray result_data = NullArray();
-  if (has_data)
-    result_data = Concat(res_data);
+  IdArray result_data = has_data ? Concat(res_data) : NullArray();
 
   return COOMatrix(
     src_offset, dst_offset,
     result_src,
     result_dst,
-    result_data);
+    result_data,
+    row_sorted,
+    col_sorted);
 }
 
 std::vector<COOMatrix> DisjointPartitionCooBySizes(
-  const COOMatrix coo,
+  const COOMatrix &coo,
   const uint64_t batch_size,
-  const std::vector<uint64_t> edge_cumsum,
-  const std::vector<uint64_t> src_vertex_cumsum,
-  const std::vector<uint64_t> dst_vertex_cumsum) {
-  CHECK(IsNullArray(coo.data)) <<
-        "DisjointPartitionHeteroBySizes does not support input COOMatrix with eid mapping data";
+  const std::vector<uint64_t> &edge_cumsum,
+  const std::vector<uint64_t> &src_vertex_cumsum,
+  const std::vector<uint64_t> &dst_vertex_cumsum) {
+  CHECK_EQ(edge_cumsum.size(), batch_size + 1);
+  CHECK_EQ(src_vertex_cumsum.size(), batch_size + 1);
+  CHECK_EQ(dst_vertex_cumsum.size(), batch_size + 1);
   std::vector<COOMatrix> ret;
   ret.resize(batch_size);
 
@@ -85,7 +96,7 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
                                            coo.col->ctx)) - dst_vertex_cumsum[g];
     IdArray result_data = NullArray();
     // has data index array
-    if (IsNullArray(coo.data) == false) {
+    if (COOHasData(coo)) {
       result_data = IndexSelect(coo.data,
                                 Range(edge_cumsum[g],
                                       edge_cumsum[g + 1],
@@ -106,23 +117,30 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
 }
 
 ///////////////////////// CSR Based Operations/////////////////////////
-CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs) {
+CSRMatrix DisjointUnionCsr(const std::vector<CSRMatrix>& csrs) {
+  CHECK(csrs.size() > 1) <<
+    "The length of input CSRMatrix vector should be larger than 1";
   uint64_t src_offset = 0, dst_offset = 0;
   int64_t indices_offset = 0;
   bool has_data = false;
+  bool sorted = false;
 
   // check if data index array
   for (size_t i = 0; i < csrs.size(); ++i) {
-      if (IsNullArray(csrs[i].data) == false)
-        has_data = true;
+    CHECK_SAME_DTYPE(csrs[0].indptr, csrs[i].indptr);
+    CHECK_SAME_CONTEXT(csrs[0].indices, csrs[i].indices);
+    has_data |= CSRHasData(csrs[i]);
   }
 
   std::vector<IdArray> res_indptr;
   std::vector<IdArray> res_indices;
   std::vector<IdArray> res_data;
+  res_indptr.resize(csrs.size());
+  res_indices.resize(csrs.size());
 
   for (size_t i = 0; i < csrs.size(); ++i) {
-    aten::CSRMatrix csr = csrs[i];
+    const aten::CSRMatrix &csr = csrs[i];
+    sorted &= csr.sorted;
     IdArray indptr = csr.indptr + indices_offset;
     IdArray indices = csr.indices + dst_offset;
     if (i > 0)
@@ -139,7 +157,7 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs) {
     // any one of input csr has data index array
     if (has_data) {
       IdArray edges_data;
-      if (IsNullArray(csr.data)) {
+      if (CSRHasData(csr) == false) {
         edges_data = Range(indices_offset,
                            indices_offset + csr.indices->shape[0],
                            csr.indices->dtype.bits,
@@ -154,23 +172,25 @@ CSRMatrix DisjointUnionCsrGraph(const std::vector<CSRMatrix>& csrs) {
 
   IdArray result_indptr = Concat(res_indptr);
   IdArray result_indices = Concat(res_indices);
-  IdArray result_data = NullArray();
-  if (has_data)
-    result_data = Concat(res_data);
+  IdArray result_data = has_data ? Concat(res_data) : NullArray();
 
   return CSRMatrix(
     src_offset, dst_offset,
     result_indptr,
     result_indices,
-    result_data);
+    result_data,
+    sorted);
 }
 
 std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
-  const CSRMatrix csr,
+  const CSRMatrix &csr,
   const uint64_t batch_size,
-  const std::vector<uint64_t> edge_cumsum,
-  const std::vector<uint64_t> src_vertex_cumsum,
-  const std::vector<uint64_t> dst_vertex_cumsum) {
+  const std::vector<uint64_t> &edge_cumsum,
+  const std::vector<uint64_t> &src_vertex_cumsum,
+  const std::vector<uint64_t> &dst_vertex_cumsum) {
+  CHECK_EQ(edge_cumsum.size(), batch_size + 1);
+  CHECK_EQ(src_vertex_cumsum.size(), batch_size + 1);
+  CHECK_EQ(dst_vertex_cumsum.size(), batch_size + 1);
   std::vector<CSRMatrix> ret;
   ret.resize(batch_size);
 
@@ -184,15 +204,11 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
                                         csr.indptr->dtype.bits,
                                         csr.indptr->ctx)) - edge_cumsum[0];
     } else {
-      IdArray result_indptr_0 = Full(0, 1,
-                                    csr.indptr->dtype.bits,
-                                    csr.indptr->ctx);
       result_indptr = IndexSelect(csr.indptr,
-                                  Range(src_vertex_cumsum[g] + 1,
+                                  Range(src_vertex_cumsum[g],
                                         src_vertex_cumsum[g+1] + 1,
                                         csr.indptr->dtype.bits,
                                         csr.indptr->ctx)) - edge_cumsum[g];
-      result_indptr = Concat(std::vector<IdArray>({result_indptr_0, result_indptr}));
     }
 
     IdArray result_indices = IndexSelect(csr.indices,
@@ -203,7 +219,7 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
 
     IdArray result_data = NullArray();
     // has data index array
-    if (IsNullArray(csr.data) == false) {
+    if (CSRHasData(csr)) {
       result_data = IndexSelect(csr.data,
                                 Range(edge_cumsum[g],
                                       edge_cumsum[g+1],

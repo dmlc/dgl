@@ -8,6 +8,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/shared_mem.h>
+#include "../runtime/cuda/cuda_common.h"
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
@@ -152,14 +153,39 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 }
 
 NDArray Concat(const std::vector<IdArray>& arrays) {
+  CHECK(arrays.size() > 1) << "Number of arrays should larger than 1";
   IdArray ret;
-  ATEN_XPU_SWITCH_CUDA(arrays[0]->ctx.device_type, XPU, "Concat", {
-    ATEN_DTYPE_SWITCH(arrays[0]->dtype, DType, "array", {
-      return impl::Concat<XPU, DType>(arrays);
-    });
-  });
 
-  return ret;
+  int64_t len = 0, offset = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    len += arrays[i]->shape[0];
+    CHECK_SAME_DTYPE(arrays[0], arrays[i]);
+    CHECK_SAME_CONTEXT(arrays[0], arrays[i]);
+  }
+
+  NDArray ret_arr = NDArray::Empty({len},
+                                   arrays[0]->dtype,
+                                   arrays[0]->ctx);
+
+  auto device = runtime::DeviceAPI::Get(arrays[0]->ctx);
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    ATEN_DTYPE_SWITCH(arrays[i]->dtype, DType, "array", {
+      device->CopyDataFromTo(
+        static_cast<DType*>(arrays[i]->data),
+        0,
+        static_cast<DType*>(ret_arr->data),
+        offset,
+        arrays[i]->shape[0] * sizeof(DType),
+        arrays[i]->ctx,
+        ret_arr->ctx,
+        arrays[i]->dtype,
+        nullptr);
+
+        offset += arrays[i]->shape[0] * sizeof(DType);
+    });
+  }
+
+  return ret_arr;
 }
 
 template<typename ValueType>

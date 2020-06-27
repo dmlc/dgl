@@ -442,12 +442,18 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion_v2")
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
+    const DLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits)
         << "Expect graphs to batch have the same index dtype(int" << bits
         << "), but got int" << component->NumBits();
+      CHECK_EQ(component->Context(), ctx)
+        << "Expect graphs to batch have the same context" << ctx
+        << "), but got " << component->Context();
     }
+    
+
     auto hgptr = DisjointUnionHeteroGraph2(meta_graph.sptr(), component_ptrs);
     *rv = HeteroGraphRef(hgptr);
 });
