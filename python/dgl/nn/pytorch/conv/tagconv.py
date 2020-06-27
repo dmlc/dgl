@@ -11,8 +11,8 @@ class TAGConv(nn.Module):
     Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
 
     .. math::
-        \mathbf{X}^{\prime} = \sum_{k=0}^K \math(bf{D}^{-1/2} \mathbf{A}
-        \mathbf{D}^{-1/2})^(k)\mathbf{X} \mathbf{\Theta}_{k},
+        \mathbf{X}^{\prime} = \sum_{k=0}^K (\mathbf{D}^{-1/2} \mathbf{A}
+        \mathbf{D}^{-1/2})^{k}\mathbf{X} \mathbf{\Theta}_{k},
 
     where :math:`\mathbf{A}` denotes the adjacency matrix, 
     :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix,

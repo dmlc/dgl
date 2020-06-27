@@ -20,9 +20,9 @@ class GATConv(nn.Module):
     node :math:`j`:
 
     .. math::
-        \alpha_{ij}^{l} & = \mathrm{softmax_i} (e_{ij}^{l})
+        \alpha_{ij}^{l} = \mathrm{softmax_i} (e_{ij}^{l})
 
-        e_{ij}^{l} & = \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
+        e_{ij}^{l} = \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
 
     Parameters
     ----------

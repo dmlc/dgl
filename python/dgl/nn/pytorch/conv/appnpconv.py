@@ -12,9 +12,9 @@ class APPNPConv(nn.Module):
     meet Personalized PageRank <https://arxiv.org/pdf/1810.05997.pdf>`__.
 
     .. math::
-        H^{0} & = X
+        H^{0} = X
 
-        H^{t+1} & = (1-\alpha)\left(\tilde{D}^{-1/2}
+        H^{t+1} = (1-\alpha)\left(\tilde{D}^{-1/2}
         \tilde{A} \tilde{D}^{-1/2} H^{t}\right) + \alpha H^{0}
 
     Parameters

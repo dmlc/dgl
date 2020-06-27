@@ -13,13 +13,13 @@ class SAGEConv(nn.Module):
     Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
 
     .. math::
-        h_{\mathcal{N}(i)}^{(l+1)} & = \mathrm{aggregate}
+        h_{\mathcal{N}(i)}^{(l+1)} = \mathrm{aggregate}
         \left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
 
-        h_{i}^{(l+1)} & = \sigma \left(W \cdot \mathrm{concat}
+        h_{i}^{(l+1)} = \sigma \left(W \cdot \mathrm{concat}
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} & = \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} = \mathrm{norm}(h_{i}^{l})
 
     Parameters
     ----------

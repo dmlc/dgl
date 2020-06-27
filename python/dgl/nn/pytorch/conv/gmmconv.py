@@ -15,10 +15,10 @@ class GMMConv(nn.Module):
     <http://openaccess.thecvf.com/content_cvpr_2017/papers/Monti_Geometric_Deep_Learning_CVPR_2017_paper.pdf>`__.
 
     .. math::
-        h_i^{l+1} & = \mathrm{aggregate}\left(\left\{\frac{1}{K}
+        h_i^{l+1} = \mathrm{aggregate}\left(\left\{\frac{1}{K}
          \sum_{k}^{K} w_k(u_{ij}), \forall j\in \mathcal{N}(i)\right\}\right)
 
-        w_k(u) & = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
+        w_k(u) = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
 
     where :math:`\mu` denotes the pseudo-coordinates between a vertex and one of its neighbor, :math:`\Sigma_k^{-1}` and :math:`\mu_k` are learnable parameters representing the covariance matrix and mean vector of a Gaussian kernel.
 
