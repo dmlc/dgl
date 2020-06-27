@@ -92,18 +92,6 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_SaveDGLGraphs_V0")
     SaveDGLGraphs(filename, graph_data, labels_list);
   });
 
-// DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadDGLGraphFiles")
-//   .set_body([](DGLArgs args, DGLRetValue *rv) {
-//     std::string filename = args[0];
-//     List<Value> idxs = args[1];
-//     bool onlyMeta = args[2];
-//     std::vector<dgl_id_t> idx_list(idxs.size());
-//     for (uint64_t i = 0; i < idxs.size(); ++i) {
-//       idx_list[i] = static_cast<dgl_id_t>(idxs[i]->data);
-//     }
-//     *rv = LoadDGLGraphFiles(filename, idx_list, onlyMeta);
-//   });
-
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataGraphHandle")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphData gdata = args[0];
@@ -147,7 +135,7 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GetFileVersion")
     *rv = static_cast<int64_t>(GetFileVersion(filename));
   });
 
-DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V0")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V1")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<Value> idxs = args[1];
@@ -156,7 +144,7 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V0")
     *rv = LoadDGLGraphs(filename, idx_list, onlyMeta);
   });
 
-DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V1")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V2")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<Value> idxs = args[1];

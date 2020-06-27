@@ -55,8 +55,6 @@ class StorageMetaDataObject : public runtime::Object {
   Value edges_num_list;
   Map<std::string, Value> labels_list;
   List<GraphData> graph_data;
-  // For saving HeteroGraph
-  List<HeteroGraphData> heterograph_data;
 
   static constexpr const char *_type_key = "graph_serialize.StorageMetaData";
 
@@ -66,16 +64,12 @@ class StorageMetaDataObject : public runtime::Object {
 
   void SetGraphData(std::vector<GraphData> gdata);
 
-  void SetHeteroGraphData(std::vector<HeteroGraphData> gdata);
-
   void VisitAttrs(AttrVisitor *v) final {
-    v->Visit("is_hetero", &is_hetero);
     v->Visit("num_graph", &num_graph);
     v->Visit("nodes_num_list", &nodes_num_list);
     v->Visit("edges_num_list", &edges_num_list);
     v->Visit("labels", &labels_list);
     v->Visit("graph_data", &graph_data);
-    v->Visit("hetero_graph_data", &heterograph_data);
   }
 
   DGL_DECLARE_OBJECT_TYPE_INFO(StorageMetaDataObject, runtime::Object);

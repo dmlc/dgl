@@ -76,9 +76,6 @@ def save_graphs(filename, g_list, labels=None):
 
     Examples
     ----------
-    .. warning:: From DGL 0.4.4, save_graphs no longer supports saving tensor dict(labels) with graphs. If
-    you want to store labels, you can store them in a seperate file using numpy.save or other functions.
-
     >>> import dgl
     >>> import torch as th
 
@@ -98,8 +95,7 @@ def save_graphs(filename, g_list, labels=None):
     if isinstance(g_sample, DGLGraph):
         save_dglgraphs(filename, g_list, labels)
     elif isinstance(g_sample, DGLHeteroGraph):
-        assert (labels is None), "Cannot support save labels with DGLHeteroGraph"
-        save_heterographs(filename, g_list)
+        save_heterographs(filename, g_list, labels)
     else:
         raise Exception(
             "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs/DGLHeteroGraphs")
@@ -119,7 +115,7 @@ def save_dglgraphs(filename, g_list, labels=None):
     _CAPI_SaveDGLGraphs_V0(filename, gdata_list, label_dict)
 
 
-def load_graphs(filename, idx_list=None, ignore_labels=False):
+def load_graphs(filename, idx_list=None):
     """
     Load DGLGraphs from file
 
@@ -130,19 +126,14 @@ def load_graphs(filename, idx_list=None, ignore_labels=False):
     idx_list: list of int
         list of index of graph to be loaded. If not specified, will
         load all graphs from file
-    ignore_labels: bool
-        Whether to ignore the return of labels
 
     Returns
     ----------
 
     graph_list: list of DGLGraphs / DGLHeteroGraph
-    labels(Optional): dict of labels stored in file (empty dict returned if no
-    label stored)
 
-    If the file is stored with labels (before DGL 0.4.4) and set ignore_labels=False,
-     it will return graph_list and labels
-    If the file isn't stored with labels, it will only return graph_list
+    labels(Optional): dict of labels stored in file (empty dict returned if no
+    label stored). Always the full data regardless of the idx_list
 
 
     Examples
@@ -150,37 +141,34 @@ def load_graphs(filename, idx_list=None, ignore_labels=False):
     Following the example in save_graphs.
 
     >>> from dgl.data.utils import load_graphs
-    >>> glist = load_graphs("./data.bin") # glist will be [g1, g2]
-    >>> glist = load_graphs("./data.bin", [0]) # glist will be [g1]
+    >>> glist, label_dict = load_graphs("./data.bin") # glist will be [g1, g2]
+    >>> glist, label_dict = load_graphs("./data.bin", [0]) # glist will be [g1]
 
     """
     version = _CAPI_GetFileVersion(filename)
     if version == 1:
-        return load_graph_v0(filename, idx_list)
-    elif version == 2:
         return load_graph_v1(filename, idx_list)
+    elif version == 2:
+        return load_graph_v2(filename, idx_list)
     else:
         raise Exception("Invalid DGL Version Number")
 
 
-def load_graph_v1(filename, idx_list=None):
+def load_graph_v2(filename, idx_list=None):
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
-    heterograph_list = _CAPI_LoadGraphFiles_V1(filename, idx_list, False)
-    # label_dict = {}
-    # for k, v in metadata.labels.items():
-    #     label_dict[k] = F.zerocopy_from_dgl_ndarray(v.data)
-
-    return [gdata.get_graph() for gdata in heterograph_list]
+    heterograph_list = _CAPI_LoadGraphFiles_V2(filename, idx_list)
+    label_dict = load_labels_v2(filename)
+    return [gdata.get_graph() for gdata in heterograph_list], label_dict
 
 
-def load_graph_v0(filename, idx_list=None):
+def load_graph_v1(filename, idx_list=None):
     """"Internal functions for loading DGLGraphs (V0)."""
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
-    metadata = _CAPI_LoadGraphFiles_V0(filename, idx_list, False)
+    metadata = _CAPI_LoadGraphFiles_V1(filename, idx_list, False)
     label_dict = {}
     for k, v in metadata.labels.items():
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
@@ -211,7 +199,25 @@ def load_labels(filename):
     >>> label_dict = load_graphs("./data.bin")
 
     """
-    metadata = _CAPI_LoadGraphFiles_V0(filename, [], True)
+    version = _CAPI_GetFileVersion(filename)
+    if version == 1:
+        return load_labels_v1(filename)
+    elif version == 2:
+        return load_labels_v2(filename)
+    else:
+        raise Exception("Invalid DGL Version Number")
+
+
+def load_labels_v2(filename):
+    label_dict = {}
+    nd_dict = _CAPI_LoadLabels_V2(filename)
+    for k, v in nd_dict.items():
+        label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
+    return label_dict
+
+
+def load_labels_v1(filename):
+    metadata = _CAPI_LoadGraphFiles_V1(filename, [], True)
     label_dict = {}
     for k, v in metadata.labels.items():
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v)

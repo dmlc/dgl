@@ -17,11 +17,13 @@ def tensor_dict_to_ndarray_dict(tensor_dict):
     return convert_to_strmap(ndarray_dict)
 
 
-def save_heterographs(filename, g_list):
+def save_heterographs(filename, g_list, labels):
+    if labels is None:
+        labels = {}
     if isinstance(g_list, DGLHeteroGraph):
         g_list = [g_list]
     gdata_list = [HeteroGraphData.create(g) for g in g_list]
-    _CAPI_SaveHeteroGraphData(filename, gdata_list)
+    _CAPI_SaveHeteroGraphData(filename, gdata_list, tensor_dict_to_ndarray_dict(labels))
 
 @register_object("heterograph_serialize.HeteroGraphData")
 class HeteroGraphData(ObjectBase):
