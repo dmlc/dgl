@@ -11,6 +11,7 @@ For evaluatation we follow the code provided by ogb [here](https://github.com/sn
 ogbl-collab
 ```
 python3 deepwalk.py --data_file ogbl-collab-net.txt --save_in_pt --output_emb_file embedding.pt --num_walks 50 --window_size 20 --walk_length 40 --lr 0.1 --negative 1 --neg_weight 1 --lap_norm 0.005 --mix --adam --gpus 0 1 2 3 --num_threads 4 --print_interval 2000 --print_loss --batch_size 32
+
 cd ./ogb/blob/master/examples/linkproppred/collab/
 cp embedding_pt_file_path ./
 python3 mlp.py --device 0 --runs 10 --use_node_embedding
@@ -59,3 +60,4 @@ ogbl-collab
 <br>&emsp;Highest Valid: 48.49 ± 1.09
 <br>&emsp;&emsp;Final Train: 52.28 ± 1.21
 <br>&emsp;&emsp;Final Test: 29.13 ± 3.46
+
