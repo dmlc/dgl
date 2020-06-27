@@ -156,6 +156,7 @@ def load_graphs(filename, idx_list=None):
 
 
 def load_graph_v2(filename, idx_list=None):
+    """Internal functions for loading DGLHeteroGraphs."""
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
@@ -210,6 +211,7 @@ def load_labels(filename):
 
 
 def load_labels_v2(filename):
+    """Internal functions for loading labels from V2 format"""
     label_dict = {}
     nd_dict = _CAPI_LoadLabels_V2(filename)
     for k, v in nd_dict.items():
@@ -218,6 +220,7 @@ def load_labels_v2(filename):
 
 
 def load_labels_v1(filename):
+    """Internal functions for loading labels from V1 format"""
     metadata = _CAPI_LoadGraphFiles_V1(filename, [], True)
     label_dict = {}
     for k, v in metadata.labels.items():
