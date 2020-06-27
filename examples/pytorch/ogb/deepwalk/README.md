@@ -45,17 +45,17 @@ ogbl-collab
 
 <br>obgl-ddi
 <br>Hits@10
-<br>Highest Train: 35.05 ± 3.68
-<br>Highest Valid: 31.72 ± 3.52
-<br>Final Train: 35.05 ± 3.68
-<br>Final Test: 12.68 ± 3.19
+<br>&emsp;Highest Train: 35.05 ± 3.68
+<br>&emsp;Highest Valid: 31.72 ± 3.52
+<br>&emsp;&emsp;Final Train: 35.05 ± 3.68
+<br>&emsp;&emsp;Final Test: 12.68 ± 3.19
 <br>Hits@20
-<br>Highest Train: 44.85 ± 1.26
-<br>Highest Valid: 41.20 ± 1.41
-<br>Final Train: 44.85 ± 1.26
-<br>Final Test: 21.69 ± 3.14
+<br>&emsp;Highest Train: 44.85 ± 1.26
+<br>&emsp;Highest Valid: 41.20 ± 1.41
+<br>&emsp;&emsp;Final Train: 44.85 ± 1.26
+<br>&emsp;&emsp;Final Test: 21.69 ± 3.14
 <br>Hits@30
-<br>Highest Train: 52.28 ± 1.21
-<br>Highest Valid: 48.49 ± 1.09
-<br>Final Train: 52.28 ± 1.21
-<br>Final Test: 29.13 ± 3.46
+<br>&emsp;Highest Train: 52.28 ± 1.21
+<br>&emsp;Highest Valid: 48.49 ± 1.09
+<br>&emsp;&emsp;Final Train: 52.28 ± 1.21
+<br>&emsp;&emsp;Final Test: 29.13 ± 3.46
