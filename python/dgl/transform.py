@@ -716,7 +716,8 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         node_part = utils.toindex(node_part)
         return node_part.tousertensor()
 
-def metis_partition(g, k, extra_cached_hops=0, reshuffle=False, balance_ntypes=None, balance_edges=False):
+def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
+                    balance_ntypes=None, balance_edges=False):
     ''' This is to partition a graph with Metis partitioning.
 
     Metis assigns vertices to partitions. This API constructs subgraphs with the vertices assigned
