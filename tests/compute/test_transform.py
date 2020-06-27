@@ -271,13 +271,14 @@ def check_metis_partition_with_constraint(g):
         print('type2:', np.sum(sub_ntypes == 2))
     subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1,
                                           balance_ntypes=ntypes, balance_edges=True)
-    for i in subgs:
-        subg = subgs[i]
-        parent_nids = F.asnumpy(subg.ndata[dgl.NID])
-        sub_ntypes = ntypes[parent_nids]
-        print('type0:', np.sum(sub_ntypes == 0))
-        print('type1:', np.sum(sub_ntypes == 1))
-        print('type2:', np.sum(sub_ntypes == 2))
+    if subgs is not None:
+        for i in subgs:
+            subg = subgs[i]
+            parent_nids = F.asnumpy(subg.ndata[dgl.NID])
+            sub_ntypes = ntypes[parent_nids]
+            print('type0:', np.sum(sub_ntypes == 0))
+            print('type1:', np.sum(sub_ntypes == 1))
+            print('type2:', np.sum(sub_ntypes == 2))
 
 def check_metis_partition(g, extra_hops):
     subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops)
