@@ -46,17 +46,6 @@ Accuracy:
 | Neighbor Sampling     | 0.9495   |
 | Control Variate       | 0.9490   |
 
-### Distributed training
-
-```bash
-# partition graph
-python3 partition_graph.py --dataset ogb-product --num_parts 1
-# run server
-python3 train_dist.py --server --graph-name ogb-product --id 0 --num-client 1 --conf_path data/ogb-product.json --ip_config ip_config.txt
-# run client
-python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 1
-```
-
 ### Unsupervised training
 
 Train w/ mini-batch sampling in an unsupervised fashion (on the Reddit dataset)
