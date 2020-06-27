@@ -54,10 +54,11 @@ namespace serialize {
 using namespace dgl::runtime;
 using dmlc::SeekStream;
 using dmlc::Stream;
-using dmlc::io::URI;
 using dmlc::io::FileSystem;
+using dmlc::io::URI;
 
-bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata, const std::vector<NamedTensor>& nd_list) {
+bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
+                      const std::vector<NamedTensor> &nd_list) {
   auto fs = std::unique_ptr<StreamWithCount>(
     StreamWithCount::Create(filename.c_str(), "w", false));
   CHECK(fs->isValid()) << "File name " << filename << " is not a valid name";
@@ -84,11 +85,12 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata, const s
   auto label_fs = static_cast<Stream *>(&label_fs_);
   label_fs->Write(nd_list);
 
-  uint64_t gdata_start_pos = fs->count() + sizeof(uint64_t) + labels_blob.size();
+  uint64_t gdata_start_pos =
+    fs->count() + sizeof(uint64_t) + labels_blob.size();
 
   // Write start position of gdata, which can be skipped when only reading gdata
   // And label dict
-  fs->Write(gdata_start_pos);  
+  fs->Write(gdata_start_pos);
   fs->Write(labels_blob.c_str(), labels_blob.size());
 
   std::vector<uint64_t> graph_indices(num_graph);
@@ -151,12 +153,12 @@ std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
     gdata_refs.reserve(idx_list.size());
     URI uri(filename.c_str());
     uint64_t filesize = FileSystem::GetInstance(uri)->GetPathInfo(uri).size;
-    fs->Seek(filesize-sizeof(uint64_t));
+    fs->Seek(filesize - sizeof(uint64_t));
     uint64_t indptr_buffer_size;
     fs->Read(&indptr_buffer_size);
 
     std::vector<uint64_t> graph_indices(num_graph);
-    fs->Seek(filesize-sizeof(uint64_t)-indptr_buffer_size);
+    fs->Seek(filesize - sizeof(uint64_t) - indptr_buffer_size);
     fs->Read(&graph_indices);
 
     fs->Seek(gdata_start_pos);
@@ -174,7 +176,7 @@ std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
   return gdata_refs;
 }
 
-std::vector<NamedTensor> LoadLabels_V2(const std::string &filename){
+std::vector<NamedTensor> LoadLabels_V2(const std::string &filename) {
   auto fs = std::unique_ptr<SeekStream>(
     SeekStream::CreateForRead(filename.c_str(), false));
   CHECK(fs) << "File name " << filename << " is not a valid name";
@@ -212,7 +214,7 @@ DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_SaveHeteroGraphData")
     List<HeteroGraphData> hgdata = args[1];
     Map<std::string, Value> nd_map = args[2];
     std::vector<NamedTensor> nd_list;
-    for (auto kv: nd_map){
+    for (auto kv : nd_map) {
       NDArray ndarray = static_cast<NDArray>(kv.second->data);
       nd_list.emplace_back(kv.first, ndarray);
     }
@@ -280,18 +282,16 @@ DGL_REGISTER_GLOBAL(
     *rv = etensors;
   });
 
-
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadLabels_V2")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
-    auto labels_list = LoadLabels_V2(filename);    
+    auto labels_list = LoadLabels_V2(filename);
     Map<std::string, Value> rvmap;
     for (auto kv : labels_list) {
       rvmap.Set(kv.first, Value(MakeValue(kv.second)));
     }
     *rv = rvmap;
   });
-
 
 }  // namespace serialize
 }  // namespace dgl
