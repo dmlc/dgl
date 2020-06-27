@@ -242,7 +242,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
             g.edata['orig_id'] = F.arange(0, g.number_of_edges())
     elif part_method == 'metis':
-        node_parts = metis_partition_assignment(g, num_parts)
+        node_parts = metis_partition_assignment(g, num_parts, balance_ntypes=g.ndata['train_mask'])
         client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     elif part_method == 'random':
         node_parts = random_choice(num_parts, g.number_of_nodes())
