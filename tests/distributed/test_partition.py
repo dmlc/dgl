@@ -17,7 +17,7 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
-def check_partition(reshuffle):
+def check_partition(part_method, reshuffle):
     g = create_random_graph(10000)
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
@@ -28,7 +28,7 @@ def check_partition(reshuffle):
     num_hops = 2
 
     partition_graph(g, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
-                    part_method='metis', reshuffle=reshuffle)
+                    part_method=part_method, reshuffle=reshuffle)
     part_sizes = []
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb = load_partition('/tmp/partition/test.json', i)
@@ -105,8 +105,10 @@ def check_partition(reshuffle):
         assert np.all(F.asnumpy(eid2pid) == edge_map)
 
 def test_partition():
-    check_partition(True)
-    check_partition(False)
+    check_partition('metis', True)
+    check_partition('metis', False)
+    check_partition('random', True)
+    check_partition('random', False)
 
 
 if __name__ == '__main__':
