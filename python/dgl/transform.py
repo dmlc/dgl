@@ -597,15 +597,12 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     ------------
     g: DGLGraph
         The graph to be partitioned
-
     node_part: 1D tensor
         Specify which partition a node is assigned to. The length of this tensor
         needs to be the same as the number of nodes of the graph. Each element
         indicates the partition Id of a node.
-
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
-
     reshuffle : bool
         Resuffle nodes so that nodes in the same partition are in the same Id range.
 
@@ -749,19 +746,14 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
     ------------
     g: DGLGraph
         The graph to be partitioned
-
     k: int
         The number of partitions.
-
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
-
     reshuffle : bool
         Resuffle nodes so that nodes in the same partition are in the same Id range.
-
     balance_ntypes : tensor
         Node type of each node
-
     balance_edges : bool
         Indicate whether to balance the edges.
 
