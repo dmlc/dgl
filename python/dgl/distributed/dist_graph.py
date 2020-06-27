@@ -497,9 +497,15 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
+        # If DistGraph doesn't have a local partition, it doesn't matter what rank
+        # it returns. There is no data locality any way, as long as the returned rank
+        # is unique in the system.
         if self._g is None:
             return self._client.client_id
         else:
+            # If DistGraph has a local partition, we should be careful about the rank
+            # we return. We need to return a rank that node_split or edge_split can split
+            # the workload with respect to data locality.
             num_client_per_part = self._num_client // self._gpb.num_partitions()
             client_id_in_part = self._client.client_id % num_client_per_part
             return int(self._gpb.partid * num_client_per_part + client_id_in_part)
