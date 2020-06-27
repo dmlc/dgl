@@ -697,16 +697,16 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         balance_ntypes = balance_ntypes.tousertensor()
         uniq_ntypes = F.unique(balance_ntypes)
         for ntype in uniq_ntypes:
-            vwgt.append(F.astype(balance_ntypes == ntype, F.int32))
+            vwgt.append(F.astype(balance_ntypes == ntype, F.int64))
     if balance_edges:
-        vwgt.append(F.astype(g.in_degrees(), F.int32))
+        vwgt.append(F.astype(g.in_degrees(), F.int64))
     if len(vwgt) > 0:
         vwgt = F.stack(vwgt, 1)
         shape = (np.prod(F.shape(vwgt),),)
         vwgt = F.reshape(vwgt, shape)
         vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
     else:
-        vwgt = F.zeros((0,), F.int32, F.cpu())
+        vwgt = F.zeros((0,), F.int64, F.cpu())
         vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
     node_part = _CAPI_DGLMetisPartition(sym_g._graph, k, vwgt)
     if len(node_part) == 0:

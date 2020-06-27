@@ -33,15 +33,15 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   idx_t objval = 0;
   idx_t *part = static_cast<idx_t*>(part_arr->data);
 
-  int64_t vwgt_len = vwgt->shape[0];
-  CHECK_EQ(sizeof(idx_t), vwgt->dtype.bits / 8)
+  int64_t vwgt_len = vwgt_arr->shape[0];
+  CHECK_EQ(sizeof(idx_t), vwgt_arr->dtype.bits / 8)
       << "The vertex weight array doesn't have right type";
   CHECK(vwgt_len % g->NumVertices() == 0)
       << "The vertex weight array doesn't have right number of elements";
   idx_t *vwgt = NULL;
   if (vwgt_len > 0) {
     ncon = vwgt_len / g->NumVertices();
-    vwgt = static_cast<idx_t*>(vwgt->data);
+    vwgt = static_cast<idx_t*>(vwgt_arr->data);
   }
 
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
