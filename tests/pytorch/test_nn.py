@@ -679,17 +679,19 @@ def test_dense_cheb_conv():
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         adj = g.adjacency_matrix(ctx=ctx).to_dense()
-        cheb = nn.ChebConv(5, 2, k)
+        cheb = nn.ChebConv(5, 2, k, None)
         dense_cheb = nn.DenseChebConv(5, 2, k)
-        for i in range(len(cheb.fc)):
-            dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
-        if cheb.bias is not None:
-            dense_cheb.bias.data = cheb.bias.data
+        #for i in range(len(cheb.fc)):
+        #    dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
+        dense_cheb.W.data = cheb.linear.weight.data.transpose(-1, -2).view(k, 5, 2)
+        if cheb.linear.bias is not None:
+            dense_cheb.bias.data = cheb.linear.bias.data
         feat = F.randn((100, 5))
         cheb = cheb.to(ctx)
         dense_cheb = dense_cheb.to(ctx)
         out_cheb = cheb(g, feat, [2.0])
         out_dense_cheb = dense_cheb(adj, feat, 2.0)
+        print(k, out_cheb, out_dense_cheb)
         assert F.allclose(out_cheb, out_dense_cheb)
 
 def test_sequential():

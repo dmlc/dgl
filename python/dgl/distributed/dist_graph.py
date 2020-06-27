@@ -16,6 +16,7 @@ from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, 
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
+from ..transform import as_heterograph
 
 def _get_graph_path(graph_name):
     return "/" + graph_name
@@ -336,7 +337,11 @@ class DistGraph:
     def __init__(self, ip_config, graph_name, gpb=None):
         connect_to_server(ip_config=ip_config)
         self._client = KVClient(ip_config)
-        self._g = _get_graph_from_shared_mem(graph_name)
+        g = _get_graph_from_shared_mem(graph_name)
+        if g is not None:
+            self._g = as_heterograph(g)
+        else:
+            self._g = None
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
         if self._gpb is None:
             self._gpb = gpb
@@ -421,6 +426,21 @@ class DistGraph:
         '''
         # TODO(zhengda)
         raise NotImplementedError("get_node_embeddings isn't supported yet")
+
+    @property
+    def local_partition(self):
+        ''' Return the local partition on the client
+
+        DistGraph provides a global view of the distributed graph. Internally,
+        it may contains a partition of the graph if it is co-located with
+        the server. If there is no co-location, this returns None.
+
+        Returns
+        -------
+        DGLHeterograph
+            The local partition
+        '''
+        return self._g
 
     @property
     def ndata(self):
