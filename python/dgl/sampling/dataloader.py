@@ -31,7 +31,7 @@ class BlockSampler(object):
     have their outputs computed.
 
     The default implementation of :py:meth:`~dgl.sampling.BlockSampler.sample_blocks` is
-    to repeat ``__len__`` times the following:
+    to repeat ``num_hops`` times the following:
 
     * Obtain a frontier with the same nodes as the original graph but only the edges
       involved in message passing on the last layer.
@@ -52,14 +52,16 @@ class BlockSampler(object):
 
     * Override :py:meth:`~dgl.sampling.BlockSampler.sample_blocks` method, or
 
-    * Override both :py:meth:`~dgl.sampling.BlockSampler.__len__` method and
-      :py:meth:`~dgl.sampling.BlockSampler.sample_frontier` method.
+    * Override
+      :py:meth:`~dgl.sampling.BlockSampler.sample_frontier` method while specifying
+      the number of layers to sample in ``num_hops`` argument.
 
     See also
     --------
     For the concept of frontiers and blocks, please refer to User Guide Section 6.
     """
-    def __init__(self):
+    def __init__(self, num_hops):
+        self.num_hops = num_hops
         self._frontier_postprocessors = []
         self._block_postprocessors = []
 
@@ -231,10 +233,6 @@ class BlockSampler(object):
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
             blocks.insert(0, block)
         return blocks
-
-    def __len__(self):
-        """Returns the number of blocks to generate (i.e. number of layers of the GNN)."""
-        raise NotImplementedError
 
 class Collator(ABC):
     """

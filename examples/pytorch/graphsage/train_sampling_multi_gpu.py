@@ -17,27 +17,6 @@ import traceback
 
 from utils import thread_wrapped_func
 
-#### Neighbor sampler
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts):
-        self.g = g
-        self.fanouts = fanouts
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
-
 class SAGE(nn.Module):
     def __init__(self,
                  in_feats,
@@ -92,13 +71,12 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            collator = dgl.sampling.NodeCollator(g, th.arange(g.number_of_nodes()), sampler)
-            dataloader = DataLoader(
-                collator.dataset,
-                collate_fn=collator.collate,
+            dataloader = dgl.sampling.NeighborSamplerNodeDataLoader(
+                g,
+                th.arange(g.number_of_nodes()),
+                [None],
                 batch_size=args.batch_size,
-                shuffle=True,
+                shuffle=False,
                 drop_last=False,
                 num_workers=args.num_workers)
 
@@ -184,14 +162,11 @@ def run(proc_id, n_gpus, args, devices, data):
     # Split train_nid
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
-    # Create sampler
-    sampler = dgl.sampling.MultiLayerNeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
-
     # Create PyTorch DataLoader for constructing blocks
-    collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
-    dataloader = DataLoader(
-        collator.dataset,
-        collate_fn=collator.collate,
+    dataloader = dgl.sampling.NeighborSamplerNodeDataLoader(
+        g,
+        train_nid,
+        [int(fanout) for fanout in args.fan_out.split(',')],
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,

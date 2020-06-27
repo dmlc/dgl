@@ -88,14 +88,9 @@ def main(args):
         model.cuda()
 
     # train sampler
-    sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    collator = dgl.sampling.NodeCollator(g, {category: train_idx}, sampler)
-    loader = DataLoader(
-        collator.dataset,
-        collate_fn=collator.collate,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=0)
+    loader = dgl.sampling.NeighborSamplerNodeDataLoader(
+        g, {category: train_idx}, [args.fanout] * args.n_layers,
+        batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # validation sampler
     val_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)

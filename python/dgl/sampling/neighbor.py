@@ -177,13 +177,11 @@ class MultiLayerNeighborSampler(BlockSampler):
     This sampler will make every node gather messages from a fixed number of neighbors
     per edge type.  The neighbors are picked uniformly.
 
-    Often works with a DGL dataloader for stochastic training of GNNs.
-
     Parameters
     ----------
-    fanouts : list[int] or list[dict[etype, int]]
+    fanouts : list[int or None] or list[dict[etype, int or None]]
         List of neighbors to sample per edge type for each GNN layer, starting from the
-        first layer.
+        first layer.  If None is provided for one layer, all neighbors will be taken.
 
         If the graph is homogeneous, only an integer is needed for each layer.
     replace : bool, default True
@@ -219,7 +217,7 @@ class MultiLayerNeighborSampler(BlockSampler):
     ...      ('game', 'played-by', 'user'): 3}] * 3)
     """
     def __init__(self, fanouts, replace=False, return_eids=False):
-        super().__init__()
+        super().__init__(len(fanouts))
 
         self.fanouts = fanouts
         self.replace = replace
@@ -234,8 +232,5 @@ class MultiLayerNeighborSampler(BlockSampler):
         else:
             frontier = sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
         return frontier
-
-    def __len__(self):
-        return len(self.fanouts)
 
 _init_api('dgl.sampling.neighbor', __name__)

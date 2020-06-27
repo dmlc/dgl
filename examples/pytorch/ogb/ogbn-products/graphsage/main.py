@@ -70,11 +70,14 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            collator = dgl.sampling.NodeCollator(g, th.arange(g.number_of_nodes()), sampler)
-            dataloader = DataLoader(
-                collator.dataset, collate_fn=collator.collate,
-                shuffle=False, drop_last=False, batch_size=batch_size)
+            dataloader = dgl.sampling.NeighborSamplerNodeDataLoader(
+                g,
+                th.arange(g.number_of_nodes()),
+                [None],
+                batch_size=args.batch_size,
+                shuffle=False,
+                drop_last=False,
+                num_workers=args.num_workers)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
@@ -138,14 +141,11 @@ def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, labels, n_classes, g = data
 
-    # Create sampler
-    sampler = dgl.sampling.MultiLayerNeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
-
     # Create PyTorch DataLoader for constructing blocks
-    collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
-    dataloader = DataLoader(
-        collator.dataset,
-        collate_fn=collator.collate,
+    dataloader = dgl.sampling.NeighborSamplerNodeDataLoader(
+        g,
+        train_nid,
+        [int(fanout) for fanout in args.fan_out.split(',')],
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
