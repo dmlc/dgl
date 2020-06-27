@@ -73,11 +73,7 @@ def init_emb2neg_index(walk_length, window_size, negative, batch_size):
     return index_emb_negu, index_emb_negv
 
 def init_grad_avg(walk_length, window_size, batch_size):
-    '''select nodes' gradients from gradient matrix
-
-    Usage
-    -----
-
+    ''' averaging graidents by specific weights
     '''
     grad_avg = []
     for b in range(batch_size):
@@ -91,6 +87,22 @@ def init_grad_avg(walk_length, window_size, batch_size):
 
     # [num_pos * batch_size]
     return torch.Tensor(grad_avg).unsqueeze(1)
+
+def init_weight(walk_length, window_size, batch_size):
+    ''' select nodes' gradients from gradient matrix
+    '''
+    weight = []
+    for b in range(batch_size):
+        for i in range(walk_length):
+            for j in range(i-window_size, i):
+                if j >= 0:
+                    weight.append(1. - float(i - j - 1)/float(window_size))
+            for j in range(i + 1, i + 1 + window_size):
+                if j < walk_length:
+                    weight.append(1. - float(j - i - 1)/float(window_size))
+
+    # [num_pos * batch_size]
+    return torch.Tensor(weight).unsqueeze(1)
 
 def init_empty_grad(emb_dimension, walk_length, batch_size):
     """ initialize gradient matrix """
@@ -131,6 +143,8 @@ class SkipGramModel(nn.Module):
         avg_sgd,
         fast_neg,
         record_loss,
+        norm,
+        use_context_weight,
         ):
         """ initialize embedding on CPU 
 
@@ -171,6 +185,8 @@ class SkipGramModel(nn.Module):
         self.avg_sgd = avg_sgd
         self.fast_neg = fast_neg
         self.record_loss = record_loss
+        self.norm = norm
+        self.use_context_weight = use_context_weight
         
         # initialize the device as cpu
         self.device = torch.device("cpu")
@@ -204,6 +220,12 @@ class SkipGramModel(nn.Module):
                 self.walk_length,
                 self.window_size,
                 self.negative,
+                self.batch_size)
+
+        if self.use_context_weight:
+            self.context_weight = init_weight(
+                self.walk_length,
+                self.window_size,
                 self.batch_size)
 
         # coefficients for averaging the gradients
@@ -247,6 +269,8 @@ class SkipGramModel(nn.Module):
         self.grad_v = self.grad_v.to(self.device)
         if self.avg_sgd:
             self.grad_avg = self.grad_avg.to(self.device)
+        if self.use_context_weight:
+            self.context_weight = self.context_weight.to(self.device)
 
     def all_to_device(self, gpu_id):
         """ move all of the parameters to a single GPU """
@@ -340,6 +364,18 @@ class SkipGramModel(nn.Module):
         else:
             grad_u_pos = score * emb_pos_v
             grad_v_pos = score * emb_pos_u
+
+        if self.use_context_weight:
+            if bs < self.batch_size:
+                context_weight = init_weight(
+                    self.walk_length,
+                    self.window_size,
+                    bs).to(self.device)
+            else:
+                context_weight = self.context_weight
+            grad_u_pos *= context_weight
+            grad_v_pos *= context_weight
+
         # [batch_size * walk_length, dim]
         if bs < self.batch_size:
             grad_u, grad_v = init_empty_grad(
@@ -453,6 +489,8 @@ class SkipGramModel(nn.Module):
         file_name str : the file name
         """
         embedding = self.u_embeddings.weight.cpu().data.numpy()
+        if self.norm:
+            embedding /= np.sqrt(np.sum(embedding * embedding, 1)).reshape(-1, 1)
         np.save(file_name, embedding)
 
     def save_embedding_pt(self, dataset, file_name):
@@ -462,6 +500,8 @@ class SkipGramModel(nn.Module):
         assert max(dataset.node2id.keys()) == self.emb_size - 1, "The node id does not starts from 0, saving embedding failed."
         index = torch.LongTensor(list(map(lambda node: dataset.node2id[node], list(range(self.emb_size)))))
         embedding = torch.index_select(embedding, 0, index)
+        if self.norm:
+            embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1)).unsqueeze(1)
         torch.save(embedding, file_name)
 
     def save_embedding_txt(self, dataset, file_name):
@@ -473,6 +513,8 @@ class SkipGramModel(nn.Module):
         file_name str : the file name
         """
         embedding = self.u_embeddings.weight.cpu().data.numpy()
+        if self.norm:
+            embedding /= np.sqrt(np.sum(embedding * embedding, 1)).reshape(-1, 1)
         with open(file_name, 'w') as f:
             f.write('%d %d\n' % (self.emb_size, self.emb_dimension))
             for wid in range(self.emb_size):
