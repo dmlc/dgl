@@ -12,6 +12,10 @@ if __name__ == '__main__':
                            help='datasets: reddit, ogb-product, ogb-paper100M')
     argparser.add_argument('--num_parts', type=int, default=4,
                            help='number of partitions')
+    argparser.add_argument('--balance_train', action='store_true',
+                           help='balance the training size in each partition.')
+    argparser.add_argument('--balance_edges', action='store_true',
+                           help='balance the number of edges in each partition.')
     args = argparser.parse_args()
 
     start = time.time()
@@ -26,4 +30,10 @@ if __name__ == '__main__':
     print('train: {}, valid: {}, test: {}'.format(th.sum(g.ndata['train_mask']),
                                                   th.sum(g.ndata['val_mask']),
                                                   th.sum(g.ndata['test_mask'])))
-    dgl.distributed.partition_graph(g, args.dataset, args.num_parts, 'data')
+    if args.balance_train:
+        balance_ntypes = g.ndata['train_mask']
+    else:
+        balance_ntypes = None
+    dgl.distributed.partition_graph(g, args.dataset, args.num_parts, 'data',
+                                    balance_ntypes=balance_ntypes,
+                                    balance_edges=args.balance_edges)
