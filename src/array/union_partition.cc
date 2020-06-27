@@ -37,8 +37,8 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
     col_sorted &= coo.col_sorted;
     IdArray edges_src = coo.row + src_offset;
     IdArray edges_dst = coo.col + dst_offset;
-    res_src.push_back(edges_src);
-    res_dst.push_back(edges_dst);
+    res_src[i] = edges_src;
+    res_dst[i] = edges_dst;
     src_offset += coo.num_rows;
     dst_offset += coo.num_cols;
 
@@ -109,7 +109,9 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
         dst_vertex_cumsum[g+1]-dst_vertex_cumsum[g],
         result_src,
         result_dst,
-        result_data);
+        result_data,
+        coo.row_sorted,
+        coo.col_sorted);
     ret[g] = sub_coo;
   }
 
@@ -149,8 +151,8 @@ CSRMatrix DisjointUnionCsr(const std::vector<CSRMatrix>& csrs) {
                                  indptr->shape[0],
                                  indptr->dtype.bits,
                                  indptr->ctx));
-    res_indptr.push_back(indptr);
-    res_indices.push_back(indices);
+    res_indptr[i] = indptr;
+    res_indices[i] = indices;
     src_offset += csr.num_rows;
     dst_offset += csr.num_cols;
 
@@ -232,7 +234,8 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
       dst_vertex_cumsum[g+1]-dst_vertex_cumsum[g],
       result_indptr,
       result_indices,
-      result_data);
+      result_data,
+      csr.sorted);
     ret[g] = sub_csr;
   }
 

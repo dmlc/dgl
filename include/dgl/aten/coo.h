@@ -314,12 +314,12 @@ COOMatrix COORowWiseTopk(
  *
  * Examples:
  *
- * A = [[0, 0, 1,
- *       1, 0, 1,
- *       0, 1, 0]]
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
  *
- * B = [[0, 0,
- *       1, 0]]
+ * B = [[0, 0],
+ *      [1, 0]]
  *
  * COOMatrix_A.num_rows : 3
  * COOMatrix_A.num_cols : 3
@@ -328,11 +328,11 @@ COOMatrix COORowWiseTopk(
  *
  * C = DisjointUnionCoo({A, B});
  *
- * C = [[0, 0, 1, 0, 0,
- *       1, 0, 1, 0, 0,
- *       0, 1, 0, 0, 0,
- *       0, 0, 0, 0, 0,
- *       0, 0, 0, 1, 0]]
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0]]
  * COOMatrix_C.num_rows : 5
  * COOMatrix_C.num_cols : 5
  *
@@ -349,12 +349,12 @@ COOMatrix DisjointUnionCoo(
  *
  * Examples:
  *
- * C = [[0, 0, 1, 0, 0,
- *       1, 0, 1, 0, 0,
- *       0, 1, 0, 0, 0,
- *       0, 0, 0, 0, 0,
- *       0, 0, 0, 1, 0,
- *       0, 0, 0, 0, 1]]
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 1]]
  * COOMatrix_C.num_rows : 6
  * COOMatrix_C.num_cols : 5
  *
@@ -369,15 +369,15 @@ COOMatrix DisjointUnionCoo(
  *                                   src_vertex_cumsum,
  *                                   dst_vertex_cumsum)
  *
- * A = [[0, 0, 1,
- *       1, 0, 1,
- *       0, 1, 0]]
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
  * COOMatrix_A.num_rows : 3
  * COOMatrix_A.num_cols : 3
  *
- * B = [[0, 0,
- *       1, 0,
- *       0, 1]]
+ * B = [[0, 0],
+ *      [1, 0],
+ *      [0, 1]]
  * COOMatrix_B.num_rows : 3
  * COOMatrix_B.num_cols : 2
  *

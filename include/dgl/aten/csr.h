@@ -323,12 +323,12 @@ COOMatrix CSRRowWiseTopk(
  *
  * Examples:
  *
- * A = [[0, 0, 1,
- *       1, 0, 1,
- *       0, 1, 0]]
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
  *
- * B = [[0, 0,
- *       1, 0]]
+ * B = [[0, 0],
+ *      [1, 0]]
  *
  * CSRMatrix_A.num_rows : 3
  * CSRMatrix_A.num_cols : 3
@@ -337,11 +337,11 @@ COOMatrix CSRRowWiseTopk(
  *
  * C = DisjointUnionCsr({A, B});
  *
- * C = [[0, 0, 1, 0, 0,
- *       1, 0, 1, 0, 0,
- *       0, 1, 0, 0, 0,
- *       0, 0, 0, 0, 0,
- *       0, 0, 0, 1, 0]]
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0]]
  * CSRMatrix_C.num_rows : 5
  * CSRMatrix_C.num_cols : 5
  *
@@ -358,12 +358,12 @@ CSRMatrix DisjointUnionCsr(
  *
  * Examples:
  *
- * C = [[0, 0, 1, 0, 0,
- *       1, 0, 1, 0, 0,
- *       0, 1, 0, 0, 0,
- *       0, 0, 0, 0, 0,
- *       0, 0, 0, 1, 0,
- *       0, 0, 0, 0, 1]]
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 1]]
  * CSRMatrix_C.num_rows : 6
  * CSRMatrix_C.num_cols : 5
  *
@@ -378,15 +378,15 @@ CSRMatrix DisjointUnionCsr(
  *                                   src_vertex_cumsum,
  *                                   dst_vertex_cumsum)
  *
- * A = [[0, 0, 1,
- *       1, 0, 1,
- *       0, 1, 0]]
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
  * CSRMatrix_A.num_rows : 3
  * CSRMatrix_A.num_cols : 3
  *
- * B = [[0, 0,
- *       1, 0,
- *       0, 1]]
+ * B = [[0, 0],
+ *      [1, 0],
+ *      [0, 1]]
  * CSRMatrix_B.num_rows : 3
  * CSRMatrix_B.num_cols : 2
  *

@@ -224,15 +224,17 @@ TEST(ArrayTest, TestIndexSelect) {
 
 template <typename IDX>
 void _TestRelabel_() {
-  IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, CTX);
-  IdArray b = aten::VecToIdArray(std::vector<IDX>({4, 5, 6}), sizeof(IDX)*8, CTX);
-  IdArray tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6}), sizeof(IDX)*8, CTX);
-  IdArray c = aten::Concat(std::vector<IdArray>{a, b});
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, CTX);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({20, 5, 6}), sizeof(IDX)*8, CTX);
+  IdArray c = aten::Relabel_({a, b});
+
+  IdArray ta = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, CTX);
+  IdArray tb = aten::VecToIdArray(std::vector<IDX>({1, 3, 4}), sizeof(IDX)*8, CTX);
+  IdArray tc = aten::VecToIdArray(std::vector<IDX>({0, 20, 10, 5, 6}), sizeof(IDX)*8, CTX);
+
+  ASSERT_TRUE(ArrayEQ<IDX>(a, ta));
+  ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
   ASSERT_TRUE(ArrayEQ<IDX>(c, tc));
-  IdArray d = aten::Concat(std::vector<IdArray>{a, b, c});
-  IdArray td = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6}),
-                                  sizeof(IDX)*8, CTX);
-  ASSERT_TRUE(ArrayEQ<IDX>(d, td));
 }
 
 TEST(ArrayTest, TestRelabel_) {
@@ -242,11 +244,15 @@ TEST(ArrayTest, TestRelabel_) {
 
 template <typename IDX>
 void _TestConcat(DLContext ctx) {
-  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
-  ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
-  IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
-  IdArray c = aten::IndexSelect(a, b);
-  ASSERT_TRUE(ArrayEQ<IDX>(b, c));
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, CTX);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({4, 5, 6}), sizeof(IDX)*8, CTX);
+  IdArray tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6}), sizeof(IDX)*8, CTX);
+  IdArray c = aten::Concat(std::vector<IdArray>{a, b});
+  ASSERT_TRUE(ArrayEQ<IDX>(c, tc));
+  IdArray d = aten::Concat(std::vector<IdArray>{a, b, c});
+  IdArray td = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6}),
+                                  sizeof(IDX)*8, CTX);
+  ASSERT_TRUE(ArrayEQ<IDX>(d, td));
 }
 
 TEST(ArrayTest, TestConcat) {
@@ -259,5 +265,100 @@ TEST(ArrayTest, TestConcat) {
   _TestConcat<int64_t>(GPU);
   _TestConcat<float>(GPU);
   _TestConcat<double>(GPU);
+#endif
+}
+
+
+template <typename IdType>
+void _TestDisjointUnionPartitionCoo(DLContext ctx) {
+  /*
+   * COO_A
+   * A = [[0, 0, 1],
+   *      [1, 0, 1],
+   *      [0, 1, 0]]
+   * COO_B
+   * B = [[1, 1, 0],
+   *      [0, 1, 0]]
+   *
+   * COO_AB
+   * AB = [[0, 0, 1, 0, 0, 0],
+   *       [1, 0, 1, 0, 0, 0],
+   *       [0, 1, 0, 0, 0, 0],
+   *       [0, 0, 0, 1, 1, 0],
+   *       [0, 0, 0, 0, 1, 0]]
+   */
+  IdArray a_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2}), sizeof(IdType)*8, CTX);
+  IdArray a_col =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1}), sizeof(IdType)*8, CTX);
+  IdArray b_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 1}), sizeof(IdType)*8, CTX);
+  IdArray b_col =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1}), sizeof(IdType)*8, CTX);
+  IdArray b_data = 
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 1}), sizeof(IdType)*8, CTX);
+  IdArray ab_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2, 3, 3, 4}), sizeof(IdType)*8, CTX);
+  IdArray ab_col =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1, 3, 4, 4}), sizeof(IdType)*8, CTX);
+  IdArray ab_data =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 6, 4, 5}), sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo1 = aten::COOMatrix(
+    3,
+    3,
+    a_row,
+    a_col,
+    aten::NullArray(),
+    true,
+    false);
+  const aten::COOMatrix &coo2 = aten::COOMatrix(
+    2,
+    3,
+    b_row,
+    b_col,
+    b_data,
+    true,
+    true);
+
+  const std::vector<aten::COOMatrix> coos({coo1, coo2});
+  const aten::COOMatrix &coo = aten::DisjointUnionCoo(coos);
+  ASSERT_EQ(coo.num_rows, 5);
+  ASSERT_EQ(coo.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo.row, ab_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo.col, ab_col));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo.data, ab_data));
+  ASSERT_TRUE(coo.row_sorted);
+  ASSERT_FALSE(coo.col_sorted);
+
+  const std::vector<uint64_t> edge_cumsum({0, 4, 7});
+  const std::vector<uint64_t> src_vertex_cumsum({0, 3, 5});
+  const std::vector<uint64_t> dst_vertex_cumsum({0, 3, 6});
+  const std::vector<aten::COOMatrix> &p_coos = aten::DisjointPartitionCooBySizes(
+    coo,
+    2,
+    edge_cumsum,
+    src_vertex_cumsum,
+    dst_vertex_cumsum);
+  ASSERT_EQ(p_coos[0].num_rows, coo1.num_rows);
+  ASSERT_EQ(p_coos[0].num_cols, coo1.num_cols);
+  ASSERT_EQ(p_coos[1].num_rows, coo2.num_rows);
+  ASSERT_EQ(p_coos[1].num_cols, coo2.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[0].row, coo1.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[0].col, coo1.col));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].row, coo2.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].col, coo2.col));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].data, coo2.data));
+  ASSERT_TRUE(p_coos[0].row_sorted);
+  ASSERT_FALSE(p_coos[1].col_sorted);
+  ASSERT_TRUE(p_coos[0].row_sorted);
+  ASSERT_FALSE(p_coos[1].col_sorted);
+}
+
+TEST(DisjointUnionTest, TestDisjointUnionPartitionCoo) {
+  _TestDisjointUnionPartitionCoo<int32_t>(CPU);
+  _TestDisjointUnionPartitionCoo<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestDisjointUnionPartitionCoo<int32_t>(GPU);
+  _TestDisjointUnionPartitionCoo<int64_t>(GPU);
 #endif
 }
