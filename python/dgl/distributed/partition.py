@@ -83,6 +83,7 @@ import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID
+from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
 from .graph_partition_book import GraphPartitionBook, RangePartitionBook
@@ -237,12 +238,14 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         g.edata[EID] = F.arange(0, g.number_of_edges())
         g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int64, F.cpu())
         g.edata['inner_edge'] = F.ones((g.number_of_edges(),), F.int64, F.cpu())
-        g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
+        if reshuffle:
+            g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
+            g.edata['orig_id'] = F.arange(0, g.number_of_edges())
     elif part_method == 'metis':
         node_parts = metis_partition_assignment(g, num_parts)
         client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     elif part_method == 'random':
-        node_parts = dgl.random.choice(num_parts, g.number_of_nodes())
+        node_parts = random_choice(num_parts, g.number_of_nodes())
         client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
