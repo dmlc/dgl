@@ -2061,6 +2061,10 @@ class DGLHeteroGraph(object):
             If the graph only has one node type, one can just specify a list,
             tensor, or any iterable of node IDs intead.
 
+            The node ID array can be either an interger tensor or a bool tensor.
+            When a bool tensor is used, it is automatically converted to 
+            an interger tensor using the semantic of np.where(nodes_idx == True).
+
         Returns
         -------
         G : DGLHeteroGraph
@@ -2095,6 +2099,14 @@ class DGLHeteroGraph(object):
               num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
+        Get subgraphs using boolean mask tensor.
+
+        >>> sub_g = g.subgraph({'user': th.tensor([False, True, True])})
+        >>> print(sub_g)
+        Graph(num_nodes={'user': 2, 'game': 0},
+              num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
+              metagraph=[('user', 'game'), ('user', 'user')])
+
         Get the original node/edge indices.
 
         >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
@@ -2121,7 +2133,16 @@ class DGLHeteroGraph(object):
             assert len(self.ntypes) == 1, \
                 'need a dict of node type and IDs for graph with multiple node types'
             nodes = {self.ntypes[0]: nodes}
-        check_idtype_dict(self._idtype_str, nodes)
+
+        for ntype, v in nodes.items():
+            # Check if the v is a bool tensor
+            if F.dtype(v) is F.data_type_dict['bool']:
+                ndoes_idx = F.nonzero_1d(v)
+                nodes[ntype] = F.astype(ndoes_idx,
+                                        ty=F.data_type_dict[self._idtype_str])
+            else:
+                check_same_dtype(self._idtype_str, v)
+
         induced_nodes = [utils.toindex(nodes.get(ntype, []), self._idtype_str)
                          for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -2147,6 +2168,11 @@ class DGLHeteroGraph(object):
 
             If the graph only has one edge type, one can just specify a list,
             tensor, or any iterable of edge IDs intead.
+
+            The edge ID array can be either an interger tensor or a bool tensor.
+            When a bool tensor is used, it is automatically converted to
+            an interger tensor using the semantic of np.where(edges_idx == True).
+
         preserve_nodes : bool
             Whether to preserve all nodes or not. If false, all nodes
             without edges will be removed. (Default: False)
@@ -2185,6 +2211,14 @@ class DGLHeteroGraph(object):
               num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
+        Get subgraphs using boolean mask tensor.
+        >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): th.tensor([False, True, True]),
+        >>>                          ('user', 'plays', 'game'): th.tensor([False, False, True, False])})
+        >>> sub_g
+        Graph(num_nodes={'user': 2, 'game': 1},
+            num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
+            metagraph=[('user', 'game'), ('user', 'user')])
+
         Get the original node/edge indices.
 
         >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
@@ -2211,7 +2245,16 @@ class DGLHeteroGraph(object):
             assert len(self.canonical_etypes) == 1, \
                 'need a dict of edge type and IDs for graph with multiple edge types'
             edges = {self.canonical_etypes[0]: edges}
-        check_idtype_dict(self._idtype_str, edges)
+
+        for etype, v in edges.items():
+            # Check if the v is a bool tensor
+            if F.dtype(v) is F.data_type_dict['bool']:
+                edges_idx = F.nonzero_1d(v)
+                edges[etype] = F.astype(edges_idx,
+                                        ty=F.data_type_dict[self._idtype_str])
+            else:
+                check_same_dtype(self._idtype_str, v)
+
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
             utils.toindex(edges.get(canonical_etype, []), self._idtype_str)
