@@ -65,21 +65,22 @@ class GraphData(ObjectBase):
 
 def save_graphs(filename, g_list, labels=None):
     r"""
-    Save DGLGraphs and graph labels to file
+    Save DGLGraphs/DGLHeteroGraph and graph labels to file
 
     Parameters
     ----------
     filename : str
-        File name to store DGLGraphs. 
+        File name to store graphs. 
     g_list: list
-        DGLGraph or list of DGLGraph
+        DGLGraph or list of DGLGraph/DGLHeteroGraph
 
     Examples
     ----------
     >>> import dgl
     >>> import torch as th
 
-    Create :code:`DGLGraph` objects and initialize node and edge features.
+    Create :code:`DGLGraph`/:code:`DGLHeteroGraph` objects and initialize node 
+    and edge features.
 
     >>> g1 = dgl.graph(([0, 1, 2], [1, 2, 3])
     >>> g2 = dgl.graph(([0, 2], [2, 3])
@@ -88,7 +89,8 @@ def save_graphs(filename, g_list, labels=None):
     Save Graphs into file
 
     >>> from dgl.data.utils import save_graphs
-    >>> save_graphs("./data.bin", [g1, g2])
+    >>> graph_labels = {"glabel": th.tensor([0, 1])}
+    >>> save_graphs("./data.bin", [g1, g2], graph_labels)
 
     """
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
@@ -132,9 +134,8 @@ def load_graphs(filename, idx_list=None):
 
     graph_list: list of DGLGraphs / DGLHeteroGraph
 
-    labels(Optional): dict of labels stored in file (empty dict returned if no
+    labels: dict of labels stored in file (empty dict returned if no
     label stored). Always the full data regardless of the idx_list
-
 
     Examples
     ----------
