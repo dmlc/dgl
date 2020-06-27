@@ -27,6 +27,31 @@ class GINConv(nn.Module):
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
         If True, :math:`\epsilon` will be a learnable parameter.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> lin = th.nn.Linear(10, 10)
+    >>> from dgl.nn import GINConv
+    >>> conv = GINConv(lin, 'mean')
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
+            1.5138,  0.8704],
+            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
+            1.5138,  0.8704],
+            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
+            1.5138,  0.8704],
+            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
+            1.5138,  0.8704],
+            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
+            1.5138,  0.8704],
+            [-0.1895,  0.1438, -0.8263,  0.1299,  0.3834,  0.4899, -0.6838, -0.7136,
+            0.6493,  0.4531]], grad_fn=<AddmmBackward>)
     """
     def __init__(self,
                  apply_func,

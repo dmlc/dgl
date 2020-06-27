@@ -28,6 +28,25 @@ class AGNNConv(nn.Module):
         The :math:`\beta` in the formula.
     learn_beta : bool, optional
         If True, :math:`\beta` will be learnable parameter.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import AGNNConv
+    >>> conv = AGNNConv()
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+            [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+            [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+            [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+            [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+            [0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]],
+        grad_fn=<BinaryReduceBackward>)
     """
     def __init__(self,
                  init_beta=1.,

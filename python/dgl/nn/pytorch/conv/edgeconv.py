@@ -26,6 +26,36 @@ class EdgeConv(nn.Module):
         Output feature size.
     batch_norm : bool
         Whether to include batch normalization on messages.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import EdgeConv
+    >>> conv = EdgeConv(10, 2)
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[-3.2300e-01,  9.0517e-01],
+            [-3.2300e-01,  9.0517e-01],
+            [-3.2300e-01,  9.0517e-01],
+            [-3.2300e-01,  9.0517e-01],
+            [-3.2300e-01,  9.0517e-01],
+            [-3.4028e+38, -3.4028e+38]], grad_fn=<CopyReduceBackward>)
+    >>> # Unidirectional bipartite graph
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
+    >>> v_fea = th.tensor(np.random.rand(4, 5).astype(np.float32))
+    >>> conv = EdgeConv(5, 2, 3)
+    >>> res = conv(g, (u_fea, v_fea))
+    >>> res
+    tensor([[-3.4028e+38, -3.4028e+38],
+            [-3.4028e+38, -3.4028e+38],
+            [ 8.5870e-01, -4.9619e-01],
+            [-1.4017e+00,  1.3946e+00]], grad_fn=<CopyReduceBackward>)
     """
     def __init__(self,
                  in_feat,

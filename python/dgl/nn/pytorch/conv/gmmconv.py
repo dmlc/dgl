@@ -38,6 +38,40 @@ class GMMConv(nn.Module):
         If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> # Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import GMMConv
+    >>> conv = GMMConv(10, 2, 3, 2, 'mean')
+    >>> pseudo = th.ones(6, 3)
+    >>> res = conv(g, feat, pseudo)
+    >>> res
+    tensor([[0.1388, 0.7694],
+            [0.1388, 0.7694],
+            [0.1388, 0.7694],
+            [0.1388, 0.7694],
+            [0.1388, 0.7694],
+            [0.0000, 0.0000]], grad_fn=<AddBackward0>)
+    >>> # Unidirectional bipartite graph
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
+    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> pseudo = th.ones(3, 3)
+    >>> conv = GMMConv((10, 5), 2, 3, 2, 'mean')
+    >>> res = conv(g, (u_fea, v_fea), pseudo)
+    >>> res
+    tensor([[ 0.0000,  0.0000],
+            [ 0.0000,  0.0000],
+            [ 0.0049,  0.0347],
+            [ 0.1355, -0.0765]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,

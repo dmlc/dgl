@@ -37,7 +37,6 @@ class GraphConv(nn.Module):
     >>> g = ... # some DGLGraph
     >>> dgl.add_self_loop(g)
 
-
     Parameters
     ----------
     in_feats : int
@@ -64,6 +63,25 @@ class GraphConv(nn.Module):
         The learnable weight tensor.
     bias : torch.Tensor
         The learnable bias tensor.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import GraphConv
+    >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True)
+    >>> conv.reset_parameters()
+    >>> res = conv(g, feat)
+    >>> print(res)
+    tensor([[ 0.6438, -0.3395],
+            [ 0.9104, -0.4801],
+            [ 0.9104, -0.4801],
+            [ 1.0990, -0.5795],
+            [ 0.9104, -0.4801],
+            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,

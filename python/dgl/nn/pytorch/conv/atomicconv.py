@@ -183,6 +183,29 @@ class AtomicConv(nn.Module):
     features_to_use : None or float tensor of shape (T)
         In the original paper, these are atomic numbers to consider, representing the types
         of atoms. T for the number of types of atomic numbers. Default to None.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 1)
+    >>> edist = th.ones(6, 1)
+    >>> interaction_cutoffs = th.ones(3)
+    >>> interaction_cutoffs = th.ones(3).float()
+    >>> rbf_kernel_means = th.ones(3).float()
+    >>> rbf_kernel_scaling = th.ones(3).float()
+    >>> from dgl.nn import AtomicConv
+    >>> conv = AtomicConv(interaction_cutoffs, rbf_kernel_means, rbf_kernel_scaling)
+    >>> res = conv(g, feat, edist)
+    >>> res
+    tensor([[0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.]], grad_fn=<ViewBackward>)
     """
     def __init__(self, interaction_cutoffs, rbf_kernel_means,
                  rbf_kernel_scaling, features_to_use=None):

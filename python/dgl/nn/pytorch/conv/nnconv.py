@@ -24,7 +24,7 @@ class NNConv(nn.Module):
     in_feats : int
         Input feature size.
 
-        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -41,6 +41,43 @@ class NNConv(nn.Module):
         If True, use residual connection. Default: ``False``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> # Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import NNConv
+    >>> lin = th.nn.Linear(5, 20)
+    >>> def edge_func(efeat):
+    ...     return lin(efeat)
+    >>> efeat = th.ones(6, 5)
+    >>> conv = NNConv(10, 2, edge_func, 'mean')
+    >>> res = conv(g, feat, efeat)
+    >>> res
+    tensor([[0.5983, 1.7884],
+            [0.5983, 1.7884],
+            [0.5983, 1.7884],
+            [0.5983, 1.7884],
+            [0.5983, 1.7884],
+            [0.0000, 0.0000]], grad_fn=<AddBackward0>)
+    >>> # Unidirectional bipartite graph
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = th.tensor(np.random.rand(2, 10).astype(np.float32))
+    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> conv = NNConv(10, 2, edge_func, 'mean')
+    >>> efeat = th.ones(3, 5)
+    >>> res = conv(g, (u_fea, v_fea), efeat)
+    >>> res
+    tensor([[0.0000, 0.0000],
+            [0.0000, 0.0000],
+            [0.4474, 0.6424],
+            [0.4315, 0.9775]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,

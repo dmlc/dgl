@@ -36,6 +36,28 @@ class ChebConv(nn.Module):
         Activation function, default is ReLu.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
+
+    Note
+    ----
+    ChebConv only support DGLGraph as input for now. Heterograph will report error. To be fixed.
+    
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.DGLGraph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import ChebConv
+    >>> conv = ChebConv(10, 2, 2)
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[ 0.6163, -0.1809],
+            [ 0.6163, -0.1809],
+            [ 0.6163, -0.1809],
+            [ 0.9698, -1.5053],
+            [ 0.3664,  0.7556],
+            [-0.2370,  3.0164]], grad_fn=<AddBackward0>)
     """
 
     def __init__(self,

@@ -26,7 +26,7 @@ class SAGEConv(nn.Module):
     in_feats : int, or pair of ints
         Input feature size.
 
-        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -46,6 +46,38 @@ class SAGEConv(nn.Module):
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
+    
+    Example:
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> # Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import SAGEConv
+    >>> conv = SAGEConv(10, 2, 'gcn')
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[0.1909, 1.2743],
+            [0.1909, 1.2743],
+            [0.1909, 1.2743],
+            [0.1909, 1.2743],
+            [0.1909, 1.2743],
+            [0.1909, 1.2743]], grad_fn=<AddmmBackward>)
+    >>> # Unidirectional bipartite graph
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
+    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> conv = SAGEConv((5, 10), 2, 'mean')
+    >>> res = conv(g, (u_fea, v_fea))
+    >>> res
+    tensor([[-0.3203,  0.1696],
+            [-1.4204,  0.3623],
+            [ 1.1613,  0.2149],
+            [-0.2270,  1.3949]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,

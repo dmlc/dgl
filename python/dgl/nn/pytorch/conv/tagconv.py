@@ -36,6 +36,24 @@ class TAGConv(nn.Module):
     ----------
     lin : torch.Module
         The learnable linear module.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import TAGConv
+    >>> conv = TAGConv(10, 2, k=2)
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[ 0.5490, -1.6373],
+            [ 0.5490, -1.6373],
+            [ 0.5490, -1.6373],
+            [ 0.5513, -1.8208],
+            [ 0.5215, -1.6044],
+            [ 0.3304, -1.9927]], grad_fn=<AddmmBackward>)
     """
     def __init__(self,
                  in_feats,

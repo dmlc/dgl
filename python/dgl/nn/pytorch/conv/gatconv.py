@@ -26,8 +26,13 @@ class GATConv(nn.Module):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int or tuple
         Input feature size.
+
+        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
     out_feats : int
         Output feature size.
     num_heads : int
@@ -43,6 +48,66 @@ class GATConv(nn.Module):
     activation : callable activation function/layer or None, optional.
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
+    
+    Example:
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> # Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import GATConv
+    >>> conv = GATConv(10, 2, 3)
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[[ 0.6757,  1.9971],
+            [ 1.6249,  0.8834],
+            [-0.3886,  1.1685]],
+
+            [[ 0.6757,  1.9971],
+            [ 1.6249,  0.8834],
+            [-0.3886,  1.1685]],
+
+            [[ 0.6757,  1.9971],
+            [ 1.6249,  0.8834],
+            [-0.3886,  1.1685]],
+
+            [[ 0.6757,  1.9971],
+            [ 1.6249,  0.8834],
+            [-0.3886,  1.1685]],
+
+            [[ 0.6757,  1.9971],
+            [ 1.6249,  0.8834],
+            [-0.3886,  1.1685]],
+
+            [[ 0.0000,  0.0000],
+            [ 0.0000,  0.0000],
+            [ 0.0000,  0.0000]]], grad_fn=<BinaryReduceBackward>)
+    >>> # Unidirectional bipartite graph
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
+    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> conv = GATConv((5,10), 2, 3)
+    >>> res = conv(g, (u_fea, v_fea))
+    >>> res
+    tensor([[[ 0.0000,  0.0000],
+            [ 0.0000,  0.0000],
+            [ 0.0000,  0.0000]],
+
+            [[ 0.0000,  0.0000],
+            [ 0.0000,  0.0000],
+            [ 0.0000,  0.0000]],
+
+            [[ 1.0881, -0.3323],
+            [ 1.7442,  0.8530],
+            [-1.8164,  0.6611]],
+
+            [[ 1.0297, -0.3236],
+            [ 1.5585,  0.4965],
+            [-1.6956,  0.4543]]], grad_fn=<BinaryReduceBackward>)
     """
     def __init__(self,
                  in_feats,

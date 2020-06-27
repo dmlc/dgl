@@ -71,6 +71,37 @@ class RelGraphConv(nn.Module):
         Dropout rate. Default: 0.0
     layer_norm: float, optional
         Add layer norm. Default: False
+    
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import RelGraphConv
+    >>> conv = RelGraphConv(10, 2, 3, regularizer='basis', num_bases=2)
+    >>> conv.weight.shape
+    torch.Size([2, 10, 2])
+    >>> etype = th.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>> res = conv(g, feat, etype)
+    >>> res
+    tensor([[-1.2279, -0.2183],
+            [-1.5015,  0.9176],
+            [-1.2279, -0.2183],
+            [ 0.7081,  1.2584],
+            [-1.5015,  0.9176],
+            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
+    >>> # One-hot input
+    >>> one_hot_feat = th.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
+    >>> res = conv(g, one_hot_feat, etype)
+    >>> res
+    tensor([[-0.1925,  0.2755],
+            [-0.4811,  0.1721],
+            [ 0.3348, -0.2788],
+            [-1.3472, -0.4563],
+            [ 0.3348, -0.2788],
+            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feat,

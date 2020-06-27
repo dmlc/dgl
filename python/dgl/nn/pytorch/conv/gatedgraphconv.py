@@ -30,6 +30,31 @@ class GatedGraphConv(nn.Module):
         Number of edge types.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import GatedGraphConv
+    >>> conv = GatedGraphConv(10, 10, 2, 3)
+    >>> etype = th.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>> res = conv(g, feat, etype)
+    >>> res
+    tensor([[ 0.4652,  0.4458,  0.5169,  0.4126,  0.4847,  0.2303,  0.2757,  0.7721,
+            0.0523,  0.0857],
+            [ 0.0832,  0.1388, -0.5643,  0.7053, -0.2524, -0.3847,  0.7587,  0.8245,
+            0.9315,  0.4063],
+            [ 0.6340,  0.4096,  0.7692,  0.2125,  0.2106,  0.4542, -0.0580,  0.3364,
+            -0.1376,  0.4948],
+            [ 0.5551,  0.7946,  0.6220,  0.8058,  0.5711,  0.3063, -0.5454,  0.2272,
+            -0.6931, -0.1607],
+            [ 0.2644,  0.2469, -0.6143,  0.6008, -0.1516, -0.3781,  0.5878,  0.7993,
+            0.9241,  0.1835],
+            [ 0.6393,  0.3447,  0.3893,  0.4279,  0.3342,  0.3809,  0.0406,  0.5030,
+            0.1342,  0.0425]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,

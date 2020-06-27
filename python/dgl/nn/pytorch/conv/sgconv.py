@@ -35,6 +35,24 @@ class SGConv(nn.Module):
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
         If not None, applies normalization to the updated node features.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> from dgl.nn import SGConv
+    >>> conv = SGConv(10, 2, k=2, cached=True)
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[-0.3002, -0.7406],
+            [-0.3002, -0.7406],
+            [-0.3002, -0.7406],
+            [-0.2123, -0.5237],
+            [-0.3002, -0.7406],
+            [ 0.0000,  0.0000]], grad_fn=<AddmmBackward>)
     """
     def __init__(self,
                  in_feats,
