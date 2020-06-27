@@ -619,7 +619,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     if reshuffle:
         node_part = node_part.tousertensor()
         sorted_part, new2old_map = F.sort_1d(node_part)
-        new_node_ids = F.gather_row(F.arange(0, g.number_of_nodes()), new2old_map)
+        new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
+        new_node_ids[F.asnumpy(new2old_map)] = np.arange(0, g.number_of_nodes())
         g = reorder_nodes(g, new_node_ids)
         node_part = utils.toindex(sorted_part)
         # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
