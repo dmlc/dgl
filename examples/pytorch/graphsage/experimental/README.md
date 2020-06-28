@@ -1,6 +1,6 @@
 ## Distributed training
 
-This is an example of training GraphSage in a distributed fashion. To train GraphSage, it has three steps:
+This is an example of training GraphSage in a distributed fashion. To train GraphSage, it has four steps:
 
 ### Step 1: partition the graph.
 
@@ -26,7 +26,7 @@ will be able to access the partitioned data.
 
 ### Step 3: run servers
 
-We need to run a server on each machine.
+We need to run a server on each machine. Before running the servers, we need to update `ip_config.txt` with the right IP addresses.
 
 ```bash
 # run server on machine 0
