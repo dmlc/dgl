@@ -30,6 +30,9 @@ def data_type_dict():
 def cpu():
     return th.device('cpu')
 
+def as_tensor(data):
+    return th.as_tensor(data)
+
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 

@@ -2143,15 +2143,10 @@ class DGLHeteroGraph(object):
                     nodes_idx = F.nonzero_1d(v)
                     nodes[ntype] = F.astype(nodes_idx,
                                             ty=F.data_type_dict[self._idtype_str])
-            elif isinstance(v, np.ndarray):
-                 # Check if the v is a bool numpy tensor
-                if v.dtype is np.dtype('bool'):
-                    assert len(v.shape) == 1, \
-                        "dgl.subgraph only support 1D tensor as ID array"
-                    nodes_idx = np.nonzero(v)[0]
-                    nodes[ntype] = nodes_idx
+                else:
+                    check_same_dtype(self._idtype_str, v)
             else:
-                check_same_dtype(self._idtype_str, v)
+                v = F.tensor(v, dtype=F.data_type_dict[self._idtype_str])
 
         induced_nodes = [utils.toindex(nodes.get(ntype, []), self._idtype_str)
                          for ntype in self.ntypes]
@@ -2265,15 +2260,10 @@ class DGLHeteroGraph(object):
                     edges_idx = F.nonzero_1d(v)
                     edges[etype] = F.astype(edges_idx,
                                             ty=F.data_type_dict[self._idtype_str])
-            elif isinstance(v, np.ndarray):
-                # Check if the v is a bool numpy tensor
-                if v.dtype is np.dtype('bool'):
-                    assert len(v.shape) == 1, \
-                        "dgl.edge_subgraph only support 1D tensor as ID array"
-                    edges_idx = np.nonzero(v)[0]
-                    edges[etype] = edges_idx
+                else:
+                    check_same_dtype(self._idtype_str, v)
             else:
-                check_same_dtype(self._idtype_str, v)
+                v = F.tensor(v, dtype=F.data_type_dict[self._idtype_str])
 
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [

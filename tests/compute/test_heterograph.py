@@ -1062,15 +1062,6 @@ def test_subgraph_mask(index_dtype):
                            'wishes': F.tensor([False, True], dtype=F.data_type_dict['bool'])})
     _check_subgraph(g, sg2)
 
-    # numpy bool input
-    sg1 = g.subgraph({'user': np.array([False, True, True]),
-                      'game': np.array([True, False, False, False])})
-    _check_subgraph(g, sg1)
-    sg2 = g.edge_subgraph({'follows': np.array([False, True]),
-                           'plays': np.array([False, True, False, False]),
-                           'wishes': np.array([False, True])})
-    _check_subgraph(g, sg2)
-
 @parametrize_dtype
 def test_subgraph(index_dtype):
     g = create_test_heterograph(index_dtype)
