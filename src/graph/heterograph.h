@@ -240,7 +240,7 @@ class HeteroGraph : public BaseHeteroGraph {
   * \return pointer of FlattenedHeteroGraphh
   */
   template <class IdType>
-  FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes);
+  FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
 };
 
 }  // namespace dgl
