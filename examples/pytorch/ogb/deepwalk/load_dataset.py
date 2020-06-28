@@ -4,8 +4,10 @@ from ogb.linkproppred import PygLinkPropPredDataset
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--name', type=str, choices=['ogbl-collab', 'ogbl-ddi', 'ogbl-ppa'], default='ogbl-collab',
-        help="name of datasets by ogb") 
+parser.add_argument('--name', type=str,
+    choices=['ogbl-collab', 'ogbl-ddi', 'ogbl-ppa', 'ogbl-citation'], 
+    default='ogbl-collab',
+    help="name of datasets by ogb") 
 args = parser.parse_args()
 
 name = args.name
@@ -18,7 +20,6 @@ try:
     weighted = True
 except:
     weighted = False
-
 
 with open(name + "-net.txt", "w") as f:
     for i in range(data.edge_index.shape[1]):
