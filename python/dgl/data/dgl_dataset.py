@@ -41,7 +41,7 @@ class DGLDataset(object):
         if save_dir is None:
             self._save_dir = self._raw_dir
         else:
-            self. _save_dir = save_dir
+            self._save_dir = save_dir
 
         self._load()
 

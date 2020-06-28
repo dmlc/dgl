@@ -2,12 +2,13 @@ import scipy.sparse as sp
 import numpy as np
 import os
 
-from .dgl_dataset import DGLDataset
+from .dgl_dataset import DGLBuiltinDataset
 from .utils import download, save_graphs, load_graphs, get_download_dir, makedirs
 from ..graph import DGLGraph
 from ..base import dgl_warning
 
-__all__ = ["AmazonCoBuyDataset", "CoauthorDataset", "CoraFullDataset", "AmazonCoBuy", "Coauthor", "CoraFull"]
+__all__ = ["AmazonCoBuyComputerDataset", "AmazonCoBuyPhotoDataset", "CoauthorPhysicsDataset", "CoauthorCSDataset",
+           "CoraFullDataset", "AmazonCoBuy", "Coauthor", "CoraFull"]
 
 
 def eliminate_self_loops(A):
@@ -19,21 +20,12 @@ def eliminate_self_loops(A):
     return A
 
 
-class GNNBenchmarkDataset(DGLDataset):
+class GNNBenchmarkDataset(DGLBuiltinDataset):
     r"""Base Class for GNN Benchmark dataset from https://github.com/shchur/gnn-benchmark#datasets"""
-    _url = {}
+    _url = None
 
-    def __init__(self, **kwargs):
-        name = kwargs.get('name', '').lower()
-        assert name in self._url, "Dataset name not valid"
-        url = self._url[name]
-        raw_dir = kwargs.get('raw_dir', None)
-        if raw_dir is None:
-            raw_dir = os.path.join(get_download_dir(), 'gnn_benchmark')
-        else:
-            raw_dir = os.path.join(raw_dir, 'gnn_benchmark')
-        kwargs.update(name=name, url=url, raw_dir=raw_dir)
-        super(GNNBenchmarkDataset, self).__init__(**kwargs)
+    def __init__(self, name, force_reload=False):
+        super(GNNBenchmarkDataset, self).__init__(name=name, url=self._url, force_reload=force_reload)
 
     def process(self, root_path):
         g = self._load_npz(root_path + '.npz')
@@ -109,7 +101,7 @@ class GNNBenchmarkDataset(DGLDataset):
 
 
 class CoraFullDataset(GNNBenchmarkDataset):
-    r"""CORA-Full dataset for node classification task
+    r"""CORA-Full dataset for node classification task.
 
     Extended Cora dataset from `Deep Gaussian Embedding of Graphs:
     Unsupervised Inductive Learning via Ranking`.
@@ -137,10 +129,10 @@ class CoraFullDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = {"cora_full": 'https://github.com/shchur/gnn-benchmark/raw/master/data/npz/cora_full.npz'}
+    _url = 'https://github.com/shchur/gnn-benchmark/raw/master/data/npz/cora_full.npz'
 
-    def __init__(self, **kwargs):
-        super(CoraFullDataset, self).__init__(name="cora_full", **kwargs)
+    def __init__(self, force_reload=False):
+        super(CoraFullDataset, self).__init__(name="cora_full", force_reload=force_reload)
 
     @property
     def num_classes(self):
@@ -148,27 +140,55 @@ class CoraFullDataset(GNNBenchmarkDataset):
         return 70
 
 
-class CoauthorDataset(GNNBenchmarkDataset):
-    r"""Coauthor dataset for node classification
+class CoauthorCSDataset(GNNBenchmarkDataset):
+    r""" 'Computer Science (CS)' part of the Coauthor dataset for node classification task.
 
     Coauthor CS and Coauthor Physics are co-authorship graphs based on the Microsoft Academic Graph
     from the KDD Cup 2016 challenge. Here, nodes are authors, that are connected by an edge if they
     co-authored a paper; node features represent paper keywords for each author’s papers, and class
     labels indicate most active fields of study for each author.
 
-    Parameters
-    ---------------
-    name: str
-      Name of the dataset, has to be 'cs' or 'physics'
-
-    Statistics for 'cs' part of the dataset
+    Statistics
     ===
     Nodes: 18,333
     Edges: 327,576
     Number of classes: 15
     Node feature size: 6,805
 
-    Statistics for 'physics' part of the dataset
+    Returns
+    ===
+    CoauthorCSDataset object with two properties:
+        graph: A homogeneous graph contains the graph structure, node features and node labels
+        num_classes: number of node classes
+
+    Examples
+    ===
+    >>> data = CoauthorCSDataset()
+    >>> g = data.graph
+    >>> num_class = data.num_classes
+    >>> feat = g.ndata['feat']  # get node feature
+    >>> label = g.ndata['label']  # get node labels
+    """
+    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/ms_academic_cs.npz"
+
+    def __init__(self, force_reload=False):
+        super(CoauthorCSDataset, self).__init__(name='coauthor_cs', force_reload=force_reload)
+
+    @property
+    def num_classes(self):
+        """Number of classes."""
+        return 15
+
+
+class CoauthorPhysicsDataset(GNNBenchmarkDataset):
+    r""" 'Physics' part of the Coauthor dataset for node classification task.
+
+    Coauthor CS and Coauthor Physics are co-authorship graphs based on the Microsoft Academic Graph
+    from the KDD Cup 2016 challenge. Here, nodes are authors, that are connected by an edge if they
+    co-authored a paper; node features represent paper keywords for each author’s papers, and class
+    labels indicate most active fields of study for each author.
+
+    Statistics
     ===
     Nodes: 34,493
     Edges: 991,848
@@ -177,38 +197,71 @@ class CoauthorDataset(GNNBenchmarkDataset):
 
     Returns
     ===
-    CoauthorDataset object with two properties:
+    CoauthorPhysicsDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
         num_classes: number of node classes
 
     Examples
     ===
-    >>> data = CoauthorDataset('cs')
+    >>> data = CoauthorPhysicsDataset()
     >>> g = data.graph
     >>> num_class = data.num_classes
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = {
-        'cs': "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/ms_academic_cs.npz",
-        'physics': "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/ms_academic_phy.npz"
-    }
+    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/ms_academic_phy.npz"
 
-    def __init__(self, name, **kwargs):
-        kwargs.update(name=name)
-        super(CoauthorDataset, self).__init__(**kwargs)
+    def __init__(self, force_reload=False):
+        super(CoauthorPhysicsDataset, self).__init__(name='coauthor_physics', force_reload=force_reload)
 
     @property
     def num_classes(self):
         """Number of classes."""
-        if self.name == 'cs':
-            return 15
-        elif self.name == 'physics':
-            return 5
-        return 0
+        return 5
 
 
-class AmazonCoBuyDataset(GNNBenchmarkDataset):
+class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
+    r""" 'Computer' part of the AmazonCoBuy dataset for node classification task.
+
+    Amazon Computers and Amazon Photo are segments of the Amazon co-purchase graph [McAuley et al., 2015],
+    where nodes represent goods, edges indicate that two goods are frequently bought together, node
+    features are bag-of-words encoded product reviews, and class labels are given by the product category.
+
+    Reference: https://github.com/shchur/gnn-benchmark#datasets
+
+    Statistics
+    ===
+    Nodes: 13,752
+    Edges: 574,418
+    Number of classes: 5
+    Node feature size: 767
+
+    Returns
+    ===
+    AmazonCoBuyComputerDataset object with two properties:
+        graph: A homogeneous graph contains the graph structure, node features and node labels
+        num_classes: number of node classes
+
+    Examples
+    ===
+    >>> data = AmazonCoBuyComputerDataset()
+    >>> g = data.graph
+    >>> num_class = data.num_classes
+    >>> feat = g.ndata['feat']  # get node feature
+    >>> label = g.ndata['label']  # get node labels
+    """
+    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/amazon_electronics_computers.npz"
+
+    def __init__(self, force_reload=False):
+        super(AmazonCoBuyComputerDataset, self).__init__(name='amazon_co_buy_computer', force_reload=force_reload)
+
+    @property
+    def num_classes(self):
+        """Number of classes."""
+        return 5
+
+
+class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     r"""AmazonCoBuy dataset for node classification task.
 
     Amazon Computers and Amazon Photo are segments of the Amazon co-purchase graph [McAuley et al., 2015],
@@ -217,19 +270,7 @@ class AmazonCoBuyDataset(GNNBenchmarkDataset):
 
     Reference: https://github.com/shchur/gnn-benchmark#datasets
 
-    Parameters
-    ---------------
-    name: str
-      Name of the dataset, has to be 'computers' or 'photo'
-
-    Statistics for 'computers' part of the dataset
-    ===
-    Nodes: 13,752
-    Edges: 574,418
-    Number of classes: 5
-    Node feature size: 767
-
-    Statistics for 'photo' part of the dataset
+    Statistics
     ===
     Nodes: 7,650
     Edges: 287,326
@@ -244,20 +285,16 @@ class AmazonCoBuyDataset(GNNBenchmarkDataset):
 
     Examples
     ===
-    >>> data = AmazonCoBuyDataset('computers')
+    >>> data = AmazonCoBuyPhotoDataset()
     >>> g = data.graph
     >>> num_class = data.num_classes
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = {
-        'computers': "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/amazon_electronics_computers.npz",
-        'photo': "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/amazon_electronics_photo.npz"
-    }
+    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/amazon_electronics_photo.npz"
 
-    def __init__(self, name, **kwargs):
-        kwargs.update(name=name)
-        super(AmazonCoBuyDataset, self).__init__(**kwargs)
+    def __init__(self, force_reload=False):
+        super(AmazonCoBuyPhotoDataset, self).__init__(name='amazon_co_buy_photo', force_reload=force_reload)
 
     @property
     def num_classes(self):
@@ -272,17 +309,24 @@ class CoraFull(CoraFullDataset):
         super(CoraFull, self).__init__(**kwargs)
 
 
-class AmazonCoBuy(AmazonCoBuyDataset):
-    def __init__(self, name, **kwargs):
-        dgl_warning('AmazonCoBuy is deprecated, use AmazonCoBuyDataset instead.',
-                    DeprecationWarning, stacklevel=2)
-        kwargs.update(name=name)
-        super(AmazonCoBuy, self).__init__(**kwargs)
+def AmazonCoBuy(name):
+    dgl_warning('AmazonCoBuy is deprecated, use AmazonCoBuyComputerDataset or AmazonCoBuyPhotoDataset instead.',
+                DeprecationWarning, stacklevel=2)
+
+    if name == 'computers':
+        return AmazonCoBuyComputerDataset()
+    elif name == 'photo':
+        return AmazonCoBuyPhotoDataset()
+    else:
+        raise ValueError('Dataset name should be "computers" or "photo".')
 
 
-class Coauthor(CoauthorDataset):
-    def __init__(self, name, **kwargs):
-        dgl_warning('Coauthor is deprecated, use CoauthorDataset instead.',
-                    DeprecationWarning, stacklevel=2)
-        kwargs.update(name=name)
-        super(Coauthor, self).__init__(**kwargs)
+def Coauthor(name):
+    dgl_warning('Coauthor is deprecated, use CoauthorCSDataset or CoauthorPhysicsDataset instead.',
+                DeprecationWarning, stacklevel=2)
+    if name == 'cs':
+        return CoauthorCSDataset()
+    elif name == 'physics':
+        return CoauthorPhysicsDataset()
+    else:
+        raise ValueError('Dataset name should be "cs" or "physics".')
