@@ -130,6 +130,7 @@ def start_client():
     dgl.distributed.connect_to_server(ip_config='kv_ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt')
+    assert kvclient.num_clients == 1
     kvclient.init_data(name='data_1', 
                        shape=F.shape(data_1), 
                        dtype=F.dtype(data_1), 

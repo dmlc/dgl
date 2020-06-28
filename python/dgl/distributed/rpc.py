@@ -223,6 +223,16 @@ def get_num_server():
     """
     return _CAPI_DGLRPCGetNumServer()
 
+def set_num_client(num_client):
+    """Set the total number of client.
+    """
+    _CAPI_DGLRPCSetNumClient(int(num_client))
+
+def get_num_client():
+    """Get the total number of client.
+    """
+    return _CAPI_DGLRPCGetNumClient()
+
 def set_num_server_per_machine(num_server):
     """Set the total number of server per machine
     """

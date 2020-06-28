@@ -58,6 +58,7 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     print("Wait connections ...")
     rpc.receiver_wait(ip_addr, port, num_clients)
     print("%d clients connected!" % num_clients)
+    rpc.set_num_client(num_clients)
     # Recv all the client's IP and assign ID to clients
     addr_list = []
     client_namebook = {}
