@@ -107,17 +107,17 @@ class HelloRequest(dgl.distributed.Request):
         res = HelloResponse(self.hello_str, self.integer, new_tensor)
         return res
 
-def start_server(num_clients):
+def start_server(num_clients, ip_config):
     server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
-                                 ip_config='rpc_ip_config.txt', 
+                                 ip_config=ip_config, 
                                  num_clients=num_clients, 
                                  server_state=server_state)
 
-def start_client():
+def start_client(ip_config):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.connect_to_server(ip_config='rpc_ip_config.txt')
+    dgl.distributed.connect_to_server(ip_config=ip_config)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
@@ -194,8 +194,8 @@ def test_rpc():
     ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server, args=(1,))
-    pclient = ctx.Process(target=start_client)
+    pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
+    pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt",))
     pserver.start()
     time.sleep(1)
     pclient.start()
@@ -209,10 +209,10 @@ def test_multi_client():
     ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server, args=(10,))
+    pserver = ctx.Process(target=start_server, args=(10, "rpc_ip_config_mul_client.txt"))
     pclient_list = []
     for i in range(10):
-        pclient = ctx.Process(target=start_client)
+        pclient = ctx.Process(target=start_client, args=("rpc_ip_config_mul_client.txt",))
         pclient_list.append(pclient)
     pserver.start()
     time.sleep(1)
