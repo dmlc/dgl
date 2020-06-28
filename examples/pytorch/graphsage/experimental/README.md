@@ -1,6 +1,8 @@
 ### Distributed training
 
 ```bash
+export PYTHONPATH=$PYTHONPATH:..
+
 # partition graph
 python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges
 
