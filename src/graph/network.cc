@@ -804,7 +804,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     int msg_count = 0;
-    for (int i = 0; i < remote_ids.size(); ++i) {
+    for (size_t i = 0; i < remote_ids.size(); ++i) {
       if (remote_ids[i].size() != 0) {
         KVStoreMsg kv_msg;
         kv_msg.msg_type = MessageType::kPullMsg;
@@ -827,9 +827,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       }
     }
     char *return_data = new char[ID_size*row_size];
+    const int64_t local_ids_size = local_ids.size();
     // Copy local data
 #pragma omp parallel for
-    for (int64_t i = 0; i < local_ids.size(); ++i) {
+    for (int64_t i = 0; i < local_ids_size; ++i) {
       CHECK_GE(ID_size*row_size, local_ids_orginal[i] * row_size + row_size);
       CHECK_GE(data_size, local_ids[i] * row_size + row_size);
       CHECK_GE(local_ids[i], 0);
@@ -843,7 +844,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
       int64_t id_size = kv_msg->id.GetSize() / sizeof(int64_t);
       int part_id = kv_msg->rank / group_count;
       char* data_char = static_cast<char*>(kv_msg->data->data);
-      for (size_t n = 0; n < id_size; ++n) {
+      for (int64_t n = 0; n < id_size; ++n) {
         memcpy(return_data + remote_ids_original[part_id][n] * row_size,
                data_char + n * row_size,
                row_size);

@@ -603,10 +603,6 @@ def test_to_block(index_dtype):
     assert bg.number_of_src_nodes() == 4
     assert bg.number_of_dst_nodes() == 4
 
-    dst_nodes = F.tensor([3, 4], dtype=getattr(F, index_dtype))
-    bg = dgl.to_block(g_a, dst_nodes)
-    check(g_a, bg, 'A', 'AA', dst_nodes)
-
     dst_nodes = F.tensor([4, 3, 2, 1], dtype=getattr(F, index_dtype))
     bg = dgl.to_block(g_a, dst_nodes)
     check(g_a, bg, 'A', 'AA', dst_nodes)
@@ -620,15 +616,11 @@ def test_to_block(index_dtype):
     assert bg.number_of_nodes('DST/A') == 0
     checkall(g_ab, bg, None)
 
-    dst_nodes = {'B': F.tensor([5, 6], dtype=getattr(F, index_dtype))}
+    dst_nodes = {'B': F.tensor([5, 6, 3, 1], dtype=getattr(F, index_dtype))}
     bg = dgl.to_block(g, dst_nodes)
-    assert bg.number_of_nodes('SRC/B') == 2
+    assert bg.number_of_nodes('SRC/B') == 4
     assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
     assert bg.number_of_nodes('DST/A') == 0
-    checkall(g, bg, dst_nodes)
-
-    dst_nodes = {'A': F.tensor([3, 4], dtype=getattr(F, index_dtype)), 'B': F.tensor([5, 6], dtype=getattr(F, index_dtype))}
-    bg = dgl.to_block(g, dst_nodes)
     checkall(g, bg, dst_nodes)
 
     dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=getattr(F, index_dtype)), 'B': F.tensor([3, 5, 6, 1], dtype=getattr(F, index_dtype))}
