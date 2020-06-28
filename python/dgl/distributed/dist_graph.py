@@ -334,7 +334,7 @@ class DistGraph:
     gpb : PartitionBook
         The partition book object
     '''
-    def __init__(self, ip_config, graph_name, num_client, gpb=None):
+    def __init__(self, ip_config, graph_name, gpb=None):
         connect_to_server(ip_config=ip_config)
         self._client = KVClient(ip_config)
         g = _get_graph_from_shared_mem(graph_name)
@@ -347,9 +347,6 @@ class DistGraph:
             self._gpb = gpb
         self._client.barrier()
         self._client.map_shared_data(self._gpb)
-        assert num_client % self._gpb.num_partitions() == 0, \
-                'We should run the same number of clients on each machine.'
-        self._num_client = num_client
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
         self._default_init_ndata = _default_init_data
@@ -497,12 +494,7 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
-        if self._gpb is None:
-            return self._client.client_id
-        else:
-            num_client_per_part = self._num_client // self._gpb.num_partitions()
-            client_id_in_part = self._client.client_id % num_client_per_part
-            return int(self._gpb.partid * num_client_per_part + client_id_in_part)
+        return self._client.client_id
 
     def get_partition_book(self):
         """Get the partition information.
@@ -563,7 +555,7 @@ def _get_overlap(mask_arr, ids):
         masks = F.gather_row(mask_arr.tousertensor(), ids)
         return F.boolean_mask(ids, masks)
 
-def node_split(nodes, partition_book, num_clients, rank):
+def node_split(nodes, partition_book, rank):
     ''' Split nodes and return a subset for the local rank.
 
     This function splits the input nodes based on the partition book and
@@ -594,17 +586,10 @@ def node_split(nodes, partition_book, num_clients, rank):
     assert len(nodes) == num_nodes, \
             'The length of boolean mask vector should be the number of nodes in the graph.'
     # Get all nodes that belong to the rank.
-    local_nids = partition_book.partid2nids(partition_book.partid)
-    num_client_per_part = num_clients // partition_book.num_partitions()
-    client_id_in_part = rank  % num_client_per_part
-    local_nids = _get_overlap(nodes, local_nids)
+    local_nids = partition_book.partid2nids(rank)
+    return _get_overlap(nodes, local_nids)
 
-    # get a subset for the local client.
-    size = len(local_nids) // num_client_per_part
-    # TODO(zhengda) If it's not divisible
-    return local_nids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
-
-def edge_split(edges, partition_book, num_clients, rank):
+def edge_split(edges, partition_book, rank):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
@@ -634,14 +619,6 @@ def edge_split(edges, partition_book, num_clients, rank):
         num_edges += part['num_edges']
     assert len(edges) == num_edges, \
             'The length of boolean mask vector should be the number of edges in the graph.'
-
-    # Get all nodes that belong to the rank.
-    local_eids = partition_book.partid2eids(partition_book.partid)
-    num_client_per_part = num_clients // partition_book.num_partitions()
-    client_id_in_part = rank  % num_client_per_part
-    local_eids = _get_overlap(edges, local_eids)
-
-    # get a subset for the local client.
-    size = len(local_eids) // num_client_per_part
-    # TODO(zhengda) If it's not divisible
-    return local_eids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
+    # Get all edges that belong to the rank.
+    local_eids = partition_book.partid2eids(rank)
+    return _get_overlap(edges, local_eids)
