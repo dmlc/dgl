@@ -47,7 +47,7 @@ def run(args, device, data):
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
-    #model = th.nn.parallel.DistributedDataParallel(model)
+    model = th.nn.parallel.DistributedDataParallel(model)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -99,11 +99,11 @@ def run(args, device, data):
             backward_time += compute_end - forward_end
 
             # Aggregate gradients in multiple nodes.
-            #for param in model.parameters():
-            #    if param.requires_grad and param.grad is not None:
-            #        th.distributed.all_reduce(param.grad.data,
-            #                op=th.distributed.ReduceOp.SUM)
-            #        param.grad.data /= args.num_procs
+            for param in model.parameters():
+                if param.requires_grad and param.grad is not None:
+                    th.distributed.all_reduce(param.grad.data,
+                            op=th.distributed.ReduceOp.SUM)
+                    param.grad.data /= args.num_client
 
             optimizer.step()
             update_time += time.time() - compute_end
@@ -140,7 +140,7 @@ def run(args, device, data):
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args):
-    #th.distributed.init_process_group(backend='gloo')
+    th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name)
 
     train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), g.rank())
@@ -182,7 +182,6 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
-    parser.add_argument('--num_procs', type=int, help='the number of training processes')
     args = parser.parse_args()
 
     print(args)
