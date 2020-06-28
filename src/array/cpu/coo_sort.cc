@@ -162,8 +162,6 @@ namespace impl {
 
 ///////////////////////////// COOSort_ /////////////////////////////
 
-// TODO(minjie): O(NlogN) time and O(1) space complexity. For out-place sort,
-//   we can have an O(N) complexity.
 template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
   const int64_t nnz = coo->row->shape[0];
