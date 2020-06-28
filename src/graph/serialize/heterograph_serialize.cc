@@ -98,7 +98,7 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
   // Write HeteroGraphData
   for (uint64_t i = 0; i < num_graph; ++i) {
     graph_indices[i] = fs->count();
-    HeteroGraphDataObject gdata = *hdata[i].as<HeteroGraphDataObject>();
+    auto gdata = hdata[i].sptr();
     fs->Write(gdata);
   }
 
