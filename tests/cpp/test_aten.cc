@@ -272,20 +272,27 @@ TEST(ArrayTest, TestConcat) {
 template <typename IdType>
 void _TestDisjointUnionPartitionCoo(DLContext ctx) {
   /*
-   * COO_A
    * A = [[0, 0, 1],
    *      [1, 0, 1],
    *      [0, 1, 0]]
-   * COO_B
+   *
    * B = [[1, 1, 0],
    *      [0, 1, 0]]
    *
-   * COO_AB
+   * C = [[1]]
+   *
    * AB = [[0, 0, 1, 0, 0, 0],
    *       [1, 0, 1, 0, 0, 0],
    *       [0, 1, 0, 0, 0, 0],
    *       [0, 0, 0, 1, 1, 0],
    *       [0, 0, 0, 0, 1, 0]]
+   *
+   * ABC = [[0, 0, 1, 0, 0, 0, 0],
+   *        [1, 0, 1, 0, 0, 0, 0],
+   *        [0, 1, 0, 0, 0, 0, 0],
+   *        [0, 0, 0, 1, 1, 0, 0],
+   *        [0, 0, 0, 0, 1, 0, 0],
+   *        [0, 0, 0, 0, 0, 0, 1]]
    */
   IdArray a_row =
     aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2}), sizeof(IdType)*8, CTX);
@@ -295,15 +302,25 @@ void _TestDisjointUnionPartitionCoo(DLContext ctx) {
     aten::VecToIdArray(std::vector<IdType>({0, 0, 1}), sizeof(IdType)*8, CTX);
   IdArray b_col =
     aten::VecToIdArray(std::vector<IdType>({0, 1, 1}), sizeof(IdType)*8, CTX);
-  IdArray b_data = 
+  IdArray b_data =
     aten::VecToIdArray(std::vector<IdType>({2, 0, 1}), sizeof(IdType)*8, CTX);
+  IdArray c_row =
+    aten::VecToIdArray(std::vector<IdType>({0}), sizeof(IdType)*8, CTX);
+  IdArray c_col =
+    aten::VecToIdArray(std::vector<IdType>({0}), sizeof(IdType)*8, CTX);
   IdArray ab_row =
     aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2, 3, 3, 4}), sizeof(IdType)*8, CTX);
   IdArray ab_col =
     aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1, 3, 4, 4}), sizeof(IdType)*8, CTX);
   IdArray ab_data =
     aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 6, 4, 5}), sizeof(IdType)*8, CTX);
-  const aten::COOMatrix &coo1 = aten::COOMatrix(
+  IdArray abc_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2, 3, 3, 4, 5}), sizeof(IdType)*8, CTX);
+  IdArray abc_col =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1, 3, 4, 4, 6}), sizeof(IdType)*8, CTX);
+  IdArray abc_data =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 6, 4, 5, 7}), sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_a = aten::COOMatrix(
     3,
     3,
     a_row,
@@ -311,7 +328,7 @@ void _TestDisjointUnionPartitionCoo(DLContext ctx) {
     aten::NullArray(),
     true,
     false);
-  const aten::COOMatrix &coo2 = aten::COOMatrix(
+  const aten::COOMatrix &coo_b = aten::COOMatrix(
     2,
     3,
     b_row,
@@ -319,39 +336,86 @@ void _TestDisjointUnionPartitionCoo(DLContext ctx) {
     b_data,
     true,
     true);
+  const aten::COOMatrix &coo_c = aten::COOMatrix(
+    1,
+    1,
+    c_row,
+    c_col,
+    aten::NullArray(),
+    true,
+    true);
 
-  const std::vector<aten::COOMatrix> coos({coo1, coo2});
-  const aten::COOMatrix &coo = aten::DisjointUnionCoo(coos);
-  ASSERT_EQ(coo.num_rows, 5);
-  ASSERT_EQ(coo.num_cols, 6);
-  ASSERT_TRUE(ArrayEQ<IdType>(coo.row, ab_row));
-  ASSERT_TRUE(ArrayEQ<IdType>(coo.col, ab_col));
-  ASSERT_TRUE(ArrayEQ<IdType>(coo.data, ab_data));
-  ASSERT_TRUE(coo.row_sorted);
-  ASSERT_FALSE(coo.col_sorted);
+  const std::vector<aten::COOMatrix> coos_ab({coo_a, coo_b});
+  const aten::COOMatrix &coo_ab = aten::DisjointUnionCoo(coos_ab);
+  ASSERT_EQ(coo_ab.num_rows, 5);
+  ASSERT_EQ(coo_ab.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab.row, ab_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab.col, ab_col));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab.data, ab_data));
+  ASSERT_TRUE(coo_ab.row_sorted);
+  ASSERT_FALSE(coo_ab.col_sorted);
 
   const std::vector<uint64_t> edge_cumsum({0, 4, 7});
   const std::vector<uint64_t> src_vertex_cumsum({0, 3, 5});
   const std::vector<uint64_t> dst_vertex_cumsum({0, 3, 6});
   const std::vector<aten::COOMatrix> &p_coos = aten::DisjointPartitionCooBySizes(
-    coo,
+    coo_ab,
     2,
     edge_cumsum,
     src_vertex_cumsum,
     dst_vertex_cumsum);
-  ASSERT_EQ(p_coos[0].num_rows, coo1.num_rows);
-  ASSERT_EQ(p_coos[0].num_cols, coo1.num_cols);
-  ASSERT_EQ(p_coos[1].num_rows, coo2.num_rows);
-  ASSERT_EQ(p_coos[1].num_cols, coo2.num_cols);
-  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[0].row, coo1.row));
-  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[0].col, coo1.col));
-  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].row, coo2.row));
-  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].col, coo2.col));
-  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].data, coo2.data));
+  ASSERT_EQ(p_coos[0].num_rows, coo_a.num_rows);
+  ASSERT_EQ(p_coos[0].num_cols, coo_a.num_cols);
+  ASSERT_EQ(p_coos[1].num_rows, coo_b.num_rows);
+  ASSERT_EQ(p_coos[1].num_cols, coo_b.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[0].row, coo_a.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[0].col, coo_a.col));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].row, coo_b.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].col, coo_b.col));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos[1].data, coo_b.data));
   ASSERT_TRUE(p_coos[0].row_sorted);
+  ASSERT_FALSE(p_coos[0].col_sorted);
+  ASSERT_TRUE(p_coos[1].row_sorted);
   ASSERT_FALSE(p_coos[1].col_sorted);
-  ASSERT_TRUE(p_coos[0].row_sorted);
-  ASSERT_FALSE(p_coos[1].col_sorted);
+
+  const std::vector<aten::COOMatrix> coos_abc({coo_a, coo_b, coo_c});
+  const aten::COOMatrix &coo_abc = aten::DisjointUnionCoo(coos_abc);
+  ASSERT_EQ(coo_abc.num_rows, 6);
+  ASSERT_EQ(coo_abc.num_cols, 7);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_abc.row, abc_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_abc.col, abc_col));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_abc.data, abc_data));
+  ASSERT_TRUE(coo_abc.row_sorted);
+  ASSERT_FALSE(coo_abc.col_sorted);
+
+  const std::vector<uint64_t> edge_cumsum_abc({0, 4, 7, 8});
+  const std::vector<uint64_t> src_vertex_cumsum_abc({0, 3, 5, 6});
+  const std::vector<uint64_t> dst_vertex_cumsum_abc({0, 3, 6, 7});
+  const std::vector<aten::COOMatrix> &p_coos_abc = aten::DisjointPartitionCooBySizes(
+    coo_abc,
+    3,
+    edge_cumsum_abc,
+    src_vertex_cumsum_abc,
+    dst_vertex_cumsum_abc);
+  ASSERT_EQ(p_coos_abc[0].num_rows, coo_a.num_rows);
+  ASSERT_EQ(p_coos_abc[0].num_cols, coo_a.num_cols);
+  ASSERT_EQ(p_coos_abc[1].num_rows, coo_b.num_rows);
+  ASSERT_EQ(p_coos_abc[1].num_cols, coo_b.num_cols);
+  ASSERT_EQ(p_coos_abc[2].num_rows, coo_c.num_rows);
+  ASSERT_EQ(p_coos_abc[2].num_cols, coo_c.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos_abc[0].row, coo_a.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos_abc[0].col, coo_a.col));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos_abc[1].row, coo_b.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos_abc[1].col, coo_b.col));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos_abc[1].data, coo_b.data));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos_abc[2].row, coo_c.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_coos_abc[2].col, coo_c.col));
+  ASSERT_TRUE(p_coos_abc[0].row_sorted);
+  ASSERT_FALSE(p_coos_abc[0].col_sorted);
+  ASSERT_TRUE(p_coos_abc[1].row_sorted);
+  ASSERT_FALSE(p_coos_abc[1].col_sorted);
+  ASSERT_TRUE(p_coos_abc[2].row_sorted);
+  ASSERT_FALSE(p_coos_abc[2].col_sorted);
 }
 
 TEST(DisjointUnionTest, TestDisjointUnionPartitionCoo) {
@@ -360,5 +424,151 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCoo) {
 #ifdef DGL_USE_CUDA
   _TestDisjointUnionPartitionCoo<int32_t>(GPU);
   _TestDisjointUnionPartitionCoo<int64_t>(GPU);
+#endif
+}
+
+template <typename IdType>
+void _TestDisjointUnionPartitionCsr(DLContext ctx) {
+  /*
+   * A = [[0, 0, 1],
+   *      [1, 0, 1],
+   *      [0, 1, 0]]
+   *
+   * B = [[1, 1, 0],
+   *      [0, 1, 0]]
+   *
+   * C = [[1]]
+   *
+   * BC = [[1, 1, 0, 0],
+   *       [0, 1, 0, 0],
+   *       [0, 0, 0, 1]],
+   *
+   * ABC = [[0, 0, 1, 0, 0, 0, 0],
+   *        [1, 0, 1, 0, 0, 0, 0],
+   *        [0, 1, 0, 0, 0, 0, 0],
+   *        [0, 0, 0, 1, 1, 0, 0],
+   *        [0, 0, 0, 0, 1, 0, 0],
+   *        [0, 0, 0, 0, 0, 0, 1]]
+   */
+  IdArray a_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 3, 4}), sizeof(IdType)*8, CTX);
+  IdArray a_indices =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1}), sizeof(IdType)*8, CTX);
+  IdArray b_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 2, 3}), sizeof(IdType)*8, CTX);
+  IdArray b_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1}), sizeof(IdType)*8, CTX);
+  IdArray b_data =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 1}), sizeof(IdType)*8, CTX);
+  IdArray c_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 1}), sizeof(IdType)*8, CTX);
+  IdArray c_indices =
+    aten::VecToIdArray(std::vector<IdType>({0}), sizeof(IdType)*8, CTX);
+  IdArray bc_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 2, 3, 4}), sizeof(IdType)*8, CTX);
+  IdArray bc_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 3}), sizeof(IdType)*8, CTX);
+  IdArray bc_data =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 1, 3}), sizeof(IdType)*8, CTX);
+  IdArray abc_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 3, 4, 6, 7, 8}), sizeof(IdType)*8, CTX);
+  IdArray abc_indices =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1, 3, 4, 4, 6}), sizeof(IdType)*8, CTX);
+  IdArray abc_data =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 6, 4, 5, 7}), sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_a = aten::CSRMatrix(
+    3,
+    3,
+    a_indptr,
+    a_indices,
+    aten::NullArray(),
+    false);
+  const aten::CSRMatrix &csr_b = aten::CSRMatrix(
+    2,
+    3,
+    b_indptr,
+    b_indices,
+    b_data,
+    true);
+  const aten::CSRMatrix &csr_c = aten::CSRMatrix(
+    1,
+    1,
+    c_indptr,
+    c_indices,
+    aten::NullArray(),
+    true);
+
+  const std::vector<aten::CSRMatrix> csrs_bc({csr_b, csr_c});
+  const aten::CSRMatrix &csr_bc = aten::DisjointUnionCsr(csrs_bc);
+  ASSERT_EQ(csr_bc.num_rows, 3);
+  ASSERT_EQ(csr_bc.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_bc.indptr, bc_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_bc.indices, bc_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_bc.data, bc_data));
+  ASSERT_TRUE(csr_bc.sorted);
+
+  const std::vector<uint64_t> edge_cumsum({0, 3, 4});
+  const std::vector<uint64_t> src_vertex_cumsum({0, 2, 3});
+  const std::vector<uint64_t> dst_vertex_cumsum({0, 3, 4});
+  const std::vector<aten::CSRMatrix> &p_csrs = aten::DisjointPartitionCsrBySizes(
+    csr_bc,
+    2,
+    edge_cumsum,
+    src_vertex_cumsum,
+    dst_vertex_cumsum);
+  ASSERT_EQ(p_csrs[0].num_rows, csr_b.num_rows);
+  ASSERT_EQ(p_csrs[0].num_cols, csr_b.num_cols);
+  ASSERT_EQ(p_csrs[1].num_rows, csr_c.num_rows);
+  ASSERT_EQ(p_csrs[1].num_cols, csr_c.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs[0].indptr, csr_b.indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs[0].indices, csr_b.indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs[0].data, csr_b.data));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs[1].indptr, csr_c.indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs[1].indices, csr_c.indices));
+  ASSERT_TRUE(p_csrs[0].sorted);
+  ASSERT_TRUE(p_csrs[1].sorted);
+
+  const std::vector<aten::CSRMatrix> csrs_abc({csr_a, csr_b, csr_c});
+  const aten::CSRMatrix &csr_abc = aten::DisjointUnionCsr(csrs_abc);
+  ASSERT_EQ(csr_abc.num_rows, 6);
+  ASSERT_EQ(csr_abc.num_cols, 7);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_abc.indptr, abc_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_abc.indices, abc_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_abc.data, abc_data));
+  ASSERT_FALSE(csr_abc.sorted);
+
+  const std::vector<uint64_t> edge_cumsum_abc({0, 4, 7, 8});
+  const std::vector<uint64_t> src_vertex_cumsum_abc({0, 3, 5, 6});
+  const std::vector<uint64_t> dst_vertex_cumsum_abc({0, 3, 6, 7});
+  const std::vector<aten::CSRMatrix> &p_csrs_abc = aten::DisjointPartitionCsrBySizes(
+    csr_abc,
+    3,
+    edge_cumsum_abc,
+    src_vertex_cumsum_abc,
+    dst_vertex_cumsum_abc);
+  ASSERT_EQ(p_csrs_abc[0].num_rows, csr_a.num_rows);
+  ASSERT_EQ(p_csrs_abc[0].num_cols, csr_a.num_cols);
+  ASSERT_EQ(p_csrs_abc[1].num_rows, csr_b.num_rows);
+  ASSERT_EQ(p_csrs_abc[1].num_cols, csr_b.num_cols);
+  ASSERT_EQ(p_csrs_abc[2].num_rows, csr_c.num_rows);
+  ASSERT_EQ(p_csrs_abc[2].num_cols, csr_c.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs_abc[0].indptr, csr_a.indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs_abc[0].indices, csr_a.indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs_abc[1].indptr, csr_b.indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs_abc[1].indices, csr_b.indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs_abc[1].data, csr_b.data));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs_abc[2].indptr, csr_c.indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(p_csrs_abc[2].indices, csr_c.indices));
+  ASSERT_FALSE(p_csrs_abc[0].sorted);
+  ASSERT_FALSE(p_csrs_abc[1].sorted);
+  ASSERT_FALSE(p_csrs_abc[2].sorted);
+}
+
+TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
+  _TestDisjointUnionPartitionCsr<int32_t>(CPU);
+  _TestDisjointUnionPartitionCsr<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestDisjointUnionPartitionCsr<int32_t>(GPU);
+  _TestDisjointUnionPartitionCsr<int64_t>(GPU);
 #endif
 }

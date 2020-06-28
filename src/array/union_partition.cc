@@ -125,7 +125,7 @@ CSRMatrix DisjointUnionCsr(const std::vector<CSRMatrix>& csrs) {
   uint64_t src_offset = 0, dst_offset = 0;
   int64_t indices_offset = 0;
   bool has_data = false;
-  bool sorted = false;
+  bool sorted = true;
 
   // check if data index array
   for (size_t i = 0; i < csrs.size(); ++i) {
