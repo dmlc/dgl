@@ -27,10 +27,11 @@ class DGLDataset(object):
     force_reload : bool
         Whether to reload the dataset. Default: False
     """
-    def __init__(self, name, url=None, raw_dir=None, save_dir=None, force_reload=False):
+    def __init__(self, name, url=None, raw_dir=None, save_dir=None, force_reload=False, verbose=False):
         self._name = name
         self._url = url
         self._force_reload = force_reload
+        self._verbose = verbose
 
         # if no dir is provided, the default dgl download dir is used.
         if raw_dir is None:
@@ -99,10 +100,14 @@ class DGLDataset(object):
         """
         if not self._force_reload and self.has_cache():
             self.load()
+            if self.verbose:
+                print('Done loading data from cached files.')
         else:
             self._download()
             self.process(self.raw_path)
             self.save()
+            if self.verbose:
+                print('Done saving data into cached files.')
     
     @property
     def url(self):
@@ -140,6 +145,12 @@ class DGLDataset(object):
         r"""Path to save the processed dataset.
         """
         return os.path.join(self._save_dir, self.name)
+
+    @property
+    def verbose(self):
+        r"""Whether to print information.
+        """
+        return self._verbose
 
     def __getitem__(self, idx):
         r"""Gets the data object at index.
