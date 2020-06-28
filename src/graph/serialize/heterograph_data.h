@@ -66,15 +66,9 @@ class HeteroGraphDataObject : public runtime::Object {
         last->emplace_back(kv.first, ndarray);
       }
     }
-    for (auto v : ntype_names) {
-      std::string name = v->data;
-      this->ntype_names.push_back(name);
-    }
 
-    for (auto v : etype_names) {
-      std::string name = v->data;
-      this->etype_names.push_back(name);
-    }
+    this->ntype_names = ListValueToVector<std::string>(ntype_names);
+    this->etype_names = ListValueToVector<std::string>(etype_names);
   }
 
   void Save(dmlc::Stream *fs) const {

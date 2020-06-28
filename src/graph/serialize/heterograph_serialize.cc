@@ -9,16 +9,16 @@
  *   uint64_t kDGLSerializeMagic
  *   uint64_t kVersion = 2
  *   uint64_t GraphType = kDGLHeteroGraph
+ *   dgl_id_t num_graphs
  *   ** Reserved Area till 4kB **
  *
- *   dgl_id_t num_graphs
+ *   vector<HeteroGraphData> graph_datas; 
  *   vector<dgl_id_t> graph_indices (start address of each graph)
- *
- *   vector<GraphData> graph_datas;
+ *   uint64_t size_of_graph_indices_vector (Used to seek to graph_indices vector)
  *
  * }
  *
- * Storage of GraphData is
+ * Storage of HeteroGraphData is
  * {
  *   // Everything uses in csr
  *   HeteroGraphPtr ptr;
