@@ -22,6 +22,9 @@ struct Add {
     return lhs[0] + rhs[0];
   }
 };
+template <typename DType> constexpr bool Add<DType>::use_lhs;
+template <typename DType> constexpr bool Add<DType>::use_rhs;
+template <typename DType> constexpr bool Add<DType>::reduce_last_dim;
 
 template <typename DType>
 struct Sub {
@@ -33,6 +36,9 @@ struct Sub {
     return lhs[0] - rhs[0];
   }
 };
+template <typename DType> constexpr bool Sub<DType>::use_lhs;
+template <typename DType> constexpr bool Sub<DType>::use_rhs;
+template <typename DType> constexpr bool Sub<DType>::reduce_last_dim;
 
 template <typename DType>
 struct Mul {
@@ -44,6 +50,9 @@ struct Mul {
     return lhs[0] * rhs[0];
   }
 };
+template <typename DType> constexpr bool Mul<DType>::use_lhs;
+template <typename DType> constexpr bool Mul<DType>::use_rhs;
+template <typename DType> constexpr bool Mul<DType>::reduce_last_dim;
 
 template <typename DType>
 struct Div {
@@ -55,6 +64,9 @@ struct Div {
     return lhs[0] / rhs[0];
   }
 };
+template <typename DType> constexpr bool Div<DType>::use_lhs;
+template <typename DType> constexpr bool Div<DType>::use_rhs;
+template <typename DType> constexpr bool Div<DType>::reduce_last_dim;
 
 template <typename DType>
 struct CopyU {
@@ -66,6 +78,9 @@ struct CopyU {
     return lhs[0];
   }
 };
+template <typename DType> constexpr bool CopyU<DType>::use_lhs;
+template <typename DType> constexpr bool CopyU<DType>::use_rhs;
+template <typename DType> constexpr bool CopyU<DType>::reduce_last_dim;
 
 template <typename DType>
 struct CopyE {
@@ -77,6 +92,9 @@ struct CopyE {
     return rhs[0];
   }
 };
+template <typename DType> constexpr bool CopyE<DType>::use_lhs;
+template <typename DType> constexpr bool CopyE<DType>::use_rhs;
+template <typename DType> constexpr bool CopyE<DType>::reduce_last_dim;
 
 template <typename DType>
 struct Dot {
@@ -92,6 +110,9 @@ struct Dot {
     return rst;
   }
 };
+template <typename DType> constexpr bool Dot<DType>::use_lhs;
+template <typename DType> constexpr bool Dot<DType>::use_rhs;
+template <typename DType> constexpr bool Dot<DType>::reduce_last_dim;
 
 }   // end of namespace binary
 
@@ -116,6 +137,10 @@ struct Sum {
     Idx *arg_u_buf, Idx *arg_e_buf,
     DType val, DType val_ref, Idx uid, Idx eid) {}
 };
+template <typename Idx, typename DType, bool atomic>
+constexpr DType Sum<Idx, DType, atomic>::zero;
+template <typename Idx, typename DType, bool atomic>
+constexpr bool Sum<Idx, DType, atomic>::require_arg;
 
 template <typename Idx,
           typename DType,
@@ -149,6 +174,10 @@ struct Max {
     }
   }
 };
+template <typename Idx, typename DType, bool atomic>
+constexpr DType Max<Idx, DType, atomic>::zero;
+template <typename Idx, typename DType, bool atomic>
+constexpr bool Max<Idx, DType, atomic>::require_arg;
 
 template <typename Idx,
           typename DType,
@@ -182,6 +211,10 @@ struct Min {
     }
   }
 };
+template <typename Idx, typename DType, bool atomic>
+constexpr DType Min<Idx, DType, atomic>::zero;
+template <typename Idx, typename DType, bool atomic>
+constexpr bool Min<Idx, DType, atomic>::require_arg;
 
 }  // namespace reduce
 
