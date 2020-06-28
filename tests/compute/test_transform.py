@@ -242,6 +242,12 @@ def test_partition_with_halo():
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
+    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
+    for part_id, subg in subgs.items():
+        node_ids = np.nonzero(node_part == part_id)[0]
+        lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+        assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
@@ -322,6 +328,13 @@ def test_reorder_nodes():
     assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
     assert np.all(F.asnumpy(new_out_deg == new_out_deg1))
     orig_ids = F.asnumpy(new_g.ndata['orig_id'])
+    for nid in range(g.number_of_nodes()):
+        neighs = F.asnumpy(g.successors(nid))
+        new_neighs1 = new_nids[neighs]
+        new_nid = new_nids[nid]
+        new_neighs2 = new_g.successors(new_nid)
+        assert np.all(np.sort(new_neighs1) == np.sort(F.asnumpy(new_neighs2)))
+
     for nid in range(new_g.number_of_nodes()):
         neighs = F.asnumpy(new_g.successors(nid))
         old_neighs1 = orig_ids[neighs]
