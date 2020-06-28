@@ -494,7 +494,10 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
-        return self._client.client_id
+        if self._g is None:
+            return self._client.client_id
+        else:
+            return self._gpb.partid
 
     def get_partition_book(self):
         """Get the partition information.
