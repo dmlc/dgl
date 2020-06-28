@@ -8,7 +8,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/shared_mem.h>
-#include "../runtime/cuda/cuda_common.h"
+#include <dgl/runtime/device_api.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
