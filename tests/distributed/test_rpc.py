@@ -151,9 +151,9 @@ def start_client(ip_config):
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
     # clean up
+    time.sleep(2)
     if dgl.distributed.get_rank() == 0:
         dgl.distributed.shutdown_servers()
-    time.sleep(2)
     dgl.distributed.finalize_client()
     print("Get rank: %d" % dgl.distributed.get_rank())
 
