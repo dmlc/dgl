@@ -16,19 +16,22 @@ from dgl.data import RedditDataset
 import tqdm
 import traceback
 
+from load_graph import load_reddit, load_ogb
+
 #### Neighbor sampler
 
 class NeighborSampler(object):
-    def __init__(self, g, fanouts):
+    def __init__(self, g, fanouts, sample_neighbors):
         self.g = g
         self.fanouts = fanouts
+        self.sample_neighbors = sample_neighbors
 
     def sample_blocks(self, seeds):
         seeds = th.LongTensor(np.asarray(seeds))
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
+            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -78,6 +81,7 @@ class SAGE(nn.Module):
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
         x : the input of entire node set.
+
         The inference code is written in a fashion that it could handle any number of nodes and
         layers.
         """
@@ -113,6 +117,7 @@ def prepare_mp(g):
     Explicitly materialize the CSR, CSC and COO representation of the given graph
     so that they could be shared via copy-on-write to sampler workers and GPU
     trainers.
+
     This is a workaround before full shared memory support on heterogeneous graphs.
     """
     g.in_degree(0)
@@ -125,13 +130,13 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
+def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     """
-    Evaluate the model on the validation set specified by ``val_mask``.
+    Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
-    val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
+    val_nid : the node Ids for validation.
     batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
@@ -139,27 +144,26 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     with th.no_grad():
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred[val_mask], labels[val_mask])
+    return compute_acc(pred[val_nid], labels[val_nid])
 
-def load_subtensor(g, labels, seeds, input_nodes, device):
+def load_subtensor(g, seeds, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
     batch_inputs = g.ndata['features'][input_nodes].to(device)
-    batch_labels = labels[seeds].to(device)
+    batch_labels = g.ndata['labels'][seeds].to(device)
     return batch_inputs, batch_labels
 
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    train_mask = th.BoolTensor(train_mask)
-    val_mask = th.BoolTensor(val_mask)
+    train_mask, val_mask, in_feats, n_classes, g = data
+    train_nid = th.nonzero(train_mask, as_tuple=True)[0]
+    val_nid = th.nonzero(val_mask, as_tuple=True)[0]
 
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
+                              dgl.sampling.sample_neighbors)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
@@ -194,7 +198,7 @@ def run(args, device, data):
             seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -215,7 +219,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, device)
+            eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
@@ -224,6 +228,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument('--gpu', type=int, default=0,
         help="GPU device ID. Use -1 for CPU training")
+    argparser.add_argument('--dataset', type=str, default='reddit')
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
@@ -242,19 +247,18 @@ if __name__ == '__main__':
     else:
         device = th.device('cpu')
 
-    # load reddit data
-    data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    features = th.Tensor(data.features)
-    in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-    # Construct graph
-    g = dgl.graph(data.graph.all_edges())
-    g.ndata['features'] = features
+    if args.dataset == 'reddit':
+        g, n_classes = load_reddit()
+    elif args.dataset == 'ogb-product':
+        g, n_classes = load_ogb('ogbn-products')
+    else:
+        raise Exception('unknown dataset')
+    g = dgl.as_heterograph(g)
+    in_feats = g.ndata['features'].shape[1]
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
     prepare_mp(g)
     # Pack data
-    data = train_mask, val_mask, in_feats, labels, n_classes, g
+    data = train_mask, val_mask, in_feats, n_classes, g
 
     run(args, device, data)
