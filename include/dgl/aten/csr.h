@@ -106,6 +106,17 @@ struct CSRMatrix {
     }
     CHECK_NO_OVERFLOW(indptr->dtype, num_rows);
     CHECK_NO_OVERFLOW(indptr->dtype, num_cols);
+    CHECK_EQ(indptr->shape[0], num_rows + 1);
+  }
+
+  /*! \brief Return a copy of this matrix on the give device context. */
+  inline CSRMatrix CopyTo(const DLContext& ctx) const {
+    if (ctx == indptr->ctx)
+      return *this;
+    return CSRMatrix(num_rows, num_cols,
+                     indptr.CopyTo(ctx), indices.CopyTo(ctx),
+                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     sorted);
   }
 };
 
@@ -134,6 +145,9 @@ inline bool CSRHasData(CSRMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
+/*! \brief Whether the column indices of each row is sorted. */
+bool CSRIsSorted(CSRMatrix csr);
+
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
 /*!
@@ -155,6 +169,15 @@ CSRMatrix CSRTranspose(CSRMatrix csr);
 
 /*!
  * \brief Convert CSR matrix to COO matrix.
+ *
+ * Complexity: O(nnz)
+ * 
+ * - If data_as_order is false, the column and data arrays of the
+ *   result COO are equal to the indices and data arrays of the
+ *   input CSR. The result COO is also row sorted.
+ * - If the input CSR is further sorted, the result COO is also
+ *   column sorted.
+ *
  * \param csr Input csr matrix
  * \param data_as_order If true, the data array in the input csr matrix contains the order
  *                      by which the resulting COO tuples are stored. In this case, the
@@ -166,9 +189,8 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
 
 /*!
  * \brief Slice rows of the given matrix and return.
- * \param csr CSR matrix
- * \param start Start row id (inclusive)
- * \param end End row id (exclusive)
+ *
+ * The sliced row IDs are relabeled to starting from zero.
  *
  * Examples:
  * num_rows = 4
@@ -182,6 +204,11 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
  * num_cols = 4
  * indptr = [0, 1, 1]
  * indices = [2]
+ *
+ * \param csr CSR matrix
+ * \param start Start row id (inclusive)
+ * \param end End row id (exclusive)
+ * \return sliced rows stored in a CSR matrix
  */
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
@@ -191,6 +218,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  *
  * In numpy notation, given matrix M, row index array I, col index array J
  * This function returns the submatrix M[I, J].
+ *
+ * The sliced row and column IDs are relabeled to starting from zero.
  *
  * \param csr The input csr matrix
  * \param rows The row index to select
@@ -203,7 +232,10 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 bool CSRHasDuplicate(CSRMatrix csr);
 
 /*!
- * \brief Sort the column index at each row in the ascending order.
+ * \brief Sort the column index at each row in ascending order in-place.
+ *
+ * Only the indices and data arrays (if available) will be mutated. The indptr array
+ * stays the same.
  *
  * Examples:
  * num_rows = 4
@@ -217,6 +249,22 @@ bool CSRHasDuplicate(CSRMatrix csr);
  * indices = [0, 1, 1, 2, 3]
  */
 void CSRSort_(CSRMatrix* csr);
+
+/*!
+ * \brief Sort the column index at each row in ascending order.
+ *
+ * Return a new CSR matrix with sorted column indices and data arrays.
+ */
+inline CSRMatrix CSRSort(CSRMatrix csr) {
+  if (csr.sorted)
+    return csr;
+  CSRMatrix ret(csr.num_rows, csr.num_cols,
+                csr.indptr, csr.indices.Clone(),
+                CSRHasData(csr)? csr.data.Clone() : csr.data,
+                csr.sorted);
+  CSRSort_(&ret);
+  return ret;
+}
 
 /*!
  * \brief Reorder the rows and colmns according to the new row and column order.

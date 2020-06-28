@@ -5,7 +5,7 @@
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
-#include "../../cuda_utils.h"
+#include "./utils.h"
 #include "../arith.h"
 
 namespace dgl {

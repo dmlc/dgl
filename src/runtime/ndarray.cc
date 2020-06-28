@@ -124,6 +124,8 @@ size_t NDArray::GetSize() const {
 }
 
 int64_t NDArray::NumElements() const {
+  if (data_->dl_tensor.ndim == 0)
+    return 0;
   int64_t size = 1;
   for (int i = 0; i < data_->dl_tensor.ndim; ++i) {
     size *= data_->dl_tensor.shape[i];
