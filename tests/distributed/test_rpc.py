@@ -118,7 +118,6 @@ def start_server(num_clients):
 def start_client():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config='rpc_ip_config.txt')
-    assert dgl.distributed.get_num_client() == 1
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
