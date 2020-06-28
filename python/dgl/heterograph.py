@@ -2062,7 +2062,7 @@ class DGLHeteroGraph(object):
             tensor, or any iterable of node IDs intead.
 
             The node ID array can be either an interger tensor or a bool tensor.
-            When a bool tensor is used, it is automatically converted to 
+            When a bool tensor is used, it is automatically converted to
             an interger tensor using the semantic of np.where(nodes_idx == True).
 
         Returns
@@ -2135,11 +2135,21 @@ class DGLHeteroGraph(object):
             nodes = {self.ntypes[0]: nodes}
 
         for ntype, v in nodes.items():
-            # Check if the v is a bool tensor
-            if F.dtype(v) is F.data_type_dict['bool']:
-                ndoes_idx = F.nonzero_1d(v)
-                nodes[ntype] = F.astype(ndoes_idx,
-                                        ty=F.data_type_dict[self._idtype_str])
+            if F.is_tensor(v):
+                # Check if the v is a bool tensor
+                if F.dtype(v) is F.data_type_dict['bool']:
+                    assert len(F.shape(v)) == 1, \
+                        "dgl.subgraph only support 1D tensor as ID array"
+                    nodes_idx = F.nonzero_1d(v)
+                    nodes[ntype] = F.astype(nodes_idx,
+                                            ty=F.data_type_dict[self._idtype_str])
+            elif isinstance(v, np.ndarray):
+                 # Check if the v is a bool numpy tensor
+                if v.dtype is np.dtype('bool'):
+                    assert len(v.shape) == 1, \
+                        "dgl.subgraph only support 1D tensor as ID array"
+                    nodes_idx = np.nonzero(v)[0]
+                    nodes[ntype] = nodes_idx
             else:
                 check_same_dtype(self._idtype_str, v)
 
@@ -2213,7 +2223,7 @@ class DGLHeteroGraph(object):
 
         Get subgraphs using boolean mask tensor.
         >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): th.tensor([False, True, True]),
-        >>>                          ('user', 'plays', 'game'): th.tensor([False, False, True, False])})
+        >>>                   ('user', 'plays', 'game'): th.tensor([False, False, True, False])})
         >>> sub_g
         Graph(num_nodes={'user': 2, 'game': 1},
             num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
@@ -2247,11 +2257,21 @@ class DGLHeteroGraph(object):
             edges = {self.canonical_etypes[0]: edges}
 
         for etype, v in edges.items():
-            # Check if the v is a bool tensor
-            if F.dtype(v) is F.data_type_dict['bool']:
-                edges_idx = F.nonzero_1d(v)
-                edges[etype] = F.astype(edges_idx,
-                                        ty=F.data_type_dict[self._idtype_str])
+            if F.is_tensor(v):
+                # Check if the v is a bool tensor
+                if F.dtype(v) is F.data_type_dict['bool']:
+                    assert len(F.shape(v)) == 1, \
+                        "dgl.edge_subgraph only support 1D tensor as ID array"
+                    edges_idx = F.nonzero_1d(v)
+                    edges[etype] = F.astype(edges_idx,
+                                            ty=F.data_type_dict[self._idtype_str])
+            elif isinstance(v, np.ndarray):
+                # Check if the v is a bool numpy tensor
+                if v.dtype is np.dtype('bool'):
+                    assert len(v.shape) == 1, \
+                        "dgl.edge_subgraph only support 1D tensor as ID array"
+                    edges_idx = np.nonzero(v)[0]
+                    edges[etype] = edges_idx
             else:
                 check_same_dtype(self._idtype_str, v)
 

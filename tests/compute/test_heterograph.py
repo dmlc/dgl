@@ -1053,12 +1053,22 @@ def test_subgraph_mask(index_dtype):
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'][1:2])
 
+    # backend boo input tensor
     sg1 = g.subgraph({'user': F.tensor([False, True, True], dtype=F.data_type_dict['bool']),
                       'game': F.tensor([True, False, False, False], dtype=F.data_type_dict['bool'])})
     _check_subgraph(g, sg1)
     sg2 = g.edge_subgraph({'follows': F.tensor([False, True], dtype=F.data_type_dict['bool']),
                            'plays': F.tensor([False, True, False, False], dtype=F.data_type_dict['bool']),
                            'wishes': F.tensor([False, True], dtype=F.data_type_dict['bool'])})
+    _check_subgraph(g, sg2)
+
+    # numpy bool input
+    sg1 = g.subgraph({'user': np.array([False, True, True]),
+                      'game': np.array([True, False, False, False])})
+    _check_subgraph(g, sg1)
+    sg2 = g.edge_subgraph({'follows': np.array([False, True]),
+                           'plays': np.array([False, True, False, False]),
+                           'wishes': np.array([False, True])})
     _check_subgraph(g, sg2)
 
 @parametrize_dtype
@@ -1094,6 +1104,24 @@ def test_subgraph(index_dtype):
     sg1 = g.subgraph({'user': [1, 2], 'game': [0]})
     _check_subgraph(g, sg1)
     sg2 = g.edge_subgraph({'follows': [1], 'plays': [1], 'wishes': [1]})
+    _check_subgraph(g, sg2)
+
+    # backend tensor input
+    sg1 = g.subgraph({'user': F.tensor([1, 2], dtype=F.data_type_dict[index_dtype]),
+                      'game': F.tensor([0], dtype=F.data_type_dict[index_dtype])})
+    _check_subgraph(g, sg1)
+    sg2 = g.edge_subgraph({'follows': F.tensor([1], dtype=F.data_type_dict[index_dtype]),
+                           'plays': F.tensor([1], dtype=F.data_type_dict[index_dtype]),
+                           'wishes': F.tensor([1], dtype=F.data_type_dict[index_dtype])})
+    _check_subgraph(g, sg2)
+
+    # numpy input
+    sg1 = g.subgraph({'user': np.array([1, 2]),
+                      'game': np.array([0])})
+    _check_subgraph(g, sg1)
+    sg2 = g.edge_subgraph({'follows': np.array([1]),
+                           'plays': np.array([1]),
+                           'wishes': np.array([1])})
     _check_subgraph(g, sg2)
 
     def _check_subgraph_single_ntype(g, sg, preserve_nodes=False):
@@ -1910,8 +1938,8 @@ if __name__ == '__main__':
     # test_convert()
     # test_to_device()
     # test_transform("int32")
-    # test_subgraph()
-    # test_subgraph_mask("int32")
+    test_subgraph("int32")
+    test_subgraph_mask("int32")
     # test_apply()
     # test_level1()
     # test_level2()
