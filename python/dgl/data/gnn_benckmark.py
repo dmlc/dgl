@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import download, save_graphs, load_graphs, get_download_dir, makedirs
+from .utils import save_graphs, load_graphs, _get_dgl_url
 from ..graph import DGLGraph
 from ..base import dgl_warning
 
@@ -25,10 +25,12 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
     _url = None
 
     def __init__(self, name, force_reload=False):
-        super(GNNBenchmarkDataset, self).__init__(name=name, url=self._url, force_reload=force_reload)
+        _url = _get_dgl_url('dataset/' + name + '.zip')
+        super(GNNBenchmarkDataset, self).__init__(name=name, url=_url, force_reload=force_reload)
 
     def process(self, root_path):
-        g = self._load_npz(root_path + '.npz')
+        npz_path = os.path.join(root_path, self.name + '.npz')
+        g = self._load_npz(npz_path)
         self.graph = g
         self.data = [g]
 
@@ -47,11 +49,6 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
         graphs, _ = load_graphs(graph_path)
         self.graph = graphs[0]
         self.data = [graphs[0]]
-
-    def download(self):
-        r"""Automatically download npz data."""
-        file_path = os.path.join(self.raw_dir, self.name + '.npz')
-        download(self.url, path=file_path)
 
     def _load_npz(self, file_name):
         with np.load(file_name, allow_pickle=True) as loader:
@@ -106,7 +103,11 @@ class CoraFullDataset(GNNBenchmarkDataset):
     Extended Cora dataset from `Deep Gaussian Embedding of Graphs:
     Unsupervised Inductive Learning via Ranking`.
     Nodes represent paper and edges represent citations.
+
     Reference: https://github.com/shchur/gnn-benchmark#datasets
+
+    .. note::
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     Statistics
     ===
@@ -115,10 +116,17 @@ class CoraFullDataset(GNNBenchmarkDataset):
     Number of Classes: 70
     Node feature size: 8,710
 
+    Parameters
+    ----------
+    force_reload: bool
+        Whether to reload the dataset. Default: False
+
     Returns
     ===
     CoraFullDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
+            - ndata['feat']: tensor of the node features
+            - ndata['label']: tensor of the node label
         num_classes: number of node classes
 
     Examples
@@ -148,6 +156,11 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     co-authored a paper; node features represent paper keywords for each author’s papers, and class
     labels indicate most active fields of study for each author.
 
+    Reference: https://github.com/shchur/gnn-benchmark#datasets
+
+    .. note::
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
+
     Statistics
     ===
     Nodes: 18,333
@@ -155,10 +168,17 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     Number of classes: 15
     Node feature size: 6,805
 
+    Parameters
+    ----------
+    force_reload: bool
+        Whether to reload the dataset. Default: False
+
     Returns
     ===
     CoauthorCSDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
+            - ndata['feat']: tensor of the node features
+            - ndata['label']: tensor of the node label
         num_classes: number of node classes
 
     Examples
@@ -188,6 +208,11 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     co-authored a paper; node features represent paper keywords for each author’s papers, and class
     labels indicate most active fields of study for each author.
 
+    Reference: https://github.com/shchur/gnn-benchmark#datasets
+
+    .. note::
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
+
     Statistics
     ===
     Nodes: 34,493
@@ -195,10 +220,17 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     Number of classes: 5
     Node feature size: 8,415
 
+    Parameters
+    ----------
+    force_reload: bool
+        Whether to reload the dataset. Default: False
+
     Returns
     ===
     CoauthorPhysicsDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
+            - ndata['feat']: tensor of the node features
+            - ndata['label']: tensor of the node label
         num_classes: number of node classes
 
     Examples
@@ -229,6 +261,9 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
 
     Reference: https://github.com/shchur/gnn-benchmark#datasets
 
+    .. note::
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
+
     Statistics
     ===
     Nodes: 13,752
@@ -236,10 +271,17 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     Number of classes: 5
     Node feature size: 767
 
+    Parameters
+    ----------
+    force_reload: bool
+        Whether to reload the dataset. Default: False
+
     Returns
     ===
     AmazonCoBuyComputerDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
+            - ndata['feat']: tensor of the node features
+            - ndata['label']: tensor of the node label
         num_classes: number of node classes
 
     Examples
@@ -270,6 +312,9 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
 
     Reference: https://github.com/shchur/gnn-benchmark#datasets
 
+    .. note::
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
+
     Statistics
     ===
     Nodes: 7,650
@@ -277,10 +322,17 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     Number of classes: 5
     Node feature size: 745
 
+    Parameters
+    ----------
+    force_reload: bool
+        Whether to reload the dataset. Default: False
+
     Returns
     ===
     AmazonCoBuyDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
+            - ndata['feat']: tensor of the node features
+            - ndata['label']: tensor of the node label
         num_classes: number of node classes
 
     Examples
@@ -312,7 +364,6 @@ class CoraFull(CoraFullDataset):
 def AmazonCoBuy(name):
     dgl_warning('AmazonCoBuy is deprecated, use AmazonCoBuyComputerDataset or AmazonCoBuyPhotoDataset instead.',
                 DeprecationWarning, stacklevel=2)
-
     if name == 'computers':
         return AmazonCoBuyComputerDataset()
     elif name == 'photo':
