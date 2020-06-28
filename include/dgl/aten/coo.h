@@ -237,7 +237,8 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
  * col indices are sorted in ascending order too. The data array of the returned COOMatrix
  * stores the shuffled index which could be used to fetch edge data.
  *
- * Complexity: O(N*log(N)), where N is the number of nonzeros.
+ * Complexity: O(N*log(N)) time and O(1) space, where N is the number of nonzeros.
+ * TODO(minjie): The time complexity could be improved to O(N) by using a O(N) space.
  *
  * \param mat The coo matrix to sort.
  * \param sort_column True if column index should be sorted too.
@@ -250,6 +251,9 @@ void COOSort_(COOMatrix* mat, bool sort_column = false);
  * The function sorts row indices in ascending order. If sort_column is true,
  * col indices are sorted in ascending order too. The data array of the returned COOMatrix
  * stores the shuffled index which could be used to fetch edge data.
+ *
+ * Complexity: O(N*log(N)) time and O(1) space, where N is the number of nonzeros.
+ * TODO(minjie): The time complexity could be improved to O(N) by using a O(N) space.
  *
  * \param mat The input coo matrix
  * \param sort_column True if column index should be sorted too.

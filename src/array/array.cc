@@ -579,7 +579,7 @@ void COOSort_(COOMatrix* mat, bool sort_column) {
 }
 
 std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
-  if (coo.row->shape[0] == 0)
+  if (coo.row->shape[0] <= 1)
     return {true, true};
   std::pair<bool, bool> ret;
   ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOIsSorted", {

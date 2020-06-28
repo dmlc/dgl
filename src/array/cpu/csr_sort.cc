@@ -24,7 +24,6 @@ bool CSRIsSorted(CSRMatrix csr) {
       continue;
     for (IdType i = indptr[row] + 1; i < indptr[row + 1]; ++i) {
       if (indices[i - 1] > indices[i]) {
-#pragma omp critical
         ret = false;
         break;
       }

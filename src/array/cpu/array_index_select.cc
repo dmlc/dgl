@@ -42,8 +42,6 @@ DType IndexSelect(NDArray array, int64_t index) {
 
 template int32_t IndexSelect<kDLCPU, int32_t>(NDArray array, int64_t index);
 template int64_t IndexSelect<kDLCPU, int64_t>(NDArray array, int64_t index);
-template uint32_t IndexSelect<kDLCPU, uint32_t>(NDArray array, int64_t index);
-template uint64_t IndexSelect<kDLCPU, uint64_t>(NDArray array, int64_t index);
 template float IndexSelect<kDLCPU, float>(NDArray array, int64_t index);
 template double IndexSelect<kDLCPU, double>(NDArray array, int64_t index);
 
