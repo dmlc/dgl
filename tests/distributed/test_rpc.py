@@ -152,6 +152,7 @@ def start_client():
     # clean up
     if dgl.distributed.get_rank() == 0:
         dgl.distributed.shutdown_servers()
+    time.sleep(2)
     dgl.distributed.finalize_client()
 
 def test_serialize():
