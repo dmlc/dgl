@@ -12,7 +12,7 @@ def load_reddit():
     labels = th.LongTensor(data.labels)
 
     # Construct graph
-    g = dgl.graph(data.graph.all_edges())
+    g = data.graph
     g.ndata['features'] = features
     g.ndata['labels'] = labels
     g.ndata['train_mask'] = th.LongTensor(data.train_mask)
