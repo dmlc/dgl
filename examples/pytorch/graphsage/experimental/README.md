@@ -40,15 +40,16 @@ python3 train_dist.py --server --graph-name ogb-product --id 3 --num-client 4 --
 ```
 
 ### Step 4: run trainers
-We run a trainer process on each machine.
+We run a trainer process on each machine. Here we use Pytorch distributed. We need to use pytorch distributed launch to run each trainer process.
+Pytorch distributed requires one of the trainer process to be the master. Here we use the first machine to run the master process.
 
 ```bash
 # run client on machine 0
-python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4
+python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=0 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
 # run client on machine 1
-python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4
+python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=1 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
 # run client on machine 2
-python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4
+python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=2 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
 # run client on machine 3
-python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4
+python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=3 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
 ```

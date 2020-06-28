@@ -52,12 +52,15 @@ def run(args, device, data):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    train_size = th.sum(g.ndata['train_mask'][0:g.number_of_nodes()])
+    num_steps = int(args.num_epochs * train_size / args.batch_size / args.num_client)
+
     # Training loop
-    avg = 0
     iter_tput = []
     profiler = Profiler()
     profiler.start()
-    for epoch in range(args.num_epochs):
+    epoch = 0
+    while num_steps > 0:
         tic = time.time()
 
         sample_time = 0
@@ -117,16 +120,19 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
             start = time.time()
+            num_steps -= 1
+            # We have to ensure all trainer process run the same number of steps.
+            if num_steps == 0:
+                break
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
+        epoch += 1
 
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
-        if epoch >= 5:
-            avg += toc - tic
         #if epoch % args.eval_every == 0 and epoch != 0:
         #    eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
         #    print('Eval Acc {:.4f}'.format(eval_acc))
@@ -137,7 +143,6 @@ def run(args, device, data):
     g._client.barrier()
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
-    print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args):
     th.distributed.init_process_group(backend='gloo')
