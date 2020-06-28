@@ -182,6 +182,11 @@ def test_split():
         for n in nodes1:
             assert n in local_nids
 
+        nodes3 = node_split(node_mask, gpb, num_parts * 2, i * 2)
+        nodes4 = node_split(node_mask, gpb, num_parts * 2, i * 2 + 1)
+        nodes5 = F.cat([nodes3, nodes4], 0)
+        assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes5)))
+
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
@@ -190,6 +195,11 @@ def test_split():
         local_eids = F.asnumpy(local_eids)
         for e in edges1:
             assert e in local_eids
+
+        edges3 = edge_split(edge_mask, gpb, num_parts * 2, i * 2)
+        edges4 = edge_split(edge_mask, gpb, num_parts * 2, i * 2 + 1)
+        edges5 = F.cat([edges3, edges4], 0)
+        assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
 def prepare_dist():
     ip_config = open("kv_ip_config.txt", "w")
