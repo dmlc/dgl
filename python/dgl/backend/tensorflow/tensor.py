@@ -56,9 +56,6 @@ def data_type_dict():
 def cpu():
     return "/cpu:0"
 
-def as_tensor(data):
-    return tf.convert_to_tensor(data):
-
 def tensor(data, dtype=None):
     return tf.convert_to_tensor(data, dtype=dtype)
 

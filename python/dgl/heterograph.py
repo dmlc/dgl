@@ -2065,6 +2065,9 @@ class DGLHeteroGraph(object):
             When a bool tensor is used, it is automatically converted to
             an interger tensor using the semantic of np.where(nodes_idx == True).
 
+            Note: When using bool tensor, only backend (torch, tensorflow, mxnet)
+            tensors are supported.
+
         Returns
         -------
         G : DGLHeteroGraph
@@ -2177,6 +2180,9 @@ class DGLHeteroGraph(object):
             The edge ID array can be either an interger tensor or a bool tensor.
             When a bool tensor is used, it is automatically converted to
             an interger tensor using the semantic of np.where(edges_idx == True).
+
+            Note: When using bool tensor, only backend (torch, tensorflow, mxnet)
+            tensors are supported.
 
         preserve_nodes : bool
             Whether to preserve all nodes or not. If false, all nodes

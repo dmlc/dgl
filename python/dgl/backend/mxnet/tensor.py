@@ -34,9 +34,6 @@ def data_type_dict():
 def cpu():
     return mx.cpu()
 
-def as_tensor(data):
-    return nd.array(data)
-
 def tensor(data, dtype=None):
     # MXNet always returns a float tensor regardless of type inside data.
     # This is a workaround.
