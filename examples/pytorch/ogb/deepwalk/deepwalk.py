@@ -58,6 +58,8 @@ class DeepwalkTrainer:
             avg_sgd=self.args.avg_sgd,
             fast_neg=self.args.fast_neg,
             record_loss=self.args.print_loss,
+            norm=self.args.norm,
+            use_context_weight=self.args.use_context_weight,
             )
         
         torch.set_num_threads(self.args.num_threads)
@@ -153,7 +155,7 @@ class DeepwalkTrainer:
                 if i > 0 and i % self.args.print_interval == 0:
                     if self.args.print_loss:
                         print("Solver [%d] batch %d tt: %.2fs loss: %.4f" \
-                            % (gpu_id, i, time.time()-start, sum(self.emb_model.loss)/self.args.print_interval))
+                            % (gpu_id, i, time.time()-start, -sum(self.emb_model.loss)/self.args.print_interval))
                         self.emb_model.loss = []
                     else:
                         print("Solver [%d] batch %d tt: %.2fs" % (gpu_id, i, time.time()-start))
@@ -209,7 +211,7 @@ class DeepwalkTrainer:
                     if i > 0 and i % self.args.print_interval == 0:
                         if self.args.print_loss:
                             print("Batch %d training time: %.2fs loss: %.4f" \
-                                % (i, time.time()-start, sum(self.emb_model.loss)/self.args.print_interval))
+                                % (i, time.time()-start, -sum(self.emb_model.loss)/self.args.print_interval))
                             self.emb_model.loss = []
                         else:
                             print("Batch %d, training time: %.2fs" % (i, time.time()-start))
@@ -273,6 +275,10 @@ if __name__ == '__main__':
             help="use sgd for embedding updation")
     parser.add_argument('--avg_sgd', default=False, action="store_true", 
             help="average gradients of sgd for embedding updation")
+    parser.add_argument('--norm', default=False, action="store_true", 
+            help="whether to do normalization over node embedding after training")
+    parser.add_argument('--use_context_weight', default=False, action="store_true", 
+            help="whether to add weights over nodes in the context window")
     parser.add_argument('--num_threads', default=2, type=int, 
             help="number of threads used for each CPU-core/GPU")
     parser.add_argument('--gpus', type=int, default=[-1], nargs='+', 
