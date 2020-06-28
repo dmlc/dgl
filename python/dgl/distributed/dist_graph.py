@@ -126,9 +126,13 @@ class DistTensor:
         self._dtype = dtype
 
     def __getitem__(self, idx):
+        idx = utils.toindex(idx)
+        idx = idx.tousertensor()
         return self.kvstore.pull(name=self.name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
+        idx = utils.toindex(idx)
+        idx = idx.tousertensor()
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self.name, id_tensor=idx, data_tensor=val)
 
@@ -490,7 +494,10 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
-        return self._client.client_id
+        if self._g is None:
+            return self._client.client_id
+        else:
+            return self._gpb.partid
 
     def get_partition_book(self):
         """Get the partition information.
