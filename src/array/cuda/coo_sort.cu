@@ -18,6 +18,9 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
+  // TODO(minjie): Current implementation is based on cusparse which only supports
+  //   int32_t. To support int64_t, we could use the Radix sort algorithm provided
+  //   by CUB.
   CHECK(sizeof(IdType) == 4) << "CUDA COOSort does not support int64.";
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(coo->row->ctx);
