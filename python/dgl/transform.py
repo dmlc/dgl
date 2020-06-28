@@ -93,7 +93,7 @@ def knn_graph(x, k):
     src = F.reshape(src, (-1,))
     adj = sparse.csr_matrix(
         (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
-        shape=(n_points, n_points))
+        shape=(n_samples * n_points, n_samples * n_points))
 
     g = DGLGraph(adj, readonly=True)
     return g
@@ -129,7 +129,7 @@ def segmented_knn_graph(x, k, segs):
     h_list = F.split(x, segs, 0)
     dst = [
         F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
-        offset[i]
+        int(offset[i])
         for i, h_g in enumerate(h_list)]
     dst = F.cat(dst, 0)
     src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
