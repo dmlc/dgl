@@ -173,6 +173,42 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
   return ret;
 }
 
+NDArray Concat(const std::vector<IdArray>& arrays) {
+  CHECK(arrays.size() > 1) << "Number of arrays should larger than 1";
+  IdArray ret;
+
+  int64_t len = 0, offset = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    len += arrays[i]->shape[0];
+    CHECK_SAME_DTYPE(arrays[0], arrays[i]);
+    CHECK_SAME_CONTEXT(arrays[0], arrays[i]);
+  }
+
+  NDArray ret_arr = NDArray::Empty({len},
+                                   arrays[0]->dtype,
+                                   arrays[0]->ctx);
+
+  auto device = runtime::DeviceAPI::Get(arrays[0]->ctx);
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    ATEN_DTYPE_SWITCH(arrays[i]->dtype, DType, "array", {
+      device->CopyDataFromTo(
+        static_cast<DType*>(arrays[i]->data),
+        0,
+        static_cast<DType*>(ret_arr->data),
+        offset,
+        arrays[i]->shape[0] * sizeof(DType),
+        arrays[i]->ctx,
+        ret_arr->ctx,
+        arrays[i]->dtype,
+        nullptr);
+
+        offset += arrays[i]->shape[0] * sizeof(DType);
+    });
+  }
+
+  return ret_arr;
+}
+
 template<typename ValueType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value) {
   std::tuple<NDArray, IdArray, IdArray> ret;
@@ -632,7 +668,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
-///////////////////////// Graph Traverse  routines //////////////////////////
+///////////////////////// Graph Traverse routines //////////////////////////
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   Frontiers ret;
   CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
@@ -692,6 +728,7 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   });
   return ret;
 }
+
 Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
                              const bool has_reverse_edge,
@@ -715,6 +752,7 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
   });
   return ret;
 }
+
 
 ///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
