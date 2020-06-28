@@ -79,12 +79,9 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     for _ in range(num_clients):
         req, _ = rpc.recv_request()
         addr_list.append(req.ip_addr)
-    addr_list = sorted(addr_list, key=functools.cmp_to_key(compare_client))
+    addr_list.sort()
     for client_id, addr in enumerate(addr_list):
-        _, ip_addr = addr.split('-')
-        client_namebook[client_id] = ip_addr
-    print("client_namebook: ")
-    print(client_namebook)
+        client_namebook[client_id] = addr
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
         rpc.add_receiver_addr(client_ip, client_port, client_id)
