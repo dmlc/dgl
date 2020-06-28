@@ -25,7 +25,6 @@ struct CSRMatrix;
  * \brief Plain COO structure
  *
  * The data array stores integer ids for reading edge features.
-
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
@@ -117,6 +116,16 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_rows);
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
+
+  /*! \brief Return a copy of this matrix on the give device context. */
+  inline COOMatrix CopyTo(const DLContext& ctx) const {
+    if (ctx == row->ctx)
+      return *this;
+    return COOMatrix(num_rows, num_cols,
+                     row.CopyTo(ctx), col.CopyTo(ctx),
+                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     row_sorted, col_sorted);
+  }
 };
 
 ///////////////////////// COO routines //////////////////////////
@@ -142,6 +151,17 @@ inline bool COOHasData(COOMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
+/*!
+ * \brief Check whether the COO is sorted.
+ *
+ * It returns two flags: one for whether the row is sorted;
+ * the other for whether the columns of each row is sorted
+ * if the first flag is true.
+ *
+ * Complexity: O(NNZ)
+ */
+std::pair<bool, bool> COOIsSorted(COOMatrix coo);
+
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
 
@@ -162,6 +182,20 @@ COOMatrix COOTranspose(COOMatrix coo);
  * the result CSR matrix stores a shuffle index for how the entries
  * will be reordered in CSR. The i^th entry in the result CSR corresponds
  * to the CSR.data[i] th entry in the input COO.
+ *
+ * Conversion complexity: O(nnz)
+ *
+ * - The function first check whether the input COO matrix is sorted
+ *   using a linear scan.
+ * - If the COO matrix is row sorted, the conversion can be done very
+ *   efficiently in a sequential scan. The result indices and data arrays 
+ *   are directly equal to the column and data arrays from the input.
+ * - If the COO matrix is further column sorted, the result CSR is
+ *   also column sorted.
+ * - Otherwise, the conversion is more costly but still is O(nnz).
+ *
+ * \param coo Input COO matrix.
+ * \return CSR matrix.
  */
 CSRMatrix COOToCSR(COOMatrix coo);
 
@@ -197,17 +231,44 @@ bool COOHasDuplicate(COOMatrix coo);
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 /*!
+ * \brief Sort the indices of a COO matrix in-place.
+ *
+ * The function sorts row indices in ascending order. If sort_column is true,
+ * col indices are sorted in ascending order too. The data array of the returned COOMatrix
+ * stores the shuffled index which could be used to fetch edge data.
+ *
+ * Complexity: O(N*log(N)) time and O(1) space, where N is the number of nonzeros.
+ * TODO(minjie): The time complexity could be improved to O(N) by using a O(N) space.
+ *
+ * \param mat The coo matrix to sort.
+ * \param sort_column True if column index should be sorted too.
+ */
+void COOSort_(COOMatrix* mat, bool sort_column = false);
+
+/*!
  * \brief Sort the indices of a COO matrix.
  *
  * The function sorts row indices in ascending order. If sort_column is true,
  * col indices are sorted in ascending order too. The data array of the returned COOMatrix
  * stores the shuffled index which could be used to fetch edge data.
  *
+ * Complexity: O(N*log(N)) time and O(1) space, where N is the number of nonzeros.
+ * TODO(minjie): The time complexity could be improved to O(N) by using a O(N) space.
+ *
  * \param mat The input coo matrix
  * \param sort_column True if column index should be sorted too.
  * \return COO matrix with index sorted.
  */
-COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
+inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
+  if ((mat.row_sorted && !sort_column) || mat.col_sorted)
+    return mat;
+  COOMatrix ret(mat.num_rows, mat.num_cols,
+                mat.row.Clone(), mat.col.Clone(),
+                COOHasData(mat)? mat.data.Clone() : mat.data,
+                mat.row_sorted, mat.col_sorted);
+  COOSort_(&ret, sort_column);
+  return ret;
+}
 
 /*!
  * \brief Remove entries from COO matrix by entry indices (data indices)
@@ -309,6 +370,92 @@ COOMatrix COORowWiseTopk(
     int64_t k,
     NDArray weight,
     bool ascending = false);
+
+/*!
+ * \brief Union a list COOMatrix into one COOMatrix.
+ *
+ * Examples:
+ *
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
+ *
+ * B = [[0, 0],
+ *      [1, 0]]
+ *
+ * COOMatrix_A.num_rows : 3
+ * COOMatrix_A.num_cols : 3
+ * COOMatrix_B.num_rows : 2
+ * COOMatrix_B.num_cols : 2
+ *
+ * C = DisjointUnionCoo({A, B});
+ *
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0]]
+ * COOMatrix_C.num_rows : 5
+ * COOMatrix_C.num_cols : 5
+ *
+ * \param coos The input list of coo matrix.
+ * \param src_offset A list of integers recording src vertix id offset of each Matrix in coos
+ * \param src_offset A list of integers recording dst vertix id offset of each Matrix in coos
+ * \return The combined COOMatrix.
+ */
+COOMatrix DisjointUnionCoo(
+  const std::vector<COOMatrix>& coos);
+
+/*!
+ * \brief Split a COOMatrix into multiple disjoin components.
+ *
+ * Examples:
+ *
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 1]]
+ * COOMatrix_C.num_rows : 6
+ * COOMatrix_C.num_cols : 5
+ *
+ * batch_size : 2
+ * edge_cumsum : [0, 4, 6]
+ * src_vertex_cumsum : [0, 3, 6]
+ * dst_vertex_cumsum : [0, 3, 5]
+ *
+ * ret = DisjointPartitionCooBySizes(C,
+ *                                   batch_size,
+ *                                   edge_cumsum,
+ *                                   src_vertex_cumsum,
+ *                                   dst_vertex_cumsum)
+ *
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
+ * COOMatrix_A.num_rows : 3
+ * COOMatrix_A.num_cols : 3
+ *
+ * B = [[0, 0],
+ *      [1, 0],
+ *      [0, 1]]
+ * COOMatrix_B.num_rows : 3
+ * COOMatrix_B.num_cols : 2
+ *
+ * \param coo COOMatrix to split.
+ * \param batch_size Number of disjoin components (Sub COOMatrix)
+ * \param edge_cumsum Number of edges of each components
+ * \param src_vertex_cumsum Number of src vertices of each component.
+ * \param dst_vertex_cumsum Number of dst vertices of each component.
+ * \return A list of COOMatrixes representing each disjoint components.
+ */
+std::vector<COOMatrix> DisjointPartitionCooBySizes(
+  const COOMatrix &coo,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> &edge_cumsum,
+  const std::vector<uint64_t> &src_vertex_cumsum,
+  const std::vector<uint64_t> &dst_vertex_cumsum);
 
 }  // namespace aten
 }  // namespace dgl

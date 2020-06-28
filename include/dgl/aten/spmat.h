@@ -55,6 +55,19 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
     return std::string("auto");
 }
 
+inline dgl_format_code_t SparseFormat2Code(SparseFormat sparse_format) {
+  if (sparse_format == SparseFormat::kCOO)
+    return 1;
+  else if (sparse_format == SparseFormat::kCSR)
+    return 2;
+  else if (sparse_format == SparseFormat::kCSC)
+    return 3;
+  else if (sparse_format == SparseFormat::kAny)
+    return 0;
+  else
+    return 4;
+}
+
 // Sparse matrix object that is exposed to python API.
 struct SparseMatrix : public runtime::Object {
   // Sparse format.
