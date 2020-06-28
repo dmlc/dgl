@@ -143,6 +143,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     ip_addr = get_local_usable_addr()
     client_ip, client_port = ip_addr.split(':')
     # Register client on server
+    ip_addr = str(machine_id) + '-' + ip_addr
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
