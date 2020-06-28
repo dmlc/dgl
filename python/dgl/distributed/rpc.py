@@ -1064,7 +1064,7 @@ class GetNumberClientsRequest(Request):
         self.client_id = state
 
     def process_request(self, server_state):
-        res = GetNumberClientsResponse(rpc.get_num_client())
+        res = GetNumberClientsResponse(get_num_client())
         return res
     
 _init_api("dgl.distributed.rpc")
