@@ -107,17 +107,18 @@ class HelloRequest(dgl.distributed.Request):
         res = HelloResponse(self.hello_str, self.integer, new_tensor)
         return res
 
-def start_server():
+def start_server(num_clients):
     server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
                                  ip_config='rpc_ip_config.txt', 
-                                 num_clients=1, 
+                                 num_clients=num_clients, 
                                  server_state=server_state)
 
 def start_client():
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config='rpc_ip_config.txt')
+    assert dgl.distributed.get_num_client() == 1
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
@@ -150,7 +151,8 @@ def start_client():
         assert res.integer == INTEGER
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
     # clean up
-    dgl.distributed.shutdown_servers()
+    if dgl.distributed.get_rank() == 0:
+        dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
 
 def test_serialize():
@@ -193,14 +195,35 @@ def test_rpc():
     ip_config.close()
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server)
-    pclient = ctx.Process(target=start_client)
+    pclient = ctx.Process(target=start_client, args=(1,))
     pserver.start()
     time.sleep(1)
     pclient.start()
     pserver.join()
     pclient.join()
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+def test_multi_client():
+    ip_config = open("rpc_ip_config_mul_client.txt", "w")
+    ip_addr = get_local_usable_addr()
+    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.close()
+    ctx = mp.get_context('spawn')
+    pserver = ctx.Process(target=start_server)
+    pclient_list = []
+    for i in range(10):
+        pclient = ctx.Process(target=start_client, args=(10,))
+        pclient_list.append(pclient)
+    pserver.start()
+    time.sleep(1)
+    for i in range(10):
+        pclient_list[i].start()
+    pserver.join()
+    for i in range(10):
+        pclient_list[i].join()
+
 if __name__ == '__main__':
     test_serialize()
     test_rpc_msg()
     test_rpc()
+    test_multi_client()
