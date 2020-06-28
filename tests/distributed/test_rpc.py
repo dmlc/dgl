@@ -194,8 +194,8 @@ def test_rpc():
     ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server)
-    pclient = ctx.Process(target=start_client, args=(1,))
+    pserver = ctx.Process(target=start_server, args=(1,))
+    pclient = ctx.Process(target=start_client)
     pserver.start()
     time.sleep(1)
     pclient.start()
@@ -209,10 +209,10 @@ def test_multi_client():
     ip_config.write('%s 1\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server)
+    pserver = ctx.Process(target=start_server, args=(10,))
     pclient_list = []
     for i in range(10):
-        pclient = ctx.Process(target=start_client, args=(10,))
+        pclient = ctx.Process(target=start_client)
         pclient_list.append(pclient)
     pserver.start()
     time.sleep(1)
