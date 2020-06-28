@@ -116,6 +116,16 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_rows);
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
+
+  /*! \brief Return a copy of this matrix on the give device context. */
+  inline COOMatrix CopyTo(const DLContext& ctx) const {
+    if (ctx == row->ctx)
+      return *this;
+    return COOMatrix(num_rows, num_cols,
+                     row.CopyTo(ctx), col.CopyTo(ctx),
+                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     row_sorted, col_sorted);
+  }
 };
 
 ///////////////////////// COO routines //////////////////////////
@@ -141,6 +151,17 @@ inline bool COOHasData(COOMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
+/*!
+ * \brief Check whether the COO is sorted.
+ *
+ * It returns two flags: one for whether the row is sorted;
+ * the other for whether the columns of each row is sorted
+ * if the first flag is true.
+ *
+ * Complexity: O(NNZ)
+ */
+std::pair<bool, bool> COOIsSorted(COOMatrix coo);
+
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
 
@@ -161,6 +182,20 @@ COOMatrix COOTranspose(COOMatrix coo);
  * the result CSR matrix stores a shuffle index for how the entries
  * will be reordered in CSR. The i^th entry in the result CSR corresponds
  * to the CSR.data[i] th entry in the input COO.
+ *
+ * Conversion complexity: O(nnz)
+ *
+ * - The function first check whether the input COO matrix is sorted
+ *   using a linear scan.
+ * - If the COO matrix is row sorted, the conversion can be done very
+ *   efficiently in a sequential scan. The result indices and data arrays 
+ *   are directly equal to the column and data arrays from the input.
+ * - If the COO matrix is further column sorted, the result CSR is
+ *   also column sorted.
+ * - Otherwise, the conversion is more costly but still is O(nnz).
+ *
+ * \param coo Input COO matrix.
+ * \return CSR matrix.
  */
 CSRMatrix COOToCSR(COOMatrix coo);
 
@@ -196,17 +231,44 @@ bool COOHasDuplicate(COOMatrix coo);
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 /*!
+ * \brief Sort the indices of a COO matrix in-place.
+ *
+ * The function sorts row indices in ascending order. If sort_column is true,
+ * col indices are sorted in ascending order too. The data array of the returned COOMatrix
+ * stores the shuffled index which could be used to fetch edge data.
+ *
+ * Complexity: O(N*log(N)) time and O(1) space, where N is the number of nonzeros.
+ * TODO(minjie): The time complexity could be improved to O(N) by using a O(N) space.
+ *
+ * \param mat The coo matrix to sort.
+ * \param sort_column True if column index should be sorted too.
+ */
+void COOSort_(COOMatrix* mat, bool sort_column = false);
+
+/*!
  * \brief Sort the indices of a COO matrix.
  *
  * The function sorts row indices in ascending order. If sort_column is true,
  * col indices are sorted in ascending order too. The data array of the returned COOMatrix
  * stores the shuffled index which could be used to fetch edge data.
  *
+ * Complexity: O(N*log(N)) time and O(1) space, where N is the number of nonzeros.
+ * TODO(minjie): The time complexity could be improved to O(N) by using a O(N) space.
+ *
  * \param mat The input coo matrix
  * \param sort_column True if column index should be sorted too.
  * \return COO matrix with index sorted.
  */
-COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
+inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
+  if ((mat.row_sorted && !sort_column) || mat.col_sorted)
+    return mat;
+  COOMatrix ret(mat.num_rows, mat.num_cols,
+                mat.row.Clone(), mat.col.Clone(),
+                COOHasData(mat)? mat.data.Clone() : mat.data,
+                mat.row_sorted, mat.col_sorted);
+  COOSort_(&ret, sort_column);
+  return ret;
+}
 
 /*!
  * \brief Remove entries from COO matrix by entry indices (data indices)

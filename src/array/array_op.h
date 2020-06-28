@@ -44,7 +44,7 @@ template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index);
 
 template <DLDeviceType XPU, typename DType>
-DType IndexSelect(NDArray array, uint64_t index);
+DType IndexSelect(NDArray array, int64_t index);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);
@@ -63,6 +63,9 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
+
+template <DLDeviceType XPU, typename IdType>
+IdArray CumSum(IdArray array, bool prepend_zero);
 
 // sparse arrays
 
@@ -86,6 +89,9 @@ runtime::NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
+
+template <DLDeviceType XPU, typename IdType>
+bool CSRIsSorted(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
@@ -191,7 +197,10 @@ template <DLDeviceType XPU, typename IdType>
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COOSort(COOMatrix mat, bool sort_column);
+void COOSort_(COOMatrix* mat, bool sort_column);
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);

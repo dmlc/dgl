@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <memory>
 
 #include "socket_communicator.h"
 #include "../../c_api_common.h"

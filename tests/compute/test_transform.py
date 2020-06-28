@@ -255,9 +255,33 @@ def test_metis_partition():
     check_metis_partition(g, 0)
     check_metis_partition(g, 1)
     check_metis_partition(g, 2)
+    check_metis_partition_with_constraint(g)
+
+def check_metis_partition_with_constraint(g):
+    ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
+    ntypes[0:int(g.number_of_nodes()/4)] = 1
+    ntypes[int(g.number_of_nodes()*3/4):] = 2
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1, balance_ntypes=ntypes)
+    if subgs is not None:
+        for i in subgs:
+            subg = subgs[i]
+            parent_nids = F.asnumpy(subg.ndata[dgl.NID])
+            sub_ntypes = ntypes[parent_nids]
+            print('type0:', np.sum(sub_ntypes == 0))
+            print('type1:', np.sum(sub_ntypes == 1))
+            print('type2:', np.sum(sub_ntypes == 2))
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1,
+                                          balance_ntypes=ntypes, balance_edges=True)
+    if subgs is not None:
+        for i in subgs:
+            subg = subgs[i]
+            parent_nids = F.asnumpy(subg.ndata[dgl.NID])
+            sub_ntypes = ntypes[parent_nids]
+            print('type0:', np.sum(sub_ntypes == 0))
+            print('type1:', np.sum(sub_ntypes == 1))
+            print('type2:', np.sum(sub_ntypes == 2))
 
 def check_metis_partition(g, extra_hops):
-    # partitions with 1-hop HALO nodes
     subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops)
     num_inner_nodes = 0
     num_inner_edges = 0
@@ -274,7 +298,7 @@ def check_metis_partition(g, extra_hops):
     if extra_hops == 0:
         return
 
-    # partitions with 1-hop HALO nodes and reshuffling nodes
+    # partitions with node reshuffling
     subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops, reshuffle=True)
     num_inner_nodes = 0
     num_inner_edges = 0
@@ -579,10 +603,6 @@ def test_to_block(index_dtype):
     assert bg.number_of_src_nodes() == 4
     assert bg.number_of_dst_nodes() == 4
 
-    dst_nodes = F.tensor([3, 4], dtype=getattr(F, index_dtype))
-    bg = dgl.to_block(g_a, dst_nodes)
-    check(g_a, bg, 'A', 'AA', dst_nodes)
-
     dst_nodes = F.tensor([4, 3, 2, 1], dtype=getattr(F, index_dtype))
     bg = dgl.to_block(g_a, dst_nodes)
     check(g_a, bg, 'A', 'AA', dst_nodes)
@@ -596,15 +616,11 @@ def test_to_block(index_dtype):
     assert bg.number_of_nodes('DST/A') == 0
     checkall(g_ab, bg, None)
 
-    dst_nodes = {'B': F.tensor([5, 6], dtype=getattr(F, index_dtype))}
+    dst_nodes = {'B': F.tensor([5, 6, 3, 1], dtype=getattr(F, index_dtype))}
     bg = dgl.to_block(g, dst_nodes)
-    assert bg.number_of_nodes('SRC/B') == 2
+    assert bg.number_of_nodes('SRC/B') == 4
     assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
     assert bg.number_of_nodes('DST/A') == 0
-    checkall(g, bg, dst_nodes)
-
-    dst_nodes = {'A': F.tensor([3, 4], dtype=getattr(F, index_dtype)), 'B': F.tensor([5, 6], dtype=getattr(F, index_dtype))}
-    bg = dgl.to_block(g, dst_nodes)
     checkall(g, bg, dst_nodes)
 
     dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=getattr(F, index_dtype)), 'B': F.tensor([3, 5, 6, 1], dtype=getattr(F, index_dtype))}

@@ -208,6 +208,8 @@ template <typename IDX>
 void _TestIndexSelect(DLContext ctx) {
   IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
   ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
+  ASSERT_TRUE(ArrayEQ<IDX>(aten::IndexSelect(a, 10, 20),
+        aten::Range(10, 20, sizeof(IDX)*8, ctx)));
   IdArray b = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
   IdArray c = aten::IndexSelect(a, b);
   ASSERT_TRUE(ArrayEQ<IDX>(b, c));
@@ -570,5 +572,40 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
 #ifdef DGL_USE_CUDA
   _TestDisjointUnionPartitionCsr<int32_t>(GPU);
   _TestDisjointUnionPartitionCsr<int64_t>(GPU);
+
+void _TestCumSum(DLContext ctx) {
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}),
+      sizeof(IDX)*8, ctx);
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({8, 14, 21, 26, 29, 29, 38}),
+        sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({0, 8, 14, 21, 26, 29, 29, 38}),
+        sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a, true);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+  a = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+  {
+    IdArray tb = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+    IdArray b = aten::CumSum(a);
+    ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
+  }
+}
+
+TEST(ArrayTest, CumSum) {
+  _TestCumSum<int32_t>(CPU);
+  _TestCumSum<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCumSum<int32_t>(GPU);
+  _TestCumSum<int64_t>(GPU);
 #endif
 }

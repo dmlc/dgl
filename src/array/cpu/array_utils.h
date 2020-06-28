@@ -6,12 +6,12 @@
 #ifndef DGL_ARRAY_CPU_ARRAY_UTILS_H_
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
 
-#include <dgl/array.h>
+#include <dgl/aten/types.h>
+#include <parallel_hashmap/phmap.h>
 #include <vector>
 #include <unordered_map>
 #include <utility>
 #include "../../c_api_common.h"
-#include "../third_party/phmap/parallel_hashmap/phmap.h"
 
 namespace dgl {
 namespace aten {
