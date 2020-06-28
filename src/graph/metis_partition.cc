@@ -16,7 +16,7 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
-IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
+IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(dgl_id_t));
   ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
@@ -32,11 +32,23 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
   IdArray part_arr = aten::NewIdArray(nvtxs);
   idx_t objval = 0;
   idx_t *part = static_cast<idx_t*>(part_arr->data);
+
+  int64_t vwgt_len = vwgt_arr->shape[0];
+  CHECK_EQ(sizeof(idx_t), vwgt_arr->dtype.bits / 8)
+      << "The vertex weight array doesn't have right type";
+  CHECK(vwgt_len % g->NumVertices() == 0)
+      << "The vertex weight array doesn't have right number of elements";
+  idx_t *vwgt = NULL;
+  if (vwgt_len > 0) {
+    ncon = vwgt_len / g->NumVertices();
+    vwgt = static_cast<idx_t*>(vwgt_arr->data);
+  }
+
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
                                 xadj,        // indptr
                                 adjncy,      // indices
-                                NULL,        // the weights of the vertices
+                                vwgt,        // the weights of the vertices
                                 NULL,        // The size of the vertices for computing
                                 // the total communication volume
                                 NULL,        // The weights of the edges
@@ -69,7 +81,8 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     int k = args[1];
-    *rv = GraphOp::MetisPartition(g.sptr(), k);
+    NDArray vwgt = args[2];
+    *rv = GraphOp::MetisPartition(g.sptr(), k, vwgt);
   });
 
 }   // namespace dgl
