@@ -116,6 +116,16 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_rows);
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
+
+  /*! \brief Return a copy of this matrix on the give device context. */
+  inline COOMatrix CopyTo(const DLContext& ctx) const {
+    if (ctx == row->ctx)
+      return *this;
+    return COOMatrix(num_rows, num_cols,
+                     row.CopyTo(ctx), col.CopyTo(ctx),
+                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     row_sorted, col_sorted);
+  }
 };
 
 ///////////////////////// COO routines //////////////////////////
@@ -246,6 +256,8 @@ void COOSort_(COOMatrix* mat, bool sort_column = false);
  * \return COO matrix with index sorted.
  */
 inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
+  if ((mat.row_sorted && !sort_column) || mat.col_sorted)
+    return mat;
   COOMatrix ret(mat.num_rows, mat.num_cols,
                 mat.row.Clone(), mat.col.Clone(),
                 COOHasData(mat)? mat.data.Clone() : mat.data,

@@ -138,13 +138,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   COO CopyTo(const DLContext& ctx) const {
     if (Context() == ctx)
       return *this;
-
-    COO ret(
-        meta_graph_,
-        adj_.num_rows, adj_.num_cols,
-        adj_.row.CopyTo(ctx),
-        adj_.col.CopyTo(ctx));
-    return ret;
+    return COO(meta_graph_, adj_.CopyTo(ctx));
   }
 
   bool IsMultigraph() const override {
@@ -516,13 +510,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     if (Context() == ctx) {
       return *this;
     } else {
-      CSR ret(
-          meta_graph_,
-          adj_.num_rows, adj_.num_cols,
-          adj_.indptr.CopyTo(ctx),
-          adj_.indices.CopyTo(ctx),
-          adj_.data.CopyTo(ctx));
-      return ret;
+      return CSR(meta_graph_, adj_.CopyTo(ctx));
     }
   }
 
@@ -1181,35 +1169,28 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   if (g->NumBits() == bits) {
     return g;
   } else {
-    // TODO(minjie): since we don't have int32 operations,
-    //   we make sure that this graph (on CPU) has materialized CSR,
-    //   and then copy them to other context (usually GPU). This should
-    //   be fixed later.
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-
-    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
-    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
+    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->AsNumBits(bits))) : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->AsNumBits(bits))) : nullptr;
+    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->AsNumBits(bits))) : nullptr;
     return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
 }
 
 HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   if (ctx == g->Context()) {
     return g;
+  } else {
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
+    CHECK_NOTNULL(bg);
+    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
+    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
+    return HeteroGraphPtr(
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
-  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
-  //   we make sure that this graph (on CPU) has materialized CSR,
-  //   and then copy them to other context (usually GPU). This should
-  //   be fixed later.
-  auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
-  CHECK_NOTNULL(bg);
-
-  CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
-  CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-  return HeteroGraphPtr(
-      new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
 }
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,

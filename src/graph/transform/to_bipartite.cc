@@ -50,8 +50,7 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool includ
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
-    const dgl_type_t dsttype = src_dst_types.second;
-    const EdgeArray edges = graph->InEdges(etype, rhs_nodes[dsttype]);
+    const EdgeArray& edges = graph->Edges(etype);
     lhs_node_mappings[srctype].Update(edges.src);
     edge_arrays[etype] = edges;
   }
@@ -75,10 +74,17 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool includ
     const dgl_type_t dsttype = src_dst_types.second;
     const IdHashMap<IdType> &lhs_map = lhs_node_mappings[srctype];
     const IdHashMap<IdType> &rhs_map = rhs_node_mappings[dsttype];
+    IdArray new_src = lhs_map.Map(edge_arrays[etype].src, -1);
+    IdArray new_dst = rhs_map.Map(edge_arrays[etype].dst, -1);
+    // Check whether there are unmapped IDs and raise error.
+    for (int64_t i = 0; i < new_dst->shape[0]; ++i)
+      CHECK_NE(new_dst.Ptr<IdType>()[i], -1)
+        << "Node " << edge_arrays[etype].dst.Ptr<IdType>()[i] << " does not exist"
+        << " in `rhs_nodes`. Argument `rhs_nodes` must contain all the edge"
+        << " destination nodes.";
     rel_graphs.push_back(CreateFromCOO(
         2, lhs_map.Size(), rhs_map.Size(),
-        lhs_map.Map(edge_arrays[etype].src, -1),
-        rhs_map.Map(edge_arrays[etype].dst, -1)));
+        new_src, new_dst));
     induced_edges.push_back(edge_arrays[etype].id);
   }
 

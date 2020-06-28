@@ -108,6 +108,16 @@ struct CSRMatrix {
     CHECK_NO_OVERFLOW(indptr->dtype, num_cols);
     CHECK_EQ(indptr->shape[0], num_rows + 1);
   }
+
+  /*! \brief Return a copy of this matrix on the give device context. */
+  inline CSRMatrix CopyTo(const DLContext& ctx) const {
+    if (ctx == indptr->ctx)
+      return *this;
+    return CSRMatrix(num_rows, num_cols,
+                     indptr.CopyTo(ctx), indices.CopyTo(ctx),
+                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     sorted);
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -246,6 +256,8 @@ void CSRSort_(CSRMatrix* csr);
  * Return a new CSR matrix with sorted column indices and data arrays.
  */
 inline CSRMatrix CSRSort(CSRMatrix csr) {
+  if (csr.sorted)
+    return csr;
   CSRMatrix ret(csr.num_rows, csr.num_cols,
                 csr.indptr, csr.indices.Clone(),
                 CSRHasData(csr)? csr.data.Clone() : csr.data,
