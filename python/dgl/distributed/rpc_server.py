@@ -70,7 +70,7 @@ def start_server(server_id, ip_config, num_clients, server_state, \
         addr_list.append(req.ip_addr)
     addr_list.sort()
     for client_id, addr in enumerate(addr_list):
-        m_id, ip_addr = addr.split('-')
+        _, ip_addr = addr.split('-')
         client_namebook[client_id] = ip_addr
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
