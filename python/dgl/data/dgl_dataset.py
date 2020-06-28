@@ -36,7 +36,7 @@ class DGLDataset(object):
         if raw_dir is None:
             self._raw_dir = get_download_dir()
         else:
-            self._raw_dir = os.path.expanduser(raw_dir)
+            self._raw_dir = raw_dir
 
         if save_dir is None:
             self._save_dir = self._raw_dir
