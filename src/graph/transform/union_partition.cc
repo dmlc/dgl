@@ -36,7 +36,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
           curr_format == SparseFormat::kCSR ||
           curr_format == SparseFormat::kCSC)
         format &=(1 << (SparseFormat2Code(curr_format)-1));
-    
+
       // Update offsets
       src_offset += cg->NumVertices(src_vtype);
       dst_offset += cg->NumVertices(dst_vtype);

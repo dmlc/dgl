@@ -452,7 +452,6 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion_v2")
         << "Expect graphs to batch have the same context" << ctx
         << "), but got " << component->Context();
     }
-    
 
     auto hgptr = DisjointUnionHeteroGraph2(meta_graph.sptr(), component_ptrs);
     *rv = HeteroGraphRef(hgptr);
