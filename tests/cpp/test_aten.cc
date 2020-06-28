@@ -572,7 +572,10 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
 #ifdef DGL_USE_CUDA
   _TestDisjointUnionPartitionCsr<int32_t>(GPU);
   _TestDisjointUnionPartitionCsr<int64_t>(GPU);
+#endif
+}
 
+template <typename IDX>
 void _TestCumSum(DLContext ctx) {
   IdArray a = aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}),
       sizeof(IDX)*8, ctx);

@@ -85,23 +85,17 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
 
   for (size_t g = 0; g < batch_size; ++g) {
     IdArray result_src = IndexSelect(coo.row,
-                                     Range(edge_cumsum[g],
-                                           edge_cumsum[g + 1],
-                                           coo.row->dtype.bits,
-                                           coo.row->ctx)) - src_vertex_cumsum[g];
+                                     edge_cumsum[g],
+                                     edge_cumsum[g + 1]) - src_vertex_cumsum[g];
     IdArray result_dst = IndexSelect(coo.col,
-                                     Range(edge_cumsum[g],
-                                           edge_cumsum[g + 1],
-                                           coo.col->dtype.bits,
-                                           coo.col->ctx)) - dst_vertex_cumsum[g];
+                                     edge_cumsum[g],
+                                     edge_cumsum[g + 1]) - dst_vertex_cumsum[g];
     IdArray result_data = NullArray();
     // has data index array
     if (COOHasData(coo)) {
       result_data = IndexSelect(coo.data,
-                                Range(edge_cumsum[g],
-                                      edge_cumsum[g + 1],
-                                      coo.data->dtype.bits,
-                                      coo.data->ctx)) - edge_cumsum[g];
+                                edge_cumsum[g],
+                                edge_cumsum[g + 1]) - edge_cumsum[g];
     }
 
     COOMatrix sub_coo = COOMatrix(
@@ -147,10 +141,8 @@ CSRMatrix DisjointUnionCsr(const std::vector<CSRMatrix>& csrs) {
     IdArray indices = csr.indices + dst_offset;
     if (i > 0)
       indptr = IndexSelect(indptr,
-                           Range(1,
-                                 indptr->shape[0],
-                                 indptr->dtype.bits,
-                                 indptr->ctx));
+                           1,
+                           indptr->shape[0]);
     res_indptr[i] = indptr;
     res_indices[i] = indices;
     src_offset += csr.num_rows;
@@ -201,32 +193,24 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
     IdArray result_indptr;
     if (g == 0) {
       result_indptr = IndexSelect(csr.indptr,
-                                  Range(0,
-                                        src_vertex_cumsum[1] + 1,
-                                        csr.indptr->dtype.bits,
-                                        csr.indptr->ctx)) - edge_cumsum[0];
+                                  0,
+                                  src_vertex_cumsum[1] + 1) - edge_cumsum[0];
     } else {
       result_indptr = IndexSelect(csr.indptr,
-                                  Range(src_vertex_cumsum[g],
-                                        src_vertex_cumsum[g+1] + 1,
-                                        csr.indptr->dtype.bits,
-                                        csr.indptr->ctx)) - edge_cumsum[g];
+                                  src_vertex_cumsum[g],
+                                  src_vertex_cumsum[g+1] + 1) - edge_cumsum[g];
     }
 
     IdArray result_indices = IndexSelect(csr.indices,
-                                         Range(edge_cumsum[g],
-                                               edge_cumsum[g+1],
-                                               csr.indices->dtype.bits,
-                                               csr.indices->ctx)) - dst_vertex_cumsum[g];
+                                         edge_cumsum[g],
+                                         edge_cumsum[g+1]) - dst_vertex_cumsum[g];
 
     IdArray result_data = NullArray();
     // has data index array
     if (CSRHasData(csr)) {
       result_data = IndexSelect(csr.data,
-                                Range(edge_cumsum[g],
-                                      edge_cumsum[g+1],
-                                      csr.data->dtype.bits,
-                                      csr.data->ctx)) - edge_cumsum[g];
+                                edge_cumsum[g],
+                                edge_cumsum[g+1]) - edge_cumsum[g];
     }
 
     CSRMatrix sub_csr = CSRMatrix(
