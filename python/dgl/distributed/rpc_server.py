@@ -44,6 +44,9 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     rpc.register_service(rpc.SHUT_DOWN_SERVER,
                          rpc.ShutDownRequest,
                          None)
+    rpc.register_service(rpc.GET_NUM_CLIENT,
+                         rpc.GetNumberClientsRequest,
+                         rpc.GetNumberClientsResponse)
     rpc.set_rank(server_id)
     server_namebook = rpc.read_ip_config(ip_config)
     machine_id = server_namebook[server_id][0]

@@ -1027,6 +1027,8 @@ class ShutDownRequest(Request):
         finalize_server()
         return 'exit'
 
+GET_NUM_CLIENT = 22453
+
 class GetNumberClientsResponse(Response):
     """This reponse will send total number of clients.
 
