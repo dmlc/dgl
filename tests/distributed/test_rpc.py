@@ -219,7 +219,7 @@ def test_multi_client():
     for i in range(10):
         pclient_list[i].start()
     for i in range(10):
-        pclient_list.join()
+        pclient_list[i].join()
     pserver.join()
 
 
