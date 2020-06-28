@@ -116,6 +116,7 @@ def start_server(num_clients, ip_config):
                                  server_state=server_state)
 
 def start_client(ip_config):
+    print("000000")
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config=ip_config)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
@@ -125,6 +126,7 @@ def start_client(ip_config):
     assert res.hello_str == STR
     assert res.integer == INTEGER
     assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
+    print("111111")
     # test remote_call
     target_and_requests = []
     for i in range(10):
@@ -134,12 +136,14 @@ def start_client(ip_config):
         assert res.hello_str == STR
         assert res.integer == INTEGER
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
+    print("2222222")
     # test send_request_to_machine
     dgl.distributed.send_request_to_machine(0, req)
     res = dgl.distributed.recv_response()
     assert res.hello_str == STR
     assert res.integer == INTEGER
     assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
+    print("333333")
     # test remote_call_to_machine
     target_and_requests = []
     for i in range(10):
@@ -154,6 +158,7 @@ def start_client(ip_config):
         dgl.distributed.shutdown_servers()
     time.sleep(2)
     dgl.distributed.finalize_client()
+    print("444444")
 
 def test_serialize():
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
@@ -218,9 +223,8 @@ def test_multi_client():
     time.sleep(1)
     for i in range(10):
         pclient_list[i].start()
-    pserver.join()
-    for i in range(10):
         pclient_list[i].join()
+    pserver.join()
 
 if __name__ == '__main__':
     test_serialize()
