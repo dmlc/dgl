@@ -481,7 +481,7 @@ class SkipGramModel(nn.Module):
         return torch.sum(score), torch.sum(neg_score)
 
     def save_embedding(self, dataset, file_name):
-        """ Write embedding to local file.
+        """ Write embedding to local file. Only used when node ids are numbers.
 
         Parameter
         ---------
@@ -494,14 +494,19 @@ class SkipGramModel(nn.Module):
         np.save(file_name, embedding)
 
     def save_embedding_pt(self, dataset, file_name):
-        """ 
+        """ For ogb leaderboard.
         """
-        embedding = self.u_embeddings.weight.cpu().data
-        assert max(dataset.node2id.keys()) == self.emb_size - 1, "The node id does not starts from 0, saving embedding failed."
-        index = torch.LongTensor(list(map(lambda node: dataset.node2id[node], list(range(self.emb_size)))))
-        embedding = torch.index_select(embedding, 0, index)
+        max_node_id = max(dataset.node2id.keys())
+        if max_node_id + 1 != self.emb_size:
+            print("WARNING: The node ids are not serial.")
+
+        embedding = torch.zeros(max_node_id + 1, self.emb_dimension)
+        index = torch.LongTensor(list(map(lambda id: dataset.id2node[id], list(range(self.emb_size)))))
+        embedding.index_add_(0, index, self.u_embeddings.weight.cpu().data)
+
         if self.norm:
-            embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1)).unsqueeze(1)
+            embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1) + 1e-6).unsqueeze(1)
+
         torch.save(embedding, file_name)
 
     def save_embedding_txt(self, dataset, file_name):
