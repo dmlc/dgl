@@ -761,7 +761,7 @@ class KVClient(object):
     def num_clients(self):
         """Get total number of clients"""
         return self._num_clients
-    
+
     def barrier(self):
         """Barrier for all client nodes.
 
