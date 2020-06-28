@@ -150,6 +150,11 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.set_rank(res.client_id)
     print("Machine (%d) client (%d) connect to server successfuly!" \
         % (machine_id, rpc.get_rank()))
+    # get total number of client
+    get_client_num_req = rpc.GetNumberClientsRequest(rpc.get_rank())
+    rpc.send_request(0, get_client_num_req)
+    res = rpc.recv_response()
+    rpc.set_num_client(res.num_client)
 
 def finalize_client():
     """Release resources of this client."""

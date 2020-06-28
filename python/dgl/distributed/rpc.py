@@ -1027,4 +1027,42 @@ class ShutDownRequest(Request):
         finalize_server()
         return 'exit'
 
+class GetNumberClientsResponse(Response):
+    """This reponse will send total number of clients.
+
+    Parameters
+    ----------
+    num_client : int
+        total number of clients
+    """
+    def __init__(self, num_client):
+        self.num_client = num_client
+
+    def __getstate__(self):
+        return self.num_client
+
+    def __setstate__(self, state):
+        self.num_client = state
+
+class GetNumberClientsRequest(Request):
+    """Client send this request to get the total number of client.
+
+    Parameters
+    ----------
+    client_id : int
+        client's ID
+    """
+    def __init__(self, client_id):
+        self.client_id = client_id
+
+    def __getstate__(self):
+        return self.client_id
+
+    def __setstate__(self, state):
+        self.client_id = state
+
+    def process_request(self, server_state):
+        res = GetNumberClientsResponse(rpc.get_num_client())
+        return res
+    
 _init_api("dgl.distributed.rpc")
