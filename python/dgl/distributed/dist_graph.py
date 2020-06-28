@@ -607,8 +607,11 @@ def node_split(nodes, partition_book, num_clients, rank):
 
     # get a subset for the local client.
     size = len(local_nids) // num_client_per_part
-    # TODO(zhengda) If it's not divisible
-    return local_nids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
+    # if this isn't the last client in the partition.
+    if client_id_in_part + 1 < num_client_per_part:
+        return local_nids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
+    else:
+        return local_nids[(size * client_id_in_part):]
 
 def edge_split(edges, partition_book, num_clients, rank):
     ''' Split edges and return a subset for the local rank.
@@ -649,5 +652,8 @@ def edge_split(edges, partition_book, num_clients, rank):
 
     # get a subset for the local client.
     size = len(local_eids) // num_client_per_part
-    # TODO(zhengda) If it's not divisible
-    return local_eids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
+    # if this isn't the last client in the partition.
+    if client_id_in_part + 1 < num_client_per_part:
+        return local_eids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
+    else:
+        return local_eids[(size * client_id_in_part):]
