@@ -203,7 +203,6 @@ def run(args, device, data):
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
-            forward_end = time.time()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
