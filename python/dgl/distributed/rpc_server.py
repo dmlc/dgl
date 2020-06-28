@@ -1,20 +1,9 @@
 """Functions used by server."""
 
 import time
-import functools
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-
-def compare_client(x, y):
-    """udf compare for sort()"""
-    machine_id_x, ip_addr_x = x.split('-')
-    machine_id_y, ip_addr_y = x.split('-')
-    if machine_id_x == machine_id_y:
-        _, client_port_x = ip_addr_x.split(':')
-        _, client_port_y = ip_addr_y.split(':')
-        return int(client_port_x) - int(client_port_y)
-    return int(machine_id_x) - int(machine_id_y)
 
 def start_server(server_id, ip_config, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
