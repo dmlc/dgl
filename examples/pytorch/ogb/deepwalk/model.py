@@ -506,6 +506,7 @@ class SkipGramModel(nn.Module):
 
         if self.norm:
             embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1) + 1e-6).unsqueeze(1)
+
         torch.save(embedding, file_name)
 
     def save_embedding_txt(self, dataset, file_name):
