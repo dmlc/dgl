@@ -5,6 +5,16 @@ import time
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 
+def compare_client(x, y):
+    """udf compare for sort()"""
+    machine_id_x, ip_addr_x = x.split('-')
+    machine_id_y, ip_addr_y = x.split('-')
+    if machine_id_x == machine_id_y:
+        _, client_port_x = ip_addr_x.split(':')
+        _, client_port_y = ip_addr_y.split(':')
+        return int(client_port_x) - int(client_port_y)
+    return int(machine_id_x) - int(machine_id_y)
+
 def start_server(server_id, ip_config, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
@@ -68,7 +78,7 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     for _ in range(num_clients):
         req, _ = rpc.recv_request()
         addr_list.append(req.ip_addr)
-    addr_list.sort()
+    addr_list = sorted(addr_list, cmp=compare_client)
     for client_id, addr in enumerate(addr_list):
         _, ip_addr = addr.split('-')
         client_namebook[client_id] = ip_addr
