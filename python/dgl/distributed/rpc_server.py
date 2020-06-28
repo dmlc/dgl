@@ -71,7 +71,7 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     addr_list.sort()
     for client_id, addr in enumerate(addr_list):
         m_id, ip_addr = addr.split('-')
-        client_namebook[client_id] = addr
+        client_namebook[client_id] = ip_addr
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
         rpc.add_receiver_addr(client_ip, client_port, client_id)
