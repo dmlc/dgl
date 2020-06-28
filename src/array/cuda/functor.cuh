@@ -137,8 +137,10 @@ struct Sum {
     Idx *arg_u_buf, Idx *arg_e_buf,
     DType val, DType val_ref, Idx uid, Idx eid) {}
 };
-template <typename DType> constexpr DType Sum<DType>::zero;
-template <typename DType> constexpr bool Sum<DType>::require_arg;
+template <typename Idx, typename DType, bool atomic>
+constexpr DType Sum<Idx, DType, atomic>::zero;
+template <typename Idx, typename DType, bool atomic>
+constexpr bool Sum<Idx, DType, atomic>::require_arg;
 
 template <typename Idx,
           typename DType,
@@ -172,8 +174,10 @@ struct Max {
     }
   }
 };
-template <typename DType> constexpr DType Max<DType>::zero;
-template <typename DType> constexpr bool Max<DType>::require_arg;
+template <typename Idx, typename DType, bool atomic>
+constexpr DType Max<Idx, DType, atomic>::zero;
+template <typename Idx, typename DType, bool atomic>
+constexpr bool Max<Idx, DType, atomic>::require_arg;
 
 template <typename Idx,
           typename DType,
@@ -207,8 +211,10 @@ struct Min {
     }
   }
 };
-template <typename DType> constexpr DType Min<DType>::zero;
-template <typename DType> constexpr bool Min<DType>::require_arg;
+template <typename Idx, typename DType, bool atomic>
+constexpr DType Min<Idx, DType, atomic>::zero;
+template <typename Idx, typename DType, bool atomic>
+constexpr bool Min<Idx, DType, atomic>::require_arg;
 
 }  // namespace reduce
 
