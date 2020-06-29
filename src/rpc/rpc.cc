@@ -437,7 +437,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg_count++;
     }
   }
-  startTime = clock();
   local_data_shape[0] = ID_size;
   NDArray res_tensor = NDArray::Empty(local_data_shape,
                                       local_data->dtype,
@@ -445,6 +444,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
 //#pragma omp parallel for
+  startTime = clock();
   for (int64_t i = 0; i < local_ids.size(); ++i) {
     CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
     CHECK_GE(data_size, local_ids[i] * row_size + row_size);
