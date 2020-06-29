@@ -76,8 +76,9 @@ class EdgeSoftmax(th.autograd.Function):
         #g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
         out_sum = F.copy_reduce('sum', gidx, TargetCode.EDGE, out, n_nodes)
         #g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = F.binary_reduce(
-            'none', 'div', gidx, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
+        if n_edges > 0:
+            out = F.binary_reduce(
+                'none', 'div', gidx, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
 
         ctx.save_for_backward(out)
         return out

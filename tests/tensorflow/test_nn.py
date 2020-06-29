@@ -334,15 +334,25 @@ def test_rgcn():
     assert F.allclose(h_new, h_new_low)
 
 def test_gat_conv():
+    # test homograph
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
     gat = nn.GATConv(5, 2, 4)
     feat = F.randn((100, 5))
     h = gat(g, feat)
     assert h.shape == (100, 4, 2)
 
+    # test bipartite
     g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
     gat = nn.GATConv((5, 10), 2, 4)
     feat = (F.randn((100, 5)), F.randn((200, 10)))
+    h = gat(g, feat)
+
+    # from https://github.com/dmlc/dgl/issues/1598
+    g = dgl.DGLGraph()
+    gat = nn.GATConv(2, 2, 1)
+    g.add_nodes(4)
+    feat = F.randn((4, 2))
+    gat = gat.to(ctx)
     h = gat(g, feat)
 
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])

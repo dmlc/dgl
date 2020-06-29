@@ -153,6 +153,13 @@ def test_gat_conv():
     h = gat(g, feat)
     assert h.shape == (200, 4, 2)
 
+    # from https://github.com/dmlc/dgl/issues/1598
+    g = dgl.DGLGraph()
+    gat = nn.GATConv(2, 2, 1)
+    g.add_nodes(4)
+    feat = F.randn((4, 2))
+    gat = gat.to(ctx)
+    h = gat(g, feat)
 
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
 def test_sage_conv(aggre_type):
