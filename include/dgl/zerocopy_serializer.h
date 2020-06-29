@@ -17,31 +17,36 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "dmlc/logging.h"
 
 namespace dgl {
 
-/* StreamWithBuffer is backed up by dmlc::MemoryFixedSizeStream or
-dmlc::MemoryStringStream. This class supports serializing and deserializing
-NDArrays stored in shared memory. If the stream is created for
-sending/recving data through network, the data pointer of the NDArray will be
-transmitted directly without and copy. Otherwise, the stream is for
-sending/recving data to another process on the same machine, so if an NDArray
-is stored in shared memory, it will just record the shared memory name
-instead of the actual data buffer.
-For example:
-std::string blob;
-// Send to local
-StreamWithBuffer strm(&blob, false);
-// Send to remote
-StreamWithBuffer strm(&blob, true);
-// Receive from local
-StreamWithBuffer strm(&blob, false);
-// Receive from remote
-std::vector<void*> ptr_list
-StreamWithBuffer strm(&blob, ptr_list);
-*/
+/*!
+ *
+ * StreamWithBuffer is backed up by dmlc::MemoryFixedSizeStream or
+ * dmlc::MemoryStringStream. This class supports serializing and deserializing
+ * NDArrays stored in shared memory. If the stream is created for
+ * sending/recving data through network, the data pointer of the NDArray will be
+ * transmitted directly without and copy. Otherwise, the stream is for
+ * sending/recving data to another process on the same machine, so if an NDArray
+ * is stored in shared memory, it will just record the shared memory name
+ * instead of the actual data buffer.
+ *
+ * For example:
+ *
+ * std::string blob;
+ * // Send to local
+ * StreamWithBuffer strm(&blob, false);
+ * // Send to remote
+ * StreamWithBuffer strm(&blob, true);
+ * // Receive from local
+ * StreamWithBuffer strm(&blob, false);
+ * // Receive from remote
+ * std::vector<void*> ptr_list
+ * StreamWithBuffer strm(&blob, ptr_list);
+ */
 class StreamWithBuffer : public dmlc::SeekStream {
  public:
   // Buffer type. Storing NDArray to maintain the reference counting to ensure

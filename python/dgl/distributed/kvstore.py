@@ -740,6 +740,7 @@ class KVClient(object):
         self._machine_count = int(self._server_count / self._group_count)
         self._client_id = rpc.get_rank()
         self._machine_id = rpc.get_machine_id()
+        self._num_clients = rpc.get_num_client()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
         # push and pull handler
