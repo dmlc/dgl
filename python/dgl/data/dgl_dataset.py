@@ -180,15 +180,21 @@ class DGLBuiltinDataset(DGLDataset):
         Name of the dataset
     url : str
         Url to download the raw dataset
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose: bool
+        Whether to print out progress information. Default: False.
     """
-    def __init__(self, name, url, force_reload=False):
+    def __init__(self, name, url, raw_dir=None, force_reload=False, verbose=False):
         super(DGLBuiltinDataset, self).__init__(name,
                                                 url=url,
-                                                raw_dir=None,
+                                                raw_dir=raw_dir,
                                                 save_dir=None,
-                                                force_reload=force_reload)
+                                                force_reload=force_reload,
+                                                verbose=False)
 
     def download(self):
         r""" Automatically download data and extract it.

@@ -50,7 +50,7 @@ def main(args):
     train_mask = mx.nd.array(np.where(g.ndata['train_mask'].asnumpy() == 1))
     val_mask = mx.nd.array(np.where(g.ndata['val_mask'].asnumpy() == 1))
     test_mask = mx.nd.array(np.where(g.ndata['test_mask'].asnumpy() == 1))
-    labels = g.ndata['label']
+    labels = mx.nd.array(g.ndata['label'], dtype='float32')
     features = g.ndata['feat']
 
     print("""----Data statistics------'

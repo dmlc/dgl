@@ -35,7 +35,7 @@ def main(args):
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
-    labels = g.ndata['label']
+    labels = mx.nd.array(g.ndata['label'], dtype='float32')
     features = g.ndata['feat']
 
     print("""----Data statistics------'

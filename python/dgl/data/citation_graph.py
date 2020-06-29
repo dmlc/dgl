@@ -61,8 +61,11 @@ class CitationGraphDataset(DGLBuiltinDataset):
             name = 'cora_v2'
 
         url = _get_dgl_url(_urls[name])
-        self.verbose = verbose
-        super(CitationGraphDataset, self).__init__(name, url)
+        super(CitationGraphDataset, self).__init__(name,
+                                                   url=url,
+                                                   raw_dir=raw_dir,
+                                                   force_reload=force_reload,
+                                                   verbose=verbose)
 
     def process(self, root_path):
         """Loads input data from gcn/data directory
