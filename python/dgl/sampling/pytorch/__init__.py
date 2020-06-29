@@ -1,5 +1,6 @@
-from ..dataloader import NodeCollator
+"""DGL PyTorch DataLoaders"""
 from torch.utils.data import DataLoader
+from ..dataloader import NodeCollator
 
 class NodeDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list

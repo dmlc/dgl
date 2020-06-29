@@ -189,7 +189,7 @@ class MultiLayerNeighborSampler(BlockSampler):
         first layer.
 
         If the graph is homogeneous, only an integer is needed for each layer.
-        
+
         If None is provided for one layer, all neighbors will be included regardless of
         edge types.
 
