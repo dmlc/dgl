@@ -36,6 +36,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     fanout : int or dict[etype, int]
         The number of sampled neighbors for each node on each edge type. Provide a dict
         to specify different fanout values for each edge type.
+
+        If -1 is given, select all the neighbors.  ``prob`` and ``replace`` will be
+        ignored in this case.
     edge_dir : str, optional
         Edge direction ('in' or 'out'). If is 'in', sample from in edges. Otherwise,
         sample from out edges.
@@ -106,6 +109,8 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         Full graph structure.
     k : int or dict[etype, int]
         The K value.
+
+        If -1 is given, select all the neighbors.
     weight : str
         Feature name of the weights associated with each edge. Its shape should be
         compatible with a scalar edge feature tensor.
@@ -179,11 +184,17 @@ class MultiLayerNeighborSampler(BlockSampler):
 
     Parameters
     ----------
-    fanouts : list[int or None] or list[dict[etype, int or None]]
+    fanouts : list[int] or list[dict[etype, int] or None]
         List of neighbors to sample per edge type for each GNN layer, starting from the
-        first layer.  If None is provided for one layer, all neighbors will be taken.
+        first layer.
 
         If the graph is homogeneous, only an integer is needed for each layer.
+        
+        If None is provided for one layer, all neighbors will be included regardless of
+        edge types.
+
+        If -1 is provided for one edge type on one layer, then all inbound edges
+        of that edge type will be included.
     replace : bool, default True
         Whether to sample with replacement
     return_eids : bool, default False
@@ -223,7 +234,7 @@ class MultiLayerNeighborSampler(BlockSampler):
         self.replace = replace
         self.return_eids = return_eids
         if return_eids:
-            self.add_block_postprocessor(assign_block_eids)
+            self.set_block_postprocessor(assign_block_eids)
 
     def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
         fanout = self.fanouts[block_id]
