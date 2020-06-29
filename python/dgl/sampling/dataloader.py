@@ -43,13 +43,14 @@ class BlockSampler(object):
       involved in message passing on the last layer.
       Customizable via :py:meth:`~dgl.sampling.BlockSampler.sample_frontier`.
 
-    * Post-process the obtained frontier (e.g. by removing edges connecting training node pairs).
-      One can add such postprocessors via
+    * Optionally, post-process the obtained frontier (e.g. by removing edges connecting training
+      node pairs).  One can add such postprocessors via
       :py:meth:`~dgl.sampling.BlockSampler.add_frontier_postprocessor`.
 
     * Convert the frontier into a block.
 
-    * Post-process the block (e.g. by assigning edge IDs).  One can add such postprocessors via
+    * Optionally, post-process the block (e.g. by assigning edge IDs).  One can add such
+      postprocessors via
       :py:meth:`~dgl.sampling.BlockSampler.add_block_postprocessor`.
 
     * Prepend the block to the block list to be returned.
