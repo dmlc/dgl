@@ -11,6 +11,7 @@ _init_api("dgl.data.heterograph_serialize")
 
 
 def tensor_dict_to_ndarray_dict(tensor_dict):
+    """Convert dict[str, tensor] to StrMap[NDArray]"""
     ndarray_dict = {}
     for key, value in tensor_dict.items():
         ndarray_dict[key] = F.zerocopy_to_dgl_ndarray(value)
@@ -18,6 +19,7 @@ def tensor_dict_to_ndarray_dict(tensor_dict):
 
 
 def save_heterographs(filename, g_list, labels):
+    """Save heterographs into file"""
     if labels is None:
         labels = {}
     if isinstance(g_list, DGLHeteroGraph):
@@ -27,9 +29,10 @@ def save_heterographs(filename, g_list, labels):
 
 @register_object("heterograph_serialize.HeteroGraphData")
 class HeteroGraphData(ObjectBase):
+    """Object to hold the data to be stored for DGLHeteroGraph"""
 
     @staticmethod
-    def create(g: DGLHeteroGraph):
+    def create(g):
         edata_list = []
         ndata_list = []
         for etype in g.etypes:
