@@ -10,9 +10,7 @@ from ..utils import retry_method_with_fix
 class DGLDataset(object):
     r"""The Basic DGL Dataset for creating graph datasets.
     This class defines a basic template class for DGL Dataset.
-    TODO(xiangsx):
-        Suport to_pytorch_dataset, to_mxnet_dataset, to_tensorflow_dataset
-        so DGL Dataset can easily converted to Framework specific Dataset
+
     Parameters
     name : str
         Name of the dataset

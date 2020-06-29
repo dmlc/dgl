@@ -14,6 +14,10 @@ import pickle
 from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
 
+from .. import backend as F
+
+backend = os.environ.get('DGLBACKEND', 'pytorch')
+
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset', 'makedirs',
            'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors"]
@@ -255,6 +259,25 @@ def load_info(path):
     with open(path, "rb" ) as pf:
         info = pickle.load(pf)
     return info
+
+"""Generate mask tensor according to different backend
+
+For torch and tensorflow, it will create a bool tensor
+For mxnet, it will create a float tensor
+
+Parameters
+----------
+mask: numpy ndarray
+    input mask tensor
+"""
+def generate_mask_tensor(mask):
+    assert isinstance(mask, np.ndarray), "input for generate_mask_tensor" \
+        "should be an numpy ndarray"
+    if backend == 'mxnet':
+        return F.tensor(mask, dtype=F.data_type_dict['float32'])
+    else:
+        return F.tensor(mask, dtype=F.data_type_dict['bool'])
+
 
 class Subset(object):
     """Subset of a dataset at specified indices

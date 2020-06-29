@@ -14,6 +14,7 @@ import os, sys
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import download, extract_archive, get_download_dir
 from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
+from .utils import generate_mask_tensor
 from ..utils import retry_method_with_fix
 from .. import backend as F
 from ..graph import DGLGraph
@@ -43,10 +44,15 @@ class CitationGraphDataset(DGLBuiltinDataset):
     -----------
     name: str
       name can be 'cora', 'citeseer' or 'pubmed'.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
     verbose: bool
-      Whether to print out progress information. Default: False.
+      Whether to print out progress information. Default: True.
     """
-    def __init__(self, name, verbose=False):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=True):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
         # Previously we use the pre-processing in pygcn (https://github.com/tkipf/pygcn)
@@ -118,31 +124,26 @@ class CitationGraphDataset(DGLBuiltinDataset):
         self._graph = graph
         g = DGLGraph(graph)
 
-        if backend == 'mxnet':
-            g.ndata['train_mask'] = F.tensor(train_mask, dtype=F.data_type_dict['float32'])
-            g.ndata['val_mask'] = F.tensor(val_mask, dtype=F.data_type_dict['float32'])
-            g.ndata['test_mask'] = F.tensor(test_mask, dtype=F.data_type_dict['float32'])
-            g.ndata['label'] = F.tensor(labels, dtype=F.data_type_dict['float32'])
-        else:
-            g.ndata['train_mask'] = F.tensor(train_mask, dtype=F.data_type_dict['bool'])
-            g.ndata['val_mask'] = F.tensor(val_mask, dtype=F.data_type_dict['bool'])
-            g.ndata['test_mask'] = F.tensor(test_mask, dtype=F.data_type_dict['bool'])
-            g.ndata['label'] = F.tensor(labels)
+        g.ndata['train_mask'] = generate_mask_tensor(train_mask)
+        g.ndata['val_mask'] = generate_mask_tensor(val_mask)
+        g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+        g.ndata['label'] = F.tensor(labels)
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_labels = onehot_labels.shape[1]
         self._g = g
 
-        print('Finished data loading and preprocessing.')
-        print('  NumNodes: {}'.format(self.g.number_of_nodes()))
-        print('  NumEdges: {}'.format(self.g.number_of_edges()))
-        print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
-        print('  NumClasses: {}'.format(self.num_labels))
-        print('  NumTrainingSamples: {}'.format(
-            F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
-        print('  NumValidationSamples: {}'.format(
-            F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
-        print('  NumTestSamples: {}'.format(
-            F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
+        if self.verbose:
+            print('Finished data loading and preprocessing.')
+            print('  NumNodes: {}'.format(self.g.number_of_nodes()))
+            print('  NumEdges: {}'.format(self.g.number_of_edges()))
+            print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
+            print('  NumClasses: {}'.format(self.num_labels))
+            print('  NumTrainingSamples: {}'.format(
+                F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
+            print('  NumValidationSamples: {}'.format(
+                F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
+            print('  NumTestSamples: {}'.format(
+                F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
@@ -179,7 +180,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         info_path = os.path.join(self.save_path,
                                  self.save_name + '.pkl')
         graphs, _ = load_graphs(str(graph_path))
-        print(info_path)
+
         info = load_info(str(info_path))
         if self.verbose:
             print('Done loading data into cached files.')
@@ -187,25 +188,21 @@ class CitationGraphDataset(DGLBuiltinDataset):
         self._graph = to_networkx(self._g)
         self._g.readonly(False)
         self._num_labels = info['num_labels']
+        self._g.ndata['train_mask'] = generate_mask_tensor(self._g.ndata['train_mask'].numpy())
+        self._g.ndata['val_mask'] = generate_mask_tensor(self._g.ndata['val_mask'].numpy())
+        self._g.ndata['test_mask'] = generate_mask_tensor(self._g.ndata['test_mask'].numpy())
 
-        if backend != 'mxnet':
-            self._g.ndata['train_mask'] = \
-                F.tensor(self._g.ndata['train_mask'].numpy(), dtype=F.data_type_dict['bool'])
-            self._g.ndata['val_mask'] = \
-                F.tensor(self._g.ndata['val_mask'].numpy(), dtype=F.data_type_dict['bool'])
-            self._g.ndata['test_mask'] = \
-                F.tensor(self._g.ndata['test_mask'].numpy(), dtype=F.data_type_dict['bool'])
-
-        print('  NumNodes: {}'.format(self.g.number_of_nodes()))
-        print('  NumEdges: {}'.format(self.g.number_of_edges()))
-        print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
-        print('  NumClasses: {}'.format(self.num_labels))
-        print('  NumTrainingSamples: {}'.format(
-            F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
-        print('  NumValidationSamples: {}'.format(
-            F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
-        print('  NumTestSamples: {}'.format(
-            F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
+        if self.verbose:
+            print('  NumNodes: {}'.format(self.g.number_of_nodes()))
+            print('  NumEdges: {}'.format(self.g.number_of_edges()))
+            print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
+            print('  NumClasses: {}'.format(self.num_labels))
+            print('  NumTrainingSamples: {}'.format(
+                F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
+            print('  NumValidationSamples: {}'.format(
+                F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
+            print('  NumTestSamples: {}'.format(
+                F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
 
     @property
     def save_name(self):
@@ -262,12 +259,26 @@ class CoraGraphDataset(CitationGraphDataset):
     Edges: 10556
     Number of Classes: 7
     Label Split: Train: 140 ,Valid: 500, Test: 1000
+
+    Parameters
+    -----------
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
     
     Returns
     ===
     CoraDataset object with two properties:
         graph: A Homogeneous graph containing the 
             graph structure, node features and labels.
+            - ndata['train_mask']： mask for training node set
+            - ndata['val_mask']: mask for validation node set
+            - ndata['test_mask']: mask for test node set
+            - ndata['feat']: node feature
         num_of_class: number of paper categories for 
             the classification task.
     
@@ -292,10 +303,10 @@ class CoraGraphDataset(CitationGraphDataset):
     >>> # Train, Validation and Test
     
     """
-    def __init__(self):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         name = 'cora'
 
-        super(CoraGraphDataset, self).__init__(name)
+        super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
 
 class CiteseerGraphDataset(CitationGraphDataset):
     r""" Citeseer citation network dataset.
@@ -313,12 +324,26 @@ class CiteseerGraphDataset(CitationGraphDataset):
     Edges: 9228
     Number of Classes: 6
     Label Split: Train: 120 ,Valid: 500, Test: 1000
+
+    Parameters
+    -----------
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
     
     Returns
     ===
     CiteseerDataset object with two properties:
         graph: A Homogeneous graph containing the 
             graph structure, node features and labels.
+            - ndata['train_mask']： mask for training node set
+            - ndata['val_mask']: mask for validation node set
+            - ndata['test_mask']: mask for test node set
+            - ndata['feat']: node feature
         num_of_class: number of publication categories 
             for the classification task.
     
@@ -343,10 +368,10 @@ class CiteseerGraphDataset(CitationGraphDataset):
     >>> # Train, Validation and Test
     
     """
-    def __init__(self):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         name = 'citeseer'
 
-        super(CiteseerGraphDataset, self).__init__(name)
+        super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
 
 class PubmedGraphDataset(CitationGraphDataset):
     r""" Pubmed citation network dataset.
@@ -364,12 +389,26 @@ class PubmedGraphDataset(CitationGraphDataset):
     Edges: 88651
     Number of Classes: 3
     Label Split: Train: 60 ,Valid: 500, Test: 1000
+
+    Parameters
+    -----------
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
     
     Returns
     ===
     PubmedDataset object with two properties:
         graph: A Homogeneous graph containing the 
             graph structure, node features and labels.
+            - ndata['train_mask']： mask for training node set
+            - ndata['val_mask']: mask for validation node set
+            - ndata['test_mask']: mask for test node set
+            - ndata['feat']: node feature
         num_of_class: number of publication categories 
             for the classification task.
     
@@ -394,10 +433,10 @@ class PubmedGraphDataset(CitationGraphDataset):
     >>> # Train, Validation and Test
     
     """
-    def __init__(self):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         name = 'pubmed'
 
-        super(PubmedGraphDataset, self).__init__(name)
+        super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
 
 
 def _preprocess_features(features):
@@ -422,16 +461,64 @@ def _sample_mask(idx, l):
     mask[idx] = 1
     return mask
 
-def load_cora():
-    data = CoraGraphDataset()
+"""Get CoraGraphDataset
+
+Parameters
+    -----------
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+    
+    Returns
+    ===
+    CoraDataset object
+"""
+def load_cora(raw_dir=None, force_reload=False, verbose=True):
+    data = CoraGraphDataset(raw_dir, force_reload, verbose)
     return data
 
-def load_citeseer():
-    data = CiteseerGraphDataset()
+"""Get CiteseerDataset
+
+Parameters
+    -----------
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+    
+    Returns
+    ===
+    CiteseerDataset object
+"""
+def load_citeseer(raw_dir=None, force_reload=False, verbose=True):
+    data = CiteseerGraphDataset(raw_dir, force_reload, verbose)
     return data
 
-def load_pubmed():
-    data = PubmedGraphDataset()
+"""Get PubmedDataset
+
+Parameters
+    -----------
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+    
+    Returns
+    ===
+    PubmedDataset object
+"""
+def load_pubmed(raw_dir=None, force_reload=False, verbose=True):
+    data = PubmedGraphDataset(raw_dir, force_reload, verbose)
     return data
 
 class GCNSyntheticDataset(object):
