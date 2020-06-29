@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <string>
+#include <memory>
 
 #include "./runtime/object.h"
 #include "graph_interface.h"
