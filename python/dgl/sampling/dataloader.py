@@ -217,7 +217,7 @@ class BlockSampler(object):
         For the concept of frontiers and blocks, please refer to User Guide Section 6.
         """
         blocks = []
-        for block_id in reversed(range(len(self))):
+        for block_id in reversed(range(self.num_hops)):
             frontier = self.sample_frontier(block_id, g, seed_nodes, *args, **kwargs)
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing

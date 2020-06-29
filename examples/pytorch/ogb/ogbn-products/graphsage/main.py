@@ -70,12 +70,13 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            dataloader = dgl.sampling.NeighborSamplerNodeDataLoader(
+            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
+            dataloader = dgl.sampling.NodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
-                [None],
+                sampler,
                 batch_size=args.batch_size,
-                shuffle=False,
+                shuffle=True,
                 drop_last=False,
                 num_workers=args.num_workers)
 
@@ -142,10 +143,12 @@ def run(args, device, data):
     train_nid, val_nid, test_nid, in_feats, labels, n_classes, g = data
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = dgl.sampling.NeighborSamplerNodeDataLoader(
+    sampler = dgl.sampling.MultiLayerNeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(',')])
+    dataloader = dgl.sampling.NodeDataLoader(
         g,
         train_nid,
-        [int(fanout) for fanout in args.fan_out.split(',')],
+        sampler,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,

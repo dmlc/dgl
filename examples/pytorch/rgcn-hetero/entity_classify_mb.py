@@ -23,18 +23,25 @@ def extract_embed(node_embed, input_nodes):
         emb[ntype] = node_embed[ntype][nid]
     return emb
 
-
-def evaluate(model, seeds, input_nodes, blocks, node_embed, labels, category, use_cuda):
+def evaluate(model, loader, node_embed, labels, category, use_cuda):
     model.eval()
-    emb = extract_embed(node_embed, input_nodes)
-    lbl = labels[seeds]
-    if use_cuda:
-        emb = {k : e.cuda() for k, e in emb.items()}
-        lbl = lbl.cuda()
-    logits = model(emb, blocks)[category]
-    loss = F.cross_entropy(logits, lbl)
-    acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
-    return loss, acc
+    total_loss = 0
+    total_acc = 0
+    count = 0
+    for input_nodes, seeds, blocks in loader:
+        seeds = seeds[category]
+        emb = extract_embed(node_embed, input_nodes)
+        lbl = labels[seeds]
+        if use_cuda:
+            emb = {k : e.cuda() for k, e in emb.items()}
+            lbl = lbl.cuda()
+        logits = model(emb, blocks)[category]
+        loss = F.cross_entropy(logits, lbl)
+        acc = th.sum(logits.argmax(dim=1) == lbl).item()
+        total_loss += loss.item() * len(seeds)
+        total_acc += acc
+        count += len(seeds)
+    return total_loss / count, total_acc / count
 
 def main(args):
     # load graph data
@@ -88,23 +95,22 @@ def main(args):
         model.cuda()
 
     # train sampler
-    loader = dgl.sampling.NeighborSamplerNodeDataLoader(
-        g, {category: train_idx}, [args.fanout] * args.n_layers,
+    sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    loader = dgl.sampling.NodeDataLoader(
+        g, {category: train_idx}, sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # validation sampler
-    val_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)
-    val_blocks = val_sampler.sample_blocks(g, {category: val_idx})
-    val_input_nodes = {
-        ntype: val_blocks[0].srcnodes[ntype].data[dgl.NID]
-        for ntype in val_blocks[0].srctypes}
+    val_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    val_loader = dgl.sampling.NodeDataLoader(
+        g, {category: val_idx}, val_sampler,
+        batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # test sampler
-    test_sampler = dgl.sampling.MultiLayerNeighborSampler([None] * args.n_layers)
-    test_blocks = test_sampler.sample_blocks(g, {category: test_idx})
-    test_input_nodes = {
-        ntype: test_blocks[0].srcnodes[ntype].data[dgl.NID]
-        for ntype in test_blocks[0].srctypes}
+    test_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    test_loader = dgl.sampling.NodeDataLoader(
+        g, {category: test_idx}, test_sampler,
+        batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -139,15 +145,15 @@ def main(args):
         if epoch > 3:
             dur.append(time.time() - t0)
 
-        val_loss, val_acc = evaluate(model, val_idx, val_input_nodes, val_blocks, node_embed, labels, category, use_cuda)
+        val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, use_cuda)
         print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
-              format(epoch, val_acc, val_loss.item(), np.average(dur)))
+              format(epoch, val_acc, val_loss, np.average(dur)))
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
-    test_loss, test_acc = evaluate(model, test_idx, test_input_nodes, test_blocks, node_embed, labels, category, use_cuda)
-    print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+    test_loss, test_acc = evaluate(model, test_loader, node_embed, labels, category, use_cuda)
+    print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
     print()
 
 if __name__ == '__main__':
