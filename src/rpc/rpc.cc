@@ -437,7 +437,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
                                       DLContext{kDLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
-//#pragma omp parallel for
+#pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
     CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
     CHECK_GE(data_size, local_ids[i] * row_size + row_size);
