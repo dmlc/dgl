@@ -43,6 +43,8 @@ class DGLDataset(object):
 
         if save_dir is None:
             self._save_dir = self._raw_dir
+        else:
+            self._save_dir = save_dir
 
         self._load()
 
@@ -196,6 +198,6 @@ class DGLBuiltinDataset(DGLDataset):
         r""" Automatically download data and extract it.
         """
         print(self.url)
-        zip_file_path='{}/{}.zip'.format(self.raw_dir, self.name)
+        zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
         download(self.url, path=zip_file_path)
         extract_archive(zip_file_path, self.raw_path)
