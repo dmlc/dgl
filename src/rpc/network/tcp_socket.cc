@@ -137,8 +137,17 @@ bool TCPSocket::SetBlocking(bool flag) {
 #endif  // _WIN32
 
 void TCPSocket::SetTimeout(int timeout) {
-  setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
-    reinterpret_cast<char*>(&timeout), sizeof(timeout));
+  #ifdef _WIN32
+    timeout = timeout * 1000;  // WIN API accepts millsec
+    setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
+               reinterpret_cast<char*>(&timeout), sizeof(timeout));
+  #else  // !_WIN32
+    struct timeval tv;
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
+    setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
+               &tv, sizeof(tv));
+  #endif  // _WIN32
 }
 
 bool TCPSocket::ShutDown(int ways) {
