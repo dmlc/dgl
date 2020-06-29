@@ -994,7 +994,7 @@ def test_convert(index_dtype):
     homo_g = dgl.to_homo(hg)
     node_tids = homo_g.ndata[dgl.NTYPE]
     for i in range(num_ntype):
-        assert F.nonzero_1d(node_tids == i).size()[0] == ntid_cnt[i]
+        assert F.asnumpy(F.sum((node_tids == i), dim=0)).item() == ntid_cnt[i]
 
     # to_homo(g) with g has ETYPE test case
     num_etypes = len(hg.canonical_etypes)
@@ -1003,7 +1003,7 @@ def test_convert(index_dtype):
         etid_cnt[F.asnumpy(hg.edges[etype].data[dgl.ETYPE][0]).item()] = hg.number_of_edges(etype)
     edge_tids = homo_g.edata[dgl.ETYPE]
     for i in range(num_etypes):
-        assert F.nonzero_1d(edge_tids == i).size()[0] == etid_cnt[i]
+        assert F.asnumpy(F.sum((edge_tids == i), dim=0)).item() == etid_cnt[i]
     
 
     # hetero_from_homo test case 3
