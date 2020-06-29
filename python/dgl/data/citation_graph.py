@@ -556,7 +556,7 @@ class CoraBinary(DGLBuiltinDataset):
                                          force_reload=force_reload,
                                          verbose=verbose)
 
-    def process(self, root_path)
+    def process(self, root_path):
         root = root_path
         # load graphs
         self.graphs = []
