@@ -82,10 +82,14 @@ def test_neighbor_sampler_dataloader():
         {'user': [0, 1, 3, 5], 'game': [0, 1, 2]},
         {'user': [4, 5], 'game': [0, 1, 2]}]
     graphs = [g] * 4 + [hg] * 4
+    samplers = [g_sampler1, g_sampler1, g_sampler2, g_sampler2, hg_sampler1, hg_sampler1, hg_sampler2, hg_sampler2]
 
     for _g, nid, collator in zip(graphs, nids, collators):
         dl = DataLoader(
             collator.dataset, collate_fn=collator.collate, batch_size=2, shuffle=True, drop_last=False)
+        _check_neighbor_sampling_dataloader(_g, nid, dl)
+    for _g, nid, sampler in zip(graphs, nids, samplers):
+        dl = dgl.sampling.NodeDataLoader(_g, nid, sampler, batch_size=2, shuffle=True, drop_last=False)
         _check_neighbor_sampling_dataloader(_g, nid, dl)
 
 
