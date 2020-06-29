@@ -10,6 +10,7 @@
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/c_backend_api.h>
 #include <vector>
+#include <memory>
 
 extern "C" {
 // Function signature for generated packed function in shared library

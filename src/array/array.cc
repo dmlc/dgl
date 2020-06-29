@@ -8,6 +8,8 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/shared_mem.h>
+#include <dgl/runtime/device_api.h>
+#include <sstream>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
@@ -100,8 +102,10 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 }
 
 template<typename ValueType>
-ValueType IndexSelect(NDArray array, uint64_t index) {
+ValueType IndexSelect(NDArray array, int64_t index) {
   CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
+  CHECK(index >= 0 && index < array.NumElements())
+    << "Index " << index << " is out of bound.";
   ValueType ret = 0;
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
@@ -110,12 +114,30 @@ ValueType IndexSelect(NDArray array, uint64_t index) {
   });
   return ret;
 }
-template int32_t IndexSelect<int32_t>(NDArray array, uint64_t index);
-template int64_t IndexSelect<int64_t>(NDArray array, uint64_t index);
-template uint32_t IndexSelect<uint32_t>(NDArray array, uint64_t index);
-template uint64_t IndexSelect<uint64_t>(NDArray array, uint64_t index);
-template float IndexSelect<float>(NDArray array, uint64_t index);
-template double IndexSelect<double>(NDArray array, uint64_t index);
+template int32_t IndexSelect<int32_t>(NDArray array, int64_t index);
+template int64_t IndexSelect<int64_t>(NDArray array, int64_t index);
+template uint32_t IndexSelect<uint32_t>(NDArray array, int64_t index);
+template uint64_t IndexSelect<uint64_t>(NDArray array, int64_t index);
+template float IndexSelect<float>(NDArray array, int64_t index);
+template double IndexSelect<double>(NDArray array, int64_t index);
+
+NDArray IndexSelect(NDArray array, int64_t start, int64_t end) {
+  CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
+  CHECK(start >= 0 && start < array.NumElements())
+    << "Index " << start << " is out of bound.";
+  CHECK(end >= 0 && end <= array.NumElements())
+    << "Index " << end << " is out of bound.";
+  CHECK_LE(start, end);
+  auto device = runtime::DeviceAPI::Get(array->ctx);
+  const int64_t len = end - start;
+  NDArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
+  ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+    device->CopyDataFromTo(array->data, start * sizeof(DType),
+                           ret->data, 0, len * sizeof(DType),
+                           array->ctx, ret->ctx, array->dtype, nullptr);
+  });
+  return ret;
+}
 
 NDArray Scatter(NDArray array, IdArray indices) {
   NDArray ret;
@@ -151,6 +173,42 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
   return ret;
 }
 
+NDArray Concat(const std::vector<IdArray>& arrays) {
+  CHECK(arrays.size() > 1) << "Number of arrays should larger than 1";
+  IdArray ret;
+
+  int64_t len = 0, offset = 0;
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    len += arrays[i]->shape[0];
+    CHECK_SAME_DTYPE(arrays[0], arrays[i]);
+    CHECK_SAME_CONTEXT(arrays[0], arrays[i]);
+  }
+
+  NDArray ret_arr = NDArray::Empty({len},
+                                   arrays[0]->dtype,
+                                   arrays[0]->ctx);
+
+  auto device = runtime::DeviceAPI::Get(arrays[0]->ctx);
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    ATEN_DTYPE_SWITCH(arrays[i]->dtype, DType, "array", {
+      device->CopyDataFromTo(
+        static_cast<DType*>(arrays[i]->data),
+        0,
+        static_cast<DType*>(ret_arr->data),
+        offset,
+        arrays[i]->shape[0] * sizeof(DType),
+        arrays[i]->ctx,
+        ret_arr->ctx,
+        arrays[i]->dtype,
+        nullptr);
+
+        offset += arrays[i]->shape[0] * sizeof(DType);
+    });
+  }
+
+  return ret_arr;
+}
+
 template<typename ValueType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value) {
   std::tuple<NDArray, IdArray, IdArray> ret;
@@ -179,6 +237,31 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
     });
   });
   return ret;
+}
+
+IdArray CumSum(IdArray array, bool prepend_zero) {
+  IdArray ret;
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "CumSum", {
+    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+      ret = impl::CumSum<XPU, IdType>(array, prepend_zero);
+    });
+  });
+  return ret;
+}
+
+std::string ToDebugString(NDArray array) {
+  std::ostringstream oss;
+  NDArray a = array.CopyTo(DLContext{kDLCPU, 0});
+  oss << "array([";
+  ATEN_DTYPE_SWITCH(a->dtype, DType, "array", {
+    for (int64_t i = 0; i < std::min<int64_t>(a.NumElements(), 10L); ++i) {
+      oss << a.Ptr<DType>()[i] << ", ";
+    }
+  });
+  if (a.NumElements() > 10)
+    oss << "...";
+  oss << "], dtype=" << array->dtype << ", ctx=" << array->ctx << ")";
+  return oss.str();
 }
 
 ///////////////////////// CSR routines //////////////////////////
@@ -246,6 +329,16 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   NDArray ret;
   ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowData", {
     ret = impl::CSRGetRowData<XPU, IdType>(csr, row);
+  });
+  return ret;
+}
+
+bool CSRIsSorted(CSRMatrix csr) {
+  if (csr.indices->shape[0] <= 1)
+    return true;
+  bool ret = false;
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsSorted", {
+    ret = impl::CSRIsSorted<XPU, IdType>(csr);
   });
   return ret;
 }
@@ -318,7 +411,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   CHECK(end >= 0 && end <= csr.num_rows) << "Invalid end index: " << end;
   CHECK_GE(end, start);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, start, end);
   });
   return ret;
@@ -328,7 +421,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceRows", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
   });
   return ret;
@@ -347,7 +440,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
 }
 
 void CSRSort_(CSRMatrix* csr) {
-  ATEN_CSR_SWITCH(*csr, XPU, IdType, "CSRSort_", {
+  if (csr->sorted)
+    return;
+  ATEN_CSR_SWITCH_CUDA(*csr, XPU, IdType, "CSRSort_", {
     impl::CSRSort_<XPU, IdType>(csr);
   });
 }
@@ -509,12 +604,22 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
   return ret;
 }
 
-COOMatrix COOSort(COOMatrix mat, bool sort_column) {
-  COOMatrix ret;
-  ATEN_XPU_SWITCH_CUDA(mat.row->ctx.device_type, XPU, "COOSort", {
-    ATEN_ID_TYPE_SWITCH(mat.row->dtype, IdType, {
-      ret = impl::COOSort<XPU, IdType>(mat, sort_column);
+void COOSort_(COOMatrix* mat, bool sort_column) {
+  if ((mat->row_sorted && !sort_column) || mat->col_sorted)
+    return;
+  ATEN_XPU_SWITCH_CUDA(mat->row->ctx.device_type, XPU, "COOSort_", {
+    ATEN_ID_TYPE_SWITCH(mat->row->dtype, IdType, {
+      impl::COOSort_<XPU, IdType>(mat, sort_column);
     });
+  });
+}
+
+std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
+  if (coo.row->shape[0] <= 1)
+    return {true, true};
+  std::pair<bool, bool> ret;
+  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOIsSorted", {
+    ret = impl::COOIsSorted<XPU, IdType>(coo);
   });
   return ret;
 }
@@ -563,7 +668,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
-///////////////////////// Graph Traverse  routines //////////////////////////
+///////////////////////// Graph Traverse routines //////////////////////////
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   Frontiers ret;
   CHECK_EQ(csr.indptr->ctx.device_type, source->ctx.device_type) <<
@@ -623,6 +728,10 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   });
   return ret;
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream
 Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
                              const bool has_reverse_edge,
@@ -647,6 +756,10 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
   return ret;
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream
 ///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -709,3 +822,7 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
 
 }  // namespace aten
 }  // namespace dgl
+
+std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array) {
+  return os << dgl::aten::ToDebugString(array);
+}

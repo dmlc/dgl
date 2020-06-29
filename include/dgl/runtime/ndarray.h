@@ -11,6 +11,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "c_runtime_api.h"
 #include "dlpack/dlpack.h"
@@ -157,6 +158,10 @@ class NDArray {
    * \return The array under another context.
    */
   inline NDArray CopyTo(const DLContext& ctx) const;
+  /*!
+   * \brief Return a new array with a copy of the content.
+   */
+  inline NDArray Clone() const;
   /*!
    * \brief Load NDArray from stream
    * \param stream The input data stream
@@ -410,6 +415,12 @@ inline NDArray NDArray::CopyTo(const DLContext& ctx) const {
   return ret;
 }
 
+inline NDArray NDArray::Clone() const {
+  CHECK(data_ != nullptr);
+  const DLTensor* dptr = operator->();
+  return this->CopyTo(dptr->ctx);
+}
+
 inline int NDArray::use_count() const {
   if (data_ == nullptr) return 0;
   return data_->ref_counter_.load(std::memory_order_relaxed);
@@ -626,6 +637,8 @@ dgl::runtime::NDArray operator >= (int64_t lhs, const dgl::runtime::NDArray& a2)
 dgl::runtime::NDArray operator <= (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator == (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator != (int64_t lhs, const dgl::runtime::NDArray& a2);
+
+std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array);
 
 ///////////////// Operator overloading for DLDataType /////////////////
 

@@ -699,6 +699,9 @@ template <class IdType>
 HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
+HeteroGraphPtr DisjointUnionHeteroGraph2(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
 /*!
  * \brief Split a graph into multiple disjoin components.
  *
@@ -721,6 +724,13 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
  */
 template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray vertex_sizes,
+    IdArray edge_sizes);
+
+
+std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
     GraphPtr meta_graph,
     HeteroGraphPtr batched_graph,
     IdArray vertex_sizes,
@@ -793,6 +803,15 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
  * \return A heterograph pointer
  */
 HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
+
+#define FORMAT_HAS_CSC(format) \
+  (format & (1<<2))
+
+#define FORMAT_HAS_CSR(format) \
+  (format & (1<<1))
+
+#define FORMAT_HAS_COO(format) \
+  (format & 1)
 
 }  // namespace dgl
 

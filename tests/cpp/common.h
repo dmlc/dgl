@@ -29,6 +29,10 @@ inline int64_t Len(dgl::runtime::NDArray nd) {
 template <typename T>
 inline bool ArrayEQ(dgl::runtime::NDArray a1, dgl::runtime::NDArray a2) {
   if (a1->ndim != a2->ndim) return false;
+  if (a1->dtype != a2->dtype) return false;
+  if (a1->ctx != a2->ctx) return false;
+  if (a1.NumElements() != a2.NumElements()) return false;
+  if (a1.NumElements() == 0) return true;
   int64_t num = 1;
   for (int i = 0; i < a1->ndim; ++i) {
     if (a1->shape[i] != a2->shape[i])
