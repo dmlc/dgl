@@ -750,19 +750,33 @@ def to_homo(G):
     nids = []
     total_num_nodes = 0
 
+    ntid_dict = G.ndata[NTYPE] if len(G.ntypes) > 1 else {}
     for ntype_id, ntype in enumerate(G.ntypes):
         num_nodes = G.number_of_nodes(ntype)
-        total_num_nodes += num_nodes
-        ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
+        if len(ntid_dict) > 0:
+            ntid = ntid_dict.get(ntype, None)
+            assert ntid is not None, 'if dgl.NTYPE field exist in heterograph, ' \
+                'all nodes should have this field.'
+            ntype_ids.append(ntid)
+        else:
+            total_num_nodes += num_nodes
+            ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
         nids.append(F.arange(0, num_nodes, G._idtype_str))
 
+    etid_dict = G.edata[ETYPE] if len(G.canonical_etypes) > 1 else {}
     for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
         src, dst = G.all_edges(etype=etype, order='eid')
         num_edges = len(src)
         srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
         dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
-        etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
+        if len(etid_dict) > 0:
+            etid = etid_dict.get(etype, None)
+            assert etid is not None, 'if dgl.ETYPE field exist in heterograph, ' \
+                'all edges should have this field.'
+            etype_ids.append(etid)
+        else:
+            etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges, G._idtype_str))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,

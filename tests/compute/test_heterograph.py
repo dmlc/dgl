@@ -980,6 +980,17 @@ def test_convert(index_dtype):
     assert hg.number_of_edges('e1') == 1
     assert hg.number_of_edges('e2') == 1
 
+    # to_homo(g) with g has NTYPE test case
+    num_ntype = len(hg.ntypes)
+    ntid_cnt = {}
+    for i, ntype in enumerate(hg.ntypes):
+        ntid_cnt[F.asnumpy(hg.nodes[ntype].data[dgl.NTYPE][0]).item()] = hg.number_of_nodes(ntype)
+
+    homo_g = dgl.to_homo(hg)
+    node_tids = homo_g.ndata[dgl.NTYPE]
+    for i in range(num_ntype):
+        assert F.nonzero_1d(node_tids == i).size()[0] == ntid_cnt[i]
+
     # hetero_from_homo test case 3
     mg = nx.MultiDiGraph([
         ('user', 'movie', 'watches'),
@@ -1939,11 +1950,11 @@ if __name__ == '__main__':
     # test_view1("int32")
     # test_flatten()
     # test_convert_bound()
-    # test_convert()
+    test_convert("int32")
     # test_to_device()
     # test_transform("int32")
-    test_subgraph("int32")
-    test_subgraph_mask("int32")
+    # test_subgraph("int32")
+    # test_subgraph_mask("int32")
     # test_apply()
     # test_level1()
     # test_level2()
