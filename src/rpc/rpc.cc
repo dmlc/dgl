@@ -439,9 +439,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   // Copy local data
 #pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
-    CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
-    CHECK_GE(data_size, local_ids[i] * row_size + row_size);
-    CHECK_GE(local_ids[i], 0);
+    //CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
+    //CHECK_GE(data_size, local_ids[i] * row_size + row_size);
+    //CHECK_GE(local_ids[i], 0);
     memcpy(return_data + local_ids_orginal[i] * row_size,
            local_data_char + local_ids[i] * row_size,
            row_size);
