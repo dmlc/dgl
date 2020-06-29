@@ -156,9 +156,9 @@ def test_gat_conv():
     # from https://github.com/dmlc/dgl/issues/1598
     g = dgl.DGLGraph()
     gat = nn.GATConv(2, 2, 1)
+    gat.initialize(ctx=ctx)
     g.add_nodes(4)
     feat = F.randn((4, 2))
-    gat = gat.to(ctx)
     h = gat(g, feat)
 
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
