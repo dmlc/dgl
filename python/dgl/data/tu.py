@@ -103,22 +103,22 @@ class LegacyTUDataset(DGLBuiltinDataset):
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
             self.data_mode = "constant"
-            print(
-                "Use Constant one as Feature with hidden size {}".format(hidden_size))
+            if self.verbose:
+                print("Use Constant one as Feature with hidden size {}".format(hidden_size))
 
         # remove graphs that are too large by user given standard
         # optional pre-processing steop in conformity with Rex Ying's original
         # DiffPool implementation
         if self.max_allow_node:
             preserve_idx = []
-            print("original dataset length : ", len(self.graph_lists))
+            if self.verbose:
+                print("original dataset length : ", len(self.graph_lists))
             for (i, g) in enumerate(self.graph_lists):
                 if g.number_of_nodes() <= self.max_allow_node:
                     preserve_idx.append(i)
             self.graph_lists = [self.graph_lists[i] for i in preserve_idx]
-            print(
-                "after pruning graphs that are too big : ", len(
-                    self.graph_lists))
+            if self.verbose:
+                print("after pruning graphs that are too big : ", len(self.graph_lists))
             self.graph_labels = [self.graph_labels[i] for i in preserve_idx]
             self.max_num_node = self.max_allow_node
 

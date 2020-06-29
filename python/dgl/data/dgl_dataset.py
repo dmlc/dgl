@@ -26,6 +26,8 @@ class DGLDataset(object):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose : bool
+        Whether to print out progress information
     """
     def __init__(self, name, url=None, raw_dir=None, save_dir=None, force_reload=False, verbose=False):
         self._name = name
@@ -93,16 +95,27 @@ class DGLDataset(object):
         r"""Entry point from __init__ to load the dataset. 
             if the cache exists:
                 Load the dataset from saved dgl graph and information files.
+                If loadin process fails, re-download and process the dataset.
             else:
                 1. Download the dataset if needed.
                 2. Process the dataset and build the dgl graph.
                 3. Save the processed dataset into files.
         """
-        if not self._force_reload and self.has_cache():
-            self.load()
-            if self.verbose:
-                print('Done loading data from cached files.')
-        else:
+        load_flag = not self._force_reload and self.has_cache()
+
+        if load_flag:
+            try:
+                self.load()
+                if self.verbose:
+                    print('Done loading data from cached files.')
+            except KeyboardInterrupt:
+                raise
+            except:
+                load_flag = False
+                if self.verbose:
+                    print('Loading from cache failed, re-processing.')
+
+        if not load_flag:
             self._download()
             self.process(self.raw_path)
             self.save()

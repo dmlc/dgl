@@ -9,7 +9,7 @@
 #include <minigun/csr.h>
 #include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
-
+#include <dgl/array.h>
 #include <cstdlib>
 #include <vector>
 
@@ -22,6 +22,11 @@ namespace utils {
  * and is also the power of two.
  */
 int FindNumThreads(int dim, int max_nthrs);
+
+/*
+ * !\brief Find number of blocks is smaller than nblks and max_nblks
+ */
+int FindNumBlocks(int nblks, int max_nblks);
 
 /*
  * !\brief Compute the total number of feature elements.
