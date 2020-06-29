@@ -728,10 +728,7 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   });
   return ret;
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream
 Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
                              const bool has_reverse_edge,
@@ -756,10 +753,6 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
   return ret;
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> upstream
 ///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
