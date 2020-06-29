@@ -15,7 +15,8 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
-'send_request_to_machine', 'remote_call_to_machine', 'fast_pull']
+'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
+'get_num_client', 'set_num_client']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
@@ -222,6 +223,16 @@ def get_num_server():
     """Get the total number of server.
     """
     return _CAPI_DGLRPCGetNumServer()
+
+def set_num_client(num_client):
+    """Set the total number of client.
+    """
+    _CAPI_DGLRPCSetNumClient(int(num_client))
+
+def get_num_client():
+    """Get the total number of client.
+    """
+    return _CAPI_DGLRPCGetNumClient()
 
 def set_num_server_per_machine(num_server):
     """Set the total number of server per machine
@@ -1016,5 +1027,45 @@ class ShutDownRequest(Request):
         assert self.client_id == 0
         finalize_server()
         return 'exit'
+
+GET_NUM_CLIENT = 22453
+
+class GetNumberClientsResponse(Response):
+    """This reponse will send total number of clients.
+
+    Parameters
+    ----------
+    num_client : int
+        total number of clients
+    """
+    def __init__(self, num_client):
+        self.num_client = num_client
+
+    def __getstate__(self):
+        return self.num_client
+
+    def __setstate__(self, state):
+        self.num_client = state
+
+class GetNumberClientsRequest(Request):
+    """Client send this request to get the total number of client.
+
+    Parameters
+    ----------
+    client_id : int
+        client's ID
+    """
+    def __init__(self, client_id):
+        self.client_id = client_id
+
+    def __getstate__(self):
+        return self.client_id
+
+    def __setstate__(self, state):
+        self.client_id = state
+
+    def process_request(self, server_state):
+        res = GetNumberClientsResponse(get_num_client())
+        return res
 
 _init_api("dgl.distributed.rpc")
