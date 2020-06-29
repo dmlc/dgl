@@ -26,6 +26,8 @@ class DGLDataset(object):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose : bool
+        Whether to print out progress information
     """
     def __init__(self, name, url=None, raw_dir=None, save_dir=None, force_reload=False, verbose=False):
         self._name = name

@@ -37,17 +37,14 @@ class MiniGCDataset(DGLDataset):
         Minimum number of nodes for graphs
     max_num_v: int
         Maximum number of nodes for graphs
-    verbose : bool
-        Whether to print out progress information
     seed : int, default is None
         Random seed for data generation
     """
-    def __init__(self, num_graphs, min_num_v, max_num_v, verbose=False, seed=None, **kwargs):
+    def __init__(self, num_graphs, min_num_v, max_num_v, seed=None, **kwargs):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
         self.seed = seed
-        self.verbose = verbose
         super(MiniGCDataset, self).__init__(name="minigc", **kwargs)
 
     def process(self, root_path):
@@ -78,15 +75,11 @@ class MiniGCDataset(DGLDataset):
         """save the graph list and the labels"""
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
         save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
-        if self.verbose:
-            print('Done saving data into cached files.')
 
     def load(self):
         graphs, label_dict = load_graphs(os.path.join(self.save_path, 'dgl_graph.bin'))
         self.graphs = graphs
         self.labels = label_dict['labels']
-        if self.verbose:
-            print('Done loading data into cached files.')
 
     @property
     def num_classes(self):
