@@ -18,7 +18,7 @@ def edge_softmax_real(graph, score, eids=ALL):
         graph.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
         graph.edata['out'] = tf.math.exp(graph.edata['out'])
         graph.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        if (graph.number_of_edges() > 0)
+        if graph.number_of_edges() > 0:
             graph.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
         out = graph.edata['out']
 

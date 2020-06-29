@@ -51,7 +51,7 @@ class EdgeSoftmax(mx.autograd.Function):
             g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
             g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
             g.edata['out'] = g.edata['out'].exp()
-            if (g.number_of_edges() > 0)
+            if g.number_of_edges() > 0:
                 g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
             out = g.edata['out']
             self.save_for_backward(out)
