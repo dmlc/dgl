@@ -4,6 +4,7 @@ import abc
 import pickle
 import random
 import numpy as np
+import time
 
 from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
@@ -941,6 +942,7 @@ def fast_pull(name, id_tensor, part_id, service_id,
                                                           machine_id)
     global_id = F.zerocopy_from_dgl_ndarray(global_id)
     g2l_id = policy.to_local(global_id)
+    start = time.time()
     res_tensor = _CAPI_DGLRPCFastPull(name,
                                       int(machine_id),
                                       int(machine_count),
@@ -953,6 +955,8 @@ def fast_pull(name, id_tensor, part_id, service_id,
                                       F.zerocopy_to_dgl_ndarray(part_id),
                                       F.zerocopy_to_dgl_ndarray(g2l_id),
                                       F.zerocopy_to_dgl_ndarray(local_data))
+    end = time.time()
+    print("Time of C++ fast_pull: %f" % (end-start))
     return F.zerocopy_from_dgl_ndarray(res_tensor)
 
 def register_ctrl_c():
