@@ -64,8 +64,8 @@ class DistDataLoader:
         self.current_pos = 0
         self.m = mp.Manager()
         self.queue = self.m.Queue(maxsize=queue_size)
-
-        self.pool = mp.Pool(
+        ctx = mp.get_context("spawn")
+        self.pool = ctx.Pool(
             num_workers, initializer=init_dist_graph, initargs=(dist_gclient_config, self.queue))
         for i in range(num_workers):
             self.queue.get()
@@ -96,48 +96,3 @@ class DistDataLoader:
             self.current_pos += self.batch_size
             print(f"Ret: {ret}")
             return ret
-
-
-def start_server(rank, tmpdir, disable_shared_mem):
-    import dgl
-    g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
-                        tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem)
-    g.start()
-
-
-def init_server(filename):
-    ip_config = open("rpc_sampling_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
-    ip_config.close()
-
-    g = CitationGraphDataset("cora")[0]
-    g.readonly()
-    print(g.idtype)
-    num_parts = num_server
-    num_hops = 1
-
-    partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=False)
-
-    pserver_list = []
-    ctx = mp.get_context('spawn')
-    for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1))
-        p.start()
-        time.sleep(1)
-        pserver_list.append(p)
-
-
-# def main():
-#     train_nid = th.arange(200)
-#     _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
-#     sampler = DistDataLoader(dataset=train_nid.numpy(), batch_size=10, collate_fn=sample_blocks, num_workers=4,
-#                              queue_size=10, dist_gclient_config={"ip_config": "mp_ip_config.txt", "graph_name": "test_mp", "gpb": gpb}, sample_config={"fanout": 5})
-
-#     for idx, block in enumerate(sampler):
-#         print(block)
-
-
-# if __name__ == "__main__":
-#     main()
