@@ -9,6 +9,9 @@
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 
+/*!
+ * \brief Message type for DGL distributed training
+ */
 class StreamWithCount : dmlc::Stream {
  public:
   static StreamWithCount *Create(const char *uri, const char *const flag,
@@ -16,9 +19,11 @@ class StreamWithCount : dmlc::Stream {
     return new StreamWithCount(uri, flag, allow_null);
   }
 
-  size_t Read(void *ptr, size_t size) { return strm_->Read(ptr, size); }
+  size_t Read(void *ptr, size_t size) override {
+    return strm_->Read(ptr, size);
+  }
 
-  void Write(const void *ptr, size_t size) {
+  void Write(const void *ptr, size_t size) override {
     count_ += size;
     strm_->Write(ptr, size);
   }
@@ -28,7 +33,7 @@ class StreamWithCount : dmlc::Stream {
 
   bool isValid() { return strm_.get(); }
 
-  uint64_t count() { return count_; }
+  uint64_t Count() const { return count_; }
 
  private:
   StreamWithCount(const char *uri, const char *const flag, bool allow_null)

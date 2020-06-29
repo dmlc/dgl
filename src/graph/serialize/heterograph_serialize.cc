@@ -86,7 +86,7 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
   label_fs->Write(nd_list);
 
   uint64_t gdata_start_pos =
-    fs->count() + sizeof(uint64_t) + labels_blob.size();
+    fs->Count() + sizeof(uint64_t) + labels_blob.size();
 
   // Write start position of gdata, which can be skipped when only reading gdata
   // And label dict
@@ -97,7 +97,7 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
 
   // Write HeteroGraphData
   for (uint64_t i = 0; i < num_graph; ++i) {
-    graph_indices[i] = fs->count();
+    graph_indices[i] = fs->Count();
     auto gdata = hdata[i].sptr();
     fs->Write(gdata);
   }

@@ -73,6 +73,8 @@ def save_graphs(filename, g_list, labels=None):
         File name to store graphs. 
     g_list: list
         DGLGraph or list of DGLGraph/DGLHeteroGraph
+    labels: dict[str, tensor]
+        labels should be dict of tensors, with str as keys
 
     Examples
     ----------
@@ -130,12 +132,13 @@ def load_graphs(filename, idx_list=None):
         load all graphs from file
 
     Returns
-    ----------
-
+    --------
     graph_list: list of DGLGraphs / DGLHeteroGraph
-
-    labels: dict of labels stored in file (empty dict returned if no
-    label stored). Always the full data regardless of the idx_list
+        The loaded graphs.
+    labels: dict[str, Tensor]
+        The graph labels stored in file. If no label is stored, the dictionary is empty.
+        Regardless of whether the ``idx_list`` argument is given or not, the returned dictionary
+        always contains labels of all the graphs.
 
     Examples
     ----------

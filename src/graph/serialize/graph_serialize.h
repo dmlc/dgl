@@ -39,16 +39,10 @@ enum GraphType: uint64_t {
   kHeteroGraph = 2ull
 };
 
-enum FileVersion : uint64_t{
-  kV0 = 0ull,
-  kV1 = 1ull
-};
-
 constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
 
 class StorageMetaDataObject : public runtime::Object {
  public:
-  bool is_hetero;
   // For saving DGLGraph
   dgl_id_t num_graph;
   Value nodes_num_list;
