@@ -980,6 +980,11 @@ def test_convert(index_dtype):
     assert hg.number_of_edges('e1') == 1
     assert hg.number_of_edges('e2') == 1
 
+
+    g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3), (0, 4), (0, 5), (0, 6), (1, 7)], index_dtype=index_dtype)
+    g.ndata[dgl.NTYPE] = F.tensor([0, 0, 1, 2, 2, 2, 3, 1])
+    g.edata[dgl.ETYPE] = F.tensor([0, 0, 1, 2, 2, 2, 3, 0])
+    hg = dgl.to_hetero(g, ['l0', 'l3', 'l2', 'l1'], ['e0', 'e1', 'e2', 'e3'])
     # to_homo(g) with g has NTYPE test case
     num_ntype = len(hg.ntypes)
     ntid_cnt = {}
@@ -990,6 +995,16 @@ def test_convert(index_dtype):
     node_tids = homo_g.ndata[dgl.NTYPE]
     for i in range(num_ntype):
         assert F.nonzero_1d(node_tids == i).size()[0] == ntid_cnt[i]
+
+    # to_homo(g) with g has ETYPE test case
+    num_etypes = len(hg.canonical_etypes)
+    etid_cnt = {}
+    for i, etype in enumerate(hg.canonical_etypes):
+        etid_cnt[F.asnumpy(hg.edges[etype].data[dgl.ETYPE][0]).item()] = hg.number_of_edges(etype)
+    edge_tids = homo_g.edata[dgl.ETYPE]
+    for i in range(num_etypes):
+        assert F.nonzero_1d(edge_tids == i).size()[0] == etid_cnt[i]
+    
 
     # hetero_from_homo test case 3
     mg = nx.MultiDiGraph([
