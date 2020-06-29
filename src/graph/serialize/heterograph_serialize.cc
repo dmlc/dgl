@@ -12,15 +12,19 @@
  *   dgl_id_t num_graphs
  *   ** Reserved Area till 4kB **
  *
- *   vector<HeteroGraphData> graph_datas; 
+ *   uint64_t gdata_start_pos (This stores the start position of graph_data,
+ * which is used to skip label dict part if unnecessary)
+ *   vector<pair<string, NDArray>> label_dict (To store the dict[str, NDArray])
+ *
+ *   vector<HeteroGraphData> graph_datas;
  *   vector<dgl_id_t> graph_indices (start address of each graph)
- *   uint64_t size_of_graph_indices_vector (Used to seek to graph_indices vector)
+ *   uint64_t size_of_graph_indices_vector (Used to seek to graph_indices
+ * vector)
  *
  * }
  *
  * Storage of HeteroGraphData is
  * {
- *   // Everything uses in csr
  *   HeteroGraphPtr ptr;
  *   vector<vector<pair<string, NDArray>>> node_tensors;
  *   vector<vector<pair<string, NDArray>>> edge_tensors;
@@ -61,7 +65,7 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
                       const std::vector<NamedTensor> &nd_list) {
   auto fs = std::unique_ptr<StreamWithCount>(
     StreamWithCount::Create(filename.c_str(), "w", false));
-  CHECK(fs->isValid()) << "File name " << filename << " is not a valid name";
+  CHECK(fs->IsValid()) << "File name " << filename << " is not a valid name";
 
   // Write DGL MetaData
   const uint64_t kVersion = 2;

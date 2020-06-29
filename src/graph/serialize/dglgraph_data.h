@@ -21,7 +21,6 @@
 #include <algorithm>
 #include <utility>
 #include "../../c_api_common.h"
-#include "./utils.h"
 
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
@@ -29,6 +28,8 @@ using namespace dgl::runtime;
 
 namespace dgl {
 namespace serialize {
+
+typedef std::pair<std::string, NDArray> NamedTensor;
 
 class GraphDataObject : public runtime::Object {
  public:

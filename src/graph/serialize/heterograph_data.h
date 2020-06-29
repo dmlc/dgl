@@ -23,7 +23,6 @@
 
 #include "../../c_api_common.h"
 #include "../heterograph.h"
-#include "./utils.h"
 
 using dgl::runtime::NDArray;
 using namespace dgl::runtime;
@@ -31,6 +30,8 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace serialize {
 
+
+typedef std::pair<std::string, NDArray> NamedTensor;
 class HeteroGraphDataObject : public runtime::Object {
  public:
   std::shared_ptr<HeteroGraph> gptr;

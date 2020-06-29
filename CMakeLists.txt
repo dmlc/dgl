@@ -133,9 +133,8 @@ endif(USE_CUDA)
 
 # For serialization
 add_subdirectory("third_party/dmlc-core")
-# dmlc-core options
-add_definitions(-DUSE_S3=ON)
-# lack of hdfs dependency
+# dmlc-core options for support S3/HDFS
+add_definitions(-DUSE_S3=OFF)
 add_definitions(-DUSE_HDFS=OFF)
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test

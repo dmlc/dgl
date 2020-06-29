@@ -256,7 +256,6 @@ void StorageMetaDataObject::SetMetaData(dgl_id_t num_graph,
 
 void StorageMetaDataObject::SetGraphData(std::vector<GraphData> gdata) {
   this->graph_data = List<GraphData>(gdata);
-  this->is_hetero = false;
 }
 
 }  // namespace serialize

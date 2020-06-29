@@ -10,7 +10,8 @@
 #include <dmlc/type_traits.h>
 
 /*!
- * \brief Message type for DGL distributed training
+ * \brief StreamWithCount counts the bytes that already written into the
+ * underlying stream.
  */
 class StreamWithCount : dmlc::Stream {
  public:
@@ -31,7 +32,7 @@ class StreamWithCount : dmlc::Stream {
   using dmlc::Stream::Read;
   using dmlc::Stream::Write;
 
-  bool isValid() { return strm_.get(); }
+  bool IsValid() { return strm_.get(); }
 
   uint64_t Count() const { return count_; }
 
