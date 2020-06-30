@@ -3,7 +3,9 @@ reference: tvm/python/tvm/collections.py
 """
 from __future__ import absolute_import as _abs
 from ._ffi.object import ObjectBase, register_object
+from ._ffi.object_generic import convert_to_object
 from . import _api_internal
+
 
 @register_object
 class List(ObjectBase):
@@ -14,6 +16,7 @@ class List(ObjectBase):
     to List during dgl function call.
     You may get List in return values of DGL function call.
     """
+
     def __getitem__(self, i):
         if isinstance(i, slice):
             start = i.start if i.start is not None else 0
@@ -30,10 +33,14 @@ class List(ObjectBase):
                              .format(len(self), i))
         if i < 0:
             i += len(self)
-        return _api_internal._ListGetItem(self, i)
+        ret = _api_internal._ListGetItem(self, i)
+        if isinstance(ret, Value):
+            ret = ret.data
+        return ret
 
     def __len__(self):
         return _api_internal._ListSize(self)
+
 
 @register_object
 class Map(ObjectBase):
@@ -43,6 +50,7 @@ class Map(ObjectBase):
     Normally python dict will be converted automaticall to Map during dgl function call.
     You can use convert to create a dict[ObjectBase-> ObjectBase] into a Map
     """
+
     def __getitem__(self, k):
         return _api_internal._MapGetItem(self, k)
 
@@ -64,10 +72,12 @@ class StrMap(Map):
 
     You can use convert to create a dict[str->ObjectBase] into a Map.
     """
+
     def items(self):
         """Get the items from the map"""
         akvs = _api_internal._MapItems(self)
-        return [(akvs[i].data, akvs[i+1]) for i in range(0, len(akvs), 2)]
+        return [(akvs[i], akvs[i+1]) for i in range(0, len(akvs), 2)]
+
 
 @register_object
 class Value(ObjectBase):
@@ -76,3 +86,12 @@ class Value(ObjectBase):
     def data(self):
         """Return the value data."""
         return _api_internal._ValueGet(self)
+
+
+def convert_to_strmap(value):
+    """Convert a python dictionary to a dgl.contrainer.StrMap"""
+    assert isinstance(value, dict), "Only support dict"
+    if len(value) == 0:
+        return _api_internal._EmptyStrMap()
+    else:
+        return convert_to_object(value)
