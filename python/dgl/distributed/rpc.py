@@ -935,6 +935,7 @@ def fast_pull(name, id_tensor, part_id, service_id,
     policy : PartitionPolicy
         store the partition information
     """
+    start = time.time()
     msg_seq = incr_msg_seq()
     pickle_data = bytearray(pickle.dumps(([0], [name])))
     global_id = _CAPI_DGLRPCGetGlobalIDFromLocalPartition(F.zerocopy_to_dgl_ndarray(id_tensor),
@@ -942,6 +943,8 @@ def fast_pull(name, id_tensor, part_id, service_id,
                                                           machine_id)
     global_id = F.zerocopy_from_dgl_ndarray(global_id)
     g2l_id = policy.to_local(global_id)
+    end = time.time()
+    print("Time of pre-fast_pull: %f" % (end-start))
     start = time.time()
     res_tensor = _CAPI_DGLRPCFastPull(name,
                                       int(machine_id),
