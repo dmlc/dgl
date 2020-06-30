@@ -1328,7 +1328,7 @@ def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
     internal CSR storage. As such, the graph must allow CSR storage.
 
     Following is an example of this operation:
-        
+
         Consider a CSR storage like:
 
         indptr  = [0, 5, 8]
@@ -1340,10 +1340,9 @@ def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
         indptr  = [0, 5, 8]
         indices = [2, 4, 0, 1, 3, 2, 0, 1]
         (tag)   = [0, 0, 1, 1, 2, 0, 1, 1]
-                        ^     ^  
-                                    ^     ^
-        (the tag array itself is unchanged.)
-        
+                       ^     ^
+                                   ^     ^
+
         tag_pos:
         [[2, 4], [1, 3]] (marked with ^)
 
@@ -1362,7 +1361,7 @@ def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
         When tag is None, sort by the node id of destination nodes.
     tag_pos: str
         The name of the node feature to store split positions of different tags in the
-        adjancency list.  
+        adjancency list.
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
