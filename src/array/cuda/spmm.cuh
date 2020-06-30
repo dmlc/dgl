@@ -9,8 +9,8 @@
 #include <dgl/bcast.h>
 #include "macro.cuh"
 #include "atomic.cuh"
-#include "../../cuda_utils.h"
 #include "../../runtime/cuda/cuda_common.h"
+#include "./utils.h"
 
 namespace dgl {
 

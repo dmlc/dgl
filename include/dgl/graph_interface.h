@@ -10,6 +10,7 @@
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include <memory>
 
 #include "./runtime/object.h"
 #include "array.h"
