@@ -1,7 +1,7 @@
 import dgl
 import unittest
 import os
-from dgl.data import CitationGraphDataset
+from dgl.data import CoraGraphDataset
 from dgl.distributed.sampling import sample_neighbors
 from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
@@ -39,7 +39,7 @@ def check_rpc_sampling(tmpdir):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
 
-    g = CitationGraphDataset("cora")[0]
+    g = CoraGraphDataset()[0]
     g.readonly()
     print(g.idtype)
     num_parts = num_server
@@ -84,7 +84,7 @@ def check_rpc_sampling_shuffle(tmpdir):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
     
-    g = CitationGraphDataset("cora")[0]
+    g = CoraGraphDataset()[0]
     g.readonly()
     num_parts = num_server
     num_hops = 1
