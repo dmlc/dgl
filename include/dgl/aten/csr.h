@@ -385,7 +385,7 @@ COOMatrix CSRRowWiseTopk(
  * (the tag array itself is unchanged.)
  *   
  * Return:
- * [2, 4, 1, 3] (marked with ^)
+ * [[2, 4], [1, 3]] (marked with ^)
  * It is a flatten array produced by concatenating the split positions of all nodes
  * 
  * \param csr The csr matrix to be sorted

@@ -50,15 +50,19 @@ def test_sort_inplace(index_dtype):
     g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
     g.ndata['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
 
-    dgl.sort_csr_(g)
+    dgl.sort_out_edges_(g)
     csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(csr))    
 
-    dgl.sort_csr_(g, 'tag')
+    dgl.sort_in_edges_(g)
+    csr = g.adjacency_matrix(scipy_fmt='csr')
+    assert(check_sort(csr))    
+
+    dgl.sort_out_edges_(g, 'tag')
     csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(csr, g.ndata['tag'], g.ndata['_TAG_POS']))
 
-    dgl.sort_csc_(g, 'tag')
+    dgl.sort_in_edges_(g, 'tag')
     csc = g.adjacency_matrix(scipy_fmt='csr')
     assert(check_sort(csc, g.ndata['tag'], g.ndata['_TAG_POS']))
 
@@ -71,21 +75,21 @@ def test_sort_inplace_bipartite(index_dtype):
     g.nodes['_U'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
     g.nodes['_V'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_V')))
     
-    dgl.sort_csr_(g)
+    dgl.sort_out_edges_(g)
     csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(csr))   
 
-    dgl.sort_csc_(g)
-    csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    dgl.sort_in_edges_(g)
+    csc = g.adjacency_matrix(scipy_fmt='csr')
     assert(check_sort(csc))   
 
-    dgl.sort_csr_(g, 'tag')
+    dgl.sort_out_edges_(g, 'tag')
     csr = g.adjacency_matrix(etype='_E', transpose=True, scipy_fmt='csr')
     assert(check_sort(csr, g.nodes['_V'].data['tag'], g.nodes['_U'].data['_TAG_POS']))
 
-    dgl.sort_csc_(g, 'tag')
+    dgl.sort_in_edges_(g, 'tag')
     csc = g.adjacency_matrix(etype='_E', scipy_fmt='csr')
-    assert(check_sort(csc, g.nodes['_U'].data['tag'],  g.nodes['_V'].data['_TAG_POS']))
+    assert(check_sort(csc, g.nodes['_U'].data['tag'], g.nodes['_V'].data['_TAG_POS']))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
@@ -93,13 +97,14 @@ def test_sort_outplace(index_dtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
     g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
     g.ndata['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
-    new_g = dgl.sort_csr(g, 'tag')
-
+    
+    new_g = dgl.sort_out_edges(g, 'tag')
     old_csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     new_csr = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(new_csr, new_g.ndata['tag'], new_g.ndata["_TAG_POS"]))
     assert(not check_sort(old_csr, g.ndata['tag']))
-    new_g = dgl.sort_csc(g, 'tag')
+
+    new_g = dgl.sort_in_edges(g, 'tag')
     old_csc = g.adjacency_matrix(scipy_fmt='csr')
     new_csc = new_g.adjacency_matrix(scipy_fmt='csr')
     assert(check_sort(new_csc, new_g.ndata['tag'], new_g.ndata["_TAG_POS"]))
@@ -117,13 +122,13 @@ def test_sort_outplace_bipartite(index_dtype):
     g.nodes['_V'].data['tag'] = F.tensor(vtag)
     g.nodes['_U'].data['tag'] = F.tensor(utag)
 
-    new_g = dgl.sort_csr(g, 'tag')
+    new_g = dgl.sort_out_edges(g, 'tag')
     old_csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     new_csr = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(new_csr, new_g.nodes['_V'].data['tag'], new_g.nodes['_U'].data['_TAG_POS']))
     assert(not check_sort(old_csr, g.nodes['_V'].data['tag']))
 
-    new_g = dgl.sort_csc(g, 'tag')
+    new_g = dgl.sort_in_edges(g, 'tag')
     old_csc = g.adjacency_matrix(scipy_fmt='csr')
     new_csc = new_g.adjacency_matrix(scipy_fmt='csr')
     assert(check_sort(new_csc, new_g.nodes['_U'].data['tag'], new_g.nodes['_V'].data['_TAG_POS']))
@@ -132,5 +137,5 @@ def test_sort_outplace_bipartite(index_dtype):
 if __name__ == "__main__":
     test_sort_inplace("int32")
     test_sort_inplace_bipartite("int32")
-    # test_sort_outplace("int32")
-    # test_sort_outplace_bipartite("int32")
+    test_sort_outplace("int32")
+    test_sort_outplace_bipartite("int32")

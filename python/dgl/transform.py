@@ -40,10 +40,10 @@ __all__ = [
     'remove_edges',
     'as_immutable_graph',
     'as_heterograph',
-    'sort_csr_',
-    'sort_csc_',
-    'sort_csr',
-    'sort_csc']
+    'sort_out_edges_',
+    'sort_in_edges_',
+    'sort_out_edges',
+    'sort_in_edges']
 
 
 def pairwise_squared_distance(x):
@@ -1320,7 +1320,7 @@ def as_immutable_graph(hg):
     g.edata.update(hg.edata)
     return g
 
-def sort_csr_(g, tag=None, tag_pos="_TAG_POS"):
+def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
     """Sort the (out)CSR matrix of the graph inplace
 
     After sorting, edges whose destination shares the same tag will be arranged in
@@ -1360,7 +1360,7 @@ def sort_csr_(g, tag=None, tag_pos="_TAG_POS"):
     if tag is not None:
         g.nodes[srctype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 
-def sort_csc_(g, tag=None, tag_pos="_TAG_POS"):
+def sort_in_edges_(g, tag=None, tag_pos="_TAG_POS"):
     """Sort the CSC(in CSR) matrix of the graph inplace
 
     After sorting, edges whose source shares the same tag will be arranged in
@@ -1394,7 +1394,7 @@ def sort_csc_(g, tag=None, tag_pos="_TAG_POS"):
     if tag is not None:
         g.nodes[dsttype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 
-def sort_csr(g, tag=None, tag_pos="_TAG_POS"):
+def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
     """A copy of the given graph whose (out)CSR matrix is sorted.
 
     The outplace version of sort_csr_
@@ -1419,29 +1419,11 @@ def sort_csr(g, tag=None, tag_pos="_TAG_POS"):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
-    srctype = g.srctypes[0]
-    dsttype = g.dsttypes[0]
-    if tag is None:
-        tag_arr = nd.NULL["int32"]
-        num_tags = 0
-    else:
-        tag_data = g.nodes[dsttype].data[tag]
-        num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
-        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
-    ret = _CAPI_DGLHeteroSortCSR(g._graph, 0, tag_arr, num_tags)
-    gidx, tag_pos_arr = [item.data for item in ret]
-    node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                   if frame is None else frame.clone()
-                   for i, frame in enumerate(g._node_frames)]
-    edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                   if frame is None else frame.clone()
-                   for i, frame in enumerate(g._edge_frames)]
-    new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
-    if tag is not None:
-        new_g.nodes[srctype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(tag_pos_arr)
+    new_g = g.to_format("any")
+    sort_out_edges_(new_g, tag, tag_pos)
     return new_g
 
-def sort_csc(g, tag=None, tag_pos="_TAG_POS"):
+def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     """A copy of the given graph whose CSC(in CSR) matrix is sorted.
 
     The outplace version of sort_csc_
@@ -1466,26 +1448,8 @@ def sort_csc(g, tag=None, tag_pos="_TAG_POS"):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
-    srctype = g.srctypes[0]
-    dsttype = g.dsttypes[0]
-    if tag is None:
-        tag_arr = nd.NULL["int32"]
-        num_tags = 0
-    else:
-        tag_data = g.nodes[srctype].data[tag]
-        num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
-        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
-    ret = _CAPI_DGLHeteroSortCSC(g._graph, 0, tag_arr, num_tags)
-    gidx, tag_pos_arr = [item.data for item in ret]
-    node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                   if frame is None else frame.clone()
-                   for i, frame in enumerate(g._node_frames)]
-    edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                   if frame is None else frame.clone()
-                   for i, frame in enumerate(g._edge_frames)]
-    new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
-    if tag is not None:
-        new_g.nodes[dsttype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(tag_pos_arr)
+    new_g = g.to_format("any")
+    sort_in_edges_(new_g, tag, tag_pos)
     return new_g
 
 _init_api("dgl.transform")
