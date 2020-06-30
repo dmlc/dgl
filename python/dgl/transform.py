@@ -1320,29 +1320,49 @@ def as_immutable_graph(hg):
     return g
 
 def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
-    """Sort the (out)CSR matrix of the graph inplace
+    """Sort the in edges of the internal storage.
 
-    After sorting, edges whose destination shares the same tag will be arranged in
-    a consecutive range. The COO matrix, in CSR and edge ids remain unchanged.
-    Currently, it only support homograph and bipartite graph.
+    After sorting, edges whose destination shares the same
+    tag will be arranged in a consecutive range. Note that this
+    will not change the edge ID. It only changes the order in the
+    internal CSC storage. As such, the graph must allow CSR storage.
+
+    Following is an example of this operation:
+        
+        Consider a CSR storage like:
+        
+        indptr  = [0, 5, 8]
+        indices = [0, 1, 2, 3, 4, 0, 1, 2]
+        tag     = [1, 1, 0, 2, 0]
+
+        After `sort_out_edges_`:
+
+        indptr  = [0, 5, 8]
+        indices = [2, 4, 0, 1, 3, 2, 0, 1]
+        (tag)   = [0, 0, 1, 1, 2, 0, 1, 1]
+                        ^     ^  
+                                    ^     ^
+        (the tag array itself is unchanged.)
+        
+        Return:
+        [[2, 4], [1, 3]] (marked with ^)
+
+    - For homogeneous graph, we we store the `tag_pos` in the node feature.
+    - For bipartite graph, we get the tag data from the node feature `tag`
+      of destination nodes and store the `tag_pos` in the node feature of
+      source nodes.
 
     Parameters
     ----------
     g : DGLHeteroGraph
         The heterograph
     tag : str
-        The name of the node feature used as tag
+        The name of the node feature used as tag.
+        The tag array must be integer.
         When tag is None, sort by the node id of destination nodes.
     tag_pos: str
         The name of the node feature to store split positions of different tags in the
-        adjancency list.
-
-        For example, if the adjancy list looks like this after sorting:
-            dst: 0, 1, 2, 3, 4, 5, 6, 7, 8
-            tag: 0, 0, 1, 1, 2, 2, 2, 3, 3
-                ^    ^     ^        ^     ^
-        Then ndata[split][node_id] will be:
-            [0, 2, 4, 7, 9] (Marked with ^)
+        adjancency list.  
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
