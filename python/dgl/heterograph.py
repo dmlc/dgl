@@ -4661,11 +4661,11 @@ class DGLHeteroGraph(object):
         """
         gidx = self._graph.to_format(restrict_format)
         node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                    if frame is None else frame.clone()
-                    for i, frame in enumerate(self._node_frames)]
+                       if frame is None else frame.clone()
+                       for i, frame in enumerate(self._node_frames)]
         edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                    if frame is None else frame.clone()
-                    for i, frame in enumerate(self._edge_frames)]
+                       if frame is None else frame.clone()
+                       for i, frame in enumerate(self._edge_frames)]
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes,
                               node_frames, edge_frames)
 
