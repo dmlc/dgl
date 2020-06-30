@@ -1374,7 +1374,7 @@ def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
         tag_data = g.nodes[dsttype].data[tag]
         num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
-    ret = _CAPI_DGLHeteroSortCSR_(g._graph, tag_arr, num_tags)
+    ret = _CAPI_DGLHeteroSortOutEdges_(g._graph, tag_arr, num_tags)
     if tag is not None:
         g.nodes[srctype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 
@@ -1413,7 +1413,7 @@ def sort_in_edges_(g, tag=None, tag_pos="_TAG_POS"):
         tag_data = g.nodes[srctype].data[tag]
         num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
-    ret = _CAPI_DGLHeteroSortCSC_(g._graph, tag_arr, num_tags)
+    ret = _CAPI_DGLHeteroSortInEdges_(g._graph, tag_arr, num_tags)
     if tag is not None:
         g.nodes[dsttype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 

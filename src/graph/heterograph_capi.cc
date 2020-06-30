@@ -570,7 +570,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
     *rv = GraphRef(hg->AsImmutableGraph());
   });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSR_")
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges_")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     NDArray tag = args[1];
@@ -582,7 +582,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSR_")
       *rv = aten::CSRSortByTag_(&csr, tag, num_tag);
   });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSC_")
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges_")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     NDArray tag = args[1];

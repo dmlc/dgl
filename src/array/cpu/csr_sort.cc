@@ -126,13 +126,13 @@ NDArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
   return tag_pos;
 }
 
-template IdArray CSRSortByTag_<kDLCPU, int64_t, int64_t>(
+template NDArray CSRSortByTag_<kDLCPU, int64_t, int64_t>(
     CSRMatrix* csr, IdArray tag, int64_t num_tags);
-template IdArray CSRSortByTag_<kDLCPU, int64_t, int32_t>(
+template NDArray CSRSortByTag_<kDLCPU, int64_t, int32_t>(
     CSRMatrix* csr, IdArray tag, int64_t num_tags);
-template IdArray CSRSortByTag_<kDLCPU, int32_t, int64_t>(
+template NDArray CSRSortByTag_<kDLCPU, int32_t, int64_t>(
     CSRMatrix* csr, IdArray tag, int64_t num_tags);
-template IdArray CSRSortByTag_<kDLCPU, int32_t, int32_t>(
+template NDArray CSRSortByTag_<kDLCPU, int32_t, int32_t>(
     CSRMatrix* csr, IdArray tag, int64_t num_tags);
 
 }  // namespace impl
