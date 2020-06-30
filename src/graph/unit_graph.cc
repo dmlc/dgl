@@ -767,6 +767,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     fs->Write(adj_);
   }
 
+
  private:
   friend class Serializer;
 
@@ -1464,6 +1465,7 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
 
   return true;
 }
+
 
 void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);

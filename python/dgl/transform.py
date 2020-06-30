@@ -16,7 +16,6 @@ from .convert import graph, bipartite
 from . import utils
 from .base import EID, NID
 from . import ndarray as nd
-from .frame import Frame, FrameRef
 
 
 __all__ = [
