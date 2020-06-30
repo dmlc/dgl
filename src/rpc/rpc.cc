@@ -361,9 +361,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalIDFromLocalPartition")
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-  clock_t startTime, endTime;
   // Input
-  startTime = clock();
   std::string name = args[0];
   int local_machine_id = args[1];
   int machine_count = args[2];
@@ -417,8 +415,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       remote_ids_original[p_id].push_back(i);
     }
   }
-  endTime = clock();
-  std::cout << "Time_0 : " <<(double)(endTime - startTime) / CLOCKS_PER_SEC << "s" << std::endl;
   // Send remote id
   int msg_count = 0;
   for (int i = 0; i < remote_ids.size(); ++i) {
@@ -443,9 +439,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
                                       DLContext{kDLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
-
-  startTime = clock();
-//#pragma omp parallel for
+#pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
     CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
     CHECK_GE(data_size, local_ids[i] * row_size + row_size);
@@ -454,8 +448,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
            local_data_char + local_ids[i] * row_size,
            row_size);
   }
-  endTime = clock();
-  std::cout << "Time_1 : " <<(double)(endTime - startTime) / CLOCKS_PER_SEC << "s" << std::endl;
   // Recv remote message
   for (int i = 0; i < msg_count; ++i) {
     RPCMessage msg;
