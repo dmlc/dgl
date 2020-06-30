@@ -17,6 +17,7 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
+@unittest.skipIf(os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support TF yet')
 def check_partition(part_method, reshuffle):
     g = create_random_graph(10000)
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
