@@ -1320,17 +1320,17 @@ def as_immutable_graph(hg):
     return g
 
 def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
-    """Sort the in edges of the internal storage.
+    """Sort the out edges of the internal storage.
 
     After sorting, edges whose destination shares the same
     tag will be arranged in a consecutive range. Note that this
     will not change the edge ID. It only changes the order in the
-    internal CSC storage. As such, the graph must allow CSR storage.
+    internal CSR storage. As such, the graph must allow CSR storage.
 
     Following is an example of this operation:
         
         Consider a CSR storage like:
-        
+
         indptr  = [0, 5, 8]
         indices = [0, 1, 2, 3, 4, 0, 1, 2]
         tag     = [1, 1, 0, 2, 0]
@@ -1344,7 +1344,7 @@ def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
                                     ^     ^
         (the tag array itself is unchanged.)
         
-        Return:
+        tag_pos:
         [[2, 4], [1, 3]] (marked with ^)
 
     - For homogeneous graph, we we store the `tag_pos` in the node feature.
@@ -1380,11 +1380,16 @@ def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
         g.nodes[srctype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 
 def sort_in_edges_(g, tag=None, tag_pos="_TAG_POS"):
-    """Sort the CSC(in CSR) matrix of the graph inplace
+    """Sort the in edges of the internal storage.
 
-    After sorting, edges whose source shares the same tag will be arranged in
-    a consecutive range. The COO matrix, out CSR and edge ids remain unchanged.
-    Currently, it only support homograph and bipartite graph.
+    After sorting, edges whose destination shares the same
+    tag will be arranged in a consecutive range. Note that this
+    will not change the edge ID. It only changes the order in the
+    internal CSC storage. As such, the graph must allow CSR storage.
+
+    For bipartite graph, we get the tag data from the node feature `tag`
+    of source nodes and store the `tag_pos` in the node feature of
+    destination nodes.
 
     Parameters
     ----------
@@ -1414,9 +1419,9 @@ def sort_in_edges_(g, tag=None, tag_pos="_TAG_POS"):
         g.nodes[dsttype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 
 def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
-    """A copy of the given graph whose (out)CSR matrix is sorted.
+    """A copy of the given graph whose out edges are sorted.
 
-    The outplace version of sort_csr_
+    The outplace version of sort_out_edges_
     Node frames and edges frames are shallow copy of the original graph.
 
     Parameters
@@ -1433,7 +1438,7 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
     Returns
     -------
     DGLHeteroGraph
-        A copy of the given graph whose (out)CSR matrix is sorted.
+        A copy of the given graph whose out edges are sorted.
 
     """
     if len(g.etypes) > 1:
@@ -1443,9 +1448,9 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
     return new_g
 
 def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
-    """A copy of the given graph whose CSC(in CSR) matrix is sorted.
+    """A copy of the given graph whose in edges are sorted.
 
-    The outplace version of sort_csc_
+    The outplace version of sort_in_edges_
     Node frames and edges frames are shallow copy of the original graph.
 
     Parameters
@@ -1462,7 +1467,7 @@ def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     Returns
     -------
     DGLHeteroGraph
-        A copy of the given graph whose CSC(in CSR) matrix is sorted.
+        A copy of the given graph whose in edges are sorted.
 
     """
     if len(g.etypes) > 1:
