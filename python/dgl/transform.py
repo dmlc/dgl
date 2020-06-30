@@ -1430,7 +1430,7 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
     tag : str
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
-    tag_pos: str
+    tag_pos : str
         The name of the node feature to store split positions of different tags in the
         adjancency list.
 
@@ -1459,7 +1459,7 @@ def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     tag : str
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
-    split: str
+    tag_pos : str
         The name of the node feature to store split positions of different tags in the
         adjancency list.
 
