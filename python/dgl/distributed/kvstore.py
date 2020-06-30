@@ -740,6 +740,7 @@ class KVClient(object):
         self._machine_count = int(self._server_count / self._group_count)
         self._client_id = rpc.get_rank()
         self._machine_id = rpc.get_machine_id()
+        self._num_clients = rpc.get_num_client()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
         # push and pull handler
@@ -829,7 +830,7 @@ class KVClient(object):
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
             # recv response from all the server nodes
-            for _ in range(self._server_namebook):
+            for _ in range(self._server_count):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PULL_MSG
         self._pull_handlers[name] = func

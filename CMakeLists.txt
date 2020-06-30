@@ -44,6 +44,8 @@ include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
+include_directories("third_party/cub/")
+include_directories("third_party/phmap/")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -103,6 +105,8 @@ file(GLOB DGL_SRC
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
+  src/geometry/*.cc
+  src/geometry/cpu/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1

@@ -96,7 +96,9 @@ def knn_graph(x, k):
     src += per_sample_offset
     dst = F.reshape(dst, (-1,))
     src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+    adj = sparse.csr_matrix(
+        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
+        shape=(n_samples * n_points, n_samples * n_points))
 
     g = DGLGraph(adj, readonly=True)
     return g
@@ -132,7 +134,7 @@ def segmented_knn_graph(x, k, segs):
     h_list = F.split(x, segs, 0)
     dst = [
         F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
-        offset[i]
+        int(offset[i])
         for i, h_g in enumerate(h_list)]
     dst = F.cat(dst, 0)
     src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
@@ -600,15 +602,12 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     ------------
     g: DGLGraph
         The graph to be partitioned
-
     node_part: 1D tensor
         Specify which partition a node is assigned to. The length of this tensor
         needs to be the same as the number of nodes of the graph. Each element
         indicates the partition Id of a node.
-
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
-
     reshuffle : bool
         Resuffle nodes so that nodes in the same partition are in the same Id range.
 
@@ -622,7 +621,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     if reshuffle:
         node_part = node_part.tousertensor()
         sorted_part, new2old_map = F.sort_1d(node_part)
-        new_node_ids = F.gather_row(F.arange(0, g.number_of_nodes()), new2old_map)
+        new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
+        new_node_ids[F.asnumpy(new2old_map)] = np.arange(0, g.number_of_nodes())
         g = reorder_nodes(g, new_node_ids)
         node_part = utils.toindex(sorted_part)
         # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
@@ -658,8 +658,18 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         subg_dict[i] = subg
     return subg_dict
 
-def metis_partition_assignment(g, k):
+def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     ''' This assigns nodes to different partitions with Metis partitioning algorithm.
+
+    When performing Metis partitioning, we can put some constraint on the partitioning.
+    Current, it supports two constrants to balance the partitioning. By default, Metis
+    always tries to balance the number of nodes in each partition.
+
+    * `balance_ntypes` balances the number of nodes of different types in each partition.
+    * `balance_edges` balances the number of edges in each partition.
+
+    To balance the node types, a user needs to pass a vector of N elements to indicate
+    the type of each node. N is the number of nodes in the input graph.
 
     After the partition assignment, we construct partitions.
 
@@ -669,6 +679,10 @@ def metis_partition_assignment(g, k):
         The graph to be partitioned
     k : int
         The number of partitions.
+    balance_ntypes : tensor
+        Node type of each node
+    balance_edges : bool
+        Indicate whether to balance the edges.
 
     Returns
     -------
@@ -678,20 +692,65 @@ def metis_partition_assignment(g, k):
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     sym_g = to_bidirected(g, readonly=True)
-    node_part = _CAPI_DGLMetisPartition(sym_g._graph, k)
+    vwgt = []
+    # To balance the node types in each partition, we can take advantage of the vertex weights
+    # in Metis. When vertex weights are provided, Metis will tries to generate partitions with
+    # balanced vertex weights. A vertex can be assigned with multiple weights. The vertex weights
+    # are stored in a vector of N * w elements, where N is the number of vertices and w
+    # is the number of weights per vertex. Metis tries to balance the first weight, and then
+    # the second weight, and so on.
+    # When balancing node types, we use the first weight to indicate the first node type.
+    # if a node belongs to the first node type, its weight is set to 1; otherwise, 0.
+    # Similary, we set the second weight for the second node type and so on. The number
+    # of weights is the same as the number of node types.
+    if balance_ntypes is not None:
+        assert len(balance_ntypes) == g.number_of_nodes(), \
+                "The length of balance_ntypes should be equal to #nodes in the graph"
+        balance_ntypes = utils.toindex(balance_ntypes)
+        balance_ntypes = balance_ntypes.tousertensor()
+        uniq_ntypes = F.unique(balance_ntypes)
+        for ntype in uniq_ntypes:
+            vwgt.append(F.astype(balance_ntypes == ntype, F.int64))
+
+    # When balancing edges in partitions, we use in-degree as one of the weights.
+    if balance_edges:
+        vwgt.append(F.astype(g.in_degrees(), F.int64))
+
+    # The vertex weights have to be stored in a vector.
+    if len(vwgt) > 0:
+        vwgt = F.stack(vwgt, 1)
+        shape = (np.prod(F.shape(vwgt),),)
+        vwgt = F.reshape(vwgt, shape)
+        vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
+    else:
+        vwgt = F.zeros((0,), F.int64, F.cpu())
+        vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
+
+    node_part = _CAPI_DGLMetisPartition(sym_g._graph, k, vwgt)
     if len(node_part) == 0:
         return None
     else:
         node_part = utils.toindex(node_part)
         return node_part.tousertensor()
 
-def metis_partition(g, k, extra_cached_hops=0, reshuffle=False):
+def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
+                    balance_ntypes=None, balance_edges=False):
     ''' This is to partition a graph with Metis partitioning.
 
     Metis assigns vertices to partitions. This API constructs subgraphs with the vertices assigned
     to the partitions and their incoming edges. A subgraph may contain HALO nodes which does
     not belong to the partition of a subgraph but are connected to the nodes
     in the partition within a fixed number of hops.
+
+    When performing Metis partitioning, we can put some constraint on the partitioning.
+    Current, it supports two constrants to balance the partitioning. By default, Metis
+    always tries to balance the number of nodes in each partition.
+
+    * `balance_ntypes` balances the number of nodes of different types in each partition.
+    * `balance_edges` balances the number of edges in each partition.
+
+    To balance the node types, a user needs to pass a vector of N elements to indicate
+    the type of each node. N is the number of nodes in the input graph.
 
     If `reshuffle` is turned on, the function reshuffles node Ids and edge Ids
     of the input graph before partitioning. After reshuffling, all nodes and edges
@@ -707,26 +766,24 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False):
     ------------
     g: DGLGraph
         The graph to be partitioned
-
     k: int
         The number of partitions.
-
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
-
     reshuffle : bool
         Resuffle nodes so that nodes in the same partition are in the same Id range.
+    balance_ntypes : tensor
+        Node type of each node
+    balance_edges : bool
+        Indicate whether to balance the edges.
 
     Returns
     --------
     a dict of DGLGraphs
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
-    # METIS works only on symmetric graphs.
-    # The METIS runs on the symmetric graph to generate the node assignment to partitions.
-    sym_g = to_bidirected(g, readonly=True)
-    node_part = _CAPI_DGLMetisPartition(sym_g._graph, k)
-    if len(node_part) == 0:
+    node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges)
+    if node_part is None:
         return None
 
     # Then we split the original graph into parts based on the METIS partitioning results.

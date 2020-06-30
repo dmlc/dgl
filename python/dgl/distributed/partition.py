@@ -83,6 +83,7 @@ import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID
+from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
 from .graph_partition_book import GraphPartitionBook, RangePartitionBook
@@ -177,7 +178,7 @@ def load_partition_book(conf_file, part_id, graph=None):
         return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
-                    reshuffle=True):
+                    reshuffle=True, balance_ntypes=None, balance_edges=False):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -212,6 +213,16 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     * "orig_id" exists when reshuffle=True. It indicates the original node Ids in the original
     graph before reshuffling.
 
+    When performing Metis partitioning, we can put some constraint on the partitioning.
+    Current, it supports two constrants to balance the partitioning. By default, Metis
+    always tries to balance the number of nodes in each partition.
+
+    * `balance_ntypes` balances the number of nodes of different types in each partition.
+    * `balance_edges` balances the number of edges in each partition.
+
+    To balance the node types, a user needs to pass a vector of N elements to indicate
+    the type of each node. N is the number of nodes in the input graph.
+
     Parameters
     ----------
     g : DGLGraph
@@ -229,6 +240,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     reshuffle : bool
         Reshuffle nodes and edges so that nodes and edges in a partition are in
         contiguous Id range.
+    balance_ntypes : tensor
+        Node type of each node
+    balance_edges : bool
+        Indicate whether to balance the edges.
     '''
     if num_parts == 1:
         client_parts = {0: g}
@@ -237,12 +252,15 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         g.edata[EID] = F.arange(0, g.number_of_edges())
         g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int64, F.cpu())
         g.edata['inner_edge'] = F.ones((g.number_of_edges(),), F.int64, F.cpu())
-        g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
+        if reshuffle:
+            g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
+            g.edata['orig_id'] = F.arange(0, g.number_of_edges())
     elif part_method == 'metis':
-        node_parts = metis_partition_assignment(g, num_parts)
+        node_parts = metis_partition_assignment(g, num_parts, balance_ntypes=balance_ntypes,
+                                                balance_edges=balance_edges)
         client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     elif part_method == 'random':
-        node_parts = dgl.random.choice(num_parts, g.number_of_nodes())
+        node_parts = random_choice(num_parts, g.number_of_nodes())
         client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     else:
         raise Exception('Unknown partitioning method: ' + part_method)

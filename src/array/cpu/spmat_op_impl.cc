@@ -377,7 +377,9 @@ COOMatrix CSRToCOO(CSRMatrix csr) {
               ret_row_data + indptr_data[i + 1],
               i);
   }
-  return COOMatrix{csr.num_rows, csr.num_cols, ret_row, csr.indices, csr.data};
+  return COOMatrix(csr.num_rows, csr.num_cols,
+                   ret_row, csr.indices, csr.data,
+                   true, csr.sorted);
 }
 
 template COOMatrix CSRToCOO<kDLCPU, int32_t>(CSRMatrix csr);

@@ -16,6 +16,7 @@ from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, 
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
+from ..transform import as_heterograph
 
 def _get_graph_path(graph_name):
     return "/" + graph_name
@@ -125,9 +126,13 @@ class DistTensor:
         self._dtype = dtype
 
     def __getitem__(self, idx):
+        idx = utils.toindex(idx)
+        idx = idx.tousertensor()
         return self.kvstore.pull(name=self.name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
+        idx = utils.toindex(idx)
+        idx = idx.tousertensor()
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self.name, id_tensor=idx, data_tensor=val)
 
@@ -332,7 +337,11 @@ class DistGraph:
     def __init__(self, ip_config, graph_name, gpb=None):
         connect_to_server(ip_config=ip_config)
         self._client = KVClient(ip_config)
-        self._g = _get_graph_from_shared_mem(graph_name)
+        g = _get_graph_from_shared_mem(graph_name)
+        if g is not None:
+            self._g = as_heterograph(g)
+        else:
+            self._g = None
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
         if self._gpb is None:
             self._gpb = gpb
@@ -419,6 +428,21 @@ class DistGraph:
         raise NotImplementedError("get_node_embeddings isn't supported yet")
 
     @property
+    def local_partition(self):
+        ''' Return the local partition on the client
+
+        DistGraph provides a global view of the distributed graph. Internally,
+        it may contains a partition of the graph if it is co-located with
+        the server. If there is no co-location, this returns None.
+
+        Returns
+        -------
+        DGLHeterograph
+            The local partition
+        '''
+        return self._g
+
+    @property
     def ndata(self):
         """Return the data view of all the nodes.
 
@@ -470,7 +494,10 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
-        return self._client.client_id
+        if self._g is None:
+            return self._client.client_id
+        else:
+            return self._gpb.partid
 
     def get_partition_book(self):
         """Get the partition information.
