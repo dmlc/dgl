@@ -88,9 +88,9 @@ NDArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
   auto tag_data = static_cast<const TagType *>(tag->data);
   int64_t num_rows = csr->num_rows;
 
-  NDArray split = NDArray::Empty({csr->num_rows, num_tags - 1},
+  NDArray tag_pos = NDArray::Empty({csr->num_rows, num_tags - 1},
       csr->indptr->dtype, csr->indptr->ctx);
-  auto split_data = static_cast<IdType *>(split->data);
+  auto tag_pos_data = static_cast<IdType *>(tag_pos->data);
 
 #pragma omp parallel for
   for (IdType src = 0 ; src < num_rows ; ++src) {
@@ -111,19 +111,19 @@ NDArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
 
     IdType *indices_ptr = indices_data + start;
     IdType *eid_ptr = eid_data + start;
-    IdType split_ptr = 0;
+    IdType tag_pos_ptr = 0;
     for (TagType t = 0 ; t < num_tags ; ++t) {
       std::copy(dst_arr[t].begin(), dst_arr[t].end(), indices_ptr);
       std::copy(eid_arr[t].begin(), eid_arr[t].end(), eid_ptr);
       indices_ptr += dst_arr[t].size();
       eid_ptr += eid_arr[t].size();
-      split_ptr += dst_arr[t].size();
+      tag_pos_ptr += dst_arr[t].size();
       if (t < num_tags - 1)
-        split_data[src * (num_tags - 1) + t] = split_ptr;
+        tag_pos_data[src * (num_tags - 1) + t] = tag_pos_ptr;
     }
   }
   csr->sorted = false;
-  return split;
+  return tag_pos;
 }
 
 template IdArray CSRSortByTag_<kDLCPU, int64_t, int64_t>(
