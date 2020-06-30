@@ -52,6 +52,7 @@ def test_sort_inplace(index_dtype):
 
     dgl.sort_out_edges_(g)
     csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    # 'transpose' may be removed in the future if the semantics of adjacency_matrix will change.
     assert(check_sort(csr))    
 
     dgl.sort_in_edges_(g)
