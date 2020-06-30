@@ -602,15 +602,21 @@ class CoraBinary(DGLBuiltinDataset):
         """save the graph list and the labels"""
         graph_path = os.path.join(self.save_path,
                                   self.save_name + '.bin')
-        save_graphs(str(graph_path), self.graphs, self.labels)
+        labels = {}
+        for i, label in enumerate(self.labels):
+            labels[i] = label
+        save_graphs(str(graph_path), self.graphs, labels)
         if self.verbose:
             print('Done saving data into cached files.')
 
     def load(self):
         graph_path = os.path.join(self.save_path,
                                   self.save_name + '.bin')
-        self.graphs, self.labels = load_graphs(str(graph_path))
+        self.graphs, labels = load_graphs(str(graph_path))
 
+        self.labels = []
+        for i in range(len(lables)):
+            self.labels.append(labels[i])
         # load pmpds under self.raw_path
         with open("{}/pmpds.pkl".format(self.raw_path), 'rb') as f:
             self.pmpds = _pickle_load(f)
