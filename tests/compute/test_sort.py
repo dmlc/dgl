@@ -132,5 +132,5 @@ def test_sort_outplace_bipartite(index_dtype):
 if __name__ == "__main__":
     test_sort_inplace("int32")
     test_sort_inplace_bipartite("int32")
-    test_sort_outplace("int32")
-    test_sort_outplace_bipartite("int32")
+    # test_sort_outplace("int32")
+    # test_sort_outplace_bipartite("int32")

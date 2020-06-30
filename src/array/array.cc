@@ -449,7 +449,7 @@ void CSRSort_(CSRMatrix* csr) {
 
 IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
   CHECK_EQ(csr->num_cols, tag->shape[0]) 
-      << "The length of the tag array should be equal to the number of columns";
+      << "The length of the tag array should be equal to the number of columns ";
   CHECK_SAME_CONTEXT(csr->indices, tag);
   CHECK_INT(tag, "tag");
   IdArray ret;

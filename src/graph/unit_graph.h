@@ -266,16 +266,6 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
-  IdArray SortCSR_(dgl_type_t etype, IdArray tag, int64_t num_tags) override;
-
-  IdArray SortCSC_(dgl_type_t etype, IdArray tag, int64_t num_tags) override;
-
-  std::pair<HeteroGraphPtr, IdArray> SortCSR(
-      dgl_type_t etype, IdArray tag, int64_t num_tags) override;
-
-  std::pair<HeteroGraphPtr, IdArray> SortCSC(
-      dgl_type_t etype, IdArray tag, int64_t num_tags) override;
-
  private:
   friend class Serializer;
   friend class HeteroGraph;

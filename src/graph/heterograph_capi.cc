@@ -573,46 +573,26 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSR_")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    dgl_type_t etype = args[1];
-    NDArray tag = args[2];
-    int64_t num_tag = args[3];
-    *rv = hg->SortCSR_(etype, tag, num_tag);
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+    auto csr = hg->GetCSRMatrix(0);
+    if (!num_tag) 
+      aten::CSRSort_(&csr);
+    else
+      *rv = aten::CSRSortByTag_(&csr, tag, num_tag);
   });
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSC_")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    dgl_type_t etype = args[1];
-    NDArray tag = args[2];
-    int64_t num_tag = args[3];
-    *rv = hg->SortCSC_(etype, tag, num_tag);
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+    auto csc = hg->GetCSCMatrix(0);
+    if (!num_tag) 
+      aten::CSRSort_(&csc);
+    else
+      *rv = aten::CSRSortByTag_(&csc, tag, num_tag);
   });
-
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSR")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef hg = args[0];
-    dgl_type_t etype = args[1];
-    NDArray tag = args[2];
-    int64_t num_tag = args[3];
-    List<Value> ret_list;
-    auto ret = hg->SortCSR(etype, tag, num_tag);
-    ret_list.push_back(Value(MakeValue(ret.first)));
-    ret_list.push_back(Value(MakeValue(ret.second)));
-    *rv = ret_list;
-  });
-
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSC")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef hg = args[0];
-    dgl_type_t etype = args[1];
-    NDArray tag = args[2];
-    int64_t num_tag = args[3];
-    List<Value> ret_list;
-    auto ret = hg->SortCSC(etype, tag, num_tag);
-    ret_list.push_back(Value(MakeValue(ret.first)));
-    ret_list.push_back(Value(MakeValue(ret.second)));
-    *rv = ret_list;
-});
 
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
