@@ -21,19 +21,19 @@ class KarateClubDataset(DGLDataset):
     Official website: http://konect.cc/networks/ucidata-zachary/
 
     Statistics
-    ===
+    ----------
     Nodes: 34
     Edges: 156
     Number of Classes: 2
 
     Returns
-    ===
+    -------
     KarateClubDataset object with two properties:
         graph: A Homogeneous graph contain the graph structure and node labels
         num_classes: number of node classes
 
     Examples
-    ===
+    --------
     >>> data = KarateClubDataset()
     >>> data.num_classes
     2

@@ -1,3 +1,4 @@
+"""GNN Benchmark datasets for node classification."""
 import scipy.sparse as sp
 import numpy as np
 import os
@@ -21,9 +22,10 @@ def eliminate_self_loops(A):
 
 
 class GNNBenchmarkDataset(DGLBuiltinDataset):
-    r"""Base Class for GNN Benchmark dataset from https://github.com/shchur/gnn-benchmark#datasets"""
-    _url = None
+    r"""Base Class for GNN Benchmark dataset
 
+    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    """
     def __init__(self, name, force_reload=False):
         _url = _get_dgl_url('dataset/' + name + '.zip')
         super(GNNBenchmarkDataset, self).__init__(name=name, url=_url, force_reload=force_reload)
@@ -110,7 +112,7 @@ class CoraFullDataset(GNNBenchmarkDataset):
         This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     Statistics
-    ===
+    ----------
     Nodes: 19,793
     Edges: 130,622
     Number of Classes: 70
@@ -122,7 +124,7 @@ class CoraFullDataset(GNNBenchmarkDataset):
         Whether to reload the dataset. Default: False
 
     Returns
-    ===
+    -------
     CoraFullDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
             - ndata['feat']: tensor of the node features
@@ -130,15 +132,13 @@ class CoraFullDataset(GNNBenchmarkDataset):
         num_classes: number of node classes
 
     Examples
-    ===
+    --------
     >>> data = CoraFullDataset()
     >>> g = data.graph
     >>> num_class = data.num_classes
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = 'https://github.com/shchur/gnn-benchmark/raw/master/data/npz/cora_full.npz'
-
     def __init__(self, force_reload=False):
         super(CoraFullDataset, self).__init__(name="cora_full", force_reload=force_reload)
 
@@ -162,7 +162,7 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
         This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     Statistics
-    ===
+    ----------
     Nodes: 18,333
     Edges: 327,576
     Number of classes: 15
@@ -174,7 +174,7 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
         Whether to reload the dataset. Default: False
 
     Returns
-    ===
+    -------
     CoauthorCSDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
             - ndata['feat']: tensor of the node features
@@ -182,15 +182,13 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
         num_classes: number of node classes
 
     Examples
-    ===
+    --------
     >>> data = CoauthorCSDataset()
     >>> g = data.graph
     >>> num_class = data.num_classes
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/ms_academic_cs.npz"
-
     def __init__(self, force_reload=False):
         super(CoauthorCSDataset, self).__init__(name='coauthor_cs', force_reload=force_reload)
 
@@ -214,7 +212,7 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
         This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     Statistics
-    ===
+    ----------
     Nodes: 34,493
     Edges: 991,848
     Number of classes: 5
@@ -226,7 +224,7 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
         Whether to reload the dataset. Default: False
 
     Returns
-    ===
+    -------
     CoauthorPhysicsDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
             - ndata['feat']: tensor of the node features
@@ -234,15 +232,13 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
         num_classes: number of node classes
 
     Examples
-    ===
+    --------
     >>> data = CoauthorPhysicsDataset()
     >>> g = data.graph
     >>> num_class = data.num_classes
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/ms_academic_phy.npz"
-
     def __init__(self, force_reload=False):
         super(CoauthorPhysicsDataset, self).__init__(name='coauthor_physics', force_reload=force_reload)
 
@@ -265,7 +261,7 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
         This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     Statistics
-    ===
+    ----------
     Nodes: 13,752
     Edges: 574,418
     Number of classes: 5
@@ -277,7 +273,7 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
         Whether to reload the dataset. Default: False
 
     Returns
-    ===
+    -------
     AmazonCoBuyComputerDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
             - ndata['feat']: tensor of the node features
@@ -285,15 +281,13 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
         num_classes: number of node classes
 
     Examples
-    ===
+    --------
     >>> data = AmazonCoBuyComputerDataset()
     >>> g = data.graph
     >>> num_class = data.num_classes
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/amazon_electronics_computers.npz"
-
     def __init__(self, force_reload=False):
         super(AmazonCoBuyComputerDataset, self).__init__(name='amazon_co_buy_computer', force_reload=force_reload)
 
@@ -316,7 +310,7 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
         This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     Statistics
-    ===
+    ----------
     Nodes: 7,650
     Edges: 287,326
     Number of classes: 5
@@ -328,7 +322,7 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
         Whether to reload the dataset. Default: False
 
     Returns
-    ===
+    -------
     AmazonCoBuyDataset object with two properties:
         graph: A homogeneous graph contains the graph structure, node features and node labels
             - ndata['feat']: tensor of the node features
@@ -336,15 +330,13 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
         num_classes: number of node classes
 
     Examples
-    ===
+    --------
     >>> data = AmazonCoBuyPhotoDataset()
     >>> g = data.graph
     >>> num_class = data.num_classes
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    _url = "https://github.com/shchur/gnn-benchmark/raw/master/data/npz/amazon_electronics_photo.npz"
-
     def __init__(self, force_reload=False):
         super(AmazonCoBuyPhotoDataset, self).__init__(name='amazon_co_buy_photo', force_reload=force_reload)
 
