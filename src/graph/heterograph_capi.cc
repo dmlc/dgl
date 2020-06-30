@@ -576,7 +576,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSR_")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
     auto csr = hg->GetCSRMatrix(0);
-    if (!num_tag) 
+    if (!num_tag)
       aten::CSRSort_(&csr);
     else
       *rv = aten::CSRSortByTag_(&csr, tag, num_tag);
@@ -588,7 +588,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortCSC_")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
     auto csc = hg->GetCSCMatrix(0);
-    if (!num_tag) 
+    if (!num_tag)
       aten::CSRSort_(&csc);
     else
       *rv = aten::CSRSortByTag_(&csc, tag, num_tag);
