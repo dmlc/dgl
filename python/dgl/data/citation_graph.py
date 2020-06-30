@@ -604,7 +604,7 @@ class CoraBinary(DGLBuiltinDataset):
                                   self.save_name + '.bin')
         labels = {}
         for i, label in enumerate(self.labels):
-            labels[i] = F.tensor(label)
+            labels['{}'.format(i)] = F.tensor(label)
         save_graphs(str(graph_path), self.graphs, labels)
         if self.verbose:
             print('Done saving data into cached files.')
@@ -616,7 +616,7 @@ class CoraBinary(DGLBuiltinDataset):
 
         self.labels = []
         for i in range(len(lables)):
-            self.labels.append(labels[i].asnumpy())
+            self.labels.append(labels['{}'.format(i)].asnumpy())
         # load pmpds under self.raw_path
         with open("{}/pmpds.pkl".format(self.raw_path), 'rb') as f:
             self.pmpds = _pickle_load(f)
