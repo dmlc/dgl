@@ -4648,6 +4648,27 @@ class DGLHeteroGraph(object):
                               self._node_frames,
                               self._edge_frames)
 
+    def clone(self, restrict_format="any"):
+        """Return a cloned graph whose frames are shallow copy of the original graph's.
+
+        Returns
+        -------
+        A new graph.
+
+        See Also
+        --------
+        to_format
+        """
+        gidx = self._graph.to_format(restrict_format)
+        node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
+                    if frame is None else frame.clone()
+                    for i, frame in enumerate(self._node_frames)]
+        edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+                    if frame is None else frame.clone()
+                    for i, frame in enumerate(self._edge_frames)]
+        return DGLHeteroGraph(gidx, self.ntypes, self.etypes,
+                              node_frames, edge_frames)
+
     def long(self):
         """Return a heterograph object use int64 as index dtype,
         with the ndata and edata as the original object

@@ -1442,7 +1442,7 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
-    new_g = g.to_format("any")
+    new_g = g.clone()
     sort_out_edges_(new_g, tag, tag_pos)
     return new_g
 
@@ -1471,7 +1471,7 @@ def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
-    new_g = g.to_format("any")
+    new_g = g.clone()
     sort_in_edges_(new_g, tag, tag_pos)
     return new_g
 
