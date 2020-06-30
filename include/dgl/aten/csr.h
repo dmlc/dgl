@@ -366,11 +366,9 @@ COOMatrix CSRRowWiseTopk(
     FloatArray weight,
     bool ascending = false);
 
-/*！
- * \brief Sort the colunm index according to a node feature called tag
- * 
- * \return the split positions of different tags
- * 
+/*!
+ * \brief Sort the column index according to the tag of each column.
+ *
  * Example:
  * indptr  = [0, 5, 8]
  * indices = [0, 1, 2, 3, 4, 0, 1, 2]
@@ -382,15 +380,20 @@ COOMatrix CSRRowWiseTopk(
  * indptr  = [0, 5, 8]
  * indices = [2, 4, 0, 1, 3, 2, 0, 1]
  * (tag)   = [0, 0, 1, 1, 2, 0, 1, 1]
- *           ^    ^     ^  ^
- *                         ^  ^     ^^
+ *                ^     ^  
+ *                            ^     ^
  * (the tag array itself is unchanged.)
  *   
  * Return:
- * [0, 2, 4, 5, 0, 1, 3, 3] (marked with ^)
+ * [2, 4, 1, 3] (marked with ^)
  * It is a flatten array produced by concatenating the split positions of all nodes
+ * 
+ * \param csr The csr matrix to be sorted
+ * \param tag_array Tag of each column. IdArray with length num_cols
+ * \param num_tags Number of tags. It should be equal to max(tag_array)+1.
+ * \return the split positions of different tags. NDArray of shape (num_rows, num_tags - 1)
  */
-IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
+NDArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
 
 /*!
  * \brief Union a list CSRMatrix into one CSRMatrix.

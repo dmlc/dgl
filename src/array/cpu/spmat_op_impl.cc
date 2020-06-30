@@ -589,17 +589,20 @@ template void CSRSort_<kDLCPU, int64_t>(CSRMatrix* csr);
 template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
 
 template <DLDeviceType XPU, typename IdType, typename TagType>
-IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
-  auto indptr_data = static_cast<IdType *>(csr->indptr->data);
+NDArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
+  auto indptr_data = static_cast<const IdType *>(csr->indptr->data);
   auto indices_data = static_cast<IdType *>(csr->indices->data);
+  if (!aten::CSRHasData(*csr))
+    csr->data = aten::Range(0, csr->indices->shape[0], csr->indptr->dtype.bits, csr->indptr->ctx);
   auto eid_data = static_cast<IdType *>(csr->data->data);
-  auto tag_data = static_cast<TagType *>(tag->data);
+  auto tag_data = static_cast<const TagType *>(tag->data);
   int64_t num_rows = csr->num_rows;
 
-  NDArray split = NewIdArray(num_rows * (num_tags + 1), csr->indptr->ctx, csr->indptr->dtype.bits);
+  NDArray split = NDArray::Empty({csr->num_rows, num_tags - 1},
+      csr->indptr->dtype, csr->indptr->ctx);
   auto split_data = static_cast<IdType *>(split->data);
 
-  #pragma omp parallel for
+#pragma omp parallel for
   for (IdType src = 0 ; src < num_rows ; ++src) {
     IdType start = indptr_data[src];
     IdType end = indptr_data[src + 1];
@@ -611,6 +614,7 @@ IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
       IdType dst = indices_data[ptr];
       IdType eid = eid_data[ptr];
       TagType t = tag_data[dst];
+      CHECK_LT(t, num_tags);
       dst_arr[t].push_back(dst);
       eid_arr[t].push_back(eid);
     }
@@ -619,16 +623,16 @@ IdArray CSRSortByTag_(CSRMatrix* csr, IdArray tag, int64_t num_tags) {
     IdType *eid_ptr = eid_data + start;
     IdType split_ptr = 0;
     for (TagType t = 0 ; t < num_tags ; ++t) {
-      split_data[src * (num_tags + 1) + t] = split_ptr;
       std::copy(dst_arr[t].begin(), dst_arr[t].end(), indices_ptr);
       std::copy(eid_arr[t].begin(), eid_arr[t].end(), eid_ptr);
       indices_ptr += dst_arr[t].size();
       eid_ptr += eid_arr[t].size();
       split_ptr += dst_arr[t].size();
+      if (t < num_tags - 1)
+        split_data[src * (num_tags - 1) + t] = split_ptr;
     }
-    split_data[src * (num_tags + 1) + num_tags] = split_ptr;
   }
-
+  csr->sorted = false;
   return split;
 }
 

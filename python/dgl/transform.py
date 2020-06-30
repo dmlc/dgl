@@ -1320,7 +1320,7 @@ def as_immutable_graph(hg):
     g.edata.update(hg.edata)
     return g
 
-def sort_csr_(g, tag=None, split="_SPLIT"):
+def sort_csr_(g, tag=None, tag_pos="_TAG_POS"):
     """Sort the (out)CSR matrix of the graph inplace
 
     After sorting, edges whose destination shares the same tag will be arranged in
@@ -1334,7 +1334,7 @@ def sort_csr_(g, tag=None, split="_SPLIT"):
     tag : str
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
-    split: str
+    tag_pos: str
         The name of the node feature to store split positions of different tags in the
         adjancency list.
 
@@ -1358,10 +1358,9 @@ def sort_csr_(g, tag=None, split="_SPLIT"):
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSR_(g._graph, 0, tag_arr, num_tags)
     if tag is not None:
-        ret = F.zerocopy_from_dgl_ndarray(ret)
-        g.nodes[srctype].data[split] = F.reshape(ret, [-1, num_tags + 1])
+        g.nodes[srctype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 
-def sort_csc_(g, tag=None, split="_SPLIT"):
+def sort_csc_(g, tag=None, tag_pos="_TAG_POS"):
     """Sort the CSC(in CSR) matrix of the graph inplace
 
     After sorting, edges whose source shares the same tag will be arranged in
@@ -1375,7 +1374,7 @@ def sort_csc_(g, tag=None, split="_SPLIT"):
     tag : str
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
-    split : str
+    tag_pos : str
         The name of the node feature to store split positions of different tags in the
         adjancency list.
 
@@ -1393,10 +1392,9 @@ def sort_csc_(g, tag=None, split="_SPLIT"):
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSC_(g._graph, 0, tag_arr, num_tags)
     if tag is not None:
-        ret = F.zerocopy_from_dgl_ndarray(ret)
-        g.nodes[dsttype].data[split] = F.reshape(ret, [-1, num_tags + 1])
+        g.nodes[dsttype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
 
-def sort_csr(g, tag=None, split="_SPLIT"):
+def sort_csr(g, tag=None, tag_pos="_TAG_POS"):
     """A copy of the given graph whose (out)CSR matrix is sorted.
 
     The outplace version of sort_csr_
@@ -1409,7 +1407,7 @@ def sort_csr(g, tag=None, split="_SPLIT"):
     tag : str
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
-    split: str
+    tag_pos: str
         The name of the node feature to store split positions of different tags in the
         adjancency list.
 
@@ -1431,7 +1429,7 @@ def sort_csr(g, tag=None, split="_SPLIT"):
         num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSR(g._graph, 0, tag_arr, num_tags)
-    gidx, split_arr = [item.data for item in ret]
+    gidx, tag_pos_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
                    if frame is None else frame.clone()
                    for i, frame in enumerate(g._node_frames)]
@@ -1440,11 +1438,10 @@ def sort_csr(g, tag=None, split="_SPLIT"):
                    for i, frame in enumerate(g._edge_frames)]
     new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
     if tag is not None:
-        split_arr = F.reshape(F.zerocopy_from_dgl_ndarray(split_arr), [-1, num_tags + 1])
-        new_g.nodes[srctype].data[split] = split_arr
+        new_g.nodes[srctype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(tag_pos_arr)
     return new_g
 
-def sort_csc(g, tag=None, split="_SPLIT"):
+def sort_csc(g, tag=None, tag_pos="_TAG_POS"):
     """A copy of the given graph whose CSC(in CSR) matrix is sorted.
 
     The outplace version of sort_csc_
@@ -1479,7 +1476,7 @@ def sort_csc(g, tag=None, split="_SPLIT"):
         num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     ret = _CAPI_DGLHeteroSortCSC(g._graph, 0, tag_arr, num_tags)
-    gidx, split_arr = [item.data for item in ret]
+    gidx, tag_pos_arr = [item.data for item in ret]
     node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
                    if frame is None else frame.clone()
                    for i, frame in enumerate(g._node_frames)]
@@ -1488,8 +1485,7 @@ def sort_csc(g, tag=None, split="_SPLIT"):
                    for i, frame in enumerate(g._edge_frames)]
     new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes, node_frames, edge_frames)
     if tag is not None:
-        split_arr = F.reshape(F.zerocopy_from_dgl_ndarray(split_arr), [-1, num_tags + 1])
-        new_g.nodes[dsttype].data[split] = split_arr
+        new_g.nodes[dsttype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(tag_pos_arr)
     return new_g
 
 _init_api("dgl.transform")
