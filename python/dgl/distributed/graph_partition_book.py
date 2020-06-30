@@ -221,7 +221,7 @@ class GraphPartitionBook:
         tensor
             partition IDs
         """
-        return F.gather_row(self._nid2partid, nids)
+        return self._nid2partid[nids]
 
     def eid2partid(self, eids):
         """From global edge IDs to partition IDs
@@ -236,7 +236,7 @@ class GraphPartitionBook:
         tensor
             partition IDs
         """
-        return F.gather_row(self._eid2partid, eids)
+        return self._eid2partid[eids]
 
     def partid2nids(self, partid):
         """From partition id to global node IDs
@@ -286,7 +286,7 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of nid2localnid.')
-        return F.gather_row(self._nidg2l[partid], nids)
+        return self._nidg2l[partid][nids]
 
     def eid2localeid(self, eids, partid):
         """Get the local edge ids within the given partition.
@@ -306,7 +306,7 @@ class GraphPartitionBook:
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of eid2localeid.')
-        return F.gather_row(self._eidg2l[partid], eids)
+        return self._eidg2l[partid][eids]
 
     def get_partition(self, partid):
         """Get the graph of one partition.
