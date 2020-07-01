@@ -27,12 +27,22 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
-    train_nid = th.arange(200)
+    train_nid = th.arange(202)
+
     sampler = DistDataLoader(dataset=train_nid.numpy(), batch_size=10, collate_fn=sample_blocks, num_workers=num_workers,
-                             queue_size=10, dist_gclient_config={"ip_config": "mp_ip_config.txt", "graph_name": "test_mp", "gpb": gpb}, sample_config={"fanouts": [5]})
+                             queue_size=10, drop_last=False, dist_gclient_config={"ip_config": "mp_ip_config.txt", "graph_name": "test_mp", "gpb": gpb}, sample_config={"fanouts": [5, 5]})
     
+    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb)
+
     for idx, block in enumerate(sampler):
         print(block)
+        print(idx)
+    
+    sampler.close()
+
+    dgl.distributed.shutdown_servers()
+    dgl.distributed.finalize_client()
+
 
 
 def main(tmpdir, num_server):
@@ -54,14 +64,13 @@ def main(tmpdir, num_server):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, num_workers))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, num_workers+1))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     time.sleep(3)
     sampled_graph = start_client(0, tmpdir, num_server > 1, num_workers)
-    print("Done sampling")
     for p in pserver_list:
         p.join()
 
