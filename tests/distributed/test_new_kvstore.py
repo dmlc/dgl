@@ -244,13 +244,14 @@ def start_client(num_clients):
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # Register new push handler
-    kvclient.register_push_handler('data_3', add_push)
+    kvclient.barrier()
     kvclient.init_data(name='data_3', 
                        shape=F.shape(data_2),
                        dtype=F.dtype(data_2), 
                        policy_str='node',
                        partition_book=gpb,
                        init_func=init_zero_func)
+    kvclient.register_push_handler('data_3', add_push)
     kvclient.map_shared_data(partition_book=gpb)
     id_tensor = id_tensor = F.tensor([0,2,4], F.int64)
     data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
