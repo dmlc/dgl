@@ -304,7 +304,7 @@ class DistGraphServer(KVServer):
         # Init kvstore.
         if not disable_shared_mem:
             self.gpb.shared_memory(graph_name)
-        assert self.gpb.part_id == server_id
+        assert self.gpb.partid == server_id
         self.add_part_policy(PartitionPolicy('node', self.gpb))
         self.add_part_policy(PartitionPolicy('edge', self.gpb))
 
