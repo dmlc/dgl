@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 #include <dgl/array.h>
 #include "./common.h"
+#include "./../src/graph/heterograph.h"
 #include "../../src/graph/unit_graph.h"
 
 using namespace dgl;
@@ -67,13 +68,17 @@ void _TestUnitGraph(DLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
-  UnitGraphPtr g = std::static_pointer_cast<UnitGraph>(CreateFromCSC(1, csr, SparseFormat::kAny));
+  auto hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSC(2, csr, SparseFormat::kAny));
+  UnitGraphPtr g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 4);
 
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCSR(1, csr, SparseFormat::kAny));
+  
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSR(2, csr, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 2);
 
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCOO(1, coo, SparseFormat::kAny));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCOO(2, coo, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 1);
 }
 
@@ -82,15 +87,17 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
-  UnitGraphPtr g = std::static_pointer_cast<UnitGraph>(CreateFromCSC(1, csr, SparseFormat::kAny));
+  auto hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSC(2, csr, SparseFormat::kAny));
+  UnitGraphPtr g = hg->relation_graphs()[0];
   auto in_csr_matrix = g->GetCSCMatrix(0);
   ASSERT_EQ(in_csr_matrix.num_rows, csr.num_rows);
   ASSERT_EQ(in_csr_matrix.num_cols, csr.num_cols);
   ASSERT_EQ(g->GetFormatInUse(), 4);
 
   // test out csr
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCSR(1, csr, SparseFormat::kAny));
-  UnitGraphPtr g_ptr = std::static_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSC));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSR(2, csr, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
+  UnitGraphPtr g_ptr = std::dynamic_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSC));
   in_csr_matrix = g_ptr->GetCSCMatrix(0);
   ASSERT_EQ(in_csr_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(in_csr_matrix.num_rows, csr.num_cols);
@@ -101,8 +108,9 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
   ASSERT_EQ(g->GetFormatInUse(), 6);
 
   // test out coo
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCOO(1, coo, SparseFormat::kAny));
-  g_ptr = std::static_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSC));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCOO(2, coo, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
+  g_ptr = std::dynamic_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSC));
   in_csr_matrix = g_ptr->GetCSCMatrix(0);
   ASSERT_EQ(in_csr_matrix.num_cols, coo.num_rows);
   ASSERT_EQ(in_csr_matrix.num_rows, coo.num_cols);
@@ -119,8 +127,9 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
-  UnitGraphPtr g = std::static_pointer_cast<UnitGraph>(CreateFromCSC(1, csr, SparseFormat::kAny));
-  UnitGraphPtr g_ptr = std::static_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSR));
+  auto hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSC(2, csr, SparseFormat::kAny));
+  UnitGraphPtr g = hg->relation_graphs()[0];
+  UnitGraphPtr g_ptr = std::dynamic_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSR));
   auto out_csr_matrix = g_ptr->GetCSRMatrix(0);
   ASSERT_EQ(out_csr_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(out_csr_matrix.num_rows, csr.num_cols);
@@ -131,15 +140,17 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
   ASSERT_EQ(g->GetFormatInUse(), 6);
 
   // test out csr
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCSR(1, csr, SparseFormat::kAny));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSR(2, csr, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
   out_csr_matrix = g->GetCSRMatrix(0);
   ASSERT_EQ(out_csr_matrix.num_rows, csr.num_rows);
   ASSERT_EQ(out_csr_matrix.num_cols, csr.num_cols);
   ASSERT_EQ(g->GetFormatInUse(), 2);
 
   // test out coo
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCOO(1, coo, SparseFormat::kAny));
-  g_ptr = std::static_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSR));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCOO(2, coo, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
+  g_ptr = std::dynamic_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCSR));
   out_csr_matrix = g_ptr->GetCSRMatrix(0);
   ASSERT_EQ(out_csr_matrix.num_rows, coo.num_rows);
   ASSERT_EQ(out_csr_matrix.num_cols, coo.num_cols);
@@ -156,8 +167,9 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
-  UnitGraphPtr g = std::static_pointer_cast<UnitGraph>(CreateFromCSC(1, csr, SparseFormat::kAny));
-  UnitGraphPtr g_ptr = std::static_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCOO));
+  auto hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSC(2, csr, SparseFormat::kAny));
+  UnitGraphPtr g = hg->relation_graphs()[0];
+  UnitGraphPtr g_ptr = std::dynamic_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCOO));
   auto out_coo_matrix = g_ptr->GetCOOMatrix(0);
   ASSERT_EQ(out_coo_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(out_coo_matrix.num_rows, csr.num_cols);
@@ -168,8 +180,9 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
   ASSERT_EQ(g->GetFormatInUse(), 5);
 
   // test out csr
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCSR(1, csr, SparseFormat::kAny));
-  g_ptr = std::static_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCOO));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSR(2, csr, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
+  g_ptr = std::dynamic_pointer_cast<UnitGraph>(g->GetGraphInFormat(SparseFormat::kCOO));
   out_coo_matrix = g_ptr->GetCOOMatrix(0);
   ASSERT_EQ(out_coo_matrix.num_rows, csr.num_rows);
   ASSERT_EQ(out_coo_matrix.num_cols, csr.num_cols);
@@ -180,7 +193,8 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
   ASSERT_EQ(g->GetFormatInUse(), 3);
 
   // test out coo
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCOO(1, coo, SparseFormat::kAny));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCOO(2, coo, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
   out_coo_matrix = g->GetCOOMatrix(0);
   ASSERT_EQ(out_coo_matrix.num_rows, coo.num_rows);
   ASSERT_EQ(out_coo_matrix.num_cols, coo.num_cols);
@@ -192,7 +206,8 @@ void _TestUnitGraph_Reserve(DLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
-  UnitGraphPtr g = std::static_pointer_cast<UnitGraph>(CreateFromCSC(1, csr, SparseFormat::kAny));
+  auto hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSC(2, csr, SparseFormat::kAny));
+  UnitGraphPtr g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 4);
   UnitGraphPtr r_g = g->Reverse();
   ASSERT_EQ(r_g->GetFormatInUse(), 2);
@@ -217,7 +232,8 @@ void _TestUnitGraph_Reserve(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IdType>(g_coo.col, r_g_coo.row));
 
   // test out csr
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCSR(1, csr, SparseFormat::kAny));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSR(2, csr, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 2);
   r_g = g->Reverse();
   ASSERT_EQ(r_g->GetFormatInUse(), 4);
@@ -242,7 +258,8 @@ void _TestUnitGraph_Reserve(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IdType>(g_coo.col, r_g_coo.row));
 
   // test out coo
-  g = std::static_pointer_cast<UnitGraph>(CreateFromCOO(1, coo, SparseFormat::kAny));
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCOO(2, coo, SparseFormat::kAny));
+  g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 1);
   r_g = g->Reverse();
   ASSERT_EQ(r_g->GetFormatInUse(), 1);
