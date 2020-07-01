@@ -2,7 +2,8 @@
 from __future__ import absolute_import
 
 from . import citation_graph as citegrh
-from .citation_graph import CoraBinary, CitationGraphDataset
+from . import synthetic_graph as syngrh
+from .citation_graph import CoraBinary, CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from .minigc import *
 from .tree import *
 from .utils import *
@@ -28,7 +29,7 @@ def register_data_args(parser):
         help=
         "The input dataset. Can be cora, citeseer, pubmed, syn(synthetic dataset) or reddit"
     )
-    citegrh.register_args(parser)
+    syngrh.register_args(parser)
 
 
 def load_data(args):
@@ -39,7 +40,7 @@ def load_data(args):
     elif args.dataset == 'pubmed':
         return citegrh.load_pubmed()
     elif args.dataset == 'syn':
-        return citegrh.load_synthetic(args)
+        return syngrh.load_synthetic(args)
     elif args.dataset is not None and args.dataset.startswith('reddit'):
         return RedditDataset(self_loop=('self-loop' in args.dataset))
     else:
