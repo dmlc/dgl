@@ -107,6 +107,7 @@ def main(args):
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # test sampler
+
     test_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
     test_loader = dgl.sampling.NodeDataLoader(
         g, {category: test_idx}, test_sampler,
@@ -152,8 +153,12 @@ def main(args):
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
-    test_loss, test_acc = evaluate(model, test_loader, node_embed, labels, category, use_cuda)
-    print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
+    output = model.inference(
+        g, args.batch_size, 'cuda' if use_cuda else 'cpu', 0, node_embed)
+    test_pred = output[category][test_idx]
+    test_labels = labels[test_idx]
+    test_acc = (test_pred.argmax(1) == test_labels).float().mean()
+    print("Test Acc: {:.4f}".format(test_acc))
     print()
 
 if __name__ == '__main__':
