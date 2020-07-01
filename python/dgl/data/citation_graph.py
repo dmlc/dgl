@@ -15,6 +15,7 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import download, extract_archive, get_download_dir
 from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
 from .utils import generate_mask_tensor
+from .utils import deprecate_property, deprecate_function
 from ..utils import retry_method_with_fix
 from .. import backend as F
 from ..graph import DGLGraph
@@ -22,13 +23,6 @@ from ..graph import batch as graph_batch
 from ..convert import to_networkx
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
-
-_urls = {
-    'cora_v2' : 'dataset/cora_v2.zip',
-    'citeseer' : 'dataset/citeseer.zip',
-    'pubmed' : 'dataset/pubmed.zip',
-    'cora_binary' : 'dataset/cora_binary.zip',
-}
 
 def _pickle_load(pkl_file):
     if sys.version_info > (3, 0):
@@ -52,6 +46,12 @@ class CitationGraphDataset(DGLBuiltinDataset):
     verbose: bool
       Whether to print out progress information. Default: True.
     """
+    _urls = {
+    'cora_v2' : 'dataset/cora_v2.zip',
+    'citeseer' : 'dataset/citeseer.zip',
+    'pubmed' : 'dataset/pubmed.zip',
+    }
+
     def __init__(self, name, raw_dir=None, force_reload=False, verbose=True):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
@@ -60,7 +60,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         if name.lower() == 'cora':
             name = 'cora_v2'
 
-        url = _get_dgl_url(_urls[name])
+        url = _get_dgl_url(self._urls[name])
         super(CitationGraphDataset, self).__init__(name,
                                                    url=url,
                                                    raw_dir=raw_dir,
@@ -174,8 +174,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                  self.save_name + '.pkl')
         save_graphs(str(graph_path), self.g)
         save_info(str(info_path), {'num_labels': self.num_labels})
-        if self.verbose:
-            print('Done saving data into cached files.')
 
     def load(self):
         graph_path = os.path.join(self.save_path,
@@ -185,8 +183,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
         graphs, _ = load_graphs(str(graph_path))
 
         info = load_info(str(info_path))
-        if self.verbose:
-            print('Done loading data into cached files.')
         self._g = graphs[0]
         self._graph = to_networkx(self._g)
         self._g.readonly(False)
@@ -224,26 +220,32 @@ class CitationGraphDataset(DGLBuiltinDataset):
     """
     @property
     def graph(self):
+        deprecate_property('dataset.graph', 'dataset.g')
         return self._graph
 
     @property
     def train_mask(self):
+        deprecate_property('dataset.train_mask', 'g.ndata[\'train_mask\']')
         return self.g.ndata['train_mask']
 
     @property
     def val_mask(self):
+        deprecate_property('dataset.val_mask', 'g.ndata[\'val_mask\']')
         return self.g.ndata['val_mask']
 
     @property
     def test_mask(self):
+        deprecate_property('dataset.test_mask', 'g.ndata[\'test_mask\']')
         return self.g.ndata['test_mask']
 
     @property
     def labels(self):
+        deprecate_property('dataset.label', 'g.ndata[\'label\']')
         return self.g.ndata['label']
 
     @property
     def features(self):
+        deprecate_property('dataset.feat', 'g.ndata[\'feat\']')
         return self.g.ndata['feat']
 
 class CoraGraphDataset(CitationGraphDataset):
@@ -257,14 +259,14 @@ class CoraGraphDataset(CitationGraphDataset):
     certain paper.
 
     Statistics
-    ===
+    ----------
     Nodes: 2708
     Edges: 10556
     Number of Classes: 7
     Label Split: Train: 140 ,Valid: 500, Test: 1000
 
     Parameters
-    -----------
+    ----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
@@ -274,7 +276,7 @@ class CoraGraphDataset(CitationGraphDataset):
       Whether to print out progress information. Default: True.
     
     Returns
-    ===
+    -------
     CoraDataset object with two properties:
         graph: A Homogeneous graph containing the 
             graph structure, node features and labels.
@@ -286,7 +288,7 @@ class CoraGraphDataset(CitationGraphDataset):
             the classification task.
     
     Examples
-    ===
+    --------
     
     >>> dataset = CoraDataset()
     >>> g = dataset.graph
@@ -322,7 +324,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     certain publication.
 
     Statistics
-    ===
+    ----------
     Nodes: 3327
     Edges: 9228
     Number of Classes: 6
@@ -339,7 +341,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
       Whether to print out progress information. Default: True.
     
     Returns
-    ===
+    -------
     CiteseerDataset object with two properties:
         graph: A Homogeneous graph containing the 
             graph structure, node features and labels.
@@ -351,7 +353,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
             for the classification task.
     
     Examples
-    ===
+    --------
     
     >>> dataset = CiteseerDataset()
     >>> g = dataset.graph
@@ -387,7 +389,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     certain publication.
 
     Statistics
-    ===
+    ----------
     Nodes: 19717
     Edges: 88651
     Number of Classes: 3
@@ -404,7 +406,7 @@ class PubmedGraphDataset(CitationGraphDataset):
       Whether to print out progress information. Default: True.
     
     Returns
-    ===
+    -------
     PubmedDataset object with two properties:
         graph: A Homogeneous graph containing the 
             graph structure, node features and labels.
@@ -416,7 +418,7 @@ class PubmedGraphDataset(CitationGraphDataset):
             for the classification task.
     
     Examples
-    ===
+    ---------
     
     >>> dataset = PubmedDataset()
     >>> g = dataset.graph
@@ -464,63 +466,64 @@ def _sample_mask(idx, l):
     mask[idx] = 1
     return mask
 
-"""Get CoraGraphDataset
 
-Parameters
-    -----------
-    raw_dir : str
-        Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl/
-    force_reload : bool
-        Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
-    
-    Returns
-    ===
-    CoraDataset object
-"""
 def load_cora(raw_dir=None, force_reload=False, verbose=True):
+    """Get CoraGraphDataset
+
+    Parameters
+    -----------
+        raw_dir : str
+            Raw file directory to download/contains the input data directory.
+            Default: ~/.dgl/
+        force_reload : bool
+            Whether to reload the dataset. Default: False
+        verbose: bool
+        Whether to print out progress information. Default: True.
+        
+        Returns
+        ===
+        CoraDataset object
+    """
     data = CoraGraphDataset(raw_dir, force_reload, verbose)
     return data
 
-"""Get CiteseerDataset
-
-Parameters
-    -----------
-    raw_dir : str
-        Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl/
-    force_reload : bool
-        Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
-    
-    Returns
-    ===
-    CiteseerDataset object
-"""
 def load_citeseer(raw_dir=None, force_reload=False, verbose=True):
+    """Get CiteseerDataset
+
+    Parameters
+    -----------
+        raw_dir : str
+            Raw file directory to download/contains the input data directory.
+            Default: ~/.dgl/
+        force_reload : bool
+            Whether to reload the dataset. Default: False
+        verbose: bool
+        Whether to print out progress information. Default: True.
+        
+        Returns
+        ===
+        CiteseerDataset object
+    """
     data = CiteseerGraphDataset(raw_dir, force_reload, verbose)
     return data
 
-"""Get PubmedDataset
-
-Parameters
-    -----------
-    raw_dir : str
-        Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl/
-    force_reload : bool
-        Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
-    
-    Returns
-    ===
-    PubmedDataset object
-"""
 def load_pubmed(raw_dir=None, force_reload=False, verbose=True):
+    """Get PubmedDataset
+
+    Parameters
+    -----------
+        raw_dir : str
+            Raw file directory to download/contains the input data directory.
+            Default: ~/.dgl/
+        force_reload : bool
+            Whether to reload the dataset. Default: False
+        verbose: bool
+        Whether to print out progress information. Default: True.
+        
+        Returns
+        ===
+        PubmedDataset object
+    """
     data = PubmedGraphDataset(raw_dir, force_reload, verbose)
     return data
 
@@ -544,12 +547,12 @@ class CoraBinary(DGLBuiltinDataset):
       Whether to print out progress information. Default: True.
 
     Returns
-    ===
+    -------
     CoraBinary dataset
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         name = 'cora_binary'
-        url = _get_dgl_url(_urls[name])
+        url = _get_dgl_url('dataset/cora_binary.zip')
         super(CoraBinary, self).__init__(name,
                                          url=url,
                                          raw_dir=raw_dir,

@@ -194,7 +194,7 @@ class DGLBuiltinDataset(DGLDataset):
                                                 raw_dir=raw_dir,
                                                 save_dir=None,
                                                 force_reload=force_reload,
-                                                verbose=False)
+                                                verbose=verbose)
 
     def download(self):
         r""" Automatically download data and extract it.
