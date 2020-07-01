@@ -251,6 +251,7 @@ def start_client(num_clients):
                        init_func=init_zero_func)
     kvclient.map_shared_data(partition_book=gpb)
     time.sleep(kvclient.client_id + 1)
+    print("add...")
     kvclient.push(name='data_3',
                   id_tensor=id_tensor,
                   data_tensor=data_tensor)
