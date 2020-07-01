@@ -37,6 +37,7 @@ def shuffle_walks(walks):
     return walks[seeds]
 
 def sum_up_params(model):
+    """ Count the model parameters """
     n = []
     n.append(model.u_embeddings.weight.cpu().data.numel() * 2)
     n.append(model.lookup_table.cpu().numel())
