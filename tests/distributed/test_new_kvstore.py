@@ -244,7 +244,6 @@ def start_client(num_clients):
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # Register new push handler
-    kvclient.barrier()
     kvclient.init_data(name='data_3', 
                        shape=F.shape(data_2),
                        dtype=F.dtype(data_2), 
@@ -263,9 +262,7 @@ def start_client(num_clients):
     kvclient.barrier()
     res = kvclient.pull(name='data_3', id_tensor=id_tensor)
     data_tensor = data_tensor * num_clients
-    #assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
-    print("res: ")
-    print(res)
+    assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # clean up
     kvclient.barrier()
     dgl.distributed.shutdown_servers()

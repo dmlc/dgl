@@ -792,6 +792,7 @@ class KVClient(object):
         func : callable
             The function to be called.
         """
+        self.barrier()
         if self._client_id == 0:
             request = RegisterPushHandlerRequest(name, func)
             # send request to all the server nodes
@@ -824,6 +825,7 @@ class KVClient(object):
         func : callable
             The function to be called.
         """
+        self.barrier()
         if self._client_id == 0:
             request = RegisterPullHandlerRequest(name, func)
             # send request to all the server nodes
@@ -859,6 +861,7 @@ class KVClient(object):
         assert len(shape) > 0, 'shape cannot be empty'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         assert name not in self._data_name_list, 'data name: %s already exists.' % name
+        self.barrier()
         shape = list(shape)
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
@@ -917,6 +920,7 @@ class KVClient(object):
             Store the partition information
         """
         # Get shared data from server side
+        self.barrier()
         request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
