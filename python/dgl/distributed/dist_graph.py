@@ -13,6 +13,7 @@ from .partition import load_partition
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
+from . import rpc
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
@@ -500,14 +501,14 @@ class DistGraph:
         # it returns. There is no data locality any way, as long as the returned rank
         # is unique in the system.
         if self._g is None:
-            return self._client.client_id
+            return rpc.get_rank()
         else:
             # If DistGraph has a local partition, we should be careful about the rank
             # we return. We need to return a rank that node_split or edge_split can split
             # the workload with respect to data locality.
             num_client = rpc.get_num_client()
             num_client_per_part = num_client // self._gpb.num_partitions()
-            client_id_in_part = self._client.client_id % num_client_per_part
+            client_id_in_part = rpc.get_rank() % num_client_per_part
             return int(self._gpb.partid * num_client_per_part + client_id_in_part)
 
     def get_partition_book(self):
@@ -569,7 +570,7 @@ def _get_overlap(mask_arr, ids):
         masks = F.gather_row(mask_arr.tousertensor(), ids)
         return F.boolean_mask(ids, masks)
 
-def node_split(nodes, partition_book, rank):
+def node_split(nodes, partition_book, rank=None):
     ''' Split nodes and return a subset for the local rank.
 
     This function splits the input nodes based on the partition book and
@@ -603,6 +604,8 @@ def node_split(nodes, partition_book, rank):
     local_nids = partition_book.partid2nids(partition_book.partid)
     num_clients = rpc.get_num_client()
     num_client_per_part = num_clients // partition_book.num_partitions()
+    if rank is None:
+        rank = rpc.get_rank()
     client_id_in_part = rank  % num_client_per_part
     local_nids = _get_overlap(nodes, local_nids)
 
@@ -614,7 +617,7 @@ def node_split(nodes, partition_book, rank):
     else:
         return local_nids[(size * client_id_in_part):]
 
-def edge_split(edges, partition_book, rank):
+def edge_split(edges, partition_book, rank=None):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
@@ -649,6 +652,8 @@ def edge_split(edges, partition_book, rank):
     local_eids = partition_book.partid2eids(partition_book.partid)
     num_clients = rpc.get_num_client()
     num_client_per_part = num_clients // partition_book.num_partitions()
+    if rank is None:
+        rank = rpc.get_rank()
     client_id_in_part = rank  % num_client_per_part
     local_eids = _get_overlap(edges, local_eids)
 
