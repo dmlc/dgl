@@ -1131,7 +1131,7 @@ def disjoint_union(metagraph, graphs):
     HeteroGraphIndex
         Batched Heterograph.
     """
-    return _CAPI_DGLHeteroDisjointUnion(metagraph, graphs)
+    return _CAPI_DGLHeteroDisjointUnion_v2(metagraph, graphs)
 
 def disjoint_partition(graph, bnn_all_types, bne_all_types):
     """Partition the graph disjointly.
@@ -1152,7 +1152,7 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     """
     bnn_all_types = utils.toindex(list(itertools.chain.from_iterable(bnn_all_types)))
     bne_all_types = utils.toindex(list(itertools.chain.from_iterable(bne_all_types)))
-    return _CAPI_DGLHeteroDisjointPartitionBySizes(
+    return _CAPI_DGLHeteroDisjointPartitionBySizes_v2(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
 #################################################################

@@ -254,6 +254,8 @@ struct Add {
     return *lhs_off + *rhs_off;
   }
 };
+template <typename DType> constexpr bool Add<DType>::use_lhs;
+template <typename DType> constexpr bool Add<DType>::use_rhs;
 
 template <typename DType>
 struct Sub {
@@ -263,6 +265,8 @@ struct Sub {
     return *lhs_off - *rhs_off;
   }
 };
+template <typename DType> constexpr bool Sub<DType>::use_lhs;
+template <typename DType> constexpr bool Sub<DType>::use_rhs;
 
 template <typename DType>
 struct Mul {
@@ -272,6 +276,8 @@ struct Mul {
     return *lhs_off * *rhs_off;
   }
 };
+template <typename DType> constexpr bool Mul<DType>::use_lhs;
+template <typename DType> constexpr bool Mul<DType>::use_rhs;
 
 template <typename DType>
 struct Div {
@@ -281,6 +287,8 @@ struct Div {
     return *lhs_off / *rhs_off;
   }
 };
+template <typename DType> constexpr bool Div<DType>::use_lhs;
+template <typename DType> constexpr bool Div<DType>::use_rhs;
 
 template <typename DType>
 struct CopyLhs {
@@ -290,6 +298,8 @@ struct CopyLhs {
     return *lhs_off;
   }
 };
+template <typename DType> constexpr bool CopyLhs<DType>::use_lhs;
+template <typename DType> constexpr bool CopyLhs<DType>::use_rhs;
 
 template <typename DType>
 struct CopyRhs {
@@ -299,6 +309,8 @@ struct CopyRhs {
     return *rhs_off;
   }
 };
+template <typename DType> constexpr bool CopyRhs<DType>::use_lhs;
+template <typename DType> constexpr bool CopyRhs<DType>::use_rhs;
 
 //////////////////////////////// Reduce operators on CPU ////////////////////////////////
 template <typename DType>
@@ -309,6 +321,7 @@ struct Max {
     return accum < val;
   }
 };
+template <typename DType> constexpr DType Max<DType>::zero;
 
 template <typename DType>
 struct Min {
@@ -318,6 +331,7 @@ struct Min {
     return accum > val;
   }
 };
+template <typename DType> constexpr DType Min<DType>::zero;
 
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \

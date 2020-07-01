@@ -57,6 +57,11 @@ struct RPCContext {
   int32_t num_servers = 0;
 
   /*!
+   * \brief Total number of client.
+   */
+  int32_t num_clients = 0;
+
+  /*!
    * \brief Total number of server per machine.
    */
   int32_t num_servers_per_machine = 0;

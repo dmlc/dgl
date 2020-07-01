@@ -104,9 +104,11 @@ class RDFGraphDataset:
         If true, add reverse edge and reverse relations to the final graph.
     """
     def __init__(self, url, name,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
         download_dir = get_download_dir()
         zip_file_path = os.path.join(download_dir, '{}.zip'.format(name))
         self._dir = os.path.join(download_dir, name)
@@ -426,8 +428,45 @@ def load_strlist(filename):
             ret.append(line.strip())
         return ret
 
-class AIFB(RDFGraphDataset):
+class AIFBDataset(RDFGraphDataset):
     """AIFB dataset.
+     AIFB DataSet is a Semantic Web (RDF) dataset used as a benchmark in 
+     data mining.  It records the organizational structure of AIFB at the
+     University of Karlsruhe.
+
+    Statistics
+    ===
+    Nodes: 19717
+    Edges: 88651
+    Node Types: xxx
+    Edge Types: xxx
+    Target Category:
+    Number of Classes: xx
+    Label Split: Train: xx ,Valid: xx, Test: xx
+
+    Parameters
+    -----------
+    print_every: int
+        Log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Returns
+    ===
+    AIFBDataset object with three properties:
+        graph: A Heterogenous graph containing the 
+            graph structure, node features and labels.
+        predict_category: The category name to run the node classification
+            prediction.
+        num_of_class: number of publication categories 
+            for the classification task.
     
     Examples
     --------
@@ -441,15 +480,19 @@ class AIFB(RDFGraphDataset):
     relation_prefix = 'http://swrc.ontoware.org/'
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
         url = _get_dgl_url('dataset/rdf/aifb-hetero.zip')
         name = 'aifb-hetero'
         super(AIFB, self).__init__(url, name,
-                                   force_reload=force_reload,
                                    print_every=print_every,
-                                   insert_reverse=insert_reverse)
+                                   insert_reverse=insert_reverse,
+                                   raw_dir=raw_dir,
+                                   force_reload=force_reload,
+                                   verbose=verbose)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -486,8 +529,45 @@ class AIFB(RDFGraphDataset):
     def predict_category(self):
         return 'Personen'
 
-class MUTAG(RDFGraphDataset):
+AIBF = AIFBDataset
+
+
+class MUTAGDataset(RDFGraphDataset):
     """MUTAG dataset.
+
+    Statistics
+    ===
+    Nodes: 19717
+    Edges: 88651
+    Node Types: xxx
+    Edge Types: xxx
+    Target Category:
+    Number of Classes: 
+    Label Split: Train: xx ,Valid: xx, Test: xx
+
+    Parameters
+    -----------
+    print_every: int
+        Log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Returns
+    ===
+    MUTAGDataset object with three properties:
+        graph: A Heterogenous graph containing the 
+            graph structure, node features and labels.
+        predict_category: The category name to run the node classification
+            prediction.
+        num_of_class: number of publication categories 
+            for the classification task.
     
     Examples
     --------
@@ -507,15 +587,19 @@ class MUTAG(RDFGraphDataset):
     relation_prefix = entity_prefix
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
         url = _get_dgl_url('dataset/rdf/mutag-hetero.zip')
         name = 'mutag-hetero'
         super(MUTAG, self).__init__(url, name,
-                                   force_reload=force_reload,
                                    print_every=print_every,
-                                   insert_reverse=insert_reverse)
+                                   insert_reverse=insert_reverse,
+                                   raw_dir=raw_dir,
+                                   force_reload=force_reload,
+                                   verbose=verbose)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -569,7 +653,9 @@ class MUTAG(RDFGraphDataset):
     def predict_category(self):
         return 'd'
 
-class BGS(RDFGraphDataset):
+MUTAG = MUTAGDataset
+
+class BGSDataset(RDFGraphDataset):
     """BGS dataset.
 
     BGS namespace convention:
@@ -578,6 +664,40 @@ class BGS(RDFGraphDataset):
     We ignored all literal nodes and the relations connecting them in the
     output graph. We also ignored the relation used to mark whether a
     term is CURRENT or DEPRECATED.
+
+    Statistics
+    ===
+    Nodes: xxx
+    Edges: xxx
+    Node Types: xxx
+    Edge Types: xxx
+    Target Category:
+    Number of Classes: xx
+    Label Split: Train: xx ,Valid: xx, Test: xx
+
+    Parameters
+    -----------
+    print_every: int
+        Log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Returns
+    ===
+    BGSDataset object with three properties:
+        graph: A Heterogenous graph containing the 
+            graph structure, node features and labels.
+        predict_category: The category name to run the node classification
+            prediction.
+        num_of_class: number of publication categories 
+            for the classification task.
 
     Examples
     --------
@@ -591,9 +711,11 @@ class BGS(RDFGraphDataset):
     relation_prefix = 'http://data.bgs.ac.uk/ref'
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
         url = _get_dgl_url('dataset/rdf/bgs-hetero.zip')
         name = 'bgs-hetero'
         super(BGS, self).__init__(url, name,
@@ -648,7 +770,10 @@ class BGS(RDFGraphDataset):
     def predict_category(self):
         return 'Lexicon/NamedRockUnit'
 
-class AM(RDFGraphDataset):
+BGS = BGSDataset
+
+
+class AMDataset(RDFGraphDataset):
     """AM dataset.
 
     Namespace convention:
@@ -657,6 +782,40 @@ class AM(RDFGraphDataset):
 
     We ignored all literal nodes and the relations connecting them in the
     output graph.
+
+    Statistics
+    ===
+    Nodes: xxx
+    Edges: xxx
+    Node Types: xxx
+    Edge Types: xxx
+    Target Category:
+    Number of Classes: 
+    Label Split: Train: xx ,Valid: xx, Test: xx
+
+    Parameters
+    -----------
+    print_every: int
+        Log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Returns
+    ===
+    AMDataset object with three properties:
+        graph: A Heterogenous graph containing the 
+            graph structure, node features and labels.
+        predict_category: The category name to run the node classification
+            prediction.
+        num_of_class: number of publication categories 
+            for the classification task.
 
     Examples
     --------
@@ -670,9 +829,11 @@ class AM(RDFGraphDataset):
     relation_prefix = entity_prefix
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
         url = _get_dgl_url('dataset/rdf/am-hetero.zip')
         name = 'am-hetero'
         super(AM, self).__init__(url, name,
@@ -725,6 +886,8 @@ class AM(RDFGraphDataset):
     @property
     def predict_category(self):
         return 'proxy'
+
+AM = AMDataset
 
 if __name__ == '__main__':
     AIFB()
