@@ -4,9 +4,8 @@ import numpy as np
 import os
 
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import save_graphs, load_graphs, _get_dgl_url
+from .utils import save_graphs, load_graphs, _get_dgl_url, deprecate_property, deprecate_class
 from ..graph import DGLGraph
-from ..base import dgl_warning
 
 __all__ = ["AmazonCoBuyComputerDataset", "AmazonCoBuyPhotoDataset", "CoauthorPhysicsDataset", "CoauthorCSDataset",
            "CoraFullDataset", "AmazonCoBuy", "Coauthor", "CoraFull"]
@@ -110,7 +109,7 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 
     @property
     def data(self):
-        dgl_warning('Attribute .data is deprecated, use .graph instead.', DeprecationWarning, stacklevel=2)
+        deprecate_property('.data', '.graph')
         return self._data
 
     def __getitem__(self, idx):
@@ -410,28 +409,27 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
 
 class CoraFull(CoraFullDataset):
     def __init__(self, **kwargs):
-        dgl_warning('CoraFull is deprecated, use CoraFullDataset instead.',
-                    DeprecationWarning, stacklevel=2)
+        deprecate_class('CoraFull', 'CoraFullDataset')
         super(CoraFull, self).__init__(**kwargs)
 
 
 def AmazonCoBuy(name):
-    dgl_warning('AmazonCoBuy is deprecated, use AmazonCoBuyComputerDataset or AmazonCoBuyPhotoDataset instead.',
-                DeprecationWarning, stacklevel=2)
     if name == 'computers':
+        deprecate_class('AmazonCoBuy', 'AmazonCoBuyComputerDataset')
         return AmazonCoBuyComputerDataset()
     elif name == 'photo':
+        deprecate_class('AmazonCoBuy', 'AmazonCoBuyPhotoDataset')
         return AmazonCoBuyPhotoDataset()
     else:
         raise ValueError('Dataset name should be "computers" or "photo".')
 
 
 def Coauthor(name):
-    dgl_warning('Coauthor is deprecated, use CoauthorCSDataset or CoauthorPhysicsDataset instead.',
-                DeprecationWarning, stacklevel=2)
     if name == 'cs':
+        deprecate_class('Coauthor', 'CoauthorCSDataset')
         return CoauthorCSDataset()
     elif name == 'physics':
+        deprecate_class('Coauthor', 'CoauthorPhysicsDataset')
         return CoauthorPhysicsDataset()
     else:
         raise ValueError('Dataset name should be "cs" or "physics".')
