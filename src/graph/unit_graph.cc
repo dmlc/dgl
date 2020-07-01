@@ -79,7 +79,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   COO() {};
 
-  bool defined() const { return adj_.num_rows != 0 || adj_.num_cols != 0; }
+  bool defined() const { return (adj_.num_rows != 0) || (adj_.num_cols != 0); }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -450,7 +450,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   CSR() {};
 
-  bool defined() const { return adj_.num_rows != 0 || adj_.num_cols != 0; }
+  bool defined() const { return (adj_.num_rows != 0) || (adj_.num_cols != 0); }
 
   inline dgl_type_t SrcType() const {
     return 0;
