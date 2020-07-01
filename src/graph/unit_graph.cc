@@ -79,7 +79,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   COO() {};
 
-  bool defined() const { return adj_.num_rows != 0; }
+  bool defined() const { return adj_.num_rows != 0 || adj_.num_cols != 0; }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -450,7 +450,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   CSR() {};
 
-  bool defined() const { return adj_.num_rows != 0; }
+  bool defined() const { return adj_.num_rows != 0 || adj_.num_cols != 0; }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -1332,7 +1332,7 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       else
         ret = std::make_shared<COO>(meta_graph(), newadj);
     } else {
-      CHECK(out_csr_) << "Both CSR are missing.";
+      CHECK(out_csr_->defined()) << "Both CSR are missing.";
       const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
 
       if (inplace)
