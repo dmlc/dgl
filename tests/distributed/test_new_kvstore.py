@@ -92,6 +92,7 @@ def udf_push(target, name, id_tensor, data_tensor):
 
 def add_push(target, name, id_tensor, data_tensor):
     target[name][id_tensor] += data_tensor
+    print(target[name])
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_partition_policy():
