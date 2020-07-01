@@ -37,12 +37,13 @@ class LegacyTUDataset(DGLBuiltinDataset):
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
     def __init__(self, name, use_pandas=False,
-                 hidden_size=10, max_allow_node=None, **kwargs):
+                 hidden_size=10, max_allow_node=None,
+                 raw_dir=None, force_reload=False, verbose=False):
 
         url = self._url.format(name)
         self.hidden_size = hidden_size
         self.max_allow_node = max_allow_node
-        super(LegacyTUDataset, self).__init__(name=name, url=url, **kwargs)
+        super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
 
     def process(self, root_path):
         self.data_mode = None
@@ -143,8 +144,9 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.num_labels = info_dict['num_labels']
 
     def has_cache(self):
-        file_path = os.path.join(self.save_path, 'legacy_tu_{}.bin'.format(self.name))
-        if os.path.exists(file_path):
+        graph_path = os.path.join(self.save_path, 'legacy_tu_{}.bin'.format(self.name))
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        if os.path.exists(file_path) and os.path.exists(info_path):
             return True
         return False
 
@@ -187,7 +189,6 @@ class LegacyTUDataset(DGLBuiltinDataset):
             self.num_labels,\
             self.max_num_node
 
-
 class TUDataset(DGLBuiltinDataset):
     r"""
     TUDataset contains lots of graph kernel datasets for graph classification.
@@ -203,9 +204,11 @@ class TUDataset(DGLBuiltinDataset):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False):
         url = self._url.format(name)
-        super(TUDataset, self).__init__(name=name, url=url, *kwargs)
+        super(TUDataset, self).__init__(name=name, url=url,
+                                        raw_dir=raw_dir, force_reload=force_reload,
+                                        verbose=verbose)
     
     def process(self, root_path):
         DS_edge_list = self._idx_from_zero(
@@ -273,7 +276,8 @@ class TUDataset(DGLBuiltinDataset):
 
     def has_cache(self):
         file_path = os.path.join(self.save_path, 'tu_{}.bin'.format(self.name))
-        if os.path.exists(file_path):
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        if os.path.exists(file_path) and os.path.exists(info_path):
             return True
         return False
 
