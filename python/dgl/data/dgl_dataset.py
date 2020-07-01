@@ -10,9 +10,7 @@ from ..utils import retry_method_with_fix
 class DGLDataset(object):
     r"""The Basic DGL Dataset for creating graph datasets.
     This class defines a basic template class for DGL Dataset.
-    TODO(xiangsx):
-        Suport to_pytorch_dataset, to_mxnet_dataset, to_tensorflow_dataset
-        so DGL Dataset can easily converted to Framework specific Dataset
+
     Parameters
     name : str
         Name of the dataset
@@ -43,8 +41,6 @@ class DGLDataset(object):
 
         if save_dir is None:
             self._save_dir = self._raw_dir
-        else:
-            self._save_dir = save_dir
 
         self._load()
 
@@ -94,7 +90,7 @@ class DGLDataset(object):
         self.download()
 
     def _load(self):
-        r"""Entry point from __init__ to load the dataset. 
+        r"""Entry point from __init__ to load the dataset.
             if the cache exists:
                 Load the dataset from saved dgl graph and information files.
                 If loadin process fails, re-download and process the dataset.
@@ -123,7 +119,7 @@ class DGLDataset(object):
             self.save()
             if self.verbose:
                 print('Done saving data into cached files.')
-    
+
     @property
     def url(self):
         r"""Get url to download the raw dataset
@@ -184,20 +180,25 @@ class DGLBuiltinDataset(DGLDataset):
         Name of the dataset
     url : str
         Url to download the raw dataset
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose: bool
+        Whether to print out progress information. Default: False.
     """
-    def __init__(self, name, url, force_reload=False):
+    def __init__(self, name, url, raw_dir=None, force_reload=False, verbose=False):
         super(DGLBuiltinDataset, self).__init__(name,
                                                 url=url,
-                                                raw_dir=None,
+                                                raw_dir=raw_dir,
                                                 save_dir=None,
-                                                force_reload=force_reload)
+                                                force_reload=force_reload,
+                                                verbose=verbose)
 
     def download(self):
         r""" Automatically download data and extract it.
         """
-        print(self.url)
         zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
         download(self.url, path=zip_file_path)
         extract_archive(zip_file_path, self.raw_path)

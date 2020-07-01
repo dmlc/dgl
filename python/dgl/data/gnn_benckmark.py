@@ -26,15 +26,20 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 
     Reference: https://github.com/shchur/gnn-benchmark#datasets
     """
-    def __init__(self, name, force_reload=False):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False):
         _url = _get_dgl_url('dataset/' + name + '.zip')
-        super(GNNBenchmarkDataset, self).__init__(name=name, url=_url, force_reload=force_reload)
+        super(GNNBenchmarkDataset, self).__init__(name=name,
+                                                  url=_url,
+                                                  raw_dir=raw_dir,
+                                                  force_reload=force_reload,
+                                                  verbose=verbose)
 
     def process(self, root_path):
         npz_path = os.path.join(root_path, self.name + '.npz')
         g = self._load_npz(npz_path)
-        self.graph = g
-        self.data = [g]
+        self._graph = g
+        self._data = [g]
+        self._print_info()
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
@@ -49,8 +54,16 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
     def load(self):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
         graphs, _ = load_graphs(graph_path)
-        self.graph = graphs[0]
-        self.data = [graphs[0]]
+        self._graph = graphs[0]
+        self._data = [graphs[0]]
+        self._print_info()
+
+    def _print_info(self):
+        if self.verbose:
+            print('  NumNodes: {}'.format(self.graph.number_of_nodes()))
+            print('  NumEdges: {}'.format(self.graph.number_of_edges()))
+            print('  NumFeats: {}'.format(self.graph.ndata['feat'].shape[-1]))
+            print('  NumbClasses: {}'.format(self.num_classes))
 
     def _load_npz(self, file_name):
         with np.load(file_name, allow_pickle=True) as loader:
@@ -91,6 +104,15 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
         """Number of classes."""
         raise NotImplementedError
 
+    @property
+    def graph(self):
+        return self._graph
+
+    @property
+    def data(self):
+        dgl_warning('Attribute .data is deprecated, use .graph instead.', DeprecationWarning, stacklevel=2)
+        return self._data
+
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
         return self.graph
@@ -120,8 +142,13 @@ class CoraFullDataset(GNNBenchmarkDataset):
 
     Parameters
     ----------
-    force_reload: bool
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
 
     Returns
     -------
@@ -139,8 +166,11 @@ class CoraFullDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, force_reload=False):
-        super(CoraFullDataset, self).__init__(name="cora_full", force_reload=force_reload)
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+        super(CoraFullDataset, self).__init__(name="cora_full",
+                                              raw_dir=raw_dir,
+                                              force_reload=force_reload,
+                                              verbose=verbose)
 
     @property
     def num_classes(self):
@@ -170,8 +200,13 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
 
     Parameters
     ----------
-    force_reload: bool
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
 
     Returns
     -------
@@ -189,8 +224,11 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, force_reload=False):
-        super(CoauthorCSDataset, self).__init__(name='coauthor_cs', force_reload=force_reload)
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+        super(CoauthorCSDataset, self).__init__(name='coauthor_cs',
+                                                raw_dir=raw_dir,
+                                                force_reload=force_reload,
+                                                verbose=verbose)
 
     @property
     def num_classes(self):
@@ -220,8 +258,13 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
 
     Parameters
     ----------
-    force_reload: bool
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
 
     Returns
     -------
@@ -239,8 +282,11 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, force_reload=False):
-        super(CoauthorPhysicsDataset, self).__init__(name='coauthor_physics', force_reload=force_reload)
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+        super(CoauthorPhysicsDataset, self).__init__(name='coauthor_physics',
+                                                     raw_dir=raw_dir,
+                                                     force_reload=force_reload,
+                                                     verbose=verbose)
 
     @property
     def num_classes(self):
@@ -269,8 +315,13 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
 
     Parameters
     ----------
-    force_reload: bool
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
 
     Returns
     -------
@@ -288,8 +339,11 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, force_reload=False):
-        super(AmazonCoBuyComputerDataset, self).__init__(name='amazon_co_buy_computer', force_reload=force_reload)
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+        super(AmazonCoBuyComputerDataset, self).__init__(name='amazon_co_buy_computer',
+                                                         raw_dir=raw_dir,
+                                                         force_reload=force_reload,
+                                                         verbose=verbose)
 
     @property
     def num_classes(self):
@@ -318,8 +372,13 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
 
     Parameters
     ----------
-    force_reload: bool
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
         Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
 
     Returns
     -------
@@ -337,8 +396,11 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, force_reload=False):
-        super(AmazonCoBuyPhotoDataset, self).__init__(name='amazon_co_buy_photo', force_reload=force_reload)
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+        super(AmazonCoBuyPhotoDataset, self).__init__(name='amazon_co_buy_photo',
+                                                      raw_dir=raw_dir,
+                                                      force_reload=force_reload,
+                                                      verbose=verbose)
 
     @property
     def num_classes(self):

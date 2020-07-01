@@ -51,13 +51,22 @@ class KarateClubDataset(DGLDataset):
             [kc_graph.nodes[i]['club'] != 'Mr. Hi' for i in kc_graph.nodes]).astype(np.int64)
         g = DGLGraph(kc_graph)
         g.ndata['label'] = self.label
-        self.graph = g
-        self.data = [g]
+        self._graph = g
+        self._data = [g]
 
     @property
     def num_classes(self):
         """Number of classes."""
         return 2
+
+    @property
+    def graph(self):
+        return self._graph
+
+    @property
+    def data(self):
+        dgl_warning('Attribute .data is deprecated, use .graph instead.', DeprecationWarning, stacklevel=2)
+        return self._data
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
