@@ -4781,8 +4781,8 @@ def find_src_dst_ntypes(ntypes, metagraph):
         return None
     else:
         src, dst = ret
-        srctypes = {ntypes[tid.data] : tid.data for tid in src}
-        dsttypes = {ntypes[tid.data] : tid.data for tid in dst}
+        srctypes = {ntypes[tid] : tid for tid in src}
+        dsttypes = {ntypes[tid] : tid for tid in dst}
         return srctypes, dsttypes
 
 def infer_ntype_from_dict(graph, etype_dict):

@@ -153,8 +153,8 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         traces, types = _CAPI_DGLSamplingRandomWalkWithRestart(
             gidx, nodes, metapath, p_nd, restart_prob)
 
-    traces = F.zerocopy_from_dgl_ndarray(traces.data)
-    types = F.zerocopy_from_dgl_ndarray(types.data)
+    traces = F.zerocopy_from_dgl_ndarray(traces)
+    types = F.zerocopy_from_dgl_ndarray(types)
     return traces, types
 
 def pack_traces(traces, types):
@@ -221,10 +221,10 @@ def pack_traces(traces, types):
 
     concat_vids, concat_types, lengths, offsets = _CAPI_DGLSamplingPackTraces(traces, types)
 
-    concat_vids = F.zerocopy_from_dgl_ndarray(concat_vids.data)
-    concat_types = F.zerocopy_from_dgl_ndarray(concat_types.data)
-    lengths = F.zerocopy_from_dgl_ndarray(lengths.data)
-    offsets = F.zerocopy_from_dgl_ndarray(offsets.data)
+    concat_vids = F.zerocopy_from_dgl_ndarray(concat_vids)
+    concat_types = F.zerocopy_from_dgl_ndarray(concat_types)
+    lengths = F.zerocopy_from_dgl_ndarray(lengths)
+    offsets = F.zerocopy_from_dgl_ndarray(offsets)
 
     return concat_vids, concat_types, lengths, offsets
 
