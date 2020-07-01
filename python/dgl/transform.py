@@ -906,7 +906,7 @@ def compact_graphs(graphs, always_preserve=None):
     # Compact and construct heterographs
     new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs(
         [g._graph for g in graphs], always_preserve_nd)
-    induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
+    induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes) for nodes in induced_nodes]
 
     new_graphs = [
         DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
@@ -1063,7 +1063,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     assert new_graph.is_unibipartite  # sanity check
 
     for i, ntype in enumerate(g.ntypes):
-        new_graph.srcnodes[ntype].data[NID] = F.zerocopy_from_dgl_ndarray(src_nodes_nd[i].data)
+        new_graph.srcnodes[ntype].data[NID] = F.zerocopy_from_dgl_ndarray(src_nodes_nd[i])
         if ntype in dst_nodes:
             new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
         else:
@@ -1071,7 +1071,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
             new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=g.idtype)
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
-        induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
+        induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i])
         utype, etype, vtype = canonical_etype
         new_canonical_etype = (utype, etype, vtype)
         new_graph.edges[new_canonical_etype].data[EID] = induced_edges
@@ -1114,7 +1114,7 @@ def remove_edges(g, edge_ids):
 
     new_graph = DGLHeteroGraph(new_graph_index, g.ntypes, g.etypes)
     for i, canonical_etype in enumerate(g.canonical_etypes):
-        data = induced_eids_nd[i].data
+        data = induced_eids_nd[i]
         if len(data) == 0:
             # Empty means that either
             # (1) no edges are removed and edges are not shuffled.
@@ -1256,8 +1256,8 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
     """
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
     simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
-    counts = [F.zerocopy_from_dgl_ndarray(count.data) for count in counts]
-    edge_maps = [F.zerocopy_from_dgl_ndarray(edge_map.data) for edge_map in edge_maps]
+    counts = [F.zerocopy_from_dgl_ndarray(count) for count in counts]
+    edge_maps = [F.zerocopy_from_dgl_ndarray(edge_map) for edge_map in edge_maps]
 
     if return_counts is not None:
         for count, canonical_etype in zip(counts, g.canonical_etypes):
