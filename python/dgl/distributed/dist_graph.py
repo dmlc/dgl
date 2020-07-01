@@ -569,6 +569,25 @@ def _get_overlap(mask_arr, ids):
         masks = F.gather_row(mask_arr.tousertensor(), ids)
         return F.boolean_mask(ids, masks)
 
+def _split_local(partition_book, rank, elements, local_eles):
+    ''' Split the input element list with respect to data locality.
+    '''
+    num_clients = rpc.get_num_client()
+    num_client_per_part = num_clients // partition_book.num_partitions()
+    if rank is None:
+        rank = rpc.get_rank()
+    # all ranks of the clients in the same machine are in a contiguous range.
+    client_id_in_part = rank  % num_client_per_part
+    local_eles = _get_overlap(elements, local_eles)
+
+    # get a subset for the local client.
+    size = len(local_eles) // num_client_per_part
+    # if this isn't the last client in the partition.
+    if client_id_in_part + 1 < num_client_per_part:
+        return local_eles[(size * client_id_in_part):(size * (client_id_in_part + 1))]
+    else:
+        return local_eles[(size * client_id_in_part):]
+
 def node_split(nodes, partition_book, rank=None):
     ''' Split nodes and return a subset for the local rank.
 
@@ -601,21 +620,7 @@ def node_split(nodes, partition_book, rank=None):
             'The length of boolean mask vector should be the number of nodes in the graph.'
     # Get all nodes that belong to the rank.
     local_nids = partition_book.partid2nids(partition_book.partid)
-    num_clients = rpc.get_num_client()
-    num_client_per_part = num_clients // partition_book.num_partitions()
-    if rank is None:
-        rank = rpc.get_rank()
-    # all ranks of the clients in the same machine are in a contiguous range.
-    client_id_in_part = rank  % num_client_per_part
-    local_nids = _get_overlap(nodes, local_nids)
-
-    # get a subset for the local client.
-    size = len(local_nids) // num_client_per_part
-    # if this isn't the last client in the partition.
-    if client_id_in_part + 1 < num_client_per_part:
-        return local_nids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
-    else:
-        return local_nids[(size * client_id_in_part):]
+    return _split_local(partition_book, rank, nodes, local_nids)
 
 def edge_split(edges, partition_book, rank=None):
     ''' Split edges and return a subset for the local rank.
@@ -650,18 +655,4 @@ def edge_split(edges, partition_book, rank=None):
 
     # Get all nodes that belong to the rank.
     local_eids = partition_book.partid2eids(partition_book.partid)
-    num_clients = rpc.get_num_client()
-    num_client_per_part = num_clients // partition_book.num_partitions()
-    if rank is None:
-        rank = rpc.get_rank()
-    # all ranks of the clients in the same machine are in a contiguous range.
-    client_id_in_part = rank  % num_client_per_part
-    local_eids = _get_overlap(edges, local_eids)
-
-    # get a subset for the local client.
-    size = len(local_eids) // num_client_per_part
-    # if this isn't the last client in the partition.
-    if client_id_in_part + 1 < num_client_per_part:
-        return local_eids[(size * client_id_in_part):(size * (client_id_in_part + 1))]
-    else:
-        return local_eids[(size * client_id_in_part):]
+    return _split_local(partition_book, rank, edges, local_eids)
