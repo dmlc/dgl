@@ -1174,9 +1174,9 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->AsNumBits(bits))) : nullptr;
-    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->AsNumBits(bits))) : nullptr;
-    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->AsNumBits(bits))) : nullptr;
+    CSRPtr new_incsr = (bg->in_csr_->defined())? CSRPtr(new CSR(bg->in_csr_->AsNumBits(bits))) : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_->defined())? CSRPtr(new CSR(bg->out_csr_->AsNumBits(bits))) : nullptr;
+    COOPtr new_coo = (bg->coo_->defined())? COOPtr(new COO(bg->coo_->AsNumBits(bits))) : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
@@ -1188,9 +1188,9 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
-    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
-    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_incsr = (bg->in_csr_->defined())? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_->defined())? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
+    COOPtr new_coo = (bg->coo_->defined())? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
