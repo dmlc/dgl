@@ -88,11 +88,12 @@ def init_zero_func(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
 def udf_push(target, name, id_tensor, data_tensor):
-    target[name][id_tensor] = data_tensor * data_tensor 
+    target[name][id_tensor] = data_tensor * data_tensor
+    print("udf_push")
 
 def add_push(target, name, id_tensor, data_tensor):
     target[name][id_tensor] += data_tensor
-    print(target[name])
+    print("add_push")
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_partition_policy():
