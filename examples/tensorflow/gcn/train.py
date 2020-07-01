@@ -20,21 +20,23 @@ def evaluate(model, features, labels, mask):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
+    g = data.g
 
     if args.gpu < 0:
         device = "/cpu:0"
     else:
         device = "/gpu:{}".format(args.gpu)
+        g = g.to(device)
 
     with tf.device(device):
-        features = tf.convert_to_tensor(data.features, dtype=tf.float32)
-        labels = tf.convert_to_tensor(data.labels, dtype=tf.int64)
-        train_mask = tf.convert_to_tensor(data.train_mask, dtype=tf.bool)
-        val_mask = tf.convert_to_tensor(data.val_mask, dtype=tf.bool)
-        test_mask = tf.convert_to_tensor(data.test_mask, dtype=tf.bool)
-        in_feats = features.shape[1]
+        in_feats = g.ndata['feat'].shape[1]
         n_classes = data.num_labels
-        n_edges = data.graph.number_of_edges()
+        n_edges = g.number_of_edges()
+        train_mask = g.ndata['train_mask']
+        val_mask = g.ndata['val_mask']
+        test_mask = g.ndata['test_mask']
+        labels = g.ndata['label']
+        features = g.ndata['feat']
         print("""----Data statistics------'
         #Edges %d
         #Classes %d
@@ -46,12 +48,11 @@ def main(args):
                val_mask.numpy().sum(),
                test_mask.numpy().sum()))
 
-        # graph preprocess and calculate normalization factor
-        g = data.graph
+        # add self loop
         if args.self_loop:
-            g.remove_edges_from(nx.selfloop_edges(g))
-            g.add_edges_from(zip(g.nodes(), g.nodes()))
-        g = DGLGraph(g)
+            _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+            g.remove_edges(self_e)
+            g.add_edges(g.nodes(), g.nodes())
         n_edges = g.number_of_edges()
         # normalization
         degs = tf.cast(tf.identity(g.in_degrees()), dtype=tf.float32)
