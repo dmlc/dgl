@@ -10,7 +10,7 @@
 #include "macro.cuh"
 #include "atomic.cuh"
 #include "functor.cuh"
-#include "../../cuda_utils.h"
+#include "./utils.h"
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {

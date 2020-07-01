@@ -3,6 +3,7 @@ server and clients."""
 import abc
 import pickle
 import random
+import numpy as np
 
 from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
@@ -14,7 +15,8 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
-'send_request_to_machine', 'remote_call_to_machine', 'fast_pull']
+'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
+'get_num_client', 'set_num_client']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
@@ -221,6 +223,16 @@ def get_num_server():
     """Get the total number of server.
     """
     return _CAPI_DGLRPCGetNumServer()
+
+def set_num_client(num_client):
+    """Set the total number of client.
+    """
+    _CAPI_DGLRPCSetNumClient(int(num_client))
+
+def get_num_client():
+    """Get the total number of client.
+    """
+    return _CAPI_DGLRPCGetNumClient()
 
 def set_num_server_per_machine(num_server):
     """Set the total number of server per machine
@@ -731,6 +743,81 @@ def remote_call(target_and_requests, timeout=0):
         all_res[msgseq2pos[msg.msg_seq]] = res
     return all_res
 
+def send_requests_to_machine(target_and_requests):
+    """ Send requests to the remote machines.
+
+    This operation isn't block. It returns immediately once it sends all requests.
+
+    Parameters
+    ----------
+    target_and_requests : list[(int, Request)]
+        A list of requests and the machine they should be sent to.
+    timeout : int, optional
+        The timeout value in milliseconds. If zero, wait indefinitely.
+
+    Returns
+    -------
+    msgseq2pos : dict
+        map the message sequence number to its position in the input list.
+    """
+    msgseq2pos = {}
+    for pos, (target, request) in enumerate(target_and_requests):
+        # send request
+        service_id = request.service_id
+        msg_seq = incr_msg_seq()
+        client_id = get_rank()
+        server_id = target
+        data, tensors = serialize_to_payload(request)
+        msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
+        send_rpc_message(msg, server_id)
+        # check if has response
+        res_cls = get_service_property(service_id)[1]
+        if res_cls is not None:
+            msgseq2pos[msg_seq] = pos
+    return msgseq2pos
+
+def recv_responses(msgseq2pos, timeout=0):
+    """ Receive responses
+
+    It returns the responses in the same order as the requests. The order of requests
+    are stored in msgseq2pos.
+
+    The operation is blocking -- it returns when it receives all responses
+    or it times out.
+
+    Parameters
+    ----------
+    msgseq2pos : dict
+        map the message sequence number to its position in the input list.
+    timeout : int, optional
+        The timeout value in milliseconds. If zero, wait indefinitely.
+
+    Returns
+    -------
+    list[Response]
+        Responses for each target-request pair. If the request does not have
+        response, None is placed.
+    """
+    myrank = get_rank()
+    size = np.max(list(msgseq2pos.values())) + 1
+    all_res = [None] * size
+    num_res = len(msgseq2pos)
+    while num_res != 0:
+        # recv response
+        msg = recv_rpc_message(timeout)
+        num_res -= 1
+        _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
+        if res_cls is None:
+            raise DGLError('Got response message from service ID {}, '
+                           'but no response class is registered.'.format(msg.service_id))
+        res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
+        if msg.client_id != myrank:
+            raise DGLError('Got reponse of request sent by client {}, '
+                           'different from my rank {}!'.format(msg.client_id, myrank))
+        # set response
+        all_res[msgseq2pos[msg.msg_seq]] = res
+    return all_res
+
 def remote_call_to_machine(target_and_requests, timeout=0):
     """Invoke registered services on remote machine
     (which will ramdom select a server to process the request) and collect responses.
@@ -759,39 +846,8 @@ def remote_call_to_machine(target_and_requests, timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     # TODO(chao): handle timeout
-    all_res = [None] * len(target_and_requests)
-    msgseq2pos = {}
-    num_res = 0
-    myrank = get_rank()
-    for pos, (target, request) in enumerate(target_and_requests):
-        # send request
-        service_id = request.service_id
-        msg_seq = incr_msg_seq()
-        client_id = get_rank()
-        server_id = target
-        data, tensors = serialize_to_payload(request)
-        msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
-        send_rpc_message(msg, server_id)
-        # check if has response
-        res_cls = get_service_property(service_id)[1]
-        if res_cls is not None:
-            num_res += 1
-            msgseq2pos[msg_seq] = pos
-    while num_res != 0:
-        # recv response
-        msg = recv_rpc_message(timeout)
-        num_res -= 1
-        _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
-        if res_cls is None:
-            raise DGLError('Got response message from service ID {}, '
-                           'but no response class is registered.'.format(msg.service_id))
-        res = deserialize_from_payload(res_cls, msg.data, msg.tensors)
-        if msg.client_id != myrank:
-            raise DGLError('Got reponse of request sent by client {}, '
-                           'different from my rank {}!'.format(msg.client_id, myrank))
-        # set response
-        all_res[msgseq2pos[msg.msg_seq]] = res
-    return all_res
+    msgseq2pos = send_requests_to_machine(target_and_requests)
+    return recv_responses(msgseq2pos, timeout)
 
 def send_rpc_message(msg, target):
     """Send one message to the target server.
@@ -971,5 +1027,45 @@ class ShutDownRequest(Request):
         assert self.client_id == 0
         finalize_server()
         return 'exit'
+
+GET_NUM_CLIENT = 22453
+
+class GetNumberClientsResponse(Response):
+    """This reponse will send total number of clients.
+
+    Parameters
+    ----------
+    num_client : int
+        total number of clients
+    """
+    def __init__(self, num_client):
+        self.num_client = num_client
+
+    def __getstate__(self):
+        return self.num_client
+
+    def __setstate__(self, state):
+        self.num_client = state
+
+class GetNumberClientsRequest(Request):
+    """Client send this request to get the total number of client.
+
+    Parameters
+    ----------
+    client_id : int
+        client's ID
+    """
+    def __init__(self, client_id):
+        self.client_id = client_id
+
+    def __getstate__(self):
+        return self.client_id
+
+    def __setstate__(self, state):
+        self.client_id = state
+
+    def process_request(self, server_state):
+        res = GetNumberClientsResponse(get_num_client())
+        return res
 
 _init_api("dgl.distributed.rpc")

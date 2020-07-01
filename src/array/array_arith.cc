@@ -3,8 +3,8 @@
  * \file array/array_aritch.cc
  * \brief DGL array arithmetic operations
  */
-#include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/container.h>
 #include "../c_api_common.h"
 #include "./array_op.h"

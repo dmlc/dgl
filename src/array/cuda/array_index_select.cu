@@ -5,7 +5,7 @@
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
-#include "../../cuda_utils.h"
+#include "./utils.h"
 
 namespace dgl {
 using runtime::NDArray;
@@ -50,7 +50,7 @@ template NDArray IndexSelect<kDLGPU, double, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLGPU, double, int64_t>(NDArray, IdArray);
 
 template <DLDeviceType XPU, typename DType>
-DType IndexSelect(NDArray array, uint64_t index) {
+DType IndexSelect(NDArray array, int64_t index) {
   auto device = runtime::DeviceAPI::Get(array->ctx);
   DType ret = 0;
   device->CopyDataFromTo(
@@ -60,12 +60,12 @@ DType IndexSelect(NDArray array, uint64_t index) {
   return ret;
 }
 
-template int32_t IndexSelect<kDLGPU, int32_t>(NDArray array, uint64_t index);
-template int64_t IndexSelect<kDLGPU, int64_t>(NDArray array, uint64_t index);
-template uint32_t IndexSelect<kDLGPU, uint32_t>(NDArray array, uint64_t index);
-template uint64_t IndexSelect<kDLGPU, uint64_t>(NDArray array, uint64_t index);
-template float IndexSelect<kDLGPU, float>(NDArray array, uint64_t index);
-template double IndexSelect<kDLGPU, double>(NDArray array, uint64_t index);
+template int32_t IndexSelect<kDLGPU, int32_t>(NDArray array, int64_t index);
+template int64_t IndexSelect<kDLGPU, int64_t>(NDArray array, int64_t index);
+template uint32_t IndexSelect<kDLGPU, uint32_t>(NDArray array, int64_t index);
+template uint64_t IndexSelect<kDLGPU, uint64_t>(NDArray array, int64_t index);
+template float IndexSelect<kDLGPU, float>(NDArray array, int64_t index);
+template double IndexSelect<kDLGPU, double>(NDArray array, int64_t index);
 
 }  // namespace impl
 }  // namespace aten

@@ -172,9 +172,10 @@ class GraphOp {
    * The partitioning algorithm assigns each vertex to a partition.
    * \param graph The input graph
    * \param k The number of partitions.
+   * \param vwgt the vertex weight array.
    * \return The partition assignments of all vertices.
    */
-  static IdArray MetisPartition(GraphPtr graph, int32_t k);
+  static IdArray MetisPartition(GraphPtr graph, int32_t k, NDArray vwgt);
 };
 
 }  // namespace dgl
