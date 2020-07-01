@@ -644,6 +644,14 @@ def node_split(nodes, partition_book, rank=None, force_even=False):
     the same as the number of nodes in a graph; 1 indicates that the vertex in
     the corresponding location exists.
 
+    There are two strategies to split the nodes. By default, it splits the nodes
+    in a way to maximize data locality. That is, all nodes that belong to a process
+    are returned. If `force_even` is set to true, the nodes are split evenly so
+    that each process gets almost the same number of nodes. The current implementation
+    can still enable data locality when a graph is partitioned with range partitioning.
+    In this case, majority of the nodes returned for a process are the ones that
+    belong to the process. If range partitioning is not used, data locality isn't guaranteed.
+
     Parameters
     ----------
     nodes : 1D tensor or DistTensor
@@ -651,7 +659,9 @@ def node_split(nodes, partition_book, rank=None, force_even=False):
     partition_book : GraphPartitionBook
         The graph partition book
     rank : int
-        The rank of the current process
+        The rank of a process. If not given, the rank of the current process is used.
+    force_even : bool
+        Force the nodes are split evenly.
 
     Returns
     -------
@@ -681,14 +691,24 @@ def edge_split(edges, partition_book, rank=None, force_even=False):
     the same as the number of edges in a graph; 1 indicates that the edge in
     the corresponding location exists.
 
+    There are two strategies to split the edges. By default, it splits the edges
+    in a way to maximize data locality. That is, all edges that belong to a process
+    are returned. If `force_even` is set to true, the edges are split evenly so
+    that each process gets almost the same number of edges. The current implementation
+    can still enable data locality when a graph is partitioned with range partitioning.
+    In this case, majority of the edges returned for a process are the ones that
+    belong to the process. If range partitioning is not used, data locality isn't guaranteed.
+
     Parameters
     ----------
     edges : 1D tensor or DistTensor
-        A boolean mask vector that indicates input nodes.
+        A boolean mask vector that indicates input edges.
     partition_book : GraphPartitionBook
         The graph partition book
     rank : int
-        The rank of the current process
+        The rank of a process. If not given, the rank of the current process is used.
+    force_even : bool
+        Force the edges are split evenly.
 
     Returns
     -------
@@ -704,6 +724,6 @@ def edge_split(edges, partition_book, rank=None, force_even=False):
     if force_even:
         return _split_even(partition_book, rank, edges)
     else:
-        # Get all nodes that belong to the rank.
+        # Get all edges that belong to the rank.
         local_eids = partition_book.partid2eids(partition_book.partid)
         return _split_local(partition_book, rank, edges, local_eids)
