@@ -993,7 +993,7 @@ class HeteroGraphIndex(ObjectBase):
 
     def reverse(self):
         """Reverse the heterogeneous graph adjacency
-        
+
         The node types and edge types are not changed
 
         Returns
