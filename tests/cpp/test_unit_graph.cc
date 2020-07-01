@@ -5,11 +5,13 @@
  */
 #include <gtest/gtest.h>
 #include <dgl/array.h>
+#include <vector>
 #include "./common.h"
 #include "./../src/graph/heterograph.h"
 #include "../../src/graph/unit_graph.h"
 
 using namespace dgl;
+using namespace dgl::aten;
 using namespace dgl::runtime;
 
 template <typename IdType>
@@ -71,7 +73,6 @@ void _TestUnitGraph(DLContext ctx) {
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSC(2, csr, SparseFormat::kAny));
   UnitGraphPtr g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 4);
-
   
   hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSR(2, csr, SparseFormat::kAny));
   g = hg->relation_graphs()[0];
@@ -80,6 +81,18 @@ void _TestUnitGraph(DLContext ctx) {
   hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCOO(2, coo, SparseFormat::kAny));
   g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 1);
+
+  auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
+  auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
+  auto mg = std::dynamic_pointer_cast<UnitGraph>(
+      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCOO));
+  ASSERT_EQ(mg->GetFormatInUse(), 1);
+  mg = std::dynamic_pointer_cast<UnitGraph>(
+      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSR));
+  ASSERT_EQ(mg->GetFormatInUse(), 3);
+  mg = std::dynamic_pointer_cast<UnitGraph>(
+      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSC));
+  ASSERT_EQ(mg->GetFormatInUse(), 5);
 }
 
 template <typename IdType>

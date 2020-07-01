@@ -1199,27 +1199,6 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
                      SparseFormat restrict_format)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
-  restrict_format_ = AutoDetectFormat(in_csr, out_csr, coo, restrict_format);
-  switch (restrict_format) {
-  case SparseFormat::kCSC:
-    in_csr_ = GetInCSR();
-    coo_ = nullptr;
-    out_csr_ = nullptr;
-    break;
-  case SparseFormat::kCSR:
-    out_csr_ = GetOutCSR();
-    coo_ = nullptr;
-    in_csr_ = nullptr;
-    break;
-  case SparseFormat::kCOO:
-    coo_ = GetCOO();
-    in_csr_ = nullptr;
-    out_csr_ = nullptr;
-    break;
-  default:
-    break;
-  }
-
   if (!in_csr_) {
     in_csr_ = CSRPtr(new CSR());
   }
@@ -1228,6 +1207,21 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   }
   if (!coo_) {
     coo_ = COOPtr(new COO());
+  }
+
+  restrict_format_ = AutoDetectFormat(in_csr, out_csr, coo, restrict_format);
+  switch (restrict_format) {
+  case SparseFormat::kCSC:
+    in_csr_ = GetInCSR();
+    break;
+  case SparseFormat::kCSR:
+    out_csr_ = GetOutCSR();
+    break;
+  case SparseFormat::kCOO:
+    coo_ = GetCOO();
+    break;
+  default:
+    break;
   }
 
   CHECK(GetAny()) << "At least one graph structure should exist.";
@@ -1494,6 +1488,16 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
       break;
   }
 
+  if (!in_csr_) {
+    in_csr_ = CSRPtr(new CSR());
+  }
+  if (!out_csr_) {
+    out_csr_ = CSRPtr(new CSR());
+  }
+  if (!coo_) {
+    coo_ = COOPtr(new COO());
+  }
+
   meta_graph_ = GetAny()->meta_graph();
 
   return true;
@@ -1509,7 +1513,6 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(static_cast<int64_t>(restrict_format_));
   switch (avail_fmt) {
     case SparseFormat::kCOO:
-
       fs->Write(GetCOO());
       break;
     case SparseFormat::kCSR:
