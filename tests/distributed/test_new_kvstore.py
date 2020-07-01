@@ -90,6 +90,9 @@ def init_zero_func(shape, dtype):
 def udf_push(target, name, id_tensor, data_tensor):
     target[name][id_tensor] = data_tensor * data_tensor 
 
+def add_push(target, name, id_tensor, data_tensor):
+    target[name][id_tensor] += data_tensor
+
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_partition_policy():
     assert node_policy.policy_str == 'node'
@@ -237,6 +240,22 @@ def start_client(num_clients):
     res = kvclient.pull(name='data_1', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
+    assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
+    # Register new push handler
+    kvclient.register_push_handler('data_3', add_push)
+    kvclient.init_data(name='data_3', 
+                       shape=F.shape(data_2),
+                       dtype=F.dtype(data_2), 
+                       policy_str='node',
+                       partition_book=gpb, 
+                       init_func=init_zero_func)
+    kvclient.map_shared_data(partition_book=gpb)
+    kvclient.push(name='data_3',
+                  id_tensor=id_tensor,
+                  data_tensor=data_tensor)
+    kvclient.barrier()
+    res = kvclient.pull(name='data_3', id_tensor=id_tensor)
+    data_tensor = data_tensor * num_clients
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # clean up
     kvclient.barrier()
