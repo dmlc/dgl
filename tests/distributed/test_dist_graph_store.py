@@ -58,10 +58,10 @@ def run_server(graph_name, server_id, num_clients, shared_mem):
     print('start server', server_id)
     g.start()
 
-def run_client(graph_name, num_client, part_id, num_nodes, num_edges):
+def run_client(graph_name, part_id, num_nodes, num_edges):
     gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                               part_id, None)
-    g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb, num_client=num_client)
+    g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
 
     # Test API
     assert g.number_of_nodes() == num_nodes
@@ -107,7 +107,7 @@ def run_client(graph_name, num_client, part_id, num_nodes, num_edges):
 
     selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     # Test node split
-    nodes = node_split(selected_nodes, g.get_partition_book(), num_client, g.rank())
+    nodes = node_split(selected_nodes, g.get_partition_book())
     nodes = F.asnumpy(nodes)
     # We only have one partition, so the local nodes are basically all nodes in the graph.
     local_nids = np.arange(g.number_of_nodes())
@@ -142,7 +142,7 @@ def check_server_client(shared_mem):
     cli_ps = []
     for cli_id in range(1):
         print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, 1, cli_id, g.number_of_nodes(),
+        p = ctx.Process(target=run_client, args=(graph_name, cli_id, g.number_of_nodes(),
                                                  g.number_of_edges()))
         p.start()
         cli_ps.append(p)
@@ -167,6 +167,7 @@ def test_split():
     num_hops = 2
     partition_graph(g, 'dist_graph_test', num_parts, '/tmp/dist_graph', num_hops=num_hops, part_method='metis')
 
+    dgl.distributed.set_num_client(num_parts)
     node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     selected_nodes = np.nonzero(node_mask)[0]
@@ -176,30 +177,20 @@ def test_split():
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
-        nodes2 = node_split(node_mask, gpb, num_parts, i)
+        nodes2 = node_split(node_mask, gpb, i)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes2)))
         local_nids = F.asnumpy(local_nids)
         for n in nodes1:
             assert n in local_nids
 
-        nodes3 = node_split(node_mask, gpb, num_parts * 2, i * 2)
-        nodes4 = node_split(node_mask, gpb, num_parts * 2, i * 2 + 1)
-        nodes5 = F.cat([nodes3, nodes4], 0)
-        assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes5)))
-
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
-        edges2 = edge_split(edge_mask, gpb, num_parts, i)
+        edges2 = edge_split(edge_mask, gpb, i)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges2)))
         local_eids = F.asnumpy(local_eids)
         for e in edges1:
             assert e in local_eids
-
-        edges3 = edge_split(edge_mask, gpb, num_parts * 2, i * 2)
-        edges4 = edge_split(edge_mask, gpb, num_parts * 2, i * 2 + 1)
-        edges5 = F.cat([edges3, edges4], 0)
-        assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
 def prepare_dist():
     ip_config = open("kv_ip_config.txt", "w")
