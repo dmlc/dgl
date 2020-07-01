@@ -1303,7 +1303,7 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   if (!out_csr_->defined()) {
     if (in_csr_->defined()) {
       const auto& newadj = aten::CSRSort(aten::CSRTranspose(in_csr_->adj()));
-      
+
       if (inplace)
         *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
       else
@@ -1311,7 +1311,7 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
     } else {
       CHECK(coo_->defined()) << "None of CSR, COO exist";
       const auto& newadj = aten::CSRSort(aten::COOToCSR(coo_->adj()));
-      
+
       if (inplace)
         *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
       else
@@ -1509,6 +1509,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(static_cast<int64_t>(restrict_format_));
   switch (avail_fmt) {
     case SparseFormat::kCOO:
+
       fs->Write(GetCOO());
       break;
     case SparseFormat::kCSR:

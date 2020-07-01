@@ -606,7 +606,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
     const auto &ugs = g->relation_graphs();
     rev_ugs.resize(ugs.size());
 
-    for (size_t i; i < ugs.size(); ++i) {
+    for (size_t i = 0; i < ugs.size(); ++i) {
       const auto &rev_ug = ugs[i]->Reverse();
       rev_ugs[i] = rev_ug;
     }
