@@ -580,3 +580,12 @@ def sync():
 def attach_grad(tensor):
     tensor.attach_grad()
     return tensor
+
+def backward(x, head_gradient=None):
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return (x != 0).sum() == 0

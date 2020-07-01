@@ -25,15 +25,6 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
 def randn(shape):
     return nd.random.randn(*shape)
 
-def backward(x, head_gradient=None):
-    x.backward(head_gradient)
-
-def grad(x):
-    return x.grad
-
-def is_no_grad(x):
-    return (x != 0).sum() == 0
-
 def full(shape, fill_value, dtype, ctx):
     return nd.full(shape, fill_value, dtype=dtype, ctx=ctx)
 

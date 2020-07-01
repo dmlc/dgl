@@ -31,28 +31,6 @@ def randn(shape):
     """Generate a tensor with elements from standard normal distribution."""
     pass
 
-def attach_grad(x):
-    """Flag the tensor *in-place* to have its gradient computed in backward
-    pass.
-
-    If the flag is already set, reset the gradient buffer as well.
-    """
-    pass
-
-def backward(x, head_gradient=None):
-    """Invoke backward computation with an optional head gradient.
-
-    Returns nothing."""
-    pass
-
-def grad(x):
-    """Fetches the gradient from the tensor after backward computation."""
-    pass
-
-def is_no_grad(x):
-    """Check whether a tensor has its gradient computed."""
-    pass
-
 def full(shape, fill_value, dtype, ctx):
     pass
 

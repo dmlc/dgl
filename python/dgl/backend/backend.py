@@ -1330,3 +1330,18 @@ def attach_grad(tensor):
     """ Attach gradients to the input tensor
     """
     pass
+
+def backward(x, head_gradient=None):
+    """Invoke backward computation with an optional head gradient.
+    """
+    pass
+
+def grad(x):
+    """Fetches the gradient from the tensor after backward computation.
+    """
+    pass
+
+def is_no_grad(x):
+    """ Test if the input tensor has gradient
+    """
+    pass

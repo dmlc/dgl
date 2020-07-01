@@ -18,18 +18,6 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
 def randn(shape):
     return th.randn(*shape)
 
-def backward(x, head_gradient=None):
-    if head_gradient is not None and head_gradient.shape[0] == 1 and len(head_gradient.shape) == 1:
-        # Fix for torch 1.3.1
-        head_gradient = th.tensor(head_gradient.item()).to(head_gradient.device)
-    x.backward(head_gradient)
-
-def grad(x):
-    return x.grad
-
-def is_no_grad(x):
-    return x.grad is None or (x.grad == 0).all()
-
 def full(shape, fill_value, dtype, ctx):
     return th.full(shape, fill_value, dtype=dtype, device=ctx)
 
