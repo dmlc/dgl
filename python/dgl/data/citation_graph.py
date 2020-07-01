@@ -418,7 +418,7 @@ class PubmedGraphDataset(CitationGraphDataset):
             for the classification task.
     
     Examples
-    ---------
+    --------
     
     >>> dataset = PubmedDataset()
     >>> g = dataset.graph
@@ -480,8 +480,8 @@ def load_cora(raw_dir=None, force_reload=False, verbose=True):
         verbose: bool
         Whether to print out progress information. Default: True.
         
-        Returns
-        ===
+    Returns
+    -------
         CoraDataset object
     """
     data = CoraGraphDataset(raw_dir, force_reload, verbose)
@@ -500,8 +500,8 @@ def load_citeseer(raw_dir=None, force_reload=False, verbose=True):
         verbose: bool
         Whether to print out progress information. Default: True.
         
-        Returns
-        ===
+    Returns
+    -------
         CiteseerDataset object
     """
     data = CiteseerGraphDataset(raw_dir, force_reload, verbose)
@@ -520,8 +520,8 @@ def load_pubmed(raw_dir=None, force_reload=False, verbose=True):
         verbose: bool
         Whether to print out progress information. Default: True.
         
-        Returns
-        ===
+    Returns
+    -------
         PubmedDataset object
     """
     data = PubmedGraphDataset(raw_dir, force_reload, verbose)
