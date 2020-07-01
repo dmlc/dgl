@@ -25,7 +25,7 @@ GENRES_ML_1M = GENRES_ML_100K[1:]
 class MovieLens(object):
     """MovieLens dataset used by GCMC model
     """
-    def __init__(self, data_name, train_val=False,
+    def __init__(self, data_name, testing=False,
                  test_ratio=0.1, valid_ratio=0.2):
         self._data_name = data_name
 
@@ -54,7 +54,7 @@ class MovieLens(object):
         num_valid = int(np.ceil(train_rating_data.shape[0] * valid_ratio))
         shuffled_idx = np.random.permutation(train_rating_data.shape[0])
         valid_rating_data = train_rating_data.iloc[shuffled_idx[: num_valid]]
-        if train_val:
+        if not testing:
             train_rating_data = train_rating_data.iloc[shuffled_idx[num_valid:]]
 
         self._rating = np.sort(np.unique(all_rating_data["rating"].values))

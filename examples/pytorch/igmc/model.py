@@ -1,10 +1,16 @@
 """IGMC modules"""
 
+import math 
 import torch as th 
 import torch.nn as nn
 import torch.nn.functional as F
 
 from dgl.nn.pytorch import RelGraphConv
+
+def uniform(size, tensor):
+    bound = 1.0 / math.sqrt(size)
+    if tensor is not None:
+        tensor.data.uniform_(-bound, bound)
 
 class IGMC(nn.Module):
     # The GNN model of Inductive Graph-based Matrix Completion. 
@@ -35,15 +41,20 @@ class IGMC(nn.Module):
         else:
             assert False
             # self.lin2 = nn.Linear(128, n_classes)
-    
+        self.reset_parameters()
+
     def reset_parameters(self):
         for conv in self.convs:
-            conv.reset_parameters()
+            size = conv.num_bases * conv.in_feat
+            uniform(size, conv.weight)
+            uniform(size, conv.w_comp)
+            uniform(size, conv.loop_weight)
+            uniform(size, conv.h_bias)
         self.lin1.reset_parameters()
         self.lin2.reset_parameters()
 
     def forward(self, block):
-        block = edge_drop(block, self.edge_dropout, self.force_undirected, self.training)
+        # block = edge_drop(block, self.edge_dropout, self.force_undirected, self.training)
 
         concat_states = []
         x = block.ndata['x']

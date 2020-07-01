@@ -45,10 +45,7 @@ def links2subgraphs(
         train_indices, val_indices, test_indices, 
         train_labels, val_labels, test_labels, 
         hop=1, sample_ratio=1.0, max_nodes_per_hop=200, max_node_label=3, 
-        train_val=True, parallel=True):
-    # extract enclosing subgraphs
-    # if max_node_label is None:  # if not provided, infer from graphs
-    #     max_n_label = {'max_node_label': 0}
+        testing=False, parallel=True):
 
     def helper(adj, links, g_labels):
         g_list = []
@@ -84,7 +81,7 @@ def links2subgraphs(
 
     print('Enclosing subgraph extraction begins...')
     train_graphs = helper(adj, train_indices, train_labels)
-    val_graphs = helper(adj, val_indices, val_labels) if train_val else []
+    val_graphs = helper(adj, val_indices, val_labels) if not testing else []
     test_graphs = helper(adj, test_indices, test_labels)
     return train_graphs, val_graphs, test_graphs
 
