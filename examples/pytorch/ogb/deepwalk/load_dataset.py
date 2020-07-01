@@ -1,18 +1,15 @@
 """ load dataset from ogb """
 
 import argparse
+from ogb.linkproppred import DglLinkPropPredDataset
 
-def load_from_ogbl_with_name(name):
-    from ogb.linkproppred import DglLinkPropPredDataset
-    
+def load_from_ogbl_with_name(name):    
     choices = ['ogbl-collab', 'ogbl-ddi', 'ogbl-ppa', 'ogbl-citation']
     assert name in choices, "name must be selected from " + str(choices)
     dataset = DglLinkPropPredDataset(name)
     return dataset[0]
 
 if __name__ == "__main__":
-    from ogb.linkproppred import PygLinkPropPredDataset
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', type=str,
         choices=['ogbl-collab', 'ogbl-ddi', 'ogbl-ppa', 'ogbl-citation'],
@@ -21,23 +18,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     name = args.name
-
-    dataset = PygLinkPropPredDataset(name=name)
-    data = dataset[0]
+    g = load_from_ogbl_with_name(name=name)
 
     try:
-        weighted = data.edge_weight
+        w = g.edata['edge_weight']
         weighted = True
     except:
         weighted = False
 
     with open(name + "-net.txt", "w") as f:
-        for i in range(data.edge_index.shape[1]):
+        for i in range(g.edges()[0].shape[0]):
             if weighted:
-                f.write(str(data.edge_index[0][i].item()) + " "\
-                    +str(data.edge_index[1][i].item()) + " "\
-                    +str(data.edge_weight[i].item()) + "\n")
+                f.write(str(g.edges()[0][i].item()) + " "\
+                    +str(g.edges()[1][i].item()) + " "\
+                    +str(g.edata['edge_weight'][i]) + "\n")
             else:
-                f.write(str(data.edge_index[0][i].item()) + " "\
-                    +str(data.edge_index[1][i].item()) + " "\
+                f.write(str(g.edges()[0][i].item()) + " "\
+                    +str(g.edges()[1][i].item()) + " "\
                     +"1\n")
