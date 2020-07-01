@@ -167,12 +167,12 @@ def test_split():
     num_hops = 2
     partition_graph(g, 'dist_graph_test', num_parts, '/tmp/dist_graph', num_hops=num_hops, part_method='metis')
 
-    dgl.distributed.set_num_client(num_parts)
     node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
+        dgl.distributed.set_num_client(num_parts)
         part_g, node_feats, edge_feats, gpb = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
@@ -183,6 +183,13 @@ def test_split():
         for n in nodes1:
             assert n in local_nids
 
+        dgl.distributed.set_num_client(num_parts * 2)
+        nodes3 = node_split(node_mask, gpb, i * 2)
+        nodes4 = node_split(node_mask, gpb, i * 2 + 1)
+        nodes5 = F.cat([nodes3, nodes4], 0)
+        assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes5)))
+
+        dgl.distributed.set_num_client(num_parts)
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
@@ -191,6 +198,12 @@ def test_split():
         local_eids = F.asnumpy(local_eids)
         for e in edges1:
             assert e in local_eids
+
+        dgl.distributed.set_num_client(num_parts * 2)
+        edges3 = edge_split(edge_mask, gpb, i * 2)
+        edges4 = edge_split(edge_mask, gpb, i * 2 + 1)
+        edges5 = F.cat([edges3, edges4], 0)
+        assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
 def prepare_dist():
     ip_config = open("kv_ip_config.txt", "w")
