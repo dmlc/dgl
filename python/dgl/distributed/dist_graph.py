@@ -508,6 +508,7 @@ class DistGraph:
             # the workload with respect to data locality.
             num_client = rpc.get_num_client()
             num_client_per_part = num_client // self._gpb.num_partitions()
+            # all ranks of the clients in the same machine are in a contiguous range.
             client_id_in_part = rpc.get_rank() % num_client_per_part
             return int(self._gpb.partid * num_client_per_part + client_id_in_part)
 
@@ -606,6 +607,7 @@ def node_split(nodes, partition_book, rank=None):
     num_client_per_part = num_clients // partition_book.num_partitions()
     if rank is None:
         rank = rpc.get_rank()
+    # all ranks of the clients in the same machine are in a contiguous range.
     client_id_in_part = rank  % num_client_per_part
     local_nids = _get_overlap(nodes, local_nids)
 
@@ -654,6 +656,7 @@ def edge_split(edges, partition_book, rank=None):
     num_client_per_part = num_clients // partition_book.num_partitions()
     if rank is None:
         rank = rpc.get_rank()
+    # all ranks of the clients in the same machine are in a contiguous range.
     client_id_in_part = rank  % num_client_per_part
     local_eids = _get_overlap(edges, local_eids)
 
