@@ -348,8 +348,6 @@ class DistGraph:
             self._gpb = gpb
         self._client.barrier()
         self._client.map_shared_data(self._gpb)
-        assert rpc.get_num_client() % self._gpb.num_partitions() == 0, \
-                'We should run the same number of clients on each machine.'
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
         self._default_init_ndata = _default_init_data
