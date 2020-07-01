@@ -10,7 +10,7 @@ import numpy as np
 
 from reading_data import DeepwalkDataset
 from model import SkipGramModel
-from utils import thread_wrapped_func, shuffle_walks
+from utils import thread_wrapped_func, shuffle_walks, sum_up_params
 
 class DeepwalkTrainer:
     def __init__(self, args):
@@ -26,8 +26,10 @@ class DeepwalkTrainer:
             negative=args.negative,
             gpus=args.gpus,
             fast_neg=args.fast_neg,
+            ogbl_name=args.ogbl_name,
+            load_from_ogbl=args.load_from_ogbl,
             )
-        self.emb_size = len(self.dataset.net)
+        self.emb_size = self.dataset.G.number_of_nodes()
         self.emb_model = None
 
     def init_device_emb(self):
@@ -71,7 +73,7 @@ class DeepwalkTrainer:
             print("Mix CPU with %d GPU" % len(self.args.gpus))
             if len(self.args.gpus) == 1:
                 assert self.args.gpus[0] >= 0, 'mix CPU with GPU should have abaliable GPU'
-                self.emb_model.set_device(self.args.gpus[0])
+                #self.emb_model.set_device(self.args.gpus[0])
         else:
             print("Run in CPU process")
             self.args.gpus = [torch.device('cpu')]
@@ -88,6 +90,9 @@ class DeepwalkTrainer:
         """ multi-cpu-core or mix cpu & multi-gpu """
         self.init_device_emb()
         self.emb_model.share_memory()
+
+        if self.args.count_params:
+            sum_up_params(self.emb_model)
 
         start_all = time.time()
         ps = []
@@ -170,6 +175,9 @@ class DeepwalkTrainer:
 
         self.init_device_emb()
 
+        if self.args.count_params:
+            sum_up_params(self.emb_model)
+
         sampler = self.dataset.create_sampler(0)
 
         dataloader = DataLoader(
@@ -227,8 +235,17 @@ class DeepwalkTrainer:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="DeepWalk")
+    # input files
+    ## personal datasets
     parser.add_argument('--data_file', type=str, 
             help="path of the txt network file, builtin dataset include youtube-net and blog-net") 
+    ## ogbl datasets
+    parser.add_argument('--ogbl_name', type=str, 
+            help="name of ogbl dataset, e.g. ogbl-ddi")
+    parser.add_argument('--load_from_ogbl', default=False, action="store_true",
+            help="whether load dataset from ogbl")
+
+    # output files
     parser.add_argument('--save_in_txt', default=False, action="store_true",
             help='Whether save dat in txt format or npy')
     parser.add_argument('--save_in_pt', default=False, action="store_true",
@@ -237,52 +254,63 @@ if __name__ == '__main__':
             help='path of the output npy embedding file')
     parser.add_argument('--map_file', type=str, default="nodeid_to_index.pickle",
             help='path of the mapping dict that maps node ids to embedding index')
+    parser.add_argument('--norm', default=False, action="store_true", 
+            help="whether to do normalization over node embedding after training")
+    
+    # model parameters
     parser.add_argument('--dim', default=128, type=int, 
             help="embedding dimensions")
     parser.add_argument('--window_size', default=5, type=int, 
             help="context window size")
+    parser.add_argument('--use_context_weight', default=False, action="store_true", 
+            help="whether to add weights over nodes in the context window")
     parser.add_argument('--num_walks', default=10, type=int, 
             help="number of walks for each node")
     parser.add_argument('--negative', default=5, type=int, 
             help="negative samples for each positve node pair")
-    parser.add_argument('--iterations', default=1, type=int, 
-            help="iterations")
     parser.add_argument('--batch_size', default=10, type=int, 
             help="number of node sequences in each batch")
-    parser.add_argument('--print_interval', default=100, type=int, 
-            help="number of batches between printing")
-    parser.add_argument('--print_loss', default=False, action="store_true", 
-            help="whether print loss during training")
     parser.add_argument('--walk_length', default=80, type=int, 
             help="number of nodes in a sequence")
-    parser.add_argument('--lr', default=0.2, type=float, 
-            help="learning rate")
     parser.add_argument('--neg_weight', default=1., type=float, 
             help="negative weight")
     parser.add_argument('--lap_norm', default=0.01, type=float, 
             help="weight of laplacian normalization")
+    
+    # training parameters
+    parser.add_argument('--iterations', default=1, type=int, 
+            help="iterations")
+    parser.add_argument('--print_interval', default=100, type=int, 
+            help="number of batches between printing")
+    parser.add_argument('--print_loss', default=False, action="store_true", 
+            help="whether print loss during training")
+    parser.add_argument('--lr', default=0.2, type=float, 
+            help="learning rate")
+    
+    # optimization settings
     parser.add_argument('--mix', default=False, action="store_true", 
             help="mixed training with CPU and GPU")
+    parser.add_argument('--gpus', type=int, default=[-1], nargs='+', 
+            help='a list of active gpu ids, e.g. 0, used with --mix')
     parser.add_argument('--only_cpu', default=False, action="store_true", 
             help="training with CPU")
     parser.add_argument('--only_gpu', default=False, action="store_true", 
             help="training with GPU")
-    parser.add_argument('--fast_neg', default=True, action="store_true", 
-            help="do negative sampling inside a batch")
+
     parser.add_argument('--adam', default=False, action="store_true", 
             help="use adam for embedding updation, recommended")
     parser.add_argument('--sgd', default=False, action="store_true", 
             help="use sgd for embedding updation")
     parser.add_argument('--avg_sgd', default=False, action="store_true", 
             help="average gradients of sgd for embedding updation")
-    parser.add_argument('--norm', default=False, action="store_true", 
-            help="whether to do normalization over node embedding after training")
-    parser.add_argument('--use_context_weight', default=False, action="store_true", 
-            help="whether to add weights over nodes in the context window")
+    parser.add_argument('--fast_neg', default=False, action="store_true", 
+            help="do negative sampling inside a batch")
     parser.add_argument('--num_threads', default=2, type=int, 
             help="number of threads used for each CPU-core/GPU")
-    parser.add_argument('--gpus', type=int, default=[-1], nargs='+', 
-            help='a list of active gpu ids, e.g. 0')
+    
+    parser.add_argument('--count_params', default=False, action="store_true", 
+            help="count the params, then exit")
+
     args = parser.parse_args()
 
     start_time = time.time()
