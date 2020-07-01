@@ -8,8 +8,8 @@ from dgl.data.utils import download, _get_dgl_url, get_download_dir, extract_arc
 import random
 import time
 import dgl
+
 from utils import shuffle_walks
-#np.random.seed(3141592653)
 
 def ReadTxtNet(file_path="", undirected=True):
     """ Read the txt network file. 
@@ -110,17 +110,31 @@ def net2graph(net_sm):
     print("Building DGLGraph in %.2fs" % t)
     return G
 
+def make_undirected(G):
+    G.readonly(False)
+    G.add_edges(G.edges()[1], G.edges()[0])
+    return G
+
+def find_connected_nodes(G):
+    nodes = []
+    for n in G.nodes():
+        if G.out_degree(n) > 0:
+            nodes.append(n.item())
+    return nodes
+
 class DeepwalkDataset:
     def __init__(self, 
             net_file,
             map_file,
-            walk_length=80,
-            window_size=5,
-            num_walks=10,
-            batch_size=32,
+            walk_length,
+            window_size,
+            num_walks,
+            batch_size,
             negative=5,
             gpus=[0],
             fast_neg=True,
+            ogbl_name="",
+            load_from_ogbl=False,
             ):
         """ This class has the following functions:
         1. Transform the txt network file into DGL graph;
@@ -145,26 +159,42 @@ class DeepwalkDataset:
         self.negative = negative
         self.num_procs = len(gpus)
         self.fast_neg = fast_neg
-        self.net, self.node2id, self.id2node, self.sm = ReadTxtNet(net_file)
-        self.save_mapping(map_file)
-        self.G = net2graph(self.sm)
+
+        if load_from_ogbl:
+            assert len(gpus) == 1, "ogb.linkproppred is not compatible with multi-gpu training."
+            from load_dataset import load_from_ogbl_with_name
+            self.G = load_from_ogbl_with_name(ogbl_name)
+            self.G = make_undirected(self.G)
+        else:
+            self.net, self.node2id, self.id2node, self.sm = ReadTxtNet(net_file)
+            self.save_mapping(map_file)
+            self.G = net2graph(self.sm)
+
+        self.num_nodes = self.G.number_of_nodes()
 
         # random walk seeds
         start = time.time()
-        seeds = torch.cat([torch.LongTensor(self.G.nodes())] * num_walks)
-        self.seeds = torch.split(shuffle_walks(seeds), int(np.ceil(len(self.net) * self.num_walks / self.num_procs)), 0)
+        self.valid_seeds = find_connected_nodes(self.G)
+        if len(self.valid_seeds) != self.num_nodes:
+            print("WARNING: The node ids are not serial. Some nodes are invalid.")
+        
+        seeds = torch.cat([torch.LongTensor(self.valid_seeds)] * num_walks)
+        self.seeds = torch.split(shuffle_walks(seeds), 
+            int(np.ceil(len(self.valid_seeds) * self.num_walks / self.num_procs)), 
+            0)
         end = time.time()
         t = end - start
         print("%d seeds in %.2fs" % (len(seeds), t))
 
         # negative table for true negative sampling
         if not fast_neg:
-            node_degree = np.array(list(map(lambda x: len(self.net[x]), self.net.keys())))
+            node_degree = np.array(list(map(lambda x: self.G.out_degree(x), self.valid_seeds)))
             node_degree = np.power(node_degree, 0.75)
             node_degree /= np.sum(node_degree)
             node_degree = np.array(node_degree * 1e8, dtype=np.int)
             self.neg_table = []
-            for idx, node in enumerate(self.net.keys()):
+            
+            for idx, node in enumerate(self.valid_seeds):
                 self.neg_table += [node] * node_degree[idx]
             self.neg_table_size = len(self.neg_table)
             self.neg_table = np.array(self.neg_table, dtype=np.long)
