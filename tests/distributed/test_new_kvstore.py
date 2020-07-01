@@ -247,9 +247,10 @@ def start_client(num_clients):
                        shape=F.shape(data_2),
                        dtype=F.dtype(data_2), 
                        policy_str='node',
-                       partition_book=gpb, 
+                       partition_book=gpb,
                        init_func=init_zero_func)
     kvclient.map_shared_data(partition_book=gpb)
+    id_tensor = id_tensor = F.tensor([0,1,2,3,4,5], F.int64)
     time.sleep(kvclient.client_id + 1)
     print("add...")
     kvclient.push(name='data_3',
