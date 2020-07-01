@@ -1017,7 +1017,7 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced nodes
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedVertices(self)
-        return [utils.toindex(v.data, self.graph.dtype) for v in ret]
+        return [utils.toindex(v, self.graph.dtype) for v in ret]
 
     @property
     def induced_edges(self):
@@ -1030,7 +1030,7 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced edges
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
-        return [utils.toindex(v.data, self.graph.dtype) for v in ret]
+        return [utils.toindex(v, self.graph.dtype) for v in ret]
 
 
 #################################################################
