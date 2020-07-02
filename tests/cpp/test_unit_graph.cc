@@ -89,10 +89,10 @@ void _TestUnitGraph(DLContext ctx) {
   ASSERT_EQ(mg->GetFormatInUse(), 1);
   mg = std::dynamic_pointer_cast<UnitGraph>(
       dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSR));
-  ASSERT_EQ(mg->GetFormatInUse(), 3);
+  ASSERT_EQ(mg->GetFormatInUse(), 2);
   mg = std::dynamic_pointer_cast<UnitGraph>(
       dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSC));
-  ASSERT_EQ(mg->GetFormatInUse(), 5);
+  ASSERT_EQ(mg->GetFormatInUse(), 4);
 }
 
 template <typename IdType>
