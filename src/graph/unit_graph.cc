@@ -1229,7 +1229,7 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
     coo_ = COOPtr(new COO());
   }
 
-  restrict_format_ = AutoDetectFormat(in_csr, out_csr, coo, restrict_format);
+  restrict_format_ = AutoDetectFormat(in_csr_, out_csr_, coo_, restrict_format);
   switch (restrict_format) {
   case SparseFormat::kCSC:
     in_csr_ = GetInCSR();
@@ -1450,7 +1450,7 @@ SparseFormat UnitGraph::AutoDetectFormat(
     CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
   if (restrict_format != SparseFormat::kAuto)
     return restrict_format;
-  if (coo && coo->IsHypersparse())
+  if (coo && coo->defined() && coo->IsHypersparse())
     return SparseFormat::kCOO;
   return SparseFormat::kAny;
 }

@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 #include <dgl/array.h>
 #include <vector>
+#include <dgl/immutable_graph.h>
 #include "./common.h"
 #include "./../src/graph/heterograph.h"
 #include "../../src/graph/unit_graph.h"
@@ -87,12 +88,33 @@ void _TestUnitGraph(DLContext ctx) {
   auto mg = std::dynamic_pointer_cast<UnitGraph>(
       dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCOO));
   ASSERT_EQ(mg->GetFormatInUse(), 1);
+  auto hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, dgl::SparseFormat::kCOO);
+  auto img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
+  ASSERT_TRUE(img != nullptr);
   mg = std::dynamic_pointer_cast<UnitGraph>(
       dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSR));
   ASSERT_EQ(mg->GetFormatInUse(), 2);
+  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, dgl::SparseFormat::kCSR);
+  img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
+  ASSERT_TRUE(img != nullptr);
   mg = std::dynamic_pointer_cast<UnitGraph>(
       dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSC));
   ASSERT_EQ(mg->GetFormatInUse(), 4);
+  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, dgl::SparseFormat::kCSC);
+  img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
+  ASSERT_TRUE(img != nullptr);
+
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSC(2, csr, SparseFormat::kAuto));
+  g = hg->relation_graphs()[0];
+  ASSERT_EQ(g->GetFormatInUse(), 4);
+
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCSR(2, csr, SparseFormat::kAuto));
+  g = hg->relation_graphs()[0];
+  ASSERT_EQ(g->GetFormatInUse(), 2);
+
+  hg = std::dynamic_pointer_cast<HeteroGraph>(CreateFromCOO(2, coo, SparseFormat::kAuto));
+  g = hg->relation_graphs()[0];
+  ASSERT_EQ(g->GetFormatInUse(), 1);
 }
 
 template <typename IdType>
