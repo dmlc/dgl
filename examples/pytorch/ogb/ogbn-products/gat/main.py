@@ -101,11 +101,18 @@ class GAT(nn.Module):
             else:
                 y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
-                end = start + batch_size
-                batch_nodes = nodes[start:end]
-                block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                input_nodes = block.srcdata[dgl.NID]
+            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
+            dataloader = dgl.sampling.NodeDataLoader(
+                g,
+                th.arange(g.number_of_nodes()),
+                sampler,
+                batch_size=args.batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -115,7 +122,8 @@ class GAT(nn.Module):
                     h = layer(block, (h, h_dst))
                     h = h.mean(1)
                     h = h.log_softmax(dim=-1)
-                y[start:end] = h.cpu()
+
+                y[output_nodes] = h.cpu()
 
             x = y
         return y
@@ -167,14 +175,14 @@ def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, labels, n_classes, g, num_heads = data
 
-    # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
-
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
-        dataset=train_nid.numpy(),
+    sampler = dgl.sampling.MultiLayerNeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(',')])
+    dataloader = dgl.sampling.NodeDataLoader(
+        g,
+        train_nid,
+        sampler,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
         num_workers=args.num_workers)
@@ -194,13 +202,8 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, blocks in enumerate(dataloader):
+        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             tic_step = time.time()
-
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
-            seeds = blocks[-1].dstdata[dgl.NID]
 
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
