@@ -254,7 +254,7 @@ def save_info(path, info):
 
 
 def load_info(path):
-    with open(path, "rb" ) as pf:
+    with open(path, "rb") as pf:
         info = pickle.load(pf)
     return info
 
