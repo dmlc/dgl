@@ -109,7 +109,7 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 
     @property
     def data(self):
-        deprecate_property('.data', '.graph')
+        deprecate_property('dataset.data', 'dataset.graph')
         return self._data
 
     def __getitem__(self, idx):
