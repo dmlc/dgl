@@ -2,7 +2,7 @@
 
 from .dist_graph import DistGraphServer, DistGraph, node_split, edge_split
 from .partition import partition_graph, load_partition, load_partition_book
-from .graph_partition_book import GraphPartitionBook, PartitionPolicy
+from .graph_partition_book import GraphPartitionBook, RangePartitionBook, PartitionPolicy
 
 from .rpc import *
 from .rpc_server import start_server

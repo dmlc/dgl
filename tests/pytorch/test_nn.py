@@ -79,11 +79,21 @@ def test_graph_conv2(g, norm, weight, bias):
     nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
     ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
     h = F.randn((nsrc, 5)).to(F.ctx())
+    h_dst = F.randn((ndst, 2)).to(F.ctx())
     if weight:
-        h = conv(g, h)
+        h_out = conv(g, h)
     else:
-        h = conv(g, h, weight=ext_w)
-    assert h.shape == (ndst, 2)
+        h_out = conv(g, h, weight=ext_w)
+    assert h_out.shape == (ndst, 2)
+
+    if not isinstance(g, dgl.DGLGraph) and len(g.ntypes) == 2:
+        # bipartite, should also accept pair of tensors
+        if weight:
+            h_out2 = conv(g, (h, h_dst))
+        else:
+            h_out2 = conv(g, (h, h_dst), weight=ext_w)
+        assert h_out2.shape == (ndst, 2)
+        assert F.array_equal(h_out, h_out2)
 
 def _S2AXWb(A, N, X, W, b):
     X1 = X * N
@@ -679,17 +689,19 @@ def test_dense_cheb_conv():
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         adj = g.adjacency_matrix(ctx=ctx).to_dense()
-        cheb = nn.ChebConv(5, 2, k)
+        cheb = nn.ChebConv(5, 2, k, None)
         dense_cheb = nn.DenseChebConv(5, 2, k)
-        for i in range(len(cheb.fc)):
-            dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
-        if cheb.bias is not None:
-            dense_cheb.bias.data = cheb.bias.data
+        #for i in range(len(cheb.fc)):
+        #    dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
+        dense_cheb.W.data = cheb.linear.weight.data.transpose(-1, -2).view(k, 5, 2)
+        if cheb.linear.bias is not None:
+            dense_cheb.bias.data = cheb.linear.bias.data
         feat = F.randn((100, 5))
         cheb = cheb.to(ctx)
         dense_cheb = dense_cheb.to(ctx)
         out_cheb = cheb(g, feat, [2.0])
         out_dense_cheb = dense_cheb(adj, feat, 2.0)
+        print(k, out_cheb, out_dense_cheb)
         assert F.allclose(out_cheb, out_dense_cheb)
 
 def test_sequential():

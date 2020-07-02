@@ -740,6 +740,7 @@ class KVClient(object):
         self._machine_count = int(self._server_count / self._group_count)
         self._client_id = rpc.get_rank()
         self._machine_id = rpc.get_machine_id()
+        self._num_clients = rpc.get_num_client()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
         # push and pull handler
@@ -791,6 +792,7 @@ class KVClient(object):
         func : callable
             The function to be called.
         """
+        self.barrier()
         if self._client_id == 0:
             request = RegisterPushHandlerRequest(name, func)
             # send request to all the server nodes
@@ -823,13 +825,14 @@ class KVClient(object):
         func : callable
             The function to be called.
         """
+        self.barrier()
         if self._client_id == 0:
             request = RegisterPullHandlerRequest(name, func)
             # send request to all the server nodes
             for server_id in range(self._server_count):
                 rpc.send_request(server_id, request)
             # recv response from all the server nodes
-            for _ in range(self._server_namebook):
+            for _ in range(self._server_count):
                 response = rpc.recv_response()
                 assert response.msg == REGISTER_PULL_MSG
         self._pull_handlers[name] = func
@@ -858,6 +861,7 @@ class KVClient(object):
         assert len(shape) > 0, 'shape cannot be empty'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         assert name not in self._data_name_list, 'data name: %s already exists.' % name
+        self.barrier()
         shape = list(shape)
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
@@ -905,6 +909,7 @@ class KVClient(object):
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
+        self.barrier()
 
     def map_shared_data(self, partition_book):
         """Mapping shared-memory tensor from server to client.
@@ -915,6 +920,7 @@ class KVClient(object):
             Store the partition information
         """
         # Get shared data from server side
+        self.barrier()
         request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
@@ -956,6 +962,7 @@ class KVClient(object):
                 response = rpc.recv_response()
                 assert response.msg == SEND_META_TO_BACKUP_MSG
             self._data_name_list.add(name)
+        self.barrier()
 
     def data_name_list(self):
         """Get all the data name"""

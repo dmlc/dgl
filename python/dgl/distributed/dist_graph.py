@@ -1,6 +1,7 @@
 """Define distributed graph."""
 
 from collections.abc import MutableMapping
+import numpy as np
 
 from ..graph import DGLGraph
 from .. import backend as F
@@ -13,9 +14,11 @@ from .partition import load_partition
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
+from . import rpc
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
+from ..transform import as_heterograph
 
 def _get_graph_path(graph_name):
     return "/" + graph_name
@@ -125,9 +128,13 @@ class DistTensor:
         self._dtype = dtype
 
     def __getitem__(self, idx):
+        idx = utils.toindex(idx)
+        idx = idx.tousertensor()
         return self.kvstore.pull(name=self.name, id_tensor=idx)
 
     def __setitem__(self, idx, val):
+        idx = utils.toindex(idx)
+        idx = idx.tousertensor()
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self.name, id_tensor=idx, data_tensor=val)
 
@@ -332,7 +339,11 @@ class DistGraph:
     def __init__(self, ip_config, graph_name, gpb=None):
         connect_to_server(ip_config=ip_config)
         self._client = KVClient(ip_config)
-        self._g = _get_graph_from_shared_mem(graph_name)
+        g = _get_graph_from_shared_mem(graph_name)
+        if g is not None:
+            self._g = as_heterograph(g)
+        else:
+            self._g = None
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
         if self._gpb is None:
             self._gpb = gpb
@@ -419,6 +430,21 @@ class DistGraph:
         raise NotImplementedError("get_node_embeddings isn't supported yet")
 
     @property
+    def local_partition(self):
+        ''' Return the local partition on the client
+
+        DistGraph provides a global view of the distributed graph. Internally,
+        it may contains a partition of the graph if it is co-located with
+        the server. If there is no co-location, this returns None.
+
+        Returns
+        -------
+        DGLHeterograph
+            The local partition
+        '''
+        return self._g
+
+    @property
     def ndata(self):
         """Return the data view of all the nodes.
 
@@ -470,7 +496,20 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
-        return self._client.client_id
+        # If DistGraph doesn't have a local partition, it doesn't matter what rank
+        # it returns. There is no data locality any way, as long as the returned rank
+        # is unique in the system.
+        if self._g is None:
+            return rpc.get_rank()
+        else:
+            # If DistGraph has a local partition, we should be careful about the rank
+            # we return. We need to return a rank that node_split or edge_split can split
+            # the workload with respect to data locality.
+            num_client = rpc.get_num_client()
+            num_client_per_part = num_client // self._gpb.num_partitions()
+            # all ranks of the clients in the same machine are in a contiguous range.
+            client_id_in_part = rpc.get_rank() % num_client_per_part
+            return int(self._gpb.partid * num_client_per_part + client_id_in_part)
 
     def get_partition_book(self):
         """Get the partition information.
@@ -531,7 +570,70 @@ def _get_overlap(mask_arr, ids):
         masks = F.gather_row(mask_arr.tousertensor(), ids)
         return F.boolean_mask(ids, masks)
 
-def node_split(nodes, partition_book, rank):
+def _split_local(partition_book, rank, elements, local_eles):
+    ''' Split the input element list with respect to data locality.
+    '''
+    num_clients = rpc.get_num_client()
+    num_client_per_part = num_clients // partition_book.num_partitions()
+    if rank is None:
+        rank = rpc.get_rank()
+    # all ranks of the clients in the same machine are in a contiguous range.
+    client_id_in_part = rank  % num_client_per_part
+    local_eles = _get_overlap(elements, local_eles)
+
+    # get a subset for the local client.
+    size = len(local_eles) // num_client_per_part
+    # if this isn't the last client in the partition.
+    if client_id_in_part + 1 < num_client_per_part:
+        return local_eles[(size * client_id_in_part):(size * (client_id_in_part + 1))]
+    else:
+        return local_eles[(size * client_id_in_part):]
+
+def _split_even(partition_book, rank, elements):
+    ''' Split the input element list evenly.
+    '''
+    num_clients = rpc.get_num_client()
+    num_client_per_part = num_clients // partition_book.num_partitions()
+    if rank is None:
+        rank = rpc.get_rank()
+    # all ranks of the clients in the same machine are in a contiguous range.
+    client_id_in_part = rank  % num_client_per_part
+    rank = client_id_in_part + num_client_per_part * partition_book.partid
+
+    if isinstance(elements, DistTensor):
+        # Here we need to fetch all elements from the kvstore server.
+        # I hope it's OK.
+        eles = F.nonzero_1d(elements[0:len(elements)])
+    else:
+        elements = utils.toindex(elements)
+        eles = F.nonzero_1d(elements.tousertensor())
+
+    # here we divide the element list as evenly as possible. If we use range partitioning,
+    # the split results also respect the data locality. Range partitioning is the default
+    # strategy.
+    # TODO(zhegnda) we need another way to divide the list for other partitioning strategy.
+
+    # compute the offset of each split and ensure that the difference of each partition size
+    # is 1.
+    part_size = len(eles) // num_clients
+    sizes = [part_size] * num_clients
+    remain = len(eles) - part_size * num_clients
+    if remain > 0:
+        for i in range(num_clients):
+            sizes[i] += 1
+            remain -= 1
+            if remain == 0:
+                break
+    offsets = np.cumsum(sizes)
+    assert offsets[-1] == len(eles)
+
+    if rank == 0:
+        return eles[0:offsets[0]]
+    else:
+        return eles[offsets[rank-1]:offsets[rank]]
+
+
+def node_split(nodes, partition_book, rank=None, force_even=False):
     ''' Split nodes and return a subset for the local rank.
 
     This function splits the input nodes based on the partition book and
@@ -542,6 +644,14 @@ def node_split(nodes, partition_book, rank):
     the same as the number of nodes in a graph; 1 indicates that the vertex in
     the corresponding location exists.
 
+    There are two strategies to split the nodes. By default, it splits the nodes
+    in a way to maximize data locality. That is, all nodes that belong to a process
+    are returned. If `force_even` is set to true, the nodes are split evenly so
+    that each process gets almost the same number of nodes. The current implementation
+    can still enable data locality when a graph is partitioned with range partitioning.
+    In this case, majority of the nodes returned for a process are the ones that
+    belong to the process. If range partitioning is not used, data locality isn't guaranteed.
+
     Parameters
     ----------
     nodes : 1D tensor or DistTensor
@@ -549,7 +659,9 @@ def node_split(nodes, partition_book, rank):
     partition_book : GraphPartitionBook
         The graph partition book
     rank : int
-        The rank of the current process
+        The rank of a process. If not given, the rank of the current process is used.
+    force_even : bool
+        Force the nodes are split evenly.
 
     Returns
     -------
@@ -561,11 +673,14 @@ def node_split(nodes, partition_book, rank):
         num_nodes += part['num_nodes']
     assert len(nodes) == num_nodes, \
             'The length of boolean mask vector should be the number of nodes in the graph.'
-    # Get all nodes that belong to the rank.
-    local_nids = partition_book.partid2nids(rank)
-    return _get_overlap(nodes, local_nids)
+    if force_even:
+        return _split_even(partition_book, rank, nodes)
+    else:
+        # Get all nodes that belong to the rank.
+        local_nids = partition_book.partid2nids(partition_book.partid)
+        return _split_local(partition_book, rank, nodes, local_nids)
 
-def edge_split(edges, partition_book, rank):
+def edge_split(edges, partition_book, rank=None, force_even=False):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
@@ -576,14 +691,24 @@ def edge_split(edges, partition_book, rank):
     the same as the number of edges in a graph; 1 indicates that the edge in
     the corresponding location exists.
 
+    There are two strategies to split the edges. By default, it splits the edges
+    in a way to maximize data locality. That is, all edges that belong to a process
+    are returned. If `force_even` is set to true, the edges are split evenly so
+    that each process gets almost the same number of edges. The current implementation
+    can still enable data locality when a graph is partitioned with range partitioning.
+    In this case, majority of the edges returned for a process are the ones that
+    belong to the process. If range partitioning is not used, data locality isn't guaranteed.
+
     Parameters
     ----------
     edges : 1D tensor or DistTensor
-        A boolean mask vector that indicates input nodes.
+        A boolean mask vector that indicates input edges.
     partition_book : GraphPartitionBook
         The graph partition book
     rank : int
-        The rank of the current process
+        The rank of a process. If not given, the rank of the current process is used.
+    force_even : bool
+        Force the edges are split evenly.
 
     Returns
     -------
@@ -595,6 +720,10 @@ def edge_split(edges, partition_book, rank):
         num_edges += part['num_edges']
     assert len(edges) == num_edges, \
             'The length of boolean mask vector should be the number of edges in the graph.'
-    # Get all edges that belong to the rank.
-    local_eids = partition_book.partid2eids(rank)
-    return _get_overlap(edges, local_eids)
+
+    if force_even:
+        return _split_even(partition_book, rank, edges)
+    else:
+        # Get all edges that belong to the rank.
+        local_eids = partition_book.partid2eids(partition_book.partid)
+        return _split_local(partition_book, rank, edges, local_eids)

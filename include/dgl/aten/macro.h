@@ -252,4 +252,8 @@
       CHECK_LE((val), 0x7FFFFFFFL) << "int32 overflow for argument " << (#val) << "."; \
   } while (0);
 
+#define CHECK_IS_ID_ARRAY(VAR)                                              \
+  CHECK((VAR)->ndim == 1 && (IS_INT32(VAR) || IS_INT64(VAR)))               \
+    << "Expected argument " << (#VAR) << " to be an 1D integer array.";
+
 #endif  // DGL_ATEN_MACRO_H_
