@@ -31,6 +31,13 @@ class SparseNodeEmbedding:
         return emb
 
 class SparseAdagradUDF:
+    ''' The UDF to update the embeddings with sparse Adagrad.
+
+    Parameters
+    ----------
+    lr : float
+        The learning rate.
+    '''
     def __init__(self, lr):
         self._lr = lr
 
