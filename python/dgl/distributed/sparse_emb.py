@@ -62,11 +62,12 @@ class SparseAdagradUDF:
         grad_values = data
         embs = data_store[name]
         state_sum = data_store[name + "_sum"]
-        grad_sum = (grad_values * grad_values).mean(1)
-        state_sum.index_add_(0, grad_indices, grad_sum)
-        std = state_sum[grad_indices]  # _sparse_mask
-        std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-        embs.index_add_(0, grad_indices, grad_values / std_values * (-self._lr))
+        with F.no_grad():
+            grad_sum = (grad_values * grad_values).mean(1)
+            state_sum.index_add_(0, grad_indices, grad_sum)
+            std = state_sum[grad_indices]  # _sparse_mask
+            std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+            embs.index_add_(0, grad_indices, grad_values / std_values * (-self._lr))
 
 def _init_state(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
@@ -104,21 +105,22 @@ class SparseAdagrad:
         of the sparse embeddings to the distributed kvstore and update the embeddings
         in the kvstore.
         '''
-        for emb in self._params:
-            name = emb._tensor.name
-            kvstore = emb._tensor.kvstore
-            trace = emb._trace
-            if len(trace) == 1:
-                kvstore.push(name, trace[0][0], F.grad(trace[0][1]))
-            else:
-                # TODO(zhengda) we need to merge the gradients of the same embeddings first.
-                idxs = [t[0] for t in trace]
-                grads = [F.grad(t[1]) for t in trace]
-                idxs = F.cat(idxs, 0)
-                # Here let's adjust the gradients with the learning rate first.
-                # We'll need to scale them with the state sum on the kvstore server
-                # after we push them.
-                grads = F.cat(grads, 0)
-                kvstore.push(name, idxs, grads)
-            # Clean up the old traces.
-            emb._trace = []
+        with F.no_grad():
+            for emb in self._params:
+                name = emb._tensor.name
+                kvstore = emb._tensor.kvstore
+                trace = emb._trace
+                if len(trace) == 1:
+                    kvstore.push(name, trace[0][0], F.grad(trace[0][1]))
+                else:
+                    # TODO(zhengda) we need to merge the gradients of the same embeddings first.
+                    idxs = [t[0] for t in trace]
+                    grads = [F.grad(t[1]) for t in trace]
+                    idxs = F.cat(idxs, 0)
+                    # Here let's adjust the gradients with the learning rate first.
+                    # We'll need to scale them with the state sum on the kvstore server
+                    # after we push them.
+                    grads = F.cat(grads, 0)
+                    kvstore.push(name, idxs, grads)
+                # Clean up the old traces.
+                emb._trace = []
