@@ -1,7 +1,7 @@
 import dgl
 import unittest
 import os
-from dgl.data import CitationGraphDataset
+from dgl.data import CoraGraphDataset
 from dgl.distributed.sampling import sample_neighbors
 from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
@@ -15,16 +15,18 @@ from pathlib import Path
 from dgl.distributed import DistGraphServer, DistGraph
 
 
-def start_server(rank, tmpdir):
+def start_server(rank, tmpdir, disable_shared_mem):
     import dgl
     g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
-                        tmpdir / 'test_sampling.json', disable_shared_mem=True)
+                        tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem)
     g.start()
 
 
-def start_client(rank, tmpdir):
+def start_client(rank, tmpdir, disable_shared_mem):
     import dgl
-    _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
+    gpb = None
+    if disable_shared_mem:
+        _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
     dist_graph = DistGraph("rpc_sampling_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     dgl.distributed.shutdown_servers()
@@ -32,14 +34,13 @@ def start_client(rank, tmpdir):
     return sampled_graph
 
 
-def check_rpc_sampling(tmpdir):
-    num_server = 2
+def check_rpc_sampling(tmpdir, num_server):
     ip_config = open("rpc_sampling_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
 
-    g = CitationGraphDataset("cora")[0]
+    g = CoraGraphDataset()[0]
     g.readonly()
     print(g.idtype)
     num_parts = num_server
@@ -51,13 +52,13 @@ def check_rpc_sampling(tmpdir):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     time.sleep(3)
-    sampled_graph = start_client(0, tmpdir)
+    sampled_graph = start_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
         p.join()
@@ -75,16 +76,15 @@ def test_rpc_sampling():
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         tmpdirname = "/tmp/sampling"
-        check_rpc_sampling(Path(tmpdirname))
+        check_rpc_sampling(Path(tmpdirname), 2)
 
-def check_rpc_sampling_shuffle(tmpdir):
-    num_server = 2
+def check_rpc_sampling_shuffle(tmpdir, num_server):
     ip_config = open("rpc_sampling_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
     
-    g = CitationGraphDataset("cora")[0]
+    g = CoraGraphDataset()[0]
     g.readonly()
     num_parts = num_server
     num_hops = 1
@@ -95,13 +95,13 @@ def check_rpc_sampling_shuffle(tmpdir):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     time.sleep(3)
-    sampled_graph = start_client(0, tmpdir)
+    sampled_graph = start_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
         p.join()
@@ -129,11 +129,14 @@ def test_rpc_sampling_shuffle():
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         tmpdirname = "/tmp/sampling"
-        check_rpc_sampling_shuffle(Path(tmpdirname))
+        check_rpc_sampling_shuffle(Path(tmpdirname), 2)
+        check_rpc_sampling_shuffle(Path(tmpdirname), 1)
 
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         tmpdirname = "/tmp/sampling"
-        check_rpc_sampling(Path(tmpdirname))
-        check_rpc_sampling_shuffle(Path(tmpdirname))
+        check_rpc_sampling_shuffle(Path(tmpdirname), 1)
+        check_rpc_sampling_shuffle(Path(tmpdirname), 2)
+        check_rpc_sampling(Path(tmpdirname), 2)
+        check_rpc_sampling(Path(tmpdirname), 1)

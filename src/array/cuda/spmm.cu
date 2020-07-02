@@ -140,6 +140,7 @@ void CusparseCsrmm2(
       static_cast<int32_t*>(csr.indptr->data),
       static_cast<int32_t*>(csr.indices->data),
       B_data, n, &beta, trans_out, m));
+  CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
   if (valptr)
     device->FreeWorkspace(ctx, valptr);
   // transpose the output matrix

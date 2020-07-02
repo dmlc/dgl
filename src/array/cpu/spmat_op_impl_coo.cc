@@ -3,10 +3,10 @@
  * \file array/cpu/spmat_op_impl.cc
  * \brief CPU implementation of COO sparse matrix operators
  */
-#include <dgl/array.h>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
+#include <tuple>
 #include "array_utils.h"
 
 namespace dgl {
@@ -266,29 +266,57 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   const IdType* row_data = static_cast<IdType*>(coo.row->data);
   const IdType* col_data = static_cast<IdType*>(coo.col->data);
   const IdType* data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
+
   NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
   NDArray ret_indices;
   NDArray ret_data;
 
-  IdType* Bp = static_cast<IdType*>(ret_indptr->data);
-
-  std::fill(Bp, Bp + N, 0);
-  for (int64_t i = 0; i < NNZ; ++i) {
-    Bp[row_data[i]]++;
+  bool row_sorted = coo.row_sorted;
+  bool col_sorted = coo.col_sorted;
+  if (!row_sorted) {
+    // It is possible that the flag is simply not set (default value is false),
+    // so we still perform a linear scan to check the flag.
+    std::tie(row_sorted, col_sorted) = COOIsSorted(coo);
   }
 
-  // cumsum
-  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
-    const IdType temp = Bp[i];
-    Bp[i] = cumsum;
-    cumsum += temp;
-  }
-  Bp[N] = NNZ;
+  if (row_sorted) {
+    // compute indptr
+    IdType* Bp = static_cast<IdType*>(ret_indptr->data);
+    Bp[0] = 0;
+    int64_t j = 0;
+    for (int64_t i = 0; i < N; ++i) {
+      const int64_t k = j;
+      for (; j < NNZ && row_data[j] == i; ++j) {}
+      Bp[i + 1] = Bp[i] + j - k;
+    }
 
-  if (coo.row_sorted == true) {
+    // TODO(minjie): Many of our current implementation assumes that CSR must have
+    //   a data array. This is a temporary workaround. Remove this after:
+    //   - The old immutable graph implementation is deprecated.
+    //   - The old binary reduce kernel is deprecated.
+    if (!COOHasData(coo))
+      coo.data = aten::Range(0, NNZ, coo.row->dtype.bits, coo.row->ctx);
+
+    // compute indices and data
     ret_indices = coo.col;
     ret_data = coo.data;
   } else {
+    // compute indptr
+    IdType* Bp = static_cast<IdType*>(ret_indptr->data);
+    std::fill(Bp, Bp + N, 0);
+    for (int64_t i = 0; i < NNZ; ++i) {
+      Bp[row_data[i]]++;
+    }
+
+    // cumsum
+    for (int64_t i = 0, cumsum = 0; i < N; ++i) {
+      const IdType temp = Bp[i];
+      Bp[i] = cumsum;
+      cumsum += temp;
+    }
+    Bp[N] = NNZ;
+
+    // compute indices and data
     ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
     ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
     IdType* Bi = static_cast<IdType*>(ret_indices->data);
@@ -311,7 +339,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
   return CSRMatrix(coo.num_rows, coo.num_cols,
                    ret_indptr, ret_indices, ret_data,
-                   coo.col_sorted);
+                   col_sorted);
 }
 
 template CSRMatrix COOToCSR<kDLCPU, int32_t>(COOMatrix coo);
@@ -439,7 +467,6 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
   // Input COO
   const IdType* in_rows = static_cast<IdType*>(coo.row->data);
   const IdType* in_cols = static_cast<IdType*>(coo.col->data);
-  const IdType* in_data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
   int64_t num_rows = coo.num_rows;
   int64_t num_cols = coo.num_cols;
   int64_t nnz = coo.row->shape[0];

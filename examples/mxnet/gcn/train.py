@@ -20,15 +20,24 @@ def evaluate(model, features, labels, mask):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-    features = mx.nd.array(data.features)
-    labels = mx.nd.array(data.labels)
-    train_mask = mx.nd.array(data.train_mask)
-    val_mask = mx.nd.array(data.val_mask)
-    test_mask = mx.nd.array(data.test_mask)
+    g = data.g
 
-    in_feats = features.shape[1]
+    if args.gpu < 0:
+        cuda = False
+        ctx = mx.cpu()
+    else:
+        cuda = True
+        ctx = mx.gpu(args.gpu)
+        g = g.to(ctx)
+    in_feats = g.ndata['feat'].shape[1]
     n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
+    n_edges = g.number_of_edges()
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
+    labels = mx.nd.array(g.ndata['label'], dtype='float32')
+    features = g.ndata['feat']
+
     print("""----Data statistics------'
       #Edges %d
       #Classes %d
@@ -36,29 +45,17 @@ def main(args):
       #Val samples %d
       #Test samples %d""" %
           (n_edges, n_classes,
-              train_mask.sum().asscalar(),
-              val_mask.sum().asscalar(),
-              test_mask.sum().asscalar()))
+           train_mask.sum().asscalar(),
+           val_mask.sum().asscalar(),
+           test_mask.sum().asscalar()))
 
-    if args.gpu < 0:
-        cuda = False
-        ctx = mx.cpu(0)
-    else:
-        cuda = True
-        ctx = mx.gpu(args.gpu)
-
-    features = features.as_in_context(ctx)
-    labels = labels.as_in_context(ctx)
-    train_mask = train_mask.as_in_context(ctx)
-    val_mask = val_mask.as_in_context(ctx)
-    test_mask = test_mask.as_in_context(ctx)
-
-    # create GCN model
-    g = data.graph
+    # add self loop
     if args.self_loop:
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g.add_edges_from(zip(g.nodes(), g.nodes()))
-    g = DGLGraph(g)
+        _, _, self_e = g.edge_ids(g.nodes(), g.nodes(), return_uv=True)
+        g.remove_edges(self_e)
+        g.add_edges(g.nodes(), g.nodes())
+    n_edges = g.number_of_edges()
+
     # normalization
     degs = g.in_degrees().astype('float32')
     norm = mx.nd.power(degs, -0.5)
