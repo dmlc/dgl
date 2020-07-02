@@ -459,13 +459,21 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
  *      [1, 0, 1],
  *      [1, 1, 0]]
  *
- * B = CSRLineGraph(A)
+ * B = CSRLineGraph(A, backtracking=False)
  *
- * B = [[0, 0, 1, 1, 0],
- *      [0, 0, 1, 1, 0],
- *      [1, 1, 0, 0, 1],
- *      [1, 1, 0, 0, 1],
- *      [0, 0, 1, 1, 0]]
+ * B = [[0, 0, 0, 0, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 1, 0, 0, 0]]
+ *
+ * C = CSRLineGraph(A, backtracking=False)
+ *
+ * C = [[0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 1, 1, 0, 0]]
  *
  * \param csr CSRMatrix to create the LineGraph
  * \param backtracking whether the pair of (v, u) (u, v) edges are treated as linked

@@ -460,17 +460,21 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
 /*!
  * \brief Create a LineGraph of input coo
  * 
- * A = [[0, 0, 1],
- *      [1, 0, 1],
- *      [1, 1, 0]]
+ * B = COOLineGraph(A, backtracking=False)
  *
- * B = COOLineGraph(A)
+ * B = [[0, 0, 0, 0, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 1, 0, 0, 0]]
  *
- * B = [[0, 0, 1, 1, 0],
- *      [0, 0, 1, 1, 0],
- *      [1, 1, 0, 0, 1],
- *      [1, 1, 0, 0, 1],
- *      [0, 0, 1, 1, 0]]
+ * C = COOLineGraph(A, backtracking=False)
+ *
+ * C = [[0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 1, 1, 0, 0]]
  *
  * \param coo COOMatrix to create the LineGraph
  * \param backtracking whether the pair of (v, u) (u, v) edges are treated as linked
