@@ -40,33 +40,36 @@ class SparseEmbedding:
         self._trace.append((idx, emb))
         return emb
 
-def sparse_adagrad_optimize(data_store, name, indices, data):
-    ''' Update the embeddings with sparse Adagrad.
+class SparseAdagrdUDF:
+    def __init__(self, lr):
+        self._lr = lr
 
-    This function runs on the KVStore server. It updates the gradients by scaling them
-    according to the state sum. The gradients have been adjusted by the learning rate
-    before being pushed to the kvstore.
+    def __call__(self, data_store, name, indices, data):
+        ''' Update the embeddings with sparse Adagrad.
 
-    Parameters
-    ----------
-    data_store : dict of data
-        all data in the kvstore.
-    name : str
-        data name
-    indices : tensor
-        the indices in the local tensor.
-    data : tensor (mx.ndarray or torch.tensor)
-        a tensor with the same row size of id
-    '''
-    grad_indices = indices
-    grad_values = data
-    embs = data_store[name]
-    state_sum = data_store[name + "_sum"]
-    grad_sum = (grad_values * grad_values).mean(1)
-    state_sum.index_add_(0, grad_indices, grad_sum)
-    std = state_sum[grad_indices]  # _sparse_mask
-    std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-    embs.index_add_(0, grad_indices, grad_values / std_values)
+        This function runs on the KVStore server. It updates the gradients by scaling them
+        according to the state sum.
+
+        Parameters
+        ----------
+        data_store : dict of data
+            all data in the kvstore.
+        name : str
+            data name
+        indices : tensor
+            the indices in the local tensor.
+        data : tensor (mx.ndarray or torch.tensor)
+            a tensor with the same row size of id
+        '''
+        grad_indices = indices
+        grad_values = data
+        embs = data_store[name]
+        state_sum = data_store[name + "_sum"]
+        grad_sum = (grad_values * grad_values).mean(1)
+        state_sum.index_add_(0, grad_indices, grad_sum)
+        std = state_sum[grad_indices]  # _sparse_mask
+        std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+        embs.index_add_(0, grad_indices, grad_values / std_values * (-self._lr))
 
 def _init_state(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
@@ -95,7 +98,7 @@ class SparseAdagrad:
             kvstore.init_data(name + "_sum",
                               (emb._tensor.shape[0],), emb._tensor.dtype,
                               policy.policy_str, policy.partition_book, _init_state)
-            kvstore.register_push_handler(name, sparse_adagrad_optimize)
+            kvstore.register_push_handler(name, SparseAdagradUDF(self._lr))
 
     def step(self):
         ''' The step function.
@@ -118,7 +121,7 @@ class SparseAdagrad:
                 # Here let's adjust the gradients with the learning rate first.
                 # We'll need to scale them with the state sum on the kvstore server
                 # after we push them.
-                grads = F.cat(grads, 0) * -self._lr
+                grads = F.cat(grads, 0)
                 kvstore.push(name, idxs, grads)
             # Clean up the old traces.
             emb._trace = []
