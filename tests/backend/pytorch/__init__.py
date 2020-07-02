@@ -68,15 +68,3 @@ def matmul(a, b):
 
 def dot(a, b):
     return sum(mul(a, b), dim=-1)
-
-class record_grad(object):
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
-
-no_grad = th.no_grad

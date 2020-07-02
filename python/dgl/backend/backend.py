@@ -1345,3 +1345,26 @@ def is_no_grad(x):
     """ Test if the input tensor has gradient
     """
     pass
+
+class record_grad(object):
+    """Context manager that records the gradients"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+
+class no_grad(object):
+    """Context manager that explicitly disables gradient computation"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass

@@ -677,6 +677,6 @@ def grad(x):
 def is_no_grad(x):
     return cgrad.is_no_grad(x)
 
-
+no_grad = None
 
 initialize_context()

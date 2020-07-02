@@ -75,16 +75,3 @@ def matmul(a, b):
 
 def dot(a, b):
     return nd.sum(mul(a, b), axis=-1)
-
-record_grad = autograd.record
-
-
-class no_grad(object):
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass

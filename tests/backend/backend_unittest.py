@@ -110,26 +110,3 @@ def dot(a, b):
 # ----------------
 # These are not related to tensors. Some of them are temporary workarounds that
 # should be included in DGL in the future.
-
-class record_grad(object):
-    """Context manager that records the gradients"""
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
-
-
-class no_grad(object):
-    """Context manager that explicitly disables gradient computation"""
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
