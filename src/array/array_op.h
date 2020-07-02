@@ -149,6 +149,8 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRLineGraph(const CSRMatrix &csr, bool backtracking);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -238,7 +240,8 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              const bool has_nontree_edge,
                              const bool return_labels);
 
-
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking));
 
 }  // namespace impl
 }  // namespace aten

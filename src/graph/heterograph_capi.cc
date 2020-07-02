@@ -596,4 +596,13 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
     ret_list.push_back(dstlist);
     *rv = ret_list;
   });
+
+DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLHeteroLineGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  HeteroGraphRef hg = args[0];
+  bool backtracking = args[1];
+
+  auto hgptr = CreateLineGraph(hg.sptr(), backtracking);
+  *rv = HeteroGraphRef(hgptr);
+});
 }  // namespace dgl

@@ -457,6 +457,27 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum);
 
+/*!
+ * \brief Create a LineGraph of input coo
+ * 
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [1, 1, 0]]
+ *
+ * B = COOLineGraph(A)
+ *
+ * B = [[0, 0, 1, 1, 0],
+ *      [0, 0, 1, 1, 0],
+ *      [1, 1, 0, 0, 1],
+ *      [1, 1, 0, 0, 1],
+ *      [0, 0, 1, 1, 0]]
+ *
+ * \param coo COOMatrix to create the LineGraph
+ * \param backtracking whether the pair of (v, u) (u, v) edges are treated as linked
+ * \return LineGraph in COO format
+ */
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
+
 }  // namespace aten
 }  // namespace dgl
 

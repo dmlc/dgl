@@ -499,6 +499,14 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
+CSRMatrix CSRLineGraph(const CSRMatrix &csr) {
+  CSRMatrix ret;
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRLineGraph", {
+    ret = impl::CSRLineGraph<XPU, IdType>(csr);
+  });
+  return ret;
+}
+
 ///////////////////////// COO routines //////////////////////////
 
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
@@ -664,6 +672,14 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   std::pair<COOMatrix, IdArray> ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOCoalesce", {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
+  });
+  return ret;
+}
+
+COOMatrix COOLineGraph(const COOMatrix &coo) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOLineGraph", {
+    ret = impl::COOLineGraph<XPU, IdType>(coo);
   });
   return ret;
 }

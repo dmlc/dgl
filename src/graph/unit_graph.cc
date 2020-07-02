@@ -1435,6 +1435,23 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
   return GraphPtr(new dgl::ImmutableGraph(in_csr_ptr, out_csr_ptr, coo_ptr));
 }
 
+HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
+  // TODO(xiangsx) currently we only support homogeneous graph
+  if (coo_) {
+    const auto&new_coo = aten::COOLineGraph(coo_->adj_, backtracking);
+    return CreateFromCOO(1, new_coo, restrict_format_);
+  } else if (in_csr_) {
+    const auto&new_in_csr = aten::CSRLineGraph(in_csr_->adj_, backtracking);
+    return CreateFromCSC(1, new_in_csr, restrict_format_);
+  } else if (out_csr_) {
+    const auto&new_out_csr = aten::CSRLineGraph(out_csr_->adj_, backtracking);
+    return CreateFromCSR(1, new_out_csr, restrict_format_);
+  }
+
+  LOG(FATAL) << "None of CSC, CSR, COO exist";
+  return nullptr;
+}
+
 constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
 
 bool UnitGraph::Load(dmlc::Stream* fs) {

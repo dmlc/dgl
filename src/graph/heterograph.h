@@ -220,6 +220,9 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
+  /*! \brief Creat a LineGraph of self */
+  HeteroGraphPtr LineGraph() const;
+
  private:
   // To create empty class
   friend class Serializer;

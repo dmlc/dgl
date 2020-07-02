@@ -266,6 +266,9 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
+  /*! \brief Creat a LineGraph of self */
+  HeteroGraphPtr LineGraph(bool backtracking) const;
+
  private:
   friend class Serializer;
   friend class HeteroGraph;

@@ -150,6 +150,19 @@ class HeteroGraphIndex(ObjectBase):
         _CAPI_DGLHeteroClear(self)
         self._cache.clear()
 
+    def line_graph(self, backtracking=True):
+        """Return the line graph of this graph.
+
+        suppose the graph is an undirected homogeneous graph.
+
+        Returns
+        -------
+        GraphIndex
+            The line graph of this graph.
+        """
+        return _CAPI_DGLHeteroLineGraph(self, backtracking)
+
+
     @property
     def dtype(self):
         """Return the data type of this graph index.

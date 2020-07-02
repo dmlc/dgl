@@ -63,4 +63,11 @@ HeteroGraphPtr CreateFromCSC(
   return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
 }
 
+HeteroGraphPtr CreateLineGraph(
+    HeteroGraphPtr hg,
+    bool backtracking) {
+  CHECK(hg->IsMultigraph()) << "Line graph transformation is only supported on mutable graph";
+  return hg->LineGraph(backtracking);
+}
+
 }  // namespace dgl
