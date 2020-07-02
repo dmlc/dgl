@@ -16,25 +16,10 @@ import torch.optim as optim
 from model import IGMC
 from data import MovieLens
 from dataset import MovieLensDataset, collate_movielens 
+from utils import MetricLogger
 
 os.environ['TZ'] = 'Asia/Shanghai'
 time.tzset()
-
-def logger(info, model, optimizer, save_dir, log_interval):
-    epoch, train_loss, test_rmse = info['epoch'], info['train_loss'], info['test_rmse']
-    with open(os.path.join(save_dir, 'log.txt'), 'a') as f:
-        f.write('Epoch {}, train loss {:.4f}, test rmse {:.6f}\n'.format(
-            epoch, train_loss, test_rmse))
-    if type(epoch) == int and epoch % log_interval == 0:
-        print('Saving model states...')
-        model_name = os.path.join(save_dir, 'model_checkpoint{}.pth'.format(epoch))
-        optimizer_name = os.path.join(
-            save_dir, 'optimizer_checkpoint{}.pth'.format(epoch)
-        )
-        if model is not None:
-            th.save(model.state_dict(), model_name)
-        if optimizer is not None:
-            th.save(optimizer.state_dict(), optimizer_name)
 
 def evaluate(model, loader, device):
     # Evaluate RMSE
@@ -113,9 +98,7 @@ def train(args):
                             num_workers=args.num_workers, collate_fn=collate_movielens)
     test_loader = th.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                             num_workers=args.num_workers, collate_fn=collate_movielens)
-    
-    # multiply num_relations by 2 because now we have two types for u-v edge and v-u edge
-    # NOTE: can't remember why we need add 2 for dim, need check
+
     model = IGMC(in_feats=(args.hop+1)*2,
                  latent_dim=[32, 32, 32, 32],
                  num_relations=5, #dataset_base.num_rating, 
@@ -126,10 +109,15 @@ def train(args):
                 #  n_side_features=n_features,
                 #  multiply_by=args.multiply_by
             ).to(args.device)
-    loss_fn = nn.MSELoss()
+    loss_fn = nn.MSELoss().to(args.device)
     optimizer = optim.Adam(model.parameters(), lr=args.train_lr, weight_decay=0)
     print("Loading network finished ...\n")
 
+    ### prepare the logger
+    logger = MetricLogger(args.save_dir, args.valid_log_interval)
+    
+    best_epoch = 0
+    best_rmse = np.inf
     ### declare the loss information
     print("Start training ...")
     for epoch_idx in range(1, args.train_epochs+1):
@@ -149,7 +137,11 @@ def train(args):
             for param in optimizer.param_groups:
                 param['lr'] = args.train_lr_decay_factor * param['lr']
 
-        logger(eval_info, model, optimizer, args.save_dir, args.valid_log_interval)
+        logger.log(eval_info, model, optimizer)
+        if best_rmse > test_rmse:
+            best_rmse = test_rmse
+            best_epoch = epoch_idx
+    print("Training ends. The best testing rmse is {:.6f} at epoch {}".format(best_rmse, best_epoch))
 
 def config():
     parser = argparse.ArgumentParser(description='IGMC')
@@ -167,8 +159,8 @@ def config():
     parser.add_argument('--data_test_ratio', type=float, default=0.1) # for ml-100k the test ration is 0.2
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--data_valid_ratio', type=float, default=0.2)
-    parser.add_argument('--ensemble', action='store_true', default=False,
-                        help='if True, load a series of model checkpoints and ensemble the results')               
+    # parser.add_argument('--ensemble', action='store_true', default=False,
+    #                     help='if True, load a series of model checkpoints and ensemble the results')               
     parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--valid_log_interval', type=int, default=10)
     parser.add_argument('--save_appendix', type=str, default='', 

@@ -1,4 +1,4 @@
-import csv
+import os
 import time
 import random
 from tqdm import tqdm
@@ -6,25 +6,31 @@ import multiprocessing as mp
 from collections import OrderedDict
 
 import numpy as np
+import torch as th
 import scipy.sparse as sp
 import warnings
 warnings.simplefilter('ignore', sp.SparseEfficiencyWarning)
 
 class MetricLogger(object):
-    def __init__(self, attr_names, parse_formats, save_path):
-        self._attr_format_dict = OrderedDict(zip(attr_names, parse_formats))
-        self._file = open(save_path, 'w')
-        self._csv = csv.writer(self._file)
-        self._csv.writerow(attr_names)
-        self._file.flush()
+    def __init__(self, save_dir, log_interval):
+        self.save_dir = save_dir
+        self.log_interval = log_interval
 
-    def log(self, **kwargs):
-        self._csv.writerow([parse_format % kwargs[attr_name]
-                            for attr_name, parse_format in self._attr_format_dict.items()])
-        self._file.flush()
-
-    def close(self):
-        self._file.close()
+    def log(self, info, model, optimizer):
+        epoch, train_loss, test_rmse = info['epoch'], info['train_loss'], info['test_rmse']
+        with open(os.path.join(self.save_dir, 'log.txt'), 'a') as f:
+            f.write('Epoch {}, train loss {:.4f}, test rmse {:.6f}\n'.format(
+                epoch, train_loss, test_rmse))
+        if type(epoch) == int and epoch % self.log_interval == 0:
+            print('Saving model states...')
+            model_name = os.path.join(self.save_dir, 'model_checkpoint{}.pth'.format(epoch))
+            optimizer_name = os.path.join(
+                self.save_dir, 'optimizer_checkpoint{}.pth'.format(epoch)
+            )
+            if model is not None:
+                th.save(model.state_dict(), model_name)
+            if optimizer is not None:
+                th.save(optimizer.state_dict(), optimizer_name)
 
 def torch_total_param_num(net):
     return sum([np.prod(p.shape) for p in net.parameters()])
@@ -126,12 +132,12 @@ def subgraph_extraction_labeling(g_label, ind, adj,
     # Add bidirection link
     src = np.concatenate([u, v])
     dst = np.concatenate([v, u])
-    # NOTE: RelGraphConv count relation from 0??
+    # RelGraphConv count relation from 0
     bi_r = np.concatenate([r, r]) - 1 
     subgraph_info = {'g_label': g_label, 'src': src, 'dst': dst, 'etype': bi_r}
 
     # get structural node labels
-    # NOTE: only use subgraph here
+    # only use subgraph here
     u_node_labels = [x*2 for x in u_dist]
     v_node_labels = [x*2+1 for x in v_dist]
     u_x = one_hot(u_node_labels, max_node_label+1)

@@ -72,7 +72,7 @@ def create_dgl_graph(subgraph):
 def collate_movielens(data):
     g_list, g_label, x, etype = map(list, zip(*data))
     g = dgl.batch(g_list)
-    # TODO [tianjun] will this earase all the feature?
+    #[tianjun] will this earase all the feature?
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
     x = th.tensor(np.concatenate(x, axis=0), dtype=th.float)
