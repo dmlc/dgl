@@ -98,12 +98,16 @@ class GraphPartitionBook:
     def __init__(self, part_id, num_parts, node_map, edge_map, part_graph):
         assert part_id >= 0, 'part_id cannot be a negative number.'
         assert num_parts > 0, 'num_parts must be greater than zero.'
-        self._part_id = part_id
-        self._num_partitions = num_parts
+        self._part_id = int(part_id)
+        self._num_partitions = int(num_parts)
         node_map = utils.toindex(node_map)
         self._nid2partid = node_map.tousertensor()
+        assert F.dtype(self._nid2partid) in (F.int32, F.int64), \
+                'the node map must be stored in an integer array'
         edge_map = utils.toindex(edge_map)
         self._eid2partid = edge_map.tousertensor()
+        assert F.dtype(self._eid2partid) in (F.int32, F.int64), \
+                'the edge map must be stored in an integer array'
         # Get meta data of the partition book.
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
@@ -147,8 +151,8 @@ class GraphPartitionBook:
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
         # node size and edge size
-        self._edge_size = len(self.partid2eids(part_id))
-        self._node_size = len(self.partid2nids(part_id))
+        self._edge_size = len(self.partid2eids(self._part_id))
+        self._node_size = len(self.partid2nids(self._part_id))
 
     def shared_memory(self, graph_name):
         """Move data to shared memory.
@@ -538,8 +542,10 @@ class RangePartitionBook:
             raise RuntimeError('Now RangePartitionBook does not support \
                 getting remote tensor of nid2localnid.')
 
+        nids = utils.toindex(nids)
+        nids = nids.tousertensor()
         start = self._node_map[partid - 1] if partid > 0 else 0
-        return nids - start
+        return nids - int(start)
 
 
     def eid2localeid(self, eids, partid):
@@ -561,8 +567,10 @@ class RangePartitionBook:
             raise RuntimeError('Now RangePartitionBook does not support \
                 getting remote tensor of eid2localeid.')
 
+        eids = utils.toindex(eids)
+        eids = eids.tousertensor()
         start = self._edge_map[partid - 1] if partid > 0 else 0
-        return eids - start
+        return eids - int(start)
 
 
     def get_partition(self, partid):

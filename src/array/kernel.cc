@@ -1,8 +1,8 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/kernel.cc
- * \brief New kernels */
-#include <dgl/array.h>
+ * \brief New kernels
+ */
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
 

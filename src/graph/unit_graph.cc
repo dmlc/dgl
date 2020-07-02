@@ -138,13 +138,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   COO CopyTo(const DLContext& ctx) const {
     if (Context() == ctx)
       return *this;
-
-    COO ret(
-        meta_graph_,
-        adj_.num_rows, adj_.num_cols,
-        adj_.row.CopyTo(ctx),
-        adj_.col.CopyTo(ctx));
-    return ret;
+    return COO(meta_graph_, adj_.CopyTo(ctx));
   }
 
   bool IsMultigraph() const override {
@@ -376,10 +370,12 @@ class UnitGraph::COO : public BaseHeteroGraph {
     } else {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
       IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
-      subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(0), NumBits(), Context()));
-      subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(1), NumBits(), Context()));
+      subg.induced_vertices.emplace_back(
+          aten::Range(0, NumVertices(SrcType()), NumBits(), Context()));
+      subg.induced_vertices.emplace_back(
+          aten::Range(0, NumVertices(DstType()), NumBits(), Context()));
       subg.graph = std::make_shared<COO>(
-          meta_graph(), NumVertices(0), NumVertices(1), new_src, new_dst);
+          meta_graph(), NumVertices(SrcType()), NumVertices(DstType()), new_src, new_dst);
       subg.induced_edges = eids;
     }
     return subg;
@@ -514,13 +510,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     if (Context() == ctx) {
       return *this;
     } else {
-      CSR ret(
-          meta_graph_,
-          adj_.num_rows, adj_.num_cols,
-          adj_.indptr.CopyTo(ctx),
-          adj_.indices.CopyTo(ctx),
-          adj_.data.CopyTo(ctx));
-      return ret;
+      return CSR(meta_graph_, adj_.CopyTo(ctx));
     }
   }
 
@@ -1179,35 +1169,28 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   if (g->NumBits() == bits) {
     return g;
   } else {
-    // TODO(minjie): since we don't have int32 operations,
-    //   we make sure that this graph (on CPU) has materialized CSR,
-    //   and then copy them to other context (usually GPU). This should
-    //   be fixed later.
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-
-    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
-    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
+    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->AsNumBits(bits))) : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->AsNumBits(bits))) : nullptr;
+    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->AsNumBits(bits))) : nullptr;
     return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
 }
 
 HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   if (ctx == g->Context()) {
     return g;
+  } else {
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
+    CHECK_NOTNULL(bg);
+    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
+    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
+    return HeteroGraphPtr(
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
-  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
-  //   we make sure that this graph (on CPU) has materialized CSR,
-  //   and then copy them to other context (usually GPU). This should
-  //   be fixed later.
-  auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
-  CHECK_NOTNULL(bg);
-
-  CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
-  CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-  return HeteroGraphPtr(
-      new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
 }
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
@@ -1276,9 +1259,8 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
         const_cast<UnitGraph*>(this)->in_csr_ = ret;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      const auto& adj = coo_->adj();
-      const auto& newadj = aten::COOToCSR(
-          aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
+      const auto& newadj = aten::CSRSort(aten::COOToCSR(
+            aten::COOTranspose(coo_->adj())));
       ret = std::make_shared<CSR>(meta_graph(), newadj);
       if (inplace)
         const_cast<UnitGraph*>(this)->in_csr_ = ret;
@@ -1297,13 +1279,13 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   CSRPtr ret = out_csr_;
   if (!out_csr_) {
     if (in_csr_) {
-      const auto& newadj = aten::CSRTranspose(in_csr_->adj());
+      const auto& newadj = aten::CSRSort(aten::CSRTranspose(in_csr_->adj()));
       ret = std::make_shared<CSR>(meta_graph(), newadj);
       if (inplace)
         const_cast<UnitGraph*>(this)->out_csr_ = ret;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      const auto& newadj = aten::COOToCSR(coo_->adj());
+      const auto& newadj = aten::CSRSort(aten::COOToCSR(coo_->adj()));
       ret = std::make_shared<CSR>(meta_graph(), newadj);
       if (inplace)
         const_cast<UnitGraph*>(this)->out_csr_ = ret;
@@ -1460,11 +1442,13 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
 
-  int64_t format_code;
-  CHECK(fs->Read(&format_code)) << "Invalid format";
-  restrict_format_ = static_cast<SparseFormat>(format_code);
+  int64_t save_format_code, restrict_format_code;
+  CHECK(fs->Read(&save_format_code)) << "Invalid format";
+  CHECK(fs->Read(&restrict_format_code)) << "Invalid format";
+  restrict_format_ = static_cast<SparseFormat>(restrict_format_code);
+  auto save_format = static_cast<SparseFormat>(save_format_code);
 
-  switch (restrict_format_) {
+  switch (save_format) {
     case SparseFormat::kCOO:
       fs->Read(&coo_);
       break;
@@ -1491,6 +1475,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   // sparse matrix
   auto avail_fmt = SelectFormat(SparseFormat::kAny);
   fs->Write(static_cast<int64_t>(avail_fmt));
+  fs->Write(static_cast<int64_t>(restrict_format_));
   switch (avail_fmt) {
     case SparseFormat::kCOO:
       fs->Write(GetCOO());

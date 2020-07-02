@@ -6,9 +6,9 @@
 #ifndef DGL_ARRAY_KERNEL_DECL_H_
 #define DGL_ARRAY_KERNEL_DECL_H_
 
-#include <dgl/array.h>
 #include <dgl/bcast.h>
 #include <dgl/base_heterograph.h>
+#include <dgl/runtime/ndarray.h>
 
 #include <string>
 #include <vector>
