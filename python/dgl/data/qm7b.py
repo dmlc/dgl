@@ -5,10 +5,9 @@ import os
 
 from .dgl_dataset import DGLDataset
 from .utils import download, save_graphs, load_graphs, \
-    check_sha1, deprecate_property
+    check_sha1, deprecate_property, deprecate_class
 from ..graph import DGLGraph
 from .. import backend as F
-from ..base import dgl_warning
 
 
 class QM7bDataset(DGLDataset):
@@ -53,7 +52,7 @@ class QM7bDataset(DGLDataset):
     --------
     >>> data = QM7bDataset()
     >>> graphs = data.graphs  # get the list of graphs
-    >>> labels = data.labels   # get the labels
+    >>> labels = data.labels  # get the labels
     >>> data.num_labels
     14
     >>>
@@ -148,5 +147,5 @@ class QM7bDataset(DGLDataset):
 
 class QM7b(QM7bDataset):
     def __init__(self):
-        dgl_warning('QM7b is deprecated, use QM7bDataset instead.', DeprecationWarning, stacklevel=2)
+        deprecate_class('QM7b', 'QM7bDataset')
         super(QM7b, self).__init__()
