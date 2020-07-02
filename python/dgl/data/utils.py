@@ -267,6 +267,10 @@ def deprecate_function(old, new):
     warnings.warn('Function {} will be deprecated, please use {} instead.'.format(old, new))
 
 
+def deprecate_class(old, new):
+    warnings.warn('Class {} will be deprecated, please use {} instead.'.format(old, new))
+
+
 def generate_mask_tensor(mask):
     """Generate mask tensor according to different backend
 

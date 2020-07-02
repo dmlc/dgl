@@ -5,8 +5,9 @@ import networkx as nx
 
 from .dgl_dataset import DGLDataset
 from ..graph import DGLGraph
+from ..base import dgl_warning
 
-__all__ = ['KarateClubDataset']
+__all__ = ['KarateClubDataset', 'KarateClub']
 
 
 class KarateClubDataset(DGLDataset):
@@ -20,19 +21,19 @@ class KarateClubDataset(DGLDataset):
     Official website: http://konect.cc/networks/ucidata-zachary/
 
     Statistics
-    ===
+    ----------
     Nodes: 34
     Edges: 156
     Number of Classes: 2
 
     Returns
-    ===
+    -------
     KarateClubDataset object with two properties:
         graph: A Homogeneous graph contain the graph structure and node labels
         num_classes: number of node classes
 
     Examples
-    ===
+    --------
     >>> data = KarateClubDataset()
     >>> data.num_classes
     2
@@ -50,12 +51,22 @@ class KarateClubDataset(DGLDataset):
             [kc_graph.nodes[i]['club'] != 'Mr. Hi' for i in kc_graph.nodes]).astype(np.int64)
         g = DGLGraph(kc_graph)
         g.ndata['label'] = self.label
-        self.graph = g
+        self._graph = g
+        self._data = [g]
 
     @property
     def num_classes(self):
         """Number of classes."""
         return 2
+
+    @property
+    def graph(self):
+        return self._graph
+
+    @property
+    def data(self):
+        dgl_warning('Attribute .data is deprecated, use .graph instead.', DeprecationWarning, stacklevel=2)
+        return self._data
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
@@ -63,3 +74,10 @@ class KarateClubDataset(DGLDataset):
 
     def __len__(self):
         return 1
+
+
+class KarateClub(KarateClubDataset):
+    def __init__(self):
+        dgl_warning('KarateClub is deprecated, use KarateClubDataset instead.',
+                    DeprecationWarning, stacklevel=2)
+        super(KarateClub, self).__init__()
