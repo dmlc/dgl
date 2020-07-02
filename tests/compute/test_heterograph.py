@@ -2077,11 +2077,13 @@ if __name__ == '__main__':
     # test_level2()
     # test_updates()
     # test_backward()
-    # test_empty_heterograph()
+    # test_empty_heterograph('int32')
     # test_types_in_function()
     # test_stack_reduce()
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
-    test_reverse("int32")
+    # test_reverse("int32")
+    test_format()
+
     pass

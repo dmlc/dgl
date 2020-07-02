@@ -77,9 +77,16 @@ class UnitGraph::COO : public BaseHeteroGraph {
     adj_.data = aten::NullArray();
   }
 
-  COO() {};
+  COO() {
+    // set magic num_rows/num_cols to mark it as undefined
+    // adj_.num_rows == 0 and adj_.num_cols == 0 means empty UnitGraph which is supported
+    adj_.num_rows = -1;
+    adj_.num_cols = -1;
+  };
 
-  bool defined() const { return (adj_.num_rows != 0) || (adj_.num_cols != 0); }
+  bool defined() const {
+    return (adj_.num_rows >= 0) && (adj_.num_cols >= 0);
+  }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -448,9 +455,16 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     : BaseHeteroGraph(metagraph), adj_(csr) {
   }
 
-  CSR() {};
+  CSR() {
+    // set magic num_rows/num_cols to mark it as undefined
+    // adj_.num_rows == 0 and adj_.num_cols == 0 means empty UnitGraph which is supported
+    adj_.num_rows = -1;
+    adj_.num_cols = -1;
+  };
 
-  bool defined() const { return (adj_.num_rows != 0) || (adj_.num_cols != 0); }
+  bool defined() const {
+    return (adj_.num_rows >= 0) || (adj_.num_cols >= 0);
+  }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -1219,12 +1233,21 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   switch (restrict_format) {
   case SparseFormat::kCSC:
     in_csr_ = GetInCSR();
+    // cleaning other format
+    out_csr_ = out_csr_->defined() ? CSRPtr(new CSR()) : out_csr_;
+    coo_ = coo_->defined() ? COOPtr(new COO()) : coo_;
     break;
   case SparseFormat::kCSR:
     out_csr_ = GetOutCSR();
+    // cleaning other format
+    in_csr_ = in_csr_->defined() ? CSRPtr(new CSR()) : in_csr_;
+    coo_ = coo_->defined() ? COOPtr(new COO()) : coo_;
     break;
   case SparseFormat::kCOO:
     coo_ = GetCOO();
+    // cleaning other format
+    in_csr_ = in_csr_->defined() ? CSRPtr(new CSR()) : in_csr_;
+    out_csr_ = out_csr_->defined() ? CSRPtr(new CSR()) : out_csr_;
     break;
   default:
     break;
@@ -1412,7 +1435,11 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(SparseFormat restrict_format) const {
         num_vtypes, GetOutCSR(false)->adj(), restrict_format);
     case SparseFormat::kAny:
       return HeteroGraphPtr(
-        new UnitGraph(meta_graph_, in_csr_, out_csr_, coo_, restrict_format));
+        new UnitGraph(meta_graph_,
+                      (in_csr_->defined()) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
+                      (out_csr_->defined()) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
+                      (coo_->defined()) ? COOPtr(new COO(*coo_)) : nullptr,
+                      restrict_format));
     default:  // SparseFormat::kAuto
       LOG(FATAL) << "Must specify a restrict format.";
       return nullptr;
