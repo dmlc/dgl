@@ -13,7 +13,7 @@ from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
-from dgl.distributed import SparseAdagrad, SparseEmbedding
+from dgl.distributed import SparseAdagrad, SparseNodeEmbedding
 import backend as F
 import unittest
 import pickle
@@ -98,7 +98,7 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
 
     # Test sparse emb
     new_shape = (g.number_of_nodes(), 1)
-    emb = SparseEmbedding(g, 'emb1', new_shape, emb_init)
+    emb = SparseNodeEmbedding(g, 'emb1', new_shape, emb_init)
     optimizer = SparseAdagrad(g.get_node_embeddings(), lr=0.001)
     feats = emb(nids)
     assert np.all(feats.detach().numpy() == np.zeros((len(nids), 1)))

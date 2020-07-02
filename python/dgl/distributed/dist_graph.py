@@ -371,7 +371,6 @@ class DistGraph:
         self._edata = EdgeDataView(self)
         self._default_init_ndata = _default_init_data
         self._default_init_edata = _default_init_data
-        self._node_embs = []
 
         self._num_nodes = 0
         self._num_edges = 0
@@ -417,16 +416,6 @@ class DistGraph:
         self._client.init_data(_get_edata_name(name), shape, dtype, 'edge', self._gpb,
                                self._default_init_edata)
         self._edata._add(name)
-
-    def get_node_embeddings(self):
-        ''' Return node embeddings
-
-        Returns
-        -------
-        a list of SparseEmbedding
-            All node embeddings in the graph store.
-        '''
-        return self._node_embs.copy()
 
     @property
     def local_partition(self):

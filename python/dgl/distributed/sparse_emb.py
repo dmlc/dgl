@@ -9,7 +9,7 @@ def _get_ndata_name(name):
     '''
     return 'node:' + name
 
-class SparseEmbedding:
+class SparseNodeEmbedding:
     ''' Sparse embeddings in the distributed KVStore.
 
     The sparse embeddings are only used as node embeddings.
@@ -27,10 +27,8 @@ class SparseEmbedding:
     '''
     def __init__(self, g, name, shape, initializer):
         assert shape[0] == g.number_of_nodes()
-        g._client.init_data(_get_ndata_name(name), shape, F.float32, 'node',
-                            g.get_partition_book(), initializer)
-        g._ndata._add(name)
-        g._node_embs.append(self)
+        g.init_ndata(_get_ndata_name(name), shape, F.float32, 'node',
+                     g.get_partition_book(), initializer)
 
         self._tensor = g.ndata[name]
         self._trace = []
@@ -82,7 +80,7 @@ class SparseAdagrad:
 
     Parameters
     ----------
-    params : list of SparseEmbeddings
+    params : list of SparseNodeEmbeddings
         The list of sparse embeddings.
     lr : float
         The learning rate.
@@ -112,11 +110,11 @@ class SparseAdagrad:
             kvstore = emb._tensor.kvstore
             trace = emb._trace
             if len(trace) == 1:
-                kvstore.push(name, trace[0][0], trace[0][1].grad.data)
+                kvstore.push(name, trace[0][0], F.grad(trace[0][1]))
             else:
                 # TODO(zhengda) we need to merge the gradients of the same embeddings first.
                 idxs = [t[0] for t in trace]
-                grads = [t[1].grad.data for t in trace]
+                grads = [F.grad(t[1]) for t in trace]
                 idxs = F.cat(idxs, 0)
                 # Here let's adjust the gradients with the learning rate first.
                 # We'll need to scale them with the state sum on the kvstore server
