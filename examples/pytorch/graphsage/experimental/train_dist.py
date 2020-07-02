@@ -73,14 +73,13 @@ def run(args, device, data):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     train_size = th.sum(g.ndata['train_mask'][0:g.number_of_nodes()])
-    num_steps = int(args.num_epochs * train_size / args.batch_size / args.num_client)
 
     # Training loop
     iter_tput = []
     profiler = Profiler()
     profiler.start()
     epoch = 0
-    while num_steps > 0:
+    for epoch in range(args.num_epochs):
         tic = time.time()
 
         sample_time = 0
@@ -140,10 +139,6 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
             start = time.time()
-            num_steps -= 1
-            # We have to ensure all trainer process run the same number of steps.
-            if num_steps == 0:
-                break
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
@@ -167,10 +162,11 @@ def run(args, device, data):
 def main(args):
     th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name)
+    print('rank:', g.rank())
 
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), g.rank())
-    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), g.rank())
-    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), g.rank())
+    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), force_even=True)
+    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), force_even=True)
+    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), force_even=True)
     print('part {}, train: {}, val: {}, test: {}'.format(g.rank(), len(train_nid),
                                                          len(val_nid), len(test_nid)))
     device = th.device('cpu')
