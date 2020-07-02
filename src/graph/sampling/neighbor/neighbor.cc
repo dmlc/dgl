@@ -49,6 +49,17 @@ HeteroSubgraph SampleNeighbors(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges[etype] = aten::NullArray();
+    } else if (fanouts[etype] == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::kCSR : SparseFormat::kCSC;
@@ -124,6 +135,17 @@ HeteroSubgraph SampleNeighborsTopk(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges[etype] = aten::NullArray();
+    } else if (k[etype] == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::kCSR : SparseFormat::kCSC;

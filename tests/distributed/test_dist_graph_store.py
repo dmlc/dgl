@@ -51,14 +51,22 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
-def run_server(graph_name, server_id, num_clients, shared_mem):
+def run_server(graph_name, server_id, num_clients, shared_mem, cond_v, shared_v):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
+    cond_v.acquire()
+    shared_v.value += 1;
+    cond_v.notify()
+    cond_v.release()
     g.start()
 
-def run_client(graph_name, part_id, num_nodes, num_edges):
+def run_client(graph_name, part_id, num_nodes, num_edges, num_server, cond_v, shared_v):
+    cond_v.acquire()
+    while shared_v.value < num_server:
+      cond_v.wait()
+    cond_v.release()
     gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                               part_id, None)
     g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
@@ -133,9 +141,11 @@ def check_server_client(shared_mem):
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
     serv_ps = []
+    cond_v = Condition()
+    shared_v = Value('i', 0)
     ctx = mp.get_context('spawn')
     for serv_id in range(1):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem))
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem, cond_v, shared_v))
         serv_ps.append(p)
         p.start()
 
@@ -143,7 +153,7 @@ def check_server_client(shared_mem):
     for cli_id in range(1):
         print('start client', cli_id)
         p = ctx.Process(target=run_client, args=(graph_name, cli_id, g.number_of_nodes(),
-                                                 g.number_of_edges()))
+                                                 g.number_of_edges(), 1, cond_v, shared_v))
         p.start()
         cli_ps.append(p)
 
