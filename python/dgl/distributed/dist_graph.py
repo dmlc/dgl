@@ -369,8 +369,6 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
-        self._default_init_ndata = _default_init_data
-        self._default_init_edata = _default_init_data
 
         self._num_nodes = 0
         self._num_edges = 0
@@ -379,10 +377,18 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
 
-    def init_ndata(self, name, shape, dtype):
+    def init_ndata(self, name, shape, dtype, init_func=None):
         '''Initialize node data
 
         This initializes the node data in the distributed graph storage.
+        Users can provide a init function to initialize data. The signature of
+        the init function is
+
+        ```
+        def init_func(shape, dtype)
+        ```
+        The inputs are the shape and data type and the output is a tensor with
+        the initialized values.
 
         Parameters
         ----------
@@ -392,16 +398,27 @@ class DistGraph:
             The shape of the node data.
         dtype : dtype
             The data type of the node data.
+        init_func : callable
+            The function to initialize the data
         '''
         assert shape[0] == self.number_of_nodes()
-        self._client.init_data(_get_ndata_name(name), shape, dtype, 'node', self._gpb,
-                               self._default_init_ndata)
+        if init_func is None:
+            init_func = _default_init_data
+        self._client.init_data(_get_ndata_name(name), shape, dtype, 'node', self._gpb, init_func)
         self._ndata._add(name)
 
-    def init_edata(self, name, shape, dtype):
+    def init_edata(self, name, shape, dtype, init_func=None):
         '''Initialize edge data
 
         This initializes the edge data in the distributed graph storage.
+        Users can provide a init function to initialize data. The signature of
+        the init function is
+
+        ```
+        def init_func(shape, dtype)
+        ```
+        The inputs are the shape and data type and the output is a tensor with
+        the initialized values.
 
         Parameters
         ----------
@@ -411,10 +428,13 @@ class DistGraph:
             The shape of the edge data.
         dtype : dtype
             The data type of the edge data.
+        init_func : callable
+            The function to initialize the data
         '''
         assert shape[0] == self.number_of_edges()
-        self._client.init_data(_get_edata_name(name), shape, dtype, 'edge', self._gpb,
-                               self._default_init_edata)
+        if init_func is None:
+            init_func = _default_init_data
+        self._client.init_data(_get_edata_name(name), shape, dtype, 'edge', self._gpb, init_func)
         self._edata._add(name)
 
     @property

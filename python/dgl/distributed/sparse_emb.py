@@ -2,13 +2,6 @@
 
 from .. import backend as F
 
-def _get_ndata_name(name):
-    ''' This is to get the name of node data in the kvstore.
-
-    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
-    '''
-    return 'node:' + name
-
 class SparseNodeEmbedding:
     ''' Sparse embeddings in the distributed KVStore.
 
@@ -27,8 +20,7 @@ class SparseNodeEmbedding:
     '''
     def __init__(self, g, name, shape, initializer):
         assert shape[0] == g.number_of_nodes()
-        g.init_ndata(_get_ndata_name(name), shape, F.float32, 'node',
-                     g.get_partition_book(), initializer)
+        g.init_ndata(name, shape, F.float32, initializer)
 
         self._tensor = g.ndata[name]
         self._trace = []
@@ -38,7 +30,7 @@ class SparseNodeEmbedding:
         self._trace.append((idx, emb))
         return emb
 
-class SparseAdagrdUDF:
+class SparseAdagradUDF:
     def __init__(self, lr):
         self._lr = lr
 

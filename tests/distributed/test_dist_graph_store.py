@@ -14,6 +14,7 @@ from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
 from dgl.distributed import SparseAdagrad, SparseNodeEmbedding
+from numpy.testing import assert_almost_equal
 import backend as F
 import unittest
 import pickle
@@ -99,14 +100,15 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
     # Test sparse emb
     new_shape = (g.number_of_nodes(), 1)
     emb = SparseNodeEmbedding(g, 'emb1', new_shape, emb_init)
-    optimizer = SparseAdagrad(g.get_node_embeddings(), lr=0.001)
+    lr = 0.001
+    optimizer = SparseAdagrad([emb], lr=lr)
     feats = emb(nids)
     assert np.all(feats.detach().numpy() == np.zeros((len(nids), 1)))
     loss = F.sum(feats + 1, 0)
     loss.backward()
     optimizer.step()
     feats = emb(nids)
-    assert np.all(feats.detach().numpy() == np.ones((len(nids), 1)))
+    assert_almost_equal(feats.detach().numpy(), np.ones((len(nids), 1)) * -lr)
     rest = np.setdiff1d(np.arange(g.number_of_nodes()), nids)
     feats1 = emb(rest)
     assert np.all(feats1.detach().numpy() == np.zeros((len(rest), 1)))
