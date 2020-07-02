@@ -590,7 +590,7 @@ def grad(x):
 def is_no_grad(x):
     return (x != 0).sum() == 0
 
-record_grad = autograd.record
+record_grad = mx.autograd.record
 
 class no_grad(object):
     def __init__(self):

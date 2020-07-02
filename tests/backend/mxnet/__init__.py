@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
-import mxnet.autograd as autograd
 
 def cuda():
     return mx.gpu()
