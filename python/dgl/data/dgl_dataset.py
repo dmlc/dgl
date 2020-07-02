@@ -185,12 +185,13 @@ class DGLBuiltinDataset(DGLDataset):
     force_reload : bool
         Whether to reload the dataset. Default: False
     """
-    def __init__(self, name, url, force_reload=False):
+    def __init__(self, name, url, force_reload=False, raw_dir=None, verbose=False):
         super(DGLBuiltinDataset, self).__init__(name,
                                                 url=url,
-                                                raw_dir=None,
+                                                raw_dir=raw_dir,
                                                 save_dir=None,
-                                                force_reload=force_reload)
+                                                force_reload=force_reload,
+                                                verbose=verbose)
 
     def download(self):
         r""" Automatically download data and extract it.

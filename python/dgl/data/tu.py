@@ -32,6 +32,17 @@ class LegacyTUDataset(DGLBuiltinDataset):
         Remove graphs that contains more nodes than `max_allow_node`.
         Default : None
 
+    Returns
+    -------
+    LegacyTUDataset object as an iterable for dataloader.
+
+    Examples
+    --------
+    >>> data = LegacyTUDataset('DD')
+    >>> data[0]
+    (DGLGraph(num_nodes=327, num_edges=1798,
+             ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64), 'feat': Scheme(shape=(89,), dtype=torch.float64)}
+             edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}), 0)
     """
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
@@ -43,13 +54,13 @@ class LegacyTUDataset(DGLBuiltinDataset):
         url = self._url.format(name)
         self.hidden_size = hidden_size
         self.max_allow_node = max_allow_node
+        self.use_pandas = use_pandas
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
 
     def process(self, root_path):
         self.data_mode = None
-        self.max_allow_node = max_allow_node
 
-        if use_pandas:
+        if self.use_pandas:
             import pandas as pd
             DS_edge_list = self._idx_from_zero(
                 pd.read_csv(self._file_path("A"), delimiter=",", dtype=int, header=None).values)
@@ -146,7 +157,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'legacy_tu_{}.bin'.format(self.name))
         info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
-        if os.path.exists(file_path) and os.path.exists(info_path):
+        if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False
 
@@ -200,6 +211,18 @@ class TUDataset(DGLBuiltinDataset):
     name : str
         Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
         datasets name on https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets.
+
+    Returns
+    -------
+    TUDataset object as an iterable for dataloader.
+
+    Examples
+    --------
+    >>> data = TUDataset('DD')
+    >>> data[0]
+    (DGLGraph(num_nodes=327, num_edges=1798,
+             ndata_schemes={'node_labels': Scheme(shape=(1,), dtype=torch.int64), '_ID': Scheme(shape=(), dtype=torch.int64)}
+             edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}), tensor([0]))
     """
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
@@ -275,9 +298,9 @@ class TUDataset(DGLBuiltinDataset):
         self.num_labels = info_dict['num_labels']
 
     def has_cache(self):
-        file_path = os.path.join(self.save_path, 'tu_{}.bin'.format(self.name))
+        graph_path = os.path.join(self.save_path, 'tu_{}.bin'.format(self.name))
         info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
-        if os.path.exists(file_path) and os.path.exists(info_path):
+        if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False
 
