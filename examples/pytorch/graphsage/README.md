@@ -46,7 +46,7 @@ Accuracy:
 |:---------------------:|:--------:|
 | Full Graph            | 0.9504   |
 | Neighbor Sampling     | 0.9495   |
-| N.S. (Inductive)      | 0.9415   |
+| N.S. (Inductive)      | 0.9460   |
 | Control Variate       | 0.9490   |
 
 ### Unsupervised training

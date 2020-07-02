@@ -145,6 +145,7 @@ def run(args, device, data):
     in_feats, n_classes, train_g, val_g, test_g = data
     train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
+    test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.sampling.MultiLayerNeighborSampler(
@@ -200,6 +201,8 @@ def run(args, device, data):
         if epoch % args.eval_every == 0 and epoch != 0:
             eval_acc = evaluate(model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
+            test_acc = evaluate(model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, device)
+            print('Test Acc: {:.4f}'.format(test_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 

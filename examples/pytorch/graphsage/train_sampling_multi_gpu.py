@@ -115,13 +115,13 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
+def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     """
-    Evaluate the model on the validation set specified by ``val_mask``.
+    Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
-    val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
+    val_nid : A node ID tensor indicating which nodes do we actually compute the accuracy for.
     batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
@@ -129,7 +129,7 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     with th.no_grad():
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred[val_mask], labels[val_mask])
+    return compute_acc(pred[val_nid], labels[val_nid])
 
 def load_subtensor(g, labels, seeds, input_nodes, dev_id):
     """
@@ -158,8 +158,10 @@ def run(proc_id, n_gpus, args, devices, data):
     in_feats, n_classes, train_g, val_g, test_g = data
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
+    test_mask = ~(train_g.ndata['train_mask'] | val_g.ndata['val_mask'])
     train_nid = train_mask.nonzero()[:, 0]
     val_nid = val_mask.nonzero()[:, 0]
+    test_nid = test_mask.nonzero()[:, 0]
 
     # Split train_nid
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
@@ -232,11 +234,16 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
                     eval_acc = evaluate(
-                        model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_mask, args.batch_size, devices[0])
+                        model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, devices[0])
+                    test_acc = evaluate(
+                        model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, devices[0])
                 else:
                     eval_acc = evaluate(
-                        model.module, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_mask, args.batch_size, devices[0])
+                        model.module, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, devices[0])
+                    test_acc = evaluate(
+                        model.module, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
+                print('Test Acc: {:.4f}'.format(test_acc))
 
 
     if n_gpus > 1:
