@@ -80,11 +80,21 @@ def test_graph_conv2(g, norm, weight, bias):
     nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
     ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
     h = F.randn((nsrc, 5))
+    h_dst = F.randn((ndst, 2))
     if weight:
-        h = conv(g, h)
+        h_out = conv(g, h)
     else:
-        h = conv(g, h, weight=ext_w)
-    assert h.shape == (ndst, 2)
+        h_out = conv(g, h, weight=ext_w)
+    assert h_out.shape == (ndst, 2)
+
+    if not isinstance(g, dgl.DGLGraph) and len(g.ntypes) == 2:
+        # bipartite, should also accept pair of tensors
+        if weight:
+            h_out2 = conv(g, (h, h_dst))
+        else:
+            h_out2 = conv(g, (h, h_dst), weight=ext_w)
+        assert h_out2.shape == (ndst, 2)
+        assert F.array_equal(h_out, h_out2)
 
 def test_simple_pool():
     ctx = F.ctx()
