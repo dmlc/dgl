@@ -213,7 +213,8 @@ class RelGraphConv(nn.Module):
             if norm is not None:
                 g.edata['norm'] = norm
             if self.self_loop:
-                loop_message = utils.matmul_maybe_select(x[:g.number_of_dst_nodes()], self.loop_weight)
+                loop_message = utils.matmul_maybe_select(x[:g.number_of_dst_nodes()],
+                                                         self.loop_weight)
             # message passing
             g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
             # apply bias and activation
