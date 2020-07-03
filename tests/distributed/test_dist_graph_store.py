@@ -13,7 +13,10 @@ from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
+from dgl.distributed import SparseAdagrad, SparseNodeEmbedding
+from numpy.testing import assert_almost_equal
 import backend as F
+import math
 import unittest
 import pickle
 
@@ -58,6 +61,9 @@ def run_server(graph_name, server_id, num_clients, shared_mem):
     print('start server', server_id)
     g.start()
 
+def emb_init(shape, dtype):
+    return F.zeros(shape, dtype, F.cpu())
+
 def run_client(graph_name, part_id, num_nodes, num_edges):
     time.sleep(5)
     gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -91,6 +97,47 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
     g.init_edata('test1', new_shape, F.int32)
     feats = g.edata['test1'][eids]
     assert np.all(F.asnumpy(feats) == 0)
+
+    # Test sparse emb
+    try:
+        new_shape = (g.number_of_nodes(), 1)
+        emb = SparseNodeEmbedding(g, 'emb1', new_shape, emb_init)
+        lr = 0.001
+        optimizer = SparseAdagrad([emb], lr=lr)
+        with F.record_grad():
+            feats = emb(nids)
+            assert np.all(F.asnumpy(feats) == np.zeros((len(nids), 1)))
+            loss = F.sum(feats + 1, 0)
+        loss.backward()
+        optimizer.step()
+        feats = emb(nids)
+        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
+        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        feats1 = emb(rest)
+        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
+
+        policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
+        grad_sum = dgl.distributed.DistTensor(g, 'node:emb1_sum', policy)
+        assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
+        assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
+
+        emb = SparseNodeEmbedding(g, 'emb2', new_shape, emb_init)
+        optimizer = SparseAdagrad([emb], lr=lr)
+        with F.record_grad():
+            feats1 = emb(nids)
+            feats2 = emb(nids)
+            feats = F.cat([feats1, feats2], 0)
+            assert np.all(F.asnumpy(feats) == np.zeros((len(nids) * 2, 1)))
+            loss = F.sum(feats + 1, 0)
+        loss.backward()
+        optimizer.step()
+        feats = emb(nids)
+        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        feats1 = emb(rest)
+        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
+    except NotImplementedError as e:
+        pass
 
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
