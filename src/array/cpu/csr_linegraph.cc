@@ -38,11 +38,11 @@ CSRMatrix CSRLineGraph(const CSRMatrix &csr, bool backtracking) {
             num_edges ++;
             new_indices.push_back(l);
           }
-        } // for l
-      } // for k
+        }  // for l
+      }  // for k
       new_indptr.push_back(num_edges);
-    } // for j
-  } // for i
+    }  // for j
+  }  // for i
 
   CSRMatrix res = CSRMatrix(nnz, nnz,
                             NDArray::FromVector(new_indptr),
