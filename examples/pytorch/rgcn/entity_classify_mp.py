@@ -26,8 +26,6 @@ from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
 
-from ogb.nodeproppred import DglNodePropPredDataset
-
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
     Parameters
@@ -322,43 +320,26 @@ def main(args, devices):
         dataset = BGS()
     elif args.dataset == 'am':
         dataset = AM()
-    elif args.dataset == 'ogbn-arxiv':
-        dataset = DglNodePropPredDataset(name=args.dataset)
-        ogb_dataset = True
     else:
         raise ValueError()
 
-    if ogb_dataset:
-        splitted_idx = dataset.get_idx_split()
-        hg, labels = dataset[0]
-        num_rels = len(hg.canonical_etypes)
-        num_of_ntype = len(hg.ntypes)
-        assert len(labels) == 1
-        category = labels.keys()[0]
-        labels = labels[category]
-        num_classes = (labels.max() + 1).item()
+    # Load from hetero-graph
+    hg = dataset.graph
 
-        train_idx = splitted_idx['train']
-        val_idx = splitted_idx['valid']
-        test_idx = splitted_idx['test']
+    num_rels = len(hg.canonical_etypes)
+    num_of_ntype = len(hg.ntypes)
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    train_idx = dataset.train_idx
+    test_idx = dataset.test_idx
+    labels = dataset.labels
+
+    # split dataset into train, validate, test
+    if args.validation:
+        val_idx = train_idx[:len(train_idx) // 5]
+        train_idx = train_idx[len(train_idx) // 5:]
     else:
-        # Load from hetero-graph
-        hg = dataset.graph
-
-        num_rels = len(hg.canonical_etypes)
-        num_of_ntype = len(hg.ntypes)
-        category = dataset.predict_category
-        num_classes = dataset.num_classes
-        train_idx = dataset.train_idx
-        test_idx = dataset.test_idx
-        labels = dataset.labels
-
-        # split dataset into train, validate, test
-        if args.validation:
-            val_idx = train_idx[:len(train_idx) // 5]
-            train_idx = train_idx[len(train_idx) // 5:]
-        else:
-            val_idx = train_idx
+        val_idx = train_idx
 
     # calculate norm for each edge type and store in edge
     for canonical_etypes in hg.canonical_etypes:
