@@ -16,7 +16,7 @@ from dgl.data import RedditDataset
 import tqdm
 import traceback
 
-from load_graph import load_reddit, load_ogb
+from load_graph import load_reddit, load_ogb, inductive_split
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -142,15 +142,16 @@ def load_subtensor(g, seeds, input_nodes, device):
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    train_mask, val_mask, in_feats, n_classes, g = data
-    train_nid = th.nonzero(train_mask, as_tuple=True)[0]
-    val_nid = th.nonzero(val_mask, as_tuple=True)[0]
+    in_feats, n_classes, train_g, val_g, test_g = data
+    train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
+    val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
+    test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.sampling.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
     dataloader = dgl.sampling.NodeDataLoader(
-        g,
+        train_g,
         train_nid,
         sampler,
         batch_size=args.batch_size,
@@ -177,7 +178,7 @@ def run(args, device, data):
             tic_step = time.time()
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -198,8 +199,10 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
+            eval_acc = evaluate(model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
+            test_acc = evaluate(model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, device)
+            print('Test Acc: {:.4f}'.format(test_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
@@ -219,6 +222,8 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--inductive', action='store_true',
+        help="Inductive learning setting")
     args = argparser.parse_args()
     
     if args.gpu >= 0:
@@ -232,12 +237,20 @@ if __name__ == '__main__':
         g, n_classes = load_ogb('ogbn-products')
     else:
         raise Exception('unknown dataset')
-    g = dgl.as_heterograph(g)
+
     in_feats = g.ndata['features'].shape[1]
-    train_mask = g.ndata['train_mask']
-    val_mask = g.ndata['val_mask']
-    prepare_mp(g)
+
+    g = dgl.as_heterograph(g)
+
+    if args.inductive:
+        train_g, val_g, test_g = inductive_split(g)
+    else:
+        train_g = val_g = test_g = g
+
+    prepare_mp(train_g)
+    prepare_mp(val_g)
+    prepare_mp(test_g)
     # Pack data
-    data = train_mask, val_mask, in_feats, n_classes, g
+    data = in_feats, n_classes, train_g, val_g, test_g
 
     run(args, device, data)
