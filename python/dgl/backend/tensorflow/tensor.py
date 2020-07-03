@@ -213,6 +213,8 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return tf.exp(input)
 
+def sqrt(input):
+    return tf.sqrt(input)
 
 def softmax(input, dim=-1):
     return tf.math.softmax(input, axis=dim)
@@ -259,6 +261,9 @@ def narrow_row(x, start, stop):
 def scatter_row(data, row_index, value):
     row_index = tf.expand_dims(row_index, 1)
     return tf.tensor_scatter_nd_update(data, row_index, value)
+
+def index_add_inplace(data, row_idx, value):
+    raise NotImplementedError("Tensorflow doesn't support inplace index_add")
 
 
 def scatter_row_inplace(data, row_index, value):

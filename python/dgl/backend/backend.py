@@ -531,6 +531,21 @@ def exp(input):
     """
     pass
 
+def sqrt(input):
+    """Returns a new tensor with the square root of the elements of the input tensor `input`.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 def softmax(input, dim=-1):
     """Apply the softmax function on given dimension.
 
@@ -715,6 +730,23 @@ def scatter_row(data, row_index, value):
     -------
     Tensor
         The new data.
+    """
+    pass
+
+def index_add_inplace(data, row_idx, value):
+    """Add the values into the data tensor using the row index inplace.
+
+    If two row indices are the same, the corresponding values are sum up before
+    adding to the data tensor.
+
+    Parameters
+    ----------
+    data : Tensor
+        The data tensor to be updated.
+    row_index : Tensor
+        A 1-D integer tensor containing which rows to be updated.
+    value : Tensor
+        The new value.
     """
     pass
 

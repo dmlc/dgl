@@ -63,11 +63,11 @@ class SparseAdagradUDF:
         embs = data_store[name]
         state_sum = data_store[name + "_sum"]
         with F.no_grad():
-            grad_sum = (grad_values * grad_values).mean(1)
-            state_sum.index_add_(0, grad_indices, grad_sum)
+            grad_sum = F.mean(grad_values * grad_values, 1)
+            F.index_add_inplace(state_sum, grad_indices, grad_sum)
             std = state_sum[grad_indices]  # _sparse_mask
-            std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-            embs.index_add_(0, grad_indices, grad_values / std_values * (-self._lr))
+            std_values = F.unsqueeze((F.sqrt(std) + 1e-10), 1)
+            F.index_add_inplace(embs, grad_indices, grad_values / std_values * (-self._lr))
 
 def _init_state(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())

@@ -145,6 +145,9 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return th.exp(input)
 
+def sqrt(input):
+    return th.sqrt(input)
+
 def softmax(input, dim=-1):
     return th.softmax(input, dim=dim)
 
@@ -175,6 +178,9 @@ def take(data, indices, dim):
 
 def narrow_row(x, start, stop):
     return x[start:stop]
+
+def index_add_inplace(data, row_idx, value):
+    data.index_add_(0, row_idx, value)
 
 def scatter_row(data, row_index, value):
     return data.index_copy(0, row_index.long(), value)
