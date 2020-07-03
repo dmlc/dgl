@@ -16,6 +16,7 @@ from dgl.distributed import partition_graph, load_partition, load_partition_book
 from dgl.distributed import SparseAdagrad, SparseNodeEmbedding
 from numpy.testing import assert_almost_equal
 import backend as F
+import math
 import unittest
 import pickle
 
@@ -103,20 +104,35 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
     lr = 0.001
     optimizer = SparseAdagrad([emb], lr=lr)
     feats = emb(nids)
-    assert np.all(feats.detach().numpy() == np.zeros((len(nids), 1)))
+    assert np.all(F.asnumpy(feats) == np.zeros((len(nids), 1)))
     loss = F.sum(feats + 1, 0)
     loss.backward()
     optimizer.step()
     feats = emb(nids)
-    assert_almost_equal(feats.detach().numpy(), np.ones((len(nids), 1)) * -lr)
+    assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
     rest = np.setdiff1d(np.arange(g.number_of_nodes()), nids)
     feats1 = emb(rest)
-    assert np.all(feats1.detach().numpy() == np.zeros((len(rest), 1)))
+    assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
 
     policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
     grad_sum = dgl.distributed.DistTensor(g, 'node:emb1_sum', policy)
-    assert np.all(grad_sum[nids].detach().numpy() == np.ones((len(nids), 1)))
-    assert np.all(grad_sum[rest].detach().numpy() == np.zeros((len(rest), 1)))
+    assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
+    assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
+
+    emb = SparseNodeEmbedding(g, 'emb2', new_shape, emb_init)
+    optimizer = SparseAdagrad([emb], lr=lr)
+    feats1 = emb(nids)
+    feats2 = emb(nids)
+    feats = F.cat([feats1, feats2], 0)
+    assert np.all(F.asnumpy(feats) == np.zeros((len(nids) * 2, 1)))
+    loss = F.sum(feats + 1, 0)
+    loss.backward()
+    optimizer.step()
+    feats = emb(nids)
+    assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+    rest = np.setdiff1d(np.arange(g.number_of_nodes()), nids)
+    feats1 = emb(rest)
+    assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
 
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
