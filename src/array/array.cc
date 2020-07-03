@@ -499,10 +499,10 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
-CSRMatrix CSRLineGraph(const CSRMatrix &csr) {
+CSRMatrix CSRLineGraph(const CSRMatrix &csr, bool backtracking) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRLineGraph", {
-    ret = impl::CSRLineGraph<XPU, IdType>(csr);
+    ret = impl::CSRLineGraph<XPU, IdType>(csr, backtracking);
   });
   return ret;
 }
@@ -676,10 +676,10 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
-COOMatrix COOLineGraph(const COOMatrix &coo) {
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOLineGraph", {
-    ret = impl::COOLineGraph<XPU, IdType>(coo);
+    ret = impl::COOLineGraph<XPU, IdType>(coo, backtracking);
   });
   return ret;
 }

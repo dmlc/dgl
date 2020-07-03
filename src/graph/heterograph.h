@@ -221,7 +221,7 @@ class HeteroGraph : public BaseHeteroGraph {
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
   /*! \brief Creat a LineGraph of self */
-  HeteroGraphPtr LineGraph() const;
+  HeteroGraphPtr LineGraph(bool backtracking) const override;
 
  private:
   // To create empty class

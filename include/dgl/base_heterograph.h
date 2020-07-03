@@ -465,6 +465,12 @@ class BaseHeteroGraph : public runtime::Object {
     return nullptr;
   }
 
+  /*! \brief Creat a LineGraph of self */
+  virtual HeteroGraphPtr LineGraph(bool backtracking) const {
+    LOG(FATAL) << "LineGraph not supported.";
+    return nullptr;
+  }
+
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
 
@@ -682,6 +688,13 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
  */
 HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
+/*!
+ * \brief Create Line Graph
+ * \param hg Graph
+ * \param backtracking whether the pair of (v, u) (u, v) edges are treated as linked
+ * \return The Line Graph
+ */
+HeteroGraphPtr CreateLineGraph(HeteroGraphPtr hg, bool backtracking);
 
 /*!
  * \brief Union multiple graphs into one with each input graph as one disjoint component.

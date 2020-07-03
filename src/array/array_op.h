@@ -241,7 +241,7 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              const bool return_labels);
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking));
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
 
 }  // namespace impl
 }  // namespace aten

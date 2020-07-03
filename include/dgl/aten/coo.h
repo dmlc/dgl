@@ -460,6 +460,10 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
 /*!
  * \brief Create a LineGraph of input coo
  * 
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [1, 1, 0]]
+ *
  * B = COOLineGraph(A, backtracking=False)
  *
  * B = [[0, 0, 0, 0, 1],

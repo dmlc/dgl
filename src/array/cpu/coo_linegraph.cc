@@ -16,9 +16,9 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
-  const int64_t nnz = coo->row->shape[0];
-  IdType* coo_row = coo->row.Ptr<IdType>();
-  IdType* coo_col = coo->col.Ptr<IdType>();
+  const int64_t nnz = coo.row->shape[0];
+  IdType* coo_row = coo.row.Ptr<IdType>();
+  IdType* coo_col = coo.col.Ptr<IdType>();
   std::vector<IdType> new_row;
   std::vector<IdType> new_col;
 
@@ -32,7 +32,7 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
 
       // succ_u == v
       // if not backtracking succ_u != u
-      if (v == coo_row[j] && (backtracking || (!backtracking && u != coo_row[j]))) {
+      if (v == coo_row[j] && (backtracking || (!backtracking && u != coo_col[j]))) {
         new_row.push_back(i);
         new_col.push_back(j);
       }
@@ -40,13 +40,13 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
   }
 
   COOMatrix res = COOMatrix(nnz, nnz, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
-    NullArray(), true, true};
+    NullArray(), true, true);
   return res;
 }
 
 
 template COOMatrix COOLineGraph<kDLCPU, int32_t>(const COOMatrix &coo, bool backtracking);
-template COOMatrix COOLineGraph<kDLCPU, int32_t>(const COOMatrix &coo, bool backtracking);
+template COOMatrix COOLineGraph<kDLCPU, int64_t>(const COOMatrix &coo, bool backtracking);
 
 }  // namespace impl
 }  // namespace aten
