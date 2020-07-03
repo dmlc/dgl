@@ -1936,19 +1936,19 @@ def test_linegraph(index_dtype):
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
     row, col = lg.edges()
-    assert F.array_equal(F.copy_to(row, F.cpu()),
-                         F.tensor([0, 0, 1, 2, 2, 3, 4, 4], dtype=F.data_type_dict[index_dtype]))
-    assert F.array_equal(F.copy_to(col, F.cpu()),
-                         F.tensor([3, 4, 0, 3, 4, 0, 1, 2], dtype=F.data_type_dict[index_dtype]))
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
     lg = g.line_graph(backtracking=False)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 4
     row, col = lg.edges()
-    assert F.array_equal(F.copy_to(row, F.cpu()),
-                         F.tensor([0, 1, 2, 4], dtype=F.data_type_dict[index_dtype]))
-    assert F.array_equal(F.copy_to(col, F.cpu()),
-                         F.tensor([4, 0, 3, 1], dtype=F.data_type_dict[index_dtype]))
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 1, 2, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([4, 0, 3, 1]))
 
 if __name__ == '__main__':
     # test_create()
