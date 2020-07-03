@@ -1,7 +1,5 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
-import os
-
 from ..graph import DGLGraph
 from ..heterograph import DGLHeteroGraph
 from .._ffi.object import ObjectBase, register_object
@@ -97,11 +95,6 @@ def save_graphs(filename, g_list, labels=None):
     >>> save_graphs("./data.bin", [g1, g2], graph_labels)
 
     """
-    assert not os.path.isdir(filename), "filename %s is an existing directory."%(filename)
-    _path, _file = os.path.split(filename)
-    if not os.path.exists(_path):
-        os.makedirs(_path)
-
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
     if isinstance(g_sample, DGLGraph):
         save_dglgraphs(filename, g_list, labels)
@@ -170,8 +163,6 @@ def load_graph_v2(filename, idx_list=None):
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
-    assert os.path.exists(filename), "file %s does not exist."%(filename)
-    metadata = _CAPI_DGLLoadGraphs(filename, idx_list, False)
     heterograph_list = _CAPI_LoadGraphFiles_V2(filename, idx_list)
     label_dict = load_labels_v2(filename)
     return [gdata.get_graph() for gdata in heterograph_list], label_dict
