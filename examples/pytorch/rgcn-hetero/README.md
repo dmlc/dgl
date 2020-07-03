@@ -72,7 +72,7 @@ python3 entity_classify_mb.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gp
 
 BGS: accuracy best=96.55% avg=92.41%
 ```
-python3 entity_classify_mb.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0
+python3 entity_classify_mb.py m
 ```
 
 AM: accuracy best=90.91% avg=88.43%

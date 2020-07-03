@@ -75,25 +75,26 @@ class EntityClassify(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_self_loop = use_self_loop
+        self.low_mem = low_mem
 
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConv(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=low_mem, dropout=self.dropout))
+            low_mem=self.low_mem, dropout=self.dropout))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                low_mem=low_mem, dropout=self.dropout))
+                low_mem=self.low_mem, dropout=self.dropout))
         # h2o
         self.layers.append(RelGraphConv(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
-            low_mem=low_mem))
+            low_mem=self.low_mem))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -102,7 +103,7 @@ class EntityClassify(nn.Module):
         h = feats
         for layer, block in zip(self.layers, blocks):
             block = block.to(self.device)
-            h = layer(block, h)
+            h = layer(block, h, block.edata['etype'], block.edata['norm'])
         return h
 
 class NeighborSampler:
@@ -322,7 +323,7 @@ def main(args, devices):
     elif args.dataset == 'am':
         dataset = AM()
     elif args.dataset == 'ogbn-arxiv':
-        dataset = DglNodePropPredDataset(name='args.dataset')
+        dataset = DglNodePropPredDataset(name=args.dataset)
         ogb_dataset = True
     else:
         raise ValueError()
@@ -372,7 +373,7 @@ def main(args, devices):
     category_id = len(hg.ntypes)
     for i, ntype in enumerate(hg.ntypes):
         if ntype == category:
-            category_id = hg.nodes[ntype].data[dgl.NTYPE][0]
+            category_id = i
 
     g = dgl.to_homo(hg)
     g.ndata[dgl.NTYPE].share_memory_()
@@ -384,7 +385,6 @@ def main(args, devices):
     node_tids = g.ndata[dgl.NTYPE]
     loc = (node_tids == category_id)
     target_idx = node_ids[loc]
-    print(target_idx.shape)
     target_idx.share_memory_()
 
     n_gpus = len(devices)
