@@ -1,17 +1,72 @@
 import torch as th
 from ...sparse import _gspmm, _gsddmm
 
+def _reduce_grad(grad, shape):
+    """Reduce gradient on the broadcast dimension
+    If there is broadcast in forward pass, gradients need to be reduced on
+    broadcast dimension. This function checks the input tensor shape and
+    gradient shape and perform the reduction.
+    Parameters
+    ----------
+    grad: Tensor
+        Gradient tensor
+    shape: tuple
+        Shape of input tensor
+    Returns
+    -------
+    Tensor
+    """
+    grad_shape = grad.shape[1:]
+    in_shape = shape[1:]
+    if in_shape == grad_shape:
+        # no need to reduce
+        return grad
+    num_to_squeeze = len(grad_shape) - len(in_shape)
+    # pad inshape
+    in_shape = (1,) * num_to_squeeze + in_shape
+    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
+    reduce_idx += 1  # skip batch dim
+    if len(reduce_idx) > 0:
+        grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
+    return grad.view(-1, *shape[1:])
 
 class GSpMM(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, op, reduce_op, lhs_data, rhs_data):
-        out = _gspmm(g, op, reduce_op, lhs_data, rhs_data)
-        return out[0]
+    def forward(ctx, g, op, reduce_op, X, Y):
+        out, (argX, argY) = _gspmm(g, op, reduce_op, X, Y)
+        ctx.backward_cache = g, op, reduce_op
+        ctx.save_for_backward(X, Y, out, argX, argY)
+        return out
 
     @staticmethod
-    def backward(ctx, grad):
-        return None, None, None, None, None
-
+    def backward(ctx, dZ):
+        g, op, reduce_op = ctx.backward_cache
+        X, Y, out, argX, argY = ctx.saved_tensors
+        dX, dY = None, None
+        if ctx.needs_input_grad[3]:
+            g_rev = g.reverse()
+            if reduce_op == 'sum':
+                if op == 'mul':
+                    dX = _gspmm(g_rev, '*', 'sum', dZ, Y)
+                elif op in ['add', 'sub']:
+                    dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)
+                elif op == 'div':
+                    dX = _gspmm(g_rev, '*', 'sum', dZ, 1. / Y)
+            dX = _reduce_grad(dX, X.shape)
+        if ctx.needs_input_grad[4]:
+            if reduce_op == 'sum':
+                if op == 'mul':
+                    dY = _gsddmm(g, '*', X, dZ)
+                elif op == 'add':
+                    dY = _gsddmm(g, 'copy_rhs', X, dZ)
+                elif op == 'sub':
+                    dY = _gsddmm(g, 'copy_rhs', X, -dZ)
+                elif op == 'div':
+                    dY = -_gsddmm(g, '*', X, dZ) / (Y ** 2)
+            else:
+                pass
+            dY = _reduce_grad(dY, Y.shape)
+        return None, None, None, dX, dY
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
@@ -22,7 +77,6 @@ class GSDDMM(th.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         return None, None, None, None, None, None
-
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
