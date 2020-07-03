@@ -59,6 +59,7 @@ def run_server(graph_name, server_id, num_clients, shared_mem):
     g.start()
 
 def run_client(graph_name, part_id, num_nodes, num_edges):
+    time.sleep(5)
     gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                               part_id, None)
     g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
