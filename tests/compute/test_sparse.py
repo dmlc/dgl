@@ -3,19 +3,13 @@ import dgl.sparse
 import pytest
 import networkx as nx
 import backend as F
-import numpy as np 
+import numpy as np
 
 np.random.seed(42)
 dgl.random.seed(42)
 
 def _unsqueeze_if_scalar(x):    # used in udf, to unsqueeze the feature if it's scalar
     return x if F.ndim(x) > 1 else F.unsqueeze(x, -1)
-
-def _rand_operand_1(shp):
-    return F.tensor(np.random.rand(*shp))
-
-def _rand_operand_2(shp):   # for division op, the divisor should be greater than 1
-    return F.tensor(np.random.rand(*shp) + 1)
 
 udf_msg = {
     'add': lambda edges: {'m': edges.src['x'] + edges.data['w']},
@@ -26,13 +20,46 @@ udf_msg = {
     'copy_e': lambda edges: {'m': edges.data['w']}
 }
 
+def select(target, src, edge, dst):
+    if target == 'u':
+        return src
+    elif target == 'v':
+        return dst
+    elif target == 'e':
+        return edge
+
+def binary_op(msg, x, y):
+    if msg == 'add':
+        return x + y
+    elif msg == 'sub':
+        return x - y
+    elif msg == 'mul':
+        return x * y
+    elif msg == 'div':
+        return x / y
+    elif msg == 'dot':
+        return F.sum(x * y, -1, keepdims=True)
+    elif msg == 'copy_lhs':
+        return x
+    elif msg == 'copy_rhs':
+        return y
+
+def edge_func(lhs_target, rhs_target, msg):
+    def foo(edges):
+        return {
+            'm': binary_op(
+                msg,
+                select(lhs_target, edges.src, edges.data, edges.dst)['x'],
+                select(rhs_target, edges.src, edges.data, edges.dst)['y']
+            )
+        }
+    return foo
+
 udf_apply_edges = {
-    'add': lambda edges: {'m': edges.src['x'] + edges.dst['y']},
-    'sub': lambda edges: {'m': edges.src['x'] - edges.dst['y']},
-    'mul': lambda edges: {'m': edges.src['x'] * edges.dst['y']},
-    'div': lambda edges: {'m': edges.src['x'] / edges.dst['y']},
-    'dot': lambda edges: {'m': F.sum(edges.src['x'] * edges.dst['y'], -1, keepdims=True)},
-    'copy_u': lambda edges: {'m': edges.src['x']},
+    lhs_target + '_' + msg + '_' + rhs_target: edge_func(lhs_target, rhs_target, msg)
+    for lhs_target in ['u', 'v', 'e']
+    for rhs_target in ['u', 'v', 'e']
+    for msg in ['add', 'sub', 'mul', 'div', 'dot', 'copy_lhs', 'copy_rhs']
 }
 
 udf_reduce = {
@@ -73,8 +100,8 @@ sddmm_shapes = [
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 def test_spmm(g, shp, msg, reducer):
     print(g)
-    u = _rand_operand_1((g.number_of_src_nodes(),) + shp[0])
-    e = _rand_operand_2((g.number_of_edges(),) + shp[1])
+    u = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
+    e = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
     print('u shape: {}, e shape: {}'.format(F.shape(u), F.shape(e)))
     g.srcdata['x'] = _unsqueeze_if_scalar(u)
     g.edata['w'] = _unsqueeze_if_scalar(e)
@@ -96,26 +123,52 @@ def test_spmm(g, shp, msg, reducer):
 
 @pytest.mark.parametrize('g', graphs)
 @pytest.mark.parametrize('shp', sddmm_shapes)
-@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_u'])
-def test_sddmm(g, shp, msg):
+@pytest.mark.parametrize('lhs_target', ['u', 'v', 'e'])
+@pytest.mark.parametrize('rhs_target', ['u', 'v', 'e'])
+@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_lhs', 'copy_rhs'])
+def test_sddmm(g, shp, lhs_target, rhs_target, msg):
     if dgl.backend.backend_name == 'mxnet' and g.number_of_edges() == 0:
         pytest.skip()   # mxnet do not support zero shape tensor
-    print(g)
-    u = _rand_operand_1((g.number_of_src_nodes(),) + shp[0])
-    v = _rand_operand_2((g.number_of_dst_nodes(),) + shp[1])
-    print('u shape: {}, v shape: {}'.format(F.shape(u), F.shape(v)))
-    g.srcdata['x'] = _unsqueeze_if_scalar(u)
-    g.dstdata['y'] = _unsqueeze_if_scalar(v)
+    len_lhs = select(
+        lhs_target,
+        g.number_of_src_nodes(),
+        g.number_of_edges(),
+        g.number_of_dst_nodes())
+    lhs_shp = (len_lhs,) + shp[0]
+    len_rhs = select(
+        rhs_target,
+        g.number_of_src_nodes(),
+        g.number_of_edges(),
+        g.number_of_dst_nodes())
+    rhs_shp = (len_rhs,) + shp[1]
+    lhs = F.tensor(np.random.rand(*lhs_shp) + 1)
+    rhs = F.tensor(np.random.rand(*rhs_shp) + 1)
+    print('lhs shape: {}, rhs shape: {}'.format(F.shape(lhs), F.shape(rhs)))
 
-    print('SDDMM(message func: {})'.format(msg))
-    e = dgl.sparse._gsddmm(g, msg, u, v)
-    g.apply_edges(udf_apply_edges[msg])
+    lhs_frame = select(
+        lhs_target,
+        g.srcdata,
+        g.edata,
+        g.dstdata)
+    rhs_frame = select(
+        rhs_target,
+        g.srcdata,
+        g.edata,
+        g.dstdata)
+    lhs_frame['x'] = _unsqueeze_if_scalar(lhs)
+    rhs_frame['y'] = _unsqueeze_if_scalar(rhs)
+    msg_func = lhs_target + '_' + msg + '_' + rhs_target
+    print('SDDMM(message func: {})'.format(msg_func))
+
+    e = dgl.sparse._gsddmm(g, msg, lhs, rhs,
+                           lhs_target=lhs_target, rhs_target=rhs_target)
+    g.apply_edges(udf_apply_edges[msg_func])
     if 'm' in g.edata:
         e1 = g.edata['m']
         assert F.allclose(e, e1, rtol=1e-3, atol=1e-3)
     print('passed')
 
-    g.srcdata.pop('x')
-    g.dstdata.pop('y')
+    lhs_frame.pop('x')
+    rhs_frame.pop('y')
     if 'm' in g.edata: g.edata.pop('m')
 

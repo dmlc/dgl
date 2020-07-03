@@ -24,11 +24,11 @@ namespace aten {
     } else if ((op) == "div") {                                     \
       typedef cuda::binary::Div<DType> Op;                          \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_u") {                                  \
-      typedef cuda::binary::CopyU<DType> Op;                        \
+    } else if ((op) == "copy_lhs") {                                \
+      typedef cuda::binary::CopyLhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_e") {                                  \
-      typedef cuda::binary::CopyE<DType> Op;                        \
+    } else if ((op) == "copy_rhs") {                                \
+      typedef cuda::binary::CopyRhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \
       typedef cuda::binary::Dot<DType> Op;                          \
@@ -82,10 +82,11 @@ void SDDMMCsr(const std::string& op,
               NDArray out,
               int lhs_target,
               int rhs_target) {
-  SWITCH_OP(op, Op,
+  SWITCH_OP(op, Op, {
     SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
       cuda::SDDMMCsr<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, csr, lhs, rhs, out);
-  }));
+    });
+  });
 }
 
 /*!
@@ -100,10 +101,11 @@ void SDDMMCoo(const std::string& op,
               NDArray out,
               int lhs_target,
               int rhs_target) {
-  SWITCH_OP(op, Op,
+  SWITCH_OP(op, Op, {
     SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
-        cuda::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, lhs, rhs, out);
-  }));
+      cuda::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, lhs, rhs, out);
+    });
+  });
 }
 
 template void SDDMMCsr<kDLGPU, int32_t, float>(

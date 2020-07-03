@@ -173,11 +173,11 @@ void CusparseCsrmm2(
     } else if ((op) == "div") {                                     \
       typedef cuda::binary::Div<DType> Op;                          \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_u") {                                  \
-      typedef cuda::binary::CopyU<DType> Op;                        \
+    } else if ((op) == "copy_lhs") {                                \
+      typedef cuda::binary::CopyLhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_e") {                                  \
-      typedef cuda::binary::CopyE<DType> Op;                        \
+    } else if ((op) == "copy_rhs") {                                \
+      typedef cuda::binary::CopyRhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op;     \

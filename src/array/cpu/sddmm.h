@@ -190,10 +190,10 @@ struct Dot {
     } else if ((op) == "div") {                                     \
       typedef dgl::aten::cpu::op::Div<DType> Op;                    \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_u") {                                  \
+    } else if ((op) == "copy_lhs") {                                \
       typedef dgl::aten::cpu::op::CopyLhs<DType> Op;                \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_e") {                                  \
+    } else if ((op) == "copy_rhs") {                                \
       typedef dgl::aten::cpu::op::CopyRhs<DType> Op;                \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \

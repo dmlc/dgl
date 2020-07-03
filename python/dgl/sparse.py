@@ -64,14 +64,15 @@ op_mapping = {
     '-': 'sub',
     '*': 'mul',
     '/': 'div',
-    '.': 'dot',
     'add': 'add',
     'sub': 'sub',
     'mul': 'mul',
     'div': 'div',
     'dot': 'dot',
-    'copy_u': 'copy_u',
-    'copy_e': 'copy_e'
+    'copy_u': 'copy_lhs',
+    'copy_e': 'copy_rhs',
+    'copy_lhs': 'copy_lhs',
+    'copy_rhs': 'copy_rhs',
 }
 
 target_mapping = {
@@ -171,8 +172,8 @@ def _gsddmm(g, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     g : DGLHeteroGraph
         The input graph.
     op : str
-        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``, ``copy_u``,
-        or their alias ``+``, ``-``, ``*``, ``/``, ``.``.
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``, or their alias ``+``, ``-``, ``*``, ``/``.
     lhs : tensor or None
         Left hand operand.
     rhs : tensor or None
