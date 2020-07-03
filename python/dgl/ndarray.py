@@ -172,7 +172,7 @@ class SparseMatrix(ObjectBase):
         -------
         list of boolean
         """
-        return [v.data for v in _CAPI_DGLSparseMatrixGetFlags(self)]
+        return [v for v in _CAPI_DGLSparseMatrixGetFlags(self)]
 
     def __getstate__(self):
         return self.format, self.num_rows, self.num_cols, self.indices, self.flags

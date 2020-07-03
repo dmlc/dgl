@@ -21,7 +21,27 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from pyinstrument import Profiler
 
-from train_sampling import run, NeighborSampler, SAGE, compute_acc, evaluate, load_subtensor
+from train_sampling import run, SAGE, compute_acc, evaluate, load_subtensor
+
+class NeighborSampler(object):
+    def __init__(self, g, fanouts, sample_neighbors):
+        self.g = g
+        self.fanouts = fanouts
+        self.sample_neighbors = sample_neighbors
+
+    def sample_blocks(self, seeds):
+        seeds = th.LongTensor(np.asarray(seeds))
+        blocks = []
+        for fanout in self.fanouts:
+            # For each seed node, sample ``fanout`` neighbors.
+            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
+            # Then we compact the frontier into a bipartite graph for message passing.
+            block = dgl.to_block(frontier, seeds)
+            # Obtain the seed nodes for next layer.
+            seeds = block.srcdata[dgl.NID]
+
+            blocks.insert(0, block)
+        return blocks
 
 def start_server(args):
     serv = dgl.distributed.DistGraphServer(args.id, args.ip_config, args.num_client,
@@ -53,14 +73,13 @@ def run(args, device, data):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     train_size = th.sum(g.ndata['train_mask'][0:g.number_of_nodes()])
-    num_steps = int(args.num_epochs * train_size / args.batch_size / args.num_client)
 
     # Training loop
     iter_tput = []
     profiler = Profiler()
     profiler.start()
     epoch = 0
-    while num_steps > 0:
+    for epoch in range(args.num_epochs):
         tic = time.time()
 
         sample_time = 0
@@ -120,10 +139,6 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
             start = time.time()
-            num_steps -= 1
-            # We have to ensure all trainer process run the same number of steps.
-            if num_steps == 0:
-                break
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
@@ -147,10 +162,11 @@ def run(args, device, data):
 def main(args):
     th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name)
+    print('rank:', g.rank())
 
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), g.rank())
-    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), g.rank())
-    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), g.rank())
+    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), force_even=True)
+    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), force_even=True)
+    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), force_even=True)
     print('part {}, train: {}, val: {}, test: {}'.format(g.rank(), len(train_nid),
                                                          len(val_nid), len(test_nid)))
     device = th.device('cpu')

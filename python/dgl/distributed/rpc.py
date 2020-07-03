@@ -515,7 +515,7 @@ class RPCMessage(ObjectBase):
     def tensors(self):
         """Get tensor payloads."""
         rst = _CAPI_DGLRPCMessageGetTensors(self)
-        return [F.zerocopy_from_dgl_ndarray(tsor.data) for tsor in rst]
+        return [F.zerocopy_from_dgl_ndarray(tsor) for tsor in rst]
 
 def send_request(target, request):
     """Send one request to the target server.

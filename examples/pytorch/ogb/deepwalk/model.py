@@ -496,13 +496,29 @@ class SkipGramModel(nn.Module):
     def save_embedding_pt(self, dataset, file_name):
         """ For ogb leaderboard.
         """
-        max_node_id = max(dataset.node2id.keys())
-        if max_node_id + 1 != self.emb_size:
-            print("WARNING: The node ids are not serial.")
+        try:
+            max_node_id = max(dataset.node2id.keys())
+            if max_node_id + 1 != self.emb_size:
+                print("WARNING: The node ids are not serial.")
 
-        embedding = torch.zeros(max_node_id + 1, self.emb_dimension)
-        index = torch.LongTensor(list(map(lambda id: dataset.id2node[id], list(range(self.emb_size)))))
-        embedding.index_add_(0, index, self.u_embeddings.weight.cpu().data)
+            embedding = torch.zeros(max_node_id + 1, self.emb_dimension)
+            index = torch.LongTensor(list(map(lambda id: dataset.id2node[id], list(range(self.emb_size)))))
+            embedding.index_add_(0, index, self.u_embeddings.weight.cpu().data)
+
+            if self.norm:
+                embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1) + 1e-6).unsqueeze(1)
+            torch.save(embedding, file_name)
+        except:
+            self.save_embedding_pt_dgl_graph(dataset, file_name)
+
+    def save_embedding_pt_dgl_graph(self, dataset, file_name):
+        """ For ogb leaderboard.
+        """
+        embedding = torch.zeros_like(self.u_embeddings.weight.cpu().data)
+        valid_seeds = torch.LongTensor(dataset.valid_seeds)
+        valid_embedding = self.u_embeddings.weight.cpu().data.index_select(0, 
+            valid_seeds)
+        embedding.index_add_(0, valid_seeds, self.u_embeddings.weight.cpu().data)
 
         if self.norm:
             embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1) + 1e-6).unsqueeze(1)

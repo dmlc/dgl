@@ -16,27 +16,7 @@ import tqdm
 import traceback
 
 from utils import thread_wrapped_func
-
-#### Neighbor sampler
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts):
-        self.g = g
-        self.fanouts = fanouts
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
+from load_graph import load_reddit, inductive_split
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -92,11 +72,18 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
-                end = start + batch_size
-                batch_nodes = nodes[start:end]
-                block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                input_nodes = block.srcdata[dgl.NID]
+            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
+            dataloader = dgl.sampling.NodeDataLoader(
+                g,
+                th.arange(g.number_of_nodes()),
+                sampler,
+                batch_size=args.batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -105,7 +92,7 @@ class SAGE(nn.Module):
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[start:end] = h.cpu()
+                y[output_nodes] = h.cpu()
 
             x = y
         return y
@@ -128,13 +115,13 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
+def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     """
-    Evaluate the model on the validation set specified by ``val_mask``.
+    Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
-    val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
+    val_nid : A node ID tensor indicating which nodes do we actually compute the accuracy for.
     batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
@@ -142,7 +129,7 @@ def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
     with th.no_grad():
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred[val_mask], labels[val_mask])
+    return compute_acc(pred[val_nid], labels[val_nid])
 
 def load_subtensor(g, labels, seeds, input_nodes, dev_id):
     """
@@ -168,23 +155,25 @@ def run(proc_id, n_gpus, args, devices, data):
     th.cuda.set_device(dev_id)
 
     # Unpack data
-    train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    train_mask = th.BoolTensor(train_mask)
-    val_mask = th.BoolTensor(val_mask)
+    in_feats, n_classes, train_g, val_g, test_g = data
+    train_mask = train_g.ndata['train_mask']
+    val_mask = val_g.ndata['val_mask']
+    test_mask = ~(train_g.ndata['train_mask'] | val_g.ndata['val_mask'])
+    train_nid = train_mask.nonzero()[:, 0]
+    val_nid = val_mask.nonzero()[:, 0]
+    test_nid = test_mask.nonzero()[:, 0]
 
     # Split train_nid
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
-    # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
-
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
-        dataset=train_nid.numpy(),
+    sampler = dgl.sampling.MultiLayerNeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(',')])
+    dataloader = dgl.sampling.NodeDataLoader(
+        train_g,
+        train_nid,
+        sampler,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
         num_workers=args.num_workers)
@@ -206,17 +195,12 @@ def run(proc_id, n_gpus, args, devices, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, blocks in enumerate(dataloader):
+        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
 
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
-            seeds = blocks[-1].dstdata[dgl.NID]
-
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, dev_id)
+            batch_inputs, batch_labels = load_subtensor(train_g, train_g.ndata['labels'], seeds, input_nodes, dev_id)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -249,10 +233,17 @@ def run(proc_id, n_gpus, args, devices, data):
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
-                    eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
+                    eval_acc = evaluate(
+                        model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, devices[0])
+                    test_acc = evaluate(
+                        model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, devices[0])
                 else:
-                    eval_acc = evaluate(model.module, g, g.ndata['features'], labels, val_mask, args.batch_size, devices[0])
+                    eval_acc = evaluate(
+                        model.module, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, devices[0])
+                    test_acc = evaluate(
+                        model.module, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
+                print('Test Acc: {:.4f}'.format(test_acc))
 
 
     if n_gpus > 1:
@@ -275,25 +266,28 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--inductive', action='store_true',
+        help="Inductive learning setting")
     args = argparser.parse_args()
     
     devices = list(map(int, args.gpu.split(',')))
     n_gpus = len(devices)
 
-    # load reddit data
-    data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    features = th.Tensor(data.features)
-    in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
+    g, n_classes = load_reddit()
     # Construct graph
-    g = dgl.graph(data.graph.all_edges())
-    g.ndata['features'] = features
-    prepare_mp(g)
+    g = dgl.as_heterograph(g)
+    in_feats = g.ndata['features'].shape[1]
+
+    if args.inductive:
+        train_g, val_g, test_g = inductive_split(g)
+    else:
+        train_g = val_g = test_g = g
+
+    prepare_mp(train_g)
+    prepare_mp(val_g)
+    prepare_mp(test_g)
     # Pack data
-    data = train_mask, val_mask, in_feats, labels, n_classes, g
+    data = in_feats, n_classes, train_g, val_g, test_g
 
     if n_gpus == 1:
         run(0, n_gpus, args, devices, data)
