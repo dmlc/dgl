@@ -32,10 +32,15 @@ template <typename Idx, typename DType, typename BinaryOp,
           bool UseBcast = false, bool UseIdx = false,
           int LhsTarget = 0, int RhsTarget = 2>
 __global__ void SDDMMCooKernel(
-  const DType *lhs, const DType *rhs, DType *out,
-  const Idx *row, const Idx *col, const Idx* edge_map,
+  const DType* __restrict__ lhs,
+  const DType* __restrict__ rhs,
+  DType* __restrict__ out,
+  const Idx* __restrict__ row,
+  const Idx* __restrict__ col,
+  const Idx* __restrict__ edge_map,
   int64_t N, int64_t M, int64_t E, int64_t reduce_size,
-  const int64_t *lhs_off, const int64_t *rhs_off,
+  const int64_t* __restrict__ lhs_off,
+  const int64_t* __restrict__ rhs_off,
   int64_t lhs_len, int64_t rhs_len, int64_t out_len) {
   // SDDMM with COO.
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
@@ -98,10 +103,15 @@ template <typename Idx, typename DType, typename BinaryOp,
           bool UseBcast = false, bool UseIdx = false,
           int LhsTarget = 0, int RhsTarget = 2>
 __global__ void SDDMMCsrKernel(
-  const DType *lhs, const DType *rhs, DType *out,
-  const Idx *indptr, const Idx *indices, const Idx* edge_map,
+  const DType* __restrict__ lhs,
+  const DType* __restrict__ rhs,
+  DType* __restrict__ out,
+  const Idx* __restrict__ indptr,
+  const Idx* __restrict__ indices,
+  const Idx* __restrict__ edge_map,
   int64_t N, int64_t M, int64_t E, int64_t reduce_size,
-  int64_t *lhs_off, int64_t *rhs_off,
+  const int64_t* __restrict__ lhs_off,
+  const int64_t* __restrict__ rhs_off,
   int64_t lhs_len, int64_t rhs_len, int64_t out_len) {
   // SDDMM with Csr.
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
