@@ -137,8 +137,8 @@ def _gspmm(g, op, reduce_op, u, e):
     op = op_mapping[op]
     ctx = F.context(u) if u is not None else F.context(e)
     dtype = F.dtype(u) if u is not None else F.dtype(e)
-    use_u = (op != 'copy_e')
-    use_e = (op != 'copy_u')
+    use_u = (op != 'copy_rhs')
+    use_e = (op != 'copy_lhs')
     u_shp = F.shape(u) if use_u else (0,)
     e_shp = F.shape(e) if use_e else (0,)
     v_shp = (g.number_of_dst_nodes(), ) +\

@@ -6,6 +6,7 @@ from ...function import TargetCode
 from ...base import ALL, is_all
 from ... import backend as F
 from ... import utils
+from ...sparse import _gspmm, _gsddmm
 from ...graph import DGLGraph
 from ...heterograph import DGLHeteroGraph
 
@@ -49,6 +50,12 @@ class EdgeSoftmax(th.autograd.Function):
         if not is_all(eids):
             g = g.edge_subgraph(eids.long())
 
+        score = g.edata['score']
+        score_max = _gspmm(g, 'copy_e', 'max', None, score)[0]
+        score = th.exp(_gsddmm(g, '-', score, score_max, 'e', 'v'))
+        score_sum = _gspmm(g, 'copy_e', 'sum', None, score)[0]
+        out = _gsddmm(g, '/', score, score_sum, 'e', 'v')
+        """
         n_nodes = g.number_of_dst_nodes()
         n_edges = g.number_of_edges()
 
@@ -78,6 +85,7 @@ class EdgeSoftmax(th.autograd.Function):
         #g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
         out = F.binary_reduce(
             'none', 'div', gidx, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
+        """
 
         ctx.save_for_backward(out)
         return out
