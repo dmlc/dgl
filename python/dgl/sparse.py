@@ -104,8 +104,8 @@ def _gspmm(g, op, reduce_op, u, e):
     g : DGLHeteroGraph
         The input graph.
     op : str
-        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``, ``copy_u``,
-        ``copy_e``, or their alias ``+``, ``-``, ``*``, ``/``, ``.``.
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``copy_u``,
+        ``copy_e``, or their alias ``+``, ``-``, ``*``, ``/``.
     reduce_op : str
         Reduce operator, could be ``sum``, ``max``, ``min``.
     u : tensor or None

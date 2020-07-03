@@ -87,7 +87,6 @@ void SDDMMCoo(const BcastOff& bcast,
                 reduce_size = bcast.reduce_size;
   DType* O = out.Ptr<DType>();
   const int64_t nnz = coo.row->shape[0];
-  LOG(INFO) << "LhsTarget: " << LhsTarget << " RhsTarget: " << RhsTarget;
 #pragma omp parallel for
   for (IdType i = 0; i < nnz; ++i) {
     const IdType rid = row[i];
