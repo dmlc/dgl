@@ -739,6 +739,14 @@ def index_add_inplace(data, row_idx, value):
     If two row indices are the same, the corresponding values are sum up before
     adding to the data tensor.
 
+    Examples
+    --------
+    >>> import torch as th
+    >>> arr = th.zeros((10))
+    >>> F. index_add_inplace(arr, th.tensor([0, 1, 1]), th.tensor([1.0, 1.0, 1.0]))
+    >>> arr
+    tensor([1., 2., 0., 0., 0., 0., 0., 0., 0., 0.])
+
     Parameters
     ----------
     data : Tensor

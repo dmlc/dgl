@@ -17,6 +17,18 @@ class SparseNodeEmbedding:
         The shape of the embedding. The first dimension should be the number of nodes.
     initializer : callable
         The function to create the initial data.
+
+    Examples
+    --------
+    >>> emb_init = lambda shape, dtype: F.zeros(shape, dtype, F.cpu())
+    >>> shape = (g.number_of_nodes(), 1)
+    >>> emb = dgl.distributed.SparseNodeEmbedding(g, 'emb1', shape, emb_init)
+    >>> optimizer = dgl.distributed.SparseAdagrad([emb], lr=0.001)
+    >>> for blocks in dataloader:
+    >>>     feats = emb(nids)
+    >>>     loss = F.sum(feats + 1, 0)
+    >>>     loss.backward()
+    >>>     optimizer.step()
     '''
     def __init__(self, g, name, shape, initializer):
         assert shape[0] == g.number_of_nodes()
