@@ -7,6 +7,7 @@ from . import rpc
 from .graph_partition_book import PartitionPolicy
 
 from .. import backend as F
+from .. import utils
 from .._ffi.ndarray import empty_shared_mem
 
 ############################ Register KVStore Requsts and Responses ###############################
@@ -900,7 +901,7 @@ class KVClient(object):
             raise RuntimeError("Data %s has already exists!" % name)
         if self._full_data_shape.__contains__(name):
             raise RuntimeError("Data shape %s has already exists!" % name)
-        self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+        self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
         shared_data = empty_shared_mem(name+'-kvdata-', False, \
             local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
@@ -930,7 +931,7 @@ class KVClient(object):
                 shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-                self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+                self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
                 self._pull_handlers[name] = default_pull_handler
                 self._push_handlers[name] = default_push_handler
         # Get full data shape across servers
@@ -992,6 +993,8 @@ class KVClient(object):
             a tensor with the same row size of data ID
         """
         assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         assert F.shape(id_tensor)[0] == F.shape(data_tensor)[0], \
         'The data must has the same row size with ID.'
@@ -1040,6 +1043,8 @@ class KVClient(object):
             a data tensor with the same row size of id_tensor.
         """
         assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         if self._pull_handlers[name] is default_pull_handler: # Use fast-pull
             part_id = self._part_policy[name].to_partid(id_tensor)
