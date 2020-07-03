@@ -229,7 +229,7 @@ def _test_sample_neighbors(hypersparse):
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 1}
             assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
-            assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+            assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
                 # check no duplication
@@ -259,7 +259,7 @@ def _test_sample_neighbors(hypersparse):
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 2}
             assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
-            assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+            assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
                 # check no duplication
@@ -327,7 +327,7 @@ def _test_sample_neighbors_outedge(hypersparse):
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 1}
             assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
-            assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+            assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
                 # check no duplication
@@ -357,7 +357,7 @@ def _test_sample_neighbors_outedge(hypersparse):
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 2}
             assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
-            assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+            assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
                 # check no duplication
@@ -409,7 +409,7 @@ def _test_sample_neighbors_topk(hypersparse):
         assert subg.number_of_edges() == 4
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+        assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
         assert edge_set == {(2,0),(1,0),(2,1),(3,1)}
     _test1()
 
@@ -426,7 +426,7 @@ def _test_sample_neighbors_topk(hypersparse):
         assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 3
         u, v = subg.edges()
-        assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+        assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
         assert edge_set == {(2,0),(1,0),(0,2)}
     _test2()
@@ -437,15 +437,15 @@ def _test_sample_neighbors_topk(hypersparse):
         assert len(subg.etypes) == 4
         u, v = subg['follow'].edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+        assert F.array_equal(hg['follow'].edge_id(u, v), subg['follow'].edata[dgl.EID])
         assert edge_set == {(2,0),(1,0),(2,1),(3,1)}
         u, v = subg['play'].edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+        assert F.array_equal(hg['play'].edge_id(u, v), subg['play'].edata[dgl.EID])
         assert edge_set == {(0,0)}
         u, v = subg['liked-by'].edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+        assert F.array_equal(hg['liked-by'].edge_id(u, v), subg['liked-by'].edata[dgl.EID])
         assert edge_set == {(2,0),(2,1),(1,0)}
         assert subg['flips'].number_of_edges() == 0
     _test3()
@@ -477,7 +477,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
         assert subg.number_of_edges() == 4
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+        assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
         assert edge_set == {(0,2),(0,1),(1,2),(1,3)}
     _test1()
 
@@ -495,7 +495,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
         assert subg.number_of_edges() == 3
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+        assert F.array_equal(g.edge_id(u, v), subg.edata[dgl.EID])
         assert edge_set == {(0,2),(0,1),(2,0)}
     _test2()
 
@@ -505,15 +505,15 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
         assert len(subg.etypes) == 4
         u, v = subg['follow'].edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+        assert F.array_equal(hg['follow'].edge_id(u, v), subg['follow'].edata[dgl.EID])
         assert edge_set == {(0,2),(0,1),(1,2),(1,3)}
         u, v = subg['play'].edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+        assert F.array_equal(hg['play'].edge_id(u, v), subg['play'].edata[dgl.EID])
         assert edge_set == {(0,0)}
         u, v = subg['liked-by'].edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+        assert F.array_equal(hg['liked-by'].edge_id(u, v), subg['liked-by'].edata[dgl.EID])
         assert edge_set == {(0,2),(1,2),(0,1)}
         assert subg['flips'].number_of_edges() == 0
     _test3()

@@ -323,6 +323,7 @@ def test_batched_features(index_dtype):
         node_attrs={'user': ['h1', 'h2'], 'game': ['h1', 'h2']},
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
+@unittest.skipIf(F.backend_name == 'mxnet', reason="MXNet does not support split array with zero-length segment.")
 @parametrize_dtype
 def test_batching_with_zero_nodes_edges(index_dtype):
     """Test the features of batched DGLHeteroGraphs"""

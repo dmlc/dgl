@@ -1006,7 +1006,7 @@ def equal(x, y):
 
     Returns
     -------
-    Boolean tensor
+    Boolean or integer tensor
         The result, with the same shape as input.
     """
     pass

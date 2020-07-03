@@ -72,8 +72,7 @@ def initialize_context():
     tf.zeros(1)
 
 def as_scalar(data):
-    return data.numpy().asscalar()
-
+    return data.numpy().item()
 
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
@@ -363,7 +362,7 @@ def boolean_mask(input, mask):
 
 
 def equal(x, y):
-    return x == y
+    return tf.cast(x == y, tf.int32)
 
 
 def logical_not(input):

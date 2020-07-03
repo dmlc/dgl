@@ -43,7 +43,10 @@ def tensor(data, dtype=None):
     else:
         if isinstance(data, numbers.Integral):
             data = [data]
-        return nd.array(data, dtype=dtype)
+        if dtype is None and isinstance(data, np.ndarray):
+            return nd.array(data, dtype=data.dtype)
+        else:
+            return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
     return data.asscalar()
