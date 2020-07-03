@@ -414,7 +414,7 @@ class HeteroGraphIndex(ObjectBase):
         return utils.toindex(_CAPI_DGLHeteroEdgeId(
             self, int(etype), int(u), int(v)), self.dtype)
 
-    def edge_ids(self, etype, u, v):
+    def edge_ids_all(self, etype, u, v):
         """Return a triplet of arrays that contains the edge IDs.
 
         Parameters
@@ -437,13 +437,35 @@ class HeteroGraphIndex(ObjectBase):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        edge_array = _CAPI_DGLHeteroEdgeIds(self, int(etype), u_array, v_array)
+        edge_array = _CAPI_DGLHeteroEdgeIdsAll(self, int(etype), u_array, v_array)
 
         src = utils.toindex(edge_array(0), self.dtype)
         dst = utils.toindex(edge_array(1), self.dtype)
         eid = utils.toindex(edge_array(2), self.dtype)
 
         return src, dst, eid
+
+    def edge_ids_one(self, etype, u, v):
+        """Return an arrays of edge IDs.
+
+        Parameters
+        ----------
+        etype : int
+            Edge type
+        u : utils.Index
+            The src nodes.
+        v : utils.Index
+            The dst nodes.
+
+        Returns
+        -------
+        utils.Index
+            The edge ids.
+        """
+        u_array = u.todgltensor()
+        v_array = v.todgltensor()
+        eid = _CAPI_DGLHeteroEdgeIdsOne(self, int(etype), u_array, v_array)
+        return eid
 
     def find_edges(self, etype, eid):
         """Return a triplet of arrays that contains the edge IDs.

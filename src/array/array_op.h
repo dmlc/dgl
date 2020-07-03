@@ -94,9 +94,6 @@ template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
-
-template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType>
@@ -172,11 +169,11 @@ std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix coo, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col);
-
-template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COOTranspose(COOMatrix coo);

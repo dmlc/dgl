@@ -198,14 +198,17 @@ class UnitGraph::COO : public BaseHeteroGraph {
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
-    return aten::COOGetData(adj_, src, dst);
+    return aten::COOGetAllData(adj_, src, dst);
   }
 
-  EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
+  EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const override {
     CHECK(aten::IsValidIdArray(src)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dst)) << "Invalid vertex id array.";
     const auto& arrs = aten::COOGetDataAndIndices(adj_, src, dst);
     return EdgeArray{arrs[0], arrs[1], arrs[2]};
+  }
+
+  IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override {
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
@@ -571,14 +574,17 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
-    return aten::CSRGetData(adj_, src, dst);
+    return aten::CSRGetAllData(adj_, src, dst);
   }
 
-  EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
+  EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const override {
     CHECK(aten::IsValidIdArray(src)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dst)) << "Invalid vertex id array.";
     const auto& arrs = aten::CSRGetDataAndIndices(adj_, src, dst);
     return EdgeArray{arrs[0], arrs[1], arrs[2]};
+  }
+
+  IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override {
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
@@ -869,14 +875,24 @@ IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
     return ptr->EdgeId(etype, src, dst);
 }
 
-EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
+EdgeArray UnitGraph::EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const {
   const SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
-    EdgeArray edges = ptr->EdgeIds(etype, dst, src);
+    EdgeArray edges = ptr->EdgeIdsAll(etype, dst, src);
     return EdgeArray{edges.dst, edges.src, edges.id};
   } else {
-    return ptr->EdgeIds(etype, src, dst);
+    return ptr->EdgeIdsAll(etype, src, dst);
+  }
+}
+
+IdArray UnitGraph::EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const {
+  const SparseFormat fmt = SelectFormat(SparseFormat::kCSR);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::kCSC) {
+    return ptr->EdgeIdsOne(etype, dst, src);
+  } else {
+    return ptr->EdgeIdsOne(etype, src, dst);
   }
 }
 

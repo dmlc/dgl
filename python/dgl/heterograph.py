@@ -1501,6 +1501,8 @@ class DGLHeteroGraph(object):
         """Return the edge ID, or an array of edge IDs, between source node
         `u` and destination node `v`, with the specified edge type
 
+        **DEPRECATED**: See edge_ids
+
         Parameters
         ----------
         u : int
@@ -1550,19 +1552,14 @@ class DGLHeteroGraph(object):
         --------
         edge_ids
         """
-        idx = self._graph.edge_id(self.get_etype_id(etype), u, v)
-        if force_multi is not None:
-            dgl_warning("force_multi will be deprecated." \
-                        "Please use return_array instead")
-            return_array = force_multi
-
-        if return_array:
-            return idx.tousertensor()
+        dgl_warning("DGLGraph.edge_id is deprecated. Please use DGLGraph.edge_ids")
+        rst = edge_ids(self, u, v, force_multi=force_multi,
+                       return_uv=return_uv, etype=etype)
+        if len(rst) == 1:
+            return rst[0]
         else:
-            assert len(idx) == 1, "For return_array=False, there should be one and " \
-                "only one edge between u and v, but get {} edges. " \
-                "Please use return_array=True instead".format(len(idx))
-            return idx[0]
+            u, v, eid = rst
+            return u[0], v[0], eid[0]
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return all edge IDs between source node array `u` and destination
@@ -1631,18 +1628,16 @@ class DGLHeteroGraph(object):
         check_same_dtype(self._idtype_str, v)
         u = utils.toindex(u, self._idtype_str)
         v = utils.toindex(v, self._idtype_str)
-        src, dst, eid = self._graph.edge_ids(self.get_etype_id(etype), u, v)
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
             return_uv = force_multi
 
         if return_uv:
+            src, dst, eid = self._graph.edge_ids_all(self.get_etype_id(etype), u, v)
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
-            assert len(eid) == max(len(u), len(v)), "If return_uv=False, there should be one and " \
-                "only one edge between each u and v, expect {} edges but get {}. " \
-                "Please use return_uv=True instead".format(max(len(u), len(v)), len(eid))
+            eid = self._graph.edge_ids_one(self.get_etype_id(etype), u, v)
             return eid.tousertensor()
 
     def find_edges(self, eid, etype=None):

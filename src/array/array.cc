@@ -343,16 +343,6 @@ bool CSRIsSorted(CSRMatrix csr) {
   return ret;
 }
 
-NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
-  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
-  CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
-  NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
-    ret = impl::CSRGetData<XPU, IdType>(csr, row, col);
-  });
-  return ret;
-}
-
 NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, rows);
@@ -549,19 +539,19 @@ std::pair<NDArray, NDArray> COOGetRowDataAndIndices(COOMatrix coo, int64_t row) 
   return ret;
 }
 
-NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
-  NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetData", {
-    ret = impl::COOGetData<XPU, IdType>(coo, row, col);
-  });
-  return ret;
-}
-
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
   std::vector<NDArray> ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetDataAndIndices", {
     ret = impl::COOGetDataAndIndices<XPU, IdType>(coo, rows, cols);
+  });
+  return ret;
+}
+
+NDArray COOGetData(COOMatrix coo, NDArray rows, NDArray cols) {
+  NDArray ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetData", {
+    ret = impl::COOGetData<XPU, IdType>(coo, rows, cols);
   });
   return ret;
 }
