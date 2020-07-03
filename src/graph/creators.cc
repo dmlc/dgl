@@ -66,7 +66,6 @@ HeteroGraphPtr CreateFromCSC(
 HeteroGraphPtr CreateLineGraph(
     HeteroGraphPtr hg,
     bool backtracking) {
-  CHECK(hg->IsMultigraph()) << "Line graph transformation is only supported on mutable graph";
   return hg->LineGraph(backtracking);
 }
 

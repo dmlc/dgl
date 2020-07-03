@@ -417,7 +417,7 @@ HeteroGraphPtr HeteroGraph::LineGraph(bool backtracking) const {
 
   const auto &ulg = ug->LineGraph(backtracking);
   std::vector<HeteroGraphPtr> rel_graph = {ulg};
-  std::vector<int64_t> num_nodes_per_type = {ulg->NumEdges(0)};
+  std::vector<int64_t> num_nodes_per_type = {ulg->NumVertices(0)};
   return HeteroGraphPtr(new HeteroGraph(meta_graph_, rel_graph, std::move(num_nodes_per_type)));
 }
 

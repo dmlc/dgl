@@ -1929,6 +1929,23 @@ def test_edges_order():
     assert F.array_equal(F.copy_to(dst, F.cpu()),
                          F.copy_to(F.tensor([1, 1, 2, 2, 1]), F.cpu()))
 
+@parametrize_dtype
+def test_linegraph(index_dtype):
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows', index_dtype=index_dtype)
+    lg = g.line_graph()
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 8
+    row, col = lg.edges()
+    assert F.array_equal(row, F.astype(F.tensor([0, 0, 1, 2, 2, 3, 4, 4]), F.dtype(row)))
+    assert F.array_equal(col, F.astype(F.tensor([3, 4, 0, 3, 4, 0, 1, 2]), F.dtype(col)))
+
+    lg = g.line_graph(backtracking=False)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 4
+    row, col = lg.edges()
+    assert F.array_equal(row, F.astype(F.tensor([0, 1, 2, 4]), F.dtype(row)))
+    assert F.array_equal(col, F.astype(F.tensor([4, 0, 3, 1]), F.dtype(col)))
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -1942,8 +1959,8 @@ if __name__ == '__main__':
     # test_convert()
     # test_to_device()
     # test_transform("int32")
-    test_subgraph("int32")
-    test_subgraph_mask("int32")
+    # test_subgraph("int32")
+    # test_subgraph_mask("int32")
     # test_apply()
     # test_level1()
     # test_level2()
@@ -1955,4 +1972,5 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
+    test_linegraph('int32')
     pass

@@ -153,8 +153,6 @@ class HeteroGraphIndex(ObjectBase):
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
 
-        suppose the graph is an undirected homogeneous graph.
-
         Returns
         -------
         GraphIndex

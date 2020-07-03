@@ -2573,6 +2573,55 @@ class DGLHeteroGraph(object):
     # Alias of ``incidence_matrix``
     inc = incidence_matrix
 
+    def line_graph(self, backtracking=True):
+        """Return the line graph of this graph.
+
+        The graph should be an directed homogeneous graph. Aother type of graphs
+        are not supported right now.
+
+        All node features and edge features are not copied to the output
+
+        Parameters
+        ----------
+        backtracking : bool
+            Whether the pair of (v, u) (u, v) edges are treated as linked. Default True.
+
+        Returns
+        -------
+        G : DGLHeteroGraph
+            The line graph of this graph.
+
+        Examples:
+        A = [[0, 0, 1],
+             [1, 0, 1],
+             [1, 1, 0]]
+        >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows')
+        >>> lg = g.line_graph()
+        >>> lg
+        ... Graph(num_nodes=5, num_edges=8,
+        ... ndata_schemes={}
+        ... edata_schemes={})
+        >>> lg.edges()
+        ... (tensor([0, 0, 1, 2, 2, 3, 4, 4]), tensor([3, 4, 0, 3, 4, 0, 1, 2]))
+        >>>
+        >>> lg = g.line_graph(backtracking=False)
+        >>> lg
+        ... Graph(num_nodes=5, num_edges=4,
+        ... ndata_schemes={}
+        ... edata_schemes={})
+        >>> lg.edges()
+        ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
+
+        """
+        assert self._graph.number_of_etypes() == 1, \
+          'line_graph only support directed homogeneous graph right now'
+        assert self._graph.number_of_ntypes() == 1, \
+          'line_graph only support directed homogeneous graph right now'
+
+        hgidx = self._graph.line_graph(backtracking)
+        hg = DGLHeteroGraph(hgidx, self._etypes, self._ntypes)
+        return hg
+
     #################################################################
     # Features
     #################################################################

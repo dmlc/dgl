@@ -597,7 +597,7 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
     *rv = ret_list;
   });
 
-DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLHeteroLineGraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroLineGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   HeteroGraphRef hg = args[0];
   bool backtracking = args[1];
