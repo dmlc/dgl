@@ -219,6 +219,14 @@ void _TestCSRGetData(DLContext ctx) {
   tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 
+  // test get data on sorted
+  csr = aten::CSRSort(csr);
+  r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
+  c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
+  x = aten::CSRGetData(csr, r, c);
+  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
+
   // test get data w/ broadcasting
   r = aten::VecToIdArray(std::vector<IDX>({0}), sizeof(IDX)*8, ctx);
   c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);

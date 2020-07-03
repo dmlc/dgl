@@ -59,9 +59,15 @@ def cpu():
 def tensor(data, dtype=None):
     """Create a tensor given the data and data type.
 
+    If the input is already a tensor and has the same dtype,
+    directly return.
+
+    Scalar input is converted to a array of one element instead of
+    a 0-dim tensor to avoid certain issues with some backends.
+
     Parameters
     ----------
-    data : input data
+    data : int, iterable, Tensor
         The interface should at least support list and numpy array.
         The data is copied to a newly-allocated tensor.
     dtype : data type, optional

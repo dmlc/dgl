@@ -194,7 +194,7 @@ IdArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
       const IdType *start_ptr = indices_data + indptr_data[row_id];
       const IdType *end_ptr = indices_data + indptr_data[row_id + 1];
       auto it = std::lower_bound(start_ptr, end_ptr, col_id);
-      if (it != end_ptr) {
+      if (it != end_ptr && *it == col_id) {
         const IdType idx = it - indices_data;
         ret_data[p] = data? data[idx] : idx;
       }

@@ -6,6 +6,7 @@ from distutils.version import LooseVersion
 import tensorflow as tf
 from tensorflow.python.eager import context
 import builtins
+import numbers
 import numpy as np
 import os
 
@@ -57,7 +58,15 @@ def cpu():
     return "/cpu:0"
 
 def tensor(data, dtype=None):
-    return tf.convert_to_tensor(data, dtype=dtype)
+    if isinstance(data, tf.Tensor):
+        if dtype is None or data.dtype == dtype:
+            return data
+        else:
+            return tf.cast(data, dtype=dtype)
+    else:
+        if isinstance(data, numbers.Integral):
+            data = [data]
+        return tf.convert_to_tensor(data, dtype=dtype)
 
 def initialize_context():
     tf.zeros(1)

@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import copy
 import networkx as nx
 import numpy as np
+import numbers
 
 from . import graph_index
 from . import heterograph_index
@@ -1497,7 +1498,7 @@ class DGLHeteroGraph(object):
         check_same_dtype(self._idtype_str, v)
         return self._graph.successors(self.get_etype_id(etype), v).tousertensor()
 
-    def edge_id(self, u, v, force_multi=None, return_array=False, etype=None):
+    def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return the edge ID, or an array of edge IDs, between source node
         `u` and destination node `v`, with the specified edge type
 
@@ -1505,17 +1506,16 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        u : int
-            The node ID of source type.
-        v : int
-            The node ID of destination type.
+        u : int, list, tensor
+            The node ID array of source type.
+        v : int, list, tensor
+            The node ID array of destination type.
         force_multi : bool, optional
             Deprecated (Will be deleted in the future).
-            If False, will return a single edge ID.
-            If True, will always return an array. (Default: False)
-        return_array : bool, optional
-            If False, will return a single edge ID.
-            If True, will always return an array. (Default: False)
+            Whether to always treat the graph as a multigraph. See the
+            "Returns" for their effects. (Default: False)
+        return_uv : bool
+            See the "Returns" for their effects. (Default: False)
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
@@ -1526,50 +1526,23 @@ class DGLHeteroGraph(object):
             The edge ID if ``return_array == False``.
             The edge ID array otherwise.
 
-        Notes
-        -----
-        If multiply edges exist between `u` and `v` and return_array is False,
-        the result is undefined.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Instantiate a heterograph.
-
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-
-        Query for edge id.
-
-        >>> plays_g.edge_id(1, 2, etype=('user', 'plays', 'game'))
-        2
-        >>> g.edge_id(1, 2, return_array=True, etype=('user', 'follows', 'user'))
-        tensor([1, 2])
-
         See Also
         --------
         edge_ids
         """
-        dgl_warning("DGLGraph.edge_id is deprecated. Please use DGLGraph.edge_ids")
-        rst = edge_ids(self, u, v, force_multi=force_multi,
-                       return_uv=return_uv, etype=etype)
-        if len(rst) == 1:
-            return rst[0]
-        else:
-            u, v, eid = rst
-            return u[0], v[0], eid[0]
+        dgl_warning("DGLGraph.edge_ids is deprecated. Please use DGLGraph.edge_id")
+        return self.edge_id(u, v, force_multi=force_multi,
+                            return_uv=return_uv, etype=etype)
 
-    def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
+    def edge_id(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return all edge IDs between source node array `u` and destination
         node array `v` with the specified edge type.
 
         Parameters
         ----------
-        u : list, tensor
+        u : int, list, tensor
             The node ID array of source type.
-        v : list, tensor
+        v : int, list, tensor
             The node ID array of destination type.
         force_multi : bool, optional
             Deprecated (Will be deleted in the future).
@@ -1613,21 +1586,17 @@ class DGLHeteroGraph(object):
 
         Query for edge ids.
 
-        >>> plays_g.edge_ids([0], [2], etype=('user', 'plays', 'game'))
+        >>> plays_g.edge_id([0], [2], etype=('user', 'plays', 'game'))
         tensor([], dtype=torch.int64)
-        >>> plays_g.edge_ids([1], [2], etype=('user', 'plays', 'game'))
+        >>> plays_g.edge_id([1], [2], etype=('user', 'plays', 'game'))
         tensor([2])
         >>> g.edge_ids([1], [2], return_uv=True, etype=('user', 'follows', 'user'))
         (tensor([1, 1]), tensor([2, 2]), tensor([1, 2]))
-
-        See Also
-        --------
-        edge_id
         """
         check_same_dtype(self._idtype_str, u)
         check_same_dtype(self._idtype_str, v)
-        u = utils.toindex(u, self._idtype_str)
-        v = utils.toindex(v, self._idtype_str)
+        is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
+        u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
@@ -1635,10 +1604,20 @@ class DGLHeteroGraph(object):
 
         if return_uv:
             src, dst, eid = self._graph.edge_ids_all(self.get_etype_id(etype), u, v)
-            return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+            if is_int:
+                return F.as_scalar(src), F.as_scalar(dst), F.as_scalar(eid)
+            else:
+                return src, dst, eid
         else:
             eid = self._graph.edge_ids_one(self.get_etype_id(etype), u, v)
-            return eid.tousertensor()
+            is_neg_one = F.equal(eid, -1)
+            if F.as_scalar((F.sum(is_neg_one, 0))):
+                # Raise error since some (u, v) pair is not a valid edge.
+                idx = F.nonzero_1d(is_neg_one)
+                raise DGLError("Error: (%d, %d) does not form a valid edge." % (
+                    F.as_scalar(F.gather_row(u, idx)),
+                    F.as_scalar(F.gather_row(v, idx))))
+            return F.as_scalar(eid) if is_int else eid
 
     def find_edges(self, eid, etype=None):
         """Given an edge ID array with the specified type, return the source
@@ -2819,10 +2798,10 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u, self._idtype_str)
-            v = utils.toindex(v, self._idtype_str)
+            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            _, _, eid = self._graph.edge_ids(etid, u, v)
+            eid = self._graph.edge_ids_one(etid, u, v)
+            eid = utils.toindex(eid, self._idtype_str)
         else:
             eid = utils.toindex(edges, self._idtype_str)
 
@@ -2871,10 +2850,10 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
-            u = utils.toindex(u, self._idtype_str)
-            v = utils.toindex(v, self._idtype_str)
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            _, _, eid = self._graph.edge_ids(etid, u, v)
+            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            eid = self._graph.edge_ids_one(etid, u, v)
+            eid = utils.toindex(eid, self._idtype_str)
         else:
             eid = utils.toindex(edges, self._idtype_str)
 
@@ -2995,10 +2974,13 @@ class DGLHeteroGraph(object):
             eid = utils.toindex(slice(0, self.number_of_edges(etype)), self._idtype_str)
         elif isinstance(edges, tuple):
             u, v = edges
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            # Find all edges including parallel edges.
+            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(etid, u, v)
+            eid = utils.toindex(eid, self._idtype_str)
         else:
             eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
@@ -3060,10 +3042,13 @@ class DGLHeteroGraph(object):
             eid = utils.toindex(slice(0, self.number_of_edges(etype)), self._idtype_str)
         elif isinstance(edges, tuple):
             u, v = edges
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            # Find all edges including parallel edges.
+            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(etid, u, v)
+            eid = utils.toindex(eid, self._idtype_str)
         else:
             eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
@@ -3145,10 +3130,13 @@ class DGLHeteroGraph(object):
             u, v, _ = self._graph.edges(etid, 'eid')
         elif isinstance(edges, tuple):
             u, v = edges
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            # Find all edges including parallel edges
+            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(etid, u, v)
+            eid = utils.toindex(eid, self._idtype_str)
         else:
             eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
@@ -3427,10 +3415,13 @@ class DGLHeteroGraph(object):
 
         if isinstance(edges, tuple):
             u, v = edges
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            # Find all edges including parallel edges
+            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(etid, u, v)
+            eid = utils.toindex(eid, self._idtype_str)
         else:
             eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)
@@ -3540,10 +3531,13 @@ class DGLHeteroGraph(object):
                 edges, mfunc, rfunc, afunc = args
                 if isinstance(edges, tuple):
                     u, v = edges
+                    # Rewrite u, v to handle edge broadcasting and multigraph.
+                    # Find all edges including parallel edges
+                    u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+                    u, v, eid = self._graph.edge_ids_all(etid, u, v)
                     u = utils.toindex(u, self._idtype_str)
                     v = utils.toindex(v, self._idtype_str)
-                    # Rewrite u, v to handle edge broadcasting and multigraph.
-                    u, v, eid = self._graph.edge_ids(etid, u, v)
+                    eid = utils.toindex(eid, self._idtype_str)
                 else:
                     eid = utils.toindex(edges, self._idtype_str)
                     u, v, _ = self._graph.find_edges(etid, eid)
@@ -4237,10 +4231,13 @@ class DGLHeteroGraph(object):
             eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)), self._idtype_str)
         elif isinstance(edges, tuple):
             u, v = edges
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            # Find all edges including parallel edges
+            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(etid, u, v)
+            eid = utils.toindex(eid, self._idtype_str)
         else:
             eid = utils.toindex(edges, self._idtype_str)
             u, v, _ = self._graph.find_edges(etid, eid)

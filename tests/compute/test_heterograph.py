@@ -230,16 +230,17 @@ def test_query(index_dtype):
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
                 assert g.edge_id(src, dst, etype=etype) == i
-                assert F.asnumpy(g.edge_id(src, dst, etype=etype, return_array=True)).tolist() == [i]
-            assert F.asnumpy(g.edge_ids(srcs, dsts, etype=etype)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_ids(srcs, dsts, etype=etype, return_uv=True)
+                _, _, eid = g.edge_id(src, dst, etype=etype, return_uv=True)
+                assert eid == i
+            assert F.asnumpy(g.edge_id(srcs, dsts, etype=etype)).tolist() == list(range(n_edges))
+            u, v, e = g.edge_id(srcs, dsts, etype=etype, return_uv=True)
             assert F.asnumpy(u).tolist() == srcs
             assert F.asnumpy(v).tolist() == dsts
             assert F.asnumpy(e).tolist() == list(range(n_edges))
 
             # find_edges
-            for edge_ids in [list(range(n_edges)), np.arange(n_edges), F.astype(F.arange(0, n_edges), g.idtype)]:
-                u, v = g.find_edges(edge_ids, etype)
+            for eid in [list(range(n_edges)), np.arange(n_edges), F.astype(F.arange(0, n_edges), g.idtype)]:
+                u, v = g.find_edges(eid, etype)
                 assert F.asnumpy(u).tolist() == srcs
                 assert F.asnumpy(v).tolist() == dsts
 
@@ -340,8 +341,6 @@ def test_hypersparse():
 
     assert g.edge_id(0, 1, etype='follows') == 0
     assert g.edge_id(0, N2, etype='plays') == 0
-    assert F.asnumpy(g.edge_ids(0, 1, etype='follows')).tolist() == [0]
-    assert F.asnumpy(g.edge_ids(0, N2, etype='plays')).tolist() == [0]
 
     u, v = g.find_edges([0], 'follows')
     assert F.asnumpy(u).tolist() == [0]
@@ -379,10 +378,7 @@ def test_edge_ids():
         ('user', 'follows', 'user'): [(0, 1)],
         ('user', 'plays', 'game'): [(0, N2)]},
         {'user': N1, 'game': N1})
-    with pytest.raises(AssertionError):
-        eids = g.edge_ids(0, 0, etype='follows')
-
-    with pytest.raises(AssertionError):
+    with pytest.raises(DGLError):
         eid = g.edge_id(0, 0, etype='follows')
 
     g2 = dgl.heterograph({
@@ -390,11 +386,8 @@ def test_edge_ids():
         ('user', 'plays', 'game'): [(0, N2)]},
         {'user': N1, 'game': N1})
 
-    with pytest.raises(AssertionError):
-        eids = g2.edge_ids(0, 1, etype='follows')
-
-    with pytest.raises(AssertionError):
-        eid = g2.edge_id(0, 1, etype='follows')
+    eid = g2.edge_id(0, 1, etype='follows')
+    assert eid == 0
 
 @parametrize_dtype
 def test_adj(index_dtype):
@@ -689,10 +682,11 @@ def test_view1(index_dtype):
 
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
-                assert g.edge_id(src, dst) == i
-                assert F.asnumpy(g.edge_id(src, dst, return_array=True)).tolist() == [i]
-            assert F.asnumpy(g.edge_ids(srcs, dsts)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_ids(srcs, dsts, return_uv=True)
+                assert g.edge_id(src, dst, etype=etype) == i
+                _, _, eid = g.edge_id(src, dst, etype=etype, return_uv=True)
+                assert eid == i
+            assert F.asnumpy(g.edge_id(srcs, dsts)).tolist() == list(range(n_edges))
+            u, v, e = g.edge_id(srcs, dsts, return_uv=True)
             assert F.asnumpy(u).tolist() == srcs
             assert F.asnumpy(v).tolist() == dsts
             assert F.asnumpy(e).tolist() == list(range(n_edges))

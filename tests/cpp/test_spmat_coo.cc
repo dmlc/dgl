@@ -304,26 +304,34 @@ TEST(SpmatTest, TestCOOReorder) {
 
 template <typename IDX>
 void _TestCOOGetData(DLContext ctx) {
-  auto csr = COO2<IDX>(ctx);
+  auto coo = COO2<IDX>(ctx);
   // test get all data
-  auto x = aten::COOGetAllData(csr, 0, 0);
+  auto x = aten::COOGetAllData(coo, 0, 0);
   auto tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
-  x = aten::COOGetAllData(csr, 0, 2);
+  x = aten::COOGetAllData(coo, 0, 2);
   tx = aten::VecToIdArray(std::vector<IDX>({2, 5}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 
   // test get data
   auto r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
   auto c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
-  x = aten::COOGetData(csr, r, c);
+  x = aten::COOGetData(coo, r, c);
+  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
+
+  // test get data on sorted
+  coo = aten::COOSort(coo); 
+  r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
+  c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
+  x = aten::COOGetData(coo, r, c);
   tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 
   // test get data w/ broadcasting
   r = aten::VecToIdArray(std::vector<IDX>({0}), sizeof(IDX)*8, ctx);
   c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
-  x = aten::COOGetData(csr, r, c);
+  x = aten::COOGetData(coo, r, c);
   tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 

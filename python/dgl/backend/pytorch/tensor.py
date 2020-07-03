@@ -5,6 +5,7 @@ from distutils.version import LooseVersion
 import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
 import builtins
+import numbers
 from torch.utils import dlpack
 
 from ... import ndarray as nd
@@ -31,7 +32,15 @@ def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.tensor(data, dtype=dtype)
+    if isinstance(data, th.Tensor):
+        if dtype is None or data.dtype == dtype:
+            return data
+        else:
+            return data.type(dtype)
+    else:
+        if isinstance(data, numbers.Integral):
+            data = [data]
+        return th.tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()

@@ -209,6 +209,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override {
+    return aten::COOGetData(adj_, src, dst);
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
@@ -585,6 +586,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override {
+    return aten::CSRGetData(adj_, src, dst);
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {

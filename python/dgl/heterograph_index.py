@@ -394,26 +394,6 @@ class HeteroGraphIndex(ObjectBase):
         return utils.toindex(_CAPI_DGLHeteroSuccessors(
             self, int(etype), int(v)), self.dtype)
 
-    def edge_id(self, etype, u, v):
-        """Return the id array of all edges between u and v.
-
-        Parameters
-        ----------
-        etype : int
-            Edge type
-        u : int
-            The src node.
-        v : int
-            The dst node.
-
-        Returns
-        -------
-        utils.Index
-            The edge id array.
-        """
-        return utils.toindex(_CAPI_DGLHeteroEdgeId(
-            self, int(etype), int(u), int(v)), self.dtype)
-
     def edge_ids_all(self, etype, u, v):
         """Return a triplet of arrays that contains the edge IDs.
 
@@ -421,27 +401,26 @@ class HeteroGraphIndex(ObjectBase):
         ----------
         etype : int
             Edge type
-        u : utils.Index
+        u : Tensor
             The src nodes.
-        v : utils.Index
+        v : Tensor
             The dst nodes.
 
         Returns
         -------
-        utils.Index
+        Tensor
             The src nodes.
-        utils.Index
+        Tensor
             The dst nodes.
-        utils.Index
+        Tensor
             The edge ids.
         """
-        u_array = u.todgltensor()
-        v_array = v.todgltensor()
-        edge_array = _CAPI_DGLHeteroEdgeIdsAll(self, int(etype), u_array, v_array)
+        edge_array = _CAPI_DGLHeteroEdgeIdsAll(
+            self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v))
 
-        src = utils.toindex(edge_array(0), self.dtype)
-        dst = utils.toindex(edge_array(1), self.dtype)
-        eid = utils.toindex(edge_array(2), self.dtype)
+        src = F.from_dgl_nd(edge_array(0))
+        dst = F.from_dgl_nd(edge_array(1))
+        eid = F.from_dgl_nd(edge_array(2))
 
         return src, dst, eid
 
@@ -452,19 +431,18 @@ class HeteroGraphIndex(ObjectBase):
         ----------
         etype : int
             Edge type
-        u : utils.Index
+        u : Tensor
             The src nodes.
-        v : utils.Index
+        v : Tensor
             The dst nodes.
 
         Returns
         -------
-        utils.Index
+        Tensor
             The edge ids.
         """
-        u_array = u.todgltensor()
-        v_array = v.todgltensor()
-        eid = _CAPI_DGLHeteroEdgeIdsOne(self, int(etype), u_array, v_array)
+        eid = F.from_dgl_nd(_CAPI_DGLHeteroEdgeIdsOne(
+            self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v)))
         return eid
 
     def find_edges(self, etype, eid):
