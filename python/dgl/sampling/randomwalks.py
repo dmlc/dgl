@@ -123,8 +123,8 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         metapath = [g.get_etype_id(etype) for etype in metapath]
 
     gidx = g._graph
-    nodes = utils.toindex(nodes).todgltensor()
-    metapath = utils.toindex(metapath).todgltensor().copyto(nodes.ctx)
+    nodes = utils.toindex(nodes, g._idtype_str).todgltensor()
+    metapath = utils.toindex(metapath, g._idtype_str).todgltensor().copyto(nodes.ctx)
 
     # Load the probability tensor from the edge frames
     if prob is None:

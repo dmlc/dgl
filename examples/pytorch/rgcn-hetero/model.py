@@ -4,8 +4,9 @@ from collections import defaultdict
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
+import dgl
 import dgl.nn.pytorch as dglnn
+import tqdm
 
 class RelGraphConvLayer(nn.Module):
     r"""Relational graph convolution layer.
@@ -101,9 +102,17 @@ class RelGraphConvLayer(nn.Module):
         else:
             wdict = {}
         hs = self.conv(g, inputs, mod_kwargs=wdict)
+
+        if isinstance(inputs, tuple):
+            # minibatch training
+            inputs_dst = inputs[1]
+        else:
+            # full graph training
+            inputs_dst = inputs
+
         def _apply(ntype, h):
             if self.self_loop:
-                h = h + th.matmul(inputs[ntype], self.loop_weight)
+                h = h + th.matmul(inputs_dst[ntype], self.loop_weight)
             if self.bias:
                 h = h + self.h_bias
             if self.activation:
@@ -192,12 +201,57 @@ class EntityClassify(nn.Module):
             self_loop=self.use_self_loop))
 
     def forward(self, h=None, blocks=None):
-        if blocks is None:
-            # full graph training
-            blocks = [self.g] * len(self.layers)
         if h is None:
             # full graph training
             h = self.embed_layer()
-        for layer, block in zip(self.layers, blocks):
-            h = layer(block, h)
+        if blocks is None:
+            # full graph training
+            for layer in self.layers:
+                h = layer(self.g, h)
+        else:
+            # minibatch training
+            for layer, block in zip(self.layers, blocks):
+                h_dst = {k: v[:block.number_of_dst_nodes(k)] for k, v in h.items()}
+                h = layer(block, (h, h_dst))
         return h
+
+    def inference(self, g, batch_size, device, num_workers, x=None):
+        """Minibatch inference of final representation over all node types.
+
+        ***NOTE***
+        For node classification, the model is trained to predict on only one node type's
+        label.  Therefore, only that type's final representation is meaningful.
+        """
+
+        if x is None:
+            x = self.embed_layer()
+
+        for l, layer in enumerate(self.layers):
+            y = {
+                k: th.zeros(
+                    g.number_of_nodes(k),
+                    self.h_dim if l != len(self.layers) - 1 else self.out_dim)
+                for k in g.ntypes}
+
+            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
+            dataloader = dgl.sampling.NodeDataLoader(
+                g,
+                {k: th.arange(g.number_of_nodes(k)) for k in g.ntypes},
+                sampler,
+                batch_size=batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=num_workers)
+
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
+
+                h = {k: x[k][input_nodes[k]].to(device) for k in input_nodes.keys()}
+                h_dst = {k: v[:block.number_of_dst_nodes(k)] for k, v in h.items()}
+                h = layer(block, (h, h_dst))
+
+                for k in h.keys():
+                    y[k][output_nodes[k]] = h[k].cpu()
+
+            x = y
+        return y
