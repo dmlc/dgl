@@ -1566,7 +1566,7 @@ UnitGraphPtr UnitGraph::Reverse() const {
   if (coo_->defined()) {
     new_coo = COOPtr(new COO(coo_->meta_graph(), aten::COOTranspose(coo_->adj())));
   }
-  CHECK(restrict_format_ == SparseFormat::kAny);
+
   return UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo));
 }
 
