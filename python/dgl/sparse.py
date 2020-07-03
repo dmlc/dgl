@@ -198,7 +198,7 @@ def _gsddmm(g, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     if lhs is not None:
         if F.ndim(lhs) == 1:
             lhs = F.unsqueeze(lhs, -1)
-    if v is not None:
+    if rhs is not None:
         if F.ndim(rhs) == 1:
             rhs = F.unsqueeze(rhs, -1)
 

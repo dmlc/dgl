@@ -596,14 +596,4 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
     ret_list.push_back(dstlist);
     *rv = ret_list;
   });
-
-  DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
-  .set_body([] (DGLArgs args, DGLRetValue* rv) {
-              HeteroGraphRef hg = args[0];
-              CHECK_EQ(hg->NumEdgeTypes(), 1);
-              auto g = std::dynamic_pointer_cast<HeteroGraph>(hg.sptr());
-              auto rev_ug = g->relation_graphs()[0]->Reverse();
-              const auto& num_nodes = rev_ug->NumVerticesPerType();
-              *rv = CreateHeteroGraph(hg->meta_graph(), {rev_ug}, num_nodes);
-            });
 }  // namespace dgl

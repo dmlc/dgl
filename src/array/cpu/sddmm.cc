@@ -9,26 +9,35 @@
 namespace dgl {
 namespace aten {
 
+#define SWITCH_RHS(rhs_target, RhsTarget, ...)                        \
+  do {                                                                \
+    if ((rhs_target) == 0) {                                          \
+      constexpr int RhsTarget = 0;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 1) {                                   \
+      constexpr int RhsTarget = 1;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 2) {                                   \
+      constexpr int RhsTarget = 2;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else {                                                          \
+      LOG(INFO) << "Invalid rhs target: " << (rhs_target);            \
+    }                                                                 \
+  } while (0)
+
 #define SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, ...)\
   do {                                                                  \
     if ((lhs_target) == 0) {                                            \
       constexpr int LhsTarget = 0;                                      \
-      if ((rhs_target) == 0) {                                          \
-        constexpr int RhsTarget = 0;                                    \
-        { __VA_ARGS__ }                                                 \
-      } else {                                                          \
-        constexpr int RhsTarget = 1;                                    \
-        { __VA_ARGS__ }                                                 \
-      }                                                                 \
-    } else {                                                            \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 1) {                                     \
       constexpr int LhsTarget = 1;                                      \
-      if ((rhs_target) == 0) {                                          \
-        constexpr int RhsTarget = 0;                                    \
-        { __VA_ARGS__ }                                                 \
-      } else {                                                          \
-        constexpr int RhsTarget = 1;                                    \
-        { __VA_ARGS__ }                                                 \
-      }                                                                 \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 2) {                                     \
+      constexpr int LhsTarget = 2;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else {                                                            \
+      LOG(INFO) << "Invalid lhs target: " << (lhs_target);              \
     }                                                                   \
   } while (0)
 

@@ -266,9 +266,6 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
-  /*! \return Reversed adjacency graph */
-  UnitGraphPtr Reverse() const;
-
  private:
   friend class Serializer;
   friend class HeteroGraph;
