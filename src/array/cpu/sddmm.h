@@ -8,37 +8,11 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <dgl/selector.h>
 
 namespace dgl {
 namespace aten {
 namespace cpu {
-
-namespace {
-
-/*!
-  * \brief Select among src/edge/dst feature/idx.
-  * \note the integer argument target specifies which target
-  *       to choose, 0: src, 1: edge, 2: dst.
-  */
-temlate <typename T>
-template selector(int target, T src, T edge, T dst) {
-  switch (target) {
-  case 0:
-    return src;
-    break;
-  case 1:
-    return edge;
-    break;
-  case 2:
-    return dst;
-    break;
-  default:
-    LOG(INFO) << "Target " << target << " not recognized.";
-  }
-  return src;
-}
-
-}  // namespace
 
 /*!
  * \brief CPU kernel of g-SDDMM on Csr format.
@@ -47,18 +21,14 @@ template selector(int target, T src, T edge, T dst) {
  * \param lhs The left hand side operand feature.
  * \param rhs The right hand size operand feature.
  * \param out The result feature on edges.
- * \param lhs_target A integer indicates the lhs target.
- *        0: src, 1: edge, 2: dst
- * \param rhs_target A integer indicates the rhs target.
- *        0: src, 1: edge, 2: dst
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
-template <typename IdType, typename DType, typename Op>
+template <typename IdType, typename DType, typename Op,
+          int LhsTarget = 0, int RhsTarget = 2>
 void SDDMMCsr(const BcastOff& bcast,
               const CSRMatrix& csr,
-              NDArray lhs, NDArray rhs, NDArray out,
-              int lhs_target, int rhs_target) {
+              NDArray lhs, NDArray rhs, NDArray out) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
@@ -81,9 +51,9 @@ void SDDMMCsr(const BcastOff& bcast,
         const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
         const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
         const DType* lhs_off = Op::use_lhs?
-          X + selector(lhs_target, rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
+          X + Selector<LhsTarget>(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
         const DType* rhs_off = Op::use_rhs?
-          Y + selector(rhs_target, rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
+          Y + Selector<RhsTarget>(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
         out_off[k] = Op::Call(lhs_off, rhs_off, reduce_size);
       }
     }
@@ -97,18 +67,14 @@ void SDDMMCsr(const BcastOff& bcast,
  * \param lhs The left hand side operand feature.
  * \param rhs The right hand size operand feature.
  * \param out The result feature on edges.
- * \param lhs_target A integer indicates the lhs target.
- *        0: src, 1: edge, 2: dst
- * \param rhs_target A integer indicates the rhs target.
- *        0: src, 1: edge, 2: dst
  * \note it uses edge parallel strategy, different threads are responsible
  *       for the computation of different edges.
  */
-template <typename IdType, typename DType, typename Op>
+template <typename IdType, typename DType, typename Op,
+          int LhsTarget = 0, int RhsTarget = 2>
 void SDDMMCoo(const BcastOff& bcast,
               const COOMatrix& coo,
-              NDArray lhs, NDArray rhs, NDArray out,
-              int lhs_target, int rhs_target) {
+              NDArray lhs, NDArray rhs, NDArray out) {
   const bool has_idx = !IsNullArray(coo.data);
   const IdType* row = coo.row.Ptr<IdType>();
   const IdType* col = coo.col.Ptr<IdType>();
@@ -131,9 +97,9 @@ void SDDMMCoo(const BcastOff& bcast,
       const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
       const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
       const DType* lhs_off = Op::use_lhs ?
-        X + selector(lhs_target, rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
+        X + Selector<LhsTarget>(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
       const DType* rhs_off = Op::use_rhs ?
-        Y + selector(rhs_target, rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
+        Y + Selector<RhsTarget>(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
       out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
     }
   }

@@ -21,42 +21,6 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-namespace {
-
-/*!
- * \brief Select among src/edge/dst feature/idx.
- * \note the integer argument target specifies which target
- *       to choose, 0: src, 1: edge, 2: dst.
- */
-template <int target>
-struct Selector {
-  template <typename T>
-  static __device__ __forceinline__ Call(T src, T edge, T dst) {
-    LOG(INFO) << "Target " << target << " not recognized.";
-    return src;
-  }
-};
-
-template <>
-template <typename T>
- __device__ __forceinline__ Selector<0>::Call(T src, T edge, T dst) {
-  return src;
-}
-
-template <>
-template <typename T>
- __device__ __forceinline__ Selector<1>::Call(T src, T edge, T dst) {
-  return edge;
-}
-
-template <>
-template <typename T>
- __device__ __forceinline__ Selector<2>::Call(T src, T edge, T dst) {
-  return dst;
-}
-
-}  // namespace
-
 /*!
  * \brief CUDA kernel of g-SDDMM on Coo format.
  * \note it uses edge parallel strategy, different threadblocks (on y-axis)
@@ -132,7 +96,7 @@ __device__ __forceinline__ Idx BinarySearchSrc(const Idx *array, Idx length, Idx
  */
 template <typename Idx, typename DType, typename BinaryOp,
           bool UseBcast = false, bool UseIdx = false,
-          int lhs_target = 0, int rhs_target = 2>
+          int LhsTarget = 0, int RhsTarget = 2>
 __global__ void SDDMMCsrKernel(
   const DType *lhs, const DType *rhs, DType *out,
   const Idx *indptr, const Idx *indices, const Idx* edge_map,
@@ -149,9 +113,9 @@ __global__ void SDDMMCsrKernel(
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     const int64_t stride_x = blockDim.x * gridDim.x;
     const DType* lhsoff = BinaryOp::use_lhs ?
-      (lhs + Selector<lhs_target>::Call(src, eid, dst) * lhs_len): nullptr;
+      (lhs + Selector<LhsTarget>::Call(src, eid, dst) * lhs_len): nullptr;
     const DType* rhsoff = BinaryOp::use_rhs ?
-      (rhs + Selector<rhs_target>::Call(src, eid, dst) * rhs_len): nullptr;
+      (rhs + Selector<RhsTarget>::Call(src, eid, dst) * rhs_len): nullptr;
     DType* outoff = out + eid * out_len;
     while (tx < out_len) {
       const Idx lhs_add = UseBcast ? lhs_off[tx] : tx;
@@ -174,20 +138,15 @@ __global__ void SDDMMCsrKernel(
  * \param lhs The left hand side operand feature.
  * \param rhs The right hand size operand feature.
  * \param out The result feature on edges.
- * \param lhs_target A integer indicates the lhs target.
- *        0: src, 1: edge, 2: dst
- * \param rhs_target A integer indicates the rhs target.
- *        0: src, 1: edge, 2: dst
  */
-template <typename Idx, typename DType, typename Op>
+template <typename Idx, typename DType, typename Op,
+          int LhsTarget = 0, int RhsTarget = 2>
 void SDDMMCoo(
     const BcastOff& bcast,
     const COOMatrix& coo,
     NDArray lhs,
     NDArray rhs,
-    NDArray out,
-    int lhs_target,
-    int rhs_target) {
+    NDArray out) {
   const Idx *row = coo.row.Ptr<Idx>();
   const Idx *col = coo.col.Ptr<Idx>();
   const Idx *edge_map = coo.data.Ptr<Idx>();
@@ -213,7 +172,7 @@ void SDDMMCoo(
   const bool use_idx = !IsNullArray(coo.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
-    SDDMMCooKernel<Idx, DType, Op, UseBcast, UseIdx>
+    SDDMMCooKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>
       <<<nblks, nthrs, 0, thr_entry->stream>>>(
         lhs_data, rhs_data, out_data,
         row, col, edge_map,
@@ -231,12 +190,9 @@ void SDDMMCoo(
  * \param lhs The left hand side operand feature.
  * \param rhs The right hand size operand feature.
  * \param out The result feature on edges.
- * \param lhs_target A integer indicates the lhs target.
- *        0: src, 1: edge, 2: dst
- * \param rhs_target A integer indicates the rhs target.
- *        0: src, 1: edge, 2: dst
  */
-template <typename Idx, typename DType, typename Op>
+template <typename Idx, typename DType, typename Op,
+          int LhsTarget = 0, int RhsTarget = 2>
 void SDDMMCsr(
     const BcastOff& bcast,
     const CSRMatrix& csr,
@@ -267,7 +223,7 @@ void SDDMMCsr(
   const bool use_idx = !IsNullArray(csr.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
-    SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx>
+    SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>
       <<<nblks, nthrs, 0, thr_entry->stream>>>(
         lhs_data, rhs_data, out_data,
         indptr, indices, edge_map,

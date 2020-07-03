@@ -101,8 +101,8 @@ void SDDMM(const std::string& op,
            NDArray lhs,
            NDArray rhs,
            NDArray out,
-           char lhs_target,
-           char rhs_target,
+           int lhs_target,
+           int rhs_target,
            SparseFormat format) {
   // TODO(zihao): format tuning
   format = SparseFormat::kCOO;
