@@ -33,8 +33,8 @@ void SDDMMCsr(const BcastOff& bcast,
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
   const IdType* edges = csr.data.Ptr<IdType>();
-  const DType* X = ufeat.Ptr<DType>();
-  const DType* Y = vfeat.Ptr<DType>();
+  const DType* X = lhs.Ptr<DType>();
+  const DType* Y = rhs.Ptr<DType>();
   const int64_t dim = bcast.out_len,
                 lhs_dim = bcast.lhs_len,
                 rhs_dim = bcast.rhs_len,
@@ -51,9 +51,9 @@ void SDDMMCsr(const BcastOff& bcast,
         const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
         const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
         const DType* lhs_off = Op::use_lhs?
-          X + Selector<LhsTarget>(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
+          X + Selector<LhsTarget>::Call(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
         const DType* rhs_off = Op::use_rhs?
-          Y + Selector<RhsTarget>(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
+          Y + Selector<RhsTarget>::Call(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
         out_off[k] = Op::Call(lhs_off, rhs_off, reduce_size);
       }
     }
@@ -79,8 +79,8 @@ void SDDMMCoo(const BcastOff& bcast,
   const IdType* row = coo.row.Ptr<IdType>();
   const IdType* col = coo.col.Ptr<IdType>();
   const IdType* edges = coo.data.Ptr<IdType>();
-  const DType* X = ufeat.Ptr<DType>();
-  const DType* Y = vfeat.Ptr<DType>();
+  const DType* X = lhs.Ptr<DType>();
+  const DType* Y = rhs.Ptr<DType>();
   const int64_t dim = bcast.out_len,
                 lhs_dim = bcast.lhs_len,
                 rhs_dim = bcast.rhs_len,
@@ -97,9 +97,9 @@ void SDDMMCoo(const BcastOff& bcast,
       const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
       const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
       const DType* lhs_off = Op::use_lhs ?
-        X + Selector<LhsTarget>(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
+        X + Selector<LhsTarget>::Call(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
       const DType* rhs_off = Op::use_rhs ?
-        Y + Selector<RhsTarget>(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
+        Y + Selector<RhsTarget>::Call(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
       out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
     }
   }

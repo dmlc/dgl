@@ -30,7 +30,7 @@ namespace {
 template <int target>
 struct Selector {
   template <typename T>
-  static DGLDEVICE DGLINLINE Call(T src, T edge, T dst) {
+  static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     LOG(INFO) << "Target " << target << " not recognized.";
     return src;
   }
@@ -38,19 +38,19 @@ struct Selector {
 
 template <>
 template <typename T>
-DGLDEVICE DGLINLINE Selector<0>::Call(T src, T edge, T dst) {
+DGLDEVICE DGLINLINE T Selector<0>::Call(T src, T edge, T dst) {
   return src;
 }
 
 template <>
 template <typename T>
-DGLDEVICE DGLINLINE Selector<1>::Call(T src, T edge, T dst) {
+DGLDEVICE DGLINLINE T Selector<1>::Call(T src, T edge, T dst) {
   return edge;
 }
 
 template <>
 template <typename T>
-DGLDEVICE DGLINLINE Selector<2>::Call(T src, T edge, T dst) {
+DGLDEVICE DGLINLINE T Selector<2>::Call(T src, T edge, T dst) {
   return dst;
 }
 

@@ -106,7 +106,7 @@ void SDDMM(const std::string& op,
            SparseFormat format) {
   // TODO(zihao): format tuning
   format = SparseFormat::kCOO;
-  const auto& bcast = CalcBcastOff(op, ufeat, vfeat);
+  const auto& bcast = CalcBcastOff(op, lhs, rhs);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
@@ -173,7 +173,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
         {lhs_target, rhs_target, 1},
         {lhs, rhs, out},
         {"U_data", "E_data", "V_data"});
-    SDDMM(op, graph.sptr(), lhs, rhs, out, SparseFormat::kAny);
+    SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target, SparseFormat::kAny);
   });
 
 }  // namespace aten

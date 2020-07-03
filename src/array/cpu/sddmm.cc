@@ -38,32 +38,33 @@ template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
               const CSRMatrix& csr,
-              NDArray ufeat,
-              NDArray vfeat,
+              NDArray lhs,
+              NDArray rhs,
               NDArray out,
               int lhs_target,
               int rhs_target) {
-  SWITCH_OP(op, Op,
+  SWITCH_OP(op, Op, {
     SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
-      cpu::SDDMMCsr<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, csr, ufeat, vfeat, out);
-  }));
+      cpu::SDDMMCsr<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, csr, lhs, rhs, out);
+    });
+  });
 }
 
 template void SDDMMCsr<kDLCPU, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 template void SDDMMCsr<kDLCPU, int64_t, float>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 template void SDDMMCsr<kDLCPU, int32_t, double>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 template void SDDMMCsr<kDLCPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 
 /*! \brief Generalized SDDMM on Coo format. */
@@ -71,32 +72,33 @@ template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
               const COOMatrix& coo,
-              NDArray ufeat,
-              NDArray vfeat,
+              NDArray lhs,
+              NDArray rhs,
               NDArray out,
               int lhs_target,
               int rhs_target) {
-  SWITCH_OP(op, Op,
+  SWITCH_OP(op, Op, {
     SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
-      cpu::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, ufeat, vfeat, out);
-  }));
+      cpu::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, lhs, rhs, out);
+    });
+  });
 }
 
 template void SDDMMCoo<kDLCPU, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 template void SDDMMCoo<kDLCPU, int64_t, float>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 template void SDDMMCoo<kDLCPU, int32_t, double>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 template void SDDMMCoo<kDLCPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray efeat, NDArray out,
+    NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 
 }  // namespace aten
