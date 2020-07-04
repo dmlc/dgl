@@ -27,6 +27,30 @@ class DenseSAGEConv(nn.Module):
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
 
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import DenseSAGEConv
+    >>>
+    >>> feat = th.ones(6, 10)
+    >>> adj = th.tensor([[0., 0., 1., 0., 0., 0.],
+    ...         [1., 0., 0., 0., 0., 0.],
+    ...         [0., 1., 0., 0., 0., 0.],
+    ...         [0., 0., 1., 0., 0., 1.],
+    ...         [0., 0., 0., 1., 0., 0.],
+    ...         [0., 0., 0., 0., 0., 0.]])
+    >>> conv = DenseSAGEConv(10, 2)
+    >>> res = conv(adj, feat)
+    >>> res
+    tensor([[1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008]], grad_fn=<AddmmBackward>)
+
     See also
     --------
     SAGEConv

@@ -28,6 +28,30 @@ class DenseGraphConv(nn.Module):
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
 
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import DenseGraphConv
+    >>>
+    >>> feat = th.ones(6, 10)
+    >>> adj = th.tensor([[0., 0., 1., 0., 0., 0.],
+    ...         [1., 0., 0., 0., 0., 0.],
+    ...         [0., 1., 0., 0., 0., 0.],
+    ...         [0., 0., 1., 0., 0., 1.],
+    ...         [0., 0., 0., 1., 0., 0.],
+    ...         [0., 0., 0., 0., 0., 0.]])
+    >>> conv = DenseGraphConv(10, 2)
+    >>> res = conv(adj, feat)
+    >>> res
+    tensor([[0.2159, 1.9027],
+            [0.3053, 2.6908],
+            [0.3053, 2.6908],
+            [0.3685, 3.2481],
+            [0.3053, 2.6908],
+            [0.0000, 0.0000]], grad_fn=<AddBackward0>)
+
     See also
     --------
     GraphConv

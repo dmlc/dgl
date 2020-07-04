@@ -23,6 +23,30 @@ class DenseChebConv(nn.Module):
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
 
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import DenseChebConv
+    >>>
+    >>> feat = th.ones(6, 10)
+    >>> adj = th.tensor([[0., 0., 1., 0., 0., 0.],
+    ...         [1., 0., 0., 0., 0., 0.],
+    ...         [0., 1., 0., 0., 0., 0.],
+    ...         [0., 0., 1., 0., 0., 1.],
+    ...         [0., 0., 0., 1., 0., 0.],
+    ...         [0., 0., 0., 0., 0., 0.]])
+    >>> conv = DenseChebConv(10, 2, 2)
+    >>> res = conv(adj, feat)
+    >>> res
+    tensor([[-3.3516, -2.4797],
+            [-3.3516, -2.4797],
+            [-3.3516, -2.4797],
+            [-4.5192, -3.0835],
+            [-2.5259, -2.0527],
+            [-0.5327, -1.0219]], grad_fn=<AddBackward0>)
+
     See also
     --------
     ChebConv
