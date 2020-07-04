@@ -839,7 +839,7 @@ class KVClient(object):
         self._pull_handlers[name] = func
         self.barrier()
 
-    def init_data(self, name, shape, dtype, policy_str, partition_book, init_func):
+    def init_data(self, name, shape, dtype, part_policy, init_func):
         """Send message to kvserver to initialize new data tensor and mapping this
         data from server side to client side.
 
@@ -851,57 +851,42 @@ class KVClient(object):
             data shape
         dtype : dtype
             data type
-        policy_str : str
-            partition-policy string, e.g., 'edge' or 'node'.
-        partition_book : GraphPartitionBook or RangePartitionBook
-            Store the partition information
+        part_policy : PartitionPolicy
+            partition policy.
         init_func : func
             UDF init function
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty'
-        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         assert name not in self._data_name_list, 'data name: %s already exists.' % name
         self.barrier()
         shape = list(shape)
-        if self._client_id == 0:
-            for machine_id in range(self._machine_count):
-                if policy_str == 'edge':
-                    part_dim = partition_book.get_edge_size()
-                elif policy_str == 'node':
-                    part_dim = partition_book.get_node_size()
-                else:
-                    raise RuntimeError("Cannot support policy: %s" % policy_str)
-                part_shape = shape.copy()
-                part_shape[0] = part_dim
-                request = InitDataRequest(name,
-                                          tuple(part_shape),
-                                          F.reverse_data_type_dict[dtype],
-                                          policy_str,
-                                          init_func)
-                for n in range(self._group_count):
-                    server_id = machine_id * self._group_count + n
-                    rpc.send_request(server_id, request)
-            for _ in range(self._server_count):
+        # One of the clients in each machine will issue requests to the local server.
+        if self._client_id % part_policy.partition_book.num_partitions() == 0:
+            part_shape = shape.copy()
+            part_shape[0] = part_policy.get_data_size()
+            request = InitDataRequest(name,
+                                      tuple(part_shape),
+                                      F.reverse_data_type_dict[dtype],
+                                      part_policy.policy_str,
+                                      init_func)
+            for n in range(self._group_count):
+                server_id = machine_id * self._group_count + n
+                rpc.send_request(server_id, request)
+            for _ in range(self._group_count):
                 response = rpc.recv_response()
                 assert response.msg == INIT_MSG
         self.barrier()
         # Create local shared-data
-        if policy_str == 'edge':
-            local_dim = partition_book.get_edge_size()
-        elif policy_str == 'node':
-            local_dim = partition_book.get_node_size()
-        else:
-            raise RuntimeError("Cannot support policy: %s" % policy_str)
         local_shape = shape.copy()
-        local_shape[0] = local_dim
+        local_shape[0] = part_policy.get_data_size()
         if self._part_policy.__contains__(name):
             raise RuntimeError("Policy %s has already exists!" % name)
         if self._data_store.__contains__(name):
             raise RuntimeError("Data %s has already exists!" % name)
         if self._full_data_shape.__contains__(name):
             raise RuntimeError("Data shape %s has already exists!" % name)
-        self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
+        self._part_policy[name] = part_policy
         shared_data = empty_shared_mem(name+'-kvdata-', False, \
             local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
