@@ -21,7 +21,7 @@ namespace dgl {
 namespace network {
 
 static constexpr int kMaxTryCount = 1024;    // maximal connection: 1024
-static constexpr int kTimeOut = 10;          // 10 minutes for socket timeout
+static constexpr int kTimeOut = 10 * 60;     // 10 minutes (in seconds) for socket timeout
 static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
 /*!

@@ -1916,6 +1916,19 @@ def test_format():
         assert g.restrict_format(rel_type) == 'csr'
         assert g.format_in_use(rel_type) == ['csr']
 
+def test_edges_order():
+    # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)
+    g = dgl.graph((
+        np.array([0, 1, 0, 0, 2]),
+        np.array([2, 2, 1, 1, 1])
+    ))
+
+    src, dst = g.all_edges(order='srcdst')
+    assert F.array_equal(F.copy_to(src, F.cpu()),
+                         F.copy_to(F.tensor([0, 0, 0, 1, 2]), F.cpu()))
+    assert F.array_equal(F.copy_to(dst, F.cpu()),
+                         F.copy_to(F.tensor([1, 1, 2, 2, 1]), F.cpu()))
+
 if __name__ == '__main__':
     # test_create()
     # test_query()

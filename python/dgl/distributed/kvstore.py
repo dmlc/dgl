@@ -7,6 +7,7 @@ from . import rpc
 from .graph_partition_book import PartitionPolicy
 
 from .. import backend as F
+from .. import utils
 from .._ffi.ndarray import empty_shared_mem
 
 ############################ Register KVStore Requsts and Responses ###############################
@@ -740,6 +741,7 @@ class KVClient(object):
         self._machine_count = int(self._server_count / self._group_count)
         self._client_id = rpc.get_rank()
         self._machine_id = rpc.get_machine_id()
+        self._num_clients = rpc.get_num_client()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
         # push and pull handler
@@ -791,6 +793,7 @@ class KVClient(object):
         func : callable
             The function to be called.
         """
+        self.barrier()
         if self._client_id == 0:
             request = RegisterPushHandlerRequest(name, func)
             # send request to all the server nodes
@@ -823,6 +826,7 @@ class KVClient(object):
         func : callable
             The function to be called.
         """
+        self.barrier()
         if self._client_id == 0:
             request = RegisterPullHandlerRequest(name, func)
             # send request to all the server nodes
@@ -858,6 +862,7 @@ class KVClient(object):
         assert len(shape) > 0, 'shape cannot be empty'
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
         assert name not in self._data_name_list, 'data name: %s already exists.' % name
+        self.barrier()
         shape = list(shape)
         if self._client_id == 0:
             for machine_id in range(self._machine_count):
@@ -896,7 +901,7 @@ class KVClient(object):
             raise RuntimeError("Data %s has already exists!" % name)
         if self._full_data_shape.__contains__(name):
             raise RuntimeError("Data shape %s has already exists!" % name)
-        self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+        self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
         shared_data = empty_shared_mem(name+'-kvdata-', False, \
             local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
@@ -905,6 +910,7 @@ class KVClient(object):
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
+        self.barrier()
 
     def map_shared_data(self, partition_book):
         """Mapping shared-memory tensor from server to client.
@@ -915,6 +921,7 @@ class KVClient(object):
             Store the partition information
         """
         # Get shared data from server side
+        self.barrier()
         request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
@@ -924,7 +931,7 @@ class KVClient(object):
                 shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-                self._part_policy[name] = PartitionPolicy(policy_str, self._part_id, partition_book)
+                self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
                 self._pull_handlers[name] = default_pull_handler
                 self._push_handlers[name] = default_push_handler
         # Get full data shape across servers
@@ -956,6 +963,7 @@ class KVClient(object):
                 response = rpc.recv_response()
                 assert response.msg == SEND_META_TO_BACKUP_MSG
             self._data_name_list.add(name)
+        self.barrier()
 
     def data_name_list(self):
         """Get all the data name"""
@@ -985,6 +993,8 @@ class KVClient(object):
             a tensor with the same row size of data ID
         """
         assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         assert F.shape(id_tensor)[0] == F.shape(data_tensor)[0], \
         'The data must has the same row size with ID.'
@@ -1033,6 +1043,8 @@ class KVClient(object):
             a data tensor with the same row size of id_tensor.
         """
         assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         if self._pull_handlers[name] is default_pull_handler: # Use fast-pull
             part_id = self._part_policy[name].to_partid(id_tensor)

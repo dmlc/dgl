@@ -13,7 +13,10 @@ from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
+from dgl.distributed import SparseAdagrad, SparseNodeEmbedding
+from numpy.testing import assert_almost_equal
 import backend as F
+import math
 import unittest
 import pickle
 
@@ -58,7 +61,11 @@ def run_server(graph_name, server_id, num_clients, shared_mem):
     print('start server', server_id)
     g.start()
 
+def emb_init(shape, dtype):
+    return F.zeros(shape, dtype, F.cpu())
+
 def run_client(graph_name, part_id, num_nodes, num_edges):
+    time.sleep(5)
     gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                               part_id, None)
     g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
@@ -91,6 +98,47 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
     feats = g.edata['test1'][eids]
     assert np.all(F.asnumpy(feats) == 0)
 
+    # Test sparse emb
+    try:
+        new_shape = (g.number_of_nodes(), 1)
+        emb = SparseNodeEmbedding(g, 'emb1', new_shape, emb_init)
+        lr = 0.001
+        optimizer = SparseAdagrad([emb], lr=lr)
+        with F.record_grad():
+            feats = emb(nids)
+            assert np.all(F.asnumpy(feats) == np.zeros((len(nids), 1)))
+            loss = F.sum(feats + 1, 0)
+        loss.backward()
+        optimizer.step()
+        feats = emb(nids)
+        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
+        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        feats1 = emb(rest)
+        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
+
+        policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
+        grad_sum = dgl.distributed.DistTensor(g, 'node:emb1_sum', policy)
+        assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
+        assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
+
+        emb = SparseNodeEmbedding(g, 'emb2', new_shape, emb_init)
+        optimizer = SparseAdagrad([emb], lr=lr)
+        with F.record_grad():
+            feats1 = emb(nids)
+            feats2 = emb(nids)
+            feats = F.cat([feats1, feats2], 0)
+            assert np.all(F.asnumpy(feats) == np.zeros((len(nids) * 2, 1)))
+            loss = F.sum(feats + 1, 0)
+        loss.backward()
+        optimizer.step()
+        feats = emb(nids)
+        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        feats1 = emb(rest)
+        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
+    except NotImplementedError as e:
+        pass
+
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
     g.ndata['test1'][nids] = new_feats
@@ -107,7 +155,7 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
 
     selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
     # Test node split
-    nodes = node_split(selected_nodes, g.get_partition_book(), g.rank())
+    nodes = node_split(selected_nodes, g.get_partition_book())
     nodes = F.asnumpy(nodes)
     # We only have one partition, so the local nodes are basically all nodes in the graph.
     local_nids = np.arange(g.number_of_nodes())
@@ -172,6 +220,7 @@ def test_split():
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
+        dgl.distributed.set_num_client(num_parts)
         part_g, node_feats, edge_feats, gpb = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
@@ -182,6 +231,13 @@ def test_split():
         for n in nodes1:
             assert n in local_nids
 
+        dgl.distributed.set_num_client(num_parts * 2)
+        nodes3 = node_split(node_mask, gpb, i * 2)
+        nodes4 = node_split(node_mask, gpb, i * 2 + 1)
+        nodes5 = F.cat([nodes3, nodes4], 0)
+        assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes5)))
+
+        dgl.distributed.set_num_client(num_parts)
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
@@ -191,6 +247,71 @@ def test_split():
         for e in edges1:
             assert e in local_eids
 
+        dgl.distributed.set_num_client(num_parts * 2)
+        edges3 = edge_split(edge_mask, gpb, i * 2)
+        edges4 = edge_split(edge_mask, gpb, i * 2 + 1)
+        edges5 = F.cat([edges3, edges4], 0)
+        assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
+
+def test_split_even():
+    prepare_dist()
+    g = create_random_graph(10000)
+    num_parts = 4
+    num_hops = 2
+    partition_graph(g, 'dist_graph_test', num_parts, '/tmp/dist_graph', num_hops=num_hops, part_method='metis')
+
+    node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
+    edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
+    selected_nodes = np.nonzero(node_mask)[0]
+    selected_edges = np.nonzero(edge_mask)[0]
+    all_nodes1 = []
+    all_nodes2 = []
+    all_edges1 = []
+    all_edges2 = []
+    for i in range(num_parts):
+        dgl.distributed.set_num_client(num_parts)
+        part_g, node_feats, edge_feats, gpb = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
+        local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
+        local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
+        nodes = node_split(node_mask, gpb, i, force_even=True)
+        all_nodes1.append(nodes)
+        subset = np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids))
+        print('part {} get {} nodes and {} are in the partition'.format(i, len(nodes), len(subset)))
+
+        dgl.distributed.set_num_client(num_parts * 2)
+        nodes1 = node_split(node_mask, gpb, i * 2, force_even=True)
+        nodes2 = node_split(node_mask, gpb, i * 2 + 1, force_even=True)
+        nodes3 = F.cat([nodes1, nodes2], 0)
+        all_nodes2.append(nodes3)
+        subset = np.intersect1d(F.asnumpy(nodes), F.asnumpy(nodes3))
+        print('intersection has', len(subset))
+
+        dgl.distributed.set_num_client(num_parts)
+        local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
+        local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
+        edges = edge_split(edge_mask, gpb, i, force_even=True)
+        all_edges1.append(edges)
+        subset = np.intersect1d(F.asnumpy(edges), F.asnumpy(local_eids))
+        print('part {} get {} edges and {} are in the partition'.format(i, len(edges), len(subset)))
+
+        dgl.distributed.set_num_client(num_parts * 2)
+        edges1 = edge_split(edge_mask, gpb, i * 2, force_even=True)
+        edges2 = edge_split(edge_mask, gpb, i * 2 + 1, force_even=True)
+        edges3 = F.cat([edges1, edges2], 0)
+        all_edges2.append(edges3)
+        subset = np.intersect1d(F.asnumpy(edges), F.asnumpy(edges3))
+        print('intersection has', len(subset))
+    all_nodes1 = F.cat(all_nodes1, 0)
+    all_edges1 = F.cat(all_edges1, 0)
+    all_nodes2 = F.cat(all_nodes2, 0)
+    all_edges2 = F.cat(all_edges2, 0)
+    all_nodes = np.nonzero(node_mask)[0]
+    all_edges = np.nonzero(edge_mask)[0]
+    assert np.all(all_nodes == F.asnumpy(all_nodes1))
+    assert np.all(all_edges == F.asnumpy(all_edges1))
+    assert np.all(all_nodes == F.asnumpy(all_nodes2))
+    assert np.all(all_edges == F.asnumpy(all_edges2))
+
 def prepare_dist():
     ip_config = open("kv_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
@@ -199,5 +320,6 @@ def prepare_dist():
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)
-    #test_split()
+    test_split()
+    test_split_even()
     test_server_client()

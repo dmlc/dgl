@@ -15,9 +15,9 @@ def load_reddit():
     g = data.graph
     g.ndata['features'] = features
     g.ndata['labels'] = labels
-    g.ndata['train_mask'] = th.LongTensor(data.train_mask)
-    g.ndata['val_mask'] = th.LongTensor(data.val_mask)
-    g.ndata['test_mask'] = th.LongTensor(data.test_mask)
+    g.ndata['train_mask'] = th.BoolTensor(data.train_mask)
+    g.ndata['val_mask'] = th.BoolTensor(data.val_mask)
+    g.ndata['test_mask'] = th.BoolTensor(data.test_mask)
     return g, data.num_labels
 
 def load_ogb(name):
@@ -35,13 +35,21 @@ def load_ogb(name):
 
     # Find the node IDs in the training, validation, and test set.
     train_nid, val_nid, test_nid = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
-    train_mask = th.zeros((graph.number_of_nodes(),), dtype=th.int64)
-    train_mask[train_nid] = 1
-    val_mask = th.zeros((graph.number_of_nodes(),), dtype=th.int64)
-    val_mask[val_nid] = 1
-    test_mask = th.zeros((graph.number_of_nodes(),), dtype=th.int64)
-    test_mask[test_nid] = 1
+    train_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    train_mask[train_nid] = True
+    val_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    val_mask[val_nid] = True
+    test_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    test_mask[test_nid] = True
     graph.ndata['train_mask'] = train_mask
     graph.ndata['val_mask'] = val_mask
     graph.ndata['test_mask'] = test_mask
     return graph, len(th.unique(graph.ndata['labels']))
+
+def inductive_split(g):
+    """Split the graph into training graph, validation graph, and test graph by training
+    and validation masks.  Suitable for inductive models."""
+    train_g = g.subgraph(g.ndata['train_mask'])
+    val_g = g.subgraph(g.ndata['train_mask'] | g.ndata['val_mask'])
+    test_g = g
+    return train_g, val_g, test_g

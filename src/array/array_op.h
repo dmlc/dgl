@@ -55,6 +55,9 @@ NDArray Repeat(NDArray array, IdArray repeats);
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
+template <DLDeviceType XPU, typename IdType>
+NDArray Concat(const std::vector<IdArray>& arrays);
+
 template <DLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value);
 
@@ -146,6 +149,7 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -233,6 +237,8 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              const bool has_reverse_edge,
                              const bool has_nontree_edge,
                              const bool return_labels);
+
+
 
 }  // namespace impl
 }  // namespace aten
