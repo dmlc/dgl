@@ -149,6 +149,10 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+// Union two CSRMatrix
+// Both two matrixes should be sorted.
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -218,6 +222,8 @@ COOMatrix COORowWiseSamplingUniform(
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
+
+///////////////////////// Graph Traverse routines //////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);

@@ -367,6 +367,38 @@ COOMatrix CSRRowWiseTopk(
     bool ascending = false);
 
 /*!
+ * \brief Union two CSRMatrix into one CSRMatrix.
+ * 
+ * Two Matrix must have the same shape.
+ *
+ * Example:
+ *
+ * A = [[0, 0, 1, 0],
+ *      [1, 0, 1, 1],
+ *      [0, 1, 0, 0]]
+ *
+ * B = [[0, 1, 1, 0],
+ *      [0, 0, 0, 1],
+ *      [0, 0, 1, 0]]
+ *
+ * CSRMatrix_A.num_rows : 3
+ * CSRMatrix_A.num_cols : 4
+ * CSRMatrix_B.num_rows : 3
+ * CSRMatrix_B.num_cols : 4
+ *
+ * C = UnionCsr({A, B});
+ *
+ * C = [[0, 1, 2, 0],
+ *      [1, 0, 1, 2],
+ *      [0, 1, 1, 0]]
+ *
+ * CSRMatrix_C.num_rows : 3
+ * CSRMatrix_C.num_cols : 4
+ */
+CSRMatrix UnionCsr(
+  const std::vector<CSRMatrix>& csrs);
+
+/*!
  * \brief Union a list CSRMatrix into one CSRMatrix.
  *
  * Examples:

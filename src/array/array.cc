@@ -455,14 +455,6 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArr
   return ret;
 }
 
-COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
-  COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOReorder", {
-    ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
-  });
-  return ret;
-}
-
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRRemove", {
@@ -495,6 +487,26 @@ COOMatrix CSRRowWiseTopk(
       ret = impl::CSRRowWiseTopk<XPU, IdType, DType>(
           mat, rows, k, weight, ascending);
     });
+  });
+  return ret;
+}
+
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
+  CSRMatrix ret;
+  CHECK_EQ(csrs.size(), 2) << "UnionCsr creates a union of two CSRMatrix";
+  CHECK_SAME_CONTEXT(csrs[0].indptr, csrs[1].indptr) <<
+    "Unioned CSR should in the same context";
+  CHECK_SAME_DTYPE(csrs[0].indptr, csrs[1].indptr) <<
+    "Unioned CSR should in the same index dtype";
+  
+  // sort the csr matrix first
+  if (!CSRIsSorted(csrs[0]))
+    CSRSort_(&csrs[0]);
+  if (!CSRIsSorted(csrs[1]))
+    CSRSort_(&csrs[1]);
+
+  ATEN_CSR_SWITCH(csrs[0], XPU, IdType, "UnionCsr", {
+    ret = impl::UnionCsr<XPU, IdType>(csrs);
   });
   return ret;
 }
@@ -624,6 +636,14 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   return ret;
 }
 
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOReorder", {
+    ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
+  });
+  return ret;
+}
+
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COORemove", {
@@ -666,6 +686,55 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
   });
   return ret;
+}
+
+COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
+  COOMatrix ret;
+  CHECK_EQ(coos->size(), 2) << "UnionCoo creates a union of two COOMatrix";
+  CHECK_SAME_CONTEXT(coos[0].row, coos[1].row) <<
+    "Unioned COO should in the same context";
+  CHECK_SAME_DTYPE(coos[0].row, coos[1].row) <<
+    "Unioned COO should in the same index dtype";
+  
+  std::vector<IdArray> coo_row = {coos[0].row, coos[1].row};
+  std::vector<IdArray> coo_col = {coos[0].col, coos[1].col};
+  IdArray coo1_data; = COOHasData(coo) ? coos[0].data : NullArray();
+  IdArray coo2_data; = COOHasData(coo) ? coos[1].data : NullArray();
+  IdArray row = Concat(coo_row);
+  IdArray col = Concat(coo_col);
+  IdArray data = NullArray();
+
+  if (COOHasData(coo[0])) {
+    if (COOHasData(coo[1])) {
+      std::vector<IdArray> coo_data = {coos[0].data, coos[1].data};
+      data = Concat(coo_data);
+    } else {
+      std::vector<IdArray> coo_data = {coos[0].data,
+                                       Range(coos[0].row->shape[0],
+                                             coos[0].row->shape[0] + coos[1].row->shape[0],
+                                             coos[0].data->dtype.bits,
+                                             coos[0].data->ctx)};
+      data = Concat(coo_data);
+    }
+  } else {
+    if (COOHasData(coo[1])) {
+      std::vector<IdArray> coo_data = {Range(0,
+                                             coos[0].row->shape[0],
+                                             coos[1].data->dtype.bits,
+                                             coos[1].data->ctx),
+                                       coos[1].data + coos[0].row->shape[0]};
+      data = Concat(coo_data);
+    }
+  }
+
+  return COOMatrix(
+    coo[0].num_rows,
+    coo[0].num_cols,
+    row,
+    col,
+    data,
+    false,
+    false);
 }
 
 ///////////////////////// Graph Traverse routines //////////////////////////
