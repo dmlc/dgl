@@ -173,9 +173,12 @@ class GraphConv(nn.Module):
         """
         with graph.local_scope():
             if self._add_self_loop:
-                graph = transform.add_self_loop(graph)
-            # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
-            feat_src, feat_dst = expand_as_pair(feat, graph)
+                if graph.is_homograph():
+                    graph = transform.add_self_loop(graph)
+                else:
+                    raise DGLError('Adding self_loop only works for homogeneuos graph.')
+
+            feat_src, feat_dst = expand_as_pair(feat)
             if self._norm == 'both':
                 degs = graph.out_degrees().float().clamp(min=1)
                 norm = th.pow(degs, -0.5)
