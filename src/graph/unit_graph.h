@@ -269,6 +269,9 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Creat a LineGraph of self */
   HeteroGraphPtr LineGraph(bool backtracking) const override;
 
+  /*! \return the reversed graph */
+  UnitGraphPtr Reverse() const;
+
  private:
   friend class Serializer;
   friend class HeteroGraph;

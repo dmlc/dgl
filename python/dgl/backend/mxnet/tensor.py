@@ -166,6 +166,9 @@ def argsort(input, dim, descending):
 def exp(input):
     return nd.exp(input)
 
+def sqrt(input):
+    return nd.sqrt(input)
+
 def softmax(input, dim=-1):
     return nd.softmax(input, axis=dim)
 
@@ -223,6 +226,9 @@ def take(data, indices, dim):
 
 def narrow_row(data, start, stop):
     return data[start:stop]
+
+def index_add_inplace(data, row_idx, value):
+    raise NotImplementedError("MXNet doesn't support inplace index_add")
 
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
@@ -576,3 +582,28 @@ def sync():
     that all computation is complete after this function call.
     """
     mx.nd.waitall()
+
+def attach_grad(tensor):
+    tensor.attach_grad()
+    return tensor
+
+def backward(x, head_gradient=None):
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return (x != 0).sum() == 0
+
+record_grad = mx.autograd.record
+
+class no_grad(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
