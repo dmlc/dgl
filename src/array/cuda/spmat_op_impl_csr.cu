@@ -33,8 +33,8 @@ __global__ void _LinearSearchKernel(
     int64_t length, IdType* out) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
-  int rpos = tx, cpos = tx;
   while (tx < length) {
+    int rpos = tx * row_stride, cpos = tx * col_stride;
     IdType v = -1;
     const IdType r = row[rpos], c = col[cpos];
     for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
@@ -44,8 +44,6 @@ __global__ void _LinearSearchKernel(
       }
     }
     out[tx] = v;
-    rpos += row_stride;
-    cpos += col_stride;
     tx += stride_x;
   }
 }
@@ -215,14 +213,13 @@ __global__ void _SegmentCopyKernel(
     const IdType* out_indptr, DType* out_data) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
-  int rpos = tx;
   while (tx < length) {
+    int rpos = tx * row_stride;
     const IdType r = row[rpos];
     DType* out_buf = out_data + out_indptr[tx];
     for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
       *(out_buf++) = data? data[i] : i;
     }
-    rpos += row_stride;
     tx += stride_x;
   }
 }
@@ -304,17 +301,14 @@ __global__ void _SegmentMaskKernel(
     int64_t length, IdType* mask) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
-  int rpos = tx, cpos = tx;
   while (tx < length) {
+    int rpos = tx * row_stride, cpos = tx * col_stride;
     const IdType r = row[rpos], c = col[cpos];
     for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
       if (indices[i] == c) {
         mask[i] = 1;
-        break;
       }
     }
-    rpos += row_stride;
-    cpos += col_stride;
     tx += stride_x;
   }
 }

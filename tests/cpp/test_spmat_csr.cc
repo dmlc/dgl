@@ -239,25 +239,32 @@ void _TestCSRGetData(DLContext ctx) {
 TEST(SpmatTest, CSRGetData) {
   _TestCSRGetData<int32_t>(CPU);
   _TestCSRGetData<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRGetData<int32_t>(GPU);
+#endif
 }
 
 template <typename IDX>
-void _TestCSRGetDataAndIndices() {
-  auto csr = CSR2<IDX>();
-  auto r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, CTX);
-  auto c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, CTX);
+void _TestCSRGetDataAndIndices(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
+  auto r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
+  auto c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
   auto x = aten::CSRGetDataAndIndices(csr, r, c);
-  auto tr = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, CTX);
-  auto tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX)*8, CTX);
-  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, CTX);
+  auto tr = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
+  auto tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x[0], tr));
   ASSERT_TRUE(ArrayEQ<IDX>(x[1], tc));
   ASSERT_TRUE(ArrayEQ<IDX>(x[2], td));
 }
 
-TEST(SpmatTest, TestCSRGetDataAndIndices) {
-  _TestCSRGetDataAndIndices<int32_t>();
-  _TestCSRGetDataAndIndices<int64_t>();
+TEST(SpmatTest, CSRGetDataAndIndices) {
+  _TestCSRGetDataAndIndices<int32_t>(CPU);
+  _TestCSRGetDataAndIndices<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRGetDataAndIndices<int32_t>(GPU);
+  _TestCSRGetDataAndIndices<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
@@ -430,4 +437,21 @@ TEST(SpmatTest, CSRSort) {
 #ifdef DGL_USE_CUDA
   _TestCSRSort<int32_t>(GPU);
 #endif
+}
+
+template <typename IDX>
+void _TestCSRReorder() {
+  auto csr = CSR2<IDX>();
+  auto new_row = aten::VecToIdArray(
+    std::vector<IDX>({2, 0, 3, 1}), sizeof(IDX)*8, CTX);
+  auto new_col = aten::VecToIdArray(
+    std::vector<IDX>({2, 0, 4, 3, 1}), sizeof(IDX)*8, CTX);
+  auto new_csr = CSRReorder(csr, new_row, new_col);
+  ASSERT_EQ(new_csr.num_rows, csr.num_rows);
+  ASSERT_EQ(new_csr.num_cols, csr.num_cols);
+}
+
+TEST(SpmatTest, TestCSRReorder) {
+  _TestCSRReorder<int32_t>();
+  _TestCSRReorder<int64_t>();
 }

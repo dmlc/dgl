@@ -375,7 +375,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, cols);
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, cols);
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -388,7 +388,7 @@ std::vector<NDArray> CSRGetDataAndIndices(
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, cols);
   std::vector<NDArray> ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetDataAndIndices", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetDataAndIndices", {
     ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -449,7 +449,7 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, cols);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceMatrix", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceMatrix", {
     ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
   });
   return ret;
