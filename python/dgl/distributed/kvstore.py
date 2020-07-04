@@ -871,7 +871,7 @@ class KVClient(object):
                                       part_policy.policy_str,
                                       init_func)
             for n in range(self._group_count):
-                server_id = machine_id * self._group_count + n
+                server_id = part_policy.part_id * self._group_count + n
                 rpc.send_request(server_id, request)
             for _ in range(self._group_count):
                 response = rpc.recv_response()
