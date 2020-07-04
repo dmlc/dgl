@@ -1496,13 +1496,13 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
 
 HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
   // TODO(xiangsx) currently we only support homogeneous graph
-  if (coo_) {
+  if (coo_->defined()) {
     const auto&new_coo = aten::COOLineGraph(coo_->adj(), backtracking);
     return CreateFromCOO(1, new_coo, restrict_format_);
-  } else if (in_csr_) {
+  } else if (in_csr_->defined()) {
     const auto&new_in_csr = aten::CSRLineGraph(in_csr_->adj(), backtracking);
     return CreateFromCSC(1, new_in_csr, restrict_format_);
-  } else if (out_csr_) {
+  } else if (out_csr_->defined()) {
     const auto&new_out_csr = aten::CSRLineGraph(out_csr_->adj(), backtracking);
     return CreateFromCSR(1, new_out_csr, restrict_format_);
   }
