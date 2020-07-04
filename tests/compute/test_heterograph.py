@@ -1950,6 +1950,7 @@ def test_linegraph(index_dtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
 
+@parametrize_dtype
 def test_reverse(index_dtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
