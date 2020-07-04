@@ -154,10 +154,14 @@ def copy_to(input, ctx, **kwargs):
 
 
 def sum(input, dim, keepdims=False):
+    if input.dtype == tf.bool:
+        input = tf.cast(input, tf.int32)
     return tf.reduce_sum(input, axis=dim, keepdims=keepdims)
 
 
 def reduce_sum(input):
+    if input.dtype == tf.bool:
+        input = tf.cast(input, tf.int32)
     return tf.reduce_sum(input)
 
 
@@ -362,7 +366,7 @@ def boolean_mask(input, mask):
 
 
 def equal(x, y):
-    return tf.cast(x == y, tf.int32)
+    return x == y
 
 
 def logical_not(input):
@@ -437,56 +441,55 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
 
 def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                        out_size, lhs_map, rhs_map, out_map):
-    lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
-    rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-    feat_shape = K.infer_binary_feature_shape(
-        binary_op, lhs_data_nd, rhs_data_nd)
-    out_shape = feat_shape
-    if binary_op == 'dot':
-        out_shape = feat_shape[:-1]
-    # out_data = lhs_data.new_empty((out_size,) + out_shape)
-    out_data = tf.zeros((out_size,) + out_shape, dtype=lhs_data.dtype)
-    out_data_nd = zerocopy_to_dgl_ndarray(out_data)
-    K.binary_op_reduce(
-        reducer if reducer != 'mean' else 'sum',
-        binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-        out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
-    # normalize if mean reducer
-    # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
-    if reducer == 'mean':
-        # degs = lhs_data.new_empty((out_data.shape[0],))
-        degs = tf.zeros((out_data.shape[0],), dtype=lhs_data.dtype)
-        degs_nd = zerocopy_to_dgl_ndarray(degs)
-        if lhs != TargetCode.DST:  # src or edge
-            target = lhs
-            n = lhs_data.shape[0]
-            in_map = lhs_map[0]
-        else:  # rhs != TargetCode.DST
-            target = rhs
-            n = rhs_data.shape[0]
-            in_map = rhs_map[0]
-        # in_ones = lhs_data.new_ones((n,))
-        in_ones = tf.ones((n,), dtype=lhs_data.dtype)
-        in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-        K.copy_reduce(
-            'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
-        # reshape
-        degs = tf.reshape(degs,
-                          (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
-        degs = tf.clip_by_value(degs, clip_value_min=1,
-                                clip_value_max=np.inf)  # ???
-        out_data = out_data / degs
-    else:
-        degs = None
+    with tf.device(lhs_data.device):
+        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
+        feat_shape = K.infer_binary_feature_shape(
+            binary_op, lhs_data_nd, rhs_data_nd)
+        out_shape = feat_shape
+        if binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = tf.zeros((out_size,) + out_shape, dtype=lhs_data.dtype)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+        K.binary_op_reduce(
+            reducer if reducer != 'mean' else 'sum',
+            binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+            out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if reducer == 'mean':
+            degs = tf.zeros((out_data.shape[0],), dtype=lhs_data.dtype)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            if lhs != TargetCode.DST:  # src or edge
+                target = lhs
+                n = lhs_data.shape[0]
+                in_map = lhs_map[0]
+            else:  # rhs != TargetCode.DST
+                target = rhs
+                n = rhs_data.shape[0]
+                in_map = rhs_map[0]
+            in_ones = tf.ones((n,), dtype=lhs_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            K.copy_reduce(
+                'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
+            # reshape
+            degs = tf.reshape(degs,
+                              (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
+            degs = tf.clip_by_value(degs, clip_value_min=1,
+                                    clip_value_max=np.inf)  # ???
+            out_data = out_data / degs
+        else:
+            degs = None
 
     def grad(grad_out):
-        grad_lhs = None
-        grad_rhs = None
-        if reducer == 'mean':
-            grad_out = grad_out / degs
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-        if True:
-            # grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
+        with tf.device(grad_out.device):
+            grad_lhs = None
+            grad_rhs = None
+            if reducer == 'mean':
+                grad_out = grad_out / degs
+            grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+
+            # comptue gradient for lhs
             grad_lhs = tf.zeros((lhs_data_nd.shape[0],) + feat_shape)
             K.backward_lhs_binary_op_reduce(
                 reducer if reducer != 'mean' else 'sum',
@@ -494,8 +497,8 @@ def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                 out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_lhs),
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
-        if True:
-            # grad_rhs = grad_out.new_empty((rhs_data_nd.shape[0],) + feat_shape)
+
+            # compute gradient for rhs
             grad_rhs = tf.zeros((rhs_data_nd.shape[0],) + feat_shape)
             K.backward_rhs_binary_op_reduce(
                 reducer if reducer != 'mean' else 'sum',
@@ -504,7 +507,7 @@ def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
 
-        return grad_lhs, grad_rhs
+            return grad_lhs, grad_rhs
     return out_data, grad
 
 
@@ -519,49 +522,44 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
 
 def copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
                      out_map):
-    out_data = tf.zeros(
-        (out_size,) + tuple(in_data.shape[1:]), dtype=in_data.dtype)
-    in_data_nd = zerocopy_to_dgl_ndarray(in_data)
-    out_data_nd = zerocopy_to_dgl_ndarray(out_data)
-    K.copy_reduce(
-        reducer if reducer != 'mean' else 'sum',
-        graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
-    # normalize if mean reducer
-    # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
-    if reducer == 'mean':
-        # in_ones = in_data.new_ones((in_data.shape[0],))
-        in_ones = tf.ones(in_data.shape[0], dtype=in_data.dtype)
-        # degs = in_data.new_empty((out_data.shape[0],))
-        degs = tf.zeros(out_data.shape[0], dtype=in_data.dtype)
-        in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-        degs_nd = zerocopy_to_dgl_ndarray(degs)
+    with tf.device(in_data.device):
+        out_data = tf.zeros(
+            (out_size,) + tuple(in_data.shape[1:]), dtype=in_data.dtype)
+        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.copy_reduce(
-            'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
-        # reshape
-        degs = tf.reshape(degs,
-                          (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
-        degs = tf.clip_by_value(degs, clip_value_min=1,
-                                clip_value_max=np.inf)  # TODO: ???
-        out_data = out_data / degs
-    else:
-        degs = None
-    # save_for_backward can only save variables
+            reducer if reducer != 'mean' else 'sum',
+            graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if reducer == 'mean':
+            in_ones = tf.ones(in_data.shape[0], dtype=in_data.dtype)
+            degs = tf.zeros(out_data.shape[0], dtype=in_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            K.copy_reduce(
+                'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
+            # reshape
+            degs = tf.reshape(degs,
+                              (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
+            degs = tf.clip_by_value(degs, clip_value_min=1,
+                                    clip_value_max=np.inf)  # TODO: ???
+            out_data = out_data / degs
+        else:
+            degs = None
 
     def grad(grad_out):
-        if reducer == 'mean':
-            grad_out = grad_out / degs
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-        # if ctx.needs_input_grad[3]:
-        if True:
-            # grad_in = grad_out.new_empty(in_data_nd.shape)
+        with tf.device(grad_out.device):
+            if reducer == 'mean':
+                grad_out = grad_out / degs
+            grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
             grad_in = tf.zeros(in_data_nd.shape)
             K.backward_copy_reduce(
                 reducer if reducer != 'mean' else 'sum',
                 graph, target, in_data_nd, out_data_nd, grad_out_nd,
                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
-        return grad_in
+            return grad_in
     return out_data, grad
-
 
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension

@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 from scipy.sparse import coo_matrix
 
-
 def cuda():
     return '/gpu:0'
 

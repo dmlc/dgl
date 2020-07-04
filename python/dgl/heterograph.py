@@ -1597,6 +1597,9 @@ class DGLHeteroGraph(object):
         check_same_dtype(self._idtype_str, v)
         is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
         u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+        # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+        u = F.copy_to(u, F.cpu())
+        v = F.copy_to(v, F.cpu())
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
@@ -1611,7 +1614,7 @@ class DGLHeteroGraph(object):
         else:
             eid = self._graph.edge_ids_one(self.get_etype_id(etype), u, v)
             is_neg_one = F.equal(eid, -1)
-            if F.as_scalar((F.sum(is_neg_one, 0))):
+            if F.as_scalar(F.sum(is_neg_one, 0)):
                 # Raise error since some (u, v) pair is not a valid edge.
                 idx = F.nonzero_1d(is_neg_one)
                 raise DGLError("Error: (%d, %d) does not form a valid edge." % (
@@ -2799,6 +2802,9 @@ class DGLHeteroGraph(object):
         elif isinstance(edges, tuple):
             u, v = edges
             u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+            u = F.copy_to(u, F.cpu())
+            v = F.copy_to(v, F.cpu())
             # Rewrite u, v to handle edge broadcasting and multigraph.
             eid = self._graph.edge_ids_one(etid, u, v)
             eid = utils.toindex(eid, self._idtype_str)
@@ -2852,6 +2858,9 @@ class DGLHeteroGraph(object):
             u, v = edges
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+            u = F.copy_to(u, F.cpu())
+            v = F.copy_to(v, F.cpu())
             eid = self._graph.edge_ids_one(etid, u, v)
             eid = utils.toindex(eid, self._idtype_str)
         else:
@@ -2977,6 +2986,9 @@ class DGLHeteroGraph(object):
             # Rewrite u, v to handle edge broadcasting and multigraph.
             # Find all edges including parallel edges.
             u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+            u = F.copy_to(u, F.cpu())
+            v = F.copy_to(v, F.cpu())
             u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
@@ -3045,6 +3057,9 @@ class DGLHeteroGraph(object):
             # Rewrite u, v to handle edge broadcasting and multigraph.
             # Find all edges including parallel edges.
             u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+            u = F.copy_to(u, F.cpu())
+            v = F.copy_to(v, F.cpu())
             u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
@@ -3133,6 +3148,9 @@ class DGLHeteroGraph(object):
             # Rewrite u, v to handle edge broadcasting and multigraph.
             # Find all edges including parallel edges
             u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+            u = F.copy_to(u, F.cpu())
+            v = F.copy_to(v, F.cpu())
             u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
@@ -3418,6 +3436,9 @@ class DGLHeteroGraph(object):
             # Rewrite u, v to handle edge broadcasting and multigraph.
             # Find all edges including parallel edges
             u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+            u = F.copy_to(u, F.cpu())
+            v = F.copy_to(v, F.cpu())
             u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
@@ -3534,6 +3555,9 @@ class DGLHeteroGraph(object):
                     # Rewrite u, v to handle edge broadcasting and multigraph.
                     # Find all edges including parallel edges
                     u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+                    # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+                    u = F.copy_to(u, F.cpu())
+                    v = F.copy_to(v, F.cpu())
                     u, v, eid = self._graph.edge_ids_all(etid, u, v)
                     u = utils.toindex(u, self._idtype_str)
                     v = utils.toindex(v, self._idtype_str)
@@ -4234,6 +4258,9 @@ class DGLHeteroGraph(object):
             # Rewrite u, v to handle edge broadcasting and multigraph.
             # Find all edges including parallel edges
             u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
+            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
+            u = F.copy_to(u, F.cpu())
+            v = F.copy_to(v, F.cpu())
             u, v, eid = self._graph.edge_ids_all(etid, u, v)
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
