@@ -632,17 +632,14 @@ class PartitionPolicy(object):
     ----------
     policy_str : str
         partition-policy string, e.g., 'edge' or 'node'.
-    part_id : int
-        partition ID
     partition_book : GraphPartitionBook or RangePartitionBook
         Main class storing the partition information
     """
-    def __init__(self, policy_str, part_id, partition_book):
+    def __init__(self, policy_str, partition_book):
         # TODO(chao): support more policies for HeteroGraph
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
-        assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
         self._policy_str = policy_str
-        self._part_id = part_id
+        self._part_id = partition_book.partid
         self._partition_book = partition_book
 
     @property

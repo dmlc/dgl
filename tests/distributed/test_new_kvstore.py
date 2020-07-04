@@ -70,11 +70,9 @@ gpb = dgl.distributed.GraphPartitionBook(part_id=0,
                                          part_graph=g)
 
 node_policy = dgl.distributed.PartitionPolicy(policy_str='node',
-                                              part_id=0,
                                               partition_book=gpb)
 
 edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge',
-                                              part_id=0,
                                               partition_book=gpb)
 
 data_0 = F.tensor([[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]], F.float32)
