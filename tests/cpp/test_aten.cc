@@ -612,3 +612,26 @@ TEST(ArrayTest, CumSum) {
   _TestCumSum<int64_t>(GPU);
 #endif
 }
+
+template <typename IDX, typename D>
+void _TestScatter_(DLContext ctx) {
+  IdArray out = aten::Full(1, 10, 8*sizeof(IDX), ctx);
+  IdArray idx = aten::VecToIdArray(std::vector<IDX>({2, 3, 9}), sizeof(IDX)*8, ctx);
+  IdArray val = aten::VecToIdArray(std::vector<IDX>({-20, 30, 90}), sizeof(IDX)*8, ctx);
+  aten::Scatter_(idx, val, out);
+  IdArray tout = aten::VecToIdArray(std::vector<IDX>({1, 1, -20, 30, 1, 1, 1, 1, 1, 90}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(out, tout));
+}
+
+TEST(ArrayTest, Scatter_) {
+  _TestScatter_<int32_t, int32_t>(CPU);
+  _TestScatter_<int64_t, int32_t>(CPU);
+  _TestScatter_<int32_t, int64_t>(CPU);
+  _TestScatter_<int64_t, int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestScatter_<int32_t, int32_t>(GPU);
+  _TestScatter_<int64_t, int32_t>(GPU);
+  _TestScatter_<int32_t, int64_t>(GPU);
+  _TestScatter_<int64_t, int64_t>(GPU);
+#endif
+}

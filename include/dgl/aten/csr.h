@@ -249,9 +249,13 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  * \brief Get the submatrix specified by the row and col ids.
  *
  * In numpy notation, given matrix M, row index array I, col index array J
- * This function returns the submatrix M[I, J].
+ * This function returns the submatrix M[I, J]. It assumes that there is no
+ * duplicate (row, col) pair in the given indices. M could have duplicate
+ * entries.
  *
- * The sliced row and column IDs are relabeled to starting from zero.
+ * The sliced row and column IDs are relabeled according to the given
+ * rows and cols (i.e., row #0 in the new matrix corresponds to rows[0] in
+ * the original matrix).
  *
  * \param csr The input csr matrix
  * \param rows The row index to select

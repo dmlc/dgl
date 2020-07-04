@@ -147,6 +147,8 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
 /*!
  * \brief Permute the elements of an array according to given indices.
  *
+ * Only support 1D arrays.
+ *
  * Equivalent to:
  *
  * <code>
@@ -155,6 +157,17 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
  * </code>
  */
 NDArray Scatter(NDArray array, IdArray indices);
+
+/*!
+ * \brief Scatter data into the output array.
+ *
+ * Equivalent to:
+ *
+ * <code>
+ *     out[index] = value
+ * </code>
+ */
+void Scatter_(IdArray index, NDArray value, NDArray out);
 
 /*!
  * \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)

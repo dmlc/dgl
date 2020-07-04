@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/spmat_op_impl.cu
- * \brief Sparse matrix operator CPU implementation
+ * \file array/cuda/spmat_op_impl_csr.cu
+ * \brief CSR operator CPU implementation
  */
 #include <dgl/array.h>
 #include <vector>
@@ -19,14 +19,15 @@ namespace impl {
 
 /*!
  * \brief Search adjacency list linearly for each (row, col) pair and
- * write the matched position in the indices array to the output.
- * 
+ * write the data under the matched position in the indices array to the output.
+ *
  * If there is no match, -1 is written.
  * If there are multiple matches, only the first match is written.
+ * If the given data array is null, write the matched position to the output.
  */
 template <typename IdType>
 __global__ void _LinearSearchKernel(
-    const IdType* indptr, const IdType* indices,
+    const IdType* indptr, const IdType* indices, const IdType* data,
     const IdType* row, const IdType* col,
     int64_t row_stride, int64_t col_stride,
     int64_t length, IdType* out) {
@@ -38,7 +39,7 @@ __global__ void _LinearSearchKernel(
     const IdType r = row[rpos], c = col[cpos];
     for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
       if (indices[i] == c) {
-        out[tx] = i;
+        out[tx] = (data)? data[i] : i;
         break;
       }
     }
@@ -59,9 +60,10 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   rows = rows.CopyTo(ctx);
   cols = cols.CopyTo(ctx);
   IdArray out = aten::NewIdArray(1, ctx, sizeof(IdType) * 8);
+  const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
   _LinearSearchKernel<<<1, 1, 0, thr_entry->stream>>>(
-      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
+      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       1, 1, 1,
       out.Ptr<IdType>());
@@ -85,9 +87,10 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int nt = cuda::FindNumThreads(rstlen);
   const int nb = (rstlen + nt - 1) / nt;
+  const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
   _LinearSearchKernel<<<nb, nt, 0, thr_entry->stream>>>(
-      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
+      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       row.Ptr<IdType>(), col.Ptr<IdType>(),
       row_stride, col_stride, rstlen,
       rst.Ptr<IdType>());
@@ -251,6 +254,43 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
 template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix , NDArray);
 template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix , NDArray);
+
+///////////////////////////// CSRGetData /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+IdArray CSRGetData(CSRMatrix csr, NDArray row, NDArray col) {
+  const int64_t rowlen = row->shape[0];
+  const int64_t collen = col->shape[0];
+
+  CHECK((rowlen == collen) || (rowlen == 1) || (collen == 1))
+    << "Invalid row and col id array.";
+
+  const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
+  const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
+
+  const int64_t rstlen = std::max(rowlen, collen);
+  IdArray rst = NDArray::Empty({rstlen}, row->dtype, row->ctx);
+  if (rstlen == 0)
+    return rst;
+
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  const int nt = cuda::FindNumThreads(rstlen);
+  const int nb = (rstlen + nt - 1) / nt;
+  // TODO(minjie): use binary search for sorted csr
+  _LinearSearchKernel<<<nb, nt, 0, thr_entry->stream>>>(
+      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
+      CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
+      row.Ptr<IdType>(), col.Ptr<IdType>(),
+      row_stride, col_stride, rstlen,
+      rst.Ptr<IdType>());
+  return rst;
+}
+
+template NDArray CSRGetData<kDLGPU, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
+template NDArray CSRGetData<kDLGPU, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
+
+
+///////////////////////////// CSRSliceMatrix /////////////////////////////
 
 }  // namespace impl
 }  // namespace aten

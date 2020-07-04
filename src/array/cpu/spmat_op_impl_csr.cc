@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/spmat_op_impl.cc
- * \brief Sparse matrix operator CPU implementation
+ * \file array/cpu/spmat_op_impl_csr.cc
+ * \brief CSR matrix operator CPU implementation
  */
 #include <dgl/array.h>
 #include <vector>
@@ -483,8 +483,6 @@ template CSRMatrix CSRSliceRows<kDLCPU, int64_t>(CSRMatrix , NDArray);
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
-  CHECK_SAME_DTYPE(csr.indices, rows);
-  CHECK_SAME_DTYPE(csr.indices, cols);
   IdHashMap<IdType> hashmap(cols);
   const int64_t new_nrows = rows->shape[0];
   const int64_t new_ncols = cols->shape[0];

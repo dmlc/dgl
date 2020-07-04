@@ -50,6 +50,9 @@ template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
+void Scatter_(IdArray index, NDArray value, NDArray out);
+
+template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Repeat(NDArray array, IdArray repeats);
 
 template <DLDeviceType XPU, typename IdType>

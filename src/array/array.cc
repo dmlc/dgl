@@ -151,6 +151,22 @@ NDArray Scatter(NDArray array, IdArray indices) {
   return ret;
 }
 
+void Scatter_(IdArray index, NDArray value, NDArray out) {
+  CHECK_SAME_DTYPE(value, out);
+  CHECK_SAME_CONTEXT(index, value);
+  CHECK_SAME_CONTEXT(index, out);
+  CHECK_EQ(value->shape[0], index->shape[0]);
+  if (index->shape[0] == 0)
+    return;
+  ATEN_XPU_SWITCH_CUDA(value->ctx.device_type, XPU, "Scatter_", {
+    ATEN_DTYPE_SWITCH(value->dtype, DType, "values", {
+      ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
+        impl::Scatter_<XPU, DType, IdType>(index, value, out);
+      });
+    });
+  });
+}
+
 NDArray Repeat(NDArray array, IdArray repeats) {
   NDArray ret;
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, "Repeat", {
