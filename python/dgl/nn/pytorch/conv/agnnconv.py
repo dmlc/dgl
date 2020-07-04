@@ -25,14 +25,16 @@ class AGNNConv(nn.Module):
 
     Notes
     -----
-    Zero in degree nodes could lead to invalid normalizer. A common practice
-    to avoid this is to add a self-loop for each node in the graph, which
-    can be achieved by:
+    Zero in-degree nodes could lead to invalid normalizer. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it is homogeneous,
+    which can be achieved by:
 
     >>> g = ... # some DGLGraph
     >>> dgl.add_self_loop(g)
 
     If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+
+    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------

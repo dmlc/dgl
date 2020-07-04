@@ -3,6 +3,7 @@
 import torch as th
 from torch import nn
 
+from .... import transform
 from .... import function as fn
 from ....ops import edge_softmax
 from ..utils import Identity
@@ -33,7 +34,9 @@ class GATConv(nn.Module):
     >>> g = ... # some homogeneous graph
     >>> dgl.add_self_loop(g)
 
-    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
+    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+
+    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -59,6 +62,10 @@ class GATConv(nn.Module):
     activation : callable activation function/layer or None, optional.
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        can to set add_self_loop to ``True`` here.
 
     Example
     -------

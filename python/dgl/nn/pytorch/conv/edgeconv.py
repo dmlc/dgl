@@ -2,6 +2,7 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
 
+from .... import transform
 from .... import function as fn
 from ....utils import expand_as_pair
 
@@ -27,7 +28,7 @@ class EdgeConv(nn.Module):
     >>> g = ... # some homogeneous graph
     >>> dgl.add_self_loop(g)
 
-    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
+    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -37,6 +38,10 @@ class EdgeConv(nn.Module):
         Output feature size.
     batch_norm : bool
         Whether to include batch normalization on messages.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        can to set add_self_loop to ``True`` here.
 
     Example
     -------
@@ -75,9 +80,11 @@ class EdgeConv(nn.Module):
     def __init__(self,
                  in_feat,
                  out_feat,
-                 batch_norm=False):
+                 batch_norm=False,
+                 add_self_loop=False):
         super(EdgeConv, self).__init__()
         self.batch_norm = batch_norm
+        self._add_self_loop = add_self_loop
 
         self.theta = nn.Linear(in_feat, out_feat)
         self.phi = nn.Linear(in_feat, out_feat)
@@ -112,6 +119,8 @@ class EdgeConv(nn.Module):
             New node features.
         """
         with g.local_scope():
+            if self._add_self_loop:
+                g = transform.add_self_loop(g)
             h_src, h_dst = expand_as_pair(h, g)
             g.srcdata['x'] = h_src
             g.dstdata['x'] = h_dst

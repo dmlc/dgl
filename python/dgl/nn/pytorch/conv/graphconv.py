@@ -31,14 +31,16 @@ class GraphConv(nn.Module):
 
     Notes
     -----
-    Zero in degree nodes could lead to invalid normalizer. A common practice
-    to avoid this is to add a self-loop for each node in the graph, which
-    can be achieved by:
+    Zero in-degree nodes could lead to invalid normalizer. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it is homogeneous,
+    which can be achieved by:
 
     >>> g = ... # some DGLGraph
     >>> dgl.add_self_loop(g)
 
     If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+
+    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -78,7 +80,8 @@ class GraphConv(nn.Module):
     >>> import numpy as np
     >>> import torch as th
     >>> from dgl.nn import GraphConv
-    >>>
+
+    Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
     >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True)
@@ -100,6 +103,20 @@ class GraphConv(nn.Module):
             [-3.2559,  0.0129],
             [-3.4180,  0.0136],
             [-2.0022,  0.0080]], grad_fn=<AddBackward0>)
+
+    Case 2: Unidirectional bipartite graph
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = th.rand(2, 5)
+    >>> v_fea = th.rand(4, 5)
+    >>> conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
+    >>> res = conv(g, (u_fea, v_fea))
+    >>> res
+    tensor([[ 0.0000,  0.0000],
+        [ 0.0000,  0.0000],
+        [-1.3650, -0.1034],
+        [-0.6330,  0.1292]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,
@@ -173,10 +190,7 @@ class GraphConv(nn.Module):
         """
         with graph.local_scope():
             if self._add_self_loop:
-                if graph.is_homograph():
-                    graph = transform.add_self_loop(graph)
-                else:
-                    raise DGLError('Adding self_loop only works for homogeneuos graph.')
+                graph = transform.add_self_loop(graph)
 
             feat_src, feat_dst = expand_as_pair(feat)
             if self._norm == 'both':

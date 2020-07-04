@@ -32,7 +32,9 @@ class GMMConv(nn.Module):
     >>> g = ... # some homogeneous graph
     >>> dgl.add_self_loop(g)
 
-    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
+    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+
+    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -50,6 +52,11 @@ class GMMConv(nn.Module):
         If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. If no self-loop is added, the feature for a node with zero
+        in-degree will be all zero after Conv. This is harmful for some applications. We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        need to set add_self_loop to ``True`` here.
 
     Example
     -------
@@ -94,12 +101,14 @@ class GMMConv(nn.Module):
                  n_kernels,
                  aggregator_type='sum',
                  residual=False,
-                 bias=True):
+                 bias=True,
+                 add_self_loop=False):
         super(GMMConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
+        self._add_self_loop = add_self_loop
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'mean':

@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
+from .... import transform
 from .... import function as fn
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -28,7 +29,9 @@ class NNConv(nn.Module):
     >>> g = ... # some homogeneous graph
     >>> dgl.add_self_loop(g)
 
-    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
+    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+
+    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -52,6 +55,10 @@ class NNConv(nn.Module):
         If True, use residual connection. Default: ``False``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        can to set add_self_loop to ``True`` here.
 
     Example
     -------
@@ -98,7 +105,8 @@ class NNConv(nn.Module):
                  edge_func,
                  aggregator_type='mean',
                  residual=False,
-                 bias=True):
+                 bias=True,
+                 add_self_loop=False):
         super(NNConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
@@ -123,6 +131,7 @@ class NNConv(nn.Module):
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_buffer('bias', None)
+        self._add_self_loop = add_self_loop
         self.reset_parameters()
 
     def reset_parameters(self):
