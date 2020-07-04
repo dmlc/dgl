@@ -220,6 +220,10 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
+  const std::vector<UnitGraphPtr>& relation_graphs() const {
+    return relation_graphs_;
+  }
+
  private:
   // To create empty class
   friend class Serializer;
