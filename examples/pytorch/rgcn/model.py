@@ -75,12 +75,14 @@ class RelGraphEmbedLayer(nn.Module):
                  num_of_ntype,
                  input_size,
                  embed_size,
+                 sparse_emb=False,
                  embed_name='embed'):
         super(RelGraphEmbedLayer, self).__init__()
         self.dev_id = dev_id
         self.embed_size = embed_size
         self.embed_name = embed_name
         self.num_nodes = num_nodes
+        self.sparse_emb = sparse_emb
 
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
@@ -94,13 +96,9 @@ class RelGraphEmbedLayer(nn.Module):
                 embed = nn.Parameter(th.Tensor(input_emb_size, self.embed_size))
                 nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
                 self.embeds[str(ntype)] = embed
-            else:
-                loc = node_tids == ntype
-                num_subnodes = node_tids[loc].shape[0]
-                self.idmap[loc] = th.arange(num_subnodes)
-                none_embed = nn.Parameter(th.Tensor(num_subnodes, self.embed_size))
-                nn.init.xavier_uniform_(none_embed, gain=nn.init.calculate_gain('relu'))
-                self.embeds[str(ntype)] = none_embed
+
+        self.node_embeds = th.nn.Embedding(node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)
+        nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
 
     def forward(self, node_ids, node_tids, features):
         """Forward computation
@@ -120,20 +118,12 @@ class RelGraphEmbedLayer(nn.Module):
         tensor
             embeddings as the input of the next layer
         """
-        #embeds = self.embeds[str(-1)]
-        # first we get embeddings for transductive nodes
-        #tsd_idx = node_ids < embeds.shape[0]
-        #tsd_ids = node_ids[tsd_idx]
-        #embeds = embeds[tsd_ids]
-        embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.dev_id)
+        tsd_idx = node_ids < self.num_nodes
+        tsd_ids = node_ids[tsd_idx]
+        embeds = self.node_embeds(tsd_ids)
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
                 embeds[loc] = features[ntype] @ self.embeds[str(ntype)]
-            else:
-                loc = node_tids == ntype
-                sub_nodes = node_ids[loc]
-                if sub_nodes.shape[0] > 0:
-                    embeds[loc] = self.embeds[str(ntype)][self.idmap[sub_nodes]]
 
         return embeds.to(self.dev_id)

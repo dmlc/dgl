@@ -189,6 +189,9 @@ def run(proc_id, n_gpus, args, devices, dataset):
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
         world_size = n_gpus
+        backend = 'nccl'
+        if self.sparse_embedding:
+            backend = 'gloo'
         th.distributed.init_process_group(backend="nccl",
                                           init_method=dist_init_method,
                                           world_size=world_size,
@@ -202,7 +205,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
                                      node_tids,
                                      num_of_ntype,
                                      node_feats,
-                                     args.n_hidden)
+                                     args.n_hidden,
+                                     sparse_emb=args.sparse_embedding)
 
     # create model
     model = EntityClassify(dev_id,
@@ -229,8 +233,12 @@ def run(proc_id, n_gpus, args, devices, dataset):
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     # optimizer
-    all_params = itertools.chain(model.parameters(), embed_layer.parameters())
-    optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
+    if args.sparse_embedding:
+        optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
+        emb_optimizer = th.optim.SparseAdam(embed_layer.parameters(), lr=args.lr)
+    else:
+        all_params = itertools.chain(model.parameters(), embed_layer.parameters())
+        optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
 
     # training loop
     print("start training...")
@@ -240,6 +248,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
     for epoch in range(args.n_epochs):
         model.train()
         optimizer.zero_grad()
+        if args.sparse_embedding:
+            emb_optimizer.zero_grad()
 
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
@@ -253,6 +263,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
             t1 = time.time()
             loss.backward()
             optimizer.step()
+            if args.sparse_embedding:
+                emb_optimizer.step()
             t2 = time.time()
 
             forward_time.append(t1 - t0)
@@ -435,6 +447,8 @@ def config():
             help="Whether use low mem RelGraphCov")
     parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
             help="Whether store node embeddins in cpu")
+    parser.add_argument("--sparse-embedding", action='store_true',
+            help='Use sparse embedding for node embeddings.')
     parser.set_defaults(validation=True)
     args = parser.parse_args()
     return args
