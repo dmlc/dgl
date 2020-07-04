@@ -48,6 +48,66 @@ def start_server(args):
                                            args.graph_name, args.conf_path)
     serv.start()
 
+class DistSAGE(SAGE):
+    def __init__(self, in_feats, n_hidden, n_classes, n_layers,
+                 activation, dropout):
+        super(DistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers,
+                                       activation, dropout)
+
+    def inference(self, g, x, batch_size, device):
+        """
+        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
+        g : the entire graph.
+        x : the input of entire node set.
+
+        The inference code is written in a fashion that it could handle any number of nodes and
+        layers.
+        """
+        # During inference with sampling, multi-layer blocks are very inefficient because
+        # lots of computations in the first few layers are repeated.
+        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
+        # on each layer are of course splitted in batches.
+        # TODO: can we standardize this?
+        nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
+                                           g.get_partition_book(), force_even=True)
+        for l, layer in enumerate(self.layers):
+            # If this isn't the last layer
+            if l != len(self.layers) - 1:
+                if 'h' not in g.ndata:
+                    g.init_ndata('h', (g.number_of_nodes(), self.n_hidden), th.float32)
+                y = g.ndata['h']
+            else:
+                if 'h_last' not in g.ndata:
+                    g.init_ndata('h_last', (g.number_of_nodes(), self.n_classes), th.float32)
+                y = g.ndata['h_last']
+
+            sampler = NeighborSampler(g, [100], dgl.distributed.sample_neighbors)
+            print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
+            # Create PyTorch DataLoader for constructing blocks
+            dataloader = DataLoader(
+                dataset=nodes,
+                batch_size=batch_size,
+                collate_fn=sampler.sample_blocks,
+                shuffle=False,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
+                input_nodes = block.srcdata[dgl.NID]
+                output_nodes = block.dstdata[dgl.NID]
+                h = x[input_nodes].to(device)
+                h_dst = h[:block.number_of_dst_nodes()]
+                h = layer(block, (h, h_dst))
+                if l != len(self.layers) - 1:
+                    h = self.activation(h)
+                    h = self.dropout(h)
+
+                y[output_nodes] = h.cpu()
+
+            x = y
+        return y
+
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, in_feats, n_classes, g = data
@@ -65,7 +125,7 @@ def run(args, device, data):
         num_workers=args.num_workers)
 
     # Define model and optimizer
-    model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
+    model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     model = th.nn.parallel.DistributedDataParallel(model)
     loss_fcn = nn.CrossEntropyLoss()
@@ -148,9 +208,11 @@ def run(args, device, data):
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
-        #if epoch % args.eval_every == 0 and epoch != 0:
-        #    eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
-        #    print('Eval Acc {:.4f}'.format(eval_acc))
+        if epoch % args.eval_every == 0 and epoch != 0:
+            start = time.time()
+            eval_acc = evaluate(model, g, g.ndata['features'],
+                                g.ndata['labels'], val_nid, 10000, device)
+            print('Eval Acc {:.4f}, time: {:.4f}'.format(eval_acc, time.time() - start))
 
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
