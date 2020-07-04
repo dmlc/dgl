@@ -77,6 +77,17 @@ class UnitGraph::COO : public BaseHeteroGraph {
     adj_.data = aten::NullArray();
   }
 
+  COO() {
+    // set magic num_rows/num_cols to mark it as undefined
+    // adj_.num_rows == 0 and adj_.num_cols == 0 means empty UnitGraph which is supported
+    adj_.num_rows = -1;
+    adj_.num_cols = -1;
+  };
+
+  bool defined() const {
+    return (adj_.num_rows >= 0) && (adj_.num_cols >= 0);
+  }
+
   inline dgl_type_t SrcType() const {
     return 0;
   }
@@ -415,8 +426,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
  private:
   friend class Serializer;
 
-  COO() {}
-
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
 };
@@ -444,6 +453,17 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
     : BaseHeteroGraph(metagraph), adj_(csr) {
+  }
+
+  CSR() {
+    // set magic num_rows/num_cols to mark it as undefined
+    // adj_.num_rows == 0 and adj_.num_cols == 0 means empty UnitGraph which is supported
+    adj_.num_rows = -1;
+    adj_.num_cols = -1;
+  };
+
+  bool defined() const {
+    return (adj_.num_rows >= 0) || (adj_.num_cols >= 0);
   }
 
   inline dgl_type_t SrcType() const {
@@ -767,11 +787,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     fs->Write(adj_);
   }
 
-
  private:
   friend class Serializer;
-
-  CSR() {};
 
   /*! \brief internal adjacency matrix. Data array stores edge ids */
   aten::CSRMatrix adj_;
@@ -1171,9 +1188,12 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->AsNumBits(bits))) : nullptr;
-    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->AsNumBits(bits))) : nullptr;
-    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->AsNumBits(bits))) : nullptr;
+    CSRPtr new_incsr =
+      (bg->in_csr_->defined())? CSRPtr(new CSR(bg->in_csr_->AsNumBits(bits))) : nullptr;
+    CSRPtr new_outcsr =
+      (bg->out_csr_->defined())? CSRPtr(new CSR(bg->out_csr_->AsNumBits(bits))) : nullptr;
+    COOPtr new_coo =
+      (bg->coo_->defined())? COOPtr(new COO(bg->coo_->AsNumBits(bits))) : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
@@ -1185,9 +1205,12 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-    CSRPtr new_incsr = (bg->in_csr_)? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
-    CSRPtr new_outcsr = (bg->out_csr_)? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
-    COOPtr new_coo = (bg->coo_)? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_incsr =
+      (bg->in_csr_->defined())? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_outcsr =
+      (bg->out_csr_->defined())? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
+    COOPtr new_coo =
+      (bg->coo_->defined())? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
   }
@@ -1196,22 +1219,35 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
                      SparseFormat restrict_format)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
-  restrict_format_ = AutoDetectFormat(in_csr, out_csr, coo, restrict_format);
+  if (!in_csr_) {
+    in_csr_ = CSRPtr(new CSR());
+  }
+  if (!out_csr_) {
+    out_csr_ = CSRPtr(new CSR());
+  }
+  if (!coo_) {
+    coo_ = COOPtr(new COO());
+  }
+
+  restrict_format_ = AutoDetectFormat(in_csr_, out_csr_, coo_, restrict_format);
   switch (restrict_format) {
   case SparseFormat::kCSC:
     in_csr_ = GetInCSR();
-    coo_ = nullptr;
-    out_csr_ = nullptr;
+    // cleaning other format
+    out_csr_ = out_csr_->defined() ? CSRPtr(new CSR()) : out_csr_;
+    coo_ = coo_->defined() ? COOPtr(new COO()) : coo_;
     break;
   case SparseFormat::kCSR:
     out_csr_ = GetOutCSR();
-    coo_ = nullptr;
-    in_csr_ = nullptr;
+    // cleaning other format
+    in_csr_ = in_csr_->defined() ? CSRPtr(new CSR()) : in_csr_;
+    coo_ = coo_->defined() ? COOPtr(new COO()) : coo_;
     break;
   case SparseFormat::kCOO:
     coo_ = GetCOO();
-    in_csr_ = nullptr;
-    out_csr_ = nullptr;
+    // cleaning other format
+    in_csr_ = in_csr_->defined() ? CSRPtr(new CSR()) : in_csr_;
+    out_csr_ = out_csr_->defined() ? CSRPtr(new CSR()) : out_csr_;
     break;
   default:
     break;
@@ -1236,10 +1272,16 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
 
   if (has_in_csr)
     in_csr_ptr = CSRPtr(new CSR(mg, in_csr));
+  else
+    in_csr_ptr = CSRPtr(new CSR());
   if (has_out_csr)
     out_csr_ptr = CSRPtr(new CSR(mg, out_csr));
+  else
+    out_csr_ptr = CSRPtr(new CSR());
   if (has_coo)
     coo_ptr = COOPtr(new COO(mg, coo));
+  else
+    coo_ptr = COOPtr(new COO());
 
   return HeteroGraphPtr(new UnitGraph(mg, in_csr_ptr, out_csr_ptr, coo_ptr, restrict_format));
 }
@@ -1251,19 +1293,23 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
         ", cannot create CSC matrix.";
   CSRPtr ret = in_csr_;
-  if (!in_csr_) {
-    if (out_csr_) {
+  if (!in_csr_->defined()) {
+    if (out_csr_->defined()) {
       const auto& newadj = aten::CSRTranspose(out_csr_->adj());
-      ret = std::make_shared<CSR>(meta_graph(), newadj);
+
       if (inplace)
-        const_cast<UnitGraph*>(this)->in_csr_ = ret;
+        *(const_cast<UnitGraph*>(this)->in_csr_) = CSR(meta_graph(), newadj);
+      else
+        ret = std::make_shared<CSR>(meta_graph(), newadj);
     } else {
-      CHECK(coo_) << "None of CSR, COO exist";
+      CHECK(coo_->defined()) << "None of CSR, COO exist";
       const auto& newadj = aten::CSRSort(aten::COOToCSR(
             aten::COOTranspose(coo_->adj())));
-      ret = std::make_shared<CSR>(meta_graph(), newadj);
+
       if (inplace)
-        const_cast<UnitGraph*>(this)->in_csr_ = ret;
+        *(const_cast<UnitGraph*>(this)->in_csr_) = CSR(meta_graph(), newadj);
+      else
+        ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
   }
   return ret;
@@ -1277,18 +1323,22 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
         ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
-  if (!out_csr_) {
-    if (in_csr_) {
+  if (!out_csr_->defined()) {
+    if (in_csr_->defined()) {
       const auto& newadj = aten::CSRSort(aten::CSRTranspose(in_csr_->adj()));
-      ret = std::make_shared<CSR>(meta_graph(), newadj);
+
       if (inplace)
-        const_cast<UnitGraph*>(this)->out_csr_ = ret;
+        *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
+      else
+        ret = std::make_shared<CSR>(meta_graph(), newadj);
     } else {
-      CHECK(coo_) << "None of CSR, COO exist";
+      CHECK(coo_->defined()) << "None of CSR, COO exist";
       const auto& newadj = aten::CSRSort(aten::COOToCSR(coo_->adj()));
-      ret = std::make_shared<CSR>(meta_graph(), newadj);
+
       if (inplace)
-        const_cast<UnitGraph*>(this)->out_csr_ = ret;
+        *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
+      else
+        ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
   }
   return ret;
@@ -1302,18 +1352,22 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
         ", cannot create COO matrix.";
   COOPtr ret = coo_;
-  if (!coo_) {
-    if (in_csr_) {
+  if (!coo_->defined()) {
+    if (in_csr_->defined()) {
       const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
-      ret = std::make_shared<COO>(meta_graph(), newadj);
+
       if (inplace)
-        const_cast<UnitGraph*>(this)->coo_ = ret;
+        *(const_cast<UnitGraph*>(this)->coo_) = COO(meta_graph(), newadj);
+      else
+        ret = std::make_shared<COO>(meta_graph(), newadj);
     } else {
-      CHECK(out_csr_) << "Both CSR are missing.";
+      CHECK(out_csr_->defined()) << "Both CSR are missing.";
       const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
-      ret = std::make_shared<COO>(meta_graph(), newadj);
+
       if (inplace)
-        const_cast<UnitGraph*>(this)->coo_ = ret;
+        *(const_cast<UnitGraph*>(this)->coo_) = COO(meta_graph(), newadj);
+      else
+        ret = std::make_shared<COO>(meta_graph(), newadj);
     }
   }
   return ret;
@@ -1332,9 +1386,9 @@ aten::COOMatrix UnitGraph::GetCOOMatrix(dgl_type_t etype) const {
 }
 
 HeteroGraphPtr UnitGraph::GetAny() const {
-  if (in_csr_) {
+  if (in_csr_->defined()) {
     return in_csr_;
-  } else if (out_csr_) {
+  } else if (out_csr_->defined()) {
     return out_csr_;
   } else {
     return coo_;
@@ -1343,11 +1397,11 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 
 dgl_format_code_t UnitGraph::GetFormatInUse() const {
   dgl_format_code_t ret = 0;
-  if (in_csr_) ret = ret | 1;
+  if (in_csr_->defined()) ret = ret | 1;
   ret = ret << 1;
-  if (out_csr_) ret = ret | 1;
+  if (out_csr_->defined()) ret = ret | 1;
   ret = ret << 1;
-  if (coo_) ret = ret | 1;
+  if (coo_->defined()) ret = ret | 1;
   return ret;
 }
 
@@ -1381,7 +1435,12 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(SparseFormat restrict_format) const {
         num_vtypes, GetOutCSR(false)->adj(), restrict_format);
     case SparseFormat::kAny:
       return HeteroGraphPtr(
-        new UnitGraph(meta_graph_, in_csr_, out_csr_, coo_, restrict_format));
+        // TODO(xiangsx) Make it as graph storage.Clone()
+        new UnitGraph(meta_graph_,
+                      (in_csr_->defined()) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
+                      (out_csr_->defined()) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
+                      (coo_->defined()) ? COOPtr(new COO(*coo_)) : nullptr,
+                      restrict_format));
     default:  // SparseFormat::kAuto
       LOG(FATAL) << "Must specify a restrict format.";
       return nullptr;
@@ -1392,7 +1451,7 @@ SparseFormat UnitGraph::AutoDetectFormat(
     CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
   if (restrict_format != SparseFormat::kAuto)
     return restrict_format;
-  if (coo && coo->IsHypersparse())
+  if (coo && coo->defined() && coo->IsHypersparse())
     return SparseFormat::kCOO;
   return SparseFormat::kAny;
 }
@@ -1402,9 +1461,9 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return restrict_format_;  // force to select the restricted format
   else if (preferred_format != SparseFormat::kAny)
     return preferred_format;
-  else if (in_csr_)
+  else if (in_csr_->defined())
     return SparseFormat::kCSC;
-  else if (out_csr_)
+  else if (out_csr_->defined())
     return SparseFormat::kCSR;
   else
     return SparseFormat::kCOO;
@@ -1414,15 +1473,15 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
   CHECK(NumVertexTypes() == 1) << "not a homogeneous graph";
   dgl::CSRPtr in_csr_ptr = nullptr, out_csr_ptr = nullptr;
   dgl::COOPtr coo_ptr = nullptr;
-  if (in_csr_) {
+  if (in_csr_->defined()) {
     aten::CSRMatrix csc = GetCSCMatrix(0);
     in_csr_ptr = dgl::CSRPtr(new dgl::CSR(csc.indptr, csc.indices, csc.data));
   }
-  if (out_csr_) {
+  if (out_csr_->defined()) {
     aten::CSRMatrix csr = GetCSRMatrix(0);
     out_csr_ptr = dgl::CSRPtr(new dgl::CSR(csr.indptr, csr.indices, csr.data));
   }
-  if (coo_) {
+  if (coo_->defined()) {
     aten::COOMatrix coo = GetCOOMatrix(0);
     if (!COOHasData(coo)) {
       coo_ptr = dgl::COOPtr(new dgl::COO(NumVertices(0), coo.row, coo.col));
@@ -1463,6 +1522,16 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
       break;
   }
 
+  if (!in_csr_) {
+    in_csr_ = CSRPtr(new CSR());
+  }
+  if (!out_csr_) {
+    out_csr_ = CSRPtr(new CSR());
+  }
+  if (!coo_) {
+    coo_ = COOPtr(new COO());
+  }
+
   meta_graph_ = GetAny()->meta_graph();
 
   return true;
@@ -1490,6 +1559,16 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
       LOG(FATAL) << "unsupported format code";
       break;
   }
+}
+
+UnitGraphPtr UnitGraph::Reverse() const {
+  CSRPtr new_incsr = out_csr_, new_outcsr = in_csr_;
+  COOPtr new_coo = nullptr;
+  if (coo_->defined()) {
+    new_coo = COOPtr(new COO(coo_->meta_graph(), aten::COOTranspose(coo_->adj())));
+  }
+
+  return UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo));
 }
 
 }  // namespace dgl
