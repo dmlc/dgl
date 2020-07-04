@@ -70,6 +70,9 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 template <DLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero);
 
+template <DLDeviceType XPU, typename IdType>
+IdArray NonZero(NDArray array);
+
 // sparse arrays
 
 template <DLDeviceType XPU, typename IdType>

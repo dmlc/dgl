@@ -265,6 +265,16 @@ IdArray CumSum(IdArray array, bool prepend_zero) {
   return ret;
 }
 
+IdArray NonZero(NDArray array) {
+  IdArray ret;
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "NonZero", {
+    ATEN_ID_TYPE_SWITCH(array->dtype, DType, {
+      ret = impl::NonZero<XPU, DType>(array);
+    });
+  });
+  return ret;
+}
+
 std::string ToDebugString(NDArray array) {
   std::ostringstream oss;
   NDArray a = array.CopyTo(DLContext{kDLCPU, 0});

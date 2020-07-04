@@ -291,6 +291,16 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 IdArray CumSum(IdArray array, bool prepend_zero = false);
 
 /*!
+ * \brief Return the nonzero index.
+ *
+ * Only support 1D array. The result index array is in int64.
+ *
+ * \param array The input array.
+ * \return A 1D index array storing the positions of the non zero values.
+ */
+IdArray NonZero(NDArray array);
+
+/*!
  * \brief Return a string that prints out some debug information.
  */
 std::string ToDebugString(NDArray array);

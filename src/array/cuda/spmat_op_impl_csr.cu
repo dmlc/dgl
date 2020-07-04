@@ -35,14 +35,15 @@ __global__ void _LinearSearchKernel(
   const int stride_x = gridDim.x * blockDim.x;
   int rpos = tx, cpos = tx;
   while (tx < length) {
-    out[tx] = -1;
+    IdType v = -1;
     const IdType r = row[rpos], c = col[cpos];
     for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
       if (indices[i] == c) {
-        out[tx] = (data)? data[i] : i;
+        v = (data)? data[i] : i;
         break;
       }
     }
+    out[tx] = v;
     rpos += row_stride;
     cpos += col_stride;
     tx += stride_x;
@@ -289,8 +290,141 @@ IdArray CSRGetData(CSRMatrix csr, NDArray row, NDArray col) {
 template NDArray CSRGetData<kDLGPU, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
 template NDArray CSRGetData<kDLGPU, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
 
+///////////////////////////// CSRGetDataAndIndices /////////////////////////////
+
+/*!
+ * \brief Generate a 0-1 mask for each index that hits the provided (row, col)
+ *        index.
+ */
+template <typename IdType>
+__global__ void _SegmentMaskKernel(
+    const IdType* indptr, const IdType* indices,
+    const IdType* row, const IdType* col,
+    int64_t row_stride, int64_t col_stride,
+    int64_t length, IdType* mask) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  int rpos = tx, cpos = tx;
+  while (tx < length) {
+    const IdType r = row[rpos], c = col[cpos];
+    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
+      if (indices[i] == c) {
+        mask[i] = 1;
+        break;
+      }
+    }
+    rpos += row_stride;
+    cpos += col_stride;
+    tx += stride_x;
+  }
+}
+
+/*!
+ * \brief Search for the insertion positions for needle in the hay.
+ *
+ * The hay is a list of sorted elements and the result is the insertion position
+ * of each needle so that the insertion still gives sorted order.
+ *
+ * It essentially perform binary search to find lower bound for each needle
+ * elements.
+ */
+template <typename IdType>
+__global__ void _SortedSearchKernel(
+    const IdType* hay, int64_t hay_size,
+    const IdType* needles, int64_t num_needles,
+    IdType* pos) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < num_needles) {
+    const IdType ele = needles[tx];
+    // binary search
+    IdType lo = 0, hi = hay_size - 1;
+    while (lo < hi) {
+      IdType mid = (lo + hi) >> 1;
+      if (hay[mid] <= ele) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    pos[tx] = (hay[hi] == ele)? hi : hi - 1;
+    tx += stride_x;
+  }
+}
+
+template <DLDeviceType XPU, typename IdType>
+std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray col) {
+  const auto rowlen = row->shape[0];
+  const auto collen = col->shape[0];
+  const auto len = std::max(rowlen, collen);
+  if (len == 0)
+    return {NullArray(), NullArray(), NullArray()};
+  
+  const auto& ctx = row->ctx;
+  const auto nbits = row->dtype.bits;
+  const int64_t nnz = csr.indices->shape[0];
+  const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
+  const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+
+  // Generate a 0-1 mask for matched (row, col) positions.
+  IdArray mask = Full(0, nnz, nbits, ctx);
+  const int nt = cuda::FindNumThreads(len);
+  const int nb = (len + nt - 1) / nt;
+  _SegmentMaskKernel<<<nb, nt, 0, thr_entry->stream>>>(
+      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
+      row.Ptr<IdType>(), col.Ptr<IdType>(),
+      row_stride, col_stride, len,
+      mask.Ptr<IdType>());
+
+  IdArray idx = AsNumBits(NonZero(mask), nbits);
+  if (idx->shape[0] == 0)
+    // No data. Return three empty arrays.
+    return {idx, idx, idx};
+
+  // Search for row index
+  IdArray ret_row = NewIdArray(idx->shape[0], ctx, nbits);
+  const int nt2 = cuda::FindNumThreads(idx->shape[0]);
+  const int nb2 = (idx->shape[0] + nt - 1) / nt;
+  _SortedSearchKernel<<<nb, nt, 0, thr_entry->stream>>>(
+      csr.indptr.Ptr<IdType>(), csr.num_rows,
+      idx.Ptr<IdType>(), idx->shape[0],
+      ret_row.Ptr<IdType>());
+
+  // Column & data can be obtained by index select.
+  IdArray ret_col = IndexSelect(csr.indices, idx);
+  IdArray ret_data = CSRHasData(csr)? IndexSelect(csr.data, idx) : idx;
+  return {ret_row, ret_col, ret_data};
+}
+
+template std::vector<NDArray> CSRGetDataAndIndices<kDLGPU, int32_t>(
+    CSRMatrix csr, NDArray rows, NDArray cols);
+template std::vector<NDArray> CSRGetDataAndIndices<kDLGPU, int64_t>(
+    CSRMatrix csr, NDArray rows, NDArray cols);
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
+  const auto& ctx = rows->ctx;
+  const auto nbits = rows->dtype.bits;
+  const auto& data_and_idx = CSRGetDataAndIndices(csr, rows, cols);
+  // Relabel the row and column
+  IdArray row_hash = NewIdArray(csr.num_rows, ctx, nbits);
+  IdArray col_hash = NewIdArray(csr.num_cols, ctx, nbits);
+  Scatter_(Range(0, rows->shape[0], nbits, ctx), rows, row_hash);
+  Scatter_(Range(0, cols->shape[0], nbits, ctx), cols, col_hash);
+  IdArray new_row = IndexSelect(row_hash, data_and_idx[0]);
+  IdArray new_col = IndexSelect(col_hash, data_and_idx[1]);
+  COOMatrix coo(rows->shape[0], cols->shape[0],
+                new_row, new_col, data_and_idx[2]);
+  return COOToCSR(coo);
+}
+
+template CSRMatrix CSRSliceMatrix<kDLGPU, int32_t>(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+template CSRMatrix CSRSliceMatrix<kDLGPU, int64_t>(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 }  // namespace impl
 }  // namespace aten

@@ -635,3 +635,30 @@ TEST(ArrayTest, Scatter_) {
   _TestScatter_<int64_t, int64_t>(GPU);
 #endif
 }
+
+template <typename IDX>
+void _TestNonZero(DLContext ctx) {
+  auto val = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 0, -10, 0, 0, 23}), sizeof(IDX)*8, ctx);
+  auto idx = aten::NonZero(val);
+  auto tidx = aten::VecToIdArray(std::vector<IDX>({1, 2, 4, 7}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0}), sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+}
+
+TEST(ArrayTest, NonZero) {
+  _TestNonZero<int32_t>(CPU);
+  _TestNonZero<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestNonZero<int32_t>(GPU);
+  _TestNonZero<int64_t>(GPU);
+#endif
+}
