@@ -99,6 +99,52 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
 template NDArray CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, NDArray, NDArray);
 template NDArray CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, NDArray, NDArray);
 
+///////////////////////////// CSRHasDuplicate /////////////////////////////
+
+/*!
+ * \brief Check whether each row does not have any duplicate entries.
+ * Assume the CSR is sorted.
+ */
+template <typename IdType>
+__global__ void _SegmentHasNoDuplicate(
+    const IdType* indptr, const IdType* indices,
+    int64_t num_rows, int8_t* flags) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < num_rows) {
+    bool f = true;
+    for (IdType i = indptr[tx] + 1; f && i < indptr[tx + 1]; ++i) {
+      f = (indices[i - 1] != indices[i]);
+    }
+    flags[tx] = static_cast<int8_t>(f);
+    tx += stride_x;
+  }
+}
+
+
+template <DLDeviceType XPU, typename IdType>
+bool CSRHasDuplicate(CSRMatrix csr) {
+  if (!csr.sorted)
+    csr = CSRSort(csr);
+  const auto& ctx = csr.indptr->ctx;
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  auto device = runtime::DeviceAPI::Get(ctx);
+  // We allocate a workspace of num_rows bytes. It wastes a little bit memory but should
+  // be fine.
+  int8_t* flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, csr.num_rows));
+  const int nt = cuda::FindNumThreads(csr.num_rows);
+  const int nb = (csr.num_rows + nt - 1) / nt;
+  _SegmentHasNoDuplicate<<<nb, nt, 0, thr_entry->stream>>>(
+      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
+      csr.num_rows, flags);
+  bool ret = cuda::AllTrue(flags, csr.num_rows, ctx);
+  device->FreeWorkspace(ctx, flags);
+  return !ret;
+}
+
+template bool CSRHasDuplicate<kDLGPU, int32_t>(CSRMatrix csr);
+template bool CSRHasDuplicate<kDLGPU, int64_t>(CSRMatrix csr);
+
 ///////////////////////////// CSRGetRowNNZ /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>

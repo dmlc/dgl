@@ -316,7 +316,7 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
 
 bool CSRHasDuplicate(CSRMatrix csr) {
   bool ret = false;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRHasDuplicate", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRHasDuplicate", {
     ret = impl::CSRHasDuplicate<XPU, IdType>(csr);
   });
   return ret;

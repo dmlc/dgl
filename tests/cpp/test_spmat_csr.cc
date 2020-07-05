@@ -445,16 +445,19 @@ TEST(SpmatTest, CSRSliceMatrix) {
 }
 
 template <typename IDX>
-void _TestCSRHasDuplicate() {
-  auto csr = CSR1<IDX>();
+void _TestCSRHasDuplicate(DLContext ctx) {
+  auto csr = CSR1<IDX>(ctx);
   ASSERT_FALSE(aten::CSRHasDuplicate(csr));
-  csr = CSR2<IDX>();
+  csr = CSR2<IDX>(ctx);
   ASSERT_TRUE(aten::CSRHasDuplicate(csr));
 }
 
-TEST(SpmatTest, TestCSRHasDuplicate) {
-  _TestCSRHasDuplicate<int32_t>();
-  _TestCSRHasDuplicate<int64_t>();
+TEST(SpmatTest, CSRHasDuplicate) {
+  _TestCSRHasDuplicate<int32_t>(CPU);
+  _TestCSRHasDuplicate<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRHasDuplicate<int32_t>(GPU);
+#endif
 }
 
 template <typename IDX>
