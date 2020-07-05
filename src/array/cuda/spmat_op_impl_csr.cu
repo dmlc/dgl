@@ -437,14 +437,16 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   const int64_t new_ncols = cols->shape[0];
 
   if (new_nrows == 0 || new_ncols == 0)
-    return CSRMatrix(new_nrows, new_ncols, NullArray(dtype, ctx),
+    return CSRMatrix(new_nrows, new_ncols,
+                     Full(0, new_nrows + 1, nbits, ctx),
                      NullArray(dtype, ctx), NullArray(dtype, ctx));
 
   // First slice rows
   const auto& subcsr = CSRSliceRows(csr, rows);
 
   if (subcsr.indices->shape[0] == 0)
-    return CSRMatrix(new_nrows, new_ncols, NullArray(dtype, ctx),
+    return CSRMatrix(new_nrows, new_ncols,
+                     Full(0, new_nrows + 1, nbits, ctx),
                      NullArray(dtype, ctx), NullArray(dtype, ctx));
 
   // Generate a 0-1 mask for matched (row, col) positions.
@@ -460,7 +462,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 
   IdArray idx = AsNumBits(NonZero(mask), nbits);
   if (idx->shape[0] == 0)
-    return CSRMatrix(new_nrows, new_ncols, NullArray(dtype, ctx),
+    return CSRMatrix(new_nrows, new_ncols,
+                     Full(0, new_nrows + 1, nbits, ctx),
                      NullArray(dtype, ctx), NullArray(dtype, ctx));
 
   // Indptr needs to be adjusted according to the new nnz per row.
