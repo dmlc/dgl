@@ -24,8 +24,9 @@ namespace aten {
 //////////////////////////////////////////////////////////////////////
 
 /*! \return A special array to represent null. */
-inline NDArray NullArray() {
-  return NDArray::Empty({0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+inline NDArray NullArray(const DLDataType& dtype = DLDataType{kDLInt, 64, 1},
+                         const DLContext& ctx = DLContext{kDLCPU, 0}) {
+  return NDArray::Empty({0}, dtype, ctx);
 }
 
 /*!

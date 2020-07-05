@@ -398,21 +398,85 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDLGPU, int64_t>(
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
 
+/*!
+ * \brief Generate a 0-1 mask for each index whose column is in the provided set.
+ *        It also counts the number of masked values per row.
+ */
+template <typename IdType>
+__global__ void _SegmentMaskColKernel(
+    const IdType* indptr, const IdType* indices, int64_t num_rows,
+    const IdType* col, int64_t col_len,
+    IdType* mask, IdType* count) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  // TODO(minjie): consider putting the col array in shared memory.
+  while (tx < num_rows) {
+    IdType cnt = 0;
+    for (IdType i = indptr[tx]; i < indptr[tx + 1]; ++i) {
+      const IdType cur_c = indices[i];
+      for (int64_t j = 0; j < col_len; ++j) {
+        if (cur_c == col[j]) {
+          mask[i] = 1;
+          ++cnt;
+          break;
+        }
+      }
+    }
+    count[tx] = cnt;
+    tx += stride_x;
+  }
+}
+
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = rows->ctx;
-  const auto nbits = rows->dtype.bits;
-  const auto& data_and_idx = CSRGetDataAndIndices(csr, rows, cols);
-  // Relabel the row and column
-  IdArray row_hash = NewIdArray(csr.num_rows, ctx, nbits);
+  const auto& dtype = rows->dtype;
+  const auto nbits = dtype.bits;
+  const int64_t new_nrows = rows->shape[0];
+  const int64_t new_ncols = cols->shape[0];
+
+  if (new_nrows == 0 || new_ncols == 0)
+    return CSRMatrix(new_nrows, new_ncols, NullArray(dtype, ctx),
+                     NullArray(dtype, ctx), NullArray(dtype, ctx));
+
+  // First slice rows
+  const auto& subcsr = CSRSliceRows(csr, rows);
+
+  if (subcsr.indices->shape[0] == 0)
+    return CSRMatrix(new_nrows, new_ncols, NullArray(dtype, ctx),
+                     NullArray(dtype, ctx), NullArray(dtype, ctx));
+
+  // Generate a 0-1 mask for matched (row, col) positions.
+  IdArray mask = Full(0, subcsr.indices->shape[0], nbits, ctx);
+  // A count for how many masked values per row.
+  IdArray count = NewIdArray(subcsr.num_rows, ctx, nbits);
+  const int nt = cuda::FindNumThreads(subcsr.num_rows);
+  const int nb = (subcsr.num_rows + nt - 1) / nt;
+  _SegmentMaskColKernel<<<nb, nt, 0, thr_entry->stream>>>(
+    subcsr.indptr.Ptr<IdType>(), subcsr.indices.Ptr<IdType>(), subcsr.num_rows,
+    cols.Ptr<IdType>(), cols->shape[0],
+    mask.Ptr<IdType>(), count.Ptr<IdType>());
+
+  IdArray idx = AsNumBits(NonZero(mask), nbits);
+  if (idx->shape[0] == 0)
+    return CSRMatrix(new_nrows, new_ncols, NullArray(dtype, ctx),
+                     NullArray(dtype, ctx), NullArray(dtype, ctx));
+
+  // Indptr needs to be adjusted according to the new nnz per row.
+  IdArray ret_indptr = CumSum(count, true);
+  
+  // Column & data can be obtained by index select.
+  IdArray ret_col = IndexSelect(csr.indices, idx);
+  IdArray ret_data = CSRHasData(csr)? IndexSelect(csr.data, idx) : idx;
+
+  // Relabel column
   IdArray col_hash = NewIdArray(csr.num_cols, ctx, nbits);
-  Scatter_(Range(0, rows->shape[0], nbits, ctx), rows, row_hash);
-  Scatter_(Range(0, cols->shape[0], nbits, ctx), cols, col_hash);
-  IdArray new_row = IndexSelect(row_hash, data_and_idx[0]);
-  IdArray new_col = IndexSelect(col_hash, data_and_idx[1]);
-  COOMatrix coo(rows->shape[0], cols->shape[0],
-                new_row, new_col, data_and_idx[2]);
-  return COOToCSR(coo);
+  Scatter_(cols, Range(0, cols->shape[0], nbits, ctx), col_hash);
+  ret_col = IndexSelect(col_hash, ret_col);
+
+  return CSRMatrix(new_nrows, new_ncols, ret_indptr,
+                   ret_col, ret_data);
 }
 
 template CSRMatrix CSRSliceMatrix<kDLGPU, int32_t>(

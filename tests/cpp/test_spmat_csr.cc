@@ -379,10 +379,10 @@ TEST(SpmatTest, TestCSRSliceRows) {
 }
 
 template <typename IDX>
-void _TestCSRSliceMatrix() {
-  auto csr = CSR2<IDX>();
-  auto r = aten::VecToIdArray(std::vector<IDX>({0, 1, 3}), sizeof(IDX)*8, CTX);
-  auto c = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, CTX);
+void _TestCSRSliceMatrix(DLContext ctx) {
+  auto csr = CSR2<IDX>(ctx);
+  auto r = aten::VecToIdArray(std::vector<IDX>({0, 1, 3}), sizeof(IDX)*8, ctx);
+  auto c = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, ctx);
   auto x = aten::CSRSliceMatrix(csr, r, c);
   // [[1, 2, 0],
   //  [0, 0, 0],
@@ -390,17 +390,20 @@ void _TestCSRSliceMatrix() {
   // data: [0, 2, 5]
   ASSERT_EQ(x.num_rows, 3);
   ASSERT_EQ(x.num_cols, 3);
-  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 3, 3, 3}), sizeof(IDX)*8, CTX);
-  auto ti = aten::VecToIdArray(std::vector<IDX>({0, 1, 1}), sizeof(IDX)*8, CTX);
-  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, CTX);
+  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 3, 3, 3}), sizeof(IDX)*8, ctx);
+  auto ti = aten::VecToIdArray(std::vector<IDX>({0, 1, 1}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
   ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
   ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
 }
 
-TEST(SpmatTest, TestCSRSliceMatrix) {
-  _TestCSRSliceMatrix<int32_t>();
-  _TestCSRSliceMatrix<int64_t>();
+TEST(SpmatTest, CSRSliceMatrix) {
+  _TestCSRSliceMatrix<int32_t>(CPU);
+  _TestCSRSliceMatrix<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestCSRSliceMatrix<int32_t>(GPU);
+#endif
 }
 
 template <typename IDX>
