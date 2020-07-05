@@ -39,9 +39,9 @@ def infer_broadcast_shape(op, shp1, shp2):
             raise DGLError("Dot operator is only available for arrays with the "
                            "same size on last dimension, but got {} and {}."
                            .format(shp1, shp2))
-    if op == "copy_u":
+    if op == "copy_lhs":
         return shp1
-    if op == "copy_e":
+    if op == "copy_rhs":
         return shp2
     # operands are padded to have the same dimensionality with leading 1's.
     if len(shp1) > len(shp2):
@@ -128,21 +128,22 @@ def _gspmm(gidx, op, reduce_op, u, e):
     we expand its dimension with an additional dimension of length one. (e.g.
     (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
-    if gidx.number_of_etypes() != 1:
-        raise DGLError("We only support gspmm on graph with one edge type")
-
-    if u is not None:
+    op = op_mapping[op]
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+    if use_u:
         if F.ndim(u) == 1:
             u = F.unsqueeze(u, -1)
-    if e is not None:
+
+    if use_e:
         if F.ndim(e) == 1:
             e = F.unsqueeze(e, -1)
 
-    op = op_mapping[op]
-    ctx = F.context(u) if u is not None else F.context(e)
-    dtype = F.dtype(u) if u is not None else F.dtype(e)
-    use_u = (op != 'copy_rhs')
-    use_e = (op != 'copy_lhs')
+    if gidx.number_of_etypes() != 1:
+        raise DGLError("We only support gspmm on graph with one edge type")
+
+    ctx = F.context(u) if use_u else F.context(e)
+    dtype = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
     e_shp = F.shape(e) if use_e else (0,)
 
@@ -157,8 +158,11 @@ def _gspmm(gidx, op, reduce_op, u, e):
     if gidx.number_of_edges(0) > 0:
         ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
         _CAPI_DGLKernelSpMM(ugi, op, reduce_op,
-                            to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
-                            to_dgl_nd(arg_u), to_dgl_nd(arg_e))
+                            to_dgl_nd(u if use_u else None),
+                            to_dgl_nd(e if use_e else None),
+                            to_dgl_nd(v),
+                            to_dgl_nd(arg_u),
+                            to_dgl_nd(arg_e))
     return v, (arg_u, arg_e)
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
@@ -205,27 +209,33 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
+    op = op_mapping[op]
+    use_lhs = op != 'use_rhs'
+    use_rhs = op != 'use_lhs'
 
-    if lhs is not None:
+    if use_lhs:
         if F.ndim(lhs) == 1:
             lhs = F.unsqueeze(lhs, -1)
-    if rhs is not None:
+
+    if use_rhs:
         if F.ndim(rhs) == 1:
             rhs = F.unsqueeze(rhs, -1)
 
-    op = op_mapping[op]
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
-    ctx = F.context(lhs) if lhs is not None else F.context(rhs)
-    dtype = F.dtype(lhs) if lhs is not None else F.dtype(rhs)
-    lhs_shp = F.shape(lhs) if lhs is not None else (0,)
-    rhs_shp = F.shape(rhs) if rhs is not None else (0,)
+    ctx = F.context(lhs) if use_lhs else F.context(rhs)
+    dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
+    lhs_shp = F.shape(lhs) if use_lhs else (0,)
+    rhs_shp = F.shape(rhs) if use_rhs else (0,)
     out_shp = (gidx.number_of_edges(0), ) +\
         infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
     out = F.zeros(out_shp, dtype, ctx)
     if gidx.number_of_edges(0) > 0:
         ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
-        _CAPI_DGLKernelSDDMM(ugi, op, to_dgl_nd(lhs), to_dgl_nd(rhs), to_dgl_nd(out),
+        _CAPI_DGLKernelSDDMM(ugi, op,
+                             to_dgl_nd(lhs if use_lhs else None),
+                             to_dgl_nd(rhs if use_rhs else None),
+                             to_dgl_nd(out),
                              lhs_target, rhs_target)
     return out
 
