@@ -278,40 +278,23 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroNumEdges(self, int(etype))
 
-    def has_node(self, ntype, vid):
-        """Return true if the node exists.
-
-        Parameters
-        ----------
-        ntype : int
-            Node type
-        vid : int
-            The nodes
-
-        Returns
-        -------
-        bool
-            True if the node exists, False otherwise.
-        """
-        return bool(_CAPI_DGLHeteroHasVertex(self, int(ntype), int(vid)))
-
-    def has_nodes(self, ntype, vids):
+    def has_node(self, ntype, vids):
         """Return true if the nodes exist.
 
         Parameters
         ----------
         ntype : int
             Node type
-        vid : utils.Index
-            The nodes
+        vid : Tensor
+            Node IDs
 
         Returns
         -------
-        utils.Index
+        Tensor
             0-1 array indicating existence
         """
-        vid_array = vids.todgltensor()
-        return utils.toindex(_CAPI_DGLHeteroHasVertices(self, int(ntype), vid_array), self.dtype)
+        return F.from_dgl_nd(_CAPI_DGLHeteroHasVertices(
+            self, int(ntype), F.to_dgl_nd(vids)))
 
     def has_edge_between(self, etype, u, v):
         """Return true if the edge exists.
@@ -320,39 +303,18 @@ class HeteroGraphIndex(ObjectBase):
         ----------
         etype : int
             Edge type
-        u : int
-            The src node.
-        v : int
-            The dst node.
+        u : Tensor
+            Src node Ids.
+        v : Tensor
+            Dst node Ids.
 
         Returns
         -------
-        bool
-            True if the edge exists, False otherwise
-        """
-        return bool(_CAPI_DGLHeteroHasEdgeBetween(self, int(etype), int(u), int(v)))
-
-    def has_edges_between(self, etype, u, v):
-        """Return true if the edge exists.
-
-        Parameters
-        ----------
-        etype : int
-            Edge type
-        u : utils.Index
-            The src nodes.
-        v : utils.Index
-            The dst nodes.
-
-        Returns
-        -------
-        utils.Index
+        Tensor
             0-1 array indicating existence
         """
-        u_array = u.todgltensor()
-        v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLHeteroHasEdgesBetween(
-            self, int(etype), u_array, v_array), self.dtype)
+        return F.from_dgl_nd(_CAPI_DGLHeteroHasEdgesBetween(
+            self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v)))
 
     def predecessors(self, etype, v):
         """Return the predecessors of the node.

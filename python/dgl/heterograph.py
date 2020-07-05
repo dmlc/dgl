@@ -1293,13 +1293,46 @@ class DGLHeteroGraph(object):
         """
         return self._graph.dtype
 
+    def check_and_to_tensor(self, data, name):
+        """Convert the data to ID tensor and check its ID type and context.
+
+        If the data is already in tensor type, raise error if its ID type
+        and context does not match the current graph's.
+        Otherwise, convert it to tensor type of the current graph's ID type and
+        ctx and return.
+
+        Parameters
+        ----------
+        data : int, iterable of int, tensor
+            Data.
+        name : str
+            Name of the data.
+        idtype : data type
+            Data type.
+        ctx : device context
+            Device context.
+
+        Returns
+        -------
+        Tensor
+            Data in tensor object.
+        """
+        if F.is_tensor(data):
+            if F.dtype(data) != self.idtype or F.context(data) != self.device:
+                raise DGLError('Expect argument "{}" to have data type {} and device '
+                               'context {}. But got {} and {}.'.format(
+                                   self.idtype, self.device, F.dtype(data), F.context(data)))
+            return data
+        else:
+            return F.copy_to(F.tensor(data, self.idtype), self.device)
+
     def has_node(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
 
         Parameters
         ----------
-        vid : int
-            The node ID.
+        vid : int, iterable, tensor
+            Node ID(s).
         ntype : str, optional
             The node type. Can be omitted if there is only one node type
             in the graph. (Default: None)
@@ -1315,15 +1348,21 @@ class DGLHeteroGraph(object):
         True
         >>> g.has_node(4, 'user')
         False
-
-        See Also
-        --------
-        has_nodes
+        >>> g.has_node([0, 1, 2, 3, 4], 'user')
+        tensor([1, 1, 1, 0, 0])
         """
-        return self._graph.has_node(self.get_ntype_id(ntype), vid)
+        ret = self._graph.has_node(
+            self.get_ntype_id(ntype),
+            self.check_and_to_tensor(vid, "vid"))
+        if isinstance(vid, numbers.Integral):
+            return bool(F.as_scalar(ret))
+        else:
+            return ret
 
     def has_nodes(self, vids, ntype=None):
         """Whether the graph has nodes with ids and a particular type.
+
+        DEPRECATED: see :func:`~DGLGraph.has_node`
 
         Parameters
         ----------
@@ -1338,39 +1377,28 @@ class DGLHeteroGraph(object):
         a : tensor
             Binary tensor indicating the existence of nodes with the specified ids and type.
             ``a[i]=1`` if the graph contains node ``vids[i]`` of type ``ntype``, 0 otherwise.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> g.has_nodes([0, 1, 2, 3, 4], 'user')
-        tensor([1, 1, 1, 0, 0])
-
-        See Also
-        --------
-        has_node
         """
-        vids = utils.toindex(vids, self._idtype_str)
-        rst = self._graph.has_nodes(self.get_ntype_id(ntype), vids)
-        return rst.tousertensor()
+        dgl_warning("DGLGraph.has_nodes is deprecated. Please use DGLGraph.has_node")
+        return self.has_node(vids, ntype)
 
     def has_edge_between(self, u, v, etype=None):
         """Whether the graph has an edge (u, v) of type ``etype``.
 
         Parameters
         ----------
-        u : int
-            The node ID of source type.
-        v : int
-            The node ID of destination type.
+        u : int, iterable of int, Tensor
+            Source node ID(s).
+        v : int, iterable of int, Tensor
+            Destination node ID(s).
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
 
         Returns
         -------
-        bool
-            True if the edge is in the graph, False otherwise.
+        a : Tensor
+            Binary tensor indicating the existence of edges. ``a[i]=1`` if the graph
+            contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
 
         Examples
         --------
@@ -1379,15 +1407,22 @@ class DGLHeteroGraph(object):
         True
         >>> g.has_edge_between(0, 2, ('user', 'plays', 'game'))
         False
-
-        See Also
-        --------
-        has_edges_between
+        >>> g.has_edge_between([0, 0], [1, 2], ('user', 'plays', 'game'))
+        tensor([1, 0])
         """
-        return self._graph.has_edge_between(self.get_etype_id(etype), u, v)
+        ret = self._graph.has_edge_between(
+            self.get_etype_id(etype),
+            self.check_and_to_tensor(u, 'u'),
+            self.check_and_to_tensor(v, 'v'))
+        if isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral):
+            return bool(F.as_scalar(ret))
+        else:
+            return ret
 
     def has_edges_between(self, u, v, etype=None):
         """Whether the graph has edges of type ``etype``.
+
+        DEPRECATED: please use :func:`~DGLGraph.has_edge_between`.
 
         Parameters
         ----------
@@ -1404,22 +1439,8 @@ class DGLHeteroGraph(object):
         a : tensor
             Binary tensor indicating the existence of edges. ``a[i]=1`` if the graph
             contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> g.has_edges_between([0, 0], [1, 2], ('user', 'plays', 'game'))
-        tensor([1, 0])
-
-        See Also
-        --------
-        has_edge_between
         """
-        u = utils.toindex(u, self._idtype_str)
-        v = utils.toindex(v, self._idtype_str)
-        rst = self._graph.has_edges_between(self.get_etype_id(etype), u, v)
-        return rst.tousertensor()
+        return self.has_edge_between(u, v, etype)
 
     def predecessors(self, v, etype=None):
         """Return the predecessors of node `v` in the graph with the specified
