@@ -1243,99 +1243,6 @@ def test_apply(index_dtype):
     assert fail
 
 @parametrize_dtype
-def test_level1(index_dtype):
-    #edges = {
-    #    'follows': ([0, 1], [1, 2]),
-    #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
-    #    'wishes': ([0, 2], [1, 0]),
-    #    'develops': ([0, 1], [0, 1]),
-    #}
-    g = create_test_heterograph(index_dtype)
-    def rfunc(nodes):
-        return {'y': F.sum(nodes.mailbox['m'], 1)}
-    def rfunc2(nodes):
-        return {'y': F.max(nodes.mailbox['m'], 1)}
-    def mfunc(edges):
-        return {'m': edges.src['h']}
-    def afunc(nodes):
-        return {'y' : nodes.data['y'] + 1}
-    g.nodes['user'].data['h'] = F.ones((3, 2))
-    g.send([2, 3], mfunc, etype='plays')
-    g.recv([0, 1], rfunc, etype='plays')
-    y = g.nodes['game'].data['y']
-    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
-    g.nodes['game'].data.pop('y')
-
-    # only one type
-    play_g = g['plays']
-    play_g.send([2, 3], mfunc)
-    play_g.recv([0, 1], rfunc)
-    y = g.nodes['game'].data['y']
-    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
-    # TODO(minjie): following codes will fail because messages are
-    #   not shared with the base graph. However, since send and recv
-    #   are rarely used, no fix at the moment.
-    # g['plays'].send([2, 3], mfunc)
-    # g['plays'].recv([0, 1], mfunc)
-
-    # test fail case
-    # fail due to multiple types
-    fail = False
-    try:
-        g.send([2, 3], mfunc)
-    except dgl.DGLError:
-        fail = True
-    assert fail
-
-    fail = False
-    try:
-        g.recv([0, 1], rfunc)
-    except dgl.DGLError:
-        fail = True
-    assert fail
-
-    # test multi recv
-    g.send(g.edges(etype='plays'), mfunc, etype='plays')
-    g.send(g.edges(etype='wishes'), mfunc, etype='wishes')
-    g.multi_recv([0, 1], {'plays' : rfunc, ('user', 'wishes', 'game'): rfunc2}, 'sum')
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[3., 3.], [3., 3.]]))
-
-    # test multi recv with apply function
-    g.send(g.edges(etype='plays'), mfunc, etype='plays')
-    g.send(g.edges(etype='wishes'), mfunc, etype='wishes')
-    g.multi_recv([0, 1], {'plays' : (rfunc, afunc), ('user', 'wishes', 'game'): rfunc2}, 'sum', afunc)
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[5., 5.], [5., 5.]]))
-
-    # test cross reducer
-    g.nodes['user'].data['h'] = F.randn((3, 2))
-    for cred in ['sum', 'max', 'min', 'mean']:
-        g.send(g.edges(etype='plays'), mfunc, etype='plays')
-        g.send(g.edges(etype='wishes'), mfunc, etype='wishes')
-        g.multi_recv([0, 1], {'plays' : (rfunc, afunc), 'wishes': rfunc2}, cred, afunc)
-        y = g.nodes['game'].data['y']
-        g1 = g['plays']
-        g2 = g['wishes']
-        g1.send(g1.edges(), mfunc)
-        g1.recv(g1.nodes('game'), rfunc, afunc)
-        y1 = g.nodes['game'].data['y']
-        g2.send(g2.edges(), mfunc)
-        g2.recv(g2.nodes('game'), rfunc2)
-        y2 = g.nodes['game'].data['y']
-        yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
-        yy = yy + 1  # final afunc
-        assert F.array_equal(y, yy)
-
-    # test fail case
-    # fail because cannot infer ntype
-    fail = False
-    try:
-        g.multi_recv([0, 1], {'plays' : rfunc, 'follows': rfunc2}, 'sum')
-    except dgl.DGLError:
-        fail = True
-    assert fail
-
-
-@parametrize_dtype
 def test_level2(index_dtype):
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
@@ -1593,14 +1500,6 @@ def test_updates(index_dtype):
         assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
         del g.nodes['game'].data['y']
 
-        plays_g = g['user', 'plays', 'game']
-        plays_g.send(([0, 1, 2], [0, 1, 1]), msg)
-        plays_g.recv([0, 1], red, apply)
-        y = g.nodes['game'].data['y']
-        assert F.array_equal(y[0], x[0] * multiplier)
-        assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
-        del g.nodes['game'].data['y']
-
         # pulls from destination (game) node 0
         g['user', 'plays', 'game'].pull(0, msg, red, apply)
         y = g.nodes['game'].data['y']
@@ -1703,8 +1602,6 @@ def test_types_in_function():
     g.apply_edges(mfunc1)
     g.update_all(mfunc1, rfunc1)
     g.send_and_recv([0, 1], mfunc1, rfunc1)
-    g.send([0, 1], mfunc1)
-    g.recv([1, 2], rfunc1)
     g.push([0], mfunc1, rfunc1)
     g.pull([1], mfunc1, rfunc1)
     g.filter_nodes(filter_nodes1)
@@ -1715,8 +1612,6 @@ def test_types_in_function():
     g.apply_edges(mfunc2)
     g.update_all(mfunc2, rfunc2)
     g.send_and_recv([0, 1], mfunc2, rfunc2)
-    g.send([0, 1], mfunc2)
-    g.recv([1, 2], rfunc2)
     g.push([0], mfunc2, rfunc2)
     g.pull([1], mfunc2, rfunc2)
     g.filter_nodes(filter_nodes2, ntype='game')

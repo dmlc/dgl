@@ -414,24 +414,24 @@ class HeteroGraphIndex(ObjectBase):
         ----------
         etype : int
             Edge type
-        eid : utils.Index
-            The edge ids.
+        eid : Tensor
+            Edge ids.
 
         Returns
         -------
-        utils.Index
+        Tensor
             The src nodes.
-        utils.Index
+        Tensor
             The dst nodes.
-        utils.Index
+        Tensor
             The edge ids.
         """
-        eid_array = eid.todgltensor()
-        edge_array = _CAPI_DGLHeteroFindEdges(self, int(etype), eid_array)
+        edge_array = _CAPI_DGLHeteroFindEdges(
+            self, int(etype), F.to_dgl_nd(eid))
 
-        src = utils.toindex(edge_array(0), self.dtype)
-        dst = utils.toindex(edge_array(1), self.dtype)
-        eid = utils.toindex(edge_array(2), self.dtype)
+        src = F.from_dgl_nd(edge_array(0))
+        dst = F.from_dgl_nd(edge_array(1))
+        eid = F.from_dgl_nd(edge_array(2))
 
         return src, dst, eid
 
