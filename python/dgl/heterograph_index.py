@@ -330,11 +330,11 @@ class HeteroGraphIndex(ObjectBase):
 
         Returns
         -------
-        utils.Index
+        Tensor
             Array of predecessors
         """
-        return utils.toindex(_CAPI_DGLHeteroPredecessors(
-            self, int(etype), int(v)), self.dtype)
+        return F.from_dgl_nd(_CAPI_DGLHeteroPredecessors(
+            self, int(etype), int(v)))
 
     def successors(self, etype, v):
         """Return the successors of the node.
@@ -350,11 +350,11 @@ class HeteroGraphIndex(ObjectBase):
 
         Returns
         -------
-        utils.Index
+        Tensor
             Array of successors
         """
-        return utils.toindex(_CAPI_DGLHeteroSuccessors(
-            self, int(etype), int(v)), self.dtype)
+        return F.from_dgl_nd(_CAPI_DGLHeteroSuccessors(
+            self, int(etype), int(v)))
 
     def edge_ids_all(self, etype, u, v):
         """Return a triplet of arrays that contains the edge IDs.

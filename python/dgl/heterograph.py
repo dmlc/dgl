@@ -1478,7 +1478,7 @@ class DGLHeteroGraph(object):
         --------
         successors
         """
-        return self._graph.predecessors(self.get_etype_id(etype), v).tousertensor()
+        return self._graph.predecessors(self.get_etype_id(etype), v)
 
     def successors(self, v, etype=None):
         """Return the successors of node `v` in the graph with the specified edge
@@ -1516,8 +1516,7 @@ class DGLHeteroGraph(object):
         --------
         predecessors
         """
-        check_same_dtype(self._idtype_str, v)
-        return self._graph.successors(self.get_etype_id(etype), v).tousertensor()
+        return self._graph.successors(self.get_etype_id(etype), v)
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return the edge ID, or an array of edge IDs, between source node
