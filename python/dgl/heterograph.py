@@ -1668,7 +1668,9 @@ class DGLHeteroGraph(object):
         """
         eid = self.check_and_to_tensor(eid, 'eid')
         # sanity check
-        #valid_ids = F.max(eid, dim=0) <= (self.number_of_edges(etype) - 1)
+        valid_ids = F.max(eid, dim=0) <= (self.number_of_edges(etype) - 1)
+        print(valid_ids)
+        assert False
         #if etype is None:
         #    assert valid_ids, \
         #        'Expect edge ids to be in [0, ..., {:d}], got {}'.format(max_valid_eid, max_eid)
