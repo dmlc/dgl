@@ -236,6 +236,9 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 template IdArray Relabel_<kDLCPU, int32_t>(const std::vector<IdArray>& arrays);
 template IdArray Relabel_<kDLCPU, int64_t>(const std::vector<IdArray>& arrays);
 
+
+///////////////////////////// NonZero /////////////////////////////
+
 template <DLDeviceType XPU, typename IdType>
 IdArray NonZero(BoolArray bool_arr) {
   const IdType* bool_data = static_cast<IdType*>(bool_arr->data);
@@ -249,6 +252,7 @@ IdArray NonZero(BoolArray bool_arr) {
   return VecToIdArray(nonzero_indices, sizeof(IdType) * 8);
 }
 
+// TODO(Allen): Implement GPU version
 template IdArray NonZero<kDLCPU, int32_t>(BoolArray bool_arr);
 template IdArray NonZero<kDLCPU, int64_t>(BoolArray bool_arr);
 
