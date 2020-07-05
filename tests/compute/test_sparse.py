@@ -107,7 +107,7 @@ def test_spmm(g, shp, msg, reducer):
     g.edata['w'] = _unsqueeze_if_scalar(e)
 
     print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
-    v = dgl.sparse._gspmm(g, msg, reducer, u, e)[0]
+    v = dgl.sparse._gspmm(g._graph, msg, reducer, u, e)[0]
     non_degree_indices = F.tensor(
         np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
     v = F.gather_row(v, non_degree_indices)
@@ -160,7 +160,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
     msg_func = lhs_target + '_' + msg + '_' + rhs_target
     print('SDDMM(message func: {})'.format(msg_func))
 
-    e = dgl.sparse._gsddmm(g, msg, lhs, rhs,
+    e = dgl.sparse._gsddmm(g._graph, msg, lhs, rhs,
                            lhs_target=lhs_target, rhs_target=rhs_target)
     g.apply_edges(udf_apply_edges[msg_func])
     if 'm' in g.edata:
@@ -171,4 +171,3 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
     lhs_frame.pop('x')
     rhs_frame.pop('y')
     if 'm' in g.edata: g.edata.pop('m')
-
