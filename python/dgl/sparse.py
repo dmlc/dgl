@@ -7,6 +7,7 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from .utils import to_dgl_context
 from . import backend as F
+from .heterograph_index import HeteroGraphIndex
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -84,7 +85,7 @@ target_mapping = {
     'dst': 2
 }
 
-def _gspmm(g, op, reduce_op, u, e):
+def _gspmm(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
@@ -101,8 +102,8 @@ def _gspmm(g, op, reduce_op, u, e):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
-        The input graph.
+    gidx : HeteroGraphIndex
+        The input graph index.
     op : str
         The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``copy_u``,
         ``copy_e``, or their alias ``+``, ``-``, ``*``, ``/``.
@@ -127,6 +128,9 @@ def _gspmm(g, op, reduce_op, u, e):
     we expand its dimension with an additional dimension of length one. (e.g.
     (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
+    if gidx.number_of_etypes() != 1:
+        raise DGLError("We only support gspmm on graph with one edge type")
+
     if u is not None:
         if F.ndim(u) == 1:
             u = F.unsqueeze(u, -1)
@@ -141,20 +145,23 @@ def _gspmm(g, op, reduce_op, u, e):
     use_e = (op != 'copy_lhs')
     u_shp = F.shape(u) if use_u else (0,)
     e_shp = F.shape(e) if use_e else (0,)
-    v_shp = (g.number_of_dst_nodes(), ) +\
+
+    _, dsttype = gidx.metagraph.find_edge(0)
+    v_shp = (gidx.number_of_nodes(dsttype), ) +\
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = reduce_op in ['max', 'min']
-    arg_u = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_u else None
-    arg_e = F.zeros(v_shp, g.idtype, ctx) if use_cmp and use_e else None
-    if g.number_of_edges() > 0:
-        gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
-        _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
+    idtype = getattr(F, gidx.dtype)
+    arg_u = F.zeros(v_shp, idtype, ctx) if use_cmp and use_u else None
+    arg_e = F.zeros(v_shp, idtype, ctx) if use_cmp and use_e else None
+    if gidx.number_of_edges(0) > 0:
+        ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
+        _CAPI_DGLKernelSpMM(ugi, op, reduce_op,
                             to_dgl_nd(u), to_dgl_nd(e), to_dgl_nd(v),
                             to_dgl_nd(arg_u), to_dgl_nd(arg_e))
     return v, (arg_u, arg_e)
 
-def _gsddmm(g, op, lhs, rhs, lhs_target='u', rhs_target='v'):
+def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
@@ -169,8 +176,8 @@ def _gsddmm(g, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
-        The input graph.
+    gidx : HeteroGraphIndex
+        The input graph index.
     op : str
         Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
         ``copy_lhs``, ``copy_rhs``, or their alias ``+``, ``-``, ``*``, ``/``.
@@ -196,6 +203,9 @@ def _gsddmm(g, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     we expand its dimension with an additional dimension of length one. (e.g.
     (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
+    if gidx.number_of_etypes() != 1:
+        raise DGLError("We only support gsddmm on graph with one edge type")
+
     if lhs is not None:
         if F.ndim(lhs) == 1:
             lhs = F.unsqueeze(lhs, -1)
@@ -204,18 +214,18 @@ def _gsddmm(g, op, lhs, rhs, lhs_target='u', rhs_target='v'):
             rhs = F.unsqueeze(rhs, -1)
 
     op = op_mapping[op]
-    lhs_target = target_mapping[lhs_target];
-    rhs_target = target_mapping[rhs_target];
+    lhs_target = target_mapping[lhs_target]
+    rhs_target = target_mapping[rhs_target]
     ctx = F.context(lhs) if lhs is not None else F.context(rhs)
     dtype = F.dtype(lhs) if lhs is not None else F.dtype(rhs)
     lhs_shp = F.shape(lhs) if lhs is not None else (0,)
     rhs_shp = F.shape(rhs) if rhs is not None else (0,)
-    out_shp = (g.number_of_edges(), ) +\
+    out_shp = (gidx.number_of_edges(0), ) +\
         infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
     out = F.zeros(out_shp, dtype, ctx)
-    if g.number_of_edges() > 0:
-        gidx = g._graph.get_unitgraph(0, to_dgl_context(ctx))
-        _CAPI_DGLKernelSDDMM(gidx, op, to_dgl_nd(lhs), to_dgl_nd(rhs), to_dgl_nd(out),
+    if gidx.number_of_edges(0) > 0:
+        ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
+        _CAPI_DGLKernelSDDMM(ugi, op, to_dgl_nd(lhs), to_dgl_nd(rhs), to_dgl_nd(out),
                              lhs_target, rhs_target)
     return out
 

@@ -33,18 +33,19 @@ def _reduce_grad(grad, shape):
 class GSpMM(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, op, reduce_op, X, Y):
-        out, (argX, argY) = _gspmm(g, op, reduce_op, X, Y)
-        ctx.backward_cache = g, op, reduce_op
+        gidx = g._graph
+        out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
+        ctx.backward_cache = gidx, op, reduce_op
         ctx.save_for_backward(X, Y, out, argX, argY)
         return out
 
     @staticmethod
     def backward(ctx, dZ):
-        g, op, reduce_op = ctx.backward_cache
+        gidx, op, reduce_op = ctx.backward_cache
         X, Y, out, argX, argY = ctx.saved_tensors
         dX, dY = None, None
         if ctx.needs_input_grad[3]:
-            g_rev = g.reverse()
+            g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op == 'mul':
                     dX = _gspmm(g_rev, '*', 'sum', dZ, Y)
@@ -56,13 +57,13 @@ class GSpMM(th.autograd.Function):
         if ctx.needs_input_grad[4]:
             if reduce_op == 'sum':
                 if op == 'mul':
-                    dY = _gsddmm(g, '*', X, dZ)
+                    dY = _gsddmm(gidx, '*', X, dZ)
                 elif op == 'add':
-                    dY = _gsddmm(g, 'copy_rhs', X, dZ)
+                    dY = _gsddmm(gidx, 'copy_rhs', X, dZ)
                 elif op == 'sub':
-                    dY = _gsddmm(g, 'copy_rhs', X, -dZ)
+                    dY = _gsddmm(gidx, 'copy_rhs', X, -dZ)
                 elif op == 'div':
-                    dY = -_gsddmm(g, '*', X, dZ) / (Y ** 2)
+                    dY = -_gsddmm(gidx, '*', X, dZ) / (Y ** 2)
             else:
                 pass
             dY = _reduce_grad(dY, Y.shape)
@@ -71,7 +72,8 @@ class GSpMM(th.autograd.Function):
 class GSDDMM(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, op, lhs_data, rhs_data, lhs_target, rhs_target):
-        out = _gsddmm(g, op, lhs_data, rhs_data, lhs_target, rhs_target)
+        gidx = g._graph
+        out = _gsddmm(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
         return out
 
     @staticmethod
@@ -81,21 +83,22 @@ class GSDDMM(th.autograd.Function):
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, score):
-        score_max = _gspmm(g, 'copy_e', 'max', None, score)[0]
-        score = th.exp(_gsddmm(g, '-', score, score_max, 'e', 'v'))
-        score_sum = _gspmm(g, 'copy_e', 'sum', None, score)[0]
-        out = _gsddmm(g, '/', score, score_sum, 'e', 'v')
-        ctx.backward_cache = g
+        gidx = g._graph
+        score_max = _gspmm(gidx, 'copy_e', 'max', None, score)[0]
+        score = th.exp(_gsddmm(gidx, '-', score, score_max, 'e', 'v'))
+        score_sum = _gspmm(gidx, 'copy_e', 'sum', None, score)[0]
+        out = _gsddmm(gidx, '/', score, score_sum, 'e', 'v')
+        ctx.backward_cache = gidx
         ctx.save_for_backward(out)
         return out
 
     @staticmethod
     def backward(ctx, grad):
-        g = ctx.backward_cache
+        gidx = ctx.backward_cache
         out, = ctx.saved_tensors
         sds = out * grad
-        accum = _gspmm(g, 'copy_e', 'sum', None, sds)[0]
-        out = _gsddmm(g, '*', out, accum, 'e', 'v')
+        accum = _gspmm(gidx, 'copy_e', 'sum', None, sds)[0]
+        out = _gsddmm(gidx, '*', out, accum, 'e', 'v')
         grad_score = sds - out
         return None, grad_score, None
 
