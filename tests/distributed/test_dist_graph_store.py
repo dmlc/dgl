@@ -13,7 +13,10 @@ from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
+from dgl.distributed import SparseAdagrad, SparseNodeEmbedding
+from numpy.testing import assert_almost_equal
 import backend as F
+import math
 import unittest
 import pickle
 
@@ -51,22 +54,18 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
-def run_server(graph_name, server_id, num_clients, shared_mem, cond_v, shared_v):
+def run_server(graph_name, server_id, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
-    cond_v.acquire()
-    shared_v.value += 1;
-    cond_v.notify()
-    cond_v.release()
     g.start()
 
-def run_client(graph_name, part_id, num_nodes, num_edges, num_server, cond_v, shared_v):
-    cond_v.acquire()
-    while shared_v.value < num_server:
-      cond_v.wait()
-    cond_v.release()
+def emb_init(shape, dtype):
+    return F.zeros(shape, dtype, F.cpu())
+
+def run_client(graph_name, part_id, num_nodes, num_edges):
+    time.sleep(5)
     gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                               part_id, None)
     g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
@@ -98,6 +97,47 @@ def run_client(graph_name, part_id, num_nodes, num_edges, num_server, cond_v, sh
     g.init_edata('test1', new_shape, F.int32)
     feats = g.edata['test1'][eids]
     assert np.all(F.asnumpy(feats) == 0)
+
+    # Test sparse emb
+    try:
+        new_shape = (g.number_of_nodes(), 1)
+        emb = SparseNodeEmbedding(g, 'emb1', new_shape, emb_init)
+        lr = 0.001
+        optimizer = SparseAdagrad([emb], lr=lr)
+        with F.record_grad():
+            feats = emb(nids)
+            assert np.all(F.asnumpy(feats) == np.zeros((len(nids), 1)))
+            loss = F.sum(feats + 1, 0)
+        loss.backward()
+        optimizer.step()
+        feats = emb(nids)
+        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
+        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        feats1 = emb(rest)
+        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
+
+        policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
+        grad_sum = dgl.distributed.DistTensor(g, 'node:emb1_sum', policy)
+        assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
+        assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
+
+        emb = SparseNodeEmbedding(g, 'emb2', new_shape, emb_init)
+        optimizer = SparseAdagrad([emb], lr=lr)
+        with F.record_grad():
+            feats1 = emb(nids)
+            feats2 = emb(nids)
+            feats = F.cat([feats1, feats2], 0)
+            assert np.all(F.asnumpy(feats) == np.zeros((len(nids) * 2, 1)))
+            loss = F.sum(feats + 1, 0)
+        loss.backward()
+        optimizer.step()
+        feats = emb(nids)
+        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        feats1 = emb(rest)
+        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
+    except NotImplementedError as e:
+        pass
 
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
@@ -141,11 +181,9 @@ def check_server_client(shared_mem):
     # let's just test on one partition for now.
     # We cannot run multiple servers and clients on the same machine.
     serv_ps = []
-    cond_v = Condition()
-    shared_v = Value('i', 0)
     ctx = mp.get_context('spawn')
     for serv_id in range(1):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem, cond_v, shared_v))
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem))
         serv_ps.append(p)
         p.start()
 
@@ -153,7 +191,7 @@ def check_server_client(shared_mem):
     for cli_id in range(1):
         print('start client', cli_id)
         p = ctx.Process(target=run_client, args=(graph_name, cli_id, g.number_of_nodes(),
-                                                 g.number_of_edges(), 1, cond_v, shared_v))
+                                                 g.number_of_edges()))
         p.start()
         cli_ps.append(p)
 

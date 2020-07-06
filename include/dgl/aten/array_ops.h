@@ -127,6 +127,9 @@ IdArray NE(int64_t lhs, IdArray rhs);
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
+/*! \brief Return the indices of the elements that are non-zero. */
+IdArray NonZero(BoolArray bool_arr);
+
 /*!
  * \brief Return the data under the index. In numpy notation, A[I]
  * \tparam ValueType The type of return value.

@@ -843,4 +843,4 @@ if __name__ == '__main__':
     # test_group_apply_edges()
     # test_local_var()
     # test_local_scope()
-    # test_issue_1088()
+    test_issue_1088('int64')
