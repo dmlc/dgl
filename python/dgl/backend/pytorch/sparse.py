@@ -53,6 +53,8 @@ class GSpMM(th.autograd.Function):
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)
                 elif op == 'div':
                     dX = _gspmm(g_rev, '*', 'sum', dZ, 1. / Y)
+            else:
+                pass
             dX = _reduce_grad(dX, X.shape)
         if ctx.needs_input_grad[4]:
             if reduce_op == 'sum':
@@ -71,14 +73,23 @@ class GSpMM(th.autograd.Function):
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, op, lhs_data, rhs_data, lhs_target, rhs_target):
+    def forward(ctx, g, op, X, Y, lhs_target, rhs_target):
         gidx = g._graph
-        out = _gsddmm(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
+        out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
+        ctx.backward_cache = gidx, op
+        ctx.save_for_backward(X, Y, out)
         return out
 
     @staticmethod
     def backward(ctx, grad):
-        return None, None, None, None, None, None
+        gidx, op = ctx.backward_cache
+        X, Y, out = ctx.saved_tensors
+        dX, dY = None, None
+        if ctx.needs_input_grad[2]:
+            pass
+        if ctx.needs_input_grad[3]:
+            pass
+        return None, None, dX, dY, None, None
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
