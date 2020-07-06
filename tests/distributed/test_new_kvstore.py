@@ -138,17 +138,16 @@ def start_client(num_clients):
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt')
     assert dgl.distributed.get_num_client() == num_clients
+    policy = dgl.distributed.PartitionPolicy('edge', gpb)
     kvclient.init_data(name='data_1', 
                        shape=F.shape(data_1), 
                        dtype=F.dtype(data_1), 
-                       policy_str='edge', 
-                       partition_book=gpb, 
+                       part_policy=policy,
                        init_func=init_zero_func)
     kvclient.init_data(name='data_2', 
                        shape=F.shape(data_2), 
                        dtype=F.dtype(data_2), 
-                       policy_str='node', 
-                       partition_book=gpb, 
+                       part_policy=policy,
                        init_func=init_zero_func)
 
     kvclient.map_shared_data(partition_book=gpb)
