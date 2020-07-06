@@ -192,7 +192,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         backend = 'nccl'
         if self.sparse_embedding:
             backend = 'gloo'
-        th.distributed.init_process_group(backend="nccl",
+        th.distributed.init_process_group(backend=backend,
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=dev_id)
