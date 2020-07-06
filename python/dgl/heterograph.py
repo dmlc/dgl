@@ -1668,15 +1668,10 @@ class DGLHeteroGraph(object):
         """
         eid = self.check_and_to_tensor(eid, 'eid')
         # sanity check
-        valid_ids = F.max(eid, dim=0) <= (self.number_of_edges(etype) - 1)
-        print(valid_ids)
-        assert False
-        #if etype is None:
-        #    assert valid_ids, \
-        #        'Expect edge ids to be in [0, ..., {:d}], got {}'.format(max_valid_eid, max_eid)
-        #else:
-        #    assert valid_ids, 'Expect edge ids to be in [0, ..., {:d}]' \
-        #                      ' for type {}, got {}'.format(max_valid_eid, etype, max_eid)
+        max_eid = F.as_scalar(F.max(eid, dim=0))
+        if max_eid >= self.number_of_edges(etype):
+            raise DGLError('Expect edge IDs to be smaller than number of edges ({}). '
+                           ' But got {}.'.format(self.number_of_edges(etype), max_eid))
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src, dst
 
@@ -1722,17 +1717,16 @@ class DGLHeteroGraph(object):
         >>> g.in_edges([0, 2], form='uv')
         (tensor([0, 1]), tensor([0, 2]))
         """
-        check_same_dtype(self._idtype_str, v)
-        v = utils.toindex(v, self._idtype_str)
+        v = self.check_and_to_tensor(v, 'v')
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
-            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+            return src, dst, eid
         elif form == 'uv':
-            return (src.tousertensor(), dst.tousertensor())
+            return src, dst
         elif form == 'eid':
-            return eid.tousertensor()
+            return eid
         else:
-            raise DGLError('Invalid form:', form)
+            raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def out_edges(self, u, form='uv', etype=None):
         """Return the outbound edges of the node(s) with the specified type.
@@ -1774,17 +1768,16 @@ class DGLHeteroGraph(object):
         >>> g.out_edges([0, 1], form='uv')
         (tensor([0, 1, 1]), tensor([0, 1, 2]))
         """
-        check_same_dtype(self._idtype_str, u)
-        u = utils.toindex(u, self._idtype_str)
+        u = self.check_and_to_tensor(u, 'u')
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
-            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+            return src, dst, eid
         elif form == 'uv':
-            return (src.tousertensor(), dst.tousertensor())
+            return src, dst
         elif form == 'eid':
-            return eid.tousertensor()
+            return eid
         else:
-            raise DGLError('Invalid form:', form)
+            raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def all_edges(self, form='uv', order=None, etype=None):
         """Return all edges with the specified type.
@@ -1832,13 +1825,13 @@ class DGLHeteroGraph(object):
         """
         src, dst, eid = self._graph.edges(self.get_etype_id(etype), order)
         if form == 'all':
-            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+            return src, dst, eid
         elif form == 'uv':
-            return (src.tousertensor(), dst.tousertensor())
+            return src, dst
         elif form == 'eid':
-            return eid.tousertensor()
+            return eid
         else:
-            raise DGLError('Invalid form:', form)
+            raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def in_degree(self, v, etype=None):
         """Return the in-degree of node ``v`` with edges of type ``etype``.
@@ -2987,25 +2980,20 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
-            u, v, _ = self._graph.edges(etid, 'eid')
-            eid = utils.toindex(slice(0, self.number_of_edges(etype)), self._idtype_str)
+            u, v, eid = self.edges(etype=etype, form='all')
         elif isinstance(edges, tuple):
-            u, v = edges
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges.
-            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
-            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
-            u = F.copy_to(u, F.cpu())
-            v = F.copy_to(v, F.cpu())
-            u, v, eid = self._graph.edge_ids_all(etid, u, v)
+            # Find all edges including parallel edges
+            u, v = edges
+            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
+        else:
+            eid = self.check_and_to_tensor(edges, 'edges')
+            u, v = self.find_edges(eid, etype=etype)
+
+        with ir.prog() as prog:
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
             eid = utils.toindex(eid, self._idtype_str)
-        else:
-            eid = utils.toindex(edges, self._idtype_str)
-            u, v, _ = self._graph.find_edges(etid, eid)
-
-        with ir.prog() as prog:
             scheduler.schedule_apply_edges(
                 AdaptedHeteroGraph(self, stid, dtid, etid),
                 u, v, eid, func, inplace=inplace)
@@ -4764,13 +4752,24 @@ class AdaptedHeteroGraph(GraphAdapter):
         self.graph._set_msg_index(self.etid, val)
 
     def in_edges(self, nodes):
-        return self.graph._graph.in_edges(self.etid, nodes)
+        nodes = nodes.tousertensor()
+        src, dst, eid = self.graph._graph.in_edges(self.etid, nodes)
+        return (utils.toindex(src, self.graph._graph.dtype),
+               utils.toindex(dst, self.graph._graph.dtype),
+               utils.toindex(eid, self.graph._graph.dtype))
 
     def out_edges(self, nodes):
-        return self.graph._graph.out_edges(self.etid, nodes)
+        nodes = nodes.tousertensor()
+        src, dst, eid = self.graph._graph.out_edges(self.etid, nodes)
+        return (utils.toindex(src, self.graph._graph.dtype),
+               utils.toindex(dst, self.graph._graph.dtype),
+               utils.toindex(eid, self.graph._graph.dtype))
 
     def edges(self, form):
-        return self.graph._graph.edges(self.etid, form)
+        src, dst, eid = self.graph._graph.edges(self.etid, form)
+        return (utils.toindex(src, self.graph._graph.dtype),
+               utils.toindex(dst, self.graph._graph.dtype),
+               utils.toindex(eid, self.graph._graph.dtype))
 
     def get_immutable_gidx(self, ctx):
         return self.graph._graph.get_unitgraph(self.etid, ctx)
