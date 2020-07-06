@@ -198,7 +198,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray out,
              std::vector<NDArray> out_aux) {
   if (reduce == "sum") {
-    if (sizeof(IdType) == 4 && op == "copy_u") {
+    if (sizeof(IdType) == 4 && op == "copy_lhs") {
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
