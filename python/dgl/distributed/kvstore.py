@@ -862,6 +862,9 @@ class KVClient(object):
         self.barrier()
         shape = list(shape)
         # One of the clients in each machine will issue requests to the local server.
+        assert rpc.get_num_client() % part_policy.partition_book.num_partitions() == 0, \
+                '#clients ({}) is not divisable by #partitions ({})'.format(
+                    rpc.get_num_client(), part_policy.partition_book.num_partitions())
         num_clients_per_part = rpc.get_num_client() / part_policy.partition_book.num_partitions()
         if self._client_id % num_clients_per_part == 0:
             part_shape = shape.copy()
