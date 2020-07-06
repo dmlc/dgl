@@ -128,17 +128,17 @@ def _gspmm(gidx, op, reduce_op, u, e):
     we expand its dimension with an additional dimension of length one. (e.g.
     (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
+    if gidx.number_of_etypes() != 1:
+        raise DGLError("We only support gsddmm on graph with one edge type")
     op = op_mapping[op]
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
     if use_u:
         if F.ndim(u) == 1:
             u = F.unsqueeze(u, -1)
-
     if use_e:
         if F.ndim(e) == 1:
             e = F.unsqueeze(e, -1)
-
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gspmm on graph with one edge type")
 
@@ -152,11 +152,11 @@ def _gspmm(gidx, op, reduce_op, u, e):
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = reduce_op in ['max', 'min']
-    idtype = getattr(F, gidx.dtype)
-    arg_u = F.zeros(v_shp, idtype, ctx) if use_cmp and use_u else None
-    arg_e = F.zeros(v_shp, idtype, ctx) if use_cmp and use_e else None
     if gidx.number_of_edges(0) > 0:
         ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
+        idtype = getattr(F, ugi.dtype)
+        arg_u = F.zeros(v_shp, idtype, ctx) if use_cmp and use_u else None
+        arg_e = F.zeros(v_shp, idtype, ctx) if use_cmp and use_e else None
         _CAPI_DGLKernelSpMM(ugi, op, reduce_op,
                             to_dgl_nd(u if use_u else None),
                             to_dgl_nd(e if use_e else None),
@@ -212,11 +212,9 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     op = op_mapping[op]
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
-
     if use_lhs:
         if F.ndim(lhs) == 1:
             lhs = F.unsqueeze(lhs, -1)
-
     if use_rhs:
         if F.ndim(rhs) == 1:
             rhs = F.unsqueeze(rhs, -1)
