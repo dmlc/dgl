@@ -156,7 +156,7 @@ class InitDataRequest(rpc.Request):
     def process_request(self, server_state):
         kv_store = server_state.kv_store
         dtype = F.data_type_dict[self.dtype]
-        if kv_store.is_backup_server() is False:
+        if not kv_store.is_backup_server():
             data_tensor = self.init_func(self.shape, dtype)
             kv_store.init_data(name=self.name,
                                policy_str=self.policy_str,
@@ -403,7 +403,7 @@ class GetPartShapeRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        if kv_store.data_store.__contains__(self.name) is False:
+        if self.name not in kv_store.data_store:
             raise RuntimeError("KVServer Cannot find data tensor with name: %s" % self.name)
         data_shape = F.shape(kv_store.data_store[self.name])
         res = GetPartShapeResponse(data_shape)
@@ -652,7 +652,7 @@ class KVServer(object):
             read shared-memory when client invoking get_shared_data().
         """
         assert len(name) > 0, 'name cannot be empty.'
-        if self._data_store.__contains__(name):
+        if name in self._data_store:
             raise RuntimeError("Data %s has already exists!" % name)
         if data_tensor is not None: # Create shared-tensor
             data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
@@ -862,7 +862,8 @@ class KVClient(object):
         self.barrier()
         shape = list(shape)
         # One of the clients in each machine will issue requests to the local server.
-        if self._client_id % part_policy.partition_book.num_partitions() == 0:
+        num_clients_per_part = rpc.get_num_client() / part_policy.partition_book.num_partitions()
+        if self._client_id % num_clients_per_part == 0:
             part_shape = shape.copy()
             part_shape[0] = part_policy.get_data_size()
             request = InitDataRequest(name,
@@ -880,11 +881,11 @@ class KVClient(object):
         # Create local shared-data
         local_shape = shape.copy()
         local_shape[0] = part_policy.get_data_size()
-        if self._part_policy.__contains__(name):
+        if name in self._part_policy:
             raise RuntimeError("Policy %s has already exists!" % name)
-        if self._data_store.__contains__(name):
+        if name in self._data_store:
             raise RuntimeError("Data %s has already exists!" % name)
-        if self._full_data_shape.__contains__(name):
+        if name in self._full_data_shape:
             raise RuntimeError("Data shape %s has already exists!" % name)
         self._part_policy[name] = part_policy
         shared_data = empty_shared_mem(name+'-kvdata-', False, \
