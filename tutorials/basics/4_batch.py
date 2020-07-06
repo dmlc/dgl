@@ -41,7 +41,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 # A dataset with 80 samples, each graph is
 # of size [10, 20]
-dataset = MiniGCDataset(80, 10, 20)
+dataset = MiniGCDataset(80, 10, 20, save_graph=False, force_reload=True)
 graph, label = dataset[0]
 fig, ax = plt.subplots()
 nx.draw(graph.to_networkx(), ax=ax)
@@ -152,8 +152,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 # Create training and test sets.
-trainset = MiniGCDataset(320, 10, 20)
-testset = MiniGCDataset(80, 10, 20)
+trainset = MiniGCDataset(320, 10, 20, save_graph=False, force_reload=True)
+testset = MiniGCDataset(80, 10, 20, save_graph=False, force_reload=True)
 # Use PyTorch's DataLoader and the collate function
 # defined before.
 data_loader = DataLoader(trainset, batch_size=32, shuffle=True,
