@@ -396,7 +396,7 @@ COOMatrix CSRRowWiseTopk(
  * CSRMatrix_C.num_cols : 4
  */
 CSRMatrix UnionCsr(
-  const std::vector<CSRMatrix>& csrs);
+  std::vector<CSRMatrix>& csrs);
 
 /*!
  * \brief Union a list CSRMatrix into one CSRMatrix.
