@@ -141,14 +141,12 @@ def start_client(num_clients):
     kvclient.init_data(name='data_1', 
                        shape=F.shape(data_1), 
                        dtype=F.dtype(data_1), 
-                       policy_str='edge', 
-                       partition_book=gpb, 
+                       part_policy=edge_policy,
                        init_func=init_zero_func)
     kvclient.init_data(name='data_2', 
                        shape=F.shape(data_2), 
                        dtype=F.dtype(data_2), 
-                       policy_str='node', 
-                       partition_book=gpb, 
+                       part_policy=node_policy,
                        init_func=init_zero_func)
 
     kvclient.map_shared_data(partition_book=gpb)
@@ -243,8 +241,7 @@ def start_client(num_clients):
     kvclient.init_data(name='data_3', 
                        shape=F.shape(data_2),
                        dtype=F.dtype(data_2), 
-                       policy_str='node',
-                       partition_book=gpb,
+                       part_policy=node_policy,
                        init_func=init_zero_func)
     kvclient.register_push_handler('data_3', add_push)
     kvclient.map_shared_data(partition_book=gpb)
@@ -265,26 +262,27 @@ def start_client(num_clients):
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():
-    # start 10 server and 10 client
     ip_config = open("kv_ip_config.txt", "w")
+    num_servers = 2
+    num_clients = 2
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 10\n' % ip_addr)
+    ip_config.write('{} {}\n'.format(ip_addr, num_servers))
     ip_config.close()
     ctx = mp.get_context('spawn')
     pserver_list = []
     pclient_list = []
-    for i in range(10):
-        pserver = ctx.Process(target=start_server, args=(i, 10))
+    for i in range(num_servers):
+        pserver = ctx.Process(target=start_server, args=(i, num_clients))
         pserver.start()
         pserver_list.append(pserver)
     time.sleep(2)
-    for i in range(10):
-        pclient = ctx.Process(target=start_client, args=(10,))
+    for i in range(num_clients):
+        pclient = ctx.Process(target=start_client, args=(num_clients,))
         pclient.start()
         pclient_list.append(pclient)
-    for i in range(10):
+    for i in range(num_clients):
         pclient_list[i].join()
-    for i in range(10):
+    for i in range(num_servers):
         pserver_list[i].join()
 
 if __name__ == '__main__':

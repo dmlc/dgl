@@ -107,7 +107,7 @@ class SparseAdagrad:
             policy = emb._tensor.part_policy
             kvstore.init_data(name + "_sum",
                               (emb._tensor.shape[0],), emb._tensor.dtype,
-                              policy.policy_str, policy.partition_book, _init_state)
+                              policy, _init_state)
             kvstore.register_push_handler(name, SparseAdagradUDF(self._lr))
 
     def step(self):
