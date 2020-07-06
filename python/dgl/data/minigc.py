@@ -40,12 +40,12 @@ class MiniGCDataset(DGLDataset):
     seed : int, default is None
         Random seed for data generation
     """
-    def __init__(self, num_graphs, min_num_v, max_num_v, seed=None, **kwargs):
+    def __init__(self, num_graphs, min_num_v, max_num_v, seed=None):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
         self.seed = seed
-        super(MiniGCDataset, self).__init__(name="minigc", **kwargs)
+        super(MiniGCDataset, self).__init__(name="minigc", force_reload=True)
 
     def process(self, root_path):
         self.graphs = []
