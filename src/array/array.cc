@@ -509,6 +509,16 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
+CSRMatrix CSRToSimple(const CSRMatrix& csr) {
+  CSRMatrix ret;
+
+  const CSRMatrix sorted_csr = (CSRIsSorted(csr)) ? csr : CSRSort(csr);
+  ATEN_CSR_SWITCH(csr, XPU, IdType, 'CSRToSimple', {
+    ret = impl::CSRToSimple<XPU, IdType>(sorted_csr);
+  }
+  return ret;
+}
+
 ///////////////////////// COO routines //////////////////////////
 
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
@@ -675,6 +685,18 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOCoalesce", {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
   });
+  return ret;
+}
+
+COOMatrix COOToSimple(const COOMatrix& coo) {
+  COOMatrix ret;
+
+  auto flags = COOIsSorted(coo)
+  // coo column sorted
+  const COOMatrix sorted_coo = flags.second ? coo : COOSort(coo, true);
+  ATEN_COO_SWITCH(coo, XPU, IdType, 'COOToSimple', {
+    ret = impl::COOToSimple<XPU, IdType>(sorted_coo);
+  }
   return ret;
 }
 

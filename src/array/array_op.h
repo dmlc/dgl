@@ -152,6 +152,8 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRToSimple(const CSRMatrix& csr);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -221,6 +223,9 @@ COOMatrix COORowWiseSamplingUniform(
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOToSimple(const COOMatrix& coo);
 
 template <DLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);

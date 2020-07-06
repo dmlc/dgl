@@ -402,6 +402,23 @@ CSRMatrix DisjointUnionCsr(
   const std::vector<CSRMatrix>& csrs);
 
 /*!
+ * \brief CSRMatrix toSimple.
+ *
+ * A = [[0, 0, 0],
+ *      [3, 0, 2],
+ *      [1, 1, 0],
+ *      [0, 0, 4]]
+ * 
+ * B = ToSimaple(A)
+ *
+ * B = [[0, 0, 0],
+ *      [1, 0, 1],
+ *      [1, 1, 0],
+ *      [0, 0, 1]]
+ */
+CSRMatrix CSRToSimple(const CSRMatrix& csr);
+
+/*!
  * \brief Split a CSRMatrix into multiple disjoin components.
  *
  * Examples:
