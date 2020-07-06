@@ -131,6 +131,8 @@ def test_rpc_sampling_shuffle():
         tmpdirname = "/tmp/sampling"
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
         check_rpc_sampling_shuffle(Path(tmpdirname), 1)
+        check_rpc_sampling(Path(tmpdirname), 2)
+        check_rpc_sampling(Path(tmpdirname), 1)
 
 if __name__ == "__main__":
     import tempfile
