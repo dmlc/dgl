@@ -190,7 +190,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             master_ip='127.0.0.1', master_port='12345')
         world_size = n_gpus
         backend = 'nccl'
-        if self.sparse_embedding:
+        if args.sparse_embedding:
             backend = 'gloo'
         th.distributed.init_process_group(backend=backend,
                                           init_method=dist_init_method,
@@ -318,8 +318,10 @@ def run(proc_id, n_gpus, args, devices, dataset):
         print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
         print()
 
-    print("Mean forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
-    print("Mean backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
+    print("{}/{} Mean forward time: {:4f}".format(proc_id, n_gpus,
+                                                  np.mean(forward_time[len(forward_time) // 4:])))
+    print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
+                                                   np.mean(backward_time[len(backward_time) // 4:]))) 
 
 def main(args, devices):
     # load graph data
