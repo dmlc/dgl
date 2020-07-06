@@ -210,8 +210,8 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
     op = op_mapping[op]
-    use_lhs = op != 'use_rhs'
-    use_rhs = op != 'use_lhs'
+    use_lhs = op != 'copy_rhs'
+    use_rhs = op != 'copy_lhs'
 
     if use_lhs:
         if F.ndim(lhs) == 1:
