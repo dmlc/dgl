@@ -15,7 +15,7 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-CSRMatrix UnionCsr(std::vector<CSRMatrix>& csrs) {
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   CHECK_EQ(CSRIsSorted(csrs[0]), true) <<
     "Input CSR matrixes of UnionCsr should be sorted";
   CHECK_EQ(CSRIsSorted(csrs[1]), true) <<
@@ -87,8 +87,8 @@ CSRMatrix UnionCsr(std::vector<CSRMatrix>& csrs) {
     true);
 }
 
-template CSRMatrix UnionCsr<kDLCPU, int64_t>(std::vector<CSRMatrix>&);
-template CSRMatrix UnionCsr<kDLCPU, int32_t>(std::vector<CSRMatrix>&);
+template CSRMatrix UnionCsr<kDLCPU, int64_t>(const std::vector<CSRMatrix>&);
+template CSRMatrix UnionCsr<kDLCPU, int32_t>(const std::vector<CSRMatrix>&);
 
 }  // namespace impl
 }  // namespace aten

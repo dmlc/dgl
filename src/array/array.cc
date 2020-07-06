@@ -491,7 +491,7 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
-CSRMatrix UnionCsr(std::vector<CSRMatrix>& csrs) {
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   CSRMatrix ret;
   CHECK_EQ(csrs.size(), 2) << "UnionCsr creates a union of two CSRMatrix";
   CHECK_EQ(csrs[0].num_rows, csrs[1].num_rows) <<
@@ -500,15 +500,18 @@ CSRMatrix UnionCsr(std::vector<CSRMatrix>& csrs) {
     "UnionCsr requires both CSRMatrix have same number of cols";
   CHECK_SAME_CONTEXT(csrs[0].indptr, csrs[1].indptr);
   CHECK_SAME_DTYPE(csrs[0].indptr, csrs[1].indptr);
-  
-  // sort the csr matrix first
-  if (!CSRIsSorted(csrs[0]))
-    csrs[0] = CSRSort(csrs[0]);
-  if (!CSRIsSorted(csrs[1]))
-    csrs[1] = CSRSort(csrs[1]);
 
+  // sort the csr matrix first
+  CSRMatrix csr0 = (!CSRIsSorted(csrs[0])) ?
+    CSRSort(csrs[0]) :
+    csrs[0];
+  CSRMatrix csr1 = (!CSRIsSorted(csrs[1])) ?
+    CSRSort(csrs[1]) :
+    csrs[1];
+
+  const std::vector<CSRMatrix> input_csrs({csr0, csr1});
   ATEN_CSR_SWITCH(csrs[0], XPU, IdType, "UnionCsr", {
-    ret = impl::UnionCsr<XPU, IdType>(csrs);
+    ret = impl::UnionCsr<XPU, IdType>(input_csrs);
   });
   return ret;
 }
@@ -699,7 +702,7 @@ COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
     "UnionCoo requires both COOMatrix have same number of cols";
   CHECK_SAME_CONTEXT(coos[0].row, coos[1].row);
   CHECK_SAME_DTYPE(coos[0].row, coos[1].row);
-  
+
   std::vector<IdArray> coo_row = {coos[0].row, coos[1].row};
   std::vector<IdArray> coo_col = {coos[0].col, coos[1].col};
   IdArray coo1_data = COOHasData(coos[0]) ? coos[0].data : NullArray();
@@ -708,8 +711,8 @@ COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
   IdArray col = Concat(coo_col);
   IdArray data = NullArray();
 
-  //  eids of coos[0] remains unchanged
-  //  eids of coos[1] will be increased by number of edges of coos[0]
+  // eids of coos[0] remains unchanged
+  // eids of coos[1] will be increased by number of edges of coos[0]
   if (COOHasData(coos[0])) {
     if (COOHasData(coos[1])) {
       std::vector<IdArray> coo_data = {coos[0].data, coos[1].data + coos[0].row->shape[0]};

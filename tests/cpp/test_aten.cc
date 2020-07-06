@@ -639,7 +639,7 @@ void _TestMatrixUnionCsr(DLContext ctx) {
     aten::NullArray(),
     true);
 
-  std::vector<aten::CSRMatrix> csrs_ab({csr_a, csr_b});
+  const std::vector<aten::CSRMatrix> csrs_ab({csr_a, csr_b});
   const aten::CSRMatrix &csr_aUb = aten::UnionCsr(csrs_ab);
   ASSERT_EQ(csr_aUb.num_rows, 6);
   ASSERT_EQ(csr_aUb.num_cols, 4);
@@ -662,7 +662,7 @@ void _TestMatrixUnionCsr(DLContext ctx) {
     b_indices2,
     aten::NullArray(),
     false);
-  std::vector<aten::CSRMatrix> csrs_ab2({csr_a, csr_b2});
+  const std::vector<aten::CSRMatrix> csrs_ab2({csr_a, csr_b2});
   const aten::CSRMatrix &csr_aUb2 = aten::UnionCsr(csrs_ab2);
   ASSERT_EQ(csr_aUb2.num_rows, 6);
   ASSERT_EQ(csr_aUb2.num_cols, 4);
@@ -685,7 +685,7 @@ void _TestMatrixUnionCsr(DLContext ctx) {
     a_indices2,
     aten::NullArray(),
     false);
-  std::vector<aten::CSRMatrix> csrs_ab3({csr_a2, csr_b});
+  const std::vector<aten::CSRMatrix> csrs_ab3({csr_a2, csr_b});
   const aten::CSRMatrix &csr_aUb3 = aten::UnionCsr(csrs_ab3);
   ASSERT_EQ(csr_aUb3.num_rows, 6);
   ASSERT_EQ(csr_aUb3.num_cols, 4);
@@ -699,7 +699,7 @@ void _TestMatrixUnionCsr(DLContext ctx) {
                                             13, 15, 5, 6, 14, 7, 16, 8, 17}),
                                            sizeof(IdType)*8, CTX);
  
-  std::vector<aten::CSRMatrix> csrs_ab4({csr_a2, csr_b2});
+  const std::vector<aten::CSRMatrix> csrs_ab4({csr_a2, csr_b2});
   const aten::CSRMatrix &csr_aUb4 = aten::UnionCsr(csrs_ab4);
   ASSERT_EQ(csr_aUb4.num_rows, 6);
   ASSERT_EQ(csr_aUb4.num_cols, 4);
