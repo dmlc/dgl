@@ -68,7 +68,7 @@ bool SaveDGLGraphs(std::string filename, List<GraphData> graph_data,
                    std::vector<NamedTensor> labels_list) {
   auto fs = std::unique_ptr<SeekStream>(dynamic_cast<SeekStream *>(
     SeekStream::Create(filename.c_str(), "w", true)));
-  CHECK(fs) << "File name is not a valid local file name";
+  CHECK(fs) << "File name " << filename << " is not a valid local file name";
 
   // Write DGL MetaData
   const uint64_t kVersion = 1;

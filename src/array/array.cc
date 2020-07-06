@@ -84,6 +84,16 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   return ret;
 }
 
+IdArray NonZero(BoolArray bool_arr) {
+  IdArray ret;
+  ATEN_XPU_SWITCH(bool_arr->ctx.device_type, XPU, "NonZero", {
+    ATEN_ID_TYPE_SWITCH(bool_arr->dtype, IdType, {
+      ret = impl::NonZero<XPU, IdType>(bool_arr);
+    });
+  });
+  return ret;
+}
+
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
   CHECK_SAME_CONTEXT(array, index);
