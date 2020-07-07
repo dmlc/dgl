@@ -30,7 +30,7 @@ class SSTDataset(DGLBuiltinDataset):
     negative, neutral, positive and very positive). The sentiment label is a
     int value stored in the ``y`` feature field.
 
-    Official site: https://nlp.stanford.edu/sentiment/treebank.html
+    Official site: http://nlp.stanford.edu/sentiment/index.html
 
     .. note::
         This dataset class is compatible with pytorch's :class:`Dataset` class.

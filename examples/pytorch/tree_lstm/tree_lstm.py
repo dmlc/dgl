@@ -107,7 +107,7 @@ class TreeLSTM(nn.Module):
         g.ndata['h'] = h
         g.ndata['c'] = c
         # propagate
-        dgl.prop_nodes_topo(g)
+        dgl.prop_nodes_topo(g, self.cell.message_func, self.cell.reduce_func)
         # compute logits
         h = self.dropout(g.ndata.pop('h'))
         logits = self.linear(h)
