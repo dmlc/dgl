@@ -7,7 +7,7 @@ from .citation_graph import CoraBinary, CoraGraphDataset, CiteseerGraphDataset, 
 from .minigc import *
 from .tree import *
 from .utils import *
-from .sbm import SBMMixture
+from .sbm import SBMMixture, SBMMixtureDataset
 from .reddit import RedditDataset
 from .ppi import PPIDataset, LegacyPPIDataset
 from .tu import TUDataset, LegacyTUDataset
