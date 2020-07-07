@@ -110,6 +110,8 @@ def test_partition_policy():
 
 def start_server(server_id, num_clients):
 	# Init kvserver
+    print("Sleep 5 seconds to test client re-connect.")
+    time.sleep(5)
     kvserver = dgl.distributed.KVServer(server_id=server_id,
                                         ip_config='kv_ip_config.txt',
                                         num_clients=num_clients)
@@ -275,7 +277,6 @@ def test_kv_store():
         pserver = ctx.Process(target=start_server, args=(i, num_clients))
         pserver.start()
         pserver_list.append(pserver)
-    time.sleep(2)
     for i in range(num_clients):
         pclient = ctx.Process(target=start_client, args=(num_clients,))
         pclient.start()
