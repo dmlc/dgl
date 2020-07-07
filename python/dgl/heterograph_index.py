@@ -583,7 +583,7 @@ class HeteroGraphIndex(ObjectBase):
         -------
         SparseTensor
             The adjacency matrix.
-        utils.Index
+        Tensor
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
@@ -598,20 +598,18 @@ class HeteroGraphIndex(ObjectBase):
         ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
-            indptr = F.copy_to(utils.toindex(rst(0), self.dtype).tousertensor(), ctx)
-            indices = F.copy_to(utils.toindex(rst(1), self.dtype).tousertensor(), ctx)
-            shuffle = utils.toindex(rst(2), self.dtype)
+            indptr = F.copy_to(F.from_dgl_nd(rst(0)), ctx)
+            indices = F.copy_to(F.from_dgl_nd(rst(1)), ctx)
+            shuffle = F.copy_to(F.from_dgl_nd(rst(2)), ctx)
             dat = F.ones(nnz, dtype=F.float32, ctx=ctx)  # FIXME(minjie): data type
             spmat = F.sparse_matrix(dat, ('csr', indices, indptr), (nrows, ncols))[0]
             return spmat, shuffle
         elif fmt == "coo":
-            idx = F.copy_to(utils.toindex(rst(0), self.dtype).tousertensor(), ctx)
+            idx = F.copy_to(F.from_dgl_nd(rst(0)), ctx)
             idx = F.reshape(idx, (2, nnz))
             dat = F.ones((nnz,), dtype=F.float32, ctx=ctx)
             adj, shuffle_idx = F.sparse_matrix(
                 dat, ('coo', idx), (nrows, ncols))
-            shuffle_idx = utils.toindex(
-                shuffle_idx, self.dtype) if shuffle_idx is not None else None
             return adj, shuffle_idx
         else:
             raise Exception("unknown format")
