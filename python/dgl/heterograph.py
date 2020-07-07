@@ -272,14 +272,6 @@ class DGLHeteroGraph(object):
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
 
-        # message indicators
-        self._msg_indices = [None] * len(self._etypes)
-        self._msg_frames = []
-        for i in range(len(self._etypes)):
-            frame = FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-            frame.set_initializer(init.zero_initializer)
-            self._msg_frames.append(frame)
-
     def __getstate__(self):
         return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
 
@@ -297,16 +289,6 @@ class DGLHeteroGraph(object):
                        state['_edge_frames'])
         else:
             raise IOError("Unrecognized pickle format.")
-
-    def _get_msg_index(self, etid):
-        """Internal function for getting the message index array of the given edge type id."""
-        if self._msg_indices[etid] is None:
-            self._msg_indices[etid] = utils.zero_index(
-                size=self._graph.number_of_edges(etid))
-        return self._msg_indices[etid]
-
-    def _set_msg_index(self, etid, index):
-        self._msg_indices[etid] = index
 
     def __repr__(self):
         if len(self.ntypes) == 1 and len(self.etypes) == 1:
@@ -2604,7 +2586,7 @@ class DGLHeteroGraph(object):
         if is_all(u):
             num_nodes = self._graph.number_of_nodes(ntid)
         else:
-            u = utils.prepare_tensor(g, u, 'u')
+            u = utils.prepare_tensor(self, u, 'u')
             num_nodes = len(u)
         for key, val in data.items():
             nfeats = F.shape(val)[0]
@@ -2613,7 +2595,7 @@ class DGLHeteroGraph(object):
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
             if F.context(val) != self.device:
                 raise DGLError('Expect node feature to be on device {}.'
-                               ' But got {}.' % (self.device, F.context(val)))
+                               ' But got {}.'.format(self.device, F.context(val)))
 
         if is_all(u):
             for key, val in data.items():
@@ -2717,7 +2699,7 @@ class DGLHeteroGraph(object):
                                ' Got %d and %d instead.' % (nfeats, num_edges))
             if F.context(val) != self.device:
                 raise DGLError('Expect edge feature to be on device {}.'
-                               ' But got {}.' % (self.device, F.context(val)))
+                               ' But got {}.'.format(self.device, F.context(val)))
 
         # set
         if is_all(eid):
@@ -3945,14 +3927,12 @@ class DGLHeteroGraph(object):
         new_nframes = []
         for nframe in self._node_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
-            new_nframes.append(FrameRef(Frame(new_feats)))
+            new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
         new_eframes = []
         for eframe in self._edge_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
-            new_eframes.append(FrameRef(Frame(new_feats)))
-        # TODO(minjie): replace the following line with the commented one to enable GPU graph.
-        new_gidx = self._graph
-        #new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
+            new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
+        new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
         return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
                               new_nframes, new_eframes)
 

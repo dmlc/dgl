@@ -287,8 +287,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop, dtype="int64"):
-    return th.arange(start, stop, dtype=data_type_dict()[dtype])
+def arange(start, stop, dtype):
+    return th.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))

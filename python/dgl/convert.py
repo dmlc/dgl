@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 def graph(data, ntype='_N', etype='_E', num_nodes=None, card=None, validate=True,
-          restrict_format='auto', index_dtype="int64", **kwargs):
+          restrict_format='auto', idtype=F.int64, **kwargs):
     """Create a graph with one type of nodes and edges.
 
     In the sparse matrix perspective, :func:`dgl.graph` creates a graph
@@ -55,8 +55,8 @@ def graph(data, ntype='_N', etype='_E', num_nodes=None, card=None, validate=True
         If False and card is not None, user would receive a warning.
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
     kwargs : key-word arguments, optional
         Other key word arguments. Only comes into effect when we are using a NetworkX
         graph. It can consist of:
@@ -137,22 +137,22 @@ def graph(data, ntype='_N', etype='_E', num_nodes=None, card=None, validate=True
         u, v = data
         return create_from_edges(
             u, v, ntype, etype, ntype, urange, vrange, validate,
-            restrict_format=restrict_format, index_dtype=index_dtype)
+            restrict_format=restrict_format, idtype=idtype)
     elif isinstance(data, list):
         return create_from_edge_list(
             data, ntype, etype, ntype, urange, vrange, validate,
-            restrict_format=restrict_format, index_dtype=index_dtype)
+            restrict_format=restrict_format, idtype=idtype)
     elif isinstance(data, sp.sparse.spmatrix):
         return create_from_scipy(
-            data, ntype, etype, ntype, restrict_format=restrict_format, index_dtype=index_dtype)
+            data, ntype, etype, ntype, restrict_format=restrict_format, idtype=idtype)
     elif isinstance(data, nx.Graph):
         return create_from_networkx(
-            data, ntype, etype, restrict_format=restrict_format, index_dtype=index_dtype, **kwargs)
+            data, ntype, etype, restrict_format=restrict_format, idtype=idtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
 def bipartite(data, utype='_U', etype='_E', vtype='_V', num_nodes=None, card=None,
-              validate=True, restrict_format='auto', index_dtype='int64', **kwargs):
+              validate=True, restrict_format='auto', idtype=F.int64, **kwargs):
     """Create a bipartite graph.
 
     The result graph is directed and edges must be from ``utype`` nodes
@@ -191,8 +191,8 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', num_nodes=None, card=Non
         If False and card is not None, user would receive a warning.
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
     kwargs : key-word arguments, optional
         Other key word arguments. Only comes into effect when we are using a NetworkX
         graph. It can consist of:
@@ -286,19 +286,19 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', num_nodes=None, card=Non
     if isinstance(data, tuple):
         u, v = data
         return create_from_edges(
-            u, v, utype, etype, vtype, urange, vrange, validate, index_dtype=index_dtype,
+            u, v, utype, etype, vtype, urange, vrange, validate, idtype=idtype,
             restrict_format=restrict_format)
     elif isinstance(data, list):
         return create_from_edge_list(
-            data, utype, etype, vtype, urange, vrange, validate, index_dtype=index_dtype,
+            data, utype, etype, vtype, urange, vrange, validate, idtype=idtype,
             restrict_format=restrict_format)
     elif isinstance(data, sp.sparse.spmatrix):
         return create_from_scipy(
-            data, utype, etype, vtype, restrict_format=restrict_format, index_dtype=index_dtype)
+            data, utype, etype, vtype, restrict_format=restrict_format, idtype=idtype)
     elif isinstance(data, nx.Graph):
         return create_from_networkx_bipartite(data, utype, etype, vtype,
                                               restrict_format=restrict_format,
-                                              index_dtype=index_dtype, **kwargs)
+                                              idtype=idtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
@@ -392,11 +392,11 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         ntypes = list(sorted(num_nodes_per_type.keys()))
         num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes], "int64")
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
-    index_dtype = rel_graphs[0]._idtype_str
+    idtype = rel_graphs[0].idtype
     for rgrh in rel_graphs:
-        if rgrh._idtype_str != index_dtype:
-            raise Exception("Expect relation graphs to be {}, but got {}".format(
-                index_dtype, rgrh._idtype_str))
+        if rgrh.idtype != idtype:
+            raise DGLError("Expect relation graphs to have {} ID, but got {}.".format(
+                idtype, rgrh.idtype))
         stype, etype, dtype = rgrh.canonical_etypes[0]
         meta_edges_src.append(ntype_dict[stype])
         meta_edges_dst.append(ntype_dict[dtype])
@@ -414,7 +414,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
 
-def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto', index_dtype='int64'):
+def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto', idtype=F.int64):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.
 
     Parameters
@@ -434,8 +434,8 @@ def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto', index_dt
         by taking the maximum node ID plus one for each node type.
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
 
 
     Returns
@@ -506,14 +506,14 @@ def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto', index_dt
                 num_nodes=num_nodes_dict[srctype],
                 validate=False,
                 restrict_format=restrict_format,
-                index_dtype=index_dtype))
+                idtype=idtype))
         else:
             rel_graphs.append(bipartite(
                 data, srctype, etype, dsttype,
                 num_nodes=(num_nodes_dict[srctype], num_nodes_dict[dsttype]),
                 validate=False,
                 restrict_format=restrict_format,
-                index_dtype=index_dtype))
+                idtype=idtype))
 
     return hetero_from_relations(rel_graphs, num_nodes_dict)
 
@@ -615,7 +615,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
                        ' type of nodes and edges.')
 
     num_ntypes = len(ntypes)
-    index_dtype = G._idtype_str
+    idtype = G.idtype
 
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
@@ -669,13 +669,13 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
         if stid == dtid:
             rel_graph = graph(
                 (src_of_etype, dst_of_etype), ntypes[stid], etypes[etid],
-                num_nodes=ntype_count[stid], validate=False, index_dtype=index_dtype)
+                num_nodes=ntype_count[stid], validate=False, idtype=idtype)
         else:
             rel_graph = bipartite(
                 (src_of_etype,
                  dst_of_etype), ntypes[stid], etypes[etid], ntypes[dtid],
                 num_nodes=(ntype_count[stid], ntype_count[dtid]),
-                validate=False, index_dtype=index_dtype)
+                validate=False, idtype=idtype)
         rel_graphs.append(rel_graph)
 
     hg = hetero_from_relations(rel_graphs,
@@ -754,7 +754,7 @@ def to_homo(G):
         num_nodes = G.number_of_nodes(ntype)
         total_num_nodes += num_nodes
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
-        nids.append(F.arange(0, num_nodes, G._idtype_str))
+        nids.append(F.arange(0, num_nodes, G.idtype))
 
     for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
@@ -763,10 +763,10 @@ def to_homo(G):
         srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
         dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
-        eids.append(F.arange(0, num_edges, G._idtype_str))
+        eids.append(F.arange(0, num_edges, G.idtype))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
-                 validate=False, index_dtype=G._idtype_str)
+                 validate=False, idtype=G.idtype)
 
     # copy features
     comb_nf = combine_frames(G._node_frames, range(len(G.ntypes)))
@@ -788,8 +788,12 @@ def to_homo(G):
 # Internal APIs
 ############################################################
 
-def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, validate=True,
-                      restrict_format="auto", index_dtype='int64'):
+def create_from_edges(u, v,
+                      utype, etype, vtype,
+                      urange=None, vrange=None,
+                      validate=True,
+                      restrict_format="auto",
+                      idtype=F.int64):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -816,29 +820,27 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         If True, checks if node IDs are within range.
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
 
     Returns
     -------
     DGLHeteroGraph
     """
-    u = utils.toindex(u, index_dtype)
-    v = utils.toindex(v, index_dtype)
+    u = F.tensor(u, idtype)
+    v = F.tensor(v, idtype)
 
     if validate:
         if urange is not None and len(u) > 0 and \
-            urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
+            urange <= F.as_scalar(F.max(u, dim=0)):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                urange, int(F.asnumpy(F.max(u.tousertensor(), dim=0)))))
+                urange, F.as_scalar(F.max(u, dim=0))))
         if vrange is not None and len(v) > 0 and \
-            vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
+            vrange <= F.as_scalar(F.max(v, dim=0)):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
-    urange = urange or (
-        0 if len(u) == 0 else (int(F.asnumpy(F.max(u.tousertensor(), dim=0))) + 1))
-    vrange = vrange or (
-        0 if len(v) == 0 else (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1))
+                vrange, F.as_scalar(F.max(v, dim=0))))
+    urange = urange or (0 if len(u) == 0 else F.as_scalar(F.max(u, dim=0)) + 1)
+    vrange = vrange or (0 if len(v) == 0 else F.as_scalar(F.max(v, dim=0)) + 1)
 
     if utype == vtype:
         urange = vrange = max(urange, vrange)
@@ -854,7 +856,7 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
 def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
-                          validate=True, restrict_format='auto', index_dtype='int64'):
+                          validate=True, restrict_format='auto', idtype=F.int64):
     """Internal function to create a heterograph from a list of edge tuples with types.
 
     utype could be equal to vtype
@@ -879,8 +881,8 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
         If True, checks if node IDs are within range.
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
 
     Returns
     -------
@@ -893,10 +895,10 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
         u = list(u)
         v = list(v)
     return create_from_edges(u, v, utype, etype, vtype, urange, vrange,
-                             validate, restrict_format, index_dtype=index_dtype)
+                             validate, restrict_format, idtype=idtype)
 
 def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
-                      restrict_format='auto', index_dtype='int64'):
+                      restrict_format='auto', idtype=F.int64):
     """Internal function to create a heterograph from a scipy sparse matrix with types.
 
     Parameters
@@ -920,8 +922,8 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
         If True, checks if node IDs are within range.
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
 
     Returns
     -------
@@ -930,16 +932,17 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
     num_src, num_dst = spmat.shape
     num_ntypes = 1 if utype == vtype else 2
     if spmat.getformat() == 'coo':
-        row = utils.toindex(spmat.row.astype(index_dtype), index_dtype)
-        col = utils.toindex(spmat.col.astype(index_dtype), index_dtype)
+        # TODO(minjie): XXXXXXXXXXXXXXX
+        row = utils.toindex(spmat.row.astype(idtype), idtype)
+        col = utils.toindex(spmat.col.astype(idtype), idtype)
         hgidx = heterograph_index.create_unitgraph_from_coo(
             num_ntypes, num_src, num_dst, row, col, restrict_format)
     else:
         spmat = spmat.tocsr()
-        indptr = utils.toindex(spmat.indptr.astype(index_dtype), index_dtype)
-        indices = utils.toindex(spmat.indices.astype(index_dtype), index_dtype)
+        indptr = utils.toindex(spmat.indptr.astype(idtype), idtype)
+        indices = utils.toindex(spmat.indices.astype(idtype), idtype)
         # TODO(minjie): with_edge_id is only reasonable for csr matrix. How to fix?
-        data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))), index_dtype)
+        data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))), idtype)
         hgidx = heterograph_index.create_unitgraph_from_csr(
             num_ntypes, num_src, num_dst, indptr, indices, data, restrict_format)
     if num_ntypes == 1:
@@ -953,7 +956,7 @@ def create_from_networkx(nx_graph,
                          node_attrs=None,
                          edge_attrs=None,
                          restrict_format='auto',
-                         index_dtype='int64'):
+                         idtype=F.int64):
     """Create a heterograph that has only one set of nodes and edges.
 
     Parameters
@@ -972,8 +975,8 @@ def create_from_networkx(nx_graph,
         Names for edge features to retrieve from the NetworkX graph (Default: None)
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
 
     Returns
     -------
@@ -993,8 +996,8 @@ def create_from_networkx(nx_graph,
 
     if has_edge_id:
         num_edges = nx_graph.number_of_edges()
-        src = np.zeros((num_edges,), dtype=getattr(np, index_dtype))
-        dst = np.zeros((num_edges,), dtype=getattr(np, index_dtype))
+        src = np.zeros((num_edges,), dtype=getattr(np, idtype))
+        dst = np.zeros((num_edges,), dtype=getattr(np, idtype))
         for u, v, attr in nx_graph.edges(data=True):
             eid = attr[edge_id_attr_name]
             src[eid] = u
@@ -1005,11 +1008,11 @@ def create_from_networkx(nx_graph,
         for e in nx_graph.edges:
             src.append(e[0])
             dst.append(e[1])
-    src = utils.toindex(src, index_dtype)
-    dst = utils.toindex(dst, index_dtype)
+    src = utils.toindex(src, idtype)
+    dst = utils.toindex(dst, idtype)
     num_nodes = nx_graph.number_of_nodes()
     g = create_from_edges(src, dst, ntype, etype, ntype, num_nodes, num_nodes,
-                          validate=False, restrict_format=restrict_format, index_dtype=index_dtype)
+                          validate=False, restrict_format=restrict_format, idtype=idtype)
 
     # handle features
     # copy attributes
@@ -1062,7 +1065,7 @@ def create_from_networkx_bipartite(nx_graph,
                                    node_attrs=None,
                                    edge_attrs=None,
                                    restrict_format='auto',
-                                   index_dtype='int64'):
+                                   idtype=F.int64):
     """Create a heterograph that has one set of source nodes, one set of
     destination nodes and one set of edges.
 
@@ -1088,8 +1091,8 @@ def create_from_networkx_bipartite(nx_graph,
         Names for edge features to retrieve from the NetworkX graph (Default: None)
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto' optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    index_dtype : 'int32', 'int64', optional
-        Force the index data type. Default: 'int64'.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
 
     Returns
     -------
@@ -1112,8 +1115,8 @@ def create_from_networkx_bipartite(nx_graph,
 
     if has_edge_id:
         num_edges = nx_graph.number_of_edges()
-        src = np.zeros((num_edges,), dtype=getattr(np, index_dtype))
-        dst = np.zeros((num_edges,), dtype=getattr(np, index_dtype))
+        src = np.zeros((num_edges,), dtype=getattr(np, idtype))
+        dst = np.zeros((num_edges,), dtype=getattr(np, idtype))
         for u, v, attr in nx_graph.edges(data=True):
             eid = attr[edge_id_attr_name]
             src[eid] = top_map[u]
@@ -1125,11 +1128,11 @@ def create_from_networkx_bipartite(nx_graph,
             if e[0] in top_map:
                 src.append(top_map[e[0]])
                 dst.append(bottom_map[e[1]])
-    src = utils.toindex(src, index_dtype)
-    dst = utils.toindex(dst, index_dtype)
+    src = utils.toindex(src, idtype)
+    dst = utils.toindex(dst, idtype)
     g = create_from_edges(src, dst, utype, etype, vtype,
                           len(top_nodes), len(bottom_nodes), validate=False,
-                          restrict_format=restrict_format, index_dtype=index_dtype)
+                          restrict_format=restrict_format, idtype=idtype)
 
     # TODO attributes
     assert node_attrs is None, 'Retrieval of node attributes are not supported yet.'

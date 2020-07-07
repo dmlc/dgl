@@ -49,8 +49,10 @@ def generate_graph(index_dtype='int64', grad=False):
     8, 9, 15
     9, 0, 16
     '''
-    g = dgl.graph([(0,1), (1,9), (0,2), (2,9), (0,3), (3,9), (0,4), (4,9),
-                   (0,5), (5,9), (0,6), (6,9), (0,7), (7,9), (0,8), (8,9), (9,0)], index_dtype=index_dtype)
+    u = F.tensor([0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 9])
+    v = F.tensor([1, 9, 2, 9, 3, 9, 4, 9, 5, 9, 6, 9, 7, 9, 8, 9, 0])
+    g = dgl.graph((u, v), index_dtype=index_dtype)
+    assert g.device == F._default_context
     ncol = F.randn((10, D))
     ecol = F.randn((17, D))
     if grad:
@@ -678,11 +680,10 @@ def test_issue_1088(index_dtype):
     g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
 
 if __name__ == '__main__':
-    # test_isolated_nodes("int32")
-    # test_nx_conversion()
-    # test_batch_setter_getter("int32")
+    #test_isolated_nodes("int32")
+    test_batch_setter_getter("int32")
     # test_batch_recv("int64")
-    test_apply_edges("int32")
+    # test_apply_edges("int32")
     # test_batch_setter_autograd()
     # test_batch_send()
     # test_batch_recv()

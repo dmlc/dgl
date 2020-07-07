@@ -968,7 +968,8 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
-        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor(),
+        int(num_ntypes), int(num_src), int(num_dst),
+        F.to_dgl_nd(row), F.to_dgl_nd(col),
         restrict_format)
 
 def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
@@ -998,7 +999,7 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
-        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor(),
+        F.to_dgl_nd(indptr), F.to_dgl_nd(indices), F.to_dgl_nd(edge_ids),
         restrict_format)
 
 def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
