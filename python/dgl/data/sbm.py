@@ -6,7 +6,6 @@ import numpy as np
 import numpy.random as npr
 import scipy as sp
 
-from .dgl_dataset import DGLDataset
 from .utils import deprecate_class
 from ..graph import DGLGraph, batch
 from ..utils import Index
@@ -111,7 +110,7 @@ class SBMMixtureDataset(object):
             pq = [generator() for _ in range(n_graphs)]
         else:
             raise RuntimeError()
-        adjs = [sbm(n_communities, block_size, *x, rng) for x in pq]
+        adjs = [sbm(n_communities, block_size, *x, rng=rng) for x in pq]
         for g, adj in zip(self._graphs, adjs):
             g.from_scipy_sparse_matrix(adj)
         self._line_graphs = [g.line_graph(backtracking=False) for g in self._graphs]
@@ -155,7 +154,7 @@ class SBMMixture(SBMMixtureDataset):
                  avg_deg=3,
                  pq='Appendix_C',
                  rng=None):
-        deprecate_class('SBMMixture', SBMMixtureDataset)
+        deprecate_class('SBMMixture', 'SBMMixtureDataset')
         super(SBMMixture, self).__init__(n_graphs=n_graphs,
                                          n_nodes=n_nodes,
                                          n_communities=n_communities,
