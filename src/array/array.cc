@@ -723,7 +723,7 @@ COOToSimple(const COOMatrix& coo) {
   const IdArray new_eids = Range(
     0, coalesced_adj.row->shape[0], coalesced_adj.row->dtype.bits, coalesced_adj.row->ctx);
   const IdArray eids_remapped = Scatter(Repeat(new_eids, count), eids_shuffled);
-  
+
   COOMatrix ret = COOMatrix(
     coalesced_adj.num_rows,
     coalesced_adj.num_cols,

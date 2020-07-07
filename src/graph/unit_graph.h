@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <tuple>
 
 #include "../c_api_common.h"
 
@@ -269,7 +270,11 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return the reversed graph */
   UnitGraphPtr Reverse() const;
 
-  /*! \return the simpled (no-multi-edge) graph */
+  /*! \return the simpled (no-multi-edge) graph
+   *          the count recording the number of duplicated edges from the original graph.
+   *          the edge mapping from the edge IDs of original graph to those of the
+   *          returned graph.
+   */
   std::tuple<UnitGraphPtr, IdArray, IdArray>ToSimple() const;
 
  private:

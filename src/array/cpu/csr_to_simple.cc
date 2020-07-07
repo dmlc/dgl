@@ -31,7 +31,7 @@ std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr) {
       indptr[i] = indptr[i-1];
       continue;
     }
-    
+
     int64_t cnt = 1;
     int64_t dup_cnt = 1;
     indices.push_back(indices_data[indptr_data[i-1]]);

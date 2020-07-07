@@ -1214,6 +1214,8 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 
     This function does not preserve node and edge features.
 
+    TODO(xiangsx): Don't save writeback_mapping into g, but put it into return value.
+
     Parameters
     ----------
     g : DGLHeteroGraph

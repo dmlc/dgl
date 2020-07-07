@@ -1570,7 +1570,7 @@ UnitGraphPtr UnitGraph::Reverse() const {
 
   return UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo));
 }
- 
+
 std::tuple<UnitGraphPtr, IdArray, IdArray>
 UnitGraph::ToSimple() const {
   CSRPtr new_incsr = nullptr, new_outcsr = nullptr;
