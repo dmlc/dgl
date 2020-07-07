@@ -521,25 +521,6 @@ class HeteroGraphIndex(ObjectBase):
         eid = F.from_dgl_nd(edge_array(2))
         return src, dst, eid
 
-    def in_degree(self, etype, v):
-        """Return the in degree of the node.
-
-        Assume that node_type(v) == dst_type(etype). Thus, the ntype argument is omitted.
-
-        Parameters
-        ----------
-        etype : int
-            Edge type
-        v : int
-            The node.
-
-        Returns
-        -------
-        int
-            The in degree.
-        """
-        return _CAPI_DGLHeteroInDegree(self, int(etype), int(v))
-
     def in_degrees(self, etype, v):
         """Return the in degrees of the nodes.
 
@@ -549,35 +530,16 @@ class HeteroGraphIndex(ObjectBase):
         ----------
         etype : int
             Edge type
-        v : utils.Index
+        v : Tensor
             The nodes.
 
         Returns
         -------
-        int
+        Tensor
             The in degree array.
         """
-        v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLHeteroInDegrees(self, int(etype), v_array), self.dtype)
-
-    def out_degree(self, etype, v):
-        """Return the out degree of the node.
-
-        Assume that node_type(v) == src_type(etype). Thus, the ntype argument is omitted.
-
-        Parameters
-        ----------
-        etype : int
-            Edge type
-        v : int
-            The node.
-
-        Returns
-        -------
-        int
-            The out degree.
-        """
-        return _CAPI_DGLHeteroOutDegree(self, int(etype), int(v))
+        return F.from_dgl_nd(_CAPI_DGLHeteroInDegrees(
+            self, int(etype), F.to_dgl_nd(v)))
 
     def out_degrees(self, etype, v):
         """Return the out degrees of the nodes.
@@ -588,16 +550,16 @@ class HeteroGraphIndex(ObjectBase):
         ----------
         etype : int
             Edge type
-        v : utils.Index
+        v : Tensor
             The nodes.
 
         Returns
         -------
-        int
+        Tensor
             The out degree array.
         """
-        v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLHeteroOutDegrees(self, int(etype), v_array), self.dtype)
+        return F.from_dgl_nd(_CAPI_DGLHeteroOutDegrees(
+            self, int(etype), F.to_dgl_nd(v)))
 
     def adjacency_matrix(self, etype, transpose, ctx):
         """Return the adjacency matrix representation of this graph.

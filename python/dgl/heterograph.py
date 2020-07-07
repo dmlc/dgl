@@ -528,6 +528,11 @@ class DGLHeteroGraph(object):
         DGLError: Edge type "follows" is ambiguous.
         Please use canonical etype type in the form of (srctype, etype, dsttype)
         """
+        if etype is None:
+            if len(self.etypes) != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+            etype = self.etypes[0]
         if isinstance(etype, tuple):
             return etype
         else:
@@ -1836,47 +1841,17 @@ class DGLHeteroGraph(object):
     def in_degree(self, v, etype=None):
         """Return the in-degree of node ``v`` with edges of type ``etype``.
 
-        Parameters
-        ----------
-        v : int
-            The node ID of destination type.
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
-
-        Returns
-        -------
-        int
-            The in-degree.
-
-        Examples
-        --------
-
-        Instantiate a heterograph.
-
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-
-        Query for node degree.
-
-        >>> g.in_degree(0, 'plays')
-        2
-        >>> g.in_degree(0, 'follows')
-        0
-
-        See Also
-        --------
-        in_degrees
+        DEPRECATED: Please use in_degrees
         """
-        return self._graph.in_degree(self.get_etype_id(etype), v)
+        dgl_warning("DGLGraph.in_degree is deprecated. Please use DGLGraph.in_degrees")
+        return self.in_degrees(v, etype)
 
     def in_degrees(self, v=ALL, etype=None):
         """Return the in-degrees of nodes v with edges of type ``etype``.
 
         Parameters
         ----------
-        v : list, tensor, optional.
+        v : int, iterable of int or tensor, optional.
             The node ID array of the destination type. Default is to return the
             degrees of all nodes.
         etype : str or tuple of str or None, optional
@@ -1885,9 +1860,10 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        d : tensor
+        d : tensor or int
             The in-degree array. ``d[i]`` gives the in-degree of node ``v[i]``
-            with edges of type ``etype``.
+            with edges of type ``etype``. If the argument is an integer, so will
+            be the return.
 
         Examples
         --------
@@ -1902,60 +1878,27 @@ class DGLHeteroGraph(object):
         Query for node degree.
 
         >>> g.in_degrees(0, 'plays')
-        tensor([2])
+        2
         >>> g.in_degrees(etype='follows')
         tensor([0, 1, 2])
-
-        See Also
-        --------
-        in_degree
         """
-        check_same_dtype(self._idtype_str, v)
+        dsttype = self.to_canonical_etype(etype)[2]
         etid = self.get_etype_id(etype)
-        _, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
-            v = utils.toindex(slice(0, self._graph.number_of_nodes(dtid)), self._idtype_str)
+            v = self.nodes(dsttype)
+        deg = self._graph.in_degrees(etid, self.check_and_to_tensor(v, 'v'))
+        if isinstance(v, numbers.Integral):
+            return F.as_scalar(deg)
         else:
-            v = utils.toindex(v, self._idtype_str)
-        return self._graph.in_degrees(etid, v).tousertensor()
+            return deg
 
     def out_degree(self, u, etype=None):
         """Return the out-degree of node `u` with edges of type ``etype``.
 
-        Parameters
-        ----------
-        u : int
-            The node ID of source type.
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
-
-        Returns
-        -------
-        int
-            The out-degree of node `u` with edges of type ``etype``.
-
-        Examples
-        --------
-
-        Instantiate a heterograph.
-
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-
-        Query for node degree.
-
-        >>> g.out_degree(0, 'plays')
-        1
-        >>> g.out_degree(1, 'follows')
-        2
-
-        See Also
-        --------
-        out_degrees
+        DEPRECATED: please use DGL.out_degrees
         """
-        return self._graph.out_degree(self.get_etype_id(etype), u)
+        dgl_warning("DGLGraph.out_degree is deprecated. Please use DGLGraph.out_degrees")
+        return self.out_degrees(u, etype)
 
     def out_degrees(self, u=ALL, etype=None):
         """Return the out-degrees of nodes u with edges of type ``etype``.
@@ -1988,7 +1931,7 @@ class DGLHeteroGraph(object):
         Query for node degree.
 
         >>> g.out_degrees(0, 'plays')
-        tensor([1])
+        1
         >>> g.out_degrees(etype='follows')
         tensor([1, 2, 0])
 
@@ -1996,14 +1939,15 @@ class DGLHeteroGraph(object):
         --------
         out_degree
         """
-        check_same_dtype(self._idtype_str, u)
+        srctype = self.to_canonical_etype(etype)[0]
         etid = self.get_etype_id(etype)
-        stid, _ = self._graph.metagraph.find_edge(etid)
         if is_all(u):
-            u = utils.toindex(slice(0, self._graph.number_of_nodes(stid)), self._idtype_str)
+            u = self.nodes(srctype)
+        deg = self._graph.out_degrees(etid, self.check_and_to_tensor(u, 'u'))
+        if isinstance(u, numbers.Integral):
+            return F.as_scalar(deg)
         else:
-            u = utils.toindex(u, self._idtype_str)
-        return self._graph.out_degrees(etid, u).tousertensor()
+            return deg
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph."""
