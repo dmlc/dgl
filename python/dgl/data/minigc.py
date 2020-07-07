@@ -76,6 +76,13 @@ class MiniGCDataset(DGLDataset):
         """
         return self.graphs[idx], self.labels[idx]
 
+    def has_cache(self):
+        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        if os.path.exists(graph_path)
+            return True
+
+        return False
+
     def save(self):
         """save the graph list and the labels"""
         if self.save_graph :
