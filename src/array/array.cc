@@ -514,7 +514,7 @@ CSRToSimple(const CSRMatrix& csr) {
   std::tuple<CSRMatrix, IdArray, IdArray> ret;
 
   CSRMatrix sorted_csr = (CSRIsSorted(csr)) ? csr : CSRSort(csr);
-  ATEN_CSR_SWITCH(csr, XPU, IdType, 'CSRToSimple', {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRToSimple", {
     ret = impl::CSRToSimple<XPU, IdType>(sorted_csr);
   });
   return ret;
