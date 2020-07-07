@@ -78,7 +78,7 @@ class MiniGCDataset(DGLDataset):
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
-        if os.path.exists(graph_path)
+        if os.path.exists(graph_path):
             return True
 
         return False
