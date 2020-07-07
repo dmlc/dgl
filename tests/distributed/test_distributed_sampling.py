@@ -15,10 +15,10 @@ from pathlib import Path
 from dgl.distributed import DistGraphServer, DistGraph
 
 
-def start_server(rank, tmpdir, disable_shared_mem):
+def start_server(rank, tmpdir, disable_shared_mem, graph_name):
     import dgl
-    g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, "test_sampling",
-                        tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem)
+    g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, graph_name,
+                        tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem)
     g.start()
 
 
@@ -52,7 +52,7 @@ def check_rpc_sampling(tmpdir, num_server):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
@@ -95,7 +95,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
@@ -136,8 +136,8 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     import dgl
     gpb = None
     if disable_shared_mem:
-        _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
-    dist_graph = DistGraph("rpc_sampling_ip_config.txt", "test_sampling", gpb=gpb)
+        _, _, _, gpb = load_partition(tmpdir / 'test_in_subgraph.json', rank)
+    dist_graph = DistGraph("rpc_sampling_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
@@ -152,16 +152,15 @@ def check_rpc_in_subgraph(tmpdir, num_server):
 
     g = CitationGraphDataset("cora")[0]
     g.readonly()
-    print(g.idtype)
     num_parts = num_server
 
-    partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=1, part_method='metis', reshuffle=True)
+    partition_graph(g, 'test_in_subgraph', num_parts, tmpdir,
+                    num_hops=1, part_method='metis', reshuffle=False)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_in_subgraph'))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
@@ -169,7 +168,6 @@ def check_rpc_in_subgraph(tmpdir, num_server):
     nodes = [0, 10, 99, 66, 1024, 2008]
     time.sleep(3)
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
-    print("Done in_subgraph")
     for p in pserver_list:
         p.join()
 
@@ -178,10 +176,8 @@ def check_rpc_in_subgraph(tmpdir, num_server):
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
     subg1 = dgl.in_subgraph(g, nodes)
     src1, dst1 = subg1.edges()
-    print(F.asnumpy(src))
-    print(F.asnumpy(src1))
-    assert np.all(F.asnumpy(src) == F.asnumpy(src1))
-    assert np.all(F.asnumpy(dst) == F.asnumpy(dst1))
+    assert np.all(np.sort(F.asnumpy(src)) == np.sort(F.asnumpy(src1)))
+    assert np.all(np.sort(F.asnumpy(dst)) == np.sort(F.asnumpy(dst1)))
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
