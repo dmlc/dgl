@@ -68,13 +68,14 @@ bool SocketSender::Connect() {
       if (client_socket->Connect(ip, port)) {
         bo = true;
       } else {
-        LOG(ERROR) << "Cannot connect to Receiver: " << ip << ":" << port
-                   << ", try again ...";
+        if (try_count % 10 == 0) {
+          LOG(INFO) << "Still try to connect to: " << ip << ":" << port;
+        }
         try_count++;
 #ifdef _WIN32
-        Sleep(1);
+        Sleep(5);
 #else   // !_WIN32
-        sleep(1);
+        sleep(5);
 #endif  // _WIN32
       }
     }
