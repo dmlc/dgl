@@ -140,6 +140,30 @@ def merge_graphs(res_list, num_nodes):
 LocalSampledGraph = namedtuple('LocalSampledGraph', 'global_src global_dst global_eids')
 
 def _distributed_access(g, nodes, issue_remote_req, local_access):
+    '''A routine that fetches local neighborhood of nodes from the distributed graph.
+
+    The local neighborhood of some nodes are stored in the local machine and the other
+    nodes have their neighborhood on remote machines. This code will issue remote
+    access requests first before fetching data from the local machine. In the end,
+    we combine the data from the local machine and remote machines.
+    In this way, we can hide the latency of accessing data on remote machines.
+
+    Parameters
+    ----------
+    g : DistGraph
+        The distributed graph
+    nodes : tensor
+        The nodes whose neighborhood are to be fetched.
+    issue_remote_req : callable
+        The function that issues requests to access remote data.
+    local_access : callable
+        The function that reads data on the local machine.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The subgraph that contains the neighborhoods of all input nodes.
+    '''
     req_list = []
     partition_book = g.get_partition_book()
     nodes = toindex(nodes).tousertensor()
