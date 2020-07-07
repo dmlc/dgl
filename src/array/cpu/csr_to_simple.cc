@@ -45,7 +45,7 @@ CSRMatrix CSRToSimple(const CSRMatrix& csr) {
     csr.num_rows,
     csr.num_cols,
     IdArray::FromVector(indptr),
-    IdArray::FromVector((indices),
+    IdArray::FromVector(indices),
     NullArray(),
     true);
 }

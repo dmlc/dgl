@@ -302,6 +302,7 @@ void _TestToSimpleCsr(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indices, b_indices));
   ASSERT_TRUE(csr_b.sorted);
 
+  // a not sorted
   a_indices =
     aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 3, 0, 0,
                                             1, 1, 2, 2, 3, 3, 0, 0, 3,
@@ -313,7 +314,7 @@ void _TestToSimpleCsr(DLContext ctx) {
     a_indptr,
     a_indices,
     aten::NullArray(),
-    true);
+    false);
   csr_b = CSRToSimple(csr_a2);
   ASSERT_EQ(csr_b.num_rows, 5);
   ASSERT_EQ(csr_b.num_cols, 4);
@@ -374,20 +375,37 @@ void _TestToSimpleCoo(DLContext ctx) {
   ASSERT_EQ(coo_b.num_cols, 4);
   ASSERT_TRUE(ArrayEQ<IdType>(coo_b.row, b_row));
   ASSERT_TRUE(ArrayEQ<IdType>(coo_b.col, b_col));
-  ASSERT_FALSE(COOHasData(coo_ab));
+  ASSERT_FALSE(COOHasData(coo_b));
   ASSERT_TRUE(coo_b.row_sorted);
   ASSERT_TRUE(coo_b.col_sorted);
 
+  // a not sorted
   a_row =
     aten::VecToIdArray(std::vector<IdType>({1, 2, 1, 2, 2, 2, 3, 3, 3,
                                             3, 3, 3, 3, 3, 3, 3, 4, 4,
                                             4, 4}),
                                            sizeof(IdType)*8, CTX);
   a_col = 
-    aten::VecToIdArray(std::vector<IdType>({0, 0, 0, 1, 2, 3, 0, 0, 0,
-                                            1, 1, 2, 2, 3, 3, 3, 0, 0,
-                                            3, 3}),
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 3, 1, 2, 3, 0, 0, 0,
+                                            1, 1, 2, 2, 3, 3, 3, 0, 3,
+                                            0, 3}),
                                            sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_a2 = aten::COOMatrix(
+    5,
+    4,
+    a_row,
+    a_col,
+    aten::NullArray(),
+    false,
+    false);
+  coo_b = COOToSimple(coo_a2);
+  ASSERT_EQ(coo_b.num_rows, 5);
+  ASSERT_EQ(coo_b.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b.row, b_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b.col, b_col));
+  ASSERT_FALSE(COOHasData(coo_b));
+  ASSERT_TRUE(coo_b.row_sorted);
+  ASSERT_TRUE(coo_b.col_sorted);
 }
 
 TEST(MatrixTest, TestToSimpleCoo) {

@@ -27,6 +27,8 @@ COOMatrix COOToSimple(const COOMatrix& coo) {
 
   for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     if (last_row != row_data[i] || last_col != col_data[i]) {
+      last_row = row_data[i];
+      last_col = col_data[i];
       row.push_back(last_row);
       col.push_back(last_col);
     }
@@ -36,7 +38,7 @@ COOMatrix COOToSimple(const COOMatrix& coo) {
     coo.num_rows,
     coo.num_cols,
     IdArray::FromVector(row),
-    IdArray::FromVector((col),
+    IdArray::FromVector(col),
     NullArray(),
     true,
     true);
