@@ -152,11 +152,13 @@ def _gspmm(gidx, op, reduce_op, u, e):
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = reduce_op in ['max', 'min']
+    arg_u, arg_e = None, None
     if gidx.number_of_edges(0) > 0:
         ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
         idtype = getattr(F, ugi.dtype)
-        arg_u = F.zeros(v_shp, idtype, ctx) if use_cmp and use_u else None
-        arg_e = F.zeros(v_shp, idtype, ctx) if use_cmp and use_e else None
+        if use_cmp:
+            if use_u: arg_u = F.zeros(v_shp, idtype, ctx)
+            if use_e: arg_e = F.zeros(v_shp, idtype, ctx)
         _CAPI_DGLKernelSpMM(ugi, op, reduce_op,
                             to_dgl_nd(u if use_u else None),
                             to_dgl_nd(e if use_e else None),

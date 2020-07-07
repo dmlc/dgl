@@ -1,5 +1,5 @@
 import dgl
-import dgl.sparse
+from dgl.backend import gspmm, gsddmm
 import pytest
 import networkx as nx
 import backend as F
@@ -96,18 +96,20 @@ sddmm_shapes = [
 
 @pytest.mark.parametrize('g', graphs)
 @pytest.mark.parametrize('shp', spmm_shapes)
-@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_u', 'copy_e'])
+@pytest.mark.parametrize('msg', ['add
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 def test_spmm(g, shp, msg, reducer):
     print(g)
     u = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
     e = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
     print('u shape: {}, e shape: {}'.format(F.shape(u), F.shape(e)))
-    g.srcdata['x'] = _unsqueeze_if_scalar(u)
-    g.edata['w'] = _unsqueeze_if_scalar(e)
+    g.srcdata['x'] = F.attach_grad(F.clone(_unsqueeze_if_scalar(u)))
+    g.edata['w'] = F.attach_grad(F.clone(_unsqueeze_if_scalar(e)))
 
     print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
-    v = dgl.sparse._gspmm(g._graph, msg, reducer, u, e)[0]
+    u1 = F.attach_grad(F.clone(u))
+    e1 = F.attach_grad(F.clone(e))
+    v = gspmm(g, msg, reducer, u1, e1)
     non_degree_indices = F.tensor(
         np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
     v = F.gather_row(v, non_degree_indices)
@@ -160,7 +162,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
     msg_func = lhs_target + '_' + msg + '_' + rhs_target
     print('SDDMM(message func: {})'.format(msg_func))
 
-    e = dgl.sparse._gsddmm(g._graph, msg, lhs, rhs,
+    e = gsddmm(g, msg, lhs, rhs,
                            lhs_target=lhs_target, rhs_target=rhs_target)
     g.apply_edges(udf_apply_edges[msg_func])
     if 'm' in g.edata:

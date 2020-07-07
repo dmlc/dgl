@@ -48,11 +48,13 @@ class GSpMM(th.autograd.Function):
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op == 'mul':
-                    dX = _gspmm(g_rev, '*', 'sum', dZ, Y)
+                    dX = _gspmm(g_rev, '*', 'sum', dZ, Y)[0]
                 elif op in ['add', 'sub']:
-                    dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)
+                    dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
                 elif op == 'div':
-                    dX = _gspmm(g_rev, '*', 'sum', dZ, 1. / Y)
+                    dX = _gspmm(g_rev, '*', 'sum', dZ, 1. / Y)[0]
+                elif op == 'copy_u':
+                    dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
             else:
                 pass
             dX = _reduce_grad(dX, X.shape)
@@ -60,7 +62,7 @@ class GSpMM(th.autograd.Function):
             if reduce_op == 'sum':
                 if op == 'mul':
                     dY = _gsddmm(gidx, '*', X, dZ)
-                elif op == 'add':
+                elif op in ['add', 'copy_e']:
                     dY = _gsddmm(gidx, 'copy_rhs', X, dZ)
                 elif op == 'sub':
                     dY = _gsddmm(gidx, 'copy_rhs', X, -dZ)
