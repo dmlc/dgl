@@ -13,7 +13,7 @@ from .. import backend as F
 __all__ = ['sample_neighbors']
 
 SAMPLING_SERVICE_ID = 6657
-
+INSUBGRAPH_SERVICE_ID = 6658
 
 class SubgraphResponse(Response):
     """The response for sampling and in_subgraph"""
@@ -88,8 +88,10 @@ class SamplingRequest(Request):
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
-        global_src, global_dst, global_eids = _in_subgraph(local_g, partition_book,
-                                                           self.seed_nodes)
+        global_src, global_dst, global_eids = _sample_neighbors(local_g, partition_book,
+                                                                self.seed_nodes,
+                                                                self.fan_out, self.edge_dir,
+                                                                self.prob, self.replace)
         return SubgraphResponse(global_src, global_dst, global_eids)
 
 
@@ -108,10 +110,8 @@ class InSubgraphRequest(Request):
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
-        global_src, global_dst, global_eids = _sample_neighbors(local_g, partition_book,
-                                                                self.seed_nodes,
-                                                                self.fan_out, self.edge_dir,
-                                                                self.prob, self.replace)
+        global_src, global_dst, global_eids = _in_subgraph(local_g, partition_book,
+                                                           self.seed_nodes)
         return SubgraphResponse(global_src, global_dst, global_eids)
 
 
@@ -250,3 +250,4 @@ def in_subgraph(g, nodes):
     return _distributed_access(g, nodes, issue_remote_req, local_access)
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SubgraphResponse)
+register_service(INSUBGRAPH_SERVICE_ID, InSubgraphRequest, SubgraphResponse)
