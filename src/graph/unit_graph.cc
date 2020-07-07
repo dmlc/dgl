@@ -51,6 +51,15 @@ inline GraphPtr CreateUnitGraphMetaGraph(int num_vtypes) {
   return {};
 }
 
+inline GraphPtr ReverseMetaGraph(GraphPtr metagraph) {
+  const auto& edges = metagraph->Edges("eid");
+  LOG(INFO) << "Number of vertices " << metagraph->NumVertices();
+  LOG(INFO) << "row " << edges.dst.Ptr<int>()[0];
+  LOG(INFO) << "col " << edges.src.Ptr<int>()[0];
+  return ImmutableGraph::CreateFromCOO(metagraph->NumVertices(),
+                                       edges.dst, edges.src);
+}
+
 };  // namespace
 
 //////////////////////////////////////////////////////////
@@ -1565,10 +1574,12 @@ UnitGraphPtr UnitGraph::Reverse() const {
   CSRPtr new_incsr = out_csr_, new_outcsr = in_csr_;
   COOPtr new_coo = nullptr;
   if (coo_->defined()) {
-    new_coo = COOPtr(new COO(coo_->meta_graph(), aten::COOTranspose(coo_->adj())));
+    new_coo = COOPtr(
+        new COO(ReverseMetaGraph(coo_->meta_graph()), aten::COOTranspose(coo_->adj())));
   }
 
-  return UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo));
+  return UnitGraphPtr(
+      new UnitGraph(ReverseMetaGraph(meta_graph()), new_incsr, new_outcsr, new_coo));
 }
 
 }  // namespace dgl
