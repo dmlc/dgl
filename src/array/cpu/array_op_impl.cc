@@ -260,12 +260,12 @@ template IdArray NonZero<kDLCPU, int32_t>(BoolArray bool_arr);
 template IdArray NonZero<kDLCPU, int64_t>(BoolArray bool_arr);
 
 
-///////////////////////////// Diff1d /////////////////////////////
+///////////////////////////// SetDiff1d /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Diff1d(IdArray arr1, IdArray arr2) {
-  CHECK(arr1->ndim == 1) << "Diff1d only supports 1D array";
-  CHECK(arr2->ndim == 1) << "Diff1d only supports 1D array";
+IdArray SetDiff1d(IdArray arr1, IdArray arr2) {
+  CHECK(arr1->ndim == 1) << "SetDiff1d only supports 1D array";
+  CHECK(arr2->ndim == 1) << "SetDiff1d only supports 1D array";
   phmap::flat_hash_set<IdType> arr2_map;
   arr2_map.reserve(arr2->shape[0]);
   const IdType* arr1_data = static_cast<IdType*>(arr1->data);
@@ -274,17 +274,44 @@ IdArray Diff1d(IdArray arr1, IdArray arr2) {
     arr2_map.insert(arr2_data[i]);
   }
 
-  std::vector<IdType> ret_vec;
+  phmap::flat_hash_set<IdType> ret_set;
   for (int64_t i = 0; i < arr1->shape[0]; i++) {
     if (!arr2_map.contains(arr1_data[i])) {
-      ret_vec.push_back(arr1_data[i]);
+      ret_set.insert(arr1_data[i]);
     }
   }
-  return VecToIdArray(ret_vec, sizeof(IdType) * 8);
+
+  IdArray ret_ndarray = NewIdArray(ret_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdType* ret_data = static_cast<IdType*>(ret_ndarray->data);
+  std::copy(ret_set.begin(), ret_set.end(), ret_data);
+  std::sort(ret_data, ret_data + ret_set.size());
+  return ret_ndarray;
 }
 
-template IdArray Diff1d<kDLCPU, int32_t>(IdArray arr1, IdArray arr2);
-template IdArray Diff1d<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
+template IdArray SetDiff1d<kDLCPU, int32_t>(IdArray arr1, IdArray arr2);
+template IdArray SetDiff1d<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
+
+///////////////////////////// Unique /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Unique(IdArray arr) {
+  CHECK(arr->ndim == 1) << "Unique only supports 1D array";
+  phmap::flat_hash_set<IdType> arr_set;  
+  arr_set.reserve(arr->shape[0]);
+  const IdType* arr_data = static_cast<IdType*>(arr->data);
+  for (int64_t i = 0; i < arr->shape[0]; i++) {
+    arr_set.insert(arr_data[i]);
+  }
+
+  IdArray ret_ndarray = NewIdArray(arr_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdType* ret_data = static_cast<IdType*>(ret_ndarray->data);
+  std::copy(arr_set.begin(), arr_set.end(), ret_data);
+  std::sort(ret_data, ret_data + arr_set.size());
+  return ret_ndarray;
+}
+
+template IdArray Unique<kDLCPU, int32_t>(IdArray arr);
+template IdArray Unique<kDLCPU, int64_t>(IdArray arr);
 
 }  // namespace impl
 }  // namespace aten

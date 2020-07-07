@@ -627,16 +627,29 @@ TEST(ArrayTest, NonZero) {
 }
 
 template <typename IDX>
-void _TestDiff1d() {
+void _TestSetDiff1d() {
   IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 2, 4, 1}), sizeof(IDX) * 8);
   IdArray b = aten::VecToIdArray(std::vector<IDX>({3, 4, 5, 6}), sizeof(IDX) * 8);
 
-  IdArray indices = aten::Diff1d(a, b);
-  IdArray expected = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 1}), sizeof(IDX) * 8);
+  IdArray indices = aten::SetDiff1d(a, b);
+  IdArray expected = aten::VecToIdArray(std::vector<IDX>({1, 2}), sizeof(IDX) * 8);
   ASSERT_TRUE(ArrayEQ<IDX>(indices, expected));
 }
 
-TEST(ArrayTest, Diff1d) {
-  _TestDiff1d<int32_t>();
-  _TestDiff1d<int64_t>();
+TEST(ArrayTest, SetDiff1d) {
+  _TestSetDiff1d<int32_t>();
+  _TestSetDiff1d<int64_t>();
+}
+
+template <typename IDX>
+void _TestUnique() {
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 2, 4, 1}), sizeof(IDX) * 8);
+  IdArray indices = aten::Unique(a);
+  IdArray expected = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4}), sizeof(IDX) * 8);
+  ASSERT_TRUE(ArrayEQ<IDX>(indices, expected));
+}
+
+TEST(ArrayTest, Unique) {
+  _TestUnique<int32_t>();
+  _TestUnique<int64_t>();
 }

@@ -146,7 +146,7 @@ def test_node_subgraph_with_halo_hetero():
     # Check if the inner edge labels are correct.
     inner_edge = inner_edge.asnumpy()
     inner_edge_ids = halo_subg.induced_edges[0].tonumpy()[inner_edge > 0]
-    subg = gi.node_subgraph(toindex(nodes))
+    subg = gi.node_subgraph([toindex(nodes)])
     assert np.all(np.sort(subg.induced_edges[0].tonumpy()) == np.sort(inner_edge_ids))
 
 if __name__ == '__main__':

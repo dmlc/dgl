@@ -1009,9 +1009,11 @@ class HeteroGraphIndex(ObjectBase):
         assert self.is_homograph()
         vidx_idx = utils.toindex(vids)
         ret_list = _CAPI_HeteroGraphGetSubgraphWithHalo(self, vidx_idx.todgltensor(), num_hops)
-        subg, outer_nodes_id, outer_edges_id = ret_list[0], ret_list[1], ret_list[2]
+        subg, outner_nodes_id, outer_edges_id = ret_list[0], ret_list[1], ret_list[2]
+        # assert np.all(~np.in1d(outer_nodes_id, vidx_idx.tonumpy()))
         inner_nodes = np.ones(subg.graph.number_of_nodes(0))
-        inner_nodes[outer_nodes_id.asnumpy()] = 0
+        print(f"aaaa: {outner_nodes_id.shape}")
+        inner_nodes[outner_nodes_id.asnumpy()] = 0
         inner_edges = np.ones(subg.graph.number_of_edges(0))
         inner_edges[outer_edges_id.asnumpy()] = 0
         return subg, array(inner_nodes), array(inner_edges)

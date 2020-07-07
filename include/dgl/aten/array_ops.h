@@ -131,9 +131,12 @@ IdArray HStack(IdArray arr1, IdArray arr2);
  * np.nonzero*/
 IdArray NonZero(BoolArray bool_arr);
 
-/*! \brief Return the values in arr1 that are not in arr2. Same as
- * arr1[np.in1d(arr1, arr2, invert=True)] */
-IdArray Diff1d(IdArray arr1, IdArray arr2);
+/*! \brief Return the sorted unique values in arr1 that are not in arr2.
+ * Same as np.setdiff1d */
+IdArray SetDiff1d(IdArray arr1, IdArray arr2);
+
+/*! \brief Return the sorted unique values in arr. Same as np.unique */
+IdArray Unique(IdArray arr);
 
 /*!
  * \brief Return the data under the index. In numpy notation, A[I]
