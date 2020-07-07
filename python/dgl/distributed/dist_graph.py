@@ -404,7 +404,8 @@ class DistGraph:
         assert shape[0] == self.number_of_nodes()
         if init_func is None:
             init_func = _default_init_data
-        self._client.init_data(_get_ndata_name(name), shape, dtype, 'node', self._gpb, init_func)
+        policy = PartitionPolicy('node', self._gpb)
+        self._client.init_data(_get_ndata_name(name), shape, dtype, policy, init_func)
         self._ndata._add(name)
 
     def init_edata(self, name, shape, dtype, init_func=None):
@@ -434,7 +435,8 @@ class DistGraph:
         assert shape[0] == self.number_of_edges()
         if init_func is None:
             init_func = _default_init_data
-        self._client.init_data(_get_edata_name(name), shape, dtype, 'edge', self._gpb, init_func)
+        policy = PartitionPolicy('edge', self._gpb)
+        self._client.init_data(_get_edata_name(name), shape, dtype, policy, init_func)
         self._edata._add(name)
 
     @property
