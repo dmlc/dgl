@@ -68,8 +68,8 @@ bool SocketSender::Connect() {
       if (client_socket->Connect(ip, port)) {
         bo = true;
       } else {
-        if (try_count % 10 == 0) {
-          LOG(INFO) << "Still try to connect to: " << ip << ":" << port;
+        if (try_count % 10 == 0 && try_count != 0) {
+          LOG(INFO) << "Try to connect to: " << ip << ":" << port;
         }
         try_count++;
 #ifdef _WIN32
