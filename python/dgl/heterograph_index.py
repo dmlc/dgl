@@ -766,7 +766,7 @@ class HeteroGraphIndex(ObjectBase):
         SubgraphIndex
             The subgraph index.
         """
-        vids = [nodes.todgltensor() for nodes in induced_nodes]
+        vids = [F.to_dgl_nd(nodes) for nodes in induced_nodes]
         return _CAPI_DGLHeteroVertexSubgraph(self, vids)
 
     def edge_subgraph(self, induced_edges, preserve_nodes):
@@ -787,7 +787,7 @@ class HeteroGraphIndex(ObjectBase):
         SubgraphIndex
             The subgraph index.
         """
-        eids = [edges.todgltensor() for edges in induced_edges]
+        eids = [F.to_dgl_nd(edges) for edges in induced_edges]
         return _CAPI_DGLHeteroEdgeSubgraph(self, eids, preserve_nodes)
 
     @utils.cached_member(cache='_cache', prefix='unitgraph')
@@ -926,7 +926,7 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced nodes
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedVertices(self)
-        return [utils.toindex(v, self.graph.dtype) for v in ret]
+        return [F.from_dgl_nd(v) for v in ret]
 
     @property
     def induced_edges(self):
@@ -939,7 +939,7 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced edges
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
-        return [utils.toindex(v, self.graph.dtype) for v in ret]
+        return [F.from_dgl_nd(v) for v in ret]
 
 
 #################################################################

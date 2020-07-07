@@ -1951,24 +1951,21 @@ class DGLHeteroGraph(object):
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph."""
-        node_frames = [
-            FrameRef(Frame(
-                self._node_frames[i][induced_nodes_of_ntype],
-                num_rows=len(induced_nodes_of_ntype)))
-            for i, induced_nodes_of_ntype in enumerate(induced_nodes)]
-        edge_frames = [
-            FrameRef(Frame(
-                self._edge_frames[i][induced_edges_of_etype],
-                num_rows=len(induced_edges_of_etype)))
-            for i, induced_edges_of_etype in enumerate(induced_edges)]
-
-        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
+        # TODO(minjie): should create a utility function for feature inheritence here.
+        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes)
         hsg.is_subgraph = True
         for ntype, induced_nid in zip(self.ntypes, induced_nodes):
-            hsg.nodes[ntype].data[NID] = induced_nid.tousertensor()
+            ndata = hsg.nodes[ntype].data
+            orig_ndata = self.nodes[ntype].data
+            ndata[NID] = induced_nid
+            for key in orig_ndata:
+                ndata[key] = F.gather_row(orig_ndata[key], induced_nid)
         for etype, induced_eid in zip(self.canonical_etypes, induced_edges):
-            hsg.edges[etype].data[EID] = induced_eid.tousertensor()
-
+            edata = hsg.edges[etype].data
+            orig_edata = self.edges[etype].data
+            edata[EID] = induced_eid
+            for key in orig_edata:
+                edata[key] = F.gather_row(orig_edata[key], induced_eid)
         return hsg
 
     def subgraph(self, nodes):
@@ -2062,25 +2059,14 @@ class DGLHeteroGraph(object):
                 'need a dict of node type and IDs for graph with multiple node types'
             nodes = {self.ntypes[0]: nodes}
 
-        for ntype, v in nodes.items():
-            if F.is_tensor(v):
-                # Check if the v is a bool tensor
-                if F.dtype(v) is F.data_type_dict['bool']:
-                    assert len(F.shape(v)) == 1, \
-                        "dgl.subgraph only support 1D tensor as ID array"
-                    nodes_idx = F.nonzero_1d(v)
-                    nodes[ntype] = F.astype(nodes_idx,
-                                            ty=F.data_type_dict[self._idtype_str])
-                else:
-                    check_same_dtype(self._idtype_str, v)
+        def _process_nodes(v):
+            if F.is_tensor(v) and F.dtype(v) == F.bool:
+                return F.astype(F.nonzero_1d(F.copy_to(v, self.device)), self.idtype)
             else:
-                v = F.tensor(v, dtype=F.data_type_dict[self._idtype_str])
-
-        induced_nodes = [utils.toindex(nodes.get(ntype, []), self._idtype_str)
-                         for ntype in self.ntypes]
+                return self.check_and_to_tensor(v, 'nodes')
+        induced_nodes = [_process_nodes(nodes.get(ntype, [])) for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
         induced_edges = sgi.induced_edges
-
         return self._create_hetero_subgraph(sgi, induced_nodes, induced_edges)
 
     def edge_subgraph(self, edges, preserve_nodes=False):
@@ -2182,23 +2168,15 @@ class DGLHeteroGraph(object):
                 'need a dict of edge type and IDs for graph with multiple edge types'
             edges = {self.canonical_etypes[0]: edges}
 
-        for etype, v in edges.items():
-            if F.is_tensor(v):
-                # Check if the v is a bool tensor
-                if F.dtype(v) is F.data_type_dict['bool']:
-                    assert len(F.shape(v)) == 1, \
-                        "dgl.edge_subgraph only support 1D tensor as ID array"
-                    edges_idx = F.nonzero_1d(v)
-                    edges[etype] = F.astype(edges_idx,
-                                            ty=F.data_type_dict[self._idtype_str])
-                else:
-                    check_same_dtype(self._idtype_str, v)
+        def _process_edges(e):
+            if F.is_tensor(e) and F.dtype(e) == F.bool:
+                return F.astype(F.nonzero_1d(F.copy_to(e, self.device)), self.idtype)
             else:
-                v = F.tensor(v, dtype=F.data_type_dict[self._idtype_str])
+                return self.check_and_to_tensor(e, 'edges')
 
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
-            utils.toindex(edges.get(canonical_etype, []), self._idtype_str)
+            _process_edges(edges.get(canonical_etype, []))
             for canonical_etype in self.canonical_etypes]
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes)
         induced_nodes = sgi.induced_nodes
