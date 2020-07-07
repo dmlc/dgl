@@ -414,14 +414,21 @@ COOMatrix DisjointUnionCoo(
  *      [1, 1, 0],
  *      [0, 0, 4]]
  * 
- * B = ToSimaple(A)
+ * B, cnt, edge_map = COOToSimple(A)
  *
  * B = [[0, 0, 0],
  *      [1, 0, 1],
  *      [1, 1, 0],
  *      [0, 0, 1]]
+ * cnt = [3, 2, 1, 1, 4]
+ * edge_mape = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+ *
+ * \return The simplified COOMatrix
+ *         The count recording the number of duplicated edges from the original graph.
+ *         The edge mapping from the edge IDs of original graph to those of the
+ *         returned graph.
  */
-COOMatrix COOToSimple(const COOMatrix& coo);
+std::tuple<COOMatrix, IdArray, IdArray> COOToSimple(const COOMatrix& coo);
 
 /*!
  * \brief Split a COOMatrix into multiple disjoin components.

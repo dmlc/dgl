@@ -288,6 +288,14 @@ void _TestToSimpleCsr(DLContext ctx) {
     aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 0, 1, 2,
                                             3, 0, 3}),
                                            sizeof(IdType)*8, CTX);
+  IdArray cnt =
+    aten::VecToIdArray(std::vector<IdType>({1, 1, 1, 1, 1, 1, 3, 2, 2, 3, 2, 2}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray map =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 4, 5, 6, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 9, 10, 10,
+                                            11, 11}),
+                                           sizeof(IdType)*8, CTX);
   const aten::CSRMatrix &csr_a = aten::CSRMatrix(
     5,
     4,
@@ -295,11 +303,16 @@ void _TestToSimpleCsr(DLContext ctx) {
     a_indices,
     aten::NullArray(),
     true);
-  aten::CSRMatrix csr_b = CSRToSimple(csr_a);
+  auto ret = CSRToSimple(csr_a);
+  aten::CSRMatrix csr_b = std::get<0>(ret);
+  IdArray ecnt = std::get<1>(ret);
+  IdArray emap = std::get<2>(ret);
   ASSERT_EQ(csr_b.num_rows, 5);
   ASSERT_EQ(csr_b.num_cols, 4);
   ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indptr, b_indptr));
   ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indices, b_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
   ASSERT_TRUE(csr_b.sorted);
 
   // a not sorted
@@ -308,6 +321,11 @@ void _TestToSimpleCsr(DLContext ctx) {
                                             1, 1, 2, 2, 3, 3, 0, 0, 3,
                                             0, 3}),
                                            sizeof(IdType)*8, CTX);
+  map =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 4, 5, 9, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 6, 10, 11,
+                                            10, 11}),
+                                           sizeof(IdType)*8, CTX);
   const aten::CSRMatrix &csr_a2 = aten::CSRMatrix(
     5,
     4,
@@ -315,11 +333,16 @@ void _TestToSimpleCsr(DLContext ctx) {
     a_indices,
     aten::NullArray(),
     false);
-  csr_b = CSRToSimple(csr_a2);
+  ret = CSRToSimple(csr_a2);
+  csr_b = std::get<0>(ret);
+  ecnt = std::get<1>(ret);
+  emap = std::get<2>(ret);
   ASSERT_EQ(csr_b.num_rows, 5);
   ASSERT_EQ(csr_b.num_cols, 4);
   ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indptr, b_indptr));
   ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indices, b_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
   ASSERT_TRUE(csr_b.sorted);
 }
 
@@ -362,6 +385,14 @@ void _TestToSimpleCoo(DLContext ctx) {
     aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 0, 1, 2,
                                             3, 0, 3}),
                                            sizeof(IdType)*8, CTX);
+  IdArray cnt =
+    aten::VecToIdArray(std::vector<IdType>({1, 1, 1, 1, 1, 1, 3, 2, 2, 3, 2, 2}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray map =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 4, 5, 6, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 9, 10, 10,
+                                            11, 11}),
+                                           sizeof(IdType)*8, CTX);
   const aten::COOMatrix &coo_a = aten::COOMatrix(
     5,
     4,
@@ -370,11 +401,16 @@ void _TestToSimpleCoo(DLContext ctx) {
     aten::NullArray(),
     true,
     true);
-  aten::COOMatrix coo_b = COOToSimple(coo_a);
+  auto ret = COOToSimple(coo_a);
+  aten::COOMatrix coo_b = std::get<0>(ret);
+  IdArray ecnt = std::get<1>(ret);
+  IdArray emap = std::get<2>(ret);
   ASSERT_EQ(coo_b.num_rows, 5);
   ASSERT_EQ(coo_b.num_cols, 4);
   ASSERT_TRUE(ArrayEQ<IdType>(coo_b.row, b_row));
   ASSERT_TRUE(ArrayEQ<IdType>(coo_b.col, b_col));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
   ASSERT_FALSE(COOHasData(coo_b));
   ASSERT_TRUE(coo_b.row_sorted);
   ASSERT_TRUE(coo_b.col_sorted);
@@ -390,6 +426,11 @@ void _TestToSimpleCoo(DLContext ctx) {
                                             1, 1, 2, 2, 3, 3, 3, 0, 3,
                                             0, 3}),
                                            sizeof(IdType)*8, CTX);
+  map =
+    aten::VecToIdArray(std::vector<IdType>({0, 2, 1, 3, 4, 5, 6, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 9, 10, 11,
+                                            10, 11}),
+                                           sizeof(IdType)*8, CTX);
   const aten::COOMatrix &coo_a2 = aten::COOMatrix(
     5,
     4,
@@ -398,11 +439,16 @@ void _TestToSimpleCoo(DLContext ctx) {
     aten::NullArray(),
     false,
     false);
-  coo_b = COOToSimple(coo_a2);
+  ret = COOToSimple(coo_a2);
+  coo_b = std::get<0>(ret);
+  ecnt = std::get<1>(ret);
+  emap = std::get<2>(ret);
   ASSERT_EQ(coo_b.num_rows, 5);
   ASSERT_EQ(coo_b.num_cols, 4);
   ASSERT_TRUE(ArrayEQ<IdType>(coo_b.row, b_row));
   ASSERT_TRUE(ArrayEQ<IdType>(coo_b.col, b_col));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
   ASSERT_FALSE(COOHasData(coo_b));
   ASSERT_TRUE(coo_b.row_sorted);
   ASSERT_TRUE(coo_b.col_sorted);

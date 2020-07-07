@@ -409,14 +409,21 @@ CSRMatrix DisjointUnionCsr(
  *      [1, 1, 0],
  *      [0, 0, 4]]
  * 
- * B = ToSimaple(A)
+ * B, cnt, edge_map = CSRToSimple(A)
  *
  * B = [[0, 0, 0],
  *      [1, 0, 1],
  *      [1, 1, 0],
  *      [0, 0, 1]]
+ * cnt = [3, 2, 1, 1, 4]
+ * edge_mape = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+ *
+ * \return The simplified CSRMatrix
+ *         The count recording the number of duplicated edges from the original graph.
+ *         The edge mapping from the edge IDs of original graph to those of the
+ *         returned graph.
  */
-CSRMatrix CSRToSimple(const CSRMatrix& csr);
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(const CSRMatrix& csr);
 
 /*!
  * \brief Split a CSRMatrix into multiple disjoin components.

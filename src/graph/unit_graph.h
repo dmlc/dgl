@@ -269,6 +269,9 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return the reversed graph */
   UnitGraphPtr Reverse() const;
 
+  /*! \return the simpled (no-multi-edge) graph */
+  std::tuple<UnitGraphPtr, IdArray, IdArray>ToSimple() const;
+
  private:
   friend class Serializer;
   friend class HeteroGraph;

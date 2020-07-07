@@ -13,14 +13,16 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-CSRMatrix CSRToSimple(const CSRMatrix& csr) {
-  CHECK_EQ(csr.sorted, true) << "Input csr of CSRToSimple should be sorted";
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr) {
+  if (!csr.sorted)
+    csr = CSRSort(csr);
 
   const IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType *indices_data = static_cast<IdType*>(csr.indices->data);
-  // TODO(xiangsx): FIXME csr.data is dropped.
+
   std::vector<IdType> indptr;
   std::vector<IdType> indices;
+  std::vector<IdType> count;
   indptr.resize(csr.indptr->shape[0]);
   indptr[0] = 0;
 
@@ -31,27 +33,42 @@ CSRMatrix CSRToSimple(const CSRMatrix& csr) {
     }
     
     int64_t cnt = 1;
+    int64_t dup_cnt = 1;
     indices.push_back(indices_data[indptr_data[i-1]]);
     for (int64_t j = indptr_data[i-1]+1; j < indptr_data[i]; ++j) {
-      if (indices_data[j-1] == indices_data[j])
+      if (indices_data[j-1] == indices_data[j]) {
+        ++dup_cnt;
         continue;
+      }
+      count.push_back(dup_cnt);
+      dup_cnt = 1;
       indices.push_back(indices_data[j]);
       ++cnt;
     }
+    count.push_back(dup_cnt);
     indptr[i] = indptr[i-1] + cnt;
   }
 
-  return CSRMatrix(
+  CSRMatrix res_csr = CSRMatrix(
     csr.num_rows,
     csr.num_cols,
     IdArray::FromVector(indptr),
     IdArray::FromVector(indices),
     NullArray(),
     true);
+
+  const IdArray &edge_count = IdArray::FromVector(count);
+  const IdArray new_eids = Range(
+      0, res_csr.indices->shape[0], sizeof(IdType) * 8, csr.indptr->ctx);
+  const IdArray eids_remapped = CSRHasData(csr) ?
+    Scatter(Repeat(new_eids, edge_count), csr.data) :
+    Repeat(new_eids, edge_count);
+
+  return std::make_tuple(res_csr, edge_count, eids_remapped);
 }
 
-template CSRMatrix CSRToSimple<kDLCPU, int32_t>(const CSRMatrix&);
-template CSRMatrix CSRToSimple<kDLCPU, int64_t>(const CSRMatrix&);
+template std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple<kDLCPU, int32_t>(CSRMatrix);
+template std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple<kDLCPU, int64_t>(CSRMatrix);
 
 }  // namespace impl
 }  // namespace aten
