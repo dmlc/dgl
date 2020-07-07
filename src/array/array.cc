@@ -94,6 +94,19 @@ IdArray NonZero(BoolArray bool_arr) {
   return ret;
 }
 
+IdArray Diff1d(IdArray lhs, IdArray rhs) {
+  IdArray ret;
+  CHECK_SAME_CONTEXT(lhs, rhs);
+  CHECK_SAME_DTYPE(lhs, rhs);
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "Diff1d", {
+    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
+      ret = impl::Diff1d<XPU, IdType>(lhs, rhs);
+    });
+  });
+  return ret;
+}
+
+
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
   CHECK_SAME_CONTEXT(array, index);
@@ -184,7 +197,10 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 }
 
 NDArray Concat(const std::vector<IdArray>& arrays) {
-  CHECK(arrays.size() > 1) << "Number of arrays should larger than 1";
+  // CHECK(arrays.size() > 1) << "Number of arrays should larger than 1";
+  if (arrays.size() == 1) {
+    return arrays[0];
+  }
   IdArray ret;
 
   int64_t len = 0, offset = 0;

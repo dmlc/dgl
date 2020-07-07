@@ -154,27 +154,6 @@ BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
   return ret;
 }
 
-// Function to convert an idarray to string
-std::string IdArrayToStr(IdArray arr) {
-  arr = arr.CopyTo(DLContext{kDLCPU, 0});
-  int64_t len = arr->shape[0];
-  std::ostringstream oss;
-  oss << "(" << len << ")[";
-  if (arr->dtype.bits == 32) {
-    int32_t* data = static_cast<int32_t*>(arr->data);
-    for (int64_t i = 0; i < len; ++i) {
-      oss << data[i] << " ";
-    }
-  } else {
-    int64_t* data = static_cast<int64_t*>(arr->data);
-    for (int64_t i = 0; i < len; ++i) {
-      oss << data[i] << " ";
-    }
-  }
-  oss << "]";
-  return oss.str();
-}
-
 // Check whether the given arguments have the same context.
 inline void CheckCtx(
     const DLContext& ctx,

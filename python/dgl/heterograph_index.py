@@ -10,7 +10,7 @@ from ._ffi.function import _init_api
 from .base import DGLError, dgl_warning
 from . import backend as F
 from . import utils
-
+from .ndarray import array
 @register_object('graph.HeteroGraph')
 class HeteroGraphIndex(ObjectBase):
     """HeteroGraph index object.
@@ -70,6 +70,9 @@ class HeteroGraphIndex(ObjectBase):
     def number_of_etypes(self):
         """Return number of edge types."""
         return self.metagraph.number_of_edges()
+    
+    def is_homograph(self):
+        return self.number_of_ntypes() == 1 and self.number_of_etypes() == 1
 
     def get_relation_graph(self, etype):
         """Get the unitgraph graph of the given edge/relation type.
@@ -1001,6 +1004,17 @@ class HeteroGraphIndex(ObjectBase):
         A new graph index.
         """
         return _CAPI_DGLHeteroReverse(self)
+
+    def node_halo_subgraph(self, vids, num_hops):
+        assert self.is_homograph()
+        vidx_idx = utils.toindex(vids)
+        ret_list = _CAPI_HeteroGraphGetSubgraphWithHalo(self, vidx_idx.todgltensor(), num_hops)
+        subg, outer_nodes_id, outer_edges_id = ret_list[0], ret_list[1], ret_list[2]
+        inner_nodes = np.ones(subg.graph.number_of_nodes(0))
+        inner_nodes[outer_nodes_id.asnumpy()] = 0
+        inner_edges = np.ones(subg.graph.number_of_edges(0))
+        inner_edges[outer_edges_id.asnumpy()] = 0
+        return subg, array(inner_nodes), array(inner_edges)
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):

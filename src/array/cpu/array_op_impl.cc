@@ -4,7 +4,10 @@
  * \brief Array operator CPU implementation
  */
 #include <dgl/array.h>
+#include <parallel_hashmap/phmap.h>
+
 #include <numeric>
+
 #include "../arith.h"
 
 namespace dgl {
@@ -255,6 +258,33 @@ IdArray NonZero(BoolArray bool_arr) {
 // TODO(Allen): Implement GPU version
 template IdArray NonZero<kDLCPU, int32_t>(BoolArray bool_arr);
 template IdArray NonZero<kDLCPU, int64_t>(BoolArray bool_arr);
+
+
+///////////////////////////// Diff1d /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Diff1d(IdArray arr1, IdArray arr2) {
+  CHECK(arr1->ndim == 1) << "Diff1d only supports 1D array";
+  CHECK(arr2->ndim == 1) << "Diff1d only supports 1D array";
+  phmap::flat_hash_set<IdType> arr2_map;
+  arr2_map.reserve(arr2->shape[0]);
+  const IdType* arr1_data = static_cast<IdType*>(arr1->data);
+  const IdType* arr2_data = static_cast<IdType*>(arr2->data);
+  for (int64_t i = 0; i < arr2->shape[0]; i++) {
+    arr2_map.insert(arr2_data[i]);
+  }
+
+  std::vector<IdType> ret_vec;
+  for (int64_t i = 0; i < arr1->shape[0]; i++) {
+    if (!arr2_map.contains(arr1_data[i])) {
+      ret_vec.push_back(arr1_data[i]);
+    }
+  }
+  return VecToIdArray(ret_vec, sizeof(IdType) * 8);
+}
+
+template IdArray Diff1d<kDLCPU, int32_t>(IdArray arr1, IdArray arr2);
+template IdArray Diff1d<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
 
 }  // namespace impl
 }  // namespace aten

@@ -615,13 +615,28 @@ TEST(ArrayTest, CumSum) {
 
 template <typename IDX>
 void _TestNonZero() {
-  BoolArray a = aten::VecToIdArray(std::vector<IDX>({1, 0, 1, 1, 0, 0, 1}));
+  BoolArray a = aten::VecToIdArray(std::vector<IDX>({1, 0, 1, 1, 0, 0, 1}), sizeof(IDX) * 8);
   IdArray indices = aten::NonZero(a);
-  IdArray expected = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 6}));
+  IdArray expected = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 6}), sizeof(IDX) * 8);
   ASSERT_TRUE(ArrayEQ<IDX>(indices, expected));
 }
 
 TEST(ArrayTest, NonZero) {
   _TestNonZero<int32_t>();
   _TestNonZero<int64_t>();
+}
+
+template <typename IDX>
+void _TestDiff1d() {
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 2, 4, 1}), sizeof(IDX) * 8);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({3, 4, 5, 6}), sizeof(IDX) * 8);
+
+  IdArray indices = aten::Diff1d(a, b);
+  IdArray expected = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 1}), sizeof(IDX) * 8);
+  ASSERT_TRUE(ArrayEQ<IDX>(indices, expected));
+}
+
+TEST(ArrayTest, Diff1d) {
+  _TestDiff1d<int32_t>();
+  _TestDiff1d<int64_t>();
 }

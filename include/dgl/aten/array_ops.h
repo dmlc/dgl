@@ -127,8 +127,13 @@ IdArray NE(int64_t lhs, IdArray rhs);
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
-/*! \brief Return the indices of the elements that are non-zero. */
+/*! \brief Return the indices of the elements that are non-zero. Same as
+ * np.nonzero*/
 IdArray NonZero(BoolArray bool_arr);
+
+/*! \brief Return the values in arr1 that are not in arr2. Same as
+ * arr1[np.in1d(arr1, arr2, invert=True)] */
+IdArray Diff1d(IdArray arr1, IdArray arr2);
 
 /*!
  * \brief Return the data under the index. In numpy notation, A[I]
