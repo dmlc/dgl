@@ -1322,14 +1322,20 @@ class DGLHeteroGraph(object):
         Tensor
             Data in tensor object.
         """
+        ret = None
         if F.is_tensor(data):
             if F.dtype(data) != self.idtype or F.context(data) != self.device:
                 raise DGLError('Expect argument "{}" to have data type {} and device '
                                'context {}. But got {} and {}.'.format(
-                                   self.idtype, self.device, F.dtype(data), F.context(data)))
-            return data
+                                   name, self.idtype, self.device, F.dtype(data), F.context(data)))
+            ret = data
         else:
-            return F.copy_to(F.tensor(data, self.idtype), self.device)
+            ret = F.copy_to(F.tensor(data, self.idtype), self.device)
+
+        if F.ndim(ret) != 1:
+            raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
+                name, ret))
+        return ret
 
     def has_node(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
@@ -2059,12 +2065,12 @@ class DGLHeteroGraph(object):
                 'need a dict of node type and IDs for graph with multiple node types'
             nodes = {self.ntypes[0]: nodes}
 
-        def _process_nodes(v):
+        def _process_nodes(ntype, v):
             if F.is_tensor(v) and F.dtype(v) == F.bool:
                 return F.astype(F.nonzero_1d(F.copy_to(v, self.device)), self.idtype)
             else:
-                return self.check_and_to_tensor(v, 'nodes')
-        induced_nodes = [_process_nodes(nodes.get(ntype, [])) for ntype in self.ntypes]
+                return self.check_and_to_tensor(v, 'nodes["{}"]'.format(ntype))
+        induced_nodes = [_process_nodes(ntype, nodes.get(ntype, [])) for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
         induced_edges = sgi.induced_edges
         return self._create_hetero_subgraph(sgi, induced_nodes, induced_edges)
@@ -2168,16 +2174,16 @@ class DGLHeteroGraph(object):
                 'need a dict of edge type and IDs for graph with multiple edge types'
             edges = {self.canonical_etypes[0]: edges}
 
-        def _process_edges(e):
+        def _process_edges(etype, e):
             if F.is_tensor(e) and F.dtype(e) == F.bool:
                 return F.astype(F.nonzero_1d(F.copy_to(e, self.device)), self.idtype)
             else:
-                return self.check_and_to_tensor(e, 'edges')
+                return self.check_and_to_tensor(e, 'edges["{}"]'.format(etype))
 
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
-            _process_edges(edges.get(canonical_etype, []))
-            for canonical_etype in self.canonical_etypes]
+            _process_edges(cetype, edges.get(cetype, []))
+            for cetype in self.canonical_etypes]
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes)
         induced_nodes = sgi.induced_nodes
 
@@ -2898,7 +2904,6 @@ class DGLHeteroGraph(object):
         apply_nodes
         group_apply_edges
         """
-        check_same_dtype(self._idtype_str, edges)
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
@@ -2961,32 +2966,26 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
-        check_same_dtype(self._idtype_str, edges)
         if group_by not in ('src', 'dst'):
             raise DGLError("Group_by should be either src or dst")
-
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
-            u, v, _ = self._graph.edges(etid, 'eid')
-            eid = utils.toindex(slice(0, self.number_of_edges(etype)), self._idtype_str)
+            u, v, eid = self.edges(etype=etype, form='all')
         elif isinstance(edges, tuple):
-            u, v = edges
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges.
-            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
-            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
-            u = F.copy_to(u, F.cpu())
-            v = F.copy_to(v, F.cpu())
-            u, v, eid = self._graph.edge_ids_all(etid, u, v)
+            # Find all edges including parallel edges
+            u, v = edges
+            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
+        else:
+            eid = self.check_and_to_tensor(edges, 'edges')
+            u, v = self.find_edges(eid, etype=etype)
+
+
+        with ir.prog() as prog:
             u = utils.toindex(u, self._idtype_str)
             v = utils.toindex(v, self._idtype_str)
             eid = utils.toindex(eid, self._idtype_str)
-        else:
-            eid = utils.toindex(edges, self._idtype_str)
-            u, v, _ = self._graph.find_edges(etid, eid)
-
-        with ir.prog() as prog:
             scheduler.schedule_group_apply_edge(
                 AdaptedHeteroGraph(self, stid, dtid, etid),
                 u, v, eid,

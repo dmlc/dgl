@@ -1158,7 +1158,8 @@ def in_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
+            nodes_all_types.append(F.to_dgl_nd(
+                g.check_and_to_tensor(nodes[ntype], 'nodes["{}"]'.format(ntype))))
         else:
             nodes_all_types.append(nd.NULL[g._idtype_str])
 
@@ -1166,7 +1167,7 @@ def in_subgraph(g, nodes):
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+        ret.edges[etype].data[EID] = induced_edges[i]
     return ret
 
 def out_subgraph(g, nodes):
@@ -1197,7 +1198,8 @@ def out_subgraph(g, nodes):
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
+            nodes_all_types.append(F.to_dgl_nd(
+                g.check_and_to_tensor(nodes[ntype], 'nodes["{}"]'.format(ntype))))
         else:
             nodes_all_types.append(nd.NULL[g._idtype_str])
 
@@ -1205,7 +1207,7 @@ def out_subgraph(g, nodes):
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+        ret.edges[etype].data[EID] = induced_edges[i]
     return ret
 
 def to_simple(g, return_counts='count', writeback_mapping=None):
