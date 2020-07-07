@@ -391,7 +391,7 @@ COOMatrix COORowWiseTopk(
  * COOMatrix_B.num_rows : 3
  * COOMatrix_B.num_cols : 4
  *
- * C = UnionCoo({A, B});
+ * C, eid0, eid1 = UnionCoo({A, B});
  *
  * C = [[0, 1, 2, 0],
  *      [1, 0, 1, 2],
@@ -399,9 +399,15 @@ COOMatrix COORowWiseTopk(
  *
  * COOMatrix_C.num_rows : 3
  * COOMatrix_C.num_cols : 4
+ *
+ * \return Unioned COOMatrix
+ *         The edge mapping from the edge IDs of the first graph to those of the
+ *         returned graph.
+ *         The edge mapping from the edge IDs of the second graph to those of the
+ *         returned graph.
  */
-COOMatrix UnionCoo(
-  const std::vector<COOMatrix>& coos);
+std::tuple<COOMatrix, IdArray, IdArray>
+UnionCoo(const std::vector<COOMatrix>& coos);
 
 /*!
  * \brief DisjointUnion a list COOMatrix into one COOMatrix.

@@ -155,7 +155,7 @@ COOMatrix CSRRowWiseTopk(
 // Union two CSRMatrix
 // Both two matrixes should be sorted.
 template <DLDeviceType XPU, typename IdType>
-CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
+std::tuple<CSRMatrix, IdArray, IdArray> UnionCsr(const std::vector<CSRMatrix>& csrs);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 

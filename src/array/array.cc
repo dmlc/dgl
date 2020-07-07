@@ -501,8 +501,9 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
-CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
-  CSRMatrix ret;
+std::tuple<CSRMatrix, IdArray, IdArray>
+UnionCsr(const std::vector<CSRMatrix>& csrs) {
+  std::tuple<CSRMatrix, IdArray, IdArray> ret;
   CHECK_EQ(csrs.size(), 2) << "UnionCsr creates a union of two CSRMatrix";
   CHECK_EQ(csrs[0].num_rows, csrs[1].num_rows) <<
     "UnionCsr requires both CSRMatrix have same number of rows";
@@ -703,7 +704,8 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
-COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
+std::tuple<COOMatrix, IdArray, IdArray>
+UnionCoo(const std::vector<COOMatrix>& coos) {
   COOMatrix ret;
   CHECK_EQ(coos.size(), 2) << "UnionCoo creates a union of two COOMatrix";
   CHECK_EQ(coos[0].num_rows, coos[1].num_rows) <<
@@ -719,41 +721,39 @@ COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
   IdArray coo2_data = COOHasData(coos[1]) ? coos[1].data : NullArray();
   IdArray row = Concat(coo_row);
   IdArray col = Concat(coo_col);
-  IdArray data = NullArray();
+  // 0 ~ nnz0
+  IdArray eid_data0 = COOHasData(coos[0]) ?
+                      Scatter(Range(0,
+                                    coos[0].row->shape[0],
+                                    coos[0].row->dtype.bits,
+                                    coos[0].row->ctx),
+                              coos[0].data) :
+                      Range(0,
+                            coos[0].row->shape[0],
+                            coos[0].row->dtype.bits,
+                            coos[0].row->ctx);
+  // nnz0 ~ nnz0 + nnz1
+  IdArray eid_data1 = COOHasData(coos[1]) ?
+                      Scatter(Range(coos[0].row->shape[0],
+                                    coos[0].row->shape[0] + coos[1].row->shape[0],
+                                    coos[0].row->dtype.bits,
+                                    coos[0].row->ctx),
+                              coos[1].data) :
+                      Range(coos[0].row->shape[0],
+                            coos[0].row->shape[0] + coos[1].row->shape[0],
+                            coos[0].row->dtype.bits,
+                            coos[0].row->ctx);
 
-  // eids of coos[0] remains unchanged
-  // eids of coos[1] will be increased by number of edges of coos[0]
-  if (COOHasData(coos[0])) {
-    if (COOHasData(coos[1])) {
-      std::vector<IdArray> coo_data = {coos[0].data, coos[1].data + coos[0].row->shape[0]};
-      data = Concat(coo_data);
-    } else {
-      std::vector<IdArray> coo_data = {coos[0].data,
-                                       Range(coos[0].row->shape[0],
-                                             coos[0].row->shape[0] + coos[1].row->shape[0],
-                                             coos[0].data->dtype.bits,
-                                             coos[0].data->ctx)};
-      data = Concat(coo_data);
-    }
-  } else {
-    if (COOHasData(coos[1])) {
-      std::vector<IdArray> coo_data = {Range(0,
-                                             coos[0].row->shape[0],
-                                             coos[1].data->dtype.bits,
-                                             coos[1].data->ctx),
-                                       coos[1].data + coos[0].row->shape[0]};
-      data = Concat(coo_data);
-    }
-  }
-
-  return COOMatrix(
+  COOMatrix ret_coo = COOMatrix(
     coos[0].num_rows,
     coos[0].num_cols,
     row,
     col,
-    data,
+    NullArray(),
     false,
     false);
+
+  return std::make_tuple(ret_coo, eid_data0, eid_data1);
 }
 
 ///////////////////////// Graph Traverse routines //////////////////////////
