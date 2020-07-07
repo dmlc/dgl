@@ -30,6 +30,12 @@ def _reduce_grad(grad, shape):
         grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(-1, *shape[1:])
 
+def _muldiv(op, x):
+    return 1. / x if op == 'div' else x
+
+def _addsub(op, x):
+    return -x if op == 'sub' else x
+
 class GSpMM(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, op, reduce_op, X, Y):
@@ -44,32 +50,38 @@ class GSpMM(th.autograd.Function):
         gidx, op, reduce_op = ctx.backward_cache
         X, Y, out, argX, argY = ctx.saved_tensors
         dX, dY = None, None
-        if ctx.needs_input_grad[3]:
+        if op != 'copy_e' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
-                if op == 'mul':
-                    dX = _gspmm(g_rev, '*', 'sum', dZ, Y)[0]
+                if op in ['mul', 'div']:
+                    dX = _gspmm(g_rev, '*', 'sum', dZ, _muldiv(op, Y))[0]
                 elif op in ['add', 'sub']:
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
-                elif op == 'div':
-                    dX = _gspmm(g_rev, '*', 'sum', dZ, 1. / Y)[0]
                 elif op == 'copy_u':
                     dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
             else:
-                pass
+                dX = th.zeros((X.shape[0],) + dZ.shape[1:], dtype=X.dtype, device=X.device)
+                if op in ['mul', 'div']:
+                    dX.scatter_add_(0, argX.long(),
+                                    _muldiv(op, Y.expand(-1, *dZ.shape[1:]).gather(0, argY.long())) * dZ)
+                elif op in ['add', 'sub', 'copy_u']:
+                    dX.scatter_add_(0, argX.long(), dZ)
             dX = _reduce_grad(dX, X.shape)
-        if ctx.needs_input_grad[4]:
+        if op != 'copy_u' and ctx.needs_input_grad[4]:
             if reduce_op == 'sum':
-                if op == 'mul':
+                if op in ['mul', 'div']:
                     dY = _gsddmm(gidx, '*', X, dZ)
-                elif op in ['add', 'copy_e']:
-                    dY = _gsddmm(gidx, 'copy_rhs', X, dZ)
-                elif op == 'sub':
-                    dY = _gsddmm(gidx, 'copy_rhs', X, -dZ)
-                elif op == 'div':
-                    dY = -_gsddmm(gidx, '*', X, dZ) / (Y ** 2)
+                    if op == 'div': dY = -dY / (Y ** 2)
+                elif op in ['add', 'sub', 'copy_e']:
+                    dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
-                pass
+                dY = th.zeros((Y.shape[0],) + dZ.shape[1:], dtype=Y.dtype, device=Y.device)
+                if op in ['mul',  'div']:
+                    dY.scatter_add_(0, argY.long(),
+                                    X.expand(-1, *dZ.shape[1:]).gather(0, argX.long()) * dZ)
+                    if op == 'div': dY = -dY / (Y ** 2)
+                elif op in ['add', 'sub', 'copy_e']:
+                    dY.scatter_add_(0, argY.long(), _addsub(op, dZ))
             dY = _reduce_grad(dY, Y.shape)
         return None, None, None, dX, dY
 
@@ -78,19 +90,53 @@ class GSDDMM(th.autograd.Function):
     def forward(ctx, g, op, X, Y, lhs_target, rhs_target):
         gidx = g._graph
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
-        ctx.backward_cache = gidx, op
+        ctx.backward_cache = gidx, op, lhs_target, rhs_target
         ctx.save_for_backward(X, Y, out)
         return out
 
     @staticmethod
-    def backward(ctx, grad):
-        gidx, op = ctx.backward_cache
+    def backward(ctx, dZ):
+        gidx, op, lhs_target, rhs_target = ctx.backward_cache
         X, Y, out = ctx.saved_tensors
         dX, dY = None, None
-        if ctx.needs_input_grad[2]:
-            pass
-        if ctx.needs_input_grad[3]:
-            pass
+        if op != 'copy_rhs' and ctx.needs_input_grad[2]:
+            if lhs_target in ['u', 'v']:
+                _gidx = gidx if lhs_target == 'v' else gidx.reverse()
+                if op in ['add', 'sub', 'copy_lhs']:
+                    dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0]
+                else:  # mul, div, dot
+                    if rhs_target == lhs_target:
+                        dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0] * _muldiv(op, Y)
+                    elif rhs_target == 'e':
+                        dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ * _muldiv(op, Y))[0]
+                    else:  # rhs_target = !lhs_target
+                        dX = _gspmm(_gidx, 'mul', 'sum', _muldiv(op, Y), dZ)[0]
+            else:  # lhs_target == 'e'
+                if op in ['add', 'sub', 'copy_lhs']:
+                    dX = dZ
+                else:  # mul, div, dot
+                    dX = _gsddmm(gidx, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
+            dX = _reduce_grad(dX, X.shape)
+        if op != 'copy_lhs' and ctx.needs_input_grad[3]:
+            if rhs_target in ['u', 'v']:
+                _gidx = gidx if rhs_target == 'v' else gidx.reverse()
+                if op in ['add', 'sub', 'copy_rhs']:
+                    dY = _gspmm(_gidx, 'copy_e', 'sum', None, _addsub(op, dZ))[0]
+                else:  # mul, div, dot
+                    if lhs_target == rhs_target:
+                        dY = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0] * X
+                    elif lhs_target == 'e':
+                        dY = _gspmm(_gidx, 'copy_e', 'sum', None, dZ * X)[0]
+                    else:  # rhs_target = !lhs_target
+                        dY = _gspmm(_gidx, 'mul', 'sum', X, dZ)[0]
+                    if op == 'div': dY = -dY / (Y ** 2)
+            else:
+                if op in ['add', 'sub', 'copy_rhs']:
+                    dY = _addsub(op, dZ)
+                else:  # mul, div, dot
+                    dY = _gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
+                    if op == 'div': dY = -dY / (Y ** 2)
+            dY = _reduce_grad(dY, Y.shape)
         return None, None, dX, dY, None, None
 
 class EdgeSoftmax(th.autograd.Function):
