@@ -2604,18 +2604,22 @@ class DGLHeteroGraph(object):
         if is_all(u):
             num_nodes = self._graph.number_of_nodes(ntid)
         else:
-            u = utils.toindex(u, self._idtype_str)
+            u = utils.prepare_tensor(g, u, 'u')
             num_nodes = len(u)
         for key, val in data.items():
             nfeats = F.shape(val)[0]
             if nfeats != num_nodes:
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
+            if F.context(val) != self.device:
+                raise DGLError('Expect node feature to be on device {}.'
+                               ' But got {}.' % (self.device, F.context(val)))
 
         if is_all(u):
             for key, val in data.items():
                 self._node_frames[ntid][key] = val
         else:
+            u = utils.toindex(u, self._idtype_str)
             self._node_frames[ntid].update_rows(u, data, inplace=inplace)
 
     def _get_n_repr(self, ntid, u):
@@ -2690,16 +2694,12 @@ class DGLHeteroGraph(object):
         if is_all(edges):
             eid = ALL
         elif isinstance(edges, tuple):
-            u, v = edges
-            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
-            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
-            u = F.copy_to(u, F.cpu())
-            v = F.copy_to(v, F.cpu())
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            eid = self._graph.edge_ids_one(etid, u, v)
-            eid = utils.toindex(eid, self._idtype_str)
+            # Find all edges including parallel edges
+            u, v = edges
+            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
         else:
-            eid = utils.toindex(edges, self._idtype_str)
+            eid = utils.prepare_tensor(self, edges, 'edges')
 
         # sanity check
         if not utils.is_dict_like(data):
@@ -2709,13 +2709,16 @@ class DGLHeteroGraph(object):
         if is_all(eid):
             num_edges = self._graph.number_of_edges(etid)
         else:
-            eid = utils.toindex(eid, self._idtype_str)
             num_edges = len(eid)
         for key, val in data.items():
             nfeats = F.shape(val)[0]
             if nfeats != num_edges:
                 raise DGLError('Expect number of features to match number of edges.'
                                ' Got %d and %d instead.' % (nfeats, num_edges))
+            if F.context(val) != self.device:
+                raise DGLError('Expect edge feature to be on device {}.'
+                               ' But got {}.' % (self.device, F.context(val)))
+
         # set
         if is_all(eid):
             # update column
@@ -2723,6 +2726,7 @@ class DGLHeteroGraph(object):
                 self._edge_frames[etid][key] = val
         else:
             # update row
+            eid = utils.toindex(eid, self._idtype_str)
             self._edge_frames[etid].update_rows(eid, data, inplace=inplace)
 
     def _get_e_repr(self, etid, edges):
@@ -2745,16 +2749,12 @@ class DGLHeteroGraph(object):
         if is_all(edges):
             eid = ALL
         elif isinstance(edges, tuple):
-            u, v = edges
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
-            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
-            u = F.copy_to(u, F.cpu())
-            v = F.copy_to(v, F.cpu())
-            eid = self._graph.edge_ids_one(etid, u, v)
-            eid = utils.toindex(eid, self._idtype_str)
+            # Find all edges including parallel edges
+            u, v = edges
+            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
         else:
-            eid = utils.toindex(edges, self._idtype_str)
+            eid = utils.prepare_tensor(self, edges, 'edges')
 
         if is_all(eid):
             return dict(self._edge_frames[etid])
