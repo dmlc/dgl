@@ -660,3 +660,62 @@ class FlattenedDict(object):
         k = self._group_keys[i]
         j = idx - self._group_offsets[i]
         return k, self._groups[k][j]
+
+
+def prepare_tensor(g, data, name):
+    """Convert the data to ID tensor and check its ID type and context.
+
+    If the data is already in tensor type, raise error if its ID type
+    and context does not match the graph's.
+    Otherwise, convert it to tensor type of the graph's ID type and
+    ctx and return.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Graph.
+    data : int, iterable of int, tensor
+        Data.
+    name : str
+        Name of the data.
+
+    Returns
+    -------
+    Tensor
+        Data in tensor object.
+    """
+    ret = None
+    if F.is_tensor(data):
+        if F.dtype(data) != g.idtype or F.context(data) != g.device:
+            raise DGLError('Expect argument "{}" to have data type {} and device '
+                           'context {}. But got {} and {}.'.format(
+                               name, g.idtype, g.device, F.dtype(data), F.context(data)))
+        ret = data
+    else:
+        ret = F.copy_to(F.tensor(data, g.idtype), g.device)
+
+    if F.ndim(ret) != 1:
+        raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
+            name, ret))
+    return ret
+
+def prepare_tensor_dict(g, data, name):
+    """Convert a dictionary of data to a dictionary of ID tensors.
+
+    If calls ``prepare_tensor`` on each key-value pair.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Graph.
+    data : dict[str, (int, iterable of int, tensor)]
+        Data dict.
+    name : str
+        Name of the data.
+
+    Returns
+    -------
+    dict[str, tensor]
+    """
+    return {key : prepare_tensor(g, val, '{}["{}"]'.format(name, key))
+            for key, val in data.items()}

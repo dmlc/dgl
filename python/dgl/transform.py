@@ -1155,11 +1155,11 @@ def in_subgraph(g, nodes):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(
-                g.check_and_to_tensor(nodes[ntype], 'nodes["{}"]'.format(ntype))))
+            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
         else:
             nodes_all_types.append(nd.NULL[g._idtype_str])
 
@@ -1195,11 +1195,11 @@ def out_subgraph(g, nodes):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(
-                g.check_and_to_tensor(nodes[ntype], 'nodes["{}"]'.format(ntype))))
+            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
         else:
             nodes_all_types.append(nd.NULL[g._idtype_str])
 

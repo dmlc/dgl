@@ -1298,45 +1298,6 @@ class DGLHeteroGraph(object):
         """
         return self._graph.dtype
 
-    def check_and_to_tensor(self, data, name):
-        """Convert the data to ID tensor and check its ID type and context.
-
-        If the data is already in tensor type, raise error if its ID type
-        and context does not match the current graph's.
-        Otherwise, convert it to tensor type of the current graph's ID type and
-        ctx and return.
-
-        Parameters
-        ----------
-        data : int, iterable of int, tensor
-            Data.
-        name : str
-            Name of the data.
-        idtype : data type
-            Data type.
-        ctx : device context
-            Device context.
-
-        Returns
-        -------
-        Tensor
-            Data in tensor object.
-        """
-        ret = None
-        if F.is_tensor(data):
-            if F.dtype(data) != self.idtype or F.context(data) != self.device:
-                raise DGLError('Expect argument "{}" to have data type {} and device '
-                               'context {}. But got {} and {}.'.format(
-                                   name, self.idtype, self.device, F.dtype(data), F.context(data)))
-            ret = data
-        else:
-            ret = F.copy_to(F.tensor(data, self.idtype), self.device)
-
-        if F.ndim(ret) != 1:
-            raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
-                name, ret))
-        return ret
-
     def has_node(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
 
@@ -1364,7 +1325,7 @@ class DGLHeteroGraph(object):
         """
         ret = self._graph.has_node(
             self.get_ntype_id(ntype),
-            self.check_and_to_tensor(vid, "vid"))
+            utils.prepare_tensor(self, vid, "vid"))
         if isinstance(vid, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
@@ -1423,8 +1384,8 @@ class DGLHeteroGraph(object):
         """
         ret = self._graph.has_edge_between(
             self.get_etype_id(etype),
-            self.check_and_to_tensor(u, 'u'),
-            self.check_and_to_tensor(v, 'v'))
+            utils.prepare_tensor(self, u, 'u'),
+            utils.prepare_tensor(self, v, 'v'))
         if isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
@@ -1623,8 +1584,8 @@ class DGLHeteroGraph(object):
         (tensor([1, 1]), tensor([2, 2]), tensor([1, 2]))
         """
         is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
-        u = self.check_and_to_tensor(u, 'u')
-        v = self.check_and_to_tensor(v, 'v')
+        u = utils.prepare_tensor(self, u, 'u')
+        v = utils.prepare_tensor(self, v, 'v')
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
@@ -1677,7 +1638,7 @@ class DGLHeteroGraph(object):
         >>> g.find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 2]))
         """
-        eid = self.check_and_to_tensor(eid, 'eid')
+        eid = utils.prepare_tensor(self, eid, 'eid')
         # sanity check
         max_eid = F.as_scalar(F.max(eid, dim=0))
         if max_eid >= self.number_of_edges(etype):
@@ -1728,7 +1689,7 @@ class DGLHeteroGraph(object):
         >>> g.in_edges([0, 2], form='uv')
         (tensor([0, 1]), tensor([0, 2]))
         """
-        v = self.check_and_to_tensor(v, 'v')
+        v = utils.prepare_tensor(self, v, 'v')
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
             return src, dst, eid
@@ -1779,7 +1740,7 @@ class DGLHeteroGraph(object):
         >>> g.out_edges([0, 1], form='uv')
         (tensor([0, 1, 1]), tensor([0, 1, 2]))
         """
-        u = self.check_and_to_tensor(u, 'u')
+        u = utils.prepare_tensor(self, u, 'u')
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
             return src, dst, eid
@@ -1892,7 +1853,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         if is_all(v):
             v = self.nodes(dsttype)
-        deg = self._graph.in_degrees(etid, self.check_and_to_tensor(v, 'v'))
+        deg = self._graph.in_degrees(etid, utils.prepare_tensor(self, v, 'v'))
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
         else:
@@ -1949,7 +1910,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         if is_all(u):
             u = self.nodes(srctype)
-        deg = self._graph.out_degrees(etid, self.check_and_to_tensor(u, 'u'))
+        deg = self._graph.out_degrees(etid, utils.prepare_tensor(self, u, 'u'))
         if isinstance(u, numbers.Integral):
             return F.as_scalar(deg)
         else:
@@ -2069,7 +2030,7 @@ class DGLHeteroGraph(object):
             if F.is_tensor(v) and F.dtype(v) == F.bool:
                 return F.astype(F.nonzero_1d(F.copy_to(v, self.device)), self.idtype)
             else:
-                return self.check_and_to_tensor(v, 'nodes["{}"]'.format(ntype))
+                return utils.prepare_tensor(self, v, 'nodes["{}"]'.format(ntype))
         induced_nodes = [_process_nodes(ntype, nodes.get(ntype, [])) for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
         induced_edges = sgi.induced_edges
@@ -2178,7 +2139,7 @@ class DGLHeteroGraph(object):
             if F.is_tensor(e) and F.dtype(e) == F.bool:
                 return F.astype(F.nonzero_1d(F.copy_to(e, self.device)), self.idtype)
             else:
-                return self.check_and_to_tensor(e, 'edges["{}"]'.format(etype))
+                return utils.prepare_tensor(self, e, 'edges["{}"]'.format(etype))
 
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
@@ -2914,7 +2875,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
         else:
-            eid = self.check_and_to_tensor(edges, 'edges')
+            eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
 
         with ir.prog() as prog:
@@ -2978,7 +2939,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
         else:
-            eid = self.check_and_to_tensor(edges, 'edges')
+            eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
 
 
@@ -3090,7 +3051,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
         else:
-            eid = self.check_and_to_tensor(edges, 'edges')
+            eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
 
         if len(u) == 0:
