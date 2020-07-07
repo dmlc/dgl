@@ -1675,6 +1675,9 @@ class DGLHeteroGraph(object):
         >>> g.find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 2]))
         """
+        if len(eid) == 0:
+            return F.tensor([], dtype=self.idtype), F.tensor([], dtype=self.idtype)
+
         check_same_dtype(self._idtype_str, eid)
         if F.is_tensor(eid):
             max_eid = F.max(eid, dim=0)
@@ -4782,8 +4785,8 @@ def find_src_dst_ntypes(ntypes, metagraph):
         return None
     else:
         src, dst = ret
-        srctypes = {ntypes[tid.data] : tid.data for tid in src}
-        dsttypes = {ntypes[tid.data] : tid.data for tid in dst}
+        srctypes = {ntypes[tid] : tid for tid in src}
+        dsttypes = {ntypes[tid] : tid for tid in dst}
         return srctypes, dsttypes
 
 def infer_ntype_from_dict(graph, etype_dict):
