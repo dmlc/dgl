@@ -69,7 +69,7 @@ def generate_graph(idtype=F.int64, grad=False):
 @parametrize_dtype
 def test_isolated_nodes(idtype):
     g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, idtype=idtype)
-    assert g._idtype_str == idtype
+    assert g.idtype == idtype
     assert g.number_of_nodes() == 5
 
     # Test backward compatibility
@@ -78,14 +78,14 @@ def test_isolated_nodes(idtype):
 
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
                       'game', num_nodes=(5, 7), idtype=idtype)
-    assert g._idtype_str == idtype
+    assert g.idtype == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
     # Test backward compatibility
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
                       'game', card=(5, 7), idtype=idtype)
-    assert g._idtype_str == idtype
+    assert g.idtype == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
@@ -237,7 +237,7 @@ def atest_nx_conversion(idtype):
     # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
     g = dgl.graph(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'], idtype=idtype)    
-    assert g._idtype_str == idtype
+    assert g.idtype == idtype
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -496,6 +496,7 @@ def _test_dynamic_addition():
 @parametrize_dtype
 def test_repr(idtype):
     G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype)
+    G = G.to(F._default_context)
     repr_string = G.__repr__()
     print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
@@ -543,6 +544,7 @@ def test_group_apply_edges(idtype):
 @parametrize_dtype
 def test_local_var(idtype):
     g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype)
+    g = g.to(F._default_context)
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -579,7 +581,8 @@ def test_local_var(idtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)])
+    g = dgl.graph([(0,1), (1,1)], idtype=idtype)
+    g = g.to(F._default_context)
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         g = g.local_var()

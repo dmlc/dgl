@@ -2677,6 +2677,8 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
+            u = utils.prepare_tensor(self, u, 'edges[0]')
+            v = utils.prepare_tensor(self, v, 'edges[1]')
             eid = self.edge_id(u, v, etype=self.canonical_etypes[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
@@ -2730,6 +2732,8 @@ class DGLHeteroGraph(object):
             eid = ALL
         elif isinstance(edges, tuple):
             u, v = edges
+            u = utils.prepare_tensor(self, u, 'edges[0]')
+            v = utils.prepare_tensor(self, v, 'edges[1]')
             eid = self.edge_id(u, v, etype=self.canonical_etypes[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
@@ -2849,6 +2853,8 @@ class DGLHeteroGraph(object):
             u, v, eid = self.edges(etype=etype, form='all')
         elif isinstance(edges, tuple):
             u, v = edges
+            u = utils.prepare_tensor(self, u, 'edges[0]')
+            v = utils.prepare_tensor(self, v, 'edges[1]')
             eid = self.edge_id(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
@@ -2911,6 +2917,8 @@ class DGLHeteroGraph(object):
             u, v, eid = self.edges(etype=etype, form='all')
         elif isinstance(edges, tuple):
             u, v = edges
+            u = utils.prepare_tensor(self, u, 'edges[0]')
+            v = utils.prepare_tensor(self, v, 'edges[1]')
             eid = self.edge_id(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
@@ -3021,6 +3029,8 @@ class DGLHeteroGraph(object):
 
         if isinstance(edges, tuple):
             u, v = edges
+            u = utils.prepare_tensor(self, u, 'edges[0]')
+            v = utils.prepare_tensor(self, v, 'edges[1]')
             eid = self.edge_id(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
