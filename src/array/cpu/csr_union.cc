@@ -66,9 +66,9 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
         int64_t min_idx = -1;
         for (size_t j = 0; j < csrs.size(); ++j) {
           if (indices_off[j] < indptr_data[j][i]) {
-            if (min <= indices_data[j][indices_off[j]])
+            if (min <= indices_data[j][indices_off[j]]) {
               continue;
-            else {
+            } else {
               min = indices_data[j][indices_off[j]];
               min_idx = j;
             }
