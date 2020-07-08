@@ -15,8 +15,9 @@ from ..utils import retry_method_with_fix
 from .. import backend as F
 from ..graph import DGLGraph
 from ..graph import batch as graph_batch
+from ..convert import graph as dgl_graph
 
-class RGCNLinkDataset(DGLBuiltinDatasetm):
+class RGCNLinkDataset(DGLBuiltinDataset):
     """RGCN link prediction dataset
 
     The dataset contains a graph depicting the connectivity of a knowledge
@@ -64,14 +65,21 @@ class RGCNLinkDataset(DGLBuiltinDatasetm):
 
     """
     def __init__(self, name, reverse=True, raw_dir=None, force_reload=False, verbose=True):
-        self.name = name
+        self._name = name
         self.reverse = reverse
-        url = _get_dgl_url('dataset/') + '{}.tgz'.format(self.name)
+        url = _get_dgl_url('dataset/') + '{}.tgz'.format(name)
         super(RGCNLinkDataset, self).__init__(name,
                                               url=url,
                                               raw_dir=raw_dir,
                                               force_reload=force_reload,
                                               verbose=verbose)
+
+    def download(self):
+        r""" Automatically download data and extract it.
+        """
+        tgz_path = os.path.join(self.raw_dir, self.name + '.tgz')
+        download(self.url, path=tgz_path)
+        extract_archive(tgz_path, self.raw_path)
 
     def process(self, root_path):
         entity_path = os.path.join(root_path, 'entities.dict')
@@ -102,7 +110,7 @@ class RGCNLinkDataset(DGLBuiltinDatasetm):
         self._num_rels = num_rels
         # build graph
         g = build_knowledge_graph(num_nodes, num_rels, train, valid, test, reverse=self.reverse)
-        sekf._g = g
+        self._g = g
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path,
@@ -203,6 +211,29 @@ class RGCNLinkDataset(DGLBuiltinDatasetm):
         deprecate_property('dataset.test', 'g.edata[\'test_mask\']')
         return self._test
 
+def _read_dictionary(filename):
+    d = {}
+    with open(filename, 'r+') as f:
+        for line in f:
+            line = line.strip().split('\t')
+            d[line[1]] = int(line[0])
+    return d
+
+def _read_triplets(filename):
+    with open(filename, 'r+') as f:
+        for line in f:
+            processed_line = line.strip().split('\t')
+            yield processed_line
+
+def _read_triplets_as_list(filename, entity_dict, relation_dict):
+    l = []
+    for triplet in _read_triplets(filename):
+        s = entity_dict[triplet[0]]
+        r = relation_dict[triplet[1]]
+        o = entity_dict[triplet[2]]
+        l.append([s, r, o])
+    return l
+
 def build_knowledge_graph(num_nodes, num_rels, train, valid, test, reverse=True):
     """ Create a DGL Homogeneous graph with heterograph info stored as node or edge features.
     """
@@ -238,9 +269,10 @@ def build_knowledge_graph(num_nodes, num_rels, train, valid, test, reverse=True)
             if raw_reverse_sugb.get(re_type, None) is None:
                 raw_reverse_sugb[re_type] = ([], [])
                 raw_reverse_subg_etype[re_type] = []
+                raw_reverse_subg_eset[re_type] = []
             raw_reverse_sugb[re_type][0].append(d)
             raw_reverse_sugb[re_type][1].append(s)
-            raw_reverse_subg_eset[e_type].append(edge_set)
+            raw_reverse_subg_eset[re_type].append(edge_set)
             raw_reverse_subg_etype[re_type].append(r + num_rels)
 
     for edge in train:
@@ -279,7 +311,7 @@ def build_knowledge_graph(num_nodes, num_rels, train, valid, test, reverse=True)
 
     settype = np.concatenate(fg_settype)
     if reverse is True:
-        settype = np.concatenate([settype, np.full((settype.shape[0], -1), 0)])
+        settype = np.concatenate([settype, np.full((settype.shape[0]), 0)])
     train_edge_mask = generate_mask_tensor(settype == 1)
     valid_edge_mask = generate_mask_tensor(settype == 2)
     test_edge_mask = generate_mask_tensor(settype == 3)
@@ -300,17 +332,17 @@ def build_knowledge_graph(num_nodes, num_rels, train, valid, test, reverse=True)
 
     s = np.concatenate(fg_s)
     d = np.concatenate(fg_d)
-    g = dgl.graph((s, d), num_nodes=num_nodes)
+    g = dgl_graph((s, d), num_nodes=num_nodes)
     etype = np.concatenate(fg_etype)
     settype = np.concatenate(fg_settype)
-    g.edata['etype'] = F.tensor(etype, dtype=F.data_type_dict['long'])
+    g.edata['etype'] = F.tensor(etype, dtype=F.data_type_dict['int64'])
     g.edata['train_edge_mask'] = train_edge_mask
     g.edata['valid_edge_mask'] = valid_edge_mask
     g.edata['test_edge_mask'] = test_edge_mask
     g.edata['train_mask'] = generate_mask_tensor(settype == 1) if reverse is True else train_edge_mask
     g.edata['valid_mask'] = generate_mask_tensor(settype == 2) if reverse is True else valid_edge_mask
     g.edata['test_mask'] = generate_mask_tensor(settype == 3) if reverse is True else test_edge_mask
-    g.ndata['ntype'] = F.full_1d(num_nodes, 0, dtype=F.data_type_dict['long'], ctx=F.cpu())
+    g.ndata['ntype'] = F.full_1d(num_nodes, 0, dtype=F.data_type_dict['int64'], ctx=F.cpu())
 
     return g
 
@@ -324,11 +356,10 @@ class FB15k237Dataset(RGCNLinkDataset):
     
     Statistics
     ----------
-    Nodes: xxx
-    Edges: xxx
+    Nodes: 14541
     Number of relation types: 237
     Number of reversed relation types: 237
-    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    Label Split: Train: 272115 ,Valid: 17535, Test: 20466
 
     Parameters
     ----------
@@ -388,7 +419,7 @@ class FB15k237Dataset(RGCNLinkDataset):
     """
     def __init__(self, reverse=True, raw_dir=None, force_reload=False, verbose=True):
         name = 'FB15k-237'
-        super(FB15k237Dataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(FB15k237Dataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
 class FB15kDataset(RGCNLinkDataset):
     r"""FB15k link prediction dataset
@@ -403,10 +434,9 @@ class FB15kDataset(RGCNLinkDataset):
     Statistics
     ----------
     Nodes: 14,951
-    Edges: xxx
     Number of relation types: 1,345
     Number of reversed relation types: 1,345
-    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    Label Split: Train: 483142 ,Valid: 50000, Test: 59071
 
     Parameters
     ----------
@@ -465,7 +495,7 @@ class FB15kDataset(RGCNLinkDataset):
     """
     def __init__(self, reverse=True, raw_dir=None, force_reload=False, verbose=True):
         name = 'FB15k'
-        super(FB15kDataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(FB15kDataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
 class WN18Dataset(RGCNLinkDataset):
     r""" WN18 dataset.
@@ -541,5 +571,12 @@ class WN18Dataset(RGCNLinkDataset):
     """
     def __init__(self, reverse=True, raw_dir=None, force_reload=False, verbose=True):
         name = 'wn18'
-        super(WN18Dataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(WN18Dataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
+def load_data(dataset):
+    if dataset == 'wn18':
+        return WN18Dataset()
+    elif dataset == 'FB15k':
+        return FB15kDataset()
+    elif dataset == 'FB15k-237':
+        return FB15k237Dataset()
