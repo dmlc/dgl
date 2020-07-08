@@ -1977,6 +1977,13 @@ def test_reverse(index_dtype):
         }, index_dtype=index_dtype)
     gidx = g._graph
     r_gidx = gidx.reverse()
+
+    # metagraph
+    mg = gidx.metagraph
+    r_mg = r_gidx.metagraph
+    for etype in range(3):
+        assert mg.find_edge(etype) == r_mg.find_edge(etype)[::-1]
+
     # three node types and three edge types
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
