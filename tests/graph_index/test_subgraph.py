@@ -107,7 +107,7 @@ def create_large_heterograph(num_nodes):
 def test_node_subgraph_with_halo():
     gi = create_large_graph_index(1000)
     nodes = np.random.choice(gi.number_of_nodes(), 100, replace=False)
-    halo_subg, inner_node, inner_edge = gi.node_halo_subgraph(nodes, 2)
+    halo_subg, inner_node, inner_edge = gi.node_halo_subgraph(toindex(nodes), 2)
 
     # Check if edges in the subgraph are in the original graph.
     for s, d, e in zip(*halo_subg.graph.edges()):
