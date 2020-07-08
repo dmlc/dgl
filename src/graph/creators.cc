@@ -63,10 +63,4 @@ HeteroGraphPtr CreateFromCSC(
   return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
 }
 
-HeteroGraphPtr CreateLineGraph(
-    HeteroGraphPtr hg,
-    bool backtracking) {
-  return hg->LineGraph(backtracking);
-}
-
 }  // namespace dgl

@@ -267,7 +267,7 @@ class UnitGraph : public BaseHeteroGraph {
   void Save(dmlc::Stream* fs) const;
 
   /*! \brief Creat a LineGraph of self */
-  HeteroGraphPtr LineGraph(bool backtracking) const override;
+  HeteroGraphPtr LineGraph(bool backtracking) const;
 
   /*! \return the reversed graph */
   UnitGraphPtr Reverse() const;

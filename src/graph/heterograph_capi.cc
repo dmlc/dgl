@@ -598,16 +598,6 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
   });
 
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroLineGraph")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  HeteroGraphRef hg = args[0];
-  bool backtracking = args[1];
-
-  auto hgptr = CreateLineGraph(hg.sptr(), backtracking);
-  *rv = HeteroGraphRef(hgptr);
-});
-
-
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];

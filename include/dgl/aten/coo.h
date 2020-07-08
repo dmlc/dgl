@@ -463,6 +463,9 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
  * A = [[0, 0, 1],
  *      [1, 0, 1],
  *      [1, 1, 0]]
+ * A.row = [0, 1, 1, 2, 2]
+ * A.col = [2, 0, 2, 0, 1]
+ * A.eid = [0, 1, 2, 3, 4]
  *
  * B = COOLineGraph(A, backtracking=False)
  *
@@ -472,7 +475,7 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
  *      [0, 0, 0, 0, 0],
  *      [0, 1, 0, 0, 0]]
  *
- * C = COOLineGraph(A, backtracking=False)
+ * C = COOLineGraph(A, backtracking=True)
  *
  * C = [[0, 0, 0, 1, 1],
  *      [1, 0, 0, 0, 0],

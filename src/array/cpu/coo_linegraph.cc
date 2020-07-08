@@ -32,7 +32,7 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
 
       // succ_u == v
       // if not backtracking succ_u != u
-      if (v == coo_row[j] && (backtracking || (!backtracking && u != coo_col[j]))) {
+      if (v == coo_row[j] && (backtracking || u != coo_col[j])) {
         new_row.push_back(i);
         new_col.push_back(j);
       }

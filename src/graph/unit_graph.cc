@@ -1496,18 +1496,19 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
 
 HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
   // TODO(xiangsx) currently we only support homogeneous graph
-  if (coo_->defined()) {
-    const auto&new_coo = aten::COOLineGraph(coo_->adj(), backtracking);
-    return CreateFromCOO(1, new_coo, restrict_format_);
-  } else if (in_csr_->defined()) {
-    const auto&new_in_csr = aten::CSRLineGraph(in_csr_->adj(), backtracking);
-    return CreateFromCSC(1, new_in_csr, restrict_format_);
-  } else if (out_csr_->defined()) {
-    const auto&new_out_csr = aten::CSRLineGraph(out_csr_->adj(), backtracking);
-    return CreateFromCSR(1, new_out_csr, restrict_format_);
+  auto fmt = SelectFormat(SparseFormat::kAny);
+  switch (fmt) {
+    case SparseFormat::kCOO:
+      return CreateFromCOO(1, aten::COOLineGraph(coo_->adj(), backtracking), restrict_format_);
+    case SparseFormat::kCSR:
+      return CreateFromCSC(1, aten::CSRLineGraph(in_csr_->adj(), backtracking), restrict_format_);
+    case SparseFormat::kCSC:
+      return CreateFromCSR(1, aten::CSRLineGraph(out_csr_->adj(), backtracking), restrict_format_);
+    default:
+      LOG(FATAL) << "None of CSC, CSR, COO exist";
+      break;
   }
-
-  LOG(FATAL) << "None of CSC, CSR, COO exist";
+  
   return nullptr;
 }
 

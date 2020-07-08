@@ -1930,27 +1930,6 @@ def test_edges_order():
                          F.copy_to(F.tensor([1, 1, 2, 2, 1]), F.cpu()))
 
 @parametrize_dtype
-def test_linegraph(index_dtype):
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows', index_dtype=index_dtype)
-    lg = g.line_graph()
-    assert lg.number_of_nodes() == 5
-    assert lg.number_of_edges() == 8
-    row, col = lg.edges()
-    assert np.array_equal(F.asnumpy(row),
-                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
-    assert np.array_equal(F.asnumpy(col),
-                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
-
-    lg = g.line_graph(backtracking=False)
-    assert lg.number_of_nodes() == 5
-    assert lg.number_of_edges() == 4
-    row, col = lg.edges()
-    assert np.array_equal(F.asnumpy(row),
-                          np.array([0, 1, 2, 4]))
-    assert np.array_equal(F.asnumpy(col),
-                          np.array([4, 0, 3, 1]))
-
-@parametrize_dtype
 def test_reverse(index_dtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
@@ -2104,7 +2083,6 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
-    test_linegraph('int32')
     # test_reverse("int32")
     test_format()
     pass

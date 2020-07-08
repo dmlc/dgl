@@ -34,7 +34,7 @@ CSRMatrix CSRLineGraph(const CSRMatrix &csr, bool backtracking) {
             continue;
 
           // succ_u == v
-          if (v == k && (backtracking || (!backtracking && u != indices_data[l]))) {
+          if (v == k && (backtracking || u != indices_data[l])) {
             num_edges++;
             new_indices.push_back(l);
           }

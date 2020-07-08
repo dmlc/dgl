@@ -222,7 +222,7 @@ class HeteroGraph : public BaseHeteroGraph {
 
 
   /*! \brief Creat a LineGraph of self */
-  HeteroGraphPtr LineGraph(bool backtracking) const override;
+  HeteroGraphPtr LineGraph(bool backtracking) const;
 
   const std::vector<UnitGraphPtr>& relation_graphs() const {
     return relation_graphs_;
