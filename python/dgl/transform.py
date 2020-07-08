@@ -464,7 +464,6 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or bipartite graph.
     """
     adj = 1
-    index_dtype = g._idtype_str
     for etype in metapath:
         adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
@@ -473,9 +472,9 @@ def metapath_reachable_graph(g, metapath):
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     if srctype == dsttype:
         assert adj.shape[0] == adj.shape[1]
-        new_g = graph(adj, ntype=srctype, index_dtype=index_dtype)
+        new_g = graph(adj, ntype=srctype, idtype=g.idtype)
     else:
-        new_g = bipartite(adj, utype=srctype, vtype=dsttype, index_dtype=index_dtype)
+        new_g = bipartite(adj, utype=srctype, vtype=dsttype, idtype=g.idtype)
 
     for key, value in g.nodes[srctype].data.items():
         new_g.nodes[srctype].data[key] = value
@@ -875,16 +874,16 @@ def compact_graphs(graphs, always_preserve=None):
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
-    graph_dtype = graphs[0]._idtype_str
-    graph_ctx = graphs[0]._graph.ctx
+    idtype = graphs[0].idtype
+    device = graphs[0].device
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
-        assert graph_dtype == g._idtype_str, "Expect graph data type to be {}, but got {}".format(
-            graph_dtype, g._idtype_str)
-        assert graph_ctx == g._graph.ctx, "Expect graph device to be {}, but got {}".format(
-            graph_ctx, g._graph.ctx)
+        assert idtype == g.idtype, "Expect graph data type to be {}, but got {}".format(
+            idtype, g.idtype)
+        assert device == g.device, "Expect graph device to be {}, but got {}".format(
+            device, g.device)
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:
@@ -894,19 +893,18 @@ def compact_graphs(graphs, always_preserve=None):
             raise ValueError("Node type must be given if multiple node types exist.")
         always_preserve = {ntypes[0]: always_preserve}
 
+    always_preserve = utils.prepare_tensor_dict(graphs[0], always_preserve, 'always_preserve')
     always_preserve_nd = []
     for ntype in ntypes:
         nodes = always_preserve.get(ntype, None)
         if nodes is None:
-            nodes = nd.empty([0], graph_dtype, graph_ctx)
-        else:
-            nodes = F.zerocopy_to_dgl_ndarray(nodes)
-        always_preserve_nd.append(nodes)
+            nodes = F.copy_to(F.tensor([0], idtype), device)
+        always_preserve_nd.append(F.to_dgl_nd(nodes))
 
     # Compact and construct heterographs
     new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs(
         [g._graph for g in graphs], always_preserve_nd)
-    induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes) for nodes in induced_nodes]
+    induced_nodes = [F.from_dgl_nd(nodes) for nodes in induced_nodes]
 
     new_graphs = [
         DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)

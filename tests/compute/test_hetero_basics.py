@@ -28,7 +28,7 @@ def reduce_func(nodes):
 def apply_node_func(nodes):
     return {'h' : nodes.data['h'] + nodes.data['accum']}
 
-def generate_graph(index_dtype='int64', grad=False):
+def generate_graph(idtype=F.int64, grad=False):
     '''
     s, d, eid
     0, 1, 0
@@ -51,7 +51,7 @@ def generate_graph(index_dtype='int64', grad=False):
     '''
     u = F.tensor([0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 9])
     v = F.tensor([1, 9, 2, 9, 3, 9, 4, 9, 5, 9, 6, 9, 7, 9, 8, 9, 0])
-    g = dgl.graph((u, v), index_dtype=index_dtype)
+    g = dgl.graph((u, v), idtype=idtype)
     assert g.device == F._default_context
     ncol = F.randn((10, D))
     ecol = F.randn((17, D))
@@ -67,33 +67,33 @@ def generate_graph(index_dtype='int64', grad=False):
 
 
 @parametrize_dtype
-def test_isolated_nodes(index_dtype):
-    g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, index_dtype=index_dtype)
-    assert g._idtype_str == index_dtype
+def test_isolated_nodes(idtype):
+    g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, idtype=idtype)
+    assert g._idtype_str == idtype
     assert g.number_of_nodes() == 5
 
     # Test backward compatibility
-    g = dgl.graph([(0, 1), (1, 2)], card=5, index_dtype=index_dtype)
+    g = dgl.graph([(0, 1), (1, 2)], card=5, idtype=idtype)
     assert g.number_of_nodes() == 5
 
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
-                      'game', num_nodes=(5, 7), index_dtype=index_dtype)
-    assert g._idtype_str == index_dtype
+                      'game', num_nodes=(5, 7), idtype=idtype)
+    assert g._idtype_str == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
     # Test backward compatibility
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
-                      'game', card=(5, 7), index_dtype=index_dtype)
-    assert g._idtype_str == index_dtype
+                      'game', card=(5, 7), idtype=idtype)
+    assert g._idtype_str == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
 @parametrize_dtype
-def test_batch_setter_getter(index_dtype):
+def test_batch_setter_getter(idtype):
     def _pfc(x):
         return list(F.zerocopy_to_numpy(x)[:,0])
-    g = generate_graph(index_dtype)
+    g = generate_graph(idtype)
     # set all nodes
     g.ndata['h'] = F.zeros((10, D))
     assert F.allclose(g.ndata['h'], F.zeros((10, D)))
@@ -103,11 +103,11 @@ def test_batch_setter_getter(index_dtype):
     assert len(g.ndata) == old_len - 1
     g.ndata['h'] = F.zeros((10, D))
     # set partial nodes
-    u = F.tensor([1, 3, 5], F.data_type_dict[index_dtype])
+    u = F.tensor([1, 3, 5], idtype)
     g.nodes[u].data['h'] = F.ones((3, D))
     assert _pfc(g.ndata['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
     # get partial nodes
-    u = F.tensor([1, 2, 3], F.data_type_dict[index_dtype])
+    u = F.tensor([1, 2, 3], idtype)
     assert _pfc(g.nodes[u].data['h']) == [1., 0., 1.]
 
     '''
@@ -139,44 +139,44 @@ def test_batch_setter_getter(index_dtype):
     assert len(g.edata) == old_len - 1
     g.edata['l'] = F.zeros((17, D))
     # set partial edges (many-many)
-    u = F.tensor([0, 0, 2, 5, 9], dtype=F.data_type_dict[index_dtype])
-    v = F.tensor([1, 3, 9, 9, 0], dtype=F.data_type_dict[index_dtype])
+    u = F.tensor([0, 0, 2, 5, 9], dtype=idtype)
+    v = F.tensor([1, 3, 9, 9, 0], dtype=idtype)
     g.edges[u, v].data['l'] = F.ones((5, D))
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
     assert _pfc(g.edata['l']) == truth
     # set partial edges (many-one)
-    u = F.tensor([3, 4, 6], dtype=F.data_type_dict[index_dtype])
-    v = F.tensor([9], dtype=F.data_type_dict[index_dtype])
+    u = F.tensor([3, 4, 6], dtype=idtype)
+    v = F.tensor([9], dtype=idtype)
     g.edges[u, v].data['l'] = F.ones((3, D))
     truth[5] = truth[7] = truth[11] = 1.
     assert _pfc(g.edata['l']) == truth
     # set partial edges (one-many)
-    u = F.tensor([0], dtype=F.data_type_dict[index_dtype])
-    v = F.tensor([4, 5, 6], dtype=F.data_type_dict[index_dtype])
+    u = F.tensor([0], dtype=idtype)
+    v = F.tensor([4, 5, 6], dtype=idtype)
     g.edges[u, v].data['l'] = F.ones((3, D))
     truth[6] = truth[8] = truth[10] = 1.
     assert _pfc(g.edata['l']) == truth
     # get partial edges (many-many)
-    u = F.tensor([0, 6, 0], dtype=F.data_type_dict[index_dtype])
-    v = F.tensor([6, 9, 7], dtype=F.data_type_dict[index_dtype])
+    u = F.tensor([0, 6, 0], dtype=idtype)
+    v = F.tensor([6, 9, 7], dtype=idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (many-one)
-    u = F.tensor([5, 6, 7], dtype=F.data_type_dict[index_dtype])
-    v = F.tensor([9], dtype=F.data_type_dict[index_dtype])
+    u = F.tensor([5, 6, 7], dtype=idtype)
+    v = F.tensor([9], dtype=idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (one-many)
-    u = F.tensor([0], dtype=F.data_type_dict[index_dtype])
-    v = F.tensor([3, 4, 5], dtype=F.data_type_dict[index_dtype])
+    u = F.tensor([0], dtype=idtype)
+    v = F.tensor([3, 4, 5], dtype=idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
 
 @parametrize_dtype
-def test_batch_setter_autograd(index_dtype):
-    g = generate_graph(index_dtype=index_dtype, grad=True)
+def test_batch_setter_autograd(idtype):
+    g = generate_graph(idtype=idtype, grad=True)
     h1 = g.ndata['h']
     # partial set
-    v = F.tensor([1, 2, 8], F.data_type_dict[index_dtype])
+    v = F.tensor([1, 2, 8], idtype)
     hh = F.attach_grad(F.zeros((len(v), D)))
     with F.record_grad():
         g.nodes[v].data['h'] = hh
@@ -187,7 +187,7 @@ def test_batch_setter_autograd(index_dtype):
 
 
 @parametrize_dtype
-def atest_nx_conversion(index_dtype):
+def atest_nx_conversion(idtype):
     # check conversion between networkx and DGLGraph
 
     def _check_nx_feature(nxg, nf, ef):
@@ -224,7 +224,7 @@ def atest_nx_conversion(index_dtype):
     n3 = F.randn((5, 4))
     e1 = F.randn((4, 5))
     e2 = F.randn((4, 7))
-    g = dgl.graph([(0,2),(1,4),(3,0),(4,3)], index_dtype=index_dtype)
+    g = dgl.graph([(0,2),(1,4),(3,0),(4,3)], idtype=idtype)
     g.ndata.update({'n1': n1, 'n2': n2, 'n3': n3})
     g.edata.update({'e1': e1, 'e2': e2})
 
@@ -236,8 +236,8 @@ def atest_nx_conversion(index_dtype):
 
     # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
-    g = dgl.graph(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'], index_dtype=index_dtype)    
-    assert g._idtype_str == index_dtype
+    g = dgl.graph(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'], idtype=idtype)    
+    assert g._idtype_str == idtype
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -308,34 +308,34 @@ def atest_nx_conversion(index_dtype):
                                               [2., 3.], [2., 3.]]))
 
 @parametrize_dtype
-def test_apply_nodes(index_dtype):
+def test_apply_nodes(idtype):
     def _upd(nodes):
         return {'h' : nodes.data['h'] * 2}
-    g = generate_graph(index_dtype=index_dtype)
+    g = generate_graph(idtype=idtype)
     old = g.ndata['h']
     g.apply_nodes(_upd)
     assert F.allclose(old * 2, g.ndata['h'])
-    u = F.tensor([0, 3, 4, 6], F.data_type_dict[index_dtype])
+    u = F.tensor([0, 3, 4, 6], idtype)
     g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
     assert F.allclose(F.gather_row(g.ndata['h'], u), F.zeros((4, D)))
 
 @parametrize_dtype
-def test_apply_edges(index_dtype):
+def test_apply_edges(idtype):
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
-    g = generate_graph(index_dtype=index_dtype)
+    g = generate_graph(idtype=idtype)
     old = g.edata['w']
     g.apply_edges(_upd)
     assert F.allclose(old * 2, g.edata['w'])
-    u = F.tensor([0, 0, 0, 4, 5, 6], F.data_type_dict[index_dtype])
-    v = F.tensor([1, 2, 3, 9, 9, 9], F.data_type_dict[index_dtype])
+    u = F.tensor([0, 0, 0, 4, 5, 6], idtype)
+    v = F.tensor([1, 2, 3, 9, 9, 9], idtype)
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
-    eid = F.tensor(g.edge_id(u, v), F.data_type_dict[index_dtype])
+    eid = F.tensor(g.edge_id(u, v), idtype)
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
 @parametrize_dtype
-def test_update_routines(index_dtype):
-    g = generate_graph(index_dtype=index_dtype)
+def test_update_routines(idtype):
+    g = generate_graph(idtype=idtype)
 
     # send_and_recv
     reduce_msg_shapes.clear()
@@ -351,14 +351,14 @@ def test_update_routines(index_dtype):
         pass
 
     # pull
-    v = F.tensor([1, 2, 3, 9], F.data_type_dict[index_dtype])
+    v = F.tensor([1, 2, 3, 9], idtype)
     reduce_msg_shapes.clear()
     g.pull(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 8, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
     # push
-    v = F.tensor([0, 1, 2, 3], F.data_type_dict[index_dtype])
+    v = F.tensor([0, 1, 2, 3], idtype)
     reduce_msg_shapes.clear()
     g.push(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
@@ -371,9 +371,9 @@ def test_update_routines(index_dtype):
     reduce_msg_shapes.clear()
 
 @parametrize_dtype
-def test_update_all_0deg(index_dtype):
+def test_update_all_0deg(idtype):
     # test#1
-    g = dgl.graph([(1,0), (2,0), (3,0), (4,0)], index_dtype=index_dtype)
+    g = dgl.graph([(1,0), (2,0), (3,0), (4,0)], idtype=idtype)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -394,7 +394,7 @@ def test_update_all_0deg(index_dtype):
     assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
     # test#2:
-    g = dgl.graph([], num_nodes=5, index_dtype=index_dtype)
+    g = dgl.graph([], num_nodes=5, idtype=idtype)
     g.set_n_initializer(_init2, 'h')
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, _apply)
@@ -403,8 +403,8 @@ def test_update_all_0deg(index_dtype):
     assert F.allclose(new_repr, 2*old_repr)
 
 @parametrize_dtype
-def test_pull_0deg(index_dtype):
-    g = dgl.graph([(0,1)], index_dtype=index_dtype)
+def test_pull_0deg(idtype):
+    g = dgl.graph([(0,1)], idtype=idtype)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -435,8 +435,8 @@ def test_pull_0deg(index_dtype):
     assert F.allclose(new[1], old[1])
 
 @parametrize_dtype
-def test_send_multigraph(index_dtype):
-    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)], index_dtype=index_dtype)
+def test_send_multigraph(idtype):
+    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)], idtype=idtype)
 
     def _message_a(edges):
         return {'a': edges.data['a']}
@@ -494,8 +494,8 @@ def _test_dynamic_addition():
     assert len(g.edata['h1']) == len(g.edata['h2'])
 
 @parametrize_dtype
-def test_repr(index_dtype):
-    G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, index_dtype=index_dtype)
+def test_repr(idtype):
+    G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype)
     repr_string = G.__repr__()
     print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
@@ -505,7 +505,7 @@ def test_repr(index_dtype):
 
 
 @parametrize_dtype
-def test_group_apply_edges(index_dtype):
+def test_group_apply_edges(idtype):
     def edge_udf(edges):
         h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)
         normalized_feat = F.softmax(h, dim=1)
@@ -518,7 +518,7 @@ def test_group_apply_edges(index_dtype):
         elist.append((1, v))
     for v in [2, 3, 4, 5, 6, 7, 8]:
         elist.append((2, v))
-    g = dgl.graph(elist, index_dtype=index_dtype)
+    g = dgl.graph(elist, idtype=idtype)
 
     g.ndata['h'] = F.randn((g.number_of_nodes(), D))
     g.edata['feat'] = F.randn((g.number_of_edges(), D))
@@ -541,8 +541,8 @@ def test_group_apply_edges(index_dtype):
     _test('dst')
 
 @parametrize_dtype
-def test_local_var(index_dtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], index_dtype=index_dtype)
+def test_local_var(idtype):
+    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype)
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -599,8 +599,8 @@ def test_local_var(index_dtype):
     foo(g)
 
 @parametrize_dtype
-def test_local_scope(index_dtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], index_dtype=index_dtype)
+def test_local_scope(idtype):
+    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype)
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -651,7 +651,7 @@ def test_local_scope(index_dtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)], index_dtype=index_dtype)
+    g = dgl.graph([(0,1), (1,1)], idtype=idtype)
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         with g.local_scope():
@@ -671,17 +671,17 @@ def test_local_scope(index_dtype):
     foo(g)
 
 @parametrize_dtype
-def test_issue_1088(index_dtype):
+def test_issue_1088(idtype):
     # This test ensures that message passing on a heterograph with one edge type
     # would not crash (GitHub issue #1088).
     import dgl.function as fn
-    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])}, index_dtype=index_dtype)
+    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype)
     g.nodes['U'].data['x'] = F.randn((3, 3))
     g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
 
 if __name__ == '__main__':
     #test_isolated_nodes("int32")
-    test_batch_setter_getter("int32")
+    test_batch_setter_getter(F.int32)
     # test_batch_recv("int64")
     # test_apply_edges("int32")
     # test_batch_setter_autograd()

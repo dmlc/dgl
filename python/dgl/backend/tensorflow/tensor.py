@@ -399,7 +399,7 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop, dtype):
+def arange(start, stop, dtype=tf.int64):
     with tf.device("/cpu:0"):
         t = tf.range(start, stop, dtype=dtype)
     return t

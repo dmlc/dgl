@@ -2676,10 +2676,8 @@ class DGLHeteroGraph(object):
         if is_all(edges):
             eid = ALL
         elif isinstance(edges, tuple):
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges
             u, v = edges
-            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
+            eid = self.edge_id(u, v, etype=self.canonical_etypes[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
 
@@ -2731,10 +2729,8 @@ class DGLHeteroGraph(object):
         if is_all(edges):
             eid = ALL
         elif isinstance(edges, tuple):
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges
             u, v = edges
-            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
+            eid = self.edge_id(u, v, etype=self.canonical_etypes[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
 
@@ -2799,13 +2795,13 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
-        check_same_dtype(self._idtype_str, v)
         ntid = self.get_ntype_id(ntype)
         if is_all(v):
-            v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntype)), self._idtype_str)
+            v = F.arange(0, self.number_of_nodes(ntype), self.idtype)
         else:
-            v_ntype = utils.toindex(v, self._idtype_str)
+            v = utils.prepare_tensor(self, v, 'v')
         with ir.prog() as prog:
+            v_ntype = utils.toindex(v, self._idtype_str)
             scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
                                            inplace=inplace, ntype=self._ntypes[ntid])
             Runtime.run(prog)
@@ -2852,10 +2848,8 @@ class DGLHeteroGraph(object):
         if is_all(edges):
             u, v, eid = self.edges(etype=etype, form='all')
         elif isinstance(edges, tuple):
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges
             u, v = edges
-            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
+            eid = self.edge_id(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
@@ -2916,10 +2910,8 @@ class DGLHeteroGraph(object):
         if is_all(edges):
             u, v, eid = self.edges(etype=etype, form='all')
         elif isinstance(edges, tuple):
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges
             u, v = edges
-            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
+            eid = self.edge_id(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
@@ -3028,10 +3020,8 @@ class DGLHeteroGraph(object):
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
         if isinstance(edges, tuple):
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges
             u, v = edges
-            u, v, eid = self.edge_id(u, v, etype=etype, return_uv=True)
+            eid = self.edge_id(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)

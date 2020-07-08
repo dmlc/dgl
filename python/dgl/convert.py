@@ -932,17 +932,19 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
     num_src, num_dst = spmat.shape
     num_ntypes = 1 if utype == vtype else 2
     if spmat.getformat() == 'coo':
-        # TODO(minjie): XXXXXXXXXXXXXXX
-        row = utils.toindex(spmat.row.astype(idtype), idtype)
-        col = utils.toindex(spmat.col.astype(idtype), idtype)
+        row = F.tensor(spmat.row, idtype)
+        col = F.tensor(spmat.col, idtype)
         hgidx = heterograph_index.create_unitgraph_from_coo(
             num_ntypes, num_src, num_dst, row, col, restrict_format)
     else:
         spmat = spmat.tocsr()
-        indptr = utils.toindex(spmat.indptr.astype(idtype), idtype)
-        indices = utils.toindex(spmat.indices.astype(idtype), idtype)
-        # TODO(minjie): with_edge_id is only reasonable for csr matrix. How to fix?
-        data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))), idtype)
+        indptr = F.tensor(spmat.indptr, idtype)
+        indices = F.tensor(spmat.indices, idtype)
+        if with_edge_id:
+            data = F.tensor(spmat.data, idtype)
+        else:
+            # TODO(minjie): range[0, nnz) ids could be actually be omitted
+            data = F.arange(0, len(indices), idtype)
         hgidx = heterograph_index.create_unitgraph_from_csr(
             num_ntypes, num_src, num_dst, indptr, indices, data, restrict_format)
     if num_ntypes == 1:
@@ -1008,8 +1010,8 @@ def create_from_networkx(nx_graph,
         for e in nx_graph.edges:
             src.append(e[0])
             dst.append(e[1])
-    src = utils.toindex(src, idtype)
-    dst = utils.toindex(dst, idtype)
+    src = F.tensor(src, idtype)
+    dst = F.tensor(dst, idtype)
     num_nodes = nx_graph.number_of_nodes()
     g = create_from_edges(src, dst, ntype, etype, ntype, num_nodes, num_nodes,
                           validate=False, restrict_format=restrict_format, idtype=idtype)
@@ -1128,8 +1130,8 @@ def create_from_networkx_bipartite(nx_graph,
             if e[0] in top_map:
                 src.append(top_map[e[0]])
                 dst.append(bottom_map[e[1]])
-    src = utils.toindex(src, idtype)
-    dst = utils.toindex(dst, idtype)
+    src = F.tensor(src, idtype=idtype)
+    dst = F.tensor(dst, idtype=idtype)
     g = create_from_edges(src, dst, utype, etype, vtype,
                           len(top_nodes), len(bottom_nodes), validate=False,
                           restrict_format=restrict_format, idtype=idtype)

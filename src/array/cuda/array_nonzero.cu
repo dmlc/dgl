@@ -17,13 +17,14 @@ namespace impl {
 
 template <typename IdType>
 struct IsNonZero {
-  __host__ __device__ bool operator() (const IdType val) {
+  __device__ bool operator() (const IdType val) {
     return val != 0;
   }
 };
 
 template <DLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int64_t len = array->shape[0];
   IdArray ret = NewIdArray(len, array->ctx, array->dtype.bits);
   thrust::device_ptr<IdType> in_data(array.Ptr<IdType>());
@@ -32,7 +33,12 @@ IdArray NonZero(IdArray array) {
   //   See PyTorch's implementation here: 
   //   https://github.com/pytorch/pytorch/blob/1f7557d173c8e9066ed9542ada8f4a09314a7e17/
   //     aten/src/THC/generic/THCTensorMath.cu#L104
-  auto indices_end = thrust::copy_if(thrust::make_counting_iterator<IdType>(0),
+  // TODO(minjie): There is a strange error when converting the result
+  //   to PyTorch's Tensor via DLPack, casting it to long() will raise
+  //   an "CUDA error: invalid configuration argument". Currently don't know
+  //   how to fix it.
+  auto indices_end = thrust::copy_if(thrust::cuda::par.on(thr_entry->stream),
+                                     thrust::make_counting_iterator<IdType>(0),
                                      thrust::make_counting_iterator<IdType>(len),
                                      in_data,
                                      out_data,
