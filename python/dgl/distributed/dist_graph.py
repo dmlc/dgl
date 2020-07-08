@@ -335,6 +335,12 @@ class DistGraph:
         The partition book object
     '''
     def __init__(self, ip_config, graph_name, gpb=None):
+        self.ip_config = ip_config
+        self.graph_name = graph_name
+        self._gpb_input = gpb
+        self._init(ip_config, graph_name, gpb)
+
+    def _init(self, ip_config, graph_name, gpb):
         connect_to_server(ip_config=ip_config)
         self._client = KVClient(ip_config)
         g = _get_graph_from_shared_mem(graph_name)
@@ -358,6 +364,13 @@ class DistGraph:
             self._num_nodes += int(part_md['num_nodes'])
             self._num_edges += int(part_md['num_edges'])
 
+    # def __getstate__(self):
+    #     print("Pickle DistGraph")
+    #     return self.ip_config, self.graph_name, self._gpb_input
+
+    # def __setstate__(self, state):
+    #     ip_config, graph_name, gpb_input = state
+    #     self._init(ip_config, graph_name, gpb_input)
 
     def init_ndata(self, ndata_name, shape, dtype):
         '''Initialize node data
