@@ -16,9 +16,12 @@ def close():
     dgl.distributed.finalize_client()
 
 
-def init_dist_graph(dist_gclient_config, queue):
-    global dist_gclient
-    dist_gclient = DistGraph(**dist_gclient_config)
+def init_fn(collate_fn, mp_queue):
+    print("COLALALALALL")
+    global gfn
+    global queue
+    queue = mp_queue
+    gfn = collate_fn
     import atexit
     atexit.register(close)
 
@@ -51,12 +54,17 @@ def sample_blocks(seeds, dist_g, fanouts):
     return blocks
 
 
-def queue_wrapper(fn, queue, seeds, sample_config):
-    """Should change to decorator like implementation later"""
-    """Use kwargs to pass variable later"""
-    sample_config['dist_g'] = dist_gclient
-    sample_config['seeds'] = seeds
-    result = fn(**sample_config)
+# def queue_wrapper(fn, queue, seeds, sample_config):
+#     """Should change to decorator like implementation later"""
+#     """Use kwargs to pass variable later"""
+#     sample_config['dist_g'] = dist_gclient
+#     sample_config['seeds'] = seeds
+#     result = fn(**sample_config)
+#     queue.put(result)
+#     return 1
+
+def call_collate_fn(next_data):
+    result = gfn(next_data)
     queue.put(result)
     return 1
 
@@ -65,10 +73,11 @@ spawn_ctx = mp.get_context("spawn")
 
 
 class DistDataLoader:
-    def __init__(self, dataset, batch_size, collate_fn, num_workers, queue_size, drop_last, dist_gclient_config, sample_config):
+    def __init__(self, dataset, batch_size, collate_fn, num_workers, drop_last, queue_size=None):
         assert num_workers > 0
-        # self.pool.join()
-        self.sample_config = sample_config
+        if queue_size is None:
+            queue_size = num_workers * 4
+        self.queue_size = queue_size            
         self.dataset = dataset
         self.batch_size = batch_size
         self.queue_size = queue_size
@@ -78,18 +87,15 @@ class DistDataLoader:
         self.m = mp.Manager()
         self.queue = self.m.Queue(maxsize=queue_size)
         ctx = spawn_ctx
-
         self.drop_last = drop_last
-
         self.expected_idxs = len(dataset) // batch_size
         if not drop_last and len(dataset) % batch_size != 0:
             self.expected_idxs += 1
 
         self.send_idxs = 0
         self.recv_idxs = 0
-
         self.pool = ctx.Pool(
-            num_workers, initializer=init_dist_graph, initargs=(dist_gclient_config, self.queue))
+            num_workers, initializer=init_fn, initargs=(collate_fn, self.queue))
         for _ in range(queue_size):
             self._request_next_batch()
 
@@ -110,8 +116,7 @@ class DistDataLoader:
         if next_data is None:
             return None
         else:
-            async_result = self.pool.apply_async(queue_wrapper, args=(
-                self.collate_fn, self.queue, next_data, self.sample_config))
+            async_result = self.pool.apply_async(call_collate_fn, args=(next_data, ))
             self.send_idxs += 1
             return async_result
 

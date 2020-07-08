@@ -15,6 +15,27 @@ import torch as th
 from dgl.distributed import DistGraphServer, DistGraph
 from mp_dataloader import DistDataLoader, sample_blocks
 
+
+class NeighborSampler(object):
+    def __init__(self, g, fanouts, sample_neighbors):
+        self.g = g
+        self.fanouts = fanouts
+        self.sample_neighbors = sample_neighbors
+
+    def sample_blocks(self, seeds):
+        seeds = th.LongTensor(np.asarray(seeds))
+        blocks = []
+        for fanout in self.fanouts:
+            # For each seed node, sample ``fanout`` neighbors.
+            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
+            # Then we compact the frontier into a bipartite graph for message passing.
+            block = dgl.to_block(frontier, seeds)
+            # Obtain the seed nodes for next layer.
+            seeds = block.srcdata[dgl.NID]
+
+            blocks.insert(0, block)
+        return blocks
+
 def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     import dgl
     g = DistGraphServer(rank, "mp_ip_config.txt", num_clients, "test_sampling",
@@ -28,17 +49,28 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
     if disable_shared_mem:
         _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
     train_nid = th.arange(202)
+    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb, skip_init=True)
 
-    sampler = DistDataLoader(dataset=train_nid.numpy(), batch_size=10, collate_fn=sample_blocks, num_workers=num_workers,
-                             queue_size=10, drop_last=False, dist_gclient_config={"ip_config": "mp_ip_config.txt", "graph_name": "test_mp", "gpb": gpb}, sample_config={"fanouts": [5, 5]})
+    # Create sampler
+    sampler = NeighborSampler(dist_graph, [5, 10],
+                              dgl.distributed.sampling.sample_neighbors)
+
+    # Create PyTorch DataLoader for constructing blocks
+    dataloader = DistDataLoader(
+        dataset=train_nid.numpy(),
+        batch_size=32,
+        collate_fn=sampler.sample_blocks,
+        # shuffle=True,
+        drop_last=False,
+        num_workers=4) 
     
-    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb)
+    dist_graph._init()
 
-    for idx, block in enumerate(sampler):
+    for idx, block in enumerate(dataloader):
         print(block)
         print(idx)
     
-    sampler.close()
+    dataloader.close()
 
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
@@ -77,4 +109,6 @@ def main(tmpdir, num_server):
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
+
+        mp.set_start_method("spawn")
         main(Path(tmpdirname), 3)
