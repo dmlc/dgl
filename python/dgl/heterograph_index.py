@@ -70,7 +70,7 @@ class HeteroGraphIndex(ObjectBase):
     def number_of_etypes(self):
         """Return number of edge types."""
         return self.metagraph.number_of_edges()
-    
+
     def is_homograph(self):
         """Return if the graph is homogeneous."""
         return self.number_of_ntypes() == 1 and self.number_of_etypes() == 1
