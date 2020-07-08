@@ -44,8 +44,6 @@ bool TCPSocket::Connect(const char * ip, int port) {
                    sizeof(sa_server))) {
     return true;
   }
-
-  LOG(ERROR) << "Failed connect to " << ip << ":" << port;
   return false;
 }
 
