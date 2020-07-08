@@ -2,7 +2,7 @@ import dgl
 import unittest
 import os
 from dgl.data import CitationGraphDataset
-from dgl.distributed.sampling import sample_neighbors
+from dgl.distributed import sample_neighbors
 from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
 import multiprocessing as mp
