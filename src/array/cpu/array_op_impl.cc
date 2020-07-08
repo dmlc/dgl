@@ -296,12 +296,9 @@ template IdArray SetDiff1d<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
 template <DLDeviceType XPU, typename IdType>
 IdArray Unique(IdArray arr) {
   CHECK(arr->ndim == 1) << "Unique only supports 1D array";
-  phmap::flat_hash_set<IdType> arr_set;
-  arr_set.reserve(arr->shape[0]);
   const IdType* arr_data = static_cast<IdType*>(arr->data);
-  for (int64_t i = 0; i < arr->shape[0]; i++) {
-    arr_set.insert(arr_data[i]);
-  }
+  int64_t arr_size = arr->shape[0];
+  phmap::flat_hash_set<IdType> arr_set(arr_data, arr_data + arr_size);
 
   IdArray ret_ndarray =
     NewIdArray(arr_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
