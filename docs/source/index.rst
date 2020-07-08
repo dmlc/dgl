@@ -110,6 +110,7 @@ a useful manual for in-depth developers.
    api/python/propagate
    api/python/transform
    api/python/sampler
+   api/python/sampling
    api/python/data
    api/python/nodeflow
    api/python/random

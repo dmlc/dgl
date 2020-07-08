@@ -8,6 +8,11 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <fstream>
+#include <streambuf>
+
+#include <stdlib.h>
+#include <time.h>
 
 #include "../src/rpc/network/msg_queue.h"
 #include "../src/rpc/network/socket_communicator.h"
@@ -56,7 +61,6 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 void start_client() {
-  sleep(2); // wait server start
   SocketSender sender(kQueueSize);
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.AddReceiver(ip_addr[i], i);
@@ -84,6 +88,7 @@ void start_client() {
 }
 
 void start_server(int id) {
+  sleep(5);
   SocketReceiver receiver(kQueueSize);
   receiver.Wait(ip_addr[id], kNumSender);
   for (int i = 0; i < kNumMessage; ++i) {
@@ -132,6 +137,13 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
   WSADATA wsaData;
   DWORD retcode, exitcode;
 
+  srand((unsigned)time(NULL));
+  int port = (rand() % (5000-3000+1))+ 3000;
+  std::string ip_addr = "socket://127.0.0.1:" + std::to_string(port);
+  std::ofstream out("addr.txt");
+  out << ip_addr;
+  out.close();
+
   ASSERT_EQ(::WSAStartup(MAKEWORD(2, 2), &wsaData), 0);
 
   hThreads[0] = ::CreateThread(NULL, 0, _ClientThreadFunc, NULL, 0, NULL);  // client
@@ -152,9 +164,12 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 static void start_client() {
-  sleep(1);
+  std::ifstream t("addr.txt");
+  std::string ip_addr((std::istreambuf_iterator<char>(t)),
+                       std::istreambuf_iterator<char>());
+  t.close();
   SocketSender sender(kQueueSize);
-  sender.AddReceiver("socket://127.0.0.1:8001", 0);
+  sender.AddReceiver(ip_addr.c_str(), 0);
   sender.Connect();
   char* str_data = new char[9];
   memcpy(str_data, "123456789", 9);
@@ -165,8 +180,13 @@ static void start_client() {
 }
 
 static bool start_server() {
+  sleep(5);
+  std::ifstream t("addr.txt");
+  std::string ip_addr((std::istreambuf_iterator<char>(t)),
+                       std::istreambuf_iterator<char>());
+  t.close();
   SocketReceiver receiver(kQueueSize);
-  receiver.Wait("socket://127.0.0.1:8001", 1);
+  receiver.Wait(ip_addr.c_str(), 1);
   Message msg;
   EXPECT_EQ(receiver.RecvFrom(&msg, 0), REMOVE_SUCCESS);
   receiver.Finalize();

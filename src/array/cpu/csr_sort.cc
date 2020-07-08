@@ -18,7 +18,7 @@ bool CSRIsSorted(CSRMatrix csr) {
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
   bool ret = true;
-#pragma omp parallel for shared(ret)
+
   for (int64_t row = 0; row < csr.num_rows; ++row) {
     if (!ret)
       continue;
