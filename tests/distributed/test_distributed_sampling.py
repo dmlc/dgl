@@ -75,7 +75,6 @@ def check_rpc_sampling(tmpdir, num_server):
 def test_rpc_sampling():
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirname = "/tmp/sampling"
         check_rpc_sampling(Path(tmpdirname), 2)
 
 def check_rpc_sampling_shuffle(tmpdir, num_server):
@@ -128,7 +127,6 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
 def test_rpc_sampling_shuffle():
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirname = "/tmp/sampling"
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
         check_rpc_sampling_shuffle(Path(tmpdirname), 1)
 
@@ -187,13 +185,11 @@ def check_rpc_in_subgraph(tmpdir, num_server):
 def test_rpc_in_subgraph():
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirname = "/tmp/sampling"
-    check_rpc_in_subgraph(Path(tmpdirname), 2)
+        check_rpc_in_subgraph(Path(tmpdirname), 2)
 
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirname = "/tmp/sampling"
         check_rpc_in_subgraph(Path(tmpdirname), 2)
         check_rpc_sampling_shuffle(Path(tmpdirname), 1)
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
