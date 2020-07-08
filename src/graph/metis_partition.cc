@@ -9,7 +9,7 @@
 
 #if !defined(_WIN32)
 
-#include <metis.h>
+#include <mtmetis.h>
 #include <dgl/graph_op.h>
 
 using namespace dgl::runtime;
@@ -18,33 +18,39 @@ namespace dgl {
 
 IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   // The index type of Metis needs to be compatible with DGL index type.
-  CHECK_EQ(sizeof(idx_t), sizeof(dgl_id_t));
+  CHECK_EQ(sizeof(mtmetis_vtx_type), sizeof(dgl_id_t));
   ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
   CHECK(ig) << "The input graph must be an immutable graph.";
   // This is a symmetric graph, so in-csr and out-csr are the same.
   const auto mat = ig->GetInCSR()->ToCSRMatrix();
 
-  idx_t nvtxs = g->NumVertices();
-  idx_t ncon = 1;        // # balacing constraints.
-  idx_t *xadj = static_cast<idx_t*>(mat.indptr->data);
-  idx_t *adjncy = static_cast<idx_t*>(mat.indices->data);
-  idx_t nparts = k;
+  mtmetis_vtx_type nvtxs = g->NumVertices();
+  mtmetis_vtx_type ncon = 1;        // # balacing constraints.
+  CHECK_EQ(sizeof(mtmetis_adj_type), mat.indptr->dtype.bits / 8)
+      << "The dtype of indptr does not match";
+  mtmetis_adj_type *xadj = static_cast<mtmetis_adj_type*>(mat.indptr->data);
+  CHECK_EQ(sizeof(mtmetis_vtx_type), mat.indices->dtype.bits / 8)
+      << "The dtype of indices does not match";
+  mtmetis_vtx_type *adjncy = static_cast<mtmetis_vtx_type*>(mat.indices->data);
+  mtmetis_pid_type nparts = k;
   IdArray part_arr = aten::NewIdArray(nvtxs);
-  idx_t objval = 0;
-  idx_t *part = static_cast<idx_t*>(part_arr->data);
+  mtmetis_wgt_type objval = 0;
+  CHECK_EQ(sizeof(mtmetis_pid_type), part_arr->dtype.bits / 8)
+      << "The dtype of partition Ids does not match";
+  mtmetis_pid_type *part = static_cast<mtmetis_pid_type*>(part_arr->data);
 
   int64_t vwgt_len = vwgt_arr->shape[0];
-  CHECK_EQ(sizeof(idx_t), vwgt_arr->dtype.bits / 8)
+  CHECK_EQ(sizeof(mtmetis_wgt_type), vwgt_arr->dtype.bits / 8)
       << "The vertex weight array doesn't have right type";
   CHECK(vwgt_len % g->NumVertices() == 0)
       << "The vertex weight array doesn't have right number of elements";
-  idx_t *vwgt = NULL;
+  mtmetis_wgt_type *vwgt = NULL;
   if (vwgt_len > 0) {
     ncon = vwgt_len / g->NumVertices();
-    vwgt = static_cast<idx_t*>(vwgt_arr->data);
+    vwgt = static_cast<mtmetis_wgt_type*>(vwgt_arr->data);
   }
 
-  int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
+  int ret = MTMETIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
                                 xadj,        // indptr
                                 adjncy,      // indices
@@ -64,12 +70,8 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
       << " edges into " << k
       << " parts and get " << objval << " edge cuts";
   switch (ret) {
-    case METIS_OK:
+    case MTMETIS_SUCCESS:
       return part_arr;
-    case METIS_ERROR_INPUT:
-      LOG(FATAL) << "Error in Metis partitioning: input error";
-    case METIS_ERROR_MEMORY:
-      LOG(FATAL) << "Error in Metis partitioning: cannot allocate memory";
     default:
       LOG(FATAL) << "Error in Metis partitioning: other errors";
   }

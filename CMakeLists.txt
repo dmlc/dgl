@@ -145,7 +145,7 @@ set(GKLIB_PATH "third_party/METIS/GKlib")
 include(${GKLIB_PATH}/GKlibSystem.cmake)
 include_directories(${GKLIB_PATH})
 add_subdirectory("third_party/METIS/libmetis/")
-list(APPEND DGL_LINKER_LIBS metis)
+list(APPEND DGL_LINKER_LIBS metis mtmetis wildriver)
 
   # support PARALLEL_ALGORITHMS
   if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
