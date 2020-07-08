@@ -55,7 +55,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_HeteroGraphGetSubgraphWithHalo")
       aten::SetDiff1d(all_edges_with_extra, subg->induced_edges[0]);
     auto all_subgraph_edges =
       aten::Concat({subg->induced_edges[0], all_halo_edge_ids});
-    // auto out = hg->EdgeSubgraph({all_edges}, true);
+
     List<ObjectRef> ret;
 
     std::shared_ptr<HeteroSubgraph> out(
@@ -63,15 +63,13 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_HeteroGraphGetSubgraphWithHalo")
     int64_t total_num_edges = all_subgraph_edges->shape[0];
     int64_t inner_num_edges = subg->induced_edges[0]->shape[0];
 
-    auto outer_edge_ids = aten::IndexSelect(out->graph->Edges(0, "eid").id, inner_num_edges, total_num_edges);
-    
-    
-    auto outer_node_ids = aten::SetDiff1d(out->induced_vertices[0], subg->induced_vertices[0]);
+    auto outer_edge_ids = aten::IndexSelect(out->graph->Edges(0, "eid").id,
+                                            inner_num_edges, total_num_edges);
+    auto outer_node_ids =
+      aten::SetDiff1d(out->induced_vertices[0], subg->induced_vertices[0]);
     ret.push_back(HeteroSubgraphRef(out));
-    // ret.push_back(Value(MakeValue(inner_nodes)));
     ret.push_back(Value(MakeValue(outer_node_ids)));
     ret.push_back(Value(MakeValue(outer_edge_ids)));
-
     *rv = ret;
   });
 };  // namespace transform

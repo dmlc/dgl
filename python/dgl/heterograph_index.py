@@ -72,6 +72,7 @@ class HeteroGraphIndex(ObjectBase):
         return self.metagraph.number_of_edges()
     
     def is_homograph(self):
+        """Return if the graph is homogeneous."""
         return self.number_of_ntypes() == 1 and self.number_of_etypes() == 1
 
     def get_relation_graph(self, etype):
@@ -1006,13 +1007,30 @@ class HeteroGraphIndex(ObjectBase):
         return _CAPI_DGLHeteroReverse(self)
 
     def node_halo_subgraph(self, vids, num_hops):
+        """Return an induced subgraph with halo nodes. Only support homograph for now
+
+        Parameters
+        ----------
+        v : utils.Index
+            The nodes.
+
+        num_hops : int
+            The number of hops in which a HALO node can be accessed.
+
+        Returns
+        -------
+        SubgraphIndex
+            The subgraph index.
+        DGLTensor
+            Indicate if a node belongs to a partition.
+        DGLTensor
+            Indicate if an edge belongs to a partition.
+        """
         assert self.is_homograph()
         vidx_idx = utils.toindex(vids)
         ret_list = _CAPI_HeteroGraphGetSubgraphWithHalo(self, vidx_idx.todgltensor(), num_hops)
         subg, outner_nodes_id, outer_edges_id = ret_list[0], ret_list[1], ret_list[2]
-        # assert np.all(~np.in1d(outer_nodes_id, vidx_idx.tonumpy()))
         inner_nodes = np.ones(subg.graph.number_of_nodes(0))
-        print(f"aaaa: {outner_nodes_id.shape}")
         inner_nodes[outner_nodes_id.asnumpy()] = 0
         inner_edges = np.ones(subg.graph.number_of_edges(0))
         inner_edges[outer_edges_id.asnumpy()] = 0
