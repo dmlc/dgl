@@ -161,7 +161,6 @@ class EdgeSoftmax(th.autograd.Function):
         grad_score = sds - out
         return None, grad_score, None
 
-
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     return GSpMM.apply(g, op, reduce_op, lhs_data, rhs_data)
 

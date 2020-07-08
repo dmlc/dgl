@@ -1263,6 +1263,21 @@ def zerocopy_to_dgl_ndarray(input):
     """
     pass
 
+def zerocopy_to_dgl_ndarray_for_write(input):
+    """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
+    that is ready for write (required in MXNet).
+
+    Parameters
+    ----------
+    input : Tensor
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+    """
+    pass
+
+
 def zerocopy_from_dgl_ndarray(input):
     """Zerocopy a dgl.ndarray.NDArray to framework-specific Tensor
 

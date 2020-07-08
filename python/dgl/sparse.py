@@ -59,6 +59,9 @@ def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
+def to_dgl_nd_for_write(x):
+    return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
+
 # map alias of operator name to its actually name that backend could recognize.
 op_mapping = {
     '+': 'add',
@@ -162,9 +165,9 @@ def _gspmm(gidx, op, reduce_op, u, e):
         _CAPI_DGLKernelSpMM(ugi, op, reduce_op,
                             to_dgl_nd(u if use_u else None),
                             to_dgl_nd(e if use_e else None),
-                            to_dgl_nd(v),
-                            to_dgl_nd(arg_u),
-                            to_dgl_nd(arg_e))
+                            to_dgl_nd_for_write(v),
+                            to_dgl_nd_for_write(arg_u),
+                            to_dgl_nd_for_write(arg_e))
     return v, (arg_u, arg_e)
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
@@ -235,7 +238,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         _CAPI_DGLKernelSDDMM(ugi, op,
                              to_dgl_nd(lhs if use_lhs else None),
                              to_dgl_nd(rhs if use_rhs else None),
-                             to_dgl_nd(out),
+                             to_dgl_nd_for_write(out),
                              lhs_target, rhs_target)
     return out
 
