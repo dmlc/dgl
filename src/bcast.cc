@@ -77,7 +77,7 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
     }
     rst.out_len = out_len;
   } else {
-    rst.out_len = (op == "copy_e") ? rst.rhs_len : rst.lhs_len;
+    rst.out_len = (op == "copy_rhs") ? rst.rhs_len : rst.lhs_len;
     if (op == "dot") {
       rst.reduce_size = lhs->shape[lhs->ndim - 1];  // set reduce_size for dot.
       rst.out_len /= rst.reduce_size;  // out_len is divied by reduce_size in dot.
