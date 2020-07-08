@@ -265,17 +265,13 @@ template <DLDeviceType XPU, typename IdType>
 IdArray SetDiff1d(IdArray arr1, IdArray arr2) {
   CHECK(arr1->ndim == 1) << "SetDiff1d only supports 1D array";
   CHECK(arr2->ndim == 1) << "SetDiff1d only supports 1D array";
-  phmap::flat_hash_set<IdType> arr2_map;
-  arr2_map.reserve(arr2->shape[0]);
   const IdType* arr1_data = static_cast<IdType*>(arr1->data);
   const IdType* arr2_data = static_cast<IdType*>(arr2->data);
-  for (int64_t i = 0; i < arr2->shape[0]; i++) {
-    arr2_map.insert(arr2_data[i]);
-  }
+  phmap::flat_hash_set<IdType> arr2_set(arr2_data, arr2_data + arr2->shape[0]);
 
   phmap::flat_hash_set<IdType> ret_set;
   for (int64_t i = 0; i < arr1->shape[0]; i++) {
-    if (!arr2_map.contains(arr1_data[i])) {
+    if (!arr2_set.contains(arr1_data[i])) {
       ret_set.insert(arr1_data[i]);
     }
   }
@@ -297,8 +293,7 @@ template <DLDeviceType XPU, typename IdType>
 IdArray Unique(IdArray arr) {
   CHECK(arr->ndim == 1) << "Unique only supports 1D array";
   const IdType* arr_data = static_cast<IdType*>(arr->data);
-  int64_t arr_size = arr->shape[0];
-  phmap::flat_hash_set<IdType> arr_set(arr_data, arr_data + arr_size);
+  phmap::flat_hash_set<IdType> arr_set(arr_data, arr_data + arr->shape[0]);
 
   IdArray ret_ndarray =
     NewIdArray(arr_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
