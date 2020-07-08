@@ -17,7 +17,7 @@ from dgl.distributed import DistGraphServer, DistGraph
 
 def start_server(rank, tmpdir, disable_shared_mem, graph_name):
     import dgl
-    g = DistGraphServer(rank, "rpc_sampling_ip_config.txt", 1, graph_name,
+    g = DistGraphServer(rank, "rpc_ip_config.txt", 1, graph_name,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem)
     g.start()
 
@@ -27,7 +27,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
-    dist_graph = DistGraph("rpc_sampling_ip_config.txt", "test_sampling", gpb=gpb)
+    dist_graph = DistGraph("rpc_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
@@ -35,7 +35,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
 
 
 def check_rpc_sampling(tmpdir, num_server):
-    ip_config = open("rpc_sampling_ip_config.txt", "w")
+    ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
@@ -78,7 +78,7 @@ def test_rpc_sampling():
         check_rpc_sampling(Path(tmpdirname), 2)
 
 def check_rpc_sampling_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_sampling_ip_config.txt", "w")
+    ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
@@ -135,7 +135,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb = load_partition(tmpdir / 'test_in_subgraph.json', rank)
-    dist_graph = DistGraph("rpc_sampling_ip_config.txt", "test_in_subgraph", gpb=gpb)
+    dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
@@ -143,7 +143,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
 
 
 def check_rpc_in_subgraph(tmpdir, num_server):
-    ip_config = open("rpc_sampling_ip_config.txt", "w")
+    ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
     ip_config.close()
