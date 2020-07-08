@@ -31,7 +31,7 @@ def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.tensor(data, dtype=dtype)
+    return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
