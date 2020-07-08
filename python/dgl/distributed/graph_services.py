@@ -1,4 +1,4 @@
-"""Sampling module"""
+"""A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
 
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
