@@ -15,7 +15,7 @@ namespace {
  *        type, lhs array and rhs array.
  */
 bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
-  if (op == "copy_u" || op == "copy_e")
+  if (op == "copy_lhs" || op == "copy_rhs")
     return false;  // broadcasting is not required for copy_u/copy_e
   if (lhs->ndim != rhs->ndim)
     return true;
