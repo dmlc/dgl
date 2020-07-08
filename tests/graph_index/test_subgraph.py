@@ -150,10 +150,10 @@ def test_node_subgraph_with_halo_hetero():
     assert np.all(np.sort(subg.induced_edges[0].tonumpy()) == np.sort(inner_edge_ids))
 
 if __name__ == '__main__':
-    # test_node_subgraph()
-    # test_node_subgraph_with_halo()
-    # test_edge_subgraph()
-    # test_edge_subgraph_preserve_nodes()
-    # test_immutable_edge_subgraph()
-    # test_immutable_edge_subgraph_preserve_nodes()
+    test_node_subgraph()
+    test_node_subgraph_with_halo()
+    test_edge_subgraph()
+    test_edge_subgraph_preserve_nodes()
+    test_immutable_edge_subgraph()
+    test_immutable_edge_subgraph_preserve_nodes()
     test_node_subgraph_with_halo_hetero()
