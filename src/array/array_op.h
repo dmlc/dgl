@@ -46,6 +46,9 @@ NDArray IndexSelect(NDArray array, IdArray index);
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index);
 
+template <DLDeviceType XPU, typename DType>
+IdArray NonZero(BoolArray bool_arr);
+
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);
 

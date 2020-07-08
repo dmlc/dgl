@@ -754,3 +754,16 @@ TEST(LineGraphTest, LineGraphCSR) {
   _TestLineGraphCSR<int32_t>(CPU);
   _TestLineGraphCSR<int64_t>(CPU);
 }
+
+template <typename IDX>
+void _TestNonZero() {
+  BoolArray a = aten::VecToIdArray(std::vector<IDX>({1, 0, 1, 1, 0, 0, 1}));
+  IdArray indices = aten::NonZero(a);
+  IdArray expected = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 6}));
+  ASSERT_TRUE(ArrayEQ<IDX>(indices, expected));
+}
+
+TEST(ArrayTest, NonZero) {
+  _TestNonZero<int32_t>();
+  _TestNonZero<int64_t>();
+}
