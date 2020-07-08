@@ -32,9 +32,7 @@ ToSimpleGraph(const HeteroGraphPtr graph) {
 
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto result = ugs[etype]->ToSimple();
-    rel_graphs[etype] = std::get<0>(result);
-    counts[etype] = std::get<1>(result);
-    edge_maps[etype] = std::get<2>(result);
+    std::tie(rel_graphs[etype], counts[etype], edge_maps[etype]) = result;
   }
 
   const HeteroGraphPtr result = CreateHeteroGraph(
