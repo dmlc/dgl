@@ -386,7 +386,7 @@ COOMatrix CSRRowWiseTopk(
  * CSRMatrix_B.num_rows : 3
  * CSRMatrix_B.num_cols : 4
  *
- * C, eid0, eid1 = UnionCsr({A, B});
+ * C = UnionCsr({A, B});
  *
  * C = [[0, 1, 2, 0],
  *      [1, 0, 1, 2],
@@ -394,15 +394,9 @@ COOMatrix CSRRowWiseTopk(
  *
  * CSRMatrix_C.num_rows : 3
  * CSRMatrix_C.num_cols : 4
- *
- * \return Unioned CSRMatrix
- *         The edge mapping from the edge IDs of the first graph to those of the
- *         returned graph.
- *         The edge mapping from the edge IDs of the second graph to those of the
- *         returned graph.
  */
-std::tuple<CSRMatrix, IdArray, IdArray>
-UnionCsr(const std::vector<CSRMatrix>& csrs);
+CSRMatrix UnionCsr(
+  const std::vector<CSRMatrix>& csrs);
 
 /*!
  * \brief Union a list CSRMatrix into one CSRMatrix.
