@@ -45,7 +45,7 @@ class KarateClubDataset(DGLDataset):
     def __init__(self):
         super(KarateClubDataset, self).__init__(name='karate_club')
 
-    def process(self, root_path):
+    def process(self):
         kc_graph = nx.karate_club_graph()
         self.label = np.asarray(
             [kc_graph.nodes[i]['club'] != 'Mr. Hi' for i in kc_graph.nodes]).astype(np.int64)

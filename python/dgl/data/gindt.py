@@ -12,14 +12,12 @@ import numpy as np
 
 from .. import backend as F
 
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import loadtxt, save_graphs, load_graphs, save_info, load_info
 from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
-_url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
-
-
-class GINDataset(object):
+class GINDataset(DGLDataset):
     """Datasets for Graph Isomorphism Network (GIN)
     Adapted from https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip.
 
@@ -42,18 +40,28 @@ class GINDataset(object):
     degree_as_nlabel: boolean
         take node degree as label and feature if true
 
+    Returns
+    -------
+    GINDataset object as an iterable for dataloader.
+
+    Examples
+    --------
+    >>> data = GINDataset('MUTAG')
+    >>> data[0]
+
     """
 
-    def __init__(self, name, self_loop, degree_as_nlabel=False):
-        """Initialize the dataset."""
+    _url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
 
+    def __init__(self, name, self_loop, degree_as_nlabel=False,
+                 raw_dir=None, force_reload=False, verbose=False):
+
+        self.url = self._url
         self.name = name  # MUTAG
         self.ds_name = 'nig'
-        self.extract_dir = self._get_extract_dir()
         self.file = self._file_path()
 
         self.self_loop = self_loop
-
         self.graphs = []
         self.labels = []
 
@@ -78,10 +86,15 @@ class GINDataset(object):
         self.degree_as_nlabel = degree_as_nlabel
         self.nattrs_flag = False
         self.nlabels_flag = False
-        self.verbosity = False
 
-        # calc all values
-        self._load()
+        super(GINDataset, self).__init__(name=name, raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
+
+    def download(self):
+        r""" Automatically download data and extract it.
+        """
+        zip_file_path = os.path.join(self.raw_dir, 'GINDataset.zip')
+        download(self.url, path=zip_file_path)
+        extract_archive(zip_file_path, self.raw_path)
 
     def __len__(self):
         """Return the number of graphs in the dataset."""
@@ -102,34 +115,20 @@ class GINDataset(object):
         """
         return self.graphs[idx], self.labels[idx]
 
-    def _get_extract_dir(self):
-        return os.path.join(get_download_dir(), "{}".format(self.ds_name))
-
-    def _download(self):
-        download_dir = get_download_dir()
-        zip_file_path = os.path.join(
-            download_dir, "{}.zip".format(self.ds_name))
-        # TODO move to dgl host _get_dgl_url
-        download(_url, path=zip_file_path)
-        extract_dir = self._get_extract_dir()
-        extract_archive(zip_file_path, extract_dir)
-
     def _file_path(self):
-        return os.path.join(self.extract_dir, "dataset", self.name, "{}.txt".format(self.name))
+        return os.path.join(self.raw_dir, "GINDataset", self.name, "{}.txt".format(self.name))
 
-    @retry_method_with_fix(_download)
-    def _load(self):
+    def process(self):
         """ Loads input dataset from dataset/NAME/NAME.txt file
 
         """
-
         print('loading data...')
         with open(self.file, 'r') as f:
             # line_1 == N, total number of graphs
             self.N = int(f.readline().strip())
 
             for i in range(self.N):
-                if (i + 1) % 10 == 0 and self.verbosity is True:
+                if (i + 1) % 10 == 0 and self.verbose is True:
                     print('processing graph {}...'.format(i + 1))
 
                 grow = f.readline().strip().split()
@@ -183,7 +182,7 @@ class GINDataset(object):
                         m_edges += 1
                         g.add_edge(j, j)
 
-                    if (j + 1) % 10 == 0 and self.verbosity is True:
+                    if (j + 1) % 10 == 0 and self.verbose is True:
                         print(
                             'processing node {} of graph {}...'.format(
                                 j + 1, i + 1))

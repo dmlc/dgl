@@ -47,7 +47,7 @@ class MiniGCDataset(DGLDataset):
         self.seed = seed
         super(MiniGCDataset, self).__init__(name="minigc", **kwargs)
 
-    def process(self, root_path):
+    def process(self):
         self.graphs = []
         self.labels = []
         self._generate(self.seed)

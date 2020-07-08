@@ -64,10 +64,8 @@ class DGLDataset(object):
         """
         pass
 
-    def process(self, root_path):
-        r"""Processes the data under root_path.
-            By default root_path = os.path.join(self.raw_dir, self.name).
-            One can overwrite raw_path() function to change the path.
+    def process(self):
+        r"""Processes the data.
         """
         raise NotImplementedError
 
@@ -115,7 +113,7 @@ class DGLDataset(object):
 
         if not load_flag:
             self._download()
-            self.process(self.raw_path)
+            self.process()
             self.save()
             if self.verbose:
                 print('Done saving data into cached files.')
