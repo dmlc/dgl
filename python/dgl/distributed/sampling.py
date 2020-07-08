@@ -10,7 +10,7 @@ from ..base import NID, EID
 from ..utils import toindex
 from .. import backend as F
 
-__all__ = ['sample_neighbors']
+__all__ = ['sample_neighbors', 'in_subgraph']
 
 SAMPLING_SERVICE_ID = 6657
 INSUBGRAPH_SERVICE_ID = 6658
