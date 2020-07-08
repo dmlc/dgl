@@ -207,19 +207,18 @@ class RelGraphConv(nn.Module):
         torch.Tensor
             New node features.
         """
-        assert g.is_homograph(), \
-            "not a homograph; convert it with to_homo and pass in the edge type as argument"
         with g.local_scope():
-            g.ndata['h'] = x
+            g.srcdata['h'] = x
             g.edata['type'] = etypes
             if norm is not None:
                 g.edata['norm'] = norm
             if self.self_loop:
-                loop_message = utils.matmul_maybe_select(x, self.loop_weight)
+                loop_message = utils.matmul_maybe_select(x[:g.number_of_dst_nodes()],
+                                                         self.loop_weight)
             # message passing
             g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
             # apply bias and activation
-            node_repr = g.ndata['h']
+            node_repr = g.dstdata['h']
             if self.bias:
                 node_repr = node_repr + self.h_bias
             if self.self_loop:

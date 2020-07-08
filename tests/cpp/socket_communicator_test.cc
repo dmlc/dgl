@@ -61,7 +61,6 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 void start_client() {
-  sleep(2); // wait server start
   SocketSender sender(kQueueSize);
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.AddReceiver(ip_addr[i], i);
@@ -89,6 +88,7 @@ void start_client() {
 }
 
 void start_server(int id) {
+  sleep(5);
   SocketReceiver receiver(kQueueSize);
   receiver.Wait(ip_addr[id], kNumSender);
   for (int i = 0; i < kNumMessage; ++i) {
@@ -164,7 +164,6 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 static void start_client() {
-  sleep(1);
   std::ifstream t("addr.txt");
   std::string ip_addr((std::istreambuf_iterator<char>(t)),
                        std::istreambuf_iterator<char>());
@@ -181,6 +180,7 @@ static void start_client() {
 }
 
 static bool start_server() {
+  sleep(5);
   std::ifstream t("addr.txt");
   std::string ip_addr((std::istreambuf_iterator<char>(t)),
                        std::istreambuf_iterator<char>());
