@@ -49,7 +49,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   res_data.resize(num_edges);
   res_indptr[0] = 0;
 
-  if (sorted) { // all csrs are sorted
+  if (sorted) {  // all csrs are sorted
 #pragma omp for
     for (int64_t i = 1; i <= csrs[0].num_rows; ++i) {
       std::vector<int64_t> indices_off;
@@ -72,16 +72,16 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
               min = indices_data[j][indices_off[j]];
               min_idx = j;
             }
-          } // for check out of bound
-        } // for
+          }  // for check out of bound
+        }  // for
 
         res_indices[off] = min;
         res_data[off] = data_data[min_idx][indices_off[min_idx]];
         indices_off[min_idx] += 1;
         ++off;
-      } // while
-    } // omp for
-  } else { // some csrs are not sorted
+      }  // while
+    }  // omp for
+  } else {  // some csrs are not sorted
 #pragma omp for
     for (int64_t i = 1; i <= csrs[0].num_rows; ++i) {
       IdType off = res_indptr[i-1];
@@ -97,7 +97,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
         off += indptr_data[j][i] - indptr_data[j][i-1];
       }
       res_indptr[i] = off;
-    } // omp for
+    }  // omp for
   }
 
   return CSRMatrix(
