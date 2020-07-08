@@ -259,7 +259,6 @@ IdArray NonZero(BoolArray bool_arr) {
 template IdArray NonZero<kDLCPU, int32_t>(BoolArray bool_arr);
 template IdArray NonZero<kDLCPU, int64_t>(BoolArray bool_arr);
 
-
 ///////////////////////////// SetDiff1d /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -281,7 +280,8 @@ IdArray SetDiff1d(IdArray arr1, IdArray arr2) {
     }
   }
 
-  IdArray ret_ndarray = NewIdArray(ret_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdArray ret_ndarray =
+    NewIdArray(ret_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
   IdType* ret_data = static_cast<IdType*>(ret_ndarray->data);
   std::copy(ret_set.begin(), ret_set.end(), ret_data);
   std::sort(ret_data, ret_data + ret_set.size());
@@ -296,14 +296,15 @@ template IdArray SetDiff1d<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
 template <DLDeviceType XPU, typename IdType>
 IdArray Unique(IdArray arr) {
   CHECK(arr->ndim == 1) << "Unique only supports 1D array";
-  phmap::flat_hash_set<IdType> arr_set;  
+  phmap::flat_hash_set<IdType> arr_set;
   arr_set.reserve(arr->shape[0]);
   const IdType* arr_data = static_cast<IdType*>(arr->data);
   for (int64_t i = 0; i < arr->shape[0]; i++) {
     arr_set.insert(arr_data[i]);
   }
 
-  IdArray ret_ndarray = NewIdArray(arr_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdArray ret_ndarray =
+    NewIdArray(arr_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
   IdType* ret_data = static_cast<IdType*>(ret_ndarray->data);
   std::copy(arr_set.begin(), arr_set.end(), ret_data);
   std::sort(ret_data, ret_data + arr_set.size());
