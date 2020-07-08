@@ -701,8 +701,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     if balance_ntypes is not None:
         assert len(balance_ntypes) == g.number_of_nodes(), \
                 "The length of balance_ntypes should be equal to #nodes in the graph"
-        balance_ntypes = utils.toindex(balance_ntypes)
-        balance_ntypes = balance_ntypes.tousertensor()
+        balance_ntypes = F.tensor(balance_ntypes)
         uniq_ntypes = F.unique(balance_ntypes)
         for ntype in uniq_ntypes:
             vwgt.append(F.astype(balance_ntypes == ntype, F.int64))

@@ -272,6 +272,8 @@ def clone(input):
     return input.clone()
 
 def unique(input):
+    if input.dtype == th.bool:
+        input = input.type(th.int8)
     return th.unique(input)
 
 def full_1d(length, fill_value, dtype, ctx):
