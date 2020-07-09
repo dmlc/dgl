@@ -47,6 +47,29 @@ class CFConv(nn.Module):
 
     It combines node and edge features in message passing and updates node representations.
 
+    .. math::
+        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} h_j^{l} \circ W^{(l)}e_ij
+
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import CFConv
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> nfeat = th.ones(6, 10)
+    >>> efeat = th.ones(6, 5)
+    >>> conv = CFConv(10, 5, 3, 2)
+    >>> res = conv(g, nfeat, efeat)
+    >>> res
+    tensor([[-0.1209, -0.2289],
+            [-0.1209, -0.2289],
+            [-0.1209, -0.2289],
+            [-0.1135, -0.2338],
+            [-0.1209, -0.2289],
+            [-0.1283, -0.2240]], grad_fn=<SubBackward0>)
+
     Parameters
     ----------
     node_in_feats : int

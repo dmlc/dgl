@@ -23,6 +23,40 @@ class DotGatConv(nn.Module):
         where :math:`W_i` and :math:`W_j` transform node :math:`i`'s and node :math:`j`'s
         features into the same dimension, so that when compute note features' similarity,
         we can use dot-product.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import DotGatConv
+
+    Case 1: Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> gatconv = DotGatConv(10, 2)
+    >>> res = gatconv(g, feat)
+    >>> res
+    tensor([[0.6101, 0.3370],
+            [0.6101, 0.3370],
+            [0.6101, 0.3370],
+            [0.6101, 0.3370],
+            [0.6101, 0.3370],
+            [0.0000, 0.0000]], grad_fn=<CopyReduceBackward>)
+
+    Case 2: Unidirectional bipartite graph
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_feat = th.tensor(np.random.rand(2, 5).astype(np.float32))
+    >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> gatconv = DotGatConv((5,10), 2)
+    >>> res = gatconv(g, (u_feat, v_feat))
+    >>> res
+    tensor([[ 0.0000,  0.0000],
+            [ 0.0000,  0.0000],
+            [-0.1758,  0.1156],
+            [-0.1605, -0.0252]], grad_fn=<CopyReduceBackward>)
     """
 
     def __init__(self,
@@ -30,7 +64,7 @@ class DotGatConv(nn.Module):
                  out_feats
                  ):
         super(DotGatConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
+        self._in_src_feats, self._in_ds错的t_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
 
         if isinstance(in_feats, tuple):
