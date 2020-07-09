@@ -46,6 +46,9 @@ def tensor(data, dtype=None):
                 dtype = np.int64 if isinstance(data, numbers.Integral) else np.float32
             elif isinstance(data, np.ndarray):
                 dtype = data.dtype
+                # mxnet doesn't support bool
+                if dtype == np.bool:
+                    dtype = np.int32
             else:
                 dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
         return nd.array(data, dtype=dtype)
