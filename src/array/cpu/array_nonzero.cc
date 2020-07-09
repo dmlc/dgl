@@ -12,7 +12,7 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
-  std::vector<IdType> ret;
+  std::vector<int64_t> ret;
   const IdType* data = array.Ptr<IdType>();
   for (int64_t i = 0; i < array->shape[0]; ++i)
     if (data[i] != 0)

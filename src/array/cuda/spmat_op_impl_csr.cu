@@ -418,6 +418,7 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
       mask.Ptr<IdType>());
 
   IdArray idx = AsNumBits(NonZero(mask), nbits);
+  return {idx, idx, idx};
   if (idx->shape[0] == 0)
     // No data. Return three empty arrays.
     return {idx, idx, idx};
