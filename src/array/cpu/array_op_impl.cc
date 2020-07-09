@@ -12,6 +12,7 @@
 #include <numeric>
 
 #include "../arith.h"
+#include "../array_op.h"
 
 namespace dgl {
 using runtime::NDArray;
@@ -268,8 +269,8 @@ template <DLDeviceType XPU, typename IdType>
 IdArray SetDiff1d(IdArray arr1, IdArray arr2) {
   CHECK(arr1->ndim == 1) << "SetDiff1d only supports 1D array";
   CHECK(arr2->ndim == 1) << "SetDiff1d only supports 1D array";
-  IdArray unique_arr1 = Unique(arr1);
-  IdArray unique_arr2 = Unique(arr2);
+  IdArray unique_arr1 = Unique<XPU, IdType>(arr1);
+  IdArray unique_arr2 = Unique<XPU, IdType>(arr2);
   const IdType* unique_arr1_data = static_cast<IdType*>(unique_arr1->data);
   const IdType* unique_arr2_data = static_cast<IdType*>(unique_arr2->data);
   std::vector<IdType> diff;
