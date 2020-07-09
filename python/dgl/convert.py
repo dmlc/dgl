@@ -312,12 +312,12 @@ def bipartite(data,
     if isinstance(data, tuple):
         u, v = F.tensor(data[0], idtype), F.tensor(data[1], idtype)
         g = create_from_edges(
-            u, v, ntype, etype, ntype, urange, vrange, validate,
+            u, v, utype, etype, vtype, urange, vrange, validate,
             restrict_format=restrict_format)
     elif isinstance(data, list):
         u, v = elist2tensor(data, idtype)
         g = create_from_edges(
-            u, v, ntype, etype, ntype, urange, vrange, validate,
+            u, v, utype, etype, vtype, urange, vrange, validate,
             restrict_format=restrict_format)
     elif isinstance(data, sp.sparse.spmatrix):
         g = create_from_scipy(
@@ -402,8 +402,8 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
                      ('developer', 'develops', 'game'): 2},
           metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
     """
-    check_all_same_idtype(rel_graphs, 'rel_graphs')
-    check_all_same_device(rel_graphs, 'rel_graphs')
+    utils.check_all_same_idtype(rel_graphs, 'rel_graphs')
+    utils.check_all_same_device(rel_graphs, 'rel_graphs')
     # TODO(minjie): this API can be generalized as a union operation of the input graphs
     # TODO(minjie): handle node/edge data
     # infer meta graph
@@ -1007,8 +1007,8 @@ def create_from_networkx(nx_graph,
 
     if has_edge_id:
         num_edges = nx_graph.number_of_edges()
-        src = np.zeros((num_edges,), dtype=getattr(np, idtype))
-        dst = np.zeros((num_edges,), dtype=getattr(np, idtype))
+        src = [0] * num_edges
+        dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
             eid = attr[edge_id_attr_name]
             src[eid] = u
@@ -1023,7 +1023,7 @@ def create_from_networkx(nx_graph,
     dst = F.tensor(dst, idtype)
     num_nodes = nx_graph.number_of_nodes()
     g = create_from_edges(src, dst, ntype, etype, ntype, num_nodes, num_nodes,
-                          validate=False, restrict_format=restrict_format, idtype=idtype)
+                          validate=False, restrict_format=restrict_format)
 
     # handle features
     # copy attributes

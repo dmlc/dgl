@@ -2,6 +2,7 @@ from collections import defaultdict
 import dgl
 import networkx as nx
 import scipy.sparse as ssp
+import backend as F
 
 case_registry = defaultdict(list)
 

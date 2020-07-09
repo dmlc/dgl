@@ -3732,6 +3732,8 @@ class DGLHeteroGraph(object):
         --------
         dgl.to_networkx
         """
+        if self.device != F.cpu():
+            raise DGLError('Cannot convert a CUDA graph to networkx. Call g.cpu() first.')
         # TODO(minjie): multi-type support
         assert len(self.ntypes) == 1
         assert len(self.etypes) == 1
@@ -3924,6 +3926,7 @@ class DGLHeteroGraph(object):
         >>> print(g.device)
         device(type='cpu')
         """
+        # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
@@ -3935,6 +3938,9 @@ class DGLHeteroGraph(object):
         new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
         return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
                               new_nframes, new_eframes)
+
+    def cpu(self):
+        return self.to(F.cpu())
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.
