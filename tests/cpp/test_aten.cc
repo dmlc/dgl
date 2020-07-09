@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <dgl/array.h>
 #include "./common.h"
+#include "dgl/aten/array_ops.h"
 
 using namespace dgl;
 using namespace dgl::runtime;

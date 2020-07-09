@@ -4,8 +4,11 @@
  * \brief Array operator CPU implementation
  */
 #include <dgl/array.h>
-#include <parallel_hashmap/phmap.h>
 
+#include <iostream>
+#include <algorithm>
+#include <vector>
+#include <iterator>
 #include <numeric>
 
 #include "../arith.h"
@@ -265,23 +268,17 @@ template <DLDeviceType XPU, typename IdType>
 IdArray SetDiff1d(IdArray arr1, IdArray arr2) {
   CHECK(arr1->ndim == 1) << "SetDiff1d only supports 1D array";
   CHECK(arr2->ndim == 1) << "SetDiff1d only supports 1D array";
-  const IdType* arr1_data = static_cast<IdType*>(arr1->data);
-  const IdType* arr2_data = static_cast<IdType*>(arr2->data);
-  phmap::flat_hash_set<IdType> arr2_set(arr2_data, arr2_data + arr2->shape[0]);
+  IdArray unique_arr1 = Unique(arr1);
+  IdArray unique_arr2 = Unique(arr2);
+  const IdType* unique_arr1_data = static_cast<IdType*>(unique_arr1->data);
+  const IdType* unique_arr2_data = static_cast<IdType*>(unique_arr2->data);
+  std::vector<IdType> diff;
+  std::set_difference(
+    unique_arr1_data, unique_arr1_data + unique_arr1->shape[0],
+    unique_arr2_data, unique_arr2_data + unique_arr2->shape[0],
+    std::inserter(diff, diff.begin()));
 
-  phmap::flat_hash_set<IdType> ret_set;
-  for (int64_t i = 0; i < arr1->shape[0]; i++) {
-    if (!arr2_set.contains(arr1_data[i])) {
-      ret_set.insert(arr1_data[i]);
-    }
-  }
-
-  IdArray ret_ndarray =
-    NewIdArray(ret_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret_ndarray->data);
-  std::copy(ret_set.begin(), ret_set.end(), ret_data);
-  std::sort(ret_data, ret_data + ret_set.size());
-  return ret_ndarray;
+  return VecToIdArray(diff, sizeof(IdType) * 8);
 }
 
 template IdArray SetDiff1d<kDLCPU, int32_t>(IdArray arr1, IdArray arr2);
@@ -293,13 +290,10 @@ template <DLDeviceType XPU, typename IdType>
 IdArray Unique(IdArray arr) {
   CHECK(arr->ndim == 1) << "Unique only supports 1D array";
   const IdType* arr_data = static_cast<IdType*>(arr->data);
-  phmap::flat_hash_set<IdType> arr_set(arr_data, arr_data + arr->shape[0]);
-
-  IdArray ret_ndarray =
-    NewIdArray(arr_set.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret_ndarray->data);
-  std::copy(arr_set.begin(), arr_set.end(), ret_data);
-  std::sort(ret_data, ret_data + arr_set.size());
+  std::vector<IdType> arr_vec(arr_data, arr_data+arr->shape[0]);
+  std::sort(arr_vec.begin(), arr_vec.end());
+  arr_vec.erase(std::unique(arr_vec.begin(), arr_vec.end()), arr_vec.end());
+  IdArray ret_ndarray = VecToIdArray(arr_vec, sizeof(IdType) * 8);
   return ret_ndarray;
 }
 
