@@ -258,7 +258,6 @@ def load_info(path):
         info = pickle.load(pf)
     return info
 
-
 def deprecate_property(old, new):
     warnings.warn('Property {} will be deprecated, please use {} instead.'.format(old, new))
 
@@ -269,6 +268,13 @@ def deprecate_function(old, new):
 
 def deprecate_class(old, new):
     warnings.warn('Class {} will be deprecated, please use {} instead.'.format(old, new))
+
+
+def idx2mask(idx, len):
+    """Create mask."""
+    mask = np.zeros(len)
+    mask[idx] = 1
+    return mask
 
 
 def generate_mask_tensor(mask):

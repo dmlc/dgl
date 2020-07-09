@@ -40,12 +40,17 @@ class MiniGCDataset(DGLDataset):
     seed : int, default is None
         Random seed for data generation
     """
-    def __init__(self, num_graphs, min_num_v, max_num_v, seed=None, **kwargs):
+
+    def __init__(self, num_graphs, min_num_v, max_num_v,
+        seed=None, save_graph=True, force_reload=False):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
         self.seed = seed
-        super(MiniGCDataset, self).__init__(name="minigc", **kwargs)
+        self.save_graph = save_graph
+
+        super(MiniGCDataset, self).__init__(name="minigc",
+                                            force_reload=force_reload)
 
     def process(self):
         self.graphs = []
@@ -71,10 +76,18 @@ class MiniGCDataset(DGLDataset):
         """
         return self.graphs[idx], self.labels[idx]
 
+    def has_cache(self):
+        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        if os.path.exists(graph_path):
+            return True
+
+        return False
+
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
-        save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
+        if self.save_graph :
+            graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+            save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
 
     def load(self):
         graphs, label_dict = load_graphs(os.path.join(self.save_path, 'dgl_graph.bin'))
