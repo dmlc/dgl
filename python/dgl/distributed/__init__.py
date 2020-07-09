@@ -11,3 +11,4 @@ from .rpc_client import connect_to_server, finalize_client, shutdown_servers
 from .kvstore import KVServer, KVClient
 from .server_state import ServerState
 from .sampling import sample_neighbors
+from .dist_dataloader import DistDataLoader

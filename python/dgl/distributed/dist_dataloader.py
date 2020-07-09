@@ -1,23 +1,18 @@
 import multiprocessing as mp
 import dgl
-import torch as th
-from dgl.distributed import DistGraphServer, DistGraph
+from . import DistGraphServer, DistGraph, shutdown_servers, finalize_client
 import numpy as np
-# import multiprocessing, logging
-# logger = multiprocessing.log_to_stderr()
-# logger.setLevel(logging.DEBUG)
-from multiprocessing.util import Finalize
 
 DGL_QUEUE_TIMEOUT = 10
 
+__all__ = ["DistDataLoader"]
 
 def close():
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
+    shutdown_servers()
+    finalize_client()
 
 
 def init_fn(collate_fn, mp_queue):
-    print("COLALALALALL")
     global gfn
     global queue
     queue = mp_queue
@@ -38,46 +33,20 @@ def deregister_torch_ipc():
     ForkingPickler._extra_reducers.pop(torch.nn.parameter.Parameter)
 
 
-def sample_blocks(seeds, dist_g, fanouts):
-    # fanouts = kwargs.get("fanouts", None)
-    assert fanouts is not None, "Fanouts is not specified"
-    seeds = th.LongTensor(np.asarray(seeds))
-    blocks = []
-    for fanout in fanouts:
-        # For each seed node, sample ``fanout`` neighbors.
-        frontier = dgl.distributed.sampling.sample_neighbors(
-            dist_g, seeds, fanout, replace=True)
-        block = dgl.to_block(frontier, seeds)
-        # Obtain the seed nodes for next layer.
-        seeds = block.srcdata[dgl.NID]
-        blocks.insert(0, block)
-    return blocks
-
-
-# def queue_wrapper(fn, queue, seeds, sample_config):
-#     """Should change to decorator like implementation later"""
-#     """Use kwargs to pass variable later"""
-#     sample_config['dist_g'] = dist_gclient
-#     sample_config['seeds'] = seeds
-#     result = fn(**sample_config)
-#     queue.put(result)
-#     return 1
-
 def call_collate_fn(next_data):
     result = gfn(next_data)
     queue.put(result)
     return 1
 
 
-spawn_ctx = mp.get_context("spawn")
-
-
 class DistDataLoader:
+    """"""
     def __init__(self, dataset, batch_size, collate_fn, num_workers, drop_last, queue_size=None):
+        """"""
         assert num_workers > 0
         if queue_size is None:
             queue_size = num_workers * 4
-        self.queue_size = queue_size            
+        self.queue_size = queue_size
         self.dataset = dataset
         self.batch_size = batch_size
         self.queue_size = queue_size
@@ -86,12 +55,11 @@ class DistDataLoader:
         self.num_workers = num_workers
         self.m = mp.Manager()
         self.queue = self.m.Queue(maxsize=queue_size)
-        ctx = spawn_ctx
+        ctx = mp.get_context("spawn")
         self.drop_last = drop_last
         self.expected_idxs = len(dataset) // batch_size
         if not drop_last and len(dataset) % batch_size != 0:
             self.expected_idxs += 1
-
         self.send_idxs = 0
         self.recv_idxs = 0
         self.pool = ctx.Pool(
@@ -116,7 +84,8 @@ class DistDataLoader:
         if next_data is None:
             return None
         else:
-            async_result = self.pool.apply_async(call_collate_fn, args=(next_data, ))
+            async_result = self.pool.apply_async(
+                call_collate_fn, args=(next_data, ))
             self.send_idxs += 1
             return async_result
 

@@ -7,13 +7,11 @@ from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
 import multiprocessing as mp
 import numpy as np
-# import backend as F
 import time
 from utils import get_local_usable_addr
 from pathlib import Path
 import torch as th
-from dgl.distributed import DistGraphServer, DistGraph
-from mp_dataloader import DistDataLoader, sample_blocks
+from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
 
 
 class NeighborSampler(object):
@@ -96,7 +94,8 @@ def main(tmpdir, num_server):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, num_workers+1))
+        p = ctx.Process(target=start_server, args=(
+            i, tmpdir, num_server > 1, num_workers+1))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
@@ -106,9 +105,10 @@ def main(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
+def test_dist_dataloader(tmp_dir):
+    main(Path(tmp_dir), 3)
+
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-
-        mp.set_start_method("spawn")
         main(Path(tmpdirname), 3)
