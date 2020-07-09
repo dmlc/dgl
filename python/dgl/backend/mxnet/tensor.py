@@ -39,7 +39,7 @@ def tensor(data, dtype=None):
         if dtype is None or data.dtype == dtype:
             return data
         else:
-            return nd.cast(data, dtype):
+            return nd.cast(data, dtype)
     else:
         if dtype is None:
             if isinstance(data, numbers.Number):
