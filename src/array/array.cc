@@ -465,14 +465,6 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArr
   return ret;
 }
 
-COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
-  COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOReorder", {
-    ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
-  });
-  return ret;
-}
-
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRRemove", {
@@ -508,6 +500,27 @@ COOMatrix CSRRowWiseTopk(
   });
   return ret;
 }
+
+
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
+  CSRMatrix ret;
+  CHECK_GT(csrs.size(), 1) << "UnionCsr creates a union of multiple CSRMatrixes";
+  // sanity check
+  for (size_t i = 1; i < csrs.size(); ++i) {
+    CHECK_EQ(csrs[0].num_rows, csrs[i].num_rows) <<
+      "UnionCsr requires both CSRMatrix have same number of rows";
+    CHECK_EQ(csrs[0].num_cols, csrs[i].num_cols) <<
+      "UnionCsr requires both CSRMatrix have same number of cols";
+    CHECK_SAME_CONTEXT(csrs[0].indptr, csrs[i].indptr);
+    CHECK_SAME_DTYPE(csrs[0].indptr, csrs[i].indptr);
+  }
+
+  ATEN_CSR_SWITCH(csrs[0], XPU, IdType, "UnionCsr", {
+    ret = impl::UnionCsr<XPU, IdType>(csrs);
+  });
+  return ret;
+}
+
 
 std::tuple<CSRMatrix, IdArray, IdArray>
 CSRToSimple(const CSRMatrix& csr) {
@@ -645,6 +658,14 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   return ret;
 }
 
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOReorder", {
+    ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
+  });
+  return ret;
+}
+
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COORemove", {
@@ -688,6 +709,68 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   });
   return ret;
 }
+
+
+COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
+  COOMatrix ret;
+  CHECK_GT(coos.size(), 1) << "UnionCoo creates a union of multiple COOMatrixes";
+  // sanity check
+  for (size_t i = 1; i < coos.size(); ++i) {
+    CHECK_EQ(coos[0].num_rows, coos[i].num_rows) <<
+      "UnionCoo requires both COOMatrix have same number of rows";
+    CHECK_EQ(coos[0].num_cols, coos[i].num_cols) <<
+      "UnionCoo requires both COOMatrix have same number of cols";
+    CHECK_SAME_CONTEXT(coos[0].row, coos[i].row);
+    CHECK_SAME_DTYPE(coos[0].row, coos[i].row);
+  }
+
+  // we assume the number of coos is not large in common cases
+  std::vector<IdArray> coo_row;
+  std::vector<IdArray> coo_col;
+  bool has_data = false;
+
+  for (size_t i = 0; i < coos.size(); ++i) {
+    coo_row.push_back(coos[i].row);
+    coo_col.push_back(coos[i].col);
+    has_data |= COOHasData(coos[i]);
+  }
+
+  IdArray row = Concat(coo_row);
+  IdArray col = Concat(coo_col);
+  IdArray data = NullArray();
+
+  if (has_data) {
+    std::vector<IdArray> eid_data;
+    eid_data.push_back(COOHasData(coos[0]) ?
+                       coos[0].data :
+                       Range(0,
+                             coos[0].row->shape[0],
+                             coos[0].row->dtype.bits,
+                             coos[0].row->ctx));
+    int64_t num_edges = coos[0].row->shape[0];
+    for (size_t i = 1; i < coos.size(); ++i) {
+      eid_data.push_back(COOHasData(coos[i]) ?
+                         coos[i].data + num_edges :
+                         Range(num_edges,
+                               num_edges + coos[i].row->shape[0],
+                               coos[i].row->dtype.bits,
+                               coos[i].row->ctx));
+      num_edges += coos[i].row->shape[0];
+    }
+
+    data = Concat(eid_data);
+  }
+
+  return COOMatrix(
+    coos[0].num_rows,
+    coos[0].num_cols,
+    row,
+    col,
+    data,
+    false,
+    false);
+}
+
 
 std::tuple<COOMatrix, IdArray, IdArray>
 COOToSimple(const COOMatrix& coo) {

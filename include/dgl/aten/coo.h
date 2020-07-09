@@ -373,7 +373,39 @@ COOMatrix COORowWiseTopk(
     bool ascending = false);
 
 /*!
- * \brief Union a list COOMatrix into one COOMatrix.
+ * \brief Union two COOMatrix into one COOMatrix.
+ * 
+ * Two Matrix must have the same shape.
+ *
+ * Example:
+ *
+ * A = [[0, 0, 1, 0],
+ *      [1, 0, 1, 1],
+ *      [0, 1, 0, 0]]
+ *
+ * B = [[0, 1, 1, 0],
+ *      [0, 0, 0, 1],
+ *      [0, 0, 1, 0]]
+ *
+ * COOMatrix_A.num_rows : 3
+ * COOMatrix_A.num_cols : 4
+ * COOMatrix_B.num_rows : 3
+ * COOMatrix_B.num_cols : 4
+ *
+ * C = UnionCoo({A, B});
+ *
+ * C = [[0, 1, 2, 0],
+ *      [1, 0, 1, 2],
+ *      [0, 1, 1, 0]]
+ *
+ * COOMatrix_C.num_rows : 3
+ * COOMatrix_C.num_cols : 4
+ */
+COOMatrix UnionCoo(
+  const std::vector<COOMatrix>& coos);
+
+/*!
+ * \brief DisjointUnion a list COOMatrix into one COOMatrix.
  *
  * Examples:
  *
