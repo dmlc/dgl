@@ -51,13 +51,13 @@ def submit_jobs(server_cmd, client_cmd, args):
         ip, _ = hosts[int(i / server_count_per_machine)]
         cmd = server_cmd + ' --id ' + str(i)
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute(cmd, ip)
+        execute_remote(cmd, ip)
     # launch client tasks
     for i in range(args.num_client):
         ip, _ = hosts[int(i / client_count_per_machine)]
         cmd = client_cmd.replace('node_rank=0', 'node_rank='+str(i))
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute(cmd, ip)
+        execute_remote(cmd, ip)
 
     # use ctl+C to exit
     while True:
