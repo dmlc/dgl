@@ -206,7 +206,6 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 }
 
 NDArray Concat(const std::vector<IdArray>& arrays) {
-  // CHECK(arrays.size() > 1) << "Number of arrays should larger than 1";
   if (arrays.size() == 1) {
     return arrays[0];
   }
