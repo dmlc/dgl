@@ -701,8 +701,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     if balance_ntypes is not None:
         assert len(balance_ntypes) == g.number_of_nodes(), \
                 "The length of balance_ntypes should be equal to #nodes in the graph"
-        balance_ntypes = utils.toindex(balance_ntypes)
-        balance_ntypes = balance_ntypes.tousertensor()
+        balance_ntypes = F.tensor(balance_ntypes)
         uniq_ntypes = F.unique(balance_ntypes)
         for ntype in uniq_ntypes:
             vwgt.append(F.astype(balance_ntypes == ntype, F.int64))
@@ -1214,6 +1213,8 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 
     This function does not preserve node and edge features.
 
+    TODO(xiangsx): Don't save writeback_mapping into g, but put it into return value.
+
     Parameters
     ----------
     g : DGLHeteroGraph
@@ -1234,7 +1235,7 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
     Examples
     --------
     Consider the following graph
-    >>> g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
+    >>> g = dgl.graph(([0, 1, 2, 1, 1, 1], [1, 3, 2, 3, 4, 4]))
     >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
 
     The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
