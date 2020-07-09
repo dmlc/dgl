@@ -452,38 +452,6 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum);
 
-/*!
- * \brief Create a LineGraph of input csr
- * 
- * A = [[0, 0, 1],
- *      [1, 0, 1],
- *      [1, 1, 0]]
- * A.row = [0, 1, 1, 2, 2]
- * A.col = [2, 0, 2, 0, 1]
- * A.eid = [0, 1, 2, 3, 4]
- *
- * B = CSRLineGraph(A, backtracking=False)
- *
- * B = [[0, 0, 0, 0, 1],
- *      [1, 0, 0, 0, 0],
- *      [0, 0, 0, 1, 0],
- *      [0, 0, 0, 0, 0],
- *      [0, 1, 0, 0, 0]]
- *
- * C = CSRLineGraph(A, backtracking=False)
- *
- * C = [[0, 0, 0, 1, 1],
- *      [1, 0, 0, 0, 0],
- *      [0, 0, 0, 1, 1],
- *      [1, 0, 0, 0, 0],
- *      [0, 1, 1, 0, 0]]
- *
- * \param csr CSRMatrix to create the LineGraph
- * \param backtracking whether the pair of (v, u) (u, v) edges are treated as linked
- * \return LineGraph in CSR format
- */
-CSRMatrix CSRLineGraph(const CSRMatrix &csr, bool backtracking);
-
 }  // namespace aten
 }  // namespace dgl
 

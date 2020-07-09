@@ -669,90 +669,55 @@ void _TestLineGraphCOO(DLContext ctx) {
   ASSERT_EQ(l_coo.num_cols, 6);
   ASSERT_TRUE(ArrayEQ<IdType>(l_coo.row, b_row));
   ASSERT_TRUE(ArrayEQ<IdType>(l_coo.col, b_col));
-  ASSERT_TRUE(l_coo.row_sorted);
-  ASSERT_TRUE(l_coo.col_sorted);
+  ASSERT_FALSE(l_coo.row_sorted);
+  ASSERT_FALSE(l_coo.col_sorted);
 
   const aten::COOMatrix &l_coo2 = COOLineGraph(coo_a, true);
   ASSERT_EQ(l_coo2.num_rows, 6);
   ASSERT_EQ(l_coo2.num_cols, 6);
   ASSERT_TRUE(ArrayEQ<IdType>(l_coo2.row, c_row));
   ASSERT_TRUE(ArrayEQ<IdType>(l_coo2.col, c_col));
-  ASSERT_TRUE(l_coo2.row_sorted);
-  ASSERT_TRUE(l_coo2.col_sorted);
+  ASSERT_FALSE(l_coo2.row_sorted);
+  ASSERT_FALSE(l_coo2.col_sorted);
+
+  IdArray a_data =
+    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 1, 2, 3}), sizeof(IdType)*8, CTX);
+  b_row =
+    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 2}), sizeof(IdType)*8, CTX);
+  b_col =
+    aten::VecToIdArray(std::vector<IdType>({2, 4, 1, 5}), sizeof(IdType)*8, CTX);
+  c_row =
+    aten::VecToIdArray(std::vector<IdType>({4, 4, 5, 0, 0, 1, 2, 2}), sizeof(IdType)*8, CTX);
+  c_col =
+    aten::VecToIdArray(std::vector<IdType>({1, 2, 4, 1, 2, 4, 5, 0}), sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_ad = aten::COOMatrix(
+    4,
+    4,
+    a_row,
+    a_col,
+    a_data,
+    true,
+    false);
+  const aten::COOMatrix &ld_coo = COOLineGraph(coo_ad, false);
+  ASSERT_EQ(ld_coo.num_rows, 6);
+  ASSERT_EQ(ld_coo.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo.row, b_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo.col, b_col));
+  ASSERT_FALSE(ld_coo.row_sorted);
+  ASSERT_FALSE(ld_coo.col_sorted);
+
+  const aten::COOMatrix &ld_coo2 = COOLineGraph(coo_ad, true);
+  ASSERT_EQ(ld_coo2.num_rows, 6);
+  ASSERT_EQ(ld_coo2.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo2.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo2.col, c_col));
+  ASSERT_FALSE(ld_coo2.row_sorted);
+  ASSERT_FALSE(ld_coo2.col_sorted);
 }
 
 TEST(LineGraphTest, LineGraphCOO) {
   _TestLineGraphCOO<int32_t>(CPU);
   _TestLineGraphCOO<int64_t>(CPU);
-}
-
-template <typename IdType>
-void _TestLineGraphCSR(DLContext ctx) {
-  /*
-   * A = [[0, 0, 1, 0],
-   *      [1, 0, 1, 0],
-   *      [1, 1, 0, 0],
-   *      [0, 0, 0, 1]]
-   * row: 0 1 1 2 2 3
-   * col: 2 0 2 0 1 3
-   * ID:  0 1 2 3 4 5
-   *
-   * B = COOLineGraph(A, backtracking=False)
-   *
-   * B = [[0, 0, 0, 0, 1, 0],
-   *      [1, 0, 0, 0, 0, 0],
-   *      [0, 0, 0, 1, 0, 0],
-   *      [0, 0, 0, 0, 0, 0],
-   *      [0, 1, 0, 0, 0, 0],
-   *      [0, 0, 0, 0, 0, 0]]
-   *
-   * C = COOLineGraph(A, backtracking=True)
-   *
-   * C = [[0, 0, 0, 1, 1, 0],
-   *      [1, 0, 0, 0, 0, 0],
-   *      [0, 0, 0, 1, 1, 0],
-   *      [1, 0, 0, 0, 0, 0],
-   *      [0, 1, 1, 0, 0, 0],
-   *      [0, 0, 0, 0, 0, 0]]
-   */
-  IdArray a_indptr =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 3, 5, 6}), sizeof(IdType)*8, CTX);
-  IdArray a_indices =
-    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 0, 1, 3}), sizeof(IdType)*8, CTX);
-  IdArray b_indptr =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 3, 4, 4}), sizeof(IdType)*8, CTX);
-  IdArray b_indices =
-    aten::VecToIdArray(std::vector<IdType>({4, 0, 3, 1}), sizeof(IdType)*8, CTX);
-  IdArray c_indptr =
-    aten::VecToIdArray(std::vector<IdType>({0, 2, 3, 5, 6, 8, 8}), sizeof(IdType)*8, CTX);
-  IdArray c_indices =
-    aten::VecToIdArray(std::vector<IdType>({3, 4, 0, 3, 4, 0, 1, 2}), sizeof(IdType)*8, CTX);
-
-  const aten::CSRMatrix &csr_a = aten::CSRMatrix(
-    4,
-    4,
-    a_indptr,
-    a_indices,
-    aten::NullArray());
-
-  const aten::CSRMatrix &l_csr = CSRLineGraph(csr_a, false);
-  ASSERT_EQ(l_csr.num_rows, 6);
-  ASSERT_EQ(l_csr.num_cols, 6);
-  ASSERT_TRUE(ArrayEQ<IdType>(l_csr.indptr, b_indptr));
-  ASSERT_TRUE(ArrayEQ<IdType>(l_csr.indices, b_indices));
-  ASSERT_TRUE(l_csr.sorted);
-
-  const aten::CSRMatrix &l_csr2 = CSRLineGraph(csr_a, true);
-  ASSERT_EQ(l_csr2.num_rows, 6);
-  ASSERT_EQ(l_csr2.num_cols, 6);
-  ASSERT_TRUE(ArrayEQ<IdType>(l_csr2.indptr, c_indptr));
-  ASSERT_TRUE(ArrayEQ<IdType>(l_csr2.indices, c_indices));
-  ASSERT_TRUE(l_csr2.sorted);
-}
-
-TEST(LineGraphTest, LineGraphCSR) {
-  _TestLineGraphCSR<int32_t>(CPU);
-  _TestLineGraphCSR<int64_t>(CPU);
 }
 
 template <typename IDX>

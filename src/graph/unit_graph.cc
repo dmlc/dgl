@@ -1498,12 +1498,20 @@ HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
   // TODO(xiangsx) currently we only support homogeneous graph
   auto fmt = SelectFormat(SparseFormat::kAny);
   switch (fmt) {
-    case SparseFormat::kCOO:
+    case SparseFormat::kCOO: {
       return CreateFromCOO(1, aten::COOLineGraph(coo_->adj(), backtracking), restrict_format_);
-    case SparseFormat::kCSR:
-      return CreateFromCSC(1, aten::CSRLineGraph(in_csr_->adj(), backtracking), restrict_format_);
-    case SparseFormat::kCSC:
-      return CreateFromCSR(1, aten::CSRLineGraph(out_csr_->adj(), backtracking), restrict_format_);
+    }
+    case SparseFormat::kCSR: {
+      const aten::CSRMatrix csr = GetCSRMatrix(0);
+      const aten::COOMatrix coo = aten::COOLineGraph(aten::CSRToCOO(csr, false), backtracking);
+      return CreateFromCOO(1, coo, restrict_format_);
+    }
+    case SparseFormat::kCSC: {
+      const aten::CSRMatrix csc = GetCSCMatrix(0);
+      const aten::CSRMatrix csr = aten::CSRTranspose(csc);
+      const aten::COOMatrix coo = aten::COOLineGraph(aten::CSRToCOO(csr, false), backtracking);
+      return CreateFromCOO(1, coo, restrict_format_);
+    }
     default:
       LOG(FATAL) << "None of CSC, CSR, COO exist";
       break;

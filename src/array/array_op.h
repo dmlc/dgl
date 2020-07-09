@@ -152,9 +152,6 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
-template <DLDeviceType XPU, typename IdType>
-CSRMatrix CSRLineGraph(const CSRMatrix &csr, bool backtracking);
-
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>

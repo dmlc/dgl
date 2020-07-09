@@ -19,6 +19,11 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
   const int64_t nnz = coo.row->shape[0];
   IdType* coo_row = coo.row.Ptr<IdType>();
   IdType* coo_col = coo.col.Ptr<IdType>();
+  IdArray data = COOHasData(coo) ? coo.data : Range(0,
+                                                    nnz,
+                                                    coo.row->dtype.bits,
+                                                    coo.row->ctx);
+  IdType* data_data = data.Ptr<IdType>();
   std::vector<IdType> new_row;
   std::vector<IdType> new_col;
 
@@ -33,14 +38,14 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
       // succ_u == v
       // if not backtracking succ_u != u
       if (v == coo_row[j] && (backtracking || u != coo_col[j])) {
-        new_row.push_back(i);
-        new_col.push_back(j);
+        new_row.push_back(data_data[i]);
+        new_col.push_back(data_data[j]);
       }
     }
   }
 
   COOMatrix res = COOMatrix(nnz, nnz, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
-    NullArray(), true, true);
+    NullArray(), false, false);
   return res;
 }
 

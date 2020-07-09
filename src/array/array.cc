@@ -509,14 +509,6 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
-CSRMatrix CSRLineGraph(const CSRMatrix &csr, bool backtracking) {
-  CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRLineGraph", {
-    ret = impl::CSRLineGraph<XPU, IdType>(csr, backtracking);
-  });
-  return ret;
-}
-
 ///////////////////////// COO routines //////////////////////////
 
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
