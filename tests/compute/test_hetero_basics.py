@@ -496,7 +496,6 @@ def _test_dynamic_addition():
 @parametrize_dtype
 def test_repr(idtype):
     G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype, device=F.ctx())
-    G = G.to(F.ctx())
     repr_string = G.__repr__()
     print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
@@ -678,7 +677,7 @@ def test_issue_1088(idtype):
     # This test ensures that message passing on a heterograph with one edge type
     # would not crash (GitHub issue #1088).
     import dgl.function as fn
-    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype)
+    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype, device=F.ctx())
     g.nodes['U'].data['x'] = F.randn((3, 3))
     g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
 
