@@ -1,11 +1,11 @@
 import multiprocessing as mp
 import dgl
-from . import DistGraphServer, DistGraph, shutdown_servers, finalize_client
-import numpy as np
+from . import shutdown_servers, finalize_client
 
 DGL_QUEUE_TIMEOUT = 10
 
 __all__ = ["DistDataLoader"]
+
 
 def close():
     shutdown_servers()
@@ -41,6 +41,7 @@ def call_collate_fn(next_data):
 
 class DistDataLoader:
     """"""
+
     def __init__(self, dataset, batch_size, collate_fn, num_workers, drop_last, queue_size=None):
         """"""
         assert num_workers > 0
