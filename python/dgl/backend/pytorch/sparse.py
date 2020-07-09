@@ -42,13 +42,13 @@ class GSpMM(th.autograd.Function):
         gidx = g._graph
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
-        ctx.save_for_backward(X, Y, out, argX, argY)
+        ctx.save_for_backward(X, Y, argX, argY)
         return out
 
     @staticmethod
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
-        X, Y, out, argX, argY = ctx.saved_tensors
+        X, Y, argX, argY = ctx.saved_tensors
         dX, dY = None, None
         if op != 'copy_e' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
@@ -91,13 +91,13 @@ class GSDDMM(th.autograd.Function):
         gidx = g._graph
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
         ctx.backward_cache = gidx, op, lhs_target, rhs_target
-        ctx.save_for_backward(X, Y, out)
+        ctx.save_for_backward(X, Y)
         return out
 
     @staticmethod
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target = ctx.backward_cache
-        X, Y, out = ctx.saved_tensors
+        X, Y = ctx.saved_tensors
         dX, dY = None, None
         if op != 'copy_rhs' and ctx.needs_input_grad[2]:
             if lhs_target in ['u', 'v']:

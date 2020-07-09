@@ -94,7 +94,7 @@ sddmm_shapes = [
 @pytest.mark.parametrize('g', graphs)
 @pytest.mark.parametrize('shp', spmm_shapes)
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_u', 'copy_e'])
-@pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
+@pytest.mark.parametrize('reducer', ['sum'])#, 'min', 'max'])
 def test_spmm(g, shp, msg, reducer):
     print(g)
 
@@ -113,13 +113,16 @@ def test_spmm(g, shp, msg, reducer):
         non_degree_indices = F.tensor(
             np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
         v = F.gather_row(v, non_degree_indices)
-        F.backward(F.reduce_sum(v))
-        grad_u = F.grad(u)
-        grad_e = F.grad(e)
+        if g.number_of_edges() > 0:
+            F.backward(F.reduce_sum(v))
+            if msg != 'copy_e':
+                grad_u = F.grad(u)
+            if msg != 'copy_u':
+                grad_e = F.grad(e)
 
     with F.record_grad():
         g.update_all(udf_msg[msg], udf_reduce[reducer])
-        if 'v' in g.dstdata:
+        if g.number_of_edges() > 0:
             v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
             assert F.allclose(v, v1, rtol=1e-3, atol=1e-3)
             print('forward passed')
@@ -186,7 +189,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
 
     with F.record_grad():
         g.apply_edges(udf_apply_edges[msg_func])
-        if 'm' in g.edata:
+        if g.number_of_edges() > 0:
             e1 = g.edata['m']
             assert F.allclose(e, e1, rtol=1e-3, atol=1e-3)
             print('forward passed')
@@ -198,6 +201,11 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
                 assert F.allclose(F.grad(rhs_frame['y']), grad_rhs)
             print('backward passed')
 
+    print('fuck')
+
     lhs_frame.pop('x')
     rhs_frame.pop('y')
     if 'm' in g.edata: g.edata.pop('m')
+
+if __name__ == '__main__':
+    test_spmm(graphs[0], spmm_shapes[0], 'add', 'sum')

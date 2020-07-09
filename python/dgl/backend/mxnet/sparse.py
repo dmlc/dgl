@@ -48,48 +48,52 @@ class GSpMM(mx.autograd.Function):
 
     def forward(self, X, Y):
         out, (argX, argY) = _gspmm(self.gidx, self.op, self.reduce_op, X, Y)
-        self.save_for_backward(X, Y, out, argX, argY)
+        self.save_for_backward(X, Y, argX, argY)
         return out
 
     def backward(self, dZ):
-        X, Y, out, argX, argY = self.saved_tensors
+        X, Y, argX, argY = self.saved_tensors
+        gidx, op, reduce_op = self.gidx, self.op, self.reduce_op
         dX, dY = None, None
-        if self.op != 'copy_e' and X.grad is not None:
-            g_rev = self.gidx.reverse()
-            if self.reduce_op == 'sum':
-                if self.op in ['mul', 'div']:
-                    dX = _gspmm(g_rev, '*', 'sum', dZ, _muldiv(self.op, Y))[0]
-                elif self.op in ['add', 'sub']:
+        if op != 'copy_e' and X.grad is not None:
+            g_rev = gidx.reverse()
+            if reduce_op == 'sum':
+                if op in ['mul', 'div']:
+                    dX = _gspmm(g_rev, '*', 'sum', dZ, _muldiv(op, Y))[0]
+                elif op in ['add', 'sub']:
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
-                elif self.op == 'copy_u':
+                elif op == 'copy_u':
                     dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
             else:
-                if self.op in ['mul', 'div']:
-                    dX = nd.scatter_nd(_muldiv(self.op, nd.gather_nd(Y.broadcast_to(-1, *dZ.shape[1:]), argY)) * dZ,
+                if op in ['mul', 'div']:
+                    dX = nd.scatter_nd(_muldiv(op, nd.gather_nd(Y.broadcast_to(-1, *dZ.shape[1:]), argY)) * dZ,
                                        argX, (X.shape[0],) + dZ.shape[1:])
-                elif self.op in ['add', 'sub', 'copy_u']:
+                elif op in ['add', 'sub', 'copy_u']:
                     dX = nd.scatter_nd(dZ, argX, (X.shape[0],) + dZ.shape[1:])
+                dX = X
             dX = _reduce_grad(dX, X.shape)
-        if self.op != 'copy_u' and Y.grad is not None:
-            if self.reduce_op == 'sum':
-                if self.op in ['mul', 'div']:
-                    dY = _gsddmm(self.gidx, '*', X, dZ)
-                    if self.op == 'div': dY = -dY / (Y ** 2)
-                elif self.op in ['add', 'sub', 'copy_e']:
-                    dY = _gsddmm(self.gidx, 'copy_rhs', X, _addsub(self.op, dZ))
+        if op != 'copy_u' and Y.grad is not None:
+            if reduce_op == 'sum':
+                if op in ['mul', 'div']:
+                    dY = _gsddmm(gidx, '*', X, dZ)
+                    if op == 'div': dY = -dY / (Y ** 2)
+                elif op in ['add', 'sub', 'copy_e']:
+                    dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
-                if self.op in ['mul',  'div']:
+                if op in ['mul',  'div']:
                     dY = nd.scatter_nd(nd.gather_nd(X.broadcast_to(-1, *dZ.shape[1:]), argX) * dZ,
                                        argY, (Y.shape[0],) + dZ.shape[1:])
-                    if self.op == 'div': dY = -dY / (Y ** 2)
-                elif self.op in ['add', 'sub', 'copy_e']:
-                    dY = nd.scatter_nd(_addsub(self.op, dZ), argY)
+                    if op == 'div': dY = -dY / (Y ** 2)
+                elif op in ['add', 'sub', 'copy_e']:
+                    dY = nd.scatter_nd(_addsub(op, dZ), argY)
+                dY = Y
             dY = _reduce_grad(dY, Y.shape)
         self.saved_tensors = None
         if dX is None:
             dX = nd.empty(())
         if dY is None:
             dY = nd.empty(())
+        self.saved_tensors = None
         return dX, dY
 
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
@@ -110,11 +114,11 @@ class GSDDMM(mx.autograd.Function):
 
     def forward(self, X, Y):
         out = _gsddmm(self.gidx, self.op, X, Y, self.lhs_target, self.rhs_target)
-        self.save_for_backward(X, Y, out)
+        self.save_for_backward(X, Y)
         return out
 
     def backward(self, dZ):
-        X, Y, out = self.saved_tensors
+        X, Y = self.saved_tensors
         gidx, op = self.gidx, self.op
         lhs_target, rhs_target = self.lhs_target, self.rhs_target
         dX, dY = None, None
