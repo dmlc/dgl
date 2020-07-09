@@ -724,7 +724,7 @@ COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
     CHECK_SAME_DTYPE(coos[0].row, coos[i].row);
   }
 
-  // we assume the size of csrs is not large in common cases
+  // we assume the number of coos is not large in common cases
   std::vector<IdArray> coo_row;
   std::vector<IdArray> coo_col;
   bool has_data = false;

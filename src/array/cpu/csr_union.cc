@@ -21,7 +21,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   std::vector<IdType> res_data;
 
   // some preprocess
-  // we assume the size of csrs is not large in common cases
+  // we assume the number of csrs is not large in common cases
   std::vector<IdArray> data;
   std::vector<IdType *> data_data;
   std::vector<IdType *> indptr_data;
