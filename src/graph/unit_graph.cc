@@ -1571,4 +1571,44 @@ UnitGraphPtr UnitGraph::Reverse() const {
   return UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo));
 }
 
+std::tuple<UnitGraphPtr, IdArray, IdArray>
+UnitGraph::ToSimple() const {
+  CSRPtr new_incsr = nullptr, new_outcsr = nullptr;
+  COOPtr new_coo = nullptr;
+  IdArray count;
+  IdArray edge_map;
+
+  auto avail_fmt = SelectFormat(SparseFormat::kAny);
+  switch (avail_fmt) {
+    case SparseFormat::kCOO: {
+      auto ret = aten::COOToSimple(coo_->adj());
+      count = std::get<1>(ret);
+      edge_map = std::get<2>(ret);
+      new_coo = COOPtr(new COO(coo_->meta_graph(), std::get<0>(ret)));
+      break;
+    }
+    case SparseFormat::kCSR: {
+      auto ret = aten::CSRToSimple(in_csr_->adj());
+      count = std::get<1>(ret);
+      edge_map = std::get<2>(ret);
+      new_incsr = CSRPtr(new CSR(in_csr_->meta_graph(), std::get<0>(ret)));
+      break;
+    }
+    case SparseFormat::kCSC: {
+      auto ret = aten::CSRToSimple(out_csr_->adj());
+      count = std::get<1>(ret);
+      edge_map = std::get<2>(ret);
+      new_outcsr = CSRPtr(new CSR(out_csr_->meta_graph(), std::get<0>(ret)));
+      break;
+    }
+    default:
+      LOG(FATAL) << "At lease one of COO, CSR or CSC adj should exist.";
+      break;
+  }
+
+  return std::make_tuple(UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo)),
+                         count,
+                         edge_map);
+}
+
 }  // namespace dgl
