@@ -26,8 +26,7 @@ def kill_python_proc(args):
         for line in f:
             ip, _, _ = line.strip().split(' ')
             cmd = 'pkill -9 python'
-            cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
-            execute(cmd)
+            execute_remote(cmd, ip)
 
     # use ctl+C to exit
     while True:
