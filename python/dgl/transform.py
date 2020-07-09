@@ -1262,6 +1262,8 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 
     This function does not preserve node and edge features.
 
+    TODO(xiangsx): Don't save writeback_mapping into g, but put it into return value.
+
     Parameters
     ----------
     g : DGLHeteroGraph
@@ -1282,7 +1284,7 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
     Examples
     --------
     Consider the following graph
-    >>> g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
+    >>> g = dgl.graph(([0, 1, 2, 1, 1, 1], [1, 3, 2, 3, 4, 4]))
     >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
 
     The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
