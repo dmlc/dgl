@@ -42,6 +42,10 @@ def tensor(data, dtype=None):
             dtype = np.int64
         else:
             dtype = np.float32
+        if isinstance(data, nd.NDArray):
+            return data
+    elif isinstance(data, nd.NDArray) and data.dtype == dtype:
+        return data
     return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
