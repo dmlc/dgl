@@ -104,8 +104,8 @@ class RedditDataset(DGLBuiltinDataset):
         self._graph.ndata['train_mask'] = generate_mask_tensor(train_mask)
         self._graph.ndata['val_mask'] = generate_mask_tensor(val_mask)
         self._graph.ndata['test_mask'] = generate_mask_tensor(test_mask)
-        self._graph.ndata['feat'] = features
-        self._graph.ndata['label'] = labels
+        self._graph.ndata['feat'] = F.tensor(features, dtype=F.data_type_dict['float32'])
+        self._graph.ndata['label'] = F.tensor(labels, dtype=F.data_type_dict['int64'])
         self._print_info()
 
     def has_cache(self):
