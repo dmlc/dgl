@@ -652,6 +652,11 @@ void _TestNonZero(DLContext ctx) {
   idx = aten::NonZero(val);
   tidx = aten::VecToIdArray(std::vector<int64_t>({}), 64, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::Full(1, 3, sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<int64_t>({0, 1, 2}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
 }
 
 TEST(ArrayTest, NonZero) {

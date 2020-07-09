@@ -33,8 +33,8 @@ IdArray NonZero(IdArray array) {
   //   See PyTorch's implementation here: 
   //   https://github.com/pytorch/pytorch/blob/1f7557d173c8e9066ed9542ada8f4a09314a7e17/
   //     aten/src/THC/generic/THCTensorMath.cu#L104
-  // TODO(minjie): There is a strange error when converting the result
-  //   to PyTorch's Tensor via DLPack, casting it to long() will raise
+  // TODO(minjie): There is a strange error after invoking thrust::copy_if.
+  //   Any subsequent CUDA operations from PyTorch will raise
   //   an "CUDA error: invalid configuration argument". Currently don't know
   //   how to fix it.
   auto startiter = thrust::make_counting_iterator<int64_t>(0);
@@ -46,10 +46,7 @@ IdArray NonZero(IdArray array) {
                                      out_data,
                                      IsNonZero<IdType>());
   const int64_t num_nonzeros = indices_end - out_data;
-  LOG(INFO) << ret << " " << num_nonzeros;
-  CUDA_CALL(cudaGetLastError());
-  //return ret.CreateView({num_nonzeros}, ret->dtype, 0);
-  return ret;
+  return ret.CreateView({num_nonzeros}, ret->dtype, 0);
 }
 
 template IdArray NonZero<kDLGPU, int32_t>(IdArray);
