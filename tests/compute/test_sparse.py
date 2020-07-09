@@ -113,18 +113,22 @@ def test_spmm(g, shp, msg, reducer):
         non_degree_indices = F.tensor(
             np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
         v = F.gather_row(v, non_degree_indices)
+        F.backward(F.reduce_sum(v))
+        grad_u = F.grad(u)
+        grad_e = F.grad(e)
+
+    with F.record_grad():
         g.update_all(udf_msg[msg], udf_reduce[reducer])
         if 'v' in g.dstdata:
             v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
             assert F.allclose(v, v1, rtol=1e-3, atol=1e-3)
             print('forward passed')
 
-            F.backward(F.reduce_sum(v))
             F.backward(F.reduce_sum(v1))
             if msg != 'copy_e':
-                assert F.allclose(F.grad(g.srcdata['x']), F.grad(u))
+                assert F.allclose(F.grad(g.srcdata['x']), grad_u)
             if msg != 'copy_u':
-                assert F.allclose(F.grad(g.edata['w']), F.grad(e))
+                assert F.allclose(F.grad(g.edata['w']), grad_e)
             print('backward passed')
 
     g.srcdata.pop('x')
@@ -176,18 +180,22 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
     rhs = F.attach_grad(F.clone(feat_rhs))
     with F.record_grad():
         e = gsddmm(g, msg, lhs, rhs, lhs_target=lhs_target, rhs_target=rhs_target)
+        F.backward(F.reduce_sum(e))
+        grad_lhs = F.grad(lhs)
+        grad_rhs = F.grad(rhs)
+
+    with F.record_grad():
         g.apply_edges(udf_apply_edges[msg_func])
         if 'm' in g.edata:
             e1 = g.edata['m']
             assert F.allclose(e, e1, rtol=1e-3, atol=1e-3)
             print('forward passed')
 
-            F.backward(F.reduce_sum(e))
             F.backward(F.reduce_sum(e1))
             if msg != 'copy_rhs':
-                assert F.allclose(F.grad(lhs_frame['x']), F.grad(lhs))
+                assert F.allclose(F.grad(lhs_frame['x']), grad_lhs)
             if msg != 'copy_lhs':
-                assert F.allclose(F.grad(rhs_frame['y']), F.grad(rhs))
+                assert F.allclose(F.grad(rhs_frame['y']), grad_rhs)
             print('backward passed')
 
     lhs_frame.pop('x')
