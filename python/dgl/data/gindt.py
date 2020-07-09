@@ -12,8 +12,8 @@ import numpy as np
 
 from .. import backend as F
 
-from .dgl_dataset import DGLBuiltinDataset
-from .utils import loadtxt, save_graphs, load_graphs, save_info, load_info
+from .dgl_dataset import DGLDataset
+from .utils import loadtxt, save_graphs, load_graphs, save_info, load_info, download, extract_archive
 from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
@@ -46,20 +46,17 @@ class GINDataset(DGLDataset):
 
     Examples
     --------
-    >>> data = GINDataset('MUTAG')
+    >>> data = GINDataset(name='MUTAG', self_loop=False)
     >>> data[0]
 
     """
 
-    _url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
-
     def __init__(self, name, self_loop, degree_as_nlabel=False,
                  raw_dir=None, force_reload=False, verbose=False):
 
-        self.url = self._url
-        self.name = name  # MUTAG
+        self._name = name  # MUTAG
+        gin_url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
         self.ds_name = 'nig'
-        self.file = self._file_path()
 
         self.self_loop = self_loop
         self.graphs = []
@@ -87,7 +84,12 @@ class GINDataset(DGLDataset):
         self.nattrs_flag = False
         self.nlabels_flag = False
 
-        super(GINDataset, self).__init__(name=name, raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
+        super(GINDataset, self).__init__(name=name, url=gin_url,
+                                         raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
+
+    @property
+    def raw_path(self):
+        return os.path.join(self.raw_dir, 'GINDataset')
 
     def download(self):
         r""" Automatically download data and extract it.
@@ -116,13 +118,15 @@ class GINDataset(DGLDataset):
         return self.graphs[idx], self.labels[idx]
 
     def _file_path(self):
-        return os.path.join(self.raw_dir, "GINDataset", self.name, "{}.txt".format(self.name))
+        return os.path.join(self.raw_dir, "GINDataset", 'dataset', self.name, "{}.txt".format(self.name))
 
     def process(self):
         """ Loads input dataset from dataset/NAME/NAME.txt file
 
         """
-        print('loading data...')
+        if self.verbose:
+            print('loading data...')
+        self.file = self._file_path()
         with open(self.file, 'r') as f:
             # line_1 == N, total number of graphs
             self.N = int(f.readline().strip())
@@ -210,11 +214,13 @@ class GINDataset(DGLDataset):
 
         # if no attr
         if not self.nattrs_flag:
-            print('there are no node features in this dataset!')
+            if self.verbose:
+                print('there are no node features in this dataset!')
             label2idx = {}
             # generate node attr by node degree
             if self.degree_as_nlabel:
-                print('generate node features by node degree...')
+                if self.verbose:
+                    print('generate node features by node degree...')
                 nlabel_set = set([])
                 for g in self.graphs:
                     # actually this label shouldn't be updated
@@ -233,7 +239,8 @@ class GINDataset(DGLDataset):
                 label2idx = self.ndegree_dict
             # generate node attr by node label
             else:
-                print('generate node features by node label...')
+                if self.verbose:
+                    print('generate node features by node label...')
                 label2idx = self.nlabel_dict
 
             for g in self.graphs:
@@ -247,23 +254,73 @@ class GINDataset(DGLDataset):
         self.eclasses = len(self.elabel_dict)
         self.dim_nfeats = len(self.graphs[0].ndata['attr'][0])
 
-        print('Done.')
-        print(
-            """
-            -------- Data Statistics --------'
-            #Graphs: %d
-            #Graph Classes: %d
-            #Nodes: %d
-            #Node Classes: %d
-            #Node Features Dim: %d
-            #Edges: %d
-            #Edge Classes: %d
-            Avg. of #Nodes: %.2f
-            Avg. of #Edges: %.2f
-            Graph Relabeled: %s
-            Node Relabeled: %s
-            Degree Relabeled(If degree_as_nlabel=True): %s \n """ % (
-                self.N, self.gclasses, self.n, self.nclasses,
-                self.dim_nfeats, self.m, self.eclasses,
-                self.n / self.N, self.m / self.N, self.glabel_dict,
-                self.nlabel_dict, self.ndegree_dict))
+        if self.verbose:
+            print('Done.')
+            print(
+                """
+                -------- Data Statistics --------'
+                #Graphs: %d
+                #Graph Classes: %d
+                #Nodes: %d
+                #Node Classes: %d
+                #Node Features Dim: %d
+                #Edges: %d
+                #Edge Classes: %d
+                Avg. of #Nodes: %.2f
+                Avg. of #Edges: %.2f
+                Graph Relabeled: %s
+                Node Relabeled: %s
+                Degree Relabeled(If degree_as_nlabel=True): %s \n """ % (
+                    self.N, self.gclasses, self.n, self.nclasses,
+                    self.dim_nfeats, self.m, self.eclasses,
+                    self.n / self.N, self.m / self.N, self.glabel_dict,
+                    self.nlabel_dict, self.ndegree_dict))
+
+        def save(self):
+            graph_path = os.path.join(self.save_path, 'gin_{}.bin'.format(self.name))
+            info_path = os.path.join(self.save_path, 'gin_{}.pkl'.format(self.name))
+            label_dict = {'labels': F.tensor(self.labels)}
+            info_dict = {'N': self.N, 
+                         'n': self.n,
+                         'm': self.m,
+                         'self_loop': self_loop,
+                         'gclasses': self.glcasses,
+                         'nclasses': self.nclasses,
+                         'eclasses': self.eclasses,
+                         'dim_nfeats': self.dim_nfeats,
+                         'degree_as_nlabel': self.degree_as_nlabel,
+                         'glabel_dict': self.glabel_dict,
+                         'nlabel_dict': self.nlabel_dict,
+                         'elabel_dict': self.elabel_dict,
+                         'ndegree_dict': self.ndegree_dict}
+            save_graphs(str(graph_path), self.graph_lists, label_dict)
+            save_info(str(info_path), info_dict)
+
+        def load(self):
+            graph_path = os.path.join(self.save_path, 'gin_{}.bin'.format(self.name))
+            info_path = os.path.join(self.save_path, 'gin_{}.pkl'.format(self.name))
+            graphs, label_dict = load_graphs(str(graph_path))
+            info_dict = load_info(str(info_path))
+
+            self.graphs = graphs
+            self.labels = label_dict['labels']
+
+            self.N = info_dict['N']
+            self.n = info_dict['n']
+            self.m = info_dict['m']
+            self.gclasses = info_dict['gclasses']
+            self.nclasses = info_dict['nclasses']
+            self.eclasses = info_dict['eclasses']
+            self.dim_nfeats = info_dict['dim_nfeats']
+            self.glabel_dict = info_dict['glabel_dict']
+            self.nlabel_dict = info_dict['nlabel_dict']
+            self.elabel_dict = info_dict['elabel_dict']
+            self.ndegree_dict = info_dict['ndegree_dict']
+            self.degree_as_nlabel = info_dict['degree_as_nlabel']
+
+        def has_cache(self):
+            graph_path = os.path.join(self.save_path, 'gin_{}.bin'.format(self.name))
+            info_path = os.path.join(self.save_path, 'gin_{}.pkl'.format(self.name))
+            if os.path.exists(graph_path) and os.path.exists(info_path):
+                return True
+            return False

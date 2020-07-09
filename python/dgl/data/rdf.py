@@ -128,9 +128,9 @@ class RDFGraphDataset(DGLBuiltinDataset):
                                               force_reload=force_reload,
                                               verbose=verbose)
 
-    def process(self, root_path):
-        raw_tuples = self.load_raw_tuples(root_path)
-        self.process_raw_tuples(raw_tuples, root_path)
+    def process(self):
+        raw_tuples = self.load_raw_tuples(self.raw_path)
+        self.process_raw_tuples(raw_tuples, self.raw_path)
 
     def load_raw_tuples(self, root_path):
         raw_rdf_graphs = []
