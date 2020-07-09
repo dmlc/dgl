@@ -9,6 +9,7 @@
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 #include <vector>
+#include <tuple>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -432,6 +433,30 @@ CSRMatrix UnionCsr(
  */
 CSRMatrix DisjointUnionCsr(
   const std::vector<CSRMatrix>& csrs);
+
+/*!
+ * \brief CSRMatrix toSimple.
+ *
+ * A = [[0, 0, 0],
+ *      [3, 0, 2],
+ *      [1, 1, 0],
+ *      [0, 0, 4]]
+ * 
+ * B, cnt, edge_map = CSRToSimple(A)
+ *
+ * B = [[0, 0, 0],
+ *      [1, 0, 1],
+ *      [1, 1, 0],
+ *      [0, 0, 1]]
+ * cnt = [3, 2, 1, 1, 4]
+ * edge_map = [0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4]
+ *
+ * \return The simplified CSRMatrix
+ *         The count recording the number of duplicated edges from the original graph.
+ *         The edge mapping from the edge IDs of original graph to those of the
+ *         returned graph.
+ */
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(const CSRMatrix& csr);
 
 /*!
  * \brief Split a CSRMatrix into multiple disjoin components.
