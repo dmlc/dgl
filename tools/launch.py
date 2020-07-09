@@ -1,6 +1,5 @@
 """Launching tool for DGL distributed training"""
 import os
-import stat
 import sys
 import subprocess
 import argparse
@@ -9,58 +8,61 @@ import logging
 import time
 from threading import Thread
 
-# thread func to run the job
-def run(cmd):
-    subprocess.check_call(cmd, shell = True)
-
 def execute(cmd):
+    """execute command line"""
+
+    # thread func to run the job
+    def run(cmd):
+        subprocess.check_call(cmd, shell = True)
+
     thread = Thread(target = run, args=(cmd,))
     thread.setDaemon(True)
     thread.start()
 
 def kill_python_proc(args):
-    """Kill all the python process accross machines"""
+    """Kill all the python processes accross machines via ssh"""
     ip_config = args.workspace + '/' + args.ip_config
-    with open(args.ip_config) as f:
+    with open(ip_config) as f:
         for line in f:
             ip, _, _ = line.strip().split(' ')
             cmd = 'pkill -9 python'
             cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
             execute(cmd)
 
+    # use ctl+C to exit
     while True:
         time.sleep(10)
 
 def submit_jobs(server_cmd, client_cmd, args):
-    """Submit distributed jobs via ssh"""
-    ip_addr = []
+    """Submit distributed jobs (server and client processes) via ssh"""
+    hosts = []
     server_count_per_machine = 0
     ip_config = args.workspace + '/' + args.ip_config
-    with open(args.ip_config) as f:
+    with open(ip_config) as f:
         for line in f:
             ip, port, count = line.strip().split(' ')
             port = int(port)
             count = int(count)
             server_count_per_machine = count
-            ip_addr.append((ip, port))
-    client_count_per_machine = args.num_client / len(ip_addr)
-
+            hosts.append((ip, port))
+    assert args.num_client % len(hosts) == 0
+    client_count_per_machine = args.num_client / len(hosts)
     # launch server tasks
-    for i in range(len(ip_addr)*server_count_per_machine):
-        ip, _ = ip_addr[int(i / server_count_per_machine)]
+    for i in range(len(hosts)*server_count_per_machine):
+        ip, _ = hosts[int(i / server_count_per_machine)]
         cmd = server_cmd + ' --id ' + str(i)
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
         execute(cmd)
     # launch client tasks
     for i in range(args.num_client):
-        ip, _ = ip_addr[int(i / client_count_per_machine)]
-        new_node_rank = 'node_rank=' + str(i)
-        cmd = client_cmd.replace('node_rank=0', new_node_rank)
+        ip, _ = hosts[int(i / client_count_per_machine)]
+        cmd = client_cmd.replace('node_rank=0', 'node_rank='+str(i))
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
         execute(cmd)
 
+    # use ctl+C to exit
     while True:
         time.sleep(10)
 
@@ -76,7 +78,7 @@ def client_command(args, udf_args):
     client_cmd = 'python3 -m torch.distributed.launch'
     client_cmd = client_cmd + ' --nproc_per_node=' + str(args.nproc_per_node)
     client_cmd = client_cmd + ' --nnodes=' + str(args.nnodes)
-    client_cmd = client_cmd + ' --node_rank=0'
+    client_cmd = client_cmd + ' --node_rank=' + str(0)
     client_cmd = client_cmd + ' --master_addr=' + str(args.master_addr)
     client_cmd = client_cmd + ' --master_port=' + str(args.master_port)
     client_cmd = client_cmd + ' ' + str(args.exe_file)
