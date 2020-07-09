@@ -116,7 +116,7 @@ def main():
     args, udf_args = parser.parse_known_args()
 
     if args.kill:
-    	kill_python_proc(args)
+        kill_python_proc(args)
     else:
         server_cmd = server_command(args)
         client_cmd = client_command(args, udf_args[0])
