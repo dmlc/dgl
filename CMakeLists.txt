@@ -141,6 +141,8 @@ set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 if(NOT MSVC)
 # Compile METIS
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMTMETIS_64BIT_VERTICES -DMTMETIS_64BIT_EDGES")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMTMETIS_64BIT_VERTICES -DMTMETIS_64BIT_EDGES")
 set(GKLIB_PATH "third_party/METIS/GKlib")
 include(${GKLIB_PATH}/GKlibSystem.cmake)
 include_directories(${GKLIB_PATH})
