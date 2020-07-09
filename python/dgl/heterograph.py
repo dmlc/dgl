@@ -4620,14 +4620,14 @@ class AdaptedHeteroGraph(GraphAdapter):
         self.graph._set_msg_index(self.etid, val)
 
     def in_edges(self, nodes):
-        nodes = nodes.tousertensor()
+        nodes = nodes.tousertensor(self.graph.device)
         src, dst, eid = self.graph._graph.in_edges(self.etid, nodes)
         return (utils.toindex(src, self.graph._graph.dtype),
                utils.toindex(dst, self.graph._graph.dtype),
                utils.toindex(eid, self.graph._graph.dtype))
 
     def out_edges(self, nodes):
-        nodes = nodes.tousertensor()
+        nodes = nodes.tousertensor(self.graph.device)
         src, dst, eid = self.graph._graph.out_edges(self.etid, nodes)
         return (utils.toindex(src, self.graph._graph.dtype),
                utils.toindex(dst, self.graph._graph.dtype),
