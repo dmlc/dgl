@@ -18,7 +18,6 @@ namespace dgl {
 
 IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   // The index type of Metis needs to be compatible with DGL index type.
-  CHECK_EQ(sizeof(mtmetis_vtx_type), sizeof(dgl_id_t));
   ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
   CHECK(ig) << "The input graph must be an immutable graph.";
   // This is a symmetric graph, so in-csr and out-csr are the same.
@@ -33,24 +32,24 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
       << "The dtype of indices does not match";
   mtmetis_vtx_type *adjncy = static_cast<mtmetis_vtx_type*>(mat.indices->data);
   mtmetis_pid_type nparts = k;
-  IdArray part_arr = aten::NewIdArray(nvtxs);
   mtmetis_wgt_type objval = 0;
-  CHECK_EQ(sizeof(mtmetis_pid_type), part_arr->dtype.bits / 8)
-      << "The dtype of partition Ids does not match";
+  IdArray part_arr = aten::NewIdArray(nvtxs, DLContext{kDLCPU, 0}, sizeof(mtmetis_pid_type) * 8);
   mtmetis_pid_type *part = static_cast<mtmetis_pid_type*>(part_arr->data);
 
   int64_t vwgt_len = vwgt_arr->shape[0];
-  CHECK_EQ(sizeof(mtmetis_wgt_type), vwgt_arr->dtype.bits / 8)
-      << "The vertex weight array doesn't have right type";
-  CHECK(vwgt_len % g->NumVertices() == 0)
-      << "The vertex weight array doesn't have right number of elements";
   mtmetis_wgt_type *vwgt = NULL;
   if (vwgt_len > 0) {
+    CHECK_EQ(sizeof(mtmetis_wgt_type), vwgt_arr->dtype.bits / 8)
+        << "The vertex weight array doesn't have right type";
+    CHECK(vwgt_len % g->NumVertices() == 0)
+        << "The vertex weight array doesn't have right number of elements";
     ncon = vwgt_len / g->NumVertices();
     vwgt = static_cast<mtmetis_wgt_type*>(vwgt_arr->data);
   }
 
-  int ret = MTMETIS_PartGraphKway(&nvtxs,      // The number of vertices
+  // TODO(zhengda) this is going to be memory leak.
+  double *opts = mtmetis_init_options();
+  int ret = MTMETIS_PartGraphKway(&nvtxs,    // The number of vertices
                                 &ncon,       // The number of balancing constraints.
                                 xadj,        // indptr
                                 adjncy,      // indices
@@ -61,8 +60,8 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
                                 &nparts,     // The number of partitions.
                                 NULL,        // the desired weight for each partition and constraint
                                 NULL,        // the allowed load imbalance tolerance
-                                NULL,        // the array of options
-                                &objval,      // the edge-cut or the total communication volume of
+                                opts,        // the array of options
+                                &objval,     // the edge-cut or the total communication volume of
                                 // the partitioning solution
                                 part);
   LOG(INFO) << "Partition a graph with " << g->NumVertices()

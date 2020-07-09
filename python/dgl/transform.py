@@ -612,23 +612,22 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
     assert len(node_part) == g.number_of_nodes()
-    node_part = utils.toindex(node_part)
+    node_part = F.tensor(node_part)
     if reshuffle:
-        node_part = node_part.tousertensor()
-        sorted_part, new2old_map = F.sort_1d(node_part)
+        _, new2old_map = F.sort_1d(node_part)
         new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
         new_node_ids[F.asnumpy(new2old_map)] = np.arange(0, g.number_of_nodes())
         g = reorder_nodes(g, new_node_ids)
-        node_part = utils.toindex(sorted_part)
         # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
         # that all edges in a partition are in the contiguous Id space.
         orig_eids = _CAPI_DGLReassignEdges(g._graph, True)
         orig_eids = utils.toindex(orig_eids)
         g.edata['orig_id'] = orig_eids.tousertensor()
 
-    subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), extra_cached_hops)
+    subgs = _CAPI_DGLPartitionWithHalo(g._graph,
+                                       F.zerocopy_to_dgl_ndarray(node_part),
+                                       extra_cached_hops)
     subg_dict = {}
-    node_part = node_part.tousertensor()
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
         subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
@@ -704,11 +703,11 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         balance_ntypes = F.tensor(balance_ntypes)
         uniq_ntypes = F.unique(balance_ntypes)
         for ntype in uniq_ntypes:
-            vwgt.append(F.astype(balance_ntypes == ntype, F.int64))
+            vwgt.append(F.astype(balance_ntypes == ntype, F.int32))
 
     # When balancing edges in partitions, we use in-degree as one of the weights.
     if balance_edges:
-        vwgt.append(F.astype(g.in_degrees(), F.int64))
+        vwgt.append(F.astype(g.in_degrees(), F.int32))
 
     # The vertex weights have to be stored in a vector.
     if len(vwgt) > 0:
@@ -717,15 +716,14 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         vwgt = F.reshape(vwgt, shape)
         vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
     else:
-        vwgt = F.zeros((0,), F.int64, F.cpu())
+        vwgt = F.zeros((0,), F.int32, F.cpu())
         vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
 
     node_part = _CAPI_DGLMetisPartition(sym_g._graph, k, vwgt)
     if len(node_part) == 0:
         return None
     else:
-        node_part = utils.toindex(node_part)
-        return node_part.tousertensor()
+        return F.zerocopy_from_dlpack(node_part.to_dlpack())
 
 def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
                     balance_ntypes=None, balance_edges=False):

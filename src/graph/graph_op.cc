@@ -539,7 +539,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
     IdArray node_parts = args[1];
     int num_hops = args[2];
 
-    const dgl_id_t *part_data = static_cast<dgl_id_t *>(node_parts->data);
+    CHECK_EQ(sizeof(int32_t), node_parts->dtype.bits / 8)
+        << "node_parts should be int32";
+    const int32_t *part_data = static_cast<int32_t *>(node_parts->data);
     int64_t num_nodes = node_parts->shape[0];
     std::unordered_map<int, std::vector<dgl_id_t> > part_map;
     for (int64_t i = 0; i < num_nodes; i++) {
