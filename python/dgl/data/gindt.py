@@ -48,6 +48,9 @@ class GINDataset(DGLDataset):
     --------
     >>> data = GINDataset(name='MUTAG', self_loop=False)
     >>> data[0]
+    (DGLGraph(num_nodes=23, num_edges=54,
+             ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+             edata_schemes={}), 0)
 
     """
 
