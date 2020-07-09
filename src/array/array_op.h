@@ -152,6 +152,8 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+template <DLDeviceType XPU, typename IdType>
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 

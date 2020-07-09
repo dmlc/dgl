@@ -509,6 +509,17 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
+std::tuple<CSRMatrix, IdArray, IdArray>
+CSRToSimple(const CSRMatrix& csr) {
+  std::tuple<CSRMatrix, IdArray, IdArray> ret;
+
+  CSRMatrix sorted_csr = (CSRIsSorted(csr)) ? csr : CSRSort(csr);
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRToSimple", {
+    ret = impl::CSRToSimple<XPU, IdType>(sorted_csr);
+  });
+  return ret;
+}
+
 ///////////////////////// COO routines //////////////////////////
 
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
@@ -676,6 +687,52 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
   });
   return ret;
+}
+
+std::tuple<COOMatrix, IdArray, IdArray>
+COOToSimple(const COOMatrix& coo) {
+  // coo column sorted
+  const COOMatrix sorted_coo = COOSort(coo, true);
+  const IdArray eids_shuffled = COOHasData(sorted_coo) ?
+    sorted_coo.data :
+    Range(0, sorted_coo.row->shape[0], sorted_coo.row->dtype.bits, sorted_coo.row->ctx);
+  const auto &coalesced_result = COOCoalesce(sorted_coo);
+  const COOMatrix &coalesced_adj = coalesced_result.first;
+  const IdArray &count = coalesced_result.second;
+
+  /*
+   * eids_shuffled actually already contains the mapping from old edge space to the
+   * new one:
+   *
+   * * eids_shuffled[0:count[0]] indicates the original edge IDs that coalesced into new
+   *   edge #0.
+   * * eids_shuffled[count[0]:count[0] + count[1]] indicates those that coalesced into
+   *   new edge #1.
+   * * eids_shuffled[count[0] + count[1]:count[0] + count[1] + count[2]] indicates those
+   *   that coalesced into new edge #2.
+   * * etc.
+   *
+   * Here, we need to translate eids_shuffled to an array "eids_remapped" such that
+   * eids_remapped[i] indicates the new edge ID the old edge #i is mapped to.  The
+   * translation can simply be achieved by (in numpy code):
+   *
+   *     new_eid_for_eids_shuffled = np.range(len(count)).repeat(count)
+   *     eids_remapped = np.zeros_like(new_eid_for_eids_shuffled)
+   *     eids_remapped[eids_shuffled] = new_eid_for_eids_shuffled
+   */
+  const IdArray new_eids = Range(
+    0, coalesced_adj.row->shape[0], coalesced_adj.row->dtype.bits, coalesced_adj.row->ctx);
+  const IdArray eids_remapped = Scatter(Repeat(new_eids, count), eids_shuffled);
+
+  COOMatrix ret = COOMatrix(
+    coalesced_adj.num_rows,
+    coalesced_adj.num_cols,
+    coalesced_adj.row,
+    coalesced_adj.col,
+    NullArray(),
+    true,
+    true);
+  return std::make_tuple(ret, count, eids_remapped);
 }
 
 ///////////////////////// Graph Traverse routines //////////////////////////
