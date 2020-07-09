@@ -7,8 +7,6 @@
 #include <dgl/packed_func_ext.h>
 #include "../c_api_common.h"
 
-#if !defined(_WIN32)
-
 #include <metis.h>
 #include <dgl/graph_op.h>
 
@@ -86,21 +84,3 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
   });
 
 }   // namespace dgl
-
-#else   // defined(_WIN32)
-
-using namespace dgl::runtime;
-
-namespace dgl {
-
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphRef g = args[0];
-    int k = args[1];
-    LOG(WARNING) << "DGL doesn't support METIS partitioning in Windows";
-    *rv = aten::NullArray();
-  });
-
-
-}  // namespace dgl
-#endif  // !defined(_WIN32)
