@@ -830,6 +830,21 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
 #endif  // _WIN32
   });
 
+//DGL_REGISTER_GLOBAL("graph_index._CAPI_Test")
+//.set_body([] (DGLArgs args, DGLRetValue* rv) {
+//    IdArray a = args[0];
+//    IdArray b = args[1];
+//    int64_t len = aten::NonZero(a, b);
+//    *rv = len;
+//  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_Test2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    IdArray a = args[0];
+    IdArray b = aten::NonZero(a);
+    *rv = b;
+  });
+
 }  // namespace aten
 }  // namespace dgl
 

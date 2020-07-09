@@ -719,3 +719,23 @@ def prepare_tensor_dict(g, data, name):
     """
     return {key : prepare_tensor(g, val, '{}["{}"]'.format(name, key))
             for key, val in data.items()}
+
+def check_all_same_idtype(glist, name):
+    """Check all the graphs have the same idtype."""
+    if len(glist) == 0:
+        return
+    idtype = glist[0].idtype
+    for i, g in enumerate(glist):
+        if g.idtype != idtype:
+            raise DGLError('Expect {}[{}] to have {} type ID, but got {}.'.format(
+                name, i, idtype, g.idtype))
+
+def check_all_same_device(glist, name):
+    """Check all the graphs have the same device."""
+    if len(glist) == 0:
+        return
+    device = glist[0].device
+    for i, g in enumerate(glist):
+        if g.device != device:
+            raise DGLError('Expect {}[{}] to be on device {}, but got {}.'.format(
+                name, i, device, g.device))

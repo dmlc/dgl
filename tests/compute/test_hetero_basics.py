@@ -52,7 +52,7 @@ def generate_graph(idtype=F.int64, grad=False):
     u = F.tensor([0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 9])
     v = F.tensor([1, 9, 2, 9, 3, 9, 4, 9, 5, 9, 6, 9, 7, 9, 8, 9, 0])
     g = dgl.graph((u, v), idtype=idtype)
-    assert g.device == F._default_context
+    assert g.device == F.ctx()
     ncol = F.randn((10, D))
     ecol = F.randn((17, D))
     if grad:
@@ -496,7 +496,7 @@ def _test_dynamic_addition():
 @parametrize_dtype
 def test_repr(idtype):
     G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype)
-    G = G.to(F._default_context)
+    G = G.to(F.ctx())
     repr_string = G.__repr__()
     print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
@@ -544,7 +544,7 @@ def test_group_apply_edges(idtype):
 @parametrize_dtype
 def test_local_var(idtype):
     g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype)
-    g = g.to(F._default_context)
+    g = g.to(F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -582,7 +582,7 @@ def test_local_var(idtype):
 
     # test initializer1
     g = dgl.graph([(0,1), (1,1)], idtype=idtype)
-    g = g.to(F._default_context)
+    g = g.to(F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         g = g.local_var()

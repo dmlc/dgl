@@ -419,6 +419,7 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
 
   // TODO(minjie): non-zero is currently buggy on CUDA so we do it in CPU.
   IdArray idx = AsNumBits(NonZero(mask.CopyTo(CPU)).CopyTo(ctx), nbits);
+  //IdArray idx = AsNumBits(NonZero(mask), nbits);
   if (idx->shape[0] == 0)
     // No data. Return three empty arrays.
     return {idx, idx, idx};
