@@ -86,30 +86,33 @@ def client_command(args, udf_args):
 
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
+    ########## common args ####################
     parser.add_argument('--kill',  action='store_true',
-                        help='wether to kill all the python processes')
+                        help='kill all the python processes on cluster')
     parser.add_argument('--workspace', type=str,
-                        help='Path of user workspace of distributed tasks')
+                        help='Path of user workspace')
+    parser.add_argument('--ip_config', type=str, default='ip_config.txt',
+                        help='The file for IP configuration')
     parser.add_argument('--exe_file', type=str,
-                        help="Python executable")
+                        help="Python executable file")
     parser.add_argument('--server', action='store_true',
                         help='wether this is a server')
     parser.add_argument('--graph-name', type=str, 
                         help='graph name')
     parser.add_argument('--num-client', type=int, 
-                        help='The number of clients')
+                        help='Total number of clients on cluster')
     parser.add_argument('--conf_path', type=str, 
                         help='The path to the partition config file')
-    parser.add_argument('--ip_config', type=str, 
-                        help='The file for IP configuration')
+    ####### Pytorch distributed ################
     parser.add_argument('--nproc_per_node', type=int, default=1,
                         help='Number of processes per node')
     parser.add_argument('--nnodes', type=int, 
                         help='Total number of nodes')
     parser.add_argument('--master_addr', type=str, 
                         help='IP address of master node')
-    parser.add_argument('--master_port', type=int, default=1234,
+    parser.add_argument('--master_port', type=int, default=1250,
                         help='Port of master node')
+    ####### User-defined args ###################
     parser.add_argument('--udf_args', type=str,
                         help='user-defined arguments.')
     args, udf_args = parser.parse_known_args()
