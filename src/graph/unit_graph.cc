@@ -1516,7 +1516,6 @@ HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
       LOG(FATAL) << "None of CSC, CSR, COO exist";
       break;
   }
-  
   return nullptr;
 }
 
