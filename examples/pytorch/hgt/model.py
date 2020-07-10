@@ -45,11 +45,19 @@ class HGTLayer(nn.Module):
 
     def edge_attention(self, edges):
         etype = edges.data['id'][0]
+        
+        '''
+            Step 1: Heterogeneous Mutual Attention
+        '''
         relation_att = self.relation_att[etype]
         relation_pri = self.relation_pri[etype]
-        relation_msg = self.relation_msg[etype]
         key   = torch.bmm(edges.src['k'].transpose(1,0), relation_att).transpose(1,0)
         att   = (edges.dst['q'] * key).sum(dim=-1) * relation_pri / self.sqrt_dk
+        
+        '''
+            Step 2: Heterogeneous Message Passing
+        '''
+        relation_msg = self.relation_msg[etype]
         val   = torch.bmm(edges.src['v'].transpose(1,0), relation_msg).transpose(1,0)
         return {'a': att, 'v': val}
     
@@ -57,6 +65,11 @@ class HGTLayer(nn.Module):
         return {'v': edges.data['v'], 'a': edges.data['a']}
     
     def reduce_func(self, nodes):
+        '''
+            Softmax based on target node's id (edge_index_i). 
+            NOTE: Using DGL's API, there is a minor difference with this softmax with the original one.
+                  This implementation will do softmax only on edges belong to the same relation type, instead of for all of the edges.
+        '''
         att = F.softmax(nodes.mailbox['a'], dim=1)
         h   = torch.sum(att.unsqueeze(dim = -1) * nodes.mailbox['v'], dim=1)
         return {'t': h.view(-1, self.out_dim)}
@@ -76,6 +89,10 @@ class HGTLayer(nn.Module):
         G.multi_update_all({etype : (self.message_func, self.reduce_func) \
                             for etype in edge_dict}, cross_reducer = 'mean')
         for ntype in G.ntypes:
+            '''
+                Step 3: Target-specific Aggregation
+                x = norm( W[node_type] * gelu( Agg(x) ) + x )
+            '''
             n_id = node_dict[ntype]
             alpha = torch.sigmoid(self.skip[n_id])
             trans_out = self.drop(self.a_linears[n_id](G.nodes[ntype].data['t']))
