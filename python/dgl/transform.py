@@ -1781,4 +1781,125 @@ def as_immutable_graph(hg):
     g.edata.update(hg.edata)
     return g
 
+def compose(graphs):
+    """Return a composition of the given list of graphs.
+
+    Given the list of graphs with the same set of nodes, ``compose`` will return a new
+    graph with the same set of nodes with all the edges from the list of graphs.
+
+    All edges from all the graphs will be added.
+
+    If the graphs are heterogeneous, the graphs must have the same metagraph.  All edges from
+    all the graphs will be added for each edge type.
+
+    The edges in the first graph will be added first, followed by the edges from the second graph,
+    etc.
+
+    Notes
+    -----
+    All graphs must have the same set of nodes and metagraphs.  An error will be raised otherwise.
+
+    Parameters
+    ----------
+    graphs : list[DGLHeteroGraph]
+        The list of graphs
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The composed graph.
+
+    Examples
+    --------
+    >>> g1 = dgl.graph(([0, 1, 2], [1, 0, 2]), num_nodes=5)
+    >>> g2 = dgl.graph(([1, 3, 3], [0, 2, 3]), num_nodes=5)
+    >>> g = dgl.compose([g1, g2])
+    >>> g.all_edges(order='eid')
+    (tensor([0, 1, 2, 1, 3, 3]), tensor([1, 0, 2, 0, 2, 3]))
+    """
+    # Exposes the UnionCOO/UnionCSR functions to users here
+    pass
+
+def add_reverse(g):
+    """Return a new graph with reverse edges added to the given homogeneous graph.
+
+    For each edge with ID ``e`` connecting from node ``u`` to node ``v``, a new
+    edge with ID ``e + |E|`` connecting from node ``v`` to node ``u`` is added,
+    where ``|E|`` is the number of edges in the original graph.
+
+    Notes
+    -----
+    The graph must be homogeneous (i.e. with one node type and one edge type).
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The graph
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The new graph
+
+    Examples
+    --------
+    >>> g = dgl.graph(([0, 1, 2], [0, 2, 3]))
+    >>> g2 = dgl.add_reverse(g)
+    >>> g.all_edges(order='eid')
+    (tensor([0, 1, 2, 0, 2, 3]), tensor([0, 2, 3, 0, 1, 2]))
+    """
+    # Will replace to_bidirected whose behavior is too complicated
+    pass
+
+def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
+    """Return a new graph with reverse edges added to the given graph as another edge type.
+
+    For each edge with ID ``e`` of type ``etype`` connecting from node ``u`` of type ``utype``
+    to node ``v`` of type ``vtype``, a new edge with ID ``e`` of type ``etype_inv`` connecting
+    from node ``v`` of type ``vtype`` to node ``u`` of type ``utype`` is added.
+
+    Notes
+    -----
+    The name of the reverse edge types should not exist in the original graph.  An error
+    will be raised otherwise.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The graph
+    reverse_type_names : dict of [etype, str], optional
+        If given, defines the mapping from the names of the existing edge types to the names
+        of their reverse edge types.
+    reverse_type_suffix : str
+        The suffix appended to the original type name as the reverse type name.
+
+        Will be ignored if ``reverse_type_names`` is given
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The new graph
+
+    Examples
+    --------
+    >>> g = dgl.heterograph({
+    ...     ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 3]),
+    ...     ('user', 'view', 'item'): ([0, 0, 2], [2, 0, 3])})
+    >>> g2 = dgl.add_reverse_types(g, reverse_type_suffix='_by')
+    >>> g2.all_edges(etype='follow_by')
+    (tensor([1, 2, 3]), tensor([0, 1, 2]))
+    >>> g2.all_edges(etype='view_by')
+    (tensor([2, 0, 3]), tensor([0, 0, 2]))
+
+    Alternatively one can also supply the mapping from the edge type name to the reverse
+    edge type name.
+    >>> g3 = dgl.add_reverse_types(
+    ...     g, reverse_type_names={'follow': 'followed-by', 'view': 'viewed-by'})
+    >>> g3.all_edges(etype='followed-by')
+    (tensor([1, 2, 3]), tensor([0, 1, 2]))
+    >>> g3.all_edges(etype='viewed-by')
+    (tensor([2, 0, 3]), tensor([0, 0, 2]))
+    """
+    pass
+
 _init_api("dgl.transform")
