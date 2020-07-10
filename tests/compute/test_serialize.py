@@ -311,6 +311,7 @@ def test_serialize_heterograph_s3():
 
 
 if __name__ == "__main__":
+    pass
     #test_graph_serialize_with_feature(True)
     #test_graph_serialize_with_feature(False)
     #test_graph_serialize_without_feature(True)
@@ -322,6 +323,6 @@ if __name__ == "__main__":
     #test_load_old_files1()
     #test_load_old_files2()
     #test_serialize_heterograph()
-    # test_serialize_heterograph_s3()
+    #test_serialize_heterograph_s3()
     #test_deserialize_old_heterograph_file()
-    # create_old_heterograph_files()
+    #create_old_heterograph_files()
