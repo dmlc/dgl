@@ -50,12 +50,6 @@ class EdgeSoftmax(th.autograd.Function):
         if not is_all(eids):
             g = g.edge_subgraph(eids.long())
 
-        score = g.edata['score']
-        score_max = _gspmm(g, 'copy_e', 'max', None, score)[0]
-        score = th.exp(_gsddmm(g, '-', score, score_max, 'e', 'v'))
-        score_sum = _gspmm(g, 'copy_e', 'sum', None, score)[0]
-        out = _gsddmm(g, '/', score, score_sum, 'e', 'v')
-        """
         n_nodes = g.number_of_dst_nodes()
         n_edges = g.number_of_edges()
 
