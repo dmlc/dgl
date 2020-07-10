@@ -691,7 +691,6 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
  */
 HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
-
 /*!
  * \brief Union multiple graphs into one with each input graph as one disjoint component.
  *

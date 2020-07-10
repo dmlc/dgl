@@ -20,6 +20,7 @@ from . import ndarray as nd
 
 __all__ = [
     'line_graph',
+    'line_heterograph',
     'khop_adj',
     'khop_graph',
     'reverse',
@@ -161,6 +162,53 @@ def line_graph(g, backtracking=True, shared=False):
     graph_data = g._graph.line_graph(backtracking)
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
+
+def line_heterograph(g, backtracking=True):
+    """Return the line graph of this graph.
+
+    The graph should be an directed homogeneous graph. Aother type of graphs
+    are not supported right now.
+
+    All node features and edge features are not copied to the output
+
+    Parameters
+    ----------
+    backtracking : bool
+        Whether the pair of (v, u) (u, v) edges are treated as linked. Default True.
+
+    Returns
+    -------
+    G : DGLHeteroGraph
+        The line graph of this graph.
+
+    Examples:
+    A = [[0, 0, 1],
+            [1, 0, 1],
+            [1, 1, 0]]
+    >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows')
+    >>> lg = g.line_graph()
+    >>> lg
+    ... Graph(num_nodes=5, num_edges=8,
+    ... ndata_schemes={}
+    ... edata_schemes={})
+    >>> lg.edges()
+    ... (tensor([0, 0, 1, 2, 2, 3, 4, 4]), tensor([3, 4, 0, 3, 4, 0, 1, 2]))
+    >>>
+    >>> lg = g.line_graph(backtracking=False)
+    >>> lg
+    ... Graph(num_nodes=5, num_edges=4,
+    ... ndata_schemes={}
+    ... edata_schemes={})
+    >>> lg.edges()
+    ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
+
+    """
+    assert g.is_homograph(), \
+        'line_heterograph only support directed homogeneous graph right now'
+
+    hgidx = _CAPI_DGLHeteroLineGraph(g._graph, backtracking)
+    hg = DGLHeteroGraph(hgidx, g._etypes, g._ntypes)
+    return hg
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
@@ -700,8 +748,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     if balance_ntypes is not None:
         assert len(balance_ntypes) == g.number_of_nodes(), \
                 "The length of balance_ntypes should be equal to #nodes in the graph"
-        balance_ntypes = utils.toindex(balance_ntypes)
-        balance_ntypes = balance_ntypes.tousertensor()
+        balance_ntypes = F.tensor(balance_ntypes)
         uniq_ntypes = F.unique(balance_ntypes)
         for ntype in uniq_ntypes:
             vwgt.append(F.astype(balance_ntypes == ntype, F.int64))
@@ -1214,6 +1261,8 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
 
     This function does not preserve node and edge features.
 
+    TODO(xiangsx): Don't save writeback_mapping into g, but put it into return value.
+
     Parameters
     ----------
     g : DGLHeteroGraph
@@ -1234,7 +1283,7 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
     Examples
     --------
     Consider the following graph
-    >>> g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
+    >>> g = dgl.graph(([0, 1, 2, 1, 1, 1], [1, 3, 2, 3, 4, 4]))
     >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
 
     The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:

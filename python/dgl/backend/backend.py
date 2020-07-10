@@ -537,6 +537,21 @@ def exp(input):
     """
     pass
 
+def sqrt(input):
+    """Returns a new tensor with the square root of the elements of the input tensor `input`.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 def softmax(input, dim=-1):
     """Apply the softmax function on given dimension.
 
@@ -721,6 +736,31 @@ def scatter_row(data, row_index, value):
     -------
     Tensor
         The new data.
+    """
+    pass
+
+def index_add_inplace(data, row_idx, value):
+    """Add the values into the data tensor using the row index inplace.
+
+    If two row indices are the same, the corresponding values are sum up before
+    adding to the data tensor.
+
+    Examples
+    --------
+    >>> import torch as th
+    >>> arr = th.zeros((10))
+    >>> F. index_add_inplace(arr, th.tensor([0, 1, 1]), th.tensor([1.0, 1.0, 1.0]))
+    >>> arr
+    tensor([1., 2., 0., 0., 0., 0., 0., 0., 0., 0.])
+
+    Parameters
+    ----------
+    data : Tensor
+        The data tensor to be updated.
+    row_index : Tensor
+        A 1-D integer tensor containing which rows to be updated.
+    value : Tensor
+        The new value.
     """
     pass
 
@@ -1331,3 +1371,46 @@ def sync():
     that all computation is complete after this function call.
     """
     pass
+
+def attach_grad(tensor):
+    """ Attach gradients to the input tensor
+    """
+    pass
+
+def backward(x, head_gradient=None):
+    """Invoke backward computation with an optional head gradient.
+    """
+    pass
+
+def grad(x):
+    """Fetches the gradient from the tensor after backward computation.
+    """
+    pass
+
+def is_no_grad(x):
+    """ Test if the input tensor has gradient
+    """
+    pass
+
+class record_grad(object):
+    """Context manager that records the gradients"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+
+class no_grad(object):
+    """Context manager that explicitly disables gradient computation"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass

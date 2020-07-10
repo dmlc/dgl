@@ -35,18 +35,21 @@ def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
+    if dtype == np.bool:
+        # mxnet doesn't support bool
+        dtype =  np.int32
     if isinstance(data, nd.NDArray):
         if dtype is None or data.dtype == dtype:
             return data
         else:
             return nd.cast(data, dtype)
     else:
-        if isinstance(data, numbers.Integral):
+        if isinstance(data, numbers.Number):
+            dtype = np.int64 if isinstance(data, numbers.Integral) else np.float32
             data = [data]
         if dtype is None and isinstance(data, np.ndarray):
-            return nd.array(data, dtype=data.dtype)
-        else:
-            return nd.array(data, dtype=dtype)
+            dtype = np.int32 if data.dtype == np.bool else data.dtype
+        return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
     return data.asscalar()
@@ -170,6 +173,9 @@ def argsort(input, dim, descending):
 def exp(input):
     return nd.exp(input)
 
+def sqrt(input):
+    return nd.sqrt(input)
+
 def softmax(input, dim=-1):
     return nd.softmax(input, axis=dim)
 
@@ -227,6 +233,9 @@ def take(data, indices, dim):
 
 def narrow_row(data, start, stop):
     return data[start:stop]
+
+def index_add_inplace(data, row_idx, value):
+    raise NotImplementedError("MXNet doesn't support inplace index_add")
 
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
@@ -580,3 +589,28 @@ def sync():
     that all computation is complete after this function call.
     """
     mx.nd.waitall()
+
+def attach_grad(tensor):
+    tensor.attach_grad()
+    return tensor
+
+def backward(x, head_gradient=None):
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return (x != 0).sum() == 0
+
+record_grad = mx.autograd.record
+
+class no_grad(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass

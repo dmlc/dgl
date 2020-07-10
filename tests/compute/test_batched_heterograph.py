@@ -403,9 +403,22 @@ def test_to_device(index_dtype):
         assert bg.batch_num_nodes('user') == bg1.batch_num_nodes('user')
         assert bg.batch_num_edges('plays') == bg1.batch_num_edges('plays')
 
+    # set feature
+    g1 = dgl.heterograph({
+        ('user', 'plays', 'game'): [(0, 0), (1, 1)]
+    }, index_dtype=index_dtype)
+    g2 = dgl.heterograph({
+        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
+    }, index_dtype=index_dtype)
+    bg = dgl.batch_hetero([g1, g2])
+    if F.is_cuda_available():
+        bg1 = bg.to(F.cuda())
+        bg1.nodes['user'].data['test'] = F.copy_to(F.tensor([0,1,2,3]), F.cuda())
+        bg1.edata['test'] = F.copy_to(F.tensor([0,1,2,3]), F.cuda())
+
 if __name__ == '__main__':
     test_batching_hetero_topology('int32')
     test_batching_hetero_and_batched_hetero_topology('int32')
     test_batched_features('int32')
     test_batching_with_zero_nodes_edges('int32')
-    # test_to_device()
+    test_to_device('int32')

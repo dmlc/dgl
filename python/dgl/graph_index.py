@@ -1300,10 +1300,4 @@ def _get_halo_subgraph_inner_node(halo_subg):
 def _get_halo_subgraph_inner_edge(halo_subg):
     return _CAPI_GetHaloSubgraphInnerEdges(halo_subg)
 
-def test(a, b):
-    return _CAPI_Test(F.zerocopy_to_dgl_ndarray(a), F.zerocopy_to_dgl_ndarray(b))
-
-def test2(a):
-    return F.zerocopy_from_dgl_ndarray(_CAPI_Test2(F.zerocopy_to_dgl_ndarray(a)))
-
 _init_api("dgl.graph_index")

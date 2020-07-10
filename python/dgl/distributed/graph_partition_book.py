@@ -100,12 +100,10 @@ class GraphPartitionBook:
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._part_id = int(part_id)
         self._num_partitions = int(num_parts)
-        node_map = utils.toindex(node_map)
-        self._nid2partid = node_map.tousertensor()
+        self._nid2partid = F.tensor(node_map)
         assert F.dtype(self._nid2partid) in (F.int32, F.int64), \
                 'the node map must be stored in an integer array'
-        edge_map = utils.toindex(edge_map)
-        self._eid2partid = edge_map.tousertensor()
+        self._eid2partid = F.tensor(edge_map)
         assert F.dtype(self._eid2partid) in (F.int32, F.int64), \
                 'the edge map must be stored in an integer array'
         # Get meta data of the partition book.
@@ -374,10 +372,12 @@ class RangePartitionBook:
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._partid = part_id
         self._num_partitions = num_parts
-        node_map = utils.toindex(node_map)
-        edge_map = utils.toindex(edge_map)
-        self._node_map = node_map.tonumpy()
-        self._edge_map = edge_map.tonumpy()
+        if not isinstance(node_map, np.ndarray):
+            node_map = F.asnumpy(node_map)
+        if not isinstance(edge_map, np.ndarray):
+            edge_map = F.asnumpy(edge_map)
+        self._node_map = node_map
+        self._edge_map = edge_map
         # Get meta data of the partition book
         self._partition_meta_data = []
         for partid in range(self._num_partitions):
@@ -632,17 +632,14 @@ class PartitionPolicy(object):
     ----------
     policy_str : str
         partition-policy string, e.g., 'edge' or 'node'.
-    part_id : int
-        partition ID
     partition_book : GraphPartitionBook or RangePartitionBook
         Main class storing the partition information
     """
-    def __init__(self, policy_str, part_id, partition_book):
+    def __init__(self, policy_str, partition_book):
         # TODO(chao): support more policies for HeteroGraph
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
-        assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
         self._policy_str = policy_str
-        self._part_id = part_id
+        self._part_id = partition_book.partid
         self._partition_book = partition_book
 
     @property
