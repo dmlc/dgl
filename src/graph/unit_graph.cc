@@ -804,7 +804,9 @@ uint8_t UnitGraph::NumBits() const {
 }
 
 bool UnitGraph::IsMultigraph() const {
-  return GetAny()->IsMultigraph();
+  const SparseFormat fmt = SelectFormat(SparseFormat::kCSC);
+  const auto ptr = GetFormat(fmt);
+  return ptr->IsMultigraph();
 }
 
 uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
