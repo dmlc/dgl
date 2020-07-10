@@ -10,7 +10,7 @@ import string
 import numpy as np
 import torch as th
 import torch.nn as nn
-from dgl.data import MovieLen100kDataset, MovieLen1MDataset, MovieLen10MDataset
+from dgl.data.movielens import MovieLen100kDataset, MovieLen1MDataset, MovieLen10MDataset
 from model import BiDecoder, GCMCLayer
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
