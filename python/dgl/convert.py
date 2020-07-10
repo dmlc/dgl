@@ -162,6 +162,11 @@ def graph(data,
     else:
         raise DGLError('Unsupported graph data type:', type(data))
     
+    if (device is not None and utils.to_dgl_context(device).device_type == 2
+            and idtype == F.int64):
+        dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
+                    ' int() to convert to int32 first.')
+
     if device is None:
         return g
     else:
@@ -328,6 +333,11 @@ def bipartite(data,
                                               idtype=idtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
+
+    if (device is not None and utils.to_dgl_context(device).device_type == 2
+            and idtype == F.int64):
+        dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
+                    ' int() to convert to int32 first.')
 
     if device is None:
         return g
@@ -531,7 +541,7 @@ def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto',
 
     for (srctype, etype, dsttype), data in data_dict.items():
         if isinstance(data, DGLHeteroGraph):
-            rel_graphs.append(data)
+            rel_graphs.append(data.to(device).astype(idtype))
         elif srctype == dsttype:
             rel_graphs.append(graph(
                 data, srctype, etype,
@@ -1126,8 +1136,8 @@ def create_from_networkx_bipartite(nx_graph,
 
     if has_edge_id:
         num_edges = nx_graph.number_of_edges()
-        src = np.zeros((num_edges,), dtype=getattr(np, idtype))
-        dst = np.zeros((num_edges,), dtype=getattr(np, idtype))
+        src = [0] * num_edges
+        dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
             eid = attr[edge_id_attr_name]
             src[eid] = top_map[u]
@@ -1139,11 +1149,11 @@ def create_from_networkx_bipartite(nx_graph,
             if e[0] in top_map:
                 src.append(top_map[e[0]])
                 dst.append(bottom_map[e[1]])
-    src = F.tensor(src, idtype=idtype)
-    dst = F.tensor(dst, idtype=idtype)
+    src = F.tensor(src, dtype=idtype)
+    dst = F.tensor(dst, dtype=idtype)
     g = create_from_edges(src, dst, utype, etype, vtype,
                           len(top_nodes), len(bottom_nodes), validate=False,
-                          restrict_format=restrict_format, idtype=idtype)
+                          restrict_format=restrict_format)
 
     # TODO attributes
     assert node_attrs is None, 'Retrieval of node attributes are not supported yet.'

@@ -3897,12 +3897,12 @@ class DGLHeteroGraph(object):
         """
         return F.to_backend_ctx(self._graph.ctx)
 
-    def to(self, ctx, **kwargs):  # pylint: disable=invalid-name
-        """Move ndata, edata and graph structure to the targeted device context (cpu/gpu).
+    def to(self, device, **kwargs):  # pylint: disable=invalid-name
+        """Move ndata, edata and graph structure to the targeted device (cpu/gpu).
 
         Parameters
         ----------
-        ctx : Framework-specific device context object
+        device : Framework-specific device context object
             The context to move data to.
         kwargs : Key-word arguments.
             Key-word arguments fed to the framework copy function.
@@ -3926,20 +3926,38 @@ class DGLHeteroGraph(object):
         >>> print(g.device)
         device(type='cpu')
         """
+        if device is None or self.device == device:
+            return self
+
+        if utils.to_dgl_context(device).device_type == 2 and self.idtype == F.int64:
+            dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
+                        ' int() to convert to int32 first.')
+
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
-            new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
+            new_feats = {k : F.copy_to(feat, device) for k, feat in nframe.items()}
             new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
         new_eframes = []
         for eframe in self._edge_frames:
-            new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
+            new_feats = {k : F.copy_to(feat, device) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
-        new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
+        new_gidx = self._graph.copy_to(utils.to_dgl_context(device))
         return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
                               new_nframes, new_eframes)
 
     def cpu(self):
+        """Return a new copy of this graph on CPU.
+
+        Returns
+        -------
+        DGLHeteroGraph
+            Graph on CPU.
+
+        See Also
+        --------
+        to
+        """
         return self.to(F.cpu())
 
     def local_var(self):
@@ -4266,9 +4284,34 @@ class DGLHeteroGraph(object):
                               self._node_frames,
                               self._edge_frames)
 
+    def astype(self, idtype):
+        """Cast this graph to use another ID type.
+
+        Features are copied (shallow copy) to the new graph.
+
+        Parameters
+        ----------
+        idtype : Data type object.
+            New ID type. Can only be int32 or int64.
+
+        Returns
+        -------
+        DGLHeteroGraph
+            Graph in the new ID type.
+        """
+        if not idtype in (F.int32, F.int64):
+            raise DGLError("ID type must be int32 or int64, but got {}.".format(idtype))
+        if self.idtype == idtype:
+            return self
+        bits = 32 if idtype == F.int32 else 64
+        return DGLHeteroGraph(self._graph.asbits(bits), self.ntypes, self.etypes,
+                              self._node_frames,
+                              self._edge_frames)
+
     def long(self):
-        """Return a heterograph object use int64 as index dtype,
-        with the ndata and edata as the original object
+        """Cast this graph to use int64 IDs.
+
+        Features are copied (shallow copy) to the new graph.
 
         Returns
         -------
@@ -4279,17 +4322,16 @@ class DGLHeteroGraph(object):
         --------
 
         >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game',
-        >>>                   index_dtype='int32')
+        >>>                   idtype=torch.int32)
         >>> g_long = g.long() # Convert g to int64 indexed, not changing the original `g`
 
         See Also
         --------
         int
         idtype
+        astype
         """
-        return DGLHeteroGraph(self._graph.asbits(64), self.ntypes, self.etypes,
-                              self._node_frames,
-                              self._edge_frames)
+        return self.astype(F.int64)
 
     def int(self):
         """Return a heterograph object use int32 as index dtype,
@@ -4304,17 +4346,16 @@ class DGLHeteroGraph(object):
         --------
 
         >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game',
-        >>>                   index_dtype='int64')
+        >>>                   idtype=torch.int64)
         >>> g_int = g.int() # Convert g to int32 indexed, not changing the original `g`
 
         See Also
         --------
         long
         idtype
+        astype
         """
-        return DGLHeteroGraph(self._graph.asbits(32), self.ntypes, self.etypes,
-                              self._node_frames,
-                              self._edge_frames)
+        return self.astype(F.int32)
 
 ############################################################
 # Internal APIs
