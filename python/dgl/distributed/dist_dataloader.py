@@ -1,6 +1,6 @@
+# pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
 import multiprocessing as mp
-import dgl
 from . import shutdown_servers, finalize_client
 
 DGL_QUEUE_TIMEOUT = 10
@@ -15,7 +15,7 @@ def close():
 
 
 def init_fn(collate_fn, mp_queue):
-    """"""
+    """Initialize setting collate function and mp.Queue in the subprocess"""
     global DGL_GLOBAL_COLLATE_FN
     global DGL_GLOBAL_MP_QUEUE
     DGL_GLOBAL_MP_QUEUE = mp_queue
@@ -37,6 +37,7 @@ def deregister_torch_ipc():
 
 
 def call_collate_fn(next_data):
+    """Call collate function"""
     result = DGL_GLOBAL_COLLATE_FN(next_data)
     DGL_GLOBAL_MP_QUEUE.put(result)
     return 1
@@ -44,6 +45,7 @@ def call_collate_fn(next_data):
 
 class DistDataLoader:
     """DGL customized multiprocessing dataloader"""
+
     def __init__(self, dataset, batch_size, num_workers, collate_fn, drop_last, queue_size=None):
         """
         dataset (Dataset): dataset from which to load the data.
