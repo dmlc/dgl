@@ -26,21 +26,14 @@ template <DLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int64_t len = array->shape[0];
-  //IdArray ret = NewIdArray(len, array->ctx, 64);
-  IdArray ret = NewIdArray(len, array->ctx, array->dtype.bits);
+  IdArray ret = NewIdArray(len, array->ctx, 64);
   thrust::device_ptr<IdType> in_data(array.Ptr<IdType>());
-  //thrust::device_ptr<int64_t> out_data(ret.Ptr<int64_t>());
-  thrust::device_ptr<IdType> out_data(ret.Ptr<IdType>());
+  thrust::device_ptr<int64_t> out_data(ret.Ptr<int64_t>());
   // TODO(minjie): should take control of the memory allocator.
   //   See PyTorch's implementation here: 
   //   https://github.com/pytorch/pytorch/blob/1f7557d173c8e9066ed9542ada8f4a09314a7e17/
   //     aten/src/THC/generic/THCTensorMath.cu#L104
-  // TODO(minjie): There is a strange error after invoking thrust::copy_if.
-  //   Any subsequent CUDA operations from PyTorch will raise
-  //   an "CUDA error: invalid configuration argument". Currently don't know
-  //   how to fix it.
-  //auto startiter = thrust::make_counting_iterator<int64_t>(0);
-  auto startiter = thrust::make_counting_iterator<IdType>(0);
+  auto startiter = thrust::make_counting_iterator<int64_t>(0);
   auto enditer = startiter + len;
   auto indices_end = thrust::copy_if(thrust::cuda::par.on(thr_entry->stream),
                                      startiter,

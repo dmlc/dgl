@@ -63,6 +63,8 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
     << static_cast<int>(bits) << ".";
   if (arr->dtype.bits == bits)
     return arr;
+  if (arr.NumElements() == 0)
+    return NewIdArray(arr->shape[0], arr->ctx, bits);
   IdArray ret;
   ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
     ATEN_ID_TYPE_SWITCH(arr->dtype, IdType, {
@@ -76,10 +78,20 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_SAME_CONTEXT(lhs, rhs);
   CHECK_SAME_DTYPE(lhs, rhs);
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "HStack", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::HStack<XPU, IdType>(lhs, rhs);
-    });
+  CHECK_EQ(lhs->shape[0], rhs->shape[0]);
+  auto device = runtime::DeviceAPI::Get(lhs->ctx);
+  const auto& ctx = lhs->ctx;
+  ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
+    const int64_t len = lhs->shape[0];
+    ret = NewIdArray(2 * len, lhs->ctx, lhs->dtype.bits);
+    device->CopyDataFromTo(lhs.Ptr<IdType>(), 0,
+                           ret.Ptr<IdType>(), 0,
+                           len * sizeof(IdType),
+                           ctx, ctx, lhs->dtype, nullptr);
+    device->CopyDataFromTo(rhs.Ptr<IdType>(), 0,
+                           ret.Ptr<IdType>(), len * sizeof(IdType),
+                           len * sizeof(IdType),
+                           ctx, ctx, lhs->dtype, nullptr);
   });
   return ret;
 }

@@ -417,9 +417,7 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
       row_stride, col_stride, len,
       mask.Ptr<IdType>());
 
-  // TODO(minjie): non-zero is currently buggy on CUDA so we do it in CPU.
-  IdArray idx = AsNumBits(NonZero(mask.CopyTo(CPU)).CopyTo(ctx), nbits);
-  //IdArray idx = AsNumBits(NonZero(mask), nbits);
+  IdArray idx = AsNumBits(NonZero(mask), nbits);
   if (idx->shape[0] == 0)
     // No data. Return three empty arrays.
     return {idx, idx, idx};
@@ -508,8 +506,7 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
     cols.Ptr<IdType>(), cols->shape[0],
     mask.Ptr<IdType>(), count.Ptr<IdType>());
 
-  // TODO(minjie): non-zero is currently buggy on CUDA so we do it in CPU.
-  IdArray idx = AsNumBits(NonZero(mask.CopyTo(CPU)).CopyTo(ctx), nbits);
+  IdArray idx = AsNumBits(NonZero(mask), nbits);
   if (idx->shape[0] == 0)
     return CSRMatrix(new_nrows, new_ncols,
                      Full(0, new_nrows + 1, nbits, ctx),

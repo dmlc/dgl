@@ -1,5 +1,4 @@
 from scipy import sparse as spsp
-import unittest
 import networkx as nx
 import numpy as np
 import dgl

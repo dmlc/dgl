@@ -189,19 +189,23 @@ TEST(ArrayTest, TestArith) {
 };
 
 template <typename IDX>
-void _TestHStack() {
-  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, CTX);
-  IdArray b = aten::Range(100, 200, sizeof(IDX)*8, CTX);
-  IdArray c = aten::HStack(a, b);
+void _TestHStack(DLContext ctx) {
+  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
+  IdArray b = aten::Range(100, 200, sizeof(IDX)*8, ctx);
+  IdArray c = aten::HStack(a, b).CopyTo(aten::CPU);
   ASSERT_EQ(c->ndim, 1);
   ASSERT_EQ(c->shape[0], 200);
   for (int i = 0; i < 200; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], i);
 }
 
-TEST(ArrayTest, TestHStack) {
-  _TestHStack<int32_t>();
-  _TestHStack<int64_t>();
+TEST(ArrayTest, HStack) {
+  _TestHStack<int32_t>(CPU);
+  _TestHStack<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestHStack<int32_t>(GPU);
+  _TestHStack<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>

@@ -317,14 +317,17 @@ def test_query(idtype):
     # test repr
     print(g)
 
-def test_hypersparse():
+@parametrize_dtype
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU does not have COO impl.")
+def test_hypersparse(idtype):
     N1 = 1 << 50        # should crash if allocated a CSR
     N2 = 1 << 48
 
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1)],
         ('user', 'plays', 'game'): [(0, N2)]},
-        {'user': N1, 'game': N1})
+        {'user': N1, 'game': N1},
+        idtype=idtype, device=F.ctx())
     assert g.number_of_nodes('user') == N1
     assert g.number_of_nodes('game') == N1
     assert g.number_of_edges('follows') == 1
@@ -499,7 +502,7 @@ def test_inc(idtype):
 @parametrize_dtype
 def test_view(idtype):
     # test single node type
-    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', idtype=idtype, device=F.ctx())
     f1 = F.randn((3, 6))
     g.ndata['h'] = f1
     f2 = g.nodes['user'].data['h']
@@ -698,9 +701,9 @@ def test_view1(idtype):
                 assert eid == i
             assert F.asnumpy(g.edge_id(srcs, dsts)).tolist() == list(range(n_edges))
             u, v, e = g.edge_id(srcs, dsts, return_uv=True)
-            assert F.asnumpy(u).tolist() == srcs
-            assert F.asnumpy(v).tolist() == dsts
-            assert F.asnumpy(e).tolist() == list(range(n_edges))
+            u, v, e = F.asnumpy(u), F.asnumpy(v), F.asnumpy(e)
+            assert u[e].tolist() == srcs
+            assert v[e].tolist() == dsts
 
             # find_edges
             u, v = g.find_edges(list(range(n_edges)))
@@ -883,12 +886,21 @@ def test_flatten(idtype):
 @parametrize_dtype
 def test_to_device(idtype):
     g = create_test_heterograph(idtype)
-    g.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
-    g.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cpu())
-    g.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
+    g.nodes['user'].data['h'] = F.ones((3, 5))
+    g.nodes['game'].data['i'] = F.ones((2, 5))
+    g.edges['plays'].data['e'] = F.ones((4, 4))
+    assert g.device == F.ctx()
+    g = g.to(F.cpu())
+    assert g.device == F.cpu()
+    assert F.context(g.nodes['user'].data['h']) == F.cpu()
+    assert F.context(g.nodes['game'].data['i']) == F.cpu()
+    assert F.context(g.edges['plays'].data['e']) == F.cpu()
     if F.is_cuda_available():
         g1 = g.to(F.cuda())
-        assert g1 is not None
+        assert g.device == F.cuda()
+        assert F.context(g.nodes['user'].data['h']) == F.cuda()
+        assert F.context(g.nodes['game'].data['i']) == F.cuda()
+        assert F.context(g.edges['plays'].data['e']) == F.cuda()
 
 @parametrize_dtype
 def test_convert_bound(idtype):
@@ -1837,13 +1849,13 @@ if __name__ == '__main__':
     # test_inc()
     # test_view("int32")
     # test_view1("int32")
-    # test_flatten()
+    test_flatten(F.int32)
     # test_convert_bound()
     # test_convert()
     # test_to_device()
     # test_transform("int32")
-    test_subgraph("int32")
-    test_subgraph_mask("int32")
+    #test_subgraph("int32")
+    #test_subgraph_mask("int32")
     # test_apply()
     # test_level1()
     # test_level2()
