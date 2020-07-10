@@ -145,20 +145,4 @@ class SBMMixtureDataset(object):
         return g_batch, lg_batch, degg_batch, deglg_batch, pm_pd_batch
 
 
-class SBMMixture(SBMMixtureDataset):
-    def __init__(self,
-                 n_graphs,
-                 n_nodes,
-                 n_communities,
-                 k=2,
-                 avg_deg=3,
-                 pq='Appendix_C',
-                 rng=None):
-        deprecate_class('SBMMixture', 'SBMMixtureDataset')
-        super(SBMMixture, self).__init__(n_graphs=n_graphs,
-                                         n_nodes=n_nodes,
-                                         n_communities=n_communities,
-                                         k=k,
-                                         avg_deg=avg_deg,
-                                         pq=pq,
-                                         rng=rng)
+SBMMixture = SBMMixtureDataset
