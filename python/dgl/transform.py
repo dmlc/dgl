@@ -387,11 +387,11 @@ def reverse(g, share_ndata=False, share_edata=False):
 def reverse_heterograph(g, share_ndata=True, share_edata=False):
     r"""Return the reverse of a graph
 
-    The reverse (also called converse, transpose) of a graph with edges 
-    :math:`(i_1, j_1), (i_2, j_2), \cdots` is a new graph with edges 
+    The reverse (also called converse, transpose) of a graph with edges
+    :math:`(i_1, j_1), (i_2, j_2), \cdots` is a new graph with edges
     :math:`(j_1, i_1), (j_2, i_2), \cdots`.
 
-    For a heterograph with multiple edge types, we can treat edges corresponding to each 
+    For a heterograph with multiple edge types, we can treat edges corresponding to each
     type as a separate graph and compute the reverse for each of them.
 
     Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
@@ -417,9 +417,9 @@ def reverse_heterograph(g, share_ndata=True, share_edata=False):
 
     Examples
     --------
-    
+
     **Homographs or Heterographs with A Single Edge Type**
-    
+
     Create a graph to reverse.
 
     >>> import dgl
@@ -451,21 +451,21 @@ def reverse_heterograph(g, share_ndata=True, share_edata=False):
     tensor([[1.],
             [2.],
             [3.]])
-    
+
     **Heterographs with Multiple Edge Types**
-    
+
     >>> g = dgl.heterograph({
     >>>     ('user', 'follows', 'user'): (th.tensor([0, 2]), th.tensor([1, 2])),
     >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
     >>> })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
-    
-    The reverse of the graph above can be obtained by combining the reverse of the 
-    subgraph corresponding to ('user', 'follows', 'user') and the subgraph corresponding 
-    to ('user', 'plays', 'game'). The reverse for a graph with relation (h, r, t) will 
+
+    The reverse of the graph above can be obtained by combining the reverse of the
+    subgraph corresponding to ('user', 'follows', 'user') and the subgraph corresponding
+    to ('user', 'plays', 'game'). The reverse for a graph with relation (h, r, t) will
     have relation (t, r, h).
-    
+
     >>> rg = dgl.reverse(g, share_ndata=True)
     >>> rg
     Graph(num_nodes={'game': 3, 'user': 3},

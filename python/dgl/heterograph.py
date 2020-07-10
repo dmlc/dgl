@@ -4708,13 +4708,10 @@ class DGLHeteroGraph(object):
         # TODO(0.5 release, xiangsx) need to handle BLOCK
         # currently reversing a block results in undfined behavior
         canonical_etypes = self.canonical_etypes
-        s_ntypes = []
-        d_ntypes = []
         meta_edges_src = []
         meta_edges_dst = []
         etypes = []
-        src, dst, _ = self._graph.metagraph.edges()
-        for i, c_etype in enumerate(canonical_etypes):
+        for c_etype in canonical_etypes:
             meta_edges_src.append(self.get_ntype_id(c_etype[2]))
             meta_edges_dst.append(self.get_ntype_id(c_etype[0]))
             etypes.append(c_etype[1])
