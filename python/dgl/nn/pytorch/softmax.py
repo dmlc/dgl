@@ -6,7 +6,6 @@ from ...function import TargetCode
 from ...base import ALL, is_all
 from ... import backend as F
 from ... import utils
-from ...sparse import _gspmm, _gsddmm
 from ...graph import DGLGraph
 from ...heterograph import DGLHeteroGraph
 
@@ -79,7 +78,6 @@ class EdgeSoftmax(th.autograd.Function):
         #g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
         out = F.binary_reduce(
             'none', 'div', gidx, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
-        """
 
         ctx.save_for_backward(out)
         return out
