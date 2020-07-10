@@ -1,3 +1,4 @@
+"""Multiprocess dataloader for distributed training"""
 import multiprocessing as mp
 import dgl
 from . import shutdown_servers, finalize_client
@@ -8,15 +9,17 @@ __all__ = ["DistDataLoader"]
 
 
 def close():
+    """Finalize client and close servers when finished"""
     shutdown_servers()
     finalize_client()
 
 
 def init_fn(collate_fn, mp_queue):
-    global gfn
-    global queue
-    queue = mp_queue
-    gfn = collate_fn
+    """"""
+    global DGL_GLOBAL_COLLATE_FN
+    global DGL_GLOBAL_MP_QUEUE
+    DGL_GLOBAL_MP_QUEUE = mp_queue
+    DGL_GLOBAL_COLLATE_FN = collate_fn
     import atexit
     atexit.register(close)
 
@@ -34,16 +37,30 @@ def deregister_torch_ipc():
 
 
 def call_collate_fn(next_data):
-    result = gfn(next_data)
-    queue.put(result)
+    result = DGL_GLOBAL_COLLATE_FN(next_data)
+    DGL_GLOBAL_MP_QUEUE.put(result)
     return 1
 
 
 class DistDataLoader:
-    """"""
-
-    def __init__(self, dataset, batch_size, collate_fn, num_workers, drop_last, queue_size=None):
-        """"""
+    """DGL customized multiprocessing dataloader"""
+    def __init__(self, dataset, batch_size, num_workers, collate_fn, drop_last, queue_size=None):
+        """
+        dataset (Dataset): dataset from which to load the data.
+        batch_size (int, optional): how many samples per batch to load
+            (default: ``1``).
+        num_workers (int, optional): how many subprocesses to use for data
+            loading. ``0`` means that the data will be loaded in the main process.
+            (default: ``0``)
+        collate_fn (callable, optional): merges a list of samples to form a
+            mini-batch of Tensor(s).  Used when using batched loading from a
+            map-style dataset.
+        drop_last (bool, optional): set to ``True`` to drop the last incomplete batch,
+            if the dataset size is not divisible by the batch size. If ``False`` and
+            the size of dataset is not divisible by the batch size, then the last batch
+            will be smaller. (default: ``False``)
+        queue_size (int): Size of multiprocessing queue
+        """
         assert num_workers > 0
         if queue_size is None:
             queue_size = num_workers * 4
@@ -104,6 +121,7 @@ class DistDataLoader:
         return ret
 
     def close(self):
+        """Close the multiprocessing pool"""
         self.pool.close()
         self.pool.join()
 
