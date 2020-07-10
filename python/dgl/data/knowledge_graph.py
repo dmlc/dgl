@@ -17,8 +17,8 @@ from ..graph import DGLGraph
 from ..graph import batch as graph_batch
 from ..convert import graph as dgl_graph
 
-class RGCNLinkDataset(DGLBuiltinDataset):
-    """RGCN link prediction dataset
+class KnowledgeGraphDataset(DGLBuiltinDataset):
+    """KnowledgeGraph link prediction dataset
 
     The dataset contains a graph depicting the connectivity of a knowledge
     base. Currently, the knowledge bases from the
@@ -56,23 +56,16 @@ class RGCNLinkDataset(DGLBuiltinDataset):
     Usually, user don't need to directly use this class. Instead, DGL provides
     wrapper function to load data (see example below).
 
-    Examples
-    --------
-    Load FB15k-237 dataset
-
-    >>> from dgl.contrib.data import load_data
-    >>> data = load_data(dataset='FB15k-237')
-
     """
     def __init__(self, name, reverse=True, raw_dir=None, force_reload=False, verbose=True):
         self._name = name
         self.reverse = reverse
         url = _get_dgl_url('dataset/') + '{}.tgz'.format(name)
-        super(RGCNLinkDataset, self).__init__(name,
-                                              url=url,
-                                              raw_dir=raw_dir,
-                                              force_reload=force_reload,
-                                              verbose=verbose)
+        super(KnowledgeGraphDataset, self).__init__(name,
+                                                    url=url,
+                                                    raw_dir=raw_dir,
+                                                    force_reload=force_reload,
+                                                    verbose=verbose)
 
     def download(self):
         r""" Automatically download data and extract it.
@@ -346,7 +339,7 @@ def build_knowledge_graph(num_nodes, num_rels, train, valid, test, reverse=True)
 
     return g
 
-class FB15k237Dataset(RGCNLinkDataset):
+class FB15k237Dataset(KnowledgeGraphDataset):
     r"""FB15k237 link prediction dataset
 
     FB15k-237 is a subset of FB15k where inverse 
@@ -421,7 +414,7 @@ class FB15k237Dataset(RGCNLinkDataset):
         name = 'FB15k-237'
         super(FB15k237Dataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
-class FB15kDataset(RGCNLinkDataset):
+class FB15kDataset(KnowledgeGraphDataset):
     r"""FB15k link prediction dataset
 
     The FB15K dataset was introduced in http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf, 
@@ -497,7 +490,7 @@ class FB15kDataset(RGCNLinkDataset):
         name = 'FB15k'
         super(FB15kDataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
-class WN18Dataset(RGCNLinkDataset):
+class WN18Dataset(KnowledgeGraphDataset):
     r""" WN18 dataset.
     
     The WN18 dataset was introduced in http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf, 
@@ -508,11 +501,10 @@ class WN18Dataset(RGCNLinkDataset):
     
     Statistics
     ----------
-    Nodes: xxx
-    Edges: xxx
+    Nodes: 40943
     Number of relation types: 18
     Number of reversed relation types: 18
-    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    Label Split: Train: 141442 ,Valid: 5000, Test: 5000
     
     Parameters
     ----------
