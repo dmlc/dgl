@@ -233,7 +233,7 @@ def create_heterographs2(index_dtype):
     g_y.nodes['user'].data['hh'] = F.ones((4, 5))
     g_y.edges['knows'].data['ww'] = F.randn((2, 10))
     g = dgl.hetero_from_relations([g_x, g_y, g_z])
-    return [g, g_x, g_y]
+    return [g, g_x, g_y, g_z]
 
 def test_deserialize_old_heterograph_file():
     path = os.path.join(
@@ -273,17 +273,21 @@ def test_serialize_heterograph():
             assert g_list[i].canonical_etypes[j] == etypes
     assert g_list[1].restrict_format() == 'any'
     assert g_list[2].restrict_format() == 'csr'
-    assert g_list[3].idtype == F.int32
+    assert g_list[4].idtype == F.int32
     assert np.allclose(
         F.asnumpy(g_list[2].nodes['user'].data['hh']), np.ones((4, 5)))
     assert np.allclose(
-        F.asnumpy(g_list[5].nodes['user'].data['hh']), np.ones((4, 5)))
+        F.asnumpy(g_list[6].nodes['user'].data['hh']), np.ones((4, 5)))
     edges = g_list[0]['follows'].edges()
     assert np.allclose(F.asnumpy(edges[0]), np.array([0, 1, 2]))
     assert np.allclose(F.asnumpy(edges[1]), np.array([1, 2, 3]))
     for i in range(len(g_list)):
         assert g_list[i].ntypes == g_list0[i].ntypes
         assert g_list[i].etypes == g_list0[i].etypes
+
+    # test set feature after load_graph
+    g_list[3].nodes['user'].data['test'] = F.tensor([0, 1, 2, 4])
+    g_list[3].edata['test'] = F.tensor([0, 1, 2])
 
     os.unlink(path)
 
@@ -308,17 +312,17 @@ def test_serialize_heterograph_s3():
 
 if __name__ == "__main__":
     pass
-    test_graph_serialize_with_feature(True)
-    test_graph_serialize_with_feature(False)
-    test_graph_serialize_without_feature(True)
-    test_graph_serialize_without_feature(False)
-    test_graph_serialize_with_labels(True)
-    test_graph_serialize_with_labels(False)
-    test_serialize_tensors()
-    test_serialize_empty_dict()
-    test_load_old_files1()
-    test_load_old_files2()
-    test_serialize_heterograph()
-    # test_serialize_heterograph_s3()
-    test_deserialize_old_heterograph_file()
-    # create_old_heterograph_files()
+    #test_graph_serialize_with_feature(True)
+    #test_graph_serialize_with_feature(False)
+    #test_graph_serialize_without_feature(True)
+    #test_graph_serialize_without_feature(False)
+    #test_graph_serialize_with_labels(True)
+    #test_graph_serialize_with_labels(False)
+    #test_serialize_tensors()
+    #test_serialize_empty_dict()
+    #test_load_old_files1()
+    #test_load_old_files2()
+    #test_serialize_heterograph()
+    #test_serialize_heterograph_s3()
+    #test_deserialize_old_heterograph_file()
+    #create_old_heterograph_files()
