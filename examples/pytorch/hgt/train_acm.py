@@ -131,16 +131,16 @@ train(model, G)
 
 
 
-# model = HeteroRGCN(G, in_size=args.n_inp, hidden_size=args.n_hid, out_size=labels.max().item()+1).to(device)
-# optimizer = torch.optim.AdamW(model.parameters())
-# scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, total_steps=args.n_epoch, max_lr = args.max_lr)
-# print('Training RGCN with #param: %d' % (get_n_params(model)))
-# train(model, G)
+model = HeteroRGCN(G, in_size=args.n_inp, hidden_size=args.n_hid, out_size=labels.max().item()+1).to(device)
+optimizer = torch.optim.AdamW(model.parameters())
+scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, total_steps=args.n_epoch, max_lr = args.max_lr)
+print('Training RGCN with #param: %d' % (get_n_params(model)))
+train(model, G)
 
 
 
-# model = HGT(G, n_inp=args.n_inp, n_hid=args.n_hid, n_out=labels.max().item()+1, n_layers=0, n_heads=4).to(device)
-# optimizer = torch.optim.AdamW(model.parameters())
-# scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, total_steps=args.n_epoch, max_lr = args.max_lr)
-# print('Training MLP with #param: %d' % (get_n_params(model)))
-# train(model, G)
+model = HGT(G, n_inp=args.n_inp, n_hid=args.n_hid, n_out=labels.max().item()+1, n_layers=0, n_heads=4).to(device)
+optimizer = torch.optim.AdamW(model.parameters())
+scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, total_steps=args.n_epoch, max_lr = args.max_lr)
+print('Training MLP with #param: %d' % (get_n_params(model)))
+train(model, G)
