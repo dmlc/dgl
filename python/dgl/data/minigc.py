@@ -52,7 +52,7 @@ class MiniGCDataset(DGLDataset):
         super(MiniGCDataset, self).__init__(name="minigc",
                                             force_reload=force_reload)
 
-    def process(self, root_path):
+    def process(self):
         self.graphs = []
         self.labels = []
         self._generate(self.seed)
