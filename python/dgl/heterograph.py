@@ -4701,6 +4701,49 @@ class DGLHeteroGraph(object):
                               self._node_frames,
                               self._edge_frames)
 
+    def reverse(self, share_ndata=True, share_edata=False):
+        r""" Same as dgl.reverse_heterograph
+        """
+
+        # TODO(0.5 release, xiangsx) need to handle BLOCK
+        # currently reversing a block results in undfined behavior
+        canonical_etypes = self.canonical_etypes
+        s_ntypes = []
+        d_ntypes = []
+        meta_edges_src = []
+        meta_edges_dst = []
+        etypes = []
+        src, dst, _ = self._graph.metagraph.edges()
+        for i, c_etype in enumerate(canonical_etypes):
+            meta_edges_src.append(self.get_ntype_id(c_etype[2]))
+            meta_edges_dst.append(self.get_ntype_id(c_etype[0]))
+            etypes.append(c_etype[1])
+        metagraph = graph_index.from_edge_list((meta_edges_src, meta_edges_dst), True)
+
+        gidx = self._graph.reverse(metagraph)
+        new_g = DGLHeteroGraph(gidx, self.ntypes, etypes)
+
+        # handle ndata
+        if share_ndata:
+            # for each ntype
+            for ntype in self.ntypes:
+                ntid = self.get_ntype_id(ntype)
+                # for each data field
+                for k in self._node_frames[ntid].keys():
+                    new_g.nodes[ntype].data[k] = self.nodes[ntype].data[k]
+
+        # handle edata
+        if share_edata:
+            # for each ntype
+            for etype in canonical_etypes:
+                etid = self.get_etype_id(etype)
+                # for each data field
+                for k in self._edge_frames[etid].keys():
+                    new_g.edges[etype].data[k] = self.edges[etype].data[k]
+
+        return new_g
+
+
 ############################################################
 # Internal APIs
 ############################################################
@@ -4751,6 +4794,8 @@ def is_unibipartite(graph):
         True if the graph is a uni-bipartite.
     """
     src, dst, _ = graph.edges()
+    print(src.tonumpy())
+    print(dst.tonumpy())
     return set(src.tonumpy()).isdisjoint(set(dst.tonumpy()))
 
 def find_src_dst_ntypes(ntypes, metagraph):

@@ -24,6 +24,7 @@ __all__ = [
     'khop_adj',
     'khop_graph',
     'reverse',
+    'reverse_heterograph',
     'to_simple_graph',
     'to_bidirected',
     'laplacian_lambda_max',
@@ -382,6 +383,107 @@ def reverse(g, share_ndata=False, share_edata=False):
     if share_edata:
         g_reversed._edge_frame = g._edge_frame
     return g_reversed
+
+def reverse_heterograph(g, share_ndata=True, share_edata=False):
+    r"""Return the reverse of a graph
+
+    The reverse (also called converse, transpose) of a graph with edges 
+    :math:`(i_1, j_1), (i_2, j_2), \cdots` is a new graph with edges 
+    :math:`(j_1, i_1), (j_2, i_2), \cdots`.
+
+    For a heterograph with multiple edge types, we can treat edges corresponding to each 
+    type as a separate graph and compute the reverse for each of them.
+
+    Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
+    representing its reverse.
+
+    Notes
+    -----
+    * We do not dynamically update the topology of a graph once that of its reverse changes.
+      This can be particularly problematic when the node/edge attrs are shared. For example,
+      if the topology of both the original graph and its reverse get changed independently,
+      you can get a mismatched node/edge feature.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+        The input graph.
+    share_ndata: bool, optional
+        If True, the original graph and its reverse share memory for node features.
+        Otherwise the reverse will not have any node features. Default: True
+    share_edata: bool, optional
+        If True, the original graph and its reverse share memory for edge features.
+        Otherwise the reverse will not have any edge features.
+
+    Examples
+    --------
+    
+    **Homographs or Heterographs with A Single Edge Type**
+    
+    Create a graph to reverse.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph((th.tensor([0, 1, 2]), th.tensor([1, 2, 0])))
+    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
+    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
+
+    Reverse the graph and examine its structure.
+
+    >>> rg = dgl.reverse(g, share_ndata=True, share_edata=True)
+
+    The edges are reversed now.
+
+    >>> rg.has_edges_between([1, 2, 0], [0, 1, 2])
+    tensor([1, 1, 1])
+
+    Reversed edges have the same feature as the original ones.
+
+    >>> g.edges[[0, 2], [1, 0]].data['h'] == rg.edges[[1, 0], [0, 2]].data['h']
+    tensor([[1],
+            [1]], dtype=torch.uint8)
+
+    The node/edge features of the reversed graph share memory with the original
+    graph, which is helpful for both forward computation and back propagation.
+
+    >>> g.ndata['h'] = g.ndata['h'] + 1
+    >>> rg.ndata['h']
+    tensor([[1.],
+            [2.],
+            [3.]])
+    
+    **Heterographs with Multiple Edge Types**
+    
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): (th.tensor([0, 2]), th.tensor([1, 2])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
+    
+    The reverse of the graph above can be obtained by combining the reverse of the 
+    subgraph corresponding to ('user', 'follows', 'user') and the subgraph corresponding 
+    to ('user', 'plays', 'game'). The reverse for a graph with relation (h, r, t) will 
+    have relation (t, r, h).
+    
+    >>> rg = dgl.reverse(g, share_ndata=True)
+    >>> rg
+    Graph(num_nodes={'game': 3, 'user': 3},
+          num_edges={('user', 'follows', 'user'): 2, ('game', 'plays', 'user'): 3},
+          metagraph=[('user', 'user'), ('game', 'user')])
+    >>> rg.edges(etype='follows')
+    (tensor([1, 2]), tensor([0, 2]))
+    >>> rg.edges(etype='plays')
+    (tensor([2, 1, 1]), tensor([1, 2, 1]))
+    >>> rg.nodes['game'].data['hv
+    tensor([[1.],
+            [1.],
+            [1.]])
+    >>> rg.edges['plays'].data
+    {}
+    """
+    return g.reverse(share_ndata=share_ndata, share_edata=share_edata)
+
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.

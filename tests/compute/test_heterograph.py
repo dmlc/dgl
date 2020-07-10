@@ -1935,7 +1935,7 @@ def test_reverse(index_dtype):
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
     }, index_dtype=index_dtype)
     gidx = g._graph
-    r_gidx = gidx.reverse()
+    r_gidx = gidx.reverse(gidx.metagraph)
 
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
@@ -1947,7 +1947,7 @@ def test_reverse(index_dtype):
     # force to start with 'csr'
     gidx = gidx.to_format('csr')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse()
+    r_gidx = gidx.reverse(gidx.metagraph)
     assert gidx.format_in_use(0)[0] == 'csr'
     assert r_gidx.format_in_use(0)[0] == 'csc'
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
@@ -1960,7 +1960,7 @@ def test_reverse(index_dtype):
     # force to start with 'csc'
     gidx = gidx.to_format('csc')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse()
+    r_gidx = gidx.reverse(gidx.metagraph)
     assert gidx.format_in_use(0)[0] == 'csc'
     assert r_gidx.format_in_use(0)[0] == 'csr'
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
@@ -1976,7 +1976,7 @@ def test_reverse(index_dtype):
         ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
         }, index_dtype=index_dtype)
     gidx = g._graph
-    r_gidx = gidx.reverse()
+    r_gidx = gidx.reverse(gidx.metagraph)
     # three node types and three edge types
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
@@ -2000,7 +2000,7 @@ def test_reverse(index_dtype):
     # force to start with 'csr'
     gidx = gidx.to_format('csr')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse()
+    r_gidx = gidx.reverse(gidx.metagraph)
     # three node types and three edge types
     assert gidx.format_in_use(0)[0] == 'csr'
     assert r_gidx.format_in_use(0)[0] == 'csc'
@@ -2030,7 +2030,7 @@ def test_reverse(index_dtype):
     # force to start with 'csc'
     gidx = gidx.to_format('csc')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse()
+    r_gidx = gidx.reverse(gidx.metagraph)
     # three node types and three edge types
     assert gidx.format_in_use(0)[0] == 'csc'
     assert r_gidx.format_in_use(0)[0] == 'csr'
@@ -2056,6 +2056,52 @@ def test_reverse(index_dtype):
     rg_s, rg_d, _ = r_gidx.edges(2)
     assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
     assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+
+    # test dgl.reverse_heterograph
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
+        ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
+        ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        }, index_dtype=index_dtype)
+    g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
+    g.nodes['user'].data['hh'] = F.tensor([1, 1, 1, 1, 1])
+    g.nodes['game'].data['h'] = F.tensor([0, 1])
+    g.edges['follows'].data['h'] = F.tensor([0, 1, 2, 4, 3 ,1, 3])
+    g.edges['follows'].data['hh'] = F.tensor([1, 2, 3, 2, 0, 0, 1])
+    g_r = dgl.reverse_heterograph(g)
+
+    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
+        assert etype_g[0] == etype_gr[2]
+        assert etype_g[1] == etype_gr[1]
+        assert etype_g[2] == etype_gr[0]
+        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+    for ntype in g.ntypes:
+        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
+    assert F.array_equal(g.nodes['user'].data['h'], g_r.nodes['user'].data['h'])
+    assert F.array_equal(g.nodes['user'].data['hh'], g_r.nodes['user'].data['hh'])
+    assert F.array_equal(g.nodes['game'].data['h'], g_r.nodes['game'].data['h'])
+    assert len(g_r.edges['follows'].data) == 0
+
+    g_r = dgl.reverse_heterograph(g, share_ndata=False)
+    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
+        assert etype_g[0] == etype_gr[2]
+        assert etype_g[1] == etype_gr[1]
+        assert etype_g[2] == etype_gr[0]
+        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+    for ntype in g.ntypes:
+        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
+    assert len(g_r.nodes['user'].data) == 0
+    assert len(g_r.nodes['game'].data) == 0
+
+    g_r = dgl.reverse_heterograph(g, share_ndata=True, share_edata=True)
+    print(g_r)
+    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
+        assert etype_g[0] == etype_gr[2]
+        assert etype_g[1] == etype_gr[1]
+        assert etype_g[2] == etype_gr[0]
+        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+    assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
+    assert F.array_equal(g.edges['follows'].data['hh'], g_r.edges['follows'].data['hh'])
 
 if __name__ == '__main__':
     # test_create()
@@ -2083,6 +2129,6 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
-    # test_reverse("int32")
+    test_reverse("int32")
     test_format()
     pass
