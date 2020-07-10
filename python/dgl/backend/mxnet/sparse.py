@@ -2,6 +2,51 @@ import mxnet as mx
 import numpy as np
 from mxnet import nd
 from ...sparse import _gspmm, _gsddmm
+from ...base import dgl_warning
+from .tensor import asnumpy, copy_to, zerocopy_from_numpy
+
+def _scatter_nd(index, src, n_rows):
+    assert index.shape == src.shape
+    dgl_warning("MXNet do not support scatter_add, fallback to numpy.")
+    ctx = src.ctx
+    index = asnumpy(index)
+    src = asnumpy(src)
+    shp = index.shape
+    ndim = src.ndim
+    offsets = []
+    stride = 1
+    for i in reversed(range(1, ndim)):
+        di = shp[i]
+        offset_i = np.arange(di, dtype=index.dtype)
+        offsets.append(
+            (stride * offset_i).reshape((1,) * i + (di,) + (1,) * (ndim - 1 - i)))
+        stride *= di
+    new_idx = index * stride + sum(offsets)
+    src = src.reshape(-1)
+    new_idx = new_idx.reshape(-1)
+    rst = np.zeros((stride * n_rows,), dtype=src.dtype)
+    np.add.at(rst, new_idx, src)
+    rst = rst.reshape(n_rows, *shp[1:])
+    rst = copy_to(zerocopy_from_numpy(rst), ctx)
+    return rst
+
+def _gather_nd(index, src):
+    ctx = src.ctx
+    shp = index.shape
+    ndim = src.ndim
+    offsets = []
+    stride = 1
+    for i in reversed(range(1, ndim)):
+        di = shp[i]
+        offset_i = nd.arange(di, dtype=index.dtype)
+        offsets.append(
+            (stride * offset_i).reshape((1,) * i + (di,) + (1,) * (ndim - 1 - i)))
+        stride *= di
+    new_idx = index * stride + copy_to(sum(offsets), ctx)
+    src = src.reshape(-1)
+    new_idx = new_idx.reshape(-1)
+    rst = nd.take(src, new_idx).reshape(shp)
+    return rst
 
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
@@ -66,11 +111,11 @@ class GSpMM(mx.autograd.Function):
                     dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
             else:
                 if op in ['mul', 'div']:
-                    dX = nd.scatter_nd(_muldiv(op, nd.gather_nd(Y.broadcast_to(-1, *dZ.shape[1:]), argY)) * dZ,
-                                       argX, (X.shape[0],) + dZ.shape[1:])
+                    dX = _scatter_nd(argX,
+                                     _muldiv(op, _gather_nd(argY, Y.broadcast_to((Y.shape[0], *dZ.shape[1:])))) * dZ,
+                                     X.shape[0])
                 elif op in ['add', 'sub', 'copy_u']:
-                    dX = nd.scatter_nd(dZ, argX, (X.shape[0],) + dZ.shape[1:])
-                dX = X
+                    dX = _scatter_nd(argX, dZ, X.shape[0])
             dX = _reduce_grad(dX, X.shape)
         if op != 'copy_u' and Y.grad is not None:
             if reduce_op == 'sum':
@@ -81,12 +126,10 @@ class GSpMM(mx.autograd.Function):
                     dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
                 if op in ['mul',  'div']:
-                    dY = nd.scatter_nd(nd.gather_nd(X.broadcast_to(-1, *dZ.shape[1:]), argX) * dZ,
-                                       argY, (Y.shape[0],) + dZ.shape[1:])
+                    dY = _scatter_nd(argY, _gather_nd(argX, X.broadcast_to((X.shape[0], *dZ.shape[1:]))) * dZ, Y.shape[0])
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_e']:
-                    dY = nd.scatter_nd(_addsub(op, dZ), argY)
-                dY = Y
+                    dY = _scatter_nd(argY, _addsub(op, dZ), Y.shape[0])
             dY = _reduce_grad(dY, Y.shape)
         self.saved_tensors = None
         if dX is None:

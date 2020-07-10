@@ -94,7 +94,7 @@ sddmm_shapes = [
 @pytest.mark.parametrize('g', graphs)
 @pytest.mark.parametrize('shp', spmm_shapes)
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_u', 'copy_e'])
-@pytest.mark.parametrize('reducer', ['sum'])#, 'min', 'max'])
+@pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 def test_spmm(g, shp, msg, reducer):
     print(g)
 
@@ -201,11 +201,9 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
                 assert F.allclose(F.grad(rhs_frame['y']), grad_rhs)
             print('backward passed')
 
-    print('fuck')
-
     lhs_frame.pop('x')
     rhs_frame.pop('y')
     if 'm' in g.edata: g.edata.pop('m')
 
 if __name__ == '__main__':
-    test_spmm(graphs[0], spmm_shapes[0], 'add', 'sum')
+    test_spmm(graphs[1], spmm_shapes[5], 'mul', 'max')

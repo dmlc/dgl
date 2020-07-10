@@ -1,7 +1,45 @@
 import tensorflow as tf
 import numpy as np
-from .tensor import tensor
+from .tensor import tensor, copy_to, context
 from ...sparse import _gspmm, _gsddmm
+
+def _scatter_nd(index, src, n_rows):
+    assert index.shape == src.shape
+    shp = index.shape
+    ctx = context(src)
+    ndim = index.ndim
+    offsets = []
+    stride = 1
+    for i in reversed(range(1, ndim)):
+        di = shp[i]
+        offset_i = tf.range(di, dtype=index.dtype)
+        offsets.append(
+            tf.reshape((stride * offset_i), (1,) * i + (di,) + (1,) * (ndim - 1 - i)))
+        stride *= di
+    new_idx = index * stride + copy_to(sum(offsets), ctx)
+    src = tf.reshape(src, (-1,))
+    new_idx = tf.reshape(new_idx, (-1, 1))
+    rst = tf.reshape(tf.scatter_nd(new_idx, src, (stride * n_rows,)), (n_rows, *shp[1:]))
+    return rst
+
+def _gather_nd(index, src):
+    shp = index.shape
+    ctx = context(src)
+    ndim = index.ndim
+    offsets = []
+    stride = 1
+    for i in reversed(range(1, ndim)):
+        di = shp[i]
+        offset_i = tf.range(di, dtype=index.dtype)
+        offsets.append(
+            tf.reshape((stride * offset_i), (1,) * i + (di,) + (1,) * (ndim - 1 - i)))
+        stride *= di
+    new_idx = index * stride + copy_to(sum(offsets), ctx)
+    src = tf.reshape(src, (-1,))
+    new_idx = tf.reshape(new_idx, (-1))
+    print(src, new_idx)
+    rst = tf.reshape(tf.gather(src, new_idx), shp)
+    return rst
 
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
@@ -56,15 +94,13 @@ def gspmm_real(g, op, reduce_op, X, Y):
                 elif op == 'copy_u':
                     dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
             else:
-                out_shp = (X.shape[0],) + dZ.shape[1:]
                 if op in ['mul', 'div']:
-                    dX = tf.scatter_nd(
+                    dX = _scatter_nd(
                         argX,
-                        _muldiv(op,
-                                tf.gather_nd(argY, tf.broadcast_to(Y, (-1, *dZ.shape[1:])), dZ.shape) * dZ),
-                        out_shp)
+                        _muldiv(op, _gather_nd(argY, tf.broadcast_to(Y, (Y.shape[0], *dZ.shape[1:])))) * dZ,
+                        X.shape[0])
                 elif op in ['add', 'sub', 'copy_u']:
-                    dX = tf.scatter_nd(argX, dZ, out_shp)
+                    dX = _scatter_nd(argX, dZ, X.shape[0])
             dX = _reduce_grad(dX, X.shape)
         if op != 'copy_u':
             if reduce_op == 'sum':
@@ -76,14 +112,13 @@ def gspmm_real(g, op, reduce_op, X, Y):
             else:
                 out_shp = (Y.shape[0],) + dZ.shape[1:]
                 if op in ['mul',  'div']:
-                    dY = tf.scatter_nd(
+                    dY = _scatter_nd(
                         argY,
-                        tf.gather_nd(
-                            argX, tf.broadcast_to(X, (-1, *dZ.shape[1:])), dZ.shape) * dZ,
-                        out_shp)
+                        _gather_nd(argX, tf.broadcast_to(X, (X.shape[0], *dZ.shape[1:]))) * dZ,
+                        Y.shape[0])
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_e']:
-                    dY = tf.scatter_nd(argY, _addsub(op, dZ), out_shp)
+                    dY = _scatter_nd(argY, _addsub(op, dZ), Y.shape[0])
             dY = _reduce_grad(dY, Y.shape)
         if dX is None:
             dX = tf.zeros(())
