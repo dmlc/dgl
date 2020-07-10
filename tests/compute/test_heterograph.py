@@ -2081,6 +2081,21 @@ def test_reverse(index_dtype):
     assert F.array_equal(g.nodes['user'].data['hh'], g_r.nodes['user'].data['hh'])
     assert F.array_equal(g.nodes['game'].data['h'], g_r.nodes['game'].data['h'])
     assert len(g_r.edges['follows'].data) == 0
+    u_g, v_g, eids_g = g.all_edges(form='all', etype=('user', 'follows', 'user'))
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('user', 'follows', 'user'))
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
+    u_g, v_g, eids_g = g.all_edges(form='all', etype=('user', 'plays', 'game'))
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('game', 'plays', 'user'))
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
+    u_g, v_g, eids_g = g.all_edges(form='all', etype=('developer', 'develops', 'game'))
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('game', 'develops', 'developer'))
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
 
     g_r = dgl.reverse_heterograph(g, share_ndata=False)
     for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
