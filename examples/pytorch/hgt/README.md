@@ -14,5 +14,5 @@ The reference performance against R-GCN and MLP running 5 times:
 | Model        | Test Accuracy    | # Parameter  |
 | ---------    | ---------------  | -------------|
 | 2-layer HGT  | 0.465 ± 0.007   |  2,176,324   |
-| 2-layer RGCN | 0.392 ± 0.013    |  8,097,108   |
+| 2-layer RGCN | 0.392 ± 0.013    |  416,340   |
 | MLP          | 0.132 ± 0.003    |  200,974     | 
