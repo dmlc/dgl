@@ -2,6 +2,7 @@
 """Multiprocess dataloader for distributed training"""
 import multiprocessing as mp
 from . import shutdown_servers, finalize_client
+from ..backend import backend_name
 
 DGL_QUEUE_TIMEOUT = 10
 
@@ -131,5 +132,5 @@ class DistDataLoader:
         self.pool.close()
         self.pool.join()
 
-
-deregister_torch_ipc()
+if backend_name == 'pytorch':
+    deregister_torch_ipc()
