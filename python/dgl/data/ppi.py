@@ -1,127 +1,135 @@
-"""PPI Dataset.
-(zhang hao): Used for inductive learning.
-"""
+""" PPIDataset for inductive learning. """
 import json
 import numpy as np
 import networkx as nx
 from networkx.readwrite import json_graph
+import os
 
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
-from ..utils import retry_method_with_fix
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import _get_dgl_url, save_graphs, save_info, load_info, load_graphs, deprecate_property
 from ..graph import DGLGraph
+from .. import backend as F
 
-_url = 'dataset/ppi.zip'
 
+class PPIDataset(DGLBuiltinDataset):
+    """ Protein-Protein Interaction dataset for inductive node classification
 
-class PPIDataset(object):
-    """A toy Protein-Protein Interaction network dataset.
+    A toy Protein-Protein Interaction network dataset. The dataset contains
+    24 graphs. The average number of nodes per graph is 2372. Each node has
+    50 features and 121 labels. 20 graphs for training, 2 for validation
+    and 2 for testing.
 
-    Adapted from https://github.com/williamleif/GraphSAGE/tree/master/example_data.
+    Reference: http://snap.stanford.edu/graphsage/
 
-    The dataset contains 24 graphs. The average number of nodes per graph
-    is 2372. Each node has 50 features and 121 labels.
+    Parameters
+    ----------
+    mode : str
+        Must be one of ('train', 'valid', 'test'). Default: 'train'
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+        Whether to print out progress information. Default: True.
 
-    We use 20 graphs for training, 2 for validation and 2 for testing.
+    Returns
+    -------
+    PPIDataset object with two properties
+        graphs: list of DGLGraph objects that contains graph structure, node features and node labels:
+            - ndata['feat']: node features
+            - ndata['label']: nodel labels
+        num_labels: int, number of labels for each node
+
+    Examples
+    --------
+    >>> data = PPIDataset(mode='valid')
+    >>> num_labels = data.num_labels
+    >>> for g, _ in data:
+    ....    feat = g.ndata['feat']
+    ....    label = g.ndata['label']
+    ....    # your code here
     """
-    def __init__(self, mode):
-        """Initialize the dataset.
-
-        Paramters
-        ---------
-        mode : str
-            ('train', 'valid', 'test').
-        """
+    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False):
         assert mode in ['train', 'valid', 'test']
         self.mode = mode
-        self._name = 'ppi'
-        self._dir = get_download_dir()
-        self._zip_file_path = '{}/{}.zip'.format(self._dir, self._name)
-        self._load()
-        self._preprocess()
+        _url = _get_dgl_url('dataset/ppi.zip')
+        super(PPIDataset, self).__init__(name='ppi',
+                                         url=_url,
+                                         raw_dir=raw_dir,
+                                         force_reload=force_reload,
+                                         verbose=verbose)
 
-    def _download(self):
-        download(_get_dgl_url(_url), path=self._zip_file_path)
-        extract_archive(self._zip_file_path,
-                        '{}/{}'.format(self._dir, self._name))
+    def process(self, root_path):
+        graph_file = os.path.join(root_path, '{}_graph.json'.format(self.mode))
+        label_file = os.path.join(root_path, '{}_labels.npy'.format(self.mode))
+        feat_file = os.path.join(root_path, '{}_feats.npy'.format(self.mode))
+        graph_id_file = os.path.join(root_path, '{}_graph_id.npy'.format(self.mode))
 
-    @retry_method_with_fix(_download)
-    def _load(self):
-        """Loads input data.
+        g_data = json.load(open(graph_file))
+        self._labels = np.load(label_file)
+        self._feats = np.load(feat_file)
+        self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
+        graph_id = np.load(graph_id_file)
 
-        train/test/valid_graph.json => the graph data used for training,
-          test and validation as json format;
-        train/test/valid_feats.npy => the feature vectors of nodes as
-          numpy.ndarry object, it's shape is [n, v],
-          n is the number of nodes, v is the feature's dimension;
-        train/test/valid_labels.npy=> the labels of the input nodes, it
-          is a numpy ndarry, it's like[[0, 0, 1, ... 0], 
-          [0, 1, 1, 0 ...1]], shape of it is n*h, n is the number of nodes,
-          h is the label's dimension;
-        train/test/valid/_graph_id.npy => the element in it indicates which
-          graph the nodes belong to, it is a one dimensional numpy.ndarray
-          object and the length of it is equal the number of nodes,
-          it's like [1, 1, 2, 1...20]. 
-        """
-        print('Loading G...')
-        if self.mode == 'train':
-            with open('{}/ppi/train_graph.json'.format(self._dir)) as jsonfile:
-                g_data = json.load(jsonfile)
-            self.labels = np.load('{}/ppi/train_labels.npy'.format(self._dir))
-            self.features = np.load('{}/ppi/train_feats.npy'.format(self._dir))
-            self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
-            self.graph_id = np.load('{}/ppi/train_graph_id.npy'.format(self._dir))
+        lo, hi = 1, 21
         if self.mode == 'valid':
-            with open('{}/ppi/valid_graph.json'.format(self._dir)) as jsonfile:
-                g_data = json.load(jsonfile)
-            self.labels = np.load('{}/ppi/valid_labels.npy'.format(self._dir))
-            self.features = np.load('{}/ppi/valid_feats.npy'.format(self._dir))
-            self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
-            self.graph_id = np.load('{}/ppi/valid_graph_id.npy'.format(self._dir))
-        if self.mode == 'test':
-            with open('{}/ppi/test_graph.json'.format(self._dir)) as jsonfile:
-                g_data = json.load(jsonfile)
-            self.labels = np.load('{}/ppi/test_labels.npy'.format(self._dir))
-            self.features = np.load('{}/ppi/test_feats.npy'.format(self._dir))
-            self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
-            self.graph_id = np.load('{}/ppi/test_graph_id.npy'.format(self._dir))
+            lo, hi = 21, 23
+        elif self.mode == 'test':
+            lo, hi = 23, 25
 
-    def _preprocess(self):
-        if self.mode == 'train':
-            self.train_mask_list = []
-            self.train_graphs = []
-            self.train_labels = []
-            for train_graph_id in range(1, 21):
-                train_graph_mask = np.where(self.graph_id == train_graph_id)[0]
-                self.train_mask_list.append(train_graph_mask)
-                self.train_graphs.append(self.graph.subgraph(train_graph_mask))
-                self.train_labels.append(self.labels[train_graph_mask])
-        if self.mode == 'valid':
-            self.valid_mask_list = []
-            self.valid_graphs = []
-            self.valid_labels = []
-            for valid_graph_id in range(21, 23):
-                valid_graph_mask = np.where(self.graph_id == valid_graph_id)[0]
-                self.valid_mask_list.append(valid_graph_mask)
-                self.valid_graphs.append(self.graph.subgraph(valid_graph_mask))
-                self.valid_labels.append(self.labels[valid_graph_mask])
-        if self.mode == 'test':
-            self.test_mask_list = []
-            self.test_graphs = []
-            self.test_labels = []
-            for test_graph_id in range(23, 25):
-                test_graph_mask = np.where(self.graph_id == test_graph_id)[0]
-                self.test_mask_list.append(test_graph_mask)
-                self.test_graphs.append(self.graph.subgraph(test_graph_mask))
-                self.test_labels.append(self.labels[test_graph_mask])
+        graph_masks = []
+        self._graphs = []
+        for g_id in range(lo, hi):
+            g_mask = np.where(graph_id == g_id)[0]
+            graph_masks.append(g_mask)
+            g = self.graph.subgraph(g_mask)
+            g.ndata['feat'] = F.tensor(self._feats[g_mask], dtype=F.data_type_dict['float32'])
+            g.ndata['label'] = F.tensor(self._labels[g_mask], dtype=F.data_type_dict['int64'])
+            self._graphs.append(g)
+
+    def has_cache(self):
+        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
+        return os.path.exists(graph_path) and os.path.exists(info_path)
+
+    def save(self):
+        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
+        save_graphs(graph_path, self._graphs)
+        save_info(info_path, {'labels': self._labels, 'feats': self._feats, 'graph': self.graph})
+
+    def load(self):
+        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
+        self._graphs, _ = load_graphs(graph_path)
+        info = load_info(info_path)
+        self._labels = info['labels']
+        self.graph = info['graph']
+        self._feats = info['feats']
+
+    @property
+    def num_labels(self):
+        """Number of labels for each node."""
+        return 121
+
+    @property
+    def graphs(self):
+        return self._graphs
+
+    @property
+    def labels(self):
+        deprecate_property('dataset.labels', 'dataset.graphs[i].ndata[\'label\']')
+        return self._labels
+
+    @property
+    def features(self):
+        deprecate_property('dataset.features', 'dataset.graphs[i].ndata[\'feat\']')
+        return self._feats
 
     def __len__(self):
         """Return number of samples in this dataset."""
-        if self.mode == 'train':
-            return len(self.train_mask_list)
-        if self.mode == 'valid':
-            return len(self.valid_mask_list)
-        if self.mode == 'test':
-            return len(self.test_mask_list)
+        return len(self._graphs)
 
     def __getitem__(self, item):
         """Get the i^th sample.
@@ -136,19 +144,7 @@ class PPIDataset(object):
         (dgl.DGLGraph, ndarray)
             The graph, and its label.
         """
-        if self.mode == 'train':
-            g = self.train_graphs[item]
-            g.ndata['feat'] = self.features[self.train_mask_list[item]]
-            label =  self.train_labels[item]
-        elif self.mode == 'valid':
-            g = self.valid_graphs[item]
-            g.ndata['feat'] = self.features[self.valid_mask_list[item]]
-            label =  self.valid_labels[item]
-        elif self.mode == 'test':
-            g = self.test_graphs[item]
-            g.ndata['feat'] = self.features[self.test_mask_list[item]]
-            label =  self.test_labels[item]
-        return g, label
+        return self.graphs[item], self.graphs[item].ndata['label']
 
 
 class LegacyPPIDataset(PPIDataset):
@@ -168,9 +164,5 @@ class LegacyPPIDataset(PPIDataset):
         (dgl.DGLGraph, ndarray, ndarray)
             The graph, features and its label.
         """
-        if self.mode == 'train':
-            return self.train_graphs[item], self.features[self.train_mask_list[item]], self.train_labels[item]
-        if self.mode == 'valid':
-            return self.valid_graphs[item], self.features[self.valid_mask_list[item]], self.valid_labels[item]
-        if self.mode == 'test':
-            return self.test_graphs[item], self.features[self.test_mask_list[item]], self.test_labels[item]
+
+        return self.graphs[item], self.graphs[item].ndata['feat'], self.graphs[item].ndata['label']

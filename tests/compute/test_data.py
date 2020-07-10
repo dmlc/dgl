@@ -1,7 +1,7 @@
 import dgl.data as data
 
 def test_minigc():
-    ds = data.MiniGCDataset(16, 10, 20, test_dir='./minigc', force_reload=True)
+    ds = data.MiniGCDataset(16, 10, 20, save_graph=False, force_reload=True)
     g, l = list(zip(*ds))
     print(g, l)
 

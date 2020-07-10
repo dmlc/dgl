@@ -57,7 +57,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.use_pandas = use_pandas
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
 
-    def process(self, root_path):
+    def process(self):
         self.data_mode = None
 
         if self.use_pandas:
@@ -233,7 +233,7 @@ class TUDataset(DGLBuiltinDataset):
                                         raw_dir=raw_dir, force_reload=force_reload,
                                         verbose=verbose)
     
-    def process(self, root_path):
+    def process(self):
         DS_edge_list = self._idx_from_zero(
             loadtxt(self._file_path("A"), delimiter=",").astype(int))
         DS_indicator = self._idx_from_zero(

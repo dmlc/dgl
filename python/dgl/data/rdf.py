@@ -16,10 +16,13 @@ import numpy as np
 
 import dgl
 import dgl.backend as F
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import download, extract_archive, get_download_dir
+from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
+from .utils import generate_mask_tensor, idx2mask, deprecate_property
 from ..utils import retry_method_with_fix
 
-__all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
+__all__ = ['AIFB', 'MUTAG', 'BGS', 'AM', 'AIFBDataset', 'MUTAGDataset', 'BGSDataset', 'AMDataset']
 
 # Dictionary for renaming reserved node/edge type names to the ones
 # that are allowed by nn.Module.
@@ -59,7 +62,7 @@ class Relation:
     def __str__(self):
         return str(self.cls)
 
-class RDFGraphDataset:
+class RDFGraphDataset(DGLBuiltinDataset):
     """Base graph dataset class from RDF tuples.
 
     To derive from this, implement the following abstract methods:
@@ -92,52 +95,46 @@ class RDFGraphDataset:
 
     Parameters
     ----------
-    url : str or path
-        URL to download the raw dataset.
     name : str
         Name of the dataset
-    force_reload : bool, optional
-        If true, force load and process from raw data. Ignore cached pre-processed data.
+    url : str or path
+        URL to download the raw dataset.
+    predict_category : str
+        Predict category.
     print_every : int, optional
         Log for every X tuples.
     insert_reverse : bool, optional
         If true, add reverse edge and reverse relations to the final graph.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool, optional
+        If true, force load and process from raw data. Ignore cached pre-processed data.
+    verbose: bool
+        Whether to print out progress information. Default: True.
     """
-    def __init__(self, url, name,
+    def __init__(self, name, url, predict_category,
                  print_every=10000,
                  insert_reverse=True,
                  raw_dir=None,
                  force_reload=False,
                  verbose=True):
-        download_dir = get_download_dir()
-        zip_file_path = os.path.join(download_dir, '{}.zip'.format(name))
-        self._dir = os.path.join(download_dir, name)
-        self._url = url
-        self._zip_file_path = zip_file_path
-        self._load(print_every, insert_reverse, force_reload)
-
-    def _download(self):
-        download(self._url, path=self._zip_file_path)
-        extract_archive(self._zip_file_path, self._dir)
-
-    @retry_method_with_fix(_download)
-    def _load(self, print_every, insert_reverse, force_reload):
-        self._print_every = print_every
         self._insert_reverse = insert_reverse
-        if not force_reload and self.has_cache():
-            print('Found cached graph. Load cache ...')
-            self.load_cache()
-        else:
-            raw_tuples = self.load_raw_tuples()
-            self.process_raw_tuples(raw_tuples)
-        print('#Training samples:', len(self.train_idx))
-        print('#Testing samples:', len(self.test_idx))
-        print('#Classes:', self.num_classes)
-        print('Predict category:', self.predict_category)
+        self._print_every = print_every
+        self._predict_category = predict_category
 
-    def load_raw_tuples(self):
+        super(RDFGraphDataset, self).__init__(name, url,
+                                              raw_dir=raw_dir,
+                                              force_reload=force_reload,
+                                              verbose=verbose)
+
+    def process(self):
+        raw_tuples = self.load_raw_tuples(self.raw_path)
+        self.process_raw_tuples(raw_tuples, self.raw_path)
+
+    def load_raw_tuples(self, root_path):
         raw_rdf_graphs = []
-        for i, filename in enumerate(os.listdir(self._dir)):
+        for i, filename in enumerate(os.listdir(root_path)):
             fmt = None
             if filename.endswith('nt'):
                 fmt = 'nt'
@@ -147,11 +144,11 @@ class RDFGraphDataset:
                 continue
             g = rdf.Graph()
             print('Parsing file %s ...' % filename)
-            g.parse(os.path.join(self._dir, filename), format=fmt)
+            g.parse(os.path.join(root_path, filename), format=fmt)
             raw_rdf_graphs.append(g)
         return itertools.chain(*raw_rdf_graphs)
 
-    def process_raw_tuples(self, raw_tuples):
+    def process_raw_tuples(self, raw_tuples, root_path):
         mg = nx.MultiDiGraph()
         ent_classes = OrderedDict()
         rel_classes = OrderedDict()
@@ -166,7 +163,7 @@ class RDFGraphDataset:
         sorted_tuples.sort()
 
         for i, (sbj, pred, obj) in enumerate(sorted_tuples):
-            if i % self._print_every == 0:
+            if self.verbose and i % self._print_every == 0:
                 print('Processed %d tuples, found %d valid tuples.' % (i, len(src)))
             sbjent = self.parse_entity(sbj)
             rel = self.parse_relation(pred)
@@ -202,7 +199,8 @@ class RDFGraphDataset:
 
         # add reverse edge with reverse relation
         if self._insert_reverse:
-            print('Adding reverse edges ...')
+            if self.verbose:
+                print('Adding reverse edges ...')
             newsrc = np.hstack([src, dst])
             newdst = np.hstack([dst, src])
             src = newsrc
@@ -210,28 +208,43 @@ class RDFGraphDataset:
             etid = np.hstack([etid, etid + len(etypes)])
             etypes.extend(['rev-%s' % t for t in etypes])
 
-        self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
+        hg = self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
 
-        print('Load training/validation/testing split ...')
-        idmap = F.asnumpy(self.graph.nodes[self.predict_category].data[dgl.NID])
+        if self.verbose:
+            print('Load training/validation/testing split ...')
+        idmap = F.asnumpy(hg.nodes[self.predict_category].data[dgl.NID])
         glb2lcl = {glbid : lclid for lclid, glbid in enumerate(idmap)}
         def findidfn(ent):
             if ent not in entities:
                 return None
             else:
                 return glb2lcl[entities[ent]]
-        self.load_data_split(findidfn)
+        self._hg = hg
+        train_idx, test_idx, labels, num_classes = self.load_data_split(findidfn, root_path)
+        
+        train_mask = idx2mask(train_idx, self._hg.number_of_nodes(self.predict_category))
+        test_mask = idx2mask(test_idx, self._hg.number_of_nodes(self.predict_category))
+        labels = F.tensor(labels).long()
 
-        self.save_cache(mg, src, dst, ntid, etid, ntypes, etypes)
+        self._hg.nodes[self.predict_category].data['train_mask'] = generate_mask_tensor(train_mask)
+        self._hg.nodes[self.predict_category].data['test_mask'] = generate_mask_tensor(test_mask)
+        self._hg.nodes[self.predict_category].data['labels'] = labels
+        # save for compatability
+        self._train_idx = F.tensor(train_idx)
+        self._test_idx = F.tensor(test_idx)
+        self._labels = labels
+        self._num_classes = num_classes
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
         # create homo graph
-        print('Creating one whole graph ...')
+        if self.verbose:
+            print('Creating one whole graph ...')
         g = dgl.graph((src, dst))
         g.ndata[dgl.NTYPE] = F.tensor(ntid)
         g.edata[dgl.ETYPE] = F.tensor(etid)
-        print('Total #nodes:', g.number_of_nodes())
-        print('Total #edges:', g.number_of_edges())
+        if self.verbose:
+            print('Total #nodes:', g.number_of_nodes())
+            print('Total #edges:', g.number_of_edges())
 
         # rename names such as 'type' so that they an be used as keys
         # to nn.ModuleDict
@@ -242,69 +255,32 @@ class RDFGraphDataset:
             mg.add_edge(sty, dty, key=RENAME_DICT.get(ety, ety))
 
         # convert to heterograph
-        print('Convert to heterograph ...')
+        if self.verbose:
+            print('Convert to heterograph ...')
         hg = dgl.to_hetero(g,
                            ntypes,
                            etypes,
                            metagraph=mg)
-        print('#Node types:', len(hg.ntypes))
-        print('#Canonical edge types:', len(hg.etypes))
-        print('#Unique edge type names:', len(set(hg.etypes)))
-        self.graph = hg
+        if self.verbose:
+            print('#Node types:', len(hg.ntypes))
+            print('#Canonical edge types:', len(hg.etypes))
+            print('#Unique edge type names:', len(set(hg.etypes)))
+        return hg
 
-    def save_cache(self, mg, src, dst, ntid, etid, ntypes, etypes):
-        nx.write_gpickle(mg, os.path.join(self._dir, 'cached_mg.gpickle'))
-        np.save(os.path.join(self._dir, 'cached_src.npy'), src)
-        np.save(os.path.join(self._dir, 'cached_dst.npy'), dst)
-        np.save(os.path.join(self._dir, 'cached_ntid.npy'), ntid)
-        np.save(os.path.join(self._dir, 'cached_etid.npy'), etid)
-        save_strlist(os.path.join(self._dir, 'cached_ntypes.txt'), ntypes)
-        save_strlist(os.path.join(self._dir, 'cached_etypes.txt'), etypes)
-        np.save(os.path.join(self._dir, 'cached_train_idx.npy'), F.asnumpy(self.train_idx))
-        np.save(os.path.join(self._dir, 'cached_test_idx.npy'), F.asnumpy(self.test_idx))
-        np.save(os.path.join(self._dir, 'cached_labels.npy'), F.asnumpy(self.labels))
-
-    def has_cache(self):
-        return (os.path.exists(os.path.join(self._dir, 'cached_mg.gpickle'))
-            and os.path.exists(os.path.join(self._dir, 'cached_src.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_dst.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_ntid.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_etid.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_ntypes.txt'))
-            and os.path.exists(os.path.join(self._dir, 'cached_etypes.txt'))
-            and os.path.exists(os.path.join(self._dir, 'cached_train_idx.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_test_idx.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_labels.npy')))
-
-    def load_cache(self):
-        mg = nx.read_gpickle(os.path.join(self._dir, 'cached_mg.gpickle'))
-        src = np.load(os.path.join(self._dir, 'cached_src.npy'))
-        dst = np.load(os.path.join(self._dir, 'cached_dst.npy'))
-        ntid = np.load(os.path.join(self._dir, 'cached_ntid.npy'))
-        etid = np.load(os.path.join(self._dir, 'cached_etid.npy'))
-        ntypes = load_strlist(os.path.join(self._dir, 'cached_ntypes.txt'))
-        etypes = load_strlist(os.path.join(self._dir, 'cached_etypes.txt'))
-        self.train_idx = F.tensor(np.load(os.path.join(self._dir, 'cached_train_idx.npy')))
-        self.test_idx = F.tensor(np.load(os.path.join(self._dir, 'cached_test_idx.npy')))
-        labels = np.load(os.path.join(self._dir, 'cached_labels.npy'))
-        self.num_classes = labels.max() + 1
-        self.labels = F.tensor(labels)
-
-        self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
-
-    def load_data_split(self, ent2id):
+    def load_data_split(self, ent2id, root_path):
         label_dict = {}
         labels = np.zeros((self.graph.number_of_nodes(self.predict_category),)) - 1
         train_idx = self.parse_idx_file(
-            os.path.join(self._dir, 'trainingSet.tsv'),
+            os.path.join(root_path, 'trainingSet.tsv'),
             ent2id, label_dict, labels)
         test_idx = self.parse_idx_file(
-            os.path.join(self._dir, 'testSet.tsv'),
+            os.path.join(root_path, 'testSet.tsv'),
             ent2id, label_dict, labels)
-        self.train_idx = F.tensor(train_idx)
-        self.test_idx = F.tensor(test_idx)
-        self.labels = F.tensor(labels).long()
-        self.num_classes = len(label_dict)
+        train_idx = np.array(train_idx)
+        test_idx = np.array(test_idx)
+        labels = np.array(labels)
+        num_classes = len(label_dict)
+        return train_idx, test_idx, labels, num_classes
 
     def parse_idx_file(self, filename, ent2id, label_dict, labels):
         idx = []
@@ -323,6 +299,78 @@ class RDFGraphDataset:
                     lblid = _get_id(label_dict, label)
                     labels[entid] = lblid
         return idx
+
+    def has_cache(self):
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        if os.path.exists(graph_path) and \
+            os.path.exists(info_path):
+            return True
+
+        return False
+
+    def save(self):
+        """save the graph list and the labels"""
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        save_graphs(str(graph_path), self.graph)
+        save_info(str(info_path), {'num_classes': self.num_classes,
+                                   'predict_category': self.predict_category})
+
+    def load(self):
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        graphs, _ = load_graphs(str(graph_path))
+
+        info = load_info(str(info_path))
+        self._num_classes = info['num_classes']
+        self._predict_category = info['predict_category']
+        self._hg = graphs[0]
+        train_mask = self._hg.nodes[self.predict_category].data['train_mask']
+        test_mask = self._hg.nodes[self.predict_category].data['test_mask']
+
+        train_idx = F.nonzero_1d(train_mask)
+        test_idx = F.nonzero_1d(test_mask)
+        self._train_idx = train_idx
+        self._test_idx = test_idx
+        self._labels = self._hg.nodes[self.predict_category].data['labels']
+
+    @property
+    def save_name(self):
+        return self.name + '_dgl_graph'
+
+    @property
+    def graph(self):
+        return self._hg
+
+    @property
+    def predict_category(self):
+        return self._predict_category
+
+    @property
+    def num_classes(self):
+        return self._num_classes
+
+    @property
+    def train_idx(self):
+        deprecate_property('dataset.train_idx', 'train_mask = g.ndata[\'train_mask\']')
+        return self._train_idx
+
+    @property
+    def test_idx(self):
+        deprecate_property('dataset.test_idx', 'train_mask = g.ndata[\'test_mask\']')
+        return self._test_idx
+
+    @property
+    def labels(self):
+        deprecate_property('dataset.labels', 'train_mask = g.ndata[\'labels\']')
+        return self._labels
 
     @abc.abstractmethod
     def parse_entity(self, term):
@@ -403,12 +451,6 @@ class RDFGraphDataset:
         """
         pass
 
-    @property
-    @abc.abstractmethod
-    def predict_category(self):
-        """Return the category name that has labels."""
-        pass
-
 def _get_id(dict, key):
     id = dict.get(key, None)
     if id is None:
@@ -487,7 +529,8 @@ class AIFBDataset(RDFGraphDataset):
                  verbose=True):
         url = _get_dgl_url('dataset/rdf/aifb-hetero.zip')
         name = 'aifb-hetero'
-        super(AIFB, self).__init__(url, name,
+        predict_category = 'Personen'
+        super(AIFBDataset, self).__init__(name, url, predict_category,
                                    print_every=print_every,
                                    insert_reverse=insert_reverse,
                                    raw_dir=raw_dir,
@@ -525,11 +568,7 @@ class AIFBDataset(RDFGraphDataset):
         person, _, label = line.strip().split('\t')
         return person, label
 
-    @property
-    def predict_category(self):
-        return 'Personen'
-
-AIBF = AIFBDataset
+AIFB = AIFBDataset
 
 
 class MUTAGDataset(RDFGraphDataset):
@@ -594,12 +633,13 @@ class MUTAGDataset(RDFGraphDataset):
                  verbose=True):
         url = _get_dgl_url('dataset/rdf/mutag-hetero.zip')
         name = 'mutag-hetero'
-        super(MUTAG, self).__init__(url, name,
-                                   print_every=print_every,
-                                   insert_reverse=insert_reverse,
-                                   raw_dir=raw_dir,
-                                   force_reload=force_reload,
-                                   verbose=verbose)
+        predict_category = 'd'
+        super(MUTAGDataset, self).__init__(name, url, predict_category,
+                                    print_every=print_every,
+                                    insert_reverse=insert_reverse,
+                                    raw_dir=raw_dir,
+                                    force_reload=force_reload,
+                                    verbose=verbose)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -648,10 +688,6 @@ class MUTAGDataset(RDFGraphDataset):
     def process_idx_file_line(self, line):
         bond, _, label = line.strip().split('\t')
         return bond, label
-
-    @property
-    def predict_category(self):
-        return 'd'
 
 MUTAG = MUTAGDataset
 
@@ -718,10 +754,13 @@ class BGSDataset(RDFGraphDataset):
                  verbose=True):
         url = _get_dgl_url('dataset/rdf/bgs-hetero.zip')
         name = 'bgs-hetero'
-        super(BGS, self).__init__(url, name,
-                                   force_reload=force_reload,
-                                   print_every=print_every,
-                                   insert_reverse=insert_reverse)
+        predict_category = 'Lexicon/NamedRockUnit'
+        super(BGSDataset, self).__init__(name, url, predict_category,
+                                  print_every=print_every,
+                                  insert_reverse=insert_reverse,
+                                  raw_dir=raw_dir,
+                                  force_reload=force_reload,
+                                  verbose=verbose)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -765,10 +804,6 @@ class BGSDataset(RDFGraphDataset):
     def process_idx_file_line(self, line):
         _, rock, label = line.strip().split('\t')
         return rock, label
-
-    @property
-    def predict_category(self):
-        return 'Lexicon/NamedRockUnit'
 
 BGS = BGSDataset
 
@@ -836,10 +871,13 @@ class AMDataset(RDFGraphDataset):
                  verbose=True):
         url = _get_dgl_url('dataset/rdf/am-hetero.zip')
         name = 'am-hetero'
-        super(AM, self).__init__(url, name,
-                                   force_reload=force_reload,
-                                   print_every=print_every,
-                                   insert_reverse=insert_reverse)
+        predict_category = 'proxy'
+        super(AMDataset, self).__init__(name, url, predict_category,
+                                 print_every=print_every,
+                                 insert_reverse=insert_reverse,
+                                 raw_dir=raw_dir,
+                                 force_reload=force_reload,
+                                 verbose=verbose)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -883,11 +921,7 @@ class AMDataset(RDFGraphDataset):
         proxy, _, label = line.strip().split('\t')
         return proxy, label
 
-    @property
-    def predict_category(self):
-        return 'proxy'
-
 AM = AMDataset
 
 if __name__ == '__main__':
-    AIFB()
+    dataset = AIFB()
