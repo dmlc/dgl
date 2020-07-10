@@ -25,6 +25,10 @@ def init_fn(collate_fn, mp_queue):
 
 
 def deregister_torch_ipc():
+    """
+    Deregister pytorch's multiprocessing communication optimization.
+    Currently dgl will meet error without this function
+    """
     from multiprocessing.reduction import ForkingPickler
     import torch
     ForkingPickler._extra_reducers.pop(torch.cuda.Event)
