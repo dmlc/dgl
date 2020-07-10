@@ -3,12 +3,12 @@ import numpy as np
 from mxnet import nd
 from ...sparse import _gspmm, _gsddmm
 from ...base import dgl_warning
-from .tensor import asnumpy, copy_to, zerocopy_from_numpy
+from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context
 
 def _scatter_nd(index, src, n_rows):
     assert index.shape == src.shape
     dgl_warning("MXNet do not support scatter_add, fallback to numpy.")
-    ctx = src.ctx
+    ctx = context(src)
     index = asnumpy(index)
     src = asnumpy(src)
     shp = index.shape
@@ -31,7 +31,7 @@ def _scatter_nd(index, src, n_rows):
     return rst
 
 def _gather_nd(index, src):
-    ctx = src.ctx
+    ctx = context(src)
     shp = index.shape
     ndim = src.ndim
     offsets = []
@@ -97,9 +97,10 @@ class GSpMM(mx.autograd.Function):
         return out
 
     def backward(self, dZ):
+        ctx = context(dZ)
         X, Y, argX, argY = self.saved_tensors
         gidx, op, reduce_op = self.gidx, self.op, self.reduce_op
-        dX, dY = None, None
+        dX, dY = nd.empty((), ctx=ctx), nd.empty((), ctx=ctx)
         if op != 'copy_e' and X.grad is not None:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
@@ -111,9 +112,10 @@ class GSpMM(mx.autograd.Function):
                     dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
             else:
                 if op in ['mul', 'div']:
-                    dX = _scatter_nd(argX,
-                                     _muldiv(op, _gather_nd(argY, Y.broadcast_to((Y.shape[0], *dZ.shape[1:])))) * dZ,
-                                     X.shape[0])
+                    dX = _scatter_nd(
+                        argX,
+                        _muldiv(op, _gather_nd(argY, Y.broadcast_to((Y.shape[0], *dZ.shape[1:])))) * dZ,
+                        X.shape[0])
                 elif op in ['add', 'sub', 'copy_u']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
             dX = _reduce_grad(dX, X.shape)
@@ -126,25 +128,19 @@ class GSpMM(mx.autograd.Function):
                     dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
                 if op in ['mul',  'div']:
-                    dY = _scatter_nd(argY, _gather_nd(argX, X.broadcast_to((X.shape[0], *dZ.shape[1:]))) * dZ, Y.shape[0])
+                    dY = _scatter_nd(
+                        argY,
+                        _gather_nd(argX, X.broadcast_to((X.shape[0], *dZ.shape[1:]))) * dZ,
+                        Y.shape[0])
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_e']:
                     dY = _scatter_nd(argY, _addsub(op, dZ), Y.shape[0])
             dY = _reduce_grad(dY, Y.shape)
         self.saved_tensors = None
-        if dX is None:
-            dX = nd.empty(())
-        if dY is None:
-            dY = nd.empty(())
-        self.saved_tensors = None
         return dX, dY
 
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     func = GSpMM(g, op, reduce_op)
-    if lhs_data is None:
-        lhs_data = nd.empty(())
-    if rhs_data is None:
-        rhs_data = nd.empty(())
     return func(lhs_data, rhs_data)
 
 class GSDDMM(mx.autograd.Function):
@@ -161,10 +157,11 @@ class GSDDMM(mx.autograd.Function):
         return out
 
     def backward(self, dZ):
+        ctx = context(dZ)
         X, Y = self.saved_tensors
         gidx, op = self.gidx, self.op
         lhs_target, rhs_target = self.lhs_target, self.rhs_target
-        dX, dY = None, None
+        dX, dY = nd.empty((), ctx=ctx), nd.empty((), ctx=ctx)
         if op != 'copy_rhs':
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if self.lhs_target == 'v' else gidx.reverse()
@@ -203,16 +200,9 @@ class GSDDMM(mx.autograd.Function):
                     dY = _gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
                     if op == 'div': dY = -dY / (Y ** 2)
             dY = _reduce_grad(dY, Y.shape)
-        if dX is None:
-            dX = nd.empty(())
-        if dY is None:
-            dY = nd.empty(())
+        self.saved_tensors = None
         return dX, dY
 
 def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     func = GSDDMM(g, op, lhs_target, rhs_target)
-    if lhs_data is None:
-        lhs_data = nd.empty(())
-    if rhs_data is None:
-        rhs_data = nd.empty(())
     return func(lhs_data, rhs_data)

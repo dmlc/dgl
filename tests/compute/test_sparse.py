@@ -66,7 +66,7 @@ udf_reduce = {
 }
 
 graphs = [
-    dgl.rand_graph(30, 0),
+#    dgl.rand_graph(30, 0),
     dgl.rand_graph(100, 30),
     dgl.rand_graph(100, 3000),
 #    dgl.rand_bipartite(80, 160, 3000)
@@ -206,4 +206,4 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
     if 'm' in g.edata: g.edata.pop('m')
 
 if __name__ == '__main__':
-    test_spmm(graphs[1], spmm_shapes[5], 'mul', 'max')
+    test_spmm(graphs[0], spmm_shapes[5], 'copy_u', 'sum')

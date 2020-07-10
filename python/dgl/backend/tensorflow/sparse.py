@@ -83,7 +83,7 @@ def gspmm_real(g, op, reduce_op, X, Y):
 
     def grad(dZ):
         dZ = tensor(dZ)
-        dX, dY = None, None
+        dX, dY = tf.zeros(()), tf.zeros(())
         if op != 'copy_e':
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
@@ -120,21 +120,12 @@ def gspmm_real(g, op, reduce_op, X, Y):
                 elif op in ['add', 'sub', 'copy_e']:
                     dY = _scatter_nd(argY, _addsub(op, dZ), Y.shape[0])
             dY = _reduce_grad(dY, Y.shape)
-        if dX is None:
-            dX = tf.zeros(())
-        if dY is None:
-            dY = tf.zeros(())
         return dX, dY
-
     return out, grad
 
 def gspmm(g, op, reduce_op, X, Y):
     @tf.custom_gradient
     def _lambda(X, Y):
-        if X is None:
-            X = tf.zeros(())
-        if Y is None:
-            Y = tf.zeros(())
         return gspmm_real(g, op, reduce_op, X, Y)
     return _lambda(X, Y)
 
@@ -143,7 +134,7 @@ def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
     out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
 
     def grad(dZ):
-        dX, dY = None, None
+        dX, dY = tf.zeros(()), tf.zeros(())
         if op != 'copy_rhs':
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if lhs_target == 'v' else gidx.reverse()
@@ -182,20 +173,11 @@ def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
                     dY = _gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
                     if op == 'div': dY = -dY / (Y ** 2)
             dY = _reduce_grad(dY, Y.shape)
-        if dX is None:
-            dX = tf.zeros(())
-        if dY is None:
-            dY = tf.zeros(())
         return dX, dY
-
     return out, grad
 
 def gsddmm(g, op, X, Y, lhs_target='u', rhs_target='v'):
     @tf.custom_gradient
     def _lambda(X, Y):
-        if X is None:
-            X = tf.zeros(())
-        if Y is None:
-            Y = tf.zeros(())
         return gsddmm_real(g, op, X, Y, lhs_target, rhs_target)
     return _lambda(X, Y)
