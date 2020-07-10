@@ -4,6 +4,8 @@ import os
 import re
 import pandas as pd
 import scipy.sparse as sp
+import dgl
+
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import download, extract_archive, get_download_dir
 from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
@@ -63,7 +65,7 @@ class MovieLensDataset(DGLBuiltinDataset):
         'ml-10m' : 'http://files.grouplens.org/datasets/movielens/ml-10m.zip',
     }
 
-    def __init__(self, name, node_feat=False, reverse=True, test_ratio=0.1, valid_ratio=0.1, symm=True
+    def __init__(self, name, node_feat=False, reverse=True, test_ratio=0.1, valid_ratio=0.1, symm=True,
         raw_dir=None, force_reload=False, verbose=True):
         assert name.lower() in ['ml-100k', 'ml-1m', 'ml-10m']
         self._node_feat = node_feat
@@ -72,24 +74,24 @@ class MovieLensDataset(DGLBuiltinDataset):
         self._valid_ratio = valid_ratio
         self._symm = symm
 
-        url = _get_dgl_url(self._urls[name])
+        url = self._urls[name]
         super(MovieLensDataset, self).__init__(name,
                                                url=url,
                                                raw_dir=raw_dir,
                                                force_reload=force_reload,
                                                verbose=verbose)
-    def process(self):
-        if self.name = 'ml-10m':
+    def process(self, path):
+        if self.name == 'ml-10m':
             root_folder = 'ml-10M100K'
         else:
-            root_folder = name
+            root_folder = self.name
         root_path = os.path.join(self.raw_dir, self.name, root_folder)
         
         if self.verbose:
             print("Starting processing {} ...".format(self.name))
 
-        self._load_raw_user_info()
-        self._load_raw_movie_info()
+        self._load_raw_user_info(root_path)
+        self._load_raw_movie_info(root_path)
 
         if self.verbose:
             print('......')
@@ -112,6 +114,7 @@ class MovieLensDataset(DGLBuiltinDataset):
         valid_rating_info = all_train_rating_info.iloc[shuffled_idx[: num_valid]]
         train_rating_info = all_train_rating_info.iloc[shuffled_idx[num_valid: ]]
         possible_rating_values = np.unique(train_rating_info["rating"].values)
+        self._possible_rating_values = possible_rating_values
 
         if self.verbose:
             print("All rating pairs : {}".format(all_rating_info.shape[0]))
@@ -122,11 +125,11 @@ class MovieLensDataset(DGLBuiltinDataset):
 
         self.user_info = self._drop_unseen_nodes(orign_info=self.user_info,
                                                  cmp_col_name="id",
-                                                 reserved_ids_set=set(self.all_rating_info["user_id"].values),
+                                                 reserved_ids_set=set(all_rating_info["user_id"].values),
                                                  label="user")
         self.movie_info = self._drop_unseen_nodes(orign_info=self.movie_info,
                                                   cmp_col_name="id",
-                                                  reserved_ids_set=set(self.all_rating_info["movie_id"].values),
+                                                  reserved_ids_set=set(all_rating_info["movie_id"].values),
                                                   label="movie")
 
         # Map user/movie to the global id
@@ -181,11 +184,15 @@ class MovieLensDataset(DGLBuiltinDataset):
         self._test_dec_graph = self._generate_dec_graph(test_rating_pairs)
         self._test_truths = F.tensor(test_rating_values)
 
-        self._possible_rating_values = possible_rating_values
         if self._node_feat:
             self._test_enc_graph.ndata['feat'] = {'user' : self.user_feature,
                                                   'movie' : self.movie_feature}
-
+            print(self.test_enc_graph.nodes['user'].data['feat'])
+            print(self.test_enc_graph.nodes['movie'].data['feat'])
+        self._train_dec_graph.edata['label'] = self._train_labels
+        self._train_dec_graph.edata['truth'] = self._train_truths
+        self._valid_dec_graph.edata['truth'] = self._valid_truths
+        self._test_dec_graph.edata['truth'] = self._test_truths
         def _npairs(graph):
             rst = 0
             for r in self.possible_rating_values:
@@ -233,13 +240,10 @@ class MovieLensDataset(DGLBuiltinDataset):
                                  self.save_name + '.pkl')
         graphs = [self.train_enc_graph, self.train_dec_graph, self.test_enc_graph, self.test_dec_graph]
         save_graphs(str(graph_path), graphs)
-        save_info(str(info_path), {'train_labels': F.asnumpy(self.train_labels),
-                                   'train_truths': F.asnumpy(self.train_truths),
-                                   'valid_truths': F.asnumpy(self.valid_truths),
-                                   'test_truths': F.asnumpy(self.test_truths),
-                                   'user_feature_shape': self.user_feature_shape,
+        save_info(str(info_path), {'user_feature_shape': self.user_feature_shape,
                                    'movie_feature_shape': self.movie_feature_shape,
-                                   'possible_rating_values': self.possible_rating_values})
+                                   'possible_rating_values': self.possible_rating_values,
+                                   'has_feat': self._node_feat})
 
     def load(self):
         graph_path = os.path.join(self.save_path,
@@ -255,15 +259,29 @@ class MovieLensDataset(DGLBuiltinDataset):
         self._test_dec_graph = graphs[3]
         info = load_info(str(info_path))
 
-        self._train_labels = F.tensor(info['train_labels'])
-        self._train_truths = F.tensor(info['train_truths'])
-        self._valid_truths = F.tensor(info['valid_truths'])
-        self._test_truths = F.tensor(info['test_truths'])
         self._user_feature_shape = info['user_feature_shape']
         self._movie_feature_shape = info['movie_feature_shape']
         self._possible_rating_values = info['possible_rating_values']
-        self._user_feature = self.test_enc_graph.nodes['user'].data['feat']
-        self._movie_feature = self.test_enc_graph.nodes['movie'].data['feat']
+        self._node_feat = info['has_feat']
+
+        # for backward compatability
+        self._train_labels = self._train_dec_graph.edata['label']
+        self._train_truths = self._train_dec_graph.edata['truth']
+        self._valid_truths = self._valid_dec_graph.edata['truth']
+        self._test_truths = self._test_dec_graph.edata['truth']
+        if self._node_feat:
+            self._user_feature = self.test_enc_graph.nodes['user'].data['feat']
+            self._movie_feature = self.test_enc_graph.nodes['movie'].data['feat']
+        else:
+            self._user_feature = None
+            self._movie_feature = None
+
+        def _npairs(graph):
+            rst = 0
+            for r in self.possible_rating_values:
+                r = str(r).replace('.', '_')
+                rst += graph.number_of_edges(str(r))
+            return rst
 
         if self.verbose:
             print("Train enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
@@ -293,8 +311,8 @@ class MovieLensDataset(DGLBuiltinDataset):
         rating_values = rating_info["rating"].values.astype(np.float32)
         return rating_pairs, rating_values
 
-    def _generate_enc_graph(self, train_rating_pairs, train_rating_values):
-        user_movie_R = np.zeros((self._num_user, self._num_movie), dtype=np.float32)
+    def _generate_enc_graph(self, rating_pairs, rating_values):
+        user_movie_R = np.zeros((self.num_user, self.num_movie), dtype=np.float32)
         user_movie_R[rating_pairs] = rating_values
         movie_user_R = user_movie_R.transpose()
 
@@ -306,9 +324,9 @@ class MovieLensDataset(DGLBuiltinDataset):
             rcol = rating_col[ridx]
             rating = str(rating).replace('.', '_')
             bg = dgl.bipartite((rrow, rcol), 'user', rating, 'movie',
-                               num_nodes=(self._num_user, self._num_movie))
+                               num_nodes=(self.num_user, self.num_movie))
             rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
-                               num_nodes=(self._num_movie, self._num_user))
+                               num_nodes=(self.num_movie, self.num_user))
             rating_graphs.append(bg)
             rating_graphs.append(rev_bg)
         graph = dgl.hetero_from_relations(rating_graphs)
@@ -350,6 +368,13 @@ class MovieLensDataset(DGLBuiltinDataset):
                              'movie': movie_cj}
 
         return graph
+
+    def _generate_dec_graph(self, rating_pairs):
+        ones = np.ones_like(rating_pairs[0])
+        user_movie_ratings_coo = sp.coo_matrix(
+            (ones, rating_pairs),
+            shape=(self.num_user, self.num_movie), dtype=np.float32)
+        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
 
     def _drop_unseen_nodes(self, orign_info, cmp_col_name, reserved_ids_set, label):
         # print("  -----------------")
@@ -394,7 +419,7 @@ class MovieLensDataset(DGLBuiltinDataset):
                    'ratings': np.float32, 'timestamp': np.int64}, engine='python')
         return rating_info
 
-    def _load_raw_user_info(self):
+    def _load_raw_user_info(self, root_path):
         """In MovieLens, the user attributes file have the following formats:
 
         ml-100k:
@@ -413,15 +438,15 @@ class MovieLensDataset(DGLBuiltinDataset):
         -------
         user_info : pd.DataFrame
         """
-        if self._name == 'ml-100k':
-            self.user_info = pd.read_csv(os.path.join(self._dir, 'u.user'), sep='|', header=None,
+        if self.name == 'ml-100k':
+            self.user_info = pd.read_csv(os.path.join(root_path, 'u.user'), sep='|', header=None,
                                     names=['id', 'age', 'gender', 'occupation', 'zip_code'], engine='python')
-        elif self._name == 'ml-1m':
-            self.user_info = pd.read_csv(os.path.join(self._dir, 'users.dat'), sep='::', header=None,
+        elif self.name == 'ml-1m':
+            self.user_info = pd.read_csv(os.path.join(root_path, 'users.dat'), sep='::', header=None,
                                     names=['id', 'gender', 'age', 'occupation', 'zip_code'], engine='python')
-        elif self._name == 'ml-10m':
+        elif self.name == 'ml-10m':
             rating_info = pd.read_csv(
-                os.path.join(self._dir, 'ratings.dat'), sep='::', header=None,
+                os.path.join(root_path, 'ratings.dat'), sep='::', header=None,
                 names=['user_id', 'movie_id', 'rating', 'timestamp'],
                 dtype={'user_id': np.int32, 'movie_id': np.int32, 'ratings': np.float32,
                        'timestamp': np.int64}, engine='python')
@@ -446,7 +471,7 @@ class MovieLensDataset(DGLBuiltinDataset):
         user_features : np.ndarray
 
         """
-        if self._name == 'ml-100k' or self._name == 'ml-1m':
+        if self.name == 'ml-100k' or self.name == 'ml-1m':
             ages = self.user_info['age'].values.astype(np.float32)
             gender = (self.user_info['gender'] == 'F').values.astype(np.float32)
             all_occupations = set(self.user_info['occupation'])
@@ -464,7 +489,7 @@ class MovieLensDataset(DGLBuiltinDataset):
             raise NotImplementedError
         return user_features
 
-    def _load_raw_movie_info(self):
+    def _load_raw_movie_info(self, root_path):
         """In MovieLens, the movie attributes may have the following formats:
 
         In ml_100k:
@@ -487,22 +512,22 @@ class MovieLensDataset(DGLBuiltinDataset):
             For ml-100k, the column name is ['id', 'title', 'release_date', 'video_release_date', 'url'] + [GENRES (19)]]
             For ml-1m and ml-10m, the column name is ['id', 'title'] + [GENRES (18/20)]]
         """
-        if self._name == 'ml-100k':
+        if self.name == 'ml-100k':
             GENRES = GENRES_ML_100K
-        elif self._name == 'ml-1m':
+        elif self.name == 'ml-1m':
             GENRES = GENRES_ML_1M
-        elif self._name == 'ml-10m':
+        elif self.name == 'ml-10m':
             GENRES = GENRES_ML_10M
         else:
             raise NotImplementedError
 
-        if self._name == 'ml-100k':
-            file_path = os.path.join(self._dir, 'u.item')
+        if self.name == 'ml-100k':
+            file_path = os.path.join(root_path, 'u.item')
             self.movie_info = pd.read_csv(file_path, sep='|', header=None,
                                           names=['id', 'title', 'release_date', 'video_release_date', 'url'] + GENRES,
                                           engine='python')
-        elif self._name == 'ml-1m' or self._name == 'ml-10m':
-            file_path = os.path.join(self._dir, 'movies.dat')
+        elif self.name == 'ml-1m' or self.name == 'ml-10m':
+            file_path = os.path.join(root_path, 'movies.dat')
             movie_info = pd.read_csv(file_path, sep='::', header=None,
                                      names=['id', 'title', 'genres'], engine='python')
             genre_map = {ele: i for i, ele in enumerate(GENRES)}
@@ -539,11 +564,11 @@ class MovieLensDataset(DGLBuiltinDataset):
         """
         import torchtext
 
-        if self._name == 'ml-100k':
+        if self.name == 'ml-100k':
             GENRES = GENRES_ML_100K
-        elif self._name == 'ml-1m':
+        elif self.name == 'ml-1m':
             GENRES = GENRES_ML_1M
-        elif self._name == 'ml-10m':
+        elif self.name == 'ml-10m':
             GENRES = GENRES_ML_10M
         else:
             raise NotImplementedError
@@ -569,6 +594,14 @@ class MovieLensDataset(DGLBuiltinDataset):
                                          self.movie_info[GENRES]),
                                         axis=1)
         return movie_features
+
+    @property
+    def num_user(self):
+        return self._num_user
+
+    @property
+    def num_movie(self):
+        return self._num_movie
 
     @property
     def save_name(self):
@@ -612,18 +645,22 @@ class MovieLensDataset(DGLBuiltinDataset):
 
     @property
     def train_labels(self):
+        deprecate_property('dataset.train_labels', 'train_dnc_graph.edata[\'label\']')
         return self._train_labels
 
     @property
     def train_truths(self):
+        deprecate_property('dataset.train_truths', 'train_dnc_graph.edata[\'truth\']')
         return self._train_truths
 
     @property
     def valid_truths(self):
+        deprecate_property('dataset.valid_truths', 'valid_dnc_graph.edata[\'truth\']')
         return self._valid_truths
 
     @property
     def test_truths(self):
+        deprecate_property('dataset.test_truths', 'test_dnc_graph.edata[\'truth\']')
         return self._test_truths
 
     @property
@@ -635,3 +672,347 @@ class MovieLensDataset(DGLBuiltinDataset):
     def movie_feature(self):
         deprecate_property('dataset.movie_feature', 'test_enc_graph.nodes[\'movie\'].data[\'feat\']')
         return self._movie_feature
+
+class MovieLen100kDataset(MovieLensDataset):
+    r""" MovieLen100k dataset.
+    
+    The dataset stores MovieLens ratings in two types 
+    of graphs. The encoder graph contains rating value 
+    information in the form of edge types. The decoder 
+    graph stores plain user-movie pairs in the form of 
+    a bipartite graph with no rating information. All 
+    graphs have two types of nodes: "user" and "movie".
+    
+    Statistics
+    ----------
+    Nodes: xxx
+    Edges: xxx
+    Number of relation types: xx
+    Number of reversed relation types: xx
+    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    
+    Parameters
+    ----------
+    node_feat: bool, optional
+        Whether to load node features for training. 
+        If no node feature provied, use one-hot node 
+        label instead. Default: False
+    reverse: bool, optional
+        Whether to add reverse edge for each edge.
+        Default: True
+    test_ratio: float
+        percentage of edges used as test set.
+    valid_ratio: float
+        percentage of edges used as validation set.
+    symm : bool, optional
+        If true, the use symmetric normalize constant. Otherwise, use left normalize
+        constant. (Default: True)
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+    
+    Returns
+    ----------
+    MovieLen100kDataset object with several properties:      
+        train_enc_graph: A Heterogeneous graph for training. It is
+            used for encoding node embeddings of users and movies.
+            It only contains the edges for training.
+            - nodes['user'].data['ci']: in-edges norm
+            - nodes['user'].data['cj']: out-edges norm
+            - nodes['movie'].data['ci']: in-edges norm
+            - nodes['movie'].data['cj']: out-edges norm
+        valid_enc_graph: A Heterogeneous graph for validation,
+            identical to train_enc_graph.
+        test_enc_graph: A Heterogeneous graph for testing. It is
+            used for encoding node embeddings of users and movies.
+            It contains all the edges for both training and testing.
+            - nodes['user'].data['ci']: in-edges norm
+            - nodes['user'].data['cj']: out-edges norm
+            - nodes['user'].data['feat']: if node_feat is True (node 
+                has input features), it store features of user nodes.
+            - nodes['movie'].data['ci']: in-edges norm
+            - nodes['movie'].data['cj']: out-edges norm
+            - nodes['movie'].data['feat']: if node_feat is True (node 
+                has input features), it store features of movie nodes.
+        train_dec_graph: A bipartite graph for training. It is used 
+            for generating the edge labels using the node embeddings 
+            generated by train_enc_graph.
+            - edata['label']: label of each edge.
+            - edata['truth']: the rating value of each edge.
+        valid_dec_graph: A bipartite graph for validation. It is used 
+            when predicting the rating values using the node embeddings 
+            generated by valid_enc_graph.
+            - edata['truth']: the rating value of each edge.
+        test_dec_graph: A bipartite graph for testing. It is used 
+            when predicting the rating values using the node embeddings 
+            generated by test_enc_graph.
+            - edata['truth']: the rating value of each edge.
+        possible_rating_values: The label to rating 
+            value mapping.
+        user_feature_shape: The shape of user feature
+        movie_feature_shape: The shape of movie feature
+    
+    Examples
+    ----------
+    
+    >>> dataset = MovieLen100kDataset()
+    >>>
+    >>> train_enc = dataset.train_enc_graph
+    >>> train_dec = dataset.train_dec_graph
+    >>> valid_enc = dataset.valid_enc_graph
+    >>> valid_dec = dataset.valid_dec_graph
+    >>> test_enc = dataset.test_enc_graph
+    >>> test_dec = dataset.test_dec_graph
+    >>> user_feat = test_enc.nodes['user'].data['feat']
+    >>> movie_feat = test_enc.nodes['movie'].data['feat']
+    >>>
+    >>> # Train, Validation and Test
+    >>>
+    """
+    def __init__(self, node_feat=False, reverse=True, test_ratio=0.1, valid_ratio=0.1, symm=True,
+        raw_dir=None, force_reload=False, verbose=True):
+
+        name = 'ml-100k'
+        super(MovieLen100kDataset, self).__init__(name=name,
+                                                  node_feat=node_feat,
+                                                  reverse=reverse,
+                                                  test_ratio=test_ratio,
+                                                  valid_ratio=valid_ratio,
+                                                  symm=symm,
+                                                  raw_dir=raw_dir,
+                                                  force_reload=force_reload,
+                                                  verbose=verbose)
+
+class MovieLen1MDataset(MovieLensDataset):
+    r""" MovieLen100k dataset.
+    
+    The dataset stores MovieLens ratings in two types 
+    of graphs. The encoder graph contains rating value 
+    information in the form of edge types. The decoder 
+    graph stores plain user-movie pairs in the form of 
+    a bipartite graph with no rating information. All 
+    graphs have two types of nodes: "user" and "movie".
+    
+    Statistics
+    ----------
+    Nodes: xxx
+    Edges: xxx
+    Number of relation types: xx
+    Number of reversed relation types: xx
+    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    
+    Parameters
+    ----------
+    node_feat: bool, optional
+        Whether to load node features for training. 
+        If no node feature provied, use one-hot node 
+        label instead. Default: False
+    reverse: bool, optional
+        Whether to add reverse edge for each edge.
+        Default: True
+    test_ratio: float
+        percentage of edges used as test set.
+    valid_ratio: float
+        percentage of edges used as validation set.
+    symm : bool, optional
+        If true, the use symmetric normalize constant. Otherwise, use left normalize
+        constant. (Default: True)
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+    
+    Returns
+    ----------
+    MovieLen1MDataset object with two properties:
+        train_enc_graph: A Heterogeneous graph for training. It is
+            used for encoding node embeddings of users and movies.
+            It only contains the edges for training.
+            - nodes['user'].data['ci']: in-edges norm
+            - nodes['user'].data['cj']: out-edges norm
+            - nodes['movie'].data['ci']: in-edges norm
+            - nodes['movie'].data['cj']: out-edges norm
+        valid_enc_graph: A Heterogeneous graph for validation,
+            identical to train_enc_graph.
+        test_enc_graph: A Heterogeneous graph for testing. It is
+            used for encoding node embeddings of users and movies.
+            It contains all the edges for both training and testing.
+            - nodes['user'].data['ci']: in-edges norm
+            - nodes['user'].data['cj']: out-edges norm
+            - nodes['user'].data['feat']: if node_feat is True (node 
+                has input features), it store features of user nodes.
+            - nodes['movie'].data['ci']: in-edges norm
+            - nodes['movie'].data['cj']: out-edges norm
+            - nodes['movie'].data['feat']: if node_feat is True (node 
+                has input features), it store features of movie nodes.
+        train_dec_graph: A bipartite graph for training. It is used 
+            for generating the edge labels using the node embeddings 
+            generated by train_enc_graph.
+            - edata['label']: label of each edge.
+            - edata['truth']: the rating value of each edge.
+        valid_dec_graph: A bipartite graph for validation. It is used 
+            when predicting the rating values using the node embeddings 
+            generated by valid_enc_graph.
+            - edata['truth']: the rating value of each edge.
+        test_dec_graph: A bipartite graph for testing. It is used 
+            when predicting the rating values using the node embeddings 
+            generated by test_enc_graph.
+            - edata['truth']: the rating value of each edge.
+        possible_rating_values: The label to rating 
+            value mapping.
+        user_feature_shape: The shape of user feature
+        movie_feature_shape: The shape of movie feature
+    
+    Examples
+    ----------
+    
+    >>> dataset = MovieLen1MDataset()
+    >>>
+    >>> train_enc = dataset.train_enc_graph
+    >>> train_dec = dataset.train_dec_graph
+    >>> valid_enc = dataset.valid_enc_graph
+    >>> valid_dec = dataset.valid_dec_graph
+    >>> test_enc = dataset.test_enc_graph
+    >>> test_dec = dataset.test_dec_graph
+    >>> user_feat = test_enc.nodes['user'].data['feat']
+    >>> movie_feat = test_enc.nodes['movie'].data['feat']
+    >>>
+    >>> # Train, Validation and Test
+    >>>
+
+    """
+    def __init__(self, node_feat=False, reverse=True, test_ratio=0.1, valid_ratio=0.1, symm=True,
+        raw_dir=None, force_reload=False, verbose=True):
+
+        name = 'ml-1m'
+        super(MovieLen1MDataset, self).__init__(name=name,
+                                                  node_feat=node_feat,
+                                                  reverse=reverse,
+                                                  test_ratio=test_ratio,
+                                                  valid_ratio=valid_ratio,
+                                                  symm=symm,
+                                                  raw_dir=raw_dir,
+                                                  force_reload=force_reload,
+                                                  verbose=verbose)
+
+class MovieLen10MDataset(MovieLensDataset):
+    r""" MovieLen10MDataset dataset.
+    
+    The dataset stores MovieLens ratings in two types 
+    of graphs. The encoder graph contains rating value 
+    information in the form of edge types. The decoder 
+    graph stores plain user-movie pairs in the form of 
+    a bipartite graph with no rating information. All 
+    graphs have two types of nodes: "user" and "movie".
+    
+    Statistics
+    ----------
+    Nodes: xxx
+    Edges: xxx
+    Number of relation types: xx
+    Number of reversed relation types: xx
+    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    
+    Parameters
+    ----------
+    node_feat: bool, optional
+        Whether to load node features for training. 
+        If no node feature provied, use one-hot node 
+        label instead. Default: False
+    reverse: bool, optional
+        Whether to add reverse edge for each edge.
+        Default: True
+    test_ratio: float
+        percentage of edges used as test set.
+    valid_ratio: float
+        percentage of edges used as validation set.
+    symm : bool, optional
+        If true, the use symmetric normalize constant. Otherwise, use left normalize
+        constant. (Default: True)
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+    
+    Returns
+    ----------
+    MovieLen10MDataset object with two properties:      
+        train_enc_graph: A Heterogeneous graph for training. It is
+            used for encoding node embeddings of users and movies.
+            It only contains the edges for training.
+            - nodes['user'].data['ci']: in-edges norm
+            - nodes['user'].data['cj']: out-edges norm
+            - nodes['movie'].data['ci']: in-edges norm
+            - nodes['movie'].data['cj']: out-edges norm
+        valid_enc_graph: A Heterogeneous graph for validation,
+            identical to train_enc_graph.
+        test_enc_graph: A Heterogeneous graph for testing. It is
+            used for encoding node embeddings of users and movies.
+            It contains all the edges for both training and testing.
+            - nodes['user'].data['ci']: in-edges norm
+            - nodes['user'].data['cj']: out-edges norm
+            - nodes['user'].data['feat']: if node_feat is True (node 
+                has input features), it store features of user nodes.
+            - nodes['movie'].data['ci']: in-edges norm
+            - nodes['movie'].data['cj']: out-edges norm
+            - nodes['movie'].data['feat']: if node_feat is True (node 
+                has input features), it store features of movie nodes.
+        train_dec_graph: A bipartite graph for training. It is used 
+            for generating the edge labels using the node embeddings 
+            generated by train_enc_graph.
+            - edata['label']: label of each edge.
+            - edata['truth']: the rating value of each edge.
+        valid_dec_graph: A bipartite graph for validation. It is used 
+            when predicting the rating values using the node embeddings 
+            generated by valid_enc_graph.
+            - edata['truth']: the rating value of each edge.
+        test_dec_graph: A bipartite graph for testing. It is used 
+            when predicting the rating values using the node embeddings 
+            generated by test_enc_graph.
+            - edata['truth']: the rating value of each edge.
+        possible_rating_values: The label to rating 
+            value mapping.
+        user_feature_shape: The shape of user feature
+        movie_feature_shape: The shape of movie feature
+    
+    Examples
+    ----------
+    
+    >>> dataset = MovieLen10MDataset()
+    >>>
+    >>> train_enc = dataset.train_enc_graph
+    >>> train_dec = dataset.train_dec_graph
+    >>> valid_enc = dataset.valid_enc_graph
+    >>> valid_dec = dataset.valid_dec_graph
+    >>> test_enc = dataset.test_enc_graph
+    >>> test_dec = dataset.test_dec_graph
+    >>> user_feat = test_enc.nodes['user'].data['feat']
+    >>> movie_feat = test_enc.nodes['movie'].data['feat']
+    >>>
+    >>> # Train, Validation and Test
+    >>>
+
+    """
+    def __init__(self, node_feat=False, reverse=True, test_ratio=0.1, valid_ratio=0.1, symm=True,
+        raw_dir=None, force_reload=False, verbose=True):
+
+        name = 'ml-10m'
+        super(MovieLen10MDataset, self).__init__(name=name,
+                                                  node_feat=node_feat,
+                                                  reverse=reverse,
+                                                  test_ratio=test_ratio,
+                                                  valid_ratio=valid_ratio,
+                                                  symm=symm,
+                                                  raw_dir=raw_dir,
+                                                  force_reload=force_reload,
+                                                  verbose=verbose)

@@ -19,6 +19,7 @@ from .bitcoinotc import BitcoinOTC
 from .gdelt import GDELT
 from .icews18 import ICEWS18
 from .qm7b import QM7b, QM7bDataset
+from .movielens import MovieLen100kDataset, MovieLen1MDataset, MovieLen10MDataset
 
 
 def register_data_args(parser):
