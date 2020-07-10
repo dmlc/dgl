@@ -4,7 +4,6 @@ import os
 import re
 import pandas as pd
 import scipy.sparse as sp
-import dgl
 
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import download, extract_archive, get_download_dir
@@ -12,6 +11,7 @@ from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _ge
 from .utils import generate_mask_tensor
 from .utils import deprecate_property, deprecate_function
 from ..utils import retry_method_with_fix
+from ..convert import bipartite, hetero_from_relations
 
 from .. import backend as F
 
@@ -323,13 +323,13 @@ class MovieLensDataset(DGLBuiltinDataset):
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
             rating = str(rating).replace('.', '_')
-            bg = dgl.bipartite((rrow, rcol), 'user', rating, 'movie',
-                               num_nodes=(self.num_user, self.num_movie))
-            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
+            bg = bipartite((rrow, rcol), 'user', rating, 'movie',
+                           num_nodes=(self.num_user, self.num_movie))
+            rev_bg = bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
                                num_nodes=(self.num_movie, self.num_user))
             rating_graphs.append(bg)
             rating_graphs.append(rev_bg)
-        graph = dgl.hetero_from_relations(rating_graphs)
+        graph = hetero_from_relations(rating_graphs)
 
         # sanity check
         assert len(rating_pairs[0]) == sum([graph.number_of_edges(et) for et in graph.etypes]) // 2
@@ -374,7 +374,7 @@ class MovieLensDataset(DGLBuiltinDataset):
         user_movie_ratings_coo = sp.coo_matrix(
             (ones, rating_pairs),
             shape=(self.num_user, self.num_movie), dtype=np.float32)
-        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
+        return bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
 
     def _drop_unseen_nodes(self, orign_info, cmp_col_name, reserved_ids_set, label):
         # print("  -----------------")
