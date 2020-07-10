@@ -12,12 +12,12 @@ import numpy as np
 
 from .. import backend as F
 
-from .dgl_dataset import DGLDataset
+from .dgl_dataset import DGLBuiltinDataset
 from .utils import loadtxt, save_graphs, load_graphs, save_info, load_info, download, extract_archive
 from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
-class GINDataset(DGLDataset):
+class GINDataset(DGLBuiltinDataset):
     """Datasets for Graph Isomorphism Network (GIN)
     Adapted from https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip.
 
