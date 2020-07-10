@@ -10,7 +10,6 @@ import numpy as np
 import time
 from utils import get_local_usable_addr
 from pathlib import Path
-import torch as th
 from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
 import pytest
 
@@ -22,6 +21,7 @@ class NeighborSampler(object):
         self.sample_neighbors = sample_neighbors
 
     def sample_blocks(self, seeds):
+        import torch as th
         seeds = th.LongTensor(np.asarray(seeds))
         blocks = []
         for fanout in self.fanouts:
@@ -44,6 +44,7 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients):
 
 def start_client(rank, tmpdir, disable_shared_mem, num_workers):
     import dgl
+    import torch as th
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
@@ -109,7 +110,7 @@ def main(tmpdir, num_server):
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-def test_dist_dataloader(tmp_dir):
+def test_dist_dataloader(tmpdir):
     main(Path(tmp_dir), 3)
 
 if __name__ == "__main__":
