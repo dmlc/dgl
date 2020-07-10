@@ -2,7 +2,7 @@ import dgl
 import unittest
 import os
 from dgl.data import CitationGraphDataset
-from dgl.distributed.sampling import sample_neighbors
+from dgl.distributed import sample_neighbors
 from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
 import multiprocessing as mp
@@ -12,6 +12,7 @@ from utils import get_local_usable_addr
 from pathlib import Path
 import torch as th
 from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
+import pytest
 
 
 class NeighborSampler(object):
@@ -105,6 +106,9 @@ def main(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
+# Wait non shared memory graph store
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_dist_dataloader(tmp_dir):
     main(Path(tmp_dir), 3)
 
