@@ -20,6 +20,7 @@ from . import ndarray as nd
 
 __all__ = [
     'line_graph',
+    'line_heterograph',
     'khop_adj',
     'khop_graph',
     'reverse',
@@ -161,6 +162,53 @@ def line_graph(g, backtracking=True, shared=False):
     graph_data = g._graph.line_graph(backtracking)
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
+
+def line_heterograph(g, backtracking=True):
+    """Return the line graph of this graph.
+
+    The graph should be an directed homogeneous graph. Aother type of graphs
+    are not supported right now.
+
+    All node features and edge features are not copied to the output
+
+    Parameters
+    ----------
+    backtracking : bool
+        Whether the pair of (v, u) (u, v) edges are treated as linked. Default True.
+
+    Returns
+    -------
+    G : DGLHeteroGraph
+        The line graph of this graph.
+
+    Examples:
+    A = [[0, 0, 1],
+            [1, 0, 1],
+            [1, 1, 0]]
+    >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows')
+    >>> lg = g.line_graph()
+    >>> lg
+    ... Graph(num_nodes=5, num_edges=8,
+    ... ndata_schemes={}
+    ... edata_schemes={})
+    >>> lg.edges()
+    ... (tensor([0, 0, 1, 2, 2, 3, 4, 4]), tensor([3, 4, 0, 3, 4, 0, 1, 2]))
+    >>>
+    >>> lg = g.line_graph(backtracking=False)
+    >>> lg
+    ... Graph(num_nodes=5, num_edges=4,
+    ... ndata_schemes={}
+    ... edata_schemes={})
+    >>> lg.edges()
+    ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
+
+    """
+    assert g.is_homograph(), \
+        'line_heterograph only support directed homogeneous graph right now'
+
+    hgidx = _CAPI_DGLHeteroLineGraph(g._graph, backtracking)
+    hg = DGLHeteroGraph(hgidx, g._etypes, g._ntypes)
+    return hg
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
