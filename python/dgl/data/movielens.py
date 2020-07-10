@@ -187,8 +187,6 @@ class MovieLensDataset(DGLBuiltinDataset):
         if self._node_feat:
             self._test_enc_graph.ndata['feat'] = {'user' : self.user_feature,
                                                   'movie' : self.movie_feature}
-            print(self.test_enc_graph.nodes['user'].data['feat'])
-            print(self.test_enc_graph.nodes['movie'].data['feat'])
         self._train_dec_graph.edata['label'] = self._train_labels
         self._train_dec_graph.edata['truth'] = self._train_truths
         self._valid_dec_graph.edata['truth'] = self._valid_truths
@@ -201,6 +199,7 @@ class MovieLensDataset(DGLBuiltinDataset):
             return rst
 
         if self.verbose:
+            print("Number of rating values {}: {}".format(len(self.possible_rating_values), self.possible_rating_values))
             print("Train enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
                 self.train_enc_graph.number_of_nodes('user'), self.train_enc_graph.number_of_nodes('movie'),
                 _npairs(self.train_enc_graph)))
@@ -232,7 +231,6 @@ class MovieLensDataset(DGLBuiltinDataset):
         return False
 
     def save(self):
-        """save the graph list and the labels"""
         """save the graph list and the labels"""
         graph_path = os.path.join(self.save_path,
                                   self.save_name + '.bin')
@@ -377,17 +375,16 @@ class MovieLensDataset(DGLBuiltinDataset):
         return bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
 
     def _drop_unseen_nodes(self, orign_info, cmp_col_name, reserved_ids_set, label):
-        # print("  -----------------")
-        # print("{}: {}(reserved) v.s. {}(from info)".format(label, len(reserved_ids_set),
-        #                                                      len(set(orign_info[cmp_col_name].values))))
         if reserved_ids_set != set(orign_info[cmp_col_name].values):
             pd_rating_ids = pd.DataFrame(list(reserved_ids_set), columns=["id_graph"])
-            # print("\torign_info: ({}, {})".format(orign_info.shape[0], orign_info.shape[1]))
+            if self.verbose:
+                print("\torign_info: ({}, {})".format(orign_info.shape[0], orign_info.shape[1]))
             data_info = orign_info.merge(pd_rating_ids, left_on=cmp_col_name, right_on='id_graph', how='outer')
             data_info = data_info.dropna(subset=[cmp_col_name, 'id_graph'])
             data_info = data_info.drop(columns=["id_graph"])
             data_info = data_info.reset_index(drop=True)
-            # print("\tAfter dropping, data shape: ({}, {})".format(data_info.shape[0], data_info.shape[1]))
+            if self.verbose:
+                print("\tAfter dropping, data shape: ({}, {})".format(data_info.shape[0], data_info.shape[1]))
             return data_info
         else:
             orign_info = orign_info.reset_index(drop=True)
@@ -685,11 +682,11 @@ class MovieLen100kDataset(MovieLensDataset):
     
     Statistics
     ----------
-    Nodes: xxx
-    Edges: xxx
-    Number of relation types: xx
-    Number of reversed relation types: xx
-    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    Nodes: user: 943, movie: 1682
+    Edges: 100000
+    Number of relation types: 5
+    Number of reversed relation types: 5
+    Label Split: Train: 72000 ,Valid: 8000, Test: 20000
     
     Parameters
     ----------
@@ -799,11 +796,11 @@ class MovieLen1MDataset(MovieLensDataset):
     
     Statistics
     ----------
-    Nodes: xxx
-    Edges: xxx
-    Number of relation types: xx
-    Number of reversed relation types: xx
-    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    Nodes: user: 6040, movie: 3706
+    Edges: 1000209
+    Number of relation types: 5
+    Number of reversed relation types: 5
+    Label Split: Train: 810169 ,Valid: 90019, Test: 100021
     
     Parameters
     ----------
@@ -914,11 +911,11 @@ class MovieLen10MDataset(MovieLensDataset):
     
     Statistics
     ----------
-    Nodes: xxx
-    Edges: xxx
-    Number of relation types: xx
-    Number of reversed relation types: xx
-    Label Split: Train: xxx ,Valid: xxx, Test: xxx
+    Nodes: user: 69878, movie: 10677
+    Edges: 10000054
+    Number of relation types: 10
+    Number of reversed relation types: 10
+    Label Split: Train: 8100043 ,Valid: 900005, Test: 1000006
     
     Parameters
     ----------
