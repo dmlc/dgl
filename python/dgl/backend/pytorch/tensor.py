@@ -34,7 +34,10 @@ def cpu():
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
-    return th.as_tensor(data, dtype=dtype)
+    if isinstance(data, th.Tensor):
+        return th.as_tensor(data, dtype=dtype, device=data.device)
+    else:
+        return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()

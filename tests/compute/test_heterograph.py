@@ -1851,10 +1851,10 @@ def test_edges_order():
                          F.copy_to(F.tensor([1, 1, 2, 2, 1]), F.cpu()))
 
 @parametrize_dtype
-def test_reverse(index_dtype):
+def test_reverse(idtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
-    }, index_dtype=index_dtype)
+    }, idtype=idtype, device=F.ctx())
     gidx = g._graph
     r_gidx = gidx.reverse()
 

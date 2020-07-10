@@ -64,7 +64,7 @@ def tensor(data, dtype=None):
         else:
             return tf.cast(data, dtype=dtype)
     else:
-        if isinstance(data, numbers.Integral):
+        if isinstance(data, numbers.Number):
             data = [data]
         return tf.convert_to_tensor(data, dtype=dtype)
 

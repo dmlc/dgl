@@ -923,7 +923,7 @@ def uniform(shape, dtype, ctx, low, high):
     pass
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
-    """Pads a packed batch of variable length tensors with given value.
+    r"""Pads a packed batch of variable length tensors with given value.
 
     Parameters
     ----------
@@ -947,7 +947,7 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     pass
 
 def pack_padded_tensor(input, lengths):
-    """Packs a tensor containing padded sequence of variable length.
+    r"""Packs a tensor containing padded sequence of variable length.
 
     Parameters
     ----------
