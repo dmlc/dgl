@@ -13,6 +13,7 @@ from .ppi import PPIDataset, LegacyPPIDataset
 from .tu import TUDataset, LegacyTUDataset
 from .gnn_benckmark import AmazonCoBuyComputerDataset, AmazonCoBuyPhotoDataset, CoauthorPhysicsDataset, \
     CoauthorCSDataset,CoraFullDataset, AmazonCoBuy, Coauthor, CoraFull
+from .knowledge_graph import FB15k237Dataset, FB15kDataset, WN18Dataset
 from .karate import KarateClubDataset, KarateClub
 from .gindt import GINDataset
 from .bitcoinotc import BitcoinOTC
