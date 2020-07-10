@@ -35,6 +35,52 @@ def test_line_graph():
     L.ndata['w'] = data
     assert F.allclose(G.edata['w'], data)
 
+@parametrize_dtype
+def test_hetero_linegraph(index_dtype):
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
+        'user', 'follows', index_dtype=index_dtype)
+    lg = dgl.line_heterograph(g)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 8
+    row, col = lg.edges()
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
+
+    lg = dgl.line_heterograph(g, backtracking=False)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 4
+    row, col = lg.edges()
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 1, 2, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([4, 0, 3, 1]))
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+        'user', 'follows', restrict_format='csr', index_dtype=index_dtype)
+    lg = dgl.line_heterograph(g)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 8
+    row, col = lg.edges()
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
+
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+        'user', 'follows', restrict_format='csc', index_dtype=index_dtype)
+    lg = dgl.line_heterograph(g)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 8
+    row, col, eid = lg.edges('all')
+    row = F.asnumpy(row)
+    col = F.asnumpy(col)
+    eid = F.asnumpy(eid).astype(int)
+    order = np.argsort(eid)
+    assert np.array_equal(row[order],
+                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
+    assert np.array_equal(col[order],
+                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
 def test_no_backtracking():
     N = 5
@@ -722,6 +768,7 @@ if __name__ == '__main__':
     # test_add_self_loop()
     # test_partition_with_halo()
     # test_metis_partition()
+    test_hetero_linegraph('int32')
     # test_compact()
     test_to_simple("int32")
     # test_in_subgraph("int32")

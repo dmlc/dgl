@@ -1494,6 +1494,31 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
   return GraphPtr(new dgl::ImmutableGraph(in_csr_ptr, out_csr_ptr, coo_ptr));
 }
 
+HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
+  // TODO(xiangsx) currently we only support homogeneous graph
+  auto fmt = SelectFormat(SparseFormat::kAny);
+  switch (fmt) {
+    case SparseFormat::kCOO: {
+      return CreateFromCOO(1, aten::COOLineGraph(coo_->adj(), backtracking), SparseFormat::kAny);
+    }
+    case SparseFormat::kCSR: {
+      const aten::CSRMatrix csr = GetCSRMatrix(0);
+      const aten::COOMatrix coo = aten::COOLineGraph(aten::CSRToCOO(csr, true), backtracking);
+      return CreateFromCOO(1, coo, SparseFormat::kAny);
+    }
+    case SparseFormat::kCSC: {
+      const aten::CSRMatrix csc = GetCSCMatrix(0);
+      const aten::CSRMatrix csr = aten::CSRTranspose(csc);
+      const aten::COOMatrix coo = aten::COOLineGraph(aten::CSRToCOO(csr, true), backtracking);
+      return CreateFromCOO(1, coo, SparseFormat::kAny);
+    }
+    default:
+      LOG(FATAL) << "None of CSC, CSR, COO exist";
+      break;
+  }
+  return nullptr;
+}
+
 constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
 
 bool UnitGraph::Load(dmlc::Stream* fs) {
