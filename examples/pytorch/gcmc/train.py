@@ -47,12 +47,12 @@ def evaluate(args, net, dataset, segment='valid'):
 
     if segment == "valid":
         rating_values = dataset.valid_truths.to(args.device)
-        enc_graph = dataset.valid_enc_graph
-        dec_graph = dataset.valid_dec_graph
+        enc_graph = dataset.valid_enc_graph.to(args.device)
+        dec_graph = dataset.valid_dec_graph.to(args.device)
     elif segment == "test":
         rating_values = dataset.test_truths.to(args.device)
-        enc_graph = dataset.test_enc_graph
-        dec_graph = dataset.test_dec_graph
+        enc_graph = dataset.test_enc_graph.to(args.device)
+        dec_graph = dataset.test_dec_graph.to(args.device)
     else:
         raise NotImplementedError
 
@@ -131,7 +131,8 @@ def train(args):
                         else dataset.user_feature.to(args.device)
     movie_feature = None if dataset.movie_feature is None \
                          else dataset.movie_feature.to(args.device)
-    print(train_dec_graph)
+    train_enc_graph = train_enc_graph.to(args.device)
+    train_dec_graph = train_dec_graph.to(args.device)
     print("Start training ...")
     dur = []
     for iter_idx in range(1, args.train_max_iter):
