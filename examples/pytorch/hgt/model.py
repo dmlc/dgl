@@ -138,12 +138,6 @@ class HeteroRGCNLayer(nn.Module):
 class HeteroRGCN(nn.Module):
     def __init__(self, G, in_size, hidden_size, out_size):
         super(HeteroRGCN, self).__init__()
-        # Use trainable node embeddings as featureless inputs.
-        embed_dict = {ntype : nn.Parameter(torch.Tensor(G.number_of_nodes(ntype), in_size))
-                      for ntype in G.ntypes}
-        for key, embed in embed_dict.items():
-            nn.init.xavier_uniform_(embed)
-        self.embed = nn.ParameterDict(embed_dict)
         # create layers
         self.layer1 = HeteroRGCNLayer(in_size, hidden_size, G.etypes)
         self.layer2 = HeteroRGCNLayer(hidden_size, out_size, G.etypes)
