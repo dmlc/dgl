@@ -317,9 +317,8 @@ def test_query(idtype):
     # test repr
     print(g)
 
-@parametrize_dtype
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU does not have COO impl.")
-def test_hypersparse(idtype):
+def test_hypersparse():
     N1 = 1 << 50        # should crash if allocated a CSR
     N2 = 1 << 48
 
@@ -327,7 +326,7 @@ def test_hypersparse(idtype):
         ('user', 'follows', 'user'): [(0, 1)],
         ('user', 'plays', 'game'): [(0, N2)]},
         {'user': N1, 'game': N1},
-        idtype=idtype, device=F.ctx())
+        idtype=F.int64, device=F.ctx())
     assert g.number_of_nodes('user') == N1
     assert g.number_of_nodes('game') == N1
     assert g.number_of_edges('follows') == 1

@@ -45,10 +45,12 @@ def tensor(data, dtype=None):
             return nd.cast(data, dtype)
     else:
         if isinstance(data, numbers.Number):
-            dtype = np.int64 if isinstance(data, numbers.Integral) else np.float32
             data = [data]
-        if dtype is None and isinstance(data, np.ndarray):
-            dtype = np.int32 if data.dtype == np.bool else data.dtype
+        if dtype is None:
+            if isinstance(data, np.ndarray):
+                dtype = np.int32 if data.dtype == np.bool else data.dtype
+            else:
+                dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
         return nd.array(data, dtype=dtype)
 
 def as_scalar(data):

@@ -2624,6 +2624,7 @@ class DGLHeteroGraph(object):
         if is_all(u):
             return dict(self._node_frames[ntid])
         else:
+            u = utils.prepare_tensor(self, u, 'u')
             u = utils.toindex(u, self._idtype_str)
             return self._node_frames[ntid].select_rows(u)
 
