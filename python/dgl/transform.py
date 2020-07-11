@@ -1256,11 +1256,11 @@ def out_subgraph(g, nodes):
     return ret
 
 def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True):
-    r"""Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
-    duplicate edges into one.
-    
+    r"""Convert a heterogeneous multigraph to a heterogeneous
+    simple graph, coalescing duplicate edges into one.
+
     For a heterograph with multiple edge types, we can
-    treat edges corresponding 
+    treat edges corresponding
     to each type as a separate graph and compute the
     `simple` for each of them.
     
@@ -1273,8 +1273,8 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     of tensor is returned using canonical edge types
     as the key.
 
-    Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
-    representing its simplified version.
+    Given a :class:`DGLGraph` object, we return another
+    :class:`DGLGraph` object representing its simplified version.
 
 
     Parameters
@@ -1282,15 +1282,17 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     g : DGLGraph
         The input graph.
     return_counts : str, optional
-        If given, the returned graph would have a column with the same name that stores
-        the number of duplicated edges from the original graph.
+        If given, the returned graph would have a column with
+        the same name that stores the number of duplicated edges
+        from the original graph.
     writeback_mapping: bool, optional
-        If True, a write back mapping is returned for each edge type subgraph.
-        If False, only the g is returned.
+        If True, a write back mapping is returned for each edge
+        type subgraph. If False, only the g is returned.
         (Default: Ture)
     share_ndata: bool, optional
-        If True, the node features of the reversed graph will be the same as the 
-        original graph. If False, the reversed graph will not have any node features. 
+        If True, the node features of the reversed graph will
+        be the same as the original graph. If False, the reversed
+        graph will not have any node features.
         (Default: True)
 
     Returns
@@ -1303,10 +1305,10 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
         graph has multiple edge types, a dictionary
         of tensor is return.
 
-        Examples
+    Examples
     --------
     **Homographs or Heterographs with A Single Edge Type**
-    
+
     Create a graph to simple. In the original graph, there are multiple edges between 1 and 2
 
     >>> import dgl
@@ -1314,9 +1316,9 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     >>> g = dgl.graph((th.tensor([0, 1, 2，1]), th.tensor([1, 2, 0，2])))
     >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
     >>> g.edata['h'] = th.tensor([[3.], [4.], [5.], [6.]])
-    
+
     to_simple the graph
-    
+
     >>> sg, wm = dgl.to_simple(g)
     >>> sg.ndata['h']
     tensor([[0.],
@@ -1333,10 +1335,10 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     tensor([0, 1, 2, 1])
     >>> 'h' in g.edata
     False
-    
+
     **In-place operations on features of one graph will be reflected on features of 
     its to_simple. Out-place operations will not be reflected.**
-    
+
     >>> sg.ndata['h'] += 1
     >>> g.ndata['h']
     tensor([[1.],
@@ -1350,22 +1352,22 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     >>> sg.ndata['h2'] = th.ones(3, 1)
     >>> 'h2' in g.ndata
     False
-    
+
     **Heterographs with Multiple Edge Types**
-    
+
     >>> g = dgl.heterograph({
     >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
     >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
     >>> })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
-    
+
     The to simple operation is applied to the subgraph
     corresponding to ('user', 'wins', 'user') and the
     subgraph corresponding to ('user', 'plays', 'game').
-    The return counts is stored in the edge feature 
+    The return counts is stored in the edge feature
     `cnt`
-    
+
     >>> sg, wm = dgl.to_simple(g, return_counts='cnt' share_ndata=False)
     >>> sg
     Graph(num_nodes={'game': 3, 'user': 3},
