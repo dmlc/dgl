@@ -1263,7 +1263,7 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     treat edges corresponding
     to each type as a separate graph and compute the
     `simple` for each of them.
-    
+
     Writeback mappings can be returned for each edge
     type subgraph. A writeback mapping is a tensor
     recording the edge ids in the `simpled` graph for
@@ -1336,7 +1336,7 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     >>> 'h' in g.edata
     False
 
-    **In-place operations on features of one graph will be reflected on features of 
+    **In-place operations on features of one graph will be reflected on features of
     its to_simple. Out-place operations will not be reflected.**
 
     >>> sg.ndata['h'] += 1
