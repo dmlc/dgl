@@ -9,7 +9,7 @@ from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
 from . import backend as F
-from .graph_index import from_coo
+from .graph_index import from_coo, from_edge_list
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
 from .convert import graph, bipartite
@@ -482,7 +482,37 @@ def reverse_heterograph(g, share_ndata=True, share_edata=False):
     >>> rg.edges['plays'].data
     {}
     """
-    return g.reverse(share_ndata=share_ndata, share_edata=share_edata)
+    # TODO(0.5 release, xiangsx) need to handle BLOCK
+    # currently reversing a block results in undfined behavior
+    canonical_etypes = g.canonical_etypes
+    meta_edges_src = []
+    meta_edges_dst = []
+    etypes = []
+    for c_etype in canonical_etypes:
+        meta_edges_src.append(g.get_ntype_id(c_etype[2]))
+        meta_edges_dst.append(g.get_ntype_id(c_etype[0]))
+        etypes.append(c_etype[1])
+    metagraph = from_edge_list((meta_edges_src, meta_edges_dst), True)
+    gidx = g._graph.reverse(metagraph)
+    new_g = DGLHeteroGraph(gidx, g.ntypes, etypes)
+
+    # handle ndata
+    if share_ndata:
+        # for each ntype
+        for ntype in g.ntypes:
+            # for each data field
+            for k in g.nodes[ntype].data:
+                new_g.nodes[ntype].data[k] = g.nodes[ntype].data[k]
+
+    # handle edata
+    if share_edata:
+        # for each ntype
+        for etype in canonical_etypes:
+            # for each data field
+            for k in g.edges[etype].data:
+                new_g.edges[etype].data[k] = g.edges[etype].data[k]
+
+    return new_g
 
 
 def to_simple_graph(g):

@@ -2066,66 +2066,6 @@ def test_reverse(index_dtype):
     assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
     assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
 
-    # test dgl.reverse_heterograph
-    g = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
-        ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
-        ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        }, index_dtype=index_dtype)
-    g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
-    g.nodes['user'].data['hh'] = F.tensor([1, 1, 1, 1, 1])
-    g.nodes['game'].data['h'] = F.tensor([0, 1])
-    g.edges['follows'].data['h'] = F.tensor([0, 1, 2, 4, 3 ,1, 3])
-    g.edges['follows'].data['hh'] = F.tensor([1, 2, 3, 2, 0, 0, 1])
-    g_r = dgl.reverse_heterograph(g)
-
-    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
-        assert etype_g[0] == etype_gr[2]
-        assert etype_g[1] == etype_gr[1]
-        assert etype_g[2] == etype_gr[0]
-        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
-    for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
-    assert F.array_equal(g.nodes['user'].data['h'], g_r.nodes['user'].data['h'])
-    assert F.array_equal(g.nodes['user'].data['hh'], g_r.nodes['user'].data['hh'])
-    assert F.array_equal(g.nodes['game'].data['h'], g_r.nodes['game'].data['h'])
-    assert len(g_r.edges['follows'].data) == 0
-    u_g, v_g, eids_g = g.all_edges(form='all', etype=('user', 'follows', 'user'))
-    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('user', 'follows', 'user'))
-    assert F.array_equal(u_g, v_rg)
-    assert F.array_equal(v_g, u_rg)
-    assert F.array_equal(eids_g, eids_rg)
-    u_g, v_g, eids_g = g.all_edges(form='all', etype=('user', 'plays', 'game'))
-    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('game', 'plays', 'user'))
-    assert F.array_equal(u_g, v_rg)
-    assert F.array_equal(v_g, u_rg)
-    assert F.array_equal(eids_g, eids_rg)
-    u_g, v_g, eids_g = g.all_edges(form='all', etype=('developer', 'develops', 'game'))
-    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('game', 'develops', 'developer'))
-    assert F.array_equal(u_g, v_rg)
-    assert F.array_equal(v_g, u_rg)
-    assert F.array_equal(eids_g, eids_rg)
-
-    g_r = dgl.reverse_heterograph(g, share_ndata=False)
-    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
-        assert etype_g[0] == etype_gr[2]
-        assert etype_g[1] == etype_gr[1]
-        assert etype_g[2] == etype_gr[0]
-        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
-    for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
-    assert len(g_r.nodes['user'].data) == 0
-    assert len(g_r.nodes['game'].data) == 0
-
-    g_r = dgl.reverse_heterograph(g, share_ndata=True, share_edata=True)
-    print(g_r)
-    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
-        assert etype_g[0] == etype_gr[2]
-        assert etype_g[1] == etype_gr[1]
-        assert etype_g[2] == etype_gr[0]
-        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
-    assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
-    assert F.array_equal(g.edges['follows'].data['hh'], g_r.edges['follows'].data['hh'])
 
 if __name__ == '__main__':
     # test_create()
