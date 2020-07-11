@@ -15,7 +15,7 @@ from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
 from .convert import graph, bipartite, heterograph
 from . import utils
-from .base import EID, NID
+from .base import EID, NID, DGLError
 from . import ndarray as nd
 
 
@@ -1838,7 +1838,7 @@ def add_reverse(g, ignore_bipartite=False):
         utype, _, vtype = canonical_etype
         if utype != vtype:
             if not ignore_bipartite:
-                raise DGLError('cannot add reverse edge for edge type %s' % canonical_etype)
+                raise DGLError('cannot add reverse edge for edge type %s' % (canonical_etype,))
             new_edges[canonical_etype] = g.edges(etype=canonical_etype, order='eid')
             edata[canonical_etype] = g.edges[canonical_etype].data
         else:
@@ -1853,7 +1853,7 @@ def add_reverse(g, ignore_bipartite=False):
     for canonical_etype in g.canonical_etypes:
         new_g.edges[canonical_etype].data.update(edata[canonical_etype])
 
-    return g
+    return new_g
 
 def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
     """Return a new graph with reverse edges added to the given graph as another edge type.
@@ -1917,11 +1917,13 @@ def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
         etype_rev = reverse_type_names.get(
             canonical_etype, reverse_type_names.get(etype, None))
         if etype_rev is None:
-            raise DGLError('cannot find the name of the reverse edge type of %s' % canonical_etype)
+            raise DGLError(
+                'cannot find the name of the reverse edge type of %s' %
+                (canonical_etype,))
 
         canonical_etype_rev = vtype, etype_rev, utype
         if canonical_etype_rev in g.canonical_etypes:
-            raise DGLError('edge type %s already exists in the graph' % canonical_etype)
+            raise DGLError('edge type %s already exists in the graph' % (canonical_etype,))
 
         src, dst = g.all_edges(etype=canonical_etype, order='eid')
         edges[canonical_etype] = src, dst
@@ -1936,6 +1938,6 @@ def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
     for etype, edata in etype_data.items():
         new_g.edges[etype].data.update(edata)
 
-    return g
+    return new_g
 
 _init_api("dgl.transform")
