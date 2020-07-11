@@ -39,19 +39,20 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
             for feat_name in edge_attrs[ety]:
                 assert F.allclose(g1.edges[ety].data[feat_name], g2.edges[ety].data[feat_name])
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-def test_batching_hetero_topology(index_dtype):
+def test_batching_hetero_topology(idtype):
     """Test batching two DGLHeteroGraphs where some nodes are isolated in some relations"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     bg = dgl.batch_hetero([g1, g2])
 
     assert bg.ntypes == g2.ntypes
@@ -104,12 +105,12 @@ def test_batching_hetero_topology(index_dtype):
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    }, index_dtype=index_dtype, restrict_format='csr')
+    }, idtype=idtype, restrict_format='csr')
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    }, index_dtype=index_dtype, restrict_format='csr')
+    }, idtype=idtype, restrict_format='csr')
     bg = dgl.batch_hetero([g1, g2])
 
     # Test number of nodes
@@ -157,12 +158,12 @@ def test_batching_hetero_topology(index_dtype):
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    }, index_dtype=index_dtype, restrict_format='csc')
+    }, idtype=idtype, restrict_format='csc')
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    }, index_dtype=index_dtype, restrict_format='csc')
+    }, idtype=idtype, restrict_format='csc')
     bg = dgl.batch_hetero([g1, g2])
 
     # Test number of nodes
@@ -205,22 +206,23 @@ def test_batching_hetero_topology(index_dtype):
     check_equivalence_between_heterographs(g1, g3)
     check_equivalence_between_heterographs(g2, g4)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-def test_batching_hetero_and_batched_hetero_topology(index_dtype):
+def test_batching_hetero_and_batched_hetero_topology(idtype):
     """Test batching a DGLHeteroGraph and a BatchedDGLHeteroGraph."""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     bg1 = dgl.batch_hetero([g1, g2])
     g3 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1)],
         ('user', 'plays', 'game'): [(1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     bg2 = dgl.batch_hetero([bg1, g3])
     assert bg2.ntypes == g3.ntypes
     assert bg2.etypes == g3.etypes
@@ -265,13 +267,14 @@ def test_batching_hetero_and_batched_hetero_topology(index_dtype):
     check_equivalence_between_heterographs(g2, g5)
     check_equivalence_between_heterographs(g3, g6)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-def test_batched_features(index_dtype):
+def test_batched_features(idtype):
     """Test the features of batched DGLHeteroGraphs"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g1.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g1.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
     g1.nodes['game'].data['h1'] = F.tensor([[0.]])
@@ -283,7 +286,7 @@ def test_batched_features(index_dtype):
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g2.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g2.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
     g2.nodes['game'].data['h1'] = F.tensor([[0.]])
@@ -323,14 +326,15 @@ def test_batched_features(index_dtype):
         node_attrs={'user': ['h1', 'h2'], 'game': ['h1', 'h2']},
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @unittest.skipIf(F.backend_name == 'mxnet', reason="MXNet does not support split array with zero-length segment.")
 @parametrize_dtype
-def test_batching_with_zero_nodes_edges(index_dtype):
+def test_batching_with_zero_nodes_edges(idtype):
     """Test the features of batched DGLHeteroGraphs"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): []
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g1.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g1.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
     g1.edges['follows'].data['h1'] = F.tensor([[0.], [1.]])
@@ -339,7 +343,7 @@ def test_batching_with_zero_nodes_edges(index_dtype):
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g2.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g2.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
     g2.nodes['game'].data['h1'] = F.tensor([[0.]])
@@ -377,19 +381,20 @@ def test_batching_with_zero_nodes_edges(index_dtype):
     g2.nodes['u'].data['x'] = F.tensor([1])
     dgl.batch_hetero([g1, g2])
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @parametrize_dtype
-def test_to_device(index_dtype):
+def test_to_device(idtype):
     g1 = dgl.heterograph({
         ('user', 'plays', 'game'): [(0, 0), (1, 1)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g1.nodes['user'].data['h1'] = F.copy_to(F.tensor([[0.], [1.]]), F.cpu())
     g1.nodes['user'].data['h2'] = F.copy_to(F.tensor([[3.], [4.]]), F.cpu())
     g1.edges['plays'].data['h1'] = F.copy_to(F.tensor([[2.], [3.]]), F.cpu())
 
     g2 = dgl.heterograph({
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g2.nodes['user'].data['h1'] = F.copy_to(F.tensor([[1.], [2.]]), F.cpu())
     g2.nodes['user'].data['h2'] = F.copy_to(F.tensor([[4.], [5.]]), F.cpu())
     g2.edges['plays'].data['h1'] = F.copy_to(F.tensor([[0.], [1.]]), F.cpu())
@@ -406,10 +411,10 @@ def test_to_device(index_dtype):
     # set feature
     g1 = dgl.heterograph({
         ('user', 'plays', 'game'): [(0, 0), (1, 1)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     g2 = dgl.heterograph({
         ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, index_dtype=index_dtype)
+    }, idtype=idtype)
     bg = dgl.batch_hetero([g1, g2])
     if F.is_cuda_available():
         bg1 = bg.to(F.cuda())

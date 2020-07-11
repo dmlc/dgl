@@ -1,6 +1,7 @@
 import random
 import sys
 import time
+import unittest
 
 import dgl
 import networkx as nx
@@ -17,8 +18,9 @@ def toset(x):
     # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-def test_bfs(index_dtype, n=100):
+def test_bfs(idtype, n=100):
     def _bfs_nx(g_nx, src):
         edges = nx.bfs_edges(g_nx, src)
         layers_nx = [set([src])]
@@ -43,7 +45,7 @@ def test_bfs(index_dtype, n=100):
     g = dgl.DGLGraph()
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     g.from_scipy_sparse_matrix(a)
-    if index_dtype == 'int32':
+    if idtype == 'int32':
         g = dgl.graph(g.edges()).int()
     else:
         g = dgl.graph(g.edges()).long()
@@ -58,7 +60,7 @@ def test_bfs(index_dtype, n=100):
     g_nx = nx.random_tree(n, seed=42)
     g = dgl.DGLGraph()
     g.from_networkx(g_nx)
-    if index_dtype == 'int32':
+    if idtype == 'int32':
         g = dgl.graph(g.edges()).int()
     else:
         g = dgl.graph(g.edges()).long()
@@ -69,13 +71,14 @@ def test_bfs(index_dtype, n=100):
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-def test_topological_nodes(index_dtype, n=100):
+def test_topological_nodes(idtype, n=100):
     g = dgl.DGLGraph()
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     b = sp.tril(a, -1).tocoo()
     g.from_scipy_sparse_matrix(b)
-    if index_dtype == 'int32':
+    if idtype == 'int32':
         g = dgl.graph(g.edges()).int()
     else:
         g = dgl.graph(g.edges()).long()
@@ -101,12 +104,13 @@ def test_topological_nodes(index_dtype, n=100):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-def test_dfs_labeled_edges(index_dtype, example=False):
+def test_dfs_labeled_edges(idtype, example=False):
     dgl_g = dgl.DGLGraph()
     dgl_g.add_nodes(6)
     dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])
-    if index_dtype == 'int32':
+    if idtype == 'int32':
         dgl_g = dgl.graph(dgl_g.edges()).int()
     else:
         dgl_g = dgl.graph(dgl_g.edges()).long()
@@ -141,6 +145,6 @@ def test_dfs_labeled_edges(index_dtype, example=False):
         assert False
 
 if __name__ == '__main__':
-    test_bfs(index_dtype='int32')
-    test_topological_nodes(index_dtype='int32')
-    test_dfs_labeled_edges(index_dtype='int32')
+    test_bfs(idtype='int32')
+    test_topological_nodes(idtype='int32')
+    test_dfs_labeled_edges(idtype='int32')

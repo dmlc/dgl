@@ -3,6 +3,7 @@ import pytest
 import networkx as nx
 import backend as F
 import numpy as np 
+from utils import parametrize_dtype
 
 np.random.seed(42)
 dgl.random.seed(42)
@@ -70,7 +71,9 @@ sddmm_shapes = [
 @pytest.mark.parametrize('shp', spmm_shapes)
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_u', 'copy_e'])
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
-def test_spmm(g, shp, msg, reducer):
+@parametrize_dtype
+def test_spmm(idtype, g, shp, msg, reducer):
+    g = g.astype(idtype).to(F.ctx())
     print(g)
     u = _rand_operand_1((g.number_of_src_nodes(),) + shp[0])
     e = _rand_operand_2((g.number_of_edges(),) + shp[1])
@@ -96,7 +99,9 @@ def test_spmm(g, shp, msg, reducer):
 @pytest.mark.parametrize('g', graphs)
 @pytest.mark.parametrize('shp', sddmm_shapes)
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_u'])
-def test_sddmm(g, shp, msg):
+@parametrize_dtype
+def test_sddmm(idtype, g, shp, msg):
+    g = g.astype(idtype).to(F.ctx())
     if dgl.backend.backend_name == 'mxnet' and g.number_of_edges() == 0:
         pytest.skip()   # mxnet do not support zero shape tensor
     print(g)

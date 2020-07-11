@@ -3987,10 +3987,8 @@ class DGLHeteroGraph(object):
         """
         local_node_frames = [fr.clone() for fr in self._node_frames]
         local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        ret = copy.copy(self)
-        ret._node_frames = local_node_frames
-        ret._edge_frames = local_edge_frames
-        return ret
+        return DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
+                              local_node_frames, local_edge_frames)
 
     @contextmanager
     def local_scope(self):
