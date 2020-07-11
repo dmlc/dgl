@@ -54,6 +54,6 @@ DGLDEVICE DGLINLINE T Selector<2>::Call(T src, T edge, T dst) {
   return dst;
 }
 
-}
+}  // namespace dgl
 
 #endif  // DGL_SELECTOR_H_
