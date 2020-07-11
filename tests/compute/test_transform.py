@@ -766,8 +766,8 @@ def test_add_reverse():
     def _check(g, new_g):
         AA_x = g.edges['AA'].data['x']
         BB_x = g.edges['BB'].data['x']
-        assert new_g.ntypes == g.ntypes
-        assert new_g.canonical_etypes == g.canonical_etypes
+        assert set(new_g.ntypes) == set(g.ntypes)
+        assert set(new_g.canonical_etypes) == set(g.canonical_etypes)
         assert new_g.number_of_nodes('A') == 4
         assert new_g.number_of_nodes('B') == 5
         src_AA, dst_AA = new_g.all_edges(etype='AA', order='eid')
