@@ -1831,7 +1831,7 @@ def add_reverse(g, ignore_bipartite=False):
     (tensor([1, 2, 3, 2, 3, 4]), tensor([2, 3, 4, 1, 2, 3]))
     """
     new_edges = {}
-    num_nodes_dict = {g.number_of_nodes(ntype) for ntype in g.ntypes}
+    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
     edata = {}
 
     for canonical_etype in g.canonical_etypes:
@@ -1911,7 +1911,7 @@ def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
 
     etype_data = {}
     edges = {}
-    num_nodes_dict = {g.number_of_nodes(ntype) for ntype in g.ntypes}
+    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
     for canonical_etype in g.canonical_etypes:
         utype, etype, vtype = canonical_etype
         etype_rev = reverse_type_names.get(
