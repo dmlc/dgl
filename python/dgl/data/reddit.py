@@ -87,13 +87,13 @@ class RedditDataset(DGLBuiltinDataset):
                                             force_reload=force_reload,
                                             verbose=verbose)
 
-    def process(self, root_path):
+    def process(self):
         # graph
         coo_adj = sp.load_npz(os.path.join(
-            root_path, "reddit{}_graph.npz".format(self._self_loop_str)))
+            self.raw_path, "reddit{}_graph.npz".format(self._self_loop_str)))
         self._graph = DGLGraph(coo_adj, readonly=True)
         # features and labels
-        reddit_data = np.load(os.path.join(root_path, "reddit_data.npz"))
+        reddit_data = np.load(os.path.join(self.raw_path, "reddit_data.npz"))
         features = reddit_data["feature"]
         labels = reddit_data["label"]
         # tarin/val/test indices
