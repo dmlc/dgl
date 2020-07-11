@@ -488,21 +488,21 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
                      NullArray(dtype, ctx), NullArray(dtype, ctx));
 
   // First slice rows
-  const auto& subcsr = CSRSliceRows(csr, rows);
+  csr = CSRSliceRows(csr, rows);
 
-  if (subcsr.indices->shape[0] == 0)
+  if (csr.indices->shape[0] == 0)
     return CSRMatrix(new_nrows, new_ncols,
                      Full(0, new_nrows + 1, nbits, ctx),
                      NullArray(dtype, ctx), NullArray(dtype, ctx));
 
   // Generate a 0-1 mask for matched (row, col) positions.
-  IdArray mask = Full(0, subcsr.indices->shape[0], nbits, ctx);
+  IdArray mask = Full(0, csr.indices->shape[0], nbits, ctx);
   // A count for how many masked values per row.
-  IdArray count = NewIdArray(subcsr.num_rows, ctx, nbits);
-  const int nt = cuda::FindNumThreads(subcsr.num_rows);
-  const int nb = (subcsr.num_rows + nt - 1) / nt;
+  IdArray count = NewIdArray(csr.num_rows, ctx, nbits);
+  const int nt = cuda::FindNumThreads(csr.num_rows);
+  const int nb = (csr.num_rows + nt - 1) / nt;
   _SegmentMaskColKernel<<<nb, nt, 0, thr_entry->stream>>>(
-    subcsr.indptr.Ptr<IdType>(), subcsr.indices.Ptr<IdType>(), subcsr.num_rows,
+    csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), csr.num_rows,
     cols.Ptr<IdType>(), cols->shape[0],
     mask.Ptr<IdType>(), count.Ptr<IdType>());
 
@@ -516,8 +516,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   IdArray ret_indptr = CumSum(count, true);
   
   // Column & data can be obtained by index select.
-  IdArray ret_col = IndexSelect(subcsr.indices, idx);
-  IdArray ret_data = CSRHasData(subcsr)? IndexSelect(subcsr.data, idx) : idx;
+  IdArray ret_col = IndexSelect(csr.indices, idx);
+  IdArray ret_data = CSRHasData(csr)? IndexSelect(csr.data, idx) : idx;
 
   // Relabel column
   IdArray col_hash = NewIdArray(csr.num_cols, ctx, nbits);
