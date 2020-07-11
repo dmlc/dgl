@@ -101,30 +101,30 @@ class GSpMM(mx.autograd.Function):
         X, Y, argX, argY = self.saved_tensors
         gidx, op, reduce_op = self.gidx, self.op, self.reduce_op
         dX, dY = nd.empty((), ctx=ctx), nd.empty((), ctx=ctx)
-        if op != 'copy_e' and X.grad is not None:
+        if op != 'copy_rhs' and X.grad is not None:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dX = _gspmm(g_rev, '*', 'sum', dZ, _muldiv(op, Y))[0]
                 elif op in ['add', 'sub']:
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
-                elif op == 'copy_u':
-                    dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
+                elif op == 'copy_lhs':
+                    dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)[0]
             else:
                 if op in ['mul', 'div']:
                     dX = _scatter_nd(
                         argX,
                         _muldiv(op, _gather_nd(argY, Y.broadcast_to((Y.shape[0], *dZ.shape[1:])))) * dZ,
                         X.shape[0])
-                elif op in ['add', 'sub', 'copy_u']:
+                elif op in ['add', 'sub', 'copy_lhs']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
             dX = _reduce_grad(dX, X.shape)
-        if op != 'copy_u' and Y.grad is not None:
+        if op != 'copy_lhs' and Y.grad is not None:
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dY = _gsddmm(gidx, '*', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)
-                elif op in ['add', 'sub', 'copy_e']:
+                elif op in ['add', 'sub', 'copy_rhs']:
                     dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
                 if op in ['mul',  'div']:
@@ -133,7 +133,7 @@ class GSpMM(mx.autograd.Function):
                         _gather_nd(argX, X.broadcast_to((X.shape[0], *dZ.shape[1:]))) * dZ,
                         Y.shape[0])
                     if op == 'div': dY = -dY / (Y ** 2)
-                elif op in ['add', 'sub', 'copy_e']:
+                elif op in ['add', 'sub', 'copy_rhs']:
                     dY = _scatter_nd(argY, _addsub(op, dZ), Y.shape[0])
             dY = _reduce_grad(dY, Y.shape)
         self.saved_tensors = None
@@ -166,12 +166,12 @@ class GSDDMM(mx.autograd.Function):
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if self.lhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_lhs']:
-                    dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0]
+                    dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0]
                 else:  # mul, div, dot
                     if rhs_target == lhs_target:
-                        dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0] * _muldiv(op, Y)
+                        dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0] * _muldiv(op, Y)
                     elif self.rhs_target == 'e':
-                        dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ * _muldiv(op, Y))[0]
+                        dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * _muldiv(op, Y))[0]
                     else:  # rhs_target = !lhs_target
                         dX = _gspmm(_gidx, 'mul', 'sum', _muldiv(op, Y), dZ)[0]
             else:  # lhs_target == 'e'
@@ -184,12 +184,12 @@ class GSDDMM(mx.autograd.Function):
             if self.rhs_target in ['u', 'v']:
                 _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_rhs']:
-                    dY = _gspmm(_gidx, 'copy_e', 'sum', None, _addsub(op, dZ))[0]
+                    dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))[0]
                 else:  # mul, div, dot
                     if lhs_target == rhs_target:
-                        dY = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0] * X
+                        dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0] * X
                     elif self.lhs_target == 'e':
-                        dY = _gspmm(_gidx, 'copy_e', 'sum', None, dZ * X)[0]
+                        dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)[0]
                     else:  # rhs_target = !lhs_target
                         dY = _gspmm(_gidx, 'mul', 'sum', X, dZ)[0]
                     if op == 'div': dY = -dY / (Y ** 2)

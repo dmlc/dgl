@@ -22,7 +22,7 @@ def infer_broadcast_shape(op, shp1, shp2):
     Parameters
     ----------
     op : str
-        The binary op's name, could be `add`, `sub`, `mul`, `div`, `dot`, `copy_u`, `copy_e`.
+        The binary op's name, could be `add`, `sub`, `mul`, `div`, `dot`, `copy_lhs`, `copy_rhs`.
     shp1 : tuple[int]
         The shape of lhs operand.
     shp2 : tuple[int]
@@ -62,23 +62,6 @@ def to_dgl_nd(x):
 def to_dgl_nd_for_write(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
-# map alias of operator name to its actually name that backend could recognize.
-op_mapping = {
-    '+': 'add',
-    '-': 'sub',
-    '*': 'mul',
-    '/': 'div',
-    'add': 'add',
-    'sub': 'sub',
-    'mul': 'mul',
-    'div': 'div',
-    'dot': 'dot',
-    'copy_u': 'copy_lhs',
-    'copy_e': 'copy_rhs',
-    'copy_lhs': 'copy_lhs',
-    'copy_rhs': 'copy_rhs',
-}
-
 target_mapping = {
     'u': 0,
     'e': 1,
@@ -108,14 +91,14 @@ def _gspmm(gidx, op, reduce_op, u, e):
     gidx : HeteroGraphIndex
         The input graph index.
     op : str
-        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``copy_u``,
-        ``copy_e``, or their alias ``+``, ``-``, ``*``, ``/``.
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``copy_lhs``,
+        ``copy_rhs``.
     reduce_op : str
         Reduce operator, could be ``sum``, ``max``, ``min``.
     u : tensor or None
-        The feature on source nodes, could be None if op is ``copy_e``.
+        The feature on source nodes, could be None if op is ``copy_rhs``.
     e : tensor or None
-        The feature on edges, could be None if op is ``copy_u``.
+        The feature on edges, could be None if op is ``copy_lhs``.
 
     Returns
     -------
@@ -133,7 +116,6 @@ def _gspmm(gidx, op, reduce_op, u, e):
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
-    op = op_mapping[op]
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
     if use_u:
@@ -189,7 +171,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         The input graph index.
     op : str
         Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
-        ``copy_lhs``, ``copy_rhs``, or their alias ``+``, ``-``, ``*``, ``/``.
+        ``copy_lhs``, ``copy_rhs``.
     lhs : tensor or None
         Left hand operand.
     rhs : tensor or None
@@ -214,7 +196,6 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
-    op = op_mapping[op]
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
     if use_lhs:

@@ -84,30 +84,30 @@ def gspmm_real(g, op, reduce_op, X, Y):
     def grad(dZ):
         dZ = tensor(dZ)
         dX, dY = tf.zeros(()), tf.zeros(())
-        if op != 'copy_e':
+        if op != 'copy_rhs':
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dX = _gspmm(g_rev, '*', 'sum', dZ, _muldiv(op, Y))[0]
                 elif op in ['add', 'sub']:
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
-                elif op == 'copy_u':
-                    dX = _gspmm(g_rev, 'copy_u', 'sum', dZ, None)[0]
+                elif op == 'copy_lhs':
+                    dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)[0]
             else:
                 if op in ['mul', 'div']:
                     dX = _scatter_nd(
                         argX,
                         _muldiv(op, _gather_nd(argY, tf.broadcast_to(Y, (Y.shape[0], *dZ.shape[1:])))) * dZ,
                         X.shape[0])
-                elif op in ['add', 'sub', 'copy_u']:
+                elif op in ['add', 'sub', 'copy_lhs']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
             dX = _reduce_grad(dX, X.shape)
-        if op != 'copy_u':
+        if op != 'copy_lhs':
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dY = _gsddmm(gidx, '*', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)
-                elif op in ['add', 'sub', 'copy_e']:
+                elif op in ['add', 'sub', 'copy_rhs']:
                     dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
                 out_shp = (Y.shape[0],) + dZ.shape[1:]
@@ -117,7 +117,7 @@ def gspmm_real(g, op, reduce_op, X, Y):
                         _gather_nd(argX, tf.broadcast_to(X, (X.shape[0], *dZ.shape[1:]))) * dZ,
                         Y.shape[0])
                     if op == 'div': dY = -dY / (Y ** 2)
-                elif op in ['add', 'sub', 'copy_e']:
+                elif op in ['add', 'sub', 'copy_rhs']:
                     dY = _scatter_nd(argY, _addsub(op, dZ), Y.shape[0])
             dY = _reduce_grad(dY, Y.shape)
         return dX, dY
@@ -139,12 +139,12 @@ def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if lhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_lhs']:
-                    dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0]
+                    dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0]
                 else:  # mul, div, dot
                     if rhs_target == lhs_target:
-                        dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0] * _muldiv(op, Y)
+                        dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0] * _muldiv(op, Y)
                     elif rhs_target == 'e':
-                        dX = _gspmm(_gidx, 'copy_e', 'sum', None, dZ * _muldiv(op, Y))[0]
+                        dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * _muldiv(op, Y))[0]
                     else:  # rhs_target = !lhs_target
                         dX = _gspmm(_gidx, 'mul', 'sum', _muldiv(op, Y), dZ)[0]
             else:  # lhs_target == 'e'
@@ -157,12 +157,12 @@ def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
             if rhs_target in ['u', 'v']:
                 _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_rhs']:
-                    dY = _gspmm(_gidx, 'copy_e', 'sum', None, _addsub(op, dZ))[0]
+                    dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))[0]
                 else:  # mul, div, dot
                     if lhs_target == rhs_target:
-                        dY = _gspmm(_gidx, 'copy_e', 'sum', None, dZ)[0] * X
+                        dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0] * X
                     elif lhs_target == 'e':
-                        dY = _gspmm(_gidx, 'copy_e', 'sum', None, dZ * X)[0]
+                        dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)[0]
                     else:  # rhs_target = !lhs_target
                         dY = _gspmm(_gidx, 'mul', 'sum', X, dZ)[0]
                     if op == 'div': dY = -dY / (Y ** 2)

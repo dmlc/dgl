@@ -7,6 +7,7 @@ import importlib
 
 from . import backend
 from .set_default_backend import set_default_backend
+from itertools import product
 
 _enabled_apis = set()
 
@@ -18,6 +19,67 @@ def _gen_missing_api(api, mod_name):
                           ' the DGLBACKEND environment.' % (api, mod_name))
     return _missing_api
 
+def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
+    name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)
+    docstring = """Generalized SDDMM function that computes"""
+
+    def func(g, x, y):
+        return gsddmm(g, binary_op, x, y,
+                      lhs_target=lhs_target, rhs_target=rhs_target)
+    func.__name__ = name
+    func.__doc__ = docstring
+    return func
+
+def _gen_spmm_func(binary_op, reduce_op):
+    name = "u_{}_e_{}".format(binary_op, reduce_op)
+    docstring = """Generalized SpMM function that computes ..."""
+
+    def func(g, x, y):
+        return gspmm(g, binary_op, reduce_op, x, y)
+    func.__name__ = name
+    func.__doc__ = docstring
+    return func
+
+def _gen_copy_reduce_func(binary_op, reduce_op):
+    name = "{}_{}".format(binary_op, reduce_op)
+    docstring = """Copy reduce function..."""
+
+    def func(g, x):
+        if binary_op == 'copy_u':
+            return gspmm(g, 'copy_lhs', reduce_op, x, None)
+        else:
+            return gspmm(g, 'copy_rhs', reduce_op, None, x)
+
+    func.__name__ = name
+    func.__doc__ = docstring
+    return func
+
+def _register_sddmm_func(mod):
+    """Register sddmm functions"""
+    target = ["u", "v", "e"]
+    for lhs, rhs in product(target, target):
+        if lhs != rhs:
+            for binary_op in ["add", "sub", "mul", "div", "dot"]:
+                func = _gen_sddmm_func(lhs, rhs, binary_op)
+                setattr(mod, func.__name__, func)
+                #__all__.append(func.__name__)
+
+def _register_spmm_func(mod):
+    """Register spmm functions"""
+    for binary_op in ["add", "sub", "mul", "div", "copy_u", "copy_e"]:
+        for reduce_op in ["sum", "max", "min"]:
+            if binary_op.startswith("copy"):
+                func = _gen_copy_reduce_func(binary_op, reduce_op)
+            else:
+                func = _gen_spmm_func(binary_op, reduce_op)
+            setattr(mod, func.__name__, func)
+            #__all__.append(func.__name__)
+
+def copy_u(g, x):
+    return gsddmm(g, 'copy_lhs', x, None)
+
+def copy_v(g, x):
+    return gsddmm(g, 'copy_rhs', None, x)
 
 def load_backend(mod_name):
     print('Using backend: %s' % mod_name, file=sys.stderr)
@@ -50,6 +112,10 @@ def load_backend(mod_name):
                 setattr(thismod, api, mod.__dict__[api])
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
+    _register_sddmm_func(thismod)
+    _register_spmm_func(thismod)
+    setattr(thismod, copy_u.__name__, copy_u)
+    setattr(thismod, copy_v.__name__, copy_v)
 
 
 def get_preferred_backend():

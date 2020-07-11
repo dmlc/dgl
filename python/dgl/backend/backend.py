@@ -1387,13 +1387,13 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         The input graph.
     op : str
         The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
-        ``copy_u``, ``copy_e`` or their alias ``+``, ``-``, ``*``, ``/``.
+        ``copy_lhs``, ``copy_rhs``.
     reduce_op : str
         Reduce operator, could be ``sum``, ``max``, ``min``.
     lhs_data : tensor or None
-        The left operand, could be None if it's not required by op.
+        The left operand, could be None if it's not required by the op.
     rhs_data : tensor or None
-        The right operand, could be None if it's not required by op.
+        The right operand, could be None if it's not required by the op.
 
     Returns
     -------
@@ -1421,7 +1421,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         The input graph.
     op : str
         Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
-        ``copy_lhs``, ``copy_rhs``, or their alias ``+``, ``-``, ``*``, ``/``.
+        ``copy_lhs``, ``copy_rhs``.
     lhs_data : tensor or None
         The left operand, could be None if it's not required by op.
     rhs_data : tensor or None
