@@ -67,7 +67,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    force_reload=force_reload,
                                                    verbose=verbose)
 
-    def process(self, root_path):
+    def process(self):
         """Loads input data from gcn/data directory
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
@@ -86,7 +86,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         :param name: Dataset name
         :return: All data input files loaded (as well the training/test data).
         """
-        root = root_path
+        root = self.raw_path
         objnames = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
         objects = []
         for i in range(len(objnames)):
@@ -559,8 +559,8 @@ class CoraBinary(DGLBuiltinDataset):
                                          force_reload=force_reload,
                                          verbose=verbose)
 
-    def process(self, root_path):
-        root = root_path
+    def process(self):
+        root = self.raw_path
         # load graphs
         self.graphs = []
         with open("{}/graphs.txt".format(root), 'r') as f:
