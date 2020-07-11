@@ -4702,7 +4702,7 @@ class DGLHeteroGraph(object):
                               self._edge_frames)
 
     def reverse(self, share_ndata=True, share_edata=False):
-        r""" Same as dgl.reverse_heterograph
+        r""":func:dgl.reverse_heterograph
         """
 
         # TODO(0.5 release, xiangsx) need to handle BLOCK
@@ -4791,8 +4791,6 @@ def is_unibipartite(graph):
         True if the graph is a uni-bipartite.
     """
     src, dst, _ = graph.edges()
-    print(src.tonumpy())
-    print(dst.tonumpy())
     return set(src.tonumpy()).isdisjoint(set(dst.tonumpy()))
 
 def find_src_dst_ntypes(ntypes, metagraph):
