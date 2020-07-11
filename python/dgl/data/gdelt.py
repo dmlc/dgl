@@ -3,9 +3,70 @@ import numpy as np
 import os
 import datetime
 
-from .utils import get_download_dir, download, extract_archive, loadtxt
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import get_download_dir, download, extract_archive, loadtxt, makedirs
 from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
+
+
+class GDELTDataset(DGLBuiltinDataset):
+    r"""GDELT dataset for event-based temporal graph
+
+    The Global Database of Events, Language, and Tone (GDELT) dataset.
+    Event data consists of coded interactions between socio-political actors
+    (i.e., cooperative or hostile actions between individuals, groups, sectors
+    and nation states). Events are automatically identified and extracted
+    from news articles by the BBN ACCENT event coder. These events are
+    essentially triples consisting of a source actor, an event type (according
+    to the CAMEO taxonomy of events), and a target actor.
+
+    Offical website:
+    https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075
+
+    Statistics
+    ----------
+
+    Examples
+    ----------
+    >>> data = GDELTDataset()
+    >>>
+    """
+    _url = {
+        'train': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/train.txt',
+        'valid': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/valid.txt',
+        'test': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/test.txt',
+    }
+    _sha1_str = {
+        'train': '',
+        'valid': '',
+        'test': ''
+    }
+
+    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False):
+        mode = mode.lower()
+        assert mode in self._url, "Mode not valid."
+        self.dir = get_download_dir()
+        self.mode = mode
+        super(GDELTDataset, self).__init__(name='GDELT',
+                                           url=self._url[mode],
+                                           raw_dir=raw_dir,
+                                           force_reload=force_reload,
+                                           verbose=verbose)
+
+    def download(self):
+        makedirs(self.save_path)
+        file_path = os.path.join(self.save_path, self.mode + '.txt')
+        download(self.url, path=file_path)
+
+    def process(self):
+        file_path = os.path.join(self.raw_path, self.mode + '.txt')
+        self._data = loadtxt(file_path, delimiter='\t').astype(np.int64)
+
+        # The source code is not released, but the paper indicates there're
+        # totally 137 samples. The cutoff below has exactly 137 samples.
+        self._time_index = np.floor(self._data[:, 3] / 15).astype(np.int64)
+        self._start_time = self._time_index[self._time_index != -1].min()
+        self._end_time = self._time_index.max()
 
 
 class GDELT(object):
