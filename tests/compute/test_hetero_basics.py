@@ -683,7 +683,7 @@ def test_issue_1088(idtype):
 
 if __name__ == '__main__':
     #test_isolated_nodes("int32")
-    #test_batch_setter_getter(F.int32)
+    test_batch_setter_getter(F.int32)
     # test_batch_recv("int64")
     # test_apply_edges("int32")
     # test_batch_setter_autograd()
@@ -691,7 +691,7 @@ if __name__ == '__main__':
     # test_batch_recv()
     # test_apply_nodes()
     # test_apply_edges()
-    test_update_routines(F.int32)
+    #test_update_routines(F.int32)
     # test_recv_0deg()
     # test_recv_0deg_newfld()
     # test_update_all_0deg()
@@ -702,4 +702,5 @@ if __name__ == '__main__':
     # test_group_apply_edges()
     # test_local_var()
     # test_local_scope()
-    test_issue_1088('int64')
+    #test_issue_1088('int64')
+    pass

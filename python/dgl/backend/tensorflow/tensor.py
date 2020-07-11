@@ -116,8 +116,8 @@ def ndim(input):
 
 
 def context(input):
-    return input.device
-
+    spec = tf.DeviceSpec.from_string(input.device)
+    return "/{}:{}".format(spec.device_type.lower(), spec.device_index)
 
 def device_type(ctx):
     return tf.DeviceSpec.from_string(ctx).device_type.lower()
@@ -427,7 +427,10 @@ def zerocopy_from_numpy(np_array):
 
 
 def zerocopy_to_dgl_ndarray(input):
-    return nd.from_dlpack(zerocopy_to_dlpack(input))
+    print('>>>>>>>', input)
+    ret = nd.from_dlpack(zerocopy_to_dlpack(input))
+    print('>>>>>>!', ret)
+    return ret
 
 
 def zerocopy_from_dgl_ndarray(input):
