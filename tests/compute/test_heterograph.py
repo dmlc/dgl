@@ -1680,21 +1680,21 @@ def test_stack_reduce(idtype):
 def test_isolated_ntype(idtype):
     g = dgl.heterograph({
         ('A', 'AB', 'B'): [(0, 1), (1, 2), (2, 3)]},
-        num_nodes_dict={'A': 3, 'B': 4, 'C': 4})
+        num_nodes_dict={'A': 3, 'B': 4, 'C': 4},
+        idtype=idtype, device=F.ctx())
     assert g.number_of_nodes('A') == 3
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4
 
     g = dgl.heterograph({
         ('A', 'AC', 'C'): [(0, 1), (1, 2), (2, 3)]},
-        num_nodes_dict={'A': 3, 'B': 4, 'C': 4})
+        num_nodes_dict={'A': 3, 'B': 4, 'C': 4},
+        idtype=idtype, device=F.ctx())
     assert g.number_of_nodes('A') == 3
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4
 
-    G = dgl.DGLGraph()
-    G.add_nodes(11)
-    G.add_edges([0, 1, 2], [4, 5, 6])
+    G = dgl.graph(([0, 1, 2], [4, 5, 6]), num_nodes=11, idtype=idtype, device=F.ctx())
     G.ndata[dgl.NTYPE] = F.tensor([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2], dtype=F.int64)
     G.edata[dgl.ETYPE] = F.tensor([0, 0, 0], dtype=F.int64)
     g = dgl.to_hetero(G, ['A', 'B', 'C'], ['AB'])
@@ -1706,16 +1706,16 @@ def test_isolated_ntype(idtype):
 @parametrize_dtype
 def test_ismultigraph(idtype):
     g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5), (2, 5)], 'A',
-                       'AB', 'B', num_nodes=(6, 6), idtype=idtype)
+                       'AB', 'B', num_nodes=(6, 6), idtype=idtype, device=F.ctx())
     assert g1.is_multigraph == False
     g2 = dgl.bipartite([(0, 1), (0, 1), (0, 2), (1, 5)], 'A',
-                       'AC', 'C', num_nodes=(6, 6), idtype=idtype)
+                       'AC', 'C', num_nodes=(6, 6), idtype=idtype, device=F.ctx())
     assert g2.is_multigraph == True
     g3 = dgl.graph([(0, 1), (1, 2)], 'A', 'AA',
-                   num_nodes=6, idtype=idtype)
+                   num_nodes=6, idtype=idtype, device=F.ctx())
     assert g3.is_multigraph == False
     g4 = dgl.graph([(0, 1), (0, 1), (1, 2)], 'A', 'AA',
-                   num_nodes=6, idtype=idtype)
+                   num_nodes=6, idtype=idtype, device=F.ctx())
     assert g4.is_multigraph == True
     g = dgl.hetero_from_relations([g1, g3])
     assert g.is_multigraph == False
@@ -1728,7 +1728,7 @@ def test_ismultigraph(idtype):
 
 @parametrize_dtype
 def test_bipartite(idtype):
-    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B', idtype=idtype)
+    g1 = dgl.bipartite([(0, 1), (0, 2), (1, 5)], 'A', 'AB', 'B', idtype=idtype, device=F.ctx())
     assert g1.is_unibipartite
     assert len(g1.ntypes) == 2
     assert g1.etypes == ['AB']
@@ -1751,7 +1751,7 @@ def test_bipartite(idtype):
     assert F.array_equal(g1.nodes['DST/B'].data['h'], g1.dstdata['h'])
 
     # more complicated bipartite
-    g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C', idtype=idtype)
+    g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C', idtype=idtype, device=F.ctx())
     g3 = dgl.hetero_from_relations([g1, g2])
     assert g3.is_unibipartite
     assert g3.srctypes == ['A']
@@ -1768,30 +1768,31 @@ def test_bipartite(idtype):
     assert F.array_equal(g3.nodes['A'].data['h'], g3.srcdata['h'])
     assert F.array_equal(g3.nodes['SRC/A'].data['h'], g3.srcdata['h'])
 
-    g4 = dgl.graph([(0, 0), (1, 1)], 'A', 'AA', idtype=idtype)
+    g4 = dgl.graph([(0, 0), (1, 1)], 'A', 'AA', idtype=idtype, device=F.ctx())
     g5 = dgl.hetero_from_relations([g1, g2, g4])
     assert not g5.is_unibipartite
 
 @parametrize_dtype
 def test_dtype_cast(idtype):
-    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype)
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     g.ndata["feat"] = F.tensor([3, 4, 5])
     g.edata["h"] = F.tensor([3, 4, 5, 6])
     if idtype == "int32":
         g_cast = g.long()
-        assert g_cast.idtype == 'int64'
+        assert g_cast.idtype == F.int64
     else:
         g_cast = g.int()
-        assert g_cast.idtype == 'int32'
+        assert g_cast.idtype == F.int32
     assert "feat" in g_cast.ndata
     assert "h" in g_cast.edata
     assert F.array_equal(g.ndata["feat"], g_cast.ndata["feat"])
     assert F.array_equal(g.edata["h"], g_cast.edata["h"])
 
-def test_format():
+@parametrize_dtype
+def test_format(idtype):
     # single relation
-    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], restrict_format='coo')
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], restrict_format='coo', idtype=idtype, device=F.ctx())
     assert g.restrict_format() == 'coo'
     assert g.format_in_use() == ['coo']
     try:
@@ -1814,7 +1815,7 @@ def test_format():
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
         ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-        }, restrict_format='csr')
+        }, restrict_format='csr', idtype=idtype, device=F.ctx())
     user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
     g['follows'].srcdata['h'] = user_feat
     for rel_type in ['follows', 'plays', 'develops']:
@@ -1837,18 +1838,17 @@ def test_format():
         assert g.restrict_format(rel_type) == 'csr'
         assert g.format_in_use(rel_type) == ['csr']
 
-def test_edges_order():
+@parametrize_dtype
+def test_edges_order(idtype):
     # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)
     g = dgl.graph((
         np.array([0, 1, 0, 0, 2]),
         np.array([2, 2, 1, 1, 1])
-    ))
+    ), idtype=idtype, device=F.ctx())
 
     src, dst = g.all_edges(order='srcdst')
-    assert F.array_equal(F.copy_to(src, F.cpu()),
-                         F.copy_to(F.tensor([0, 0, 0, 1, 2]), F.cpu()))
-    assert F.array_equal(F.copy_to(dst, F.cpu()),
-                         F.copy_to(F.tensor([1, 1, 2, 2, 1]), F.cpu()))
+    assert F.array_equal(src, F.tensor([0, 0, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(dst, F.tensor([1, 1, 2, 2, 1], dtype=idtype))
 
 @parametrize_dtype
 def test_reverse(idtype):
@@ -1862,8 +1862,8 @@ def test_reverse(idtype):
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
     g_s, g_d, _ = gidx.edges(0)
     rg_s, rg_d, _ = r_gidx.edges(0)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csr'
     gidx = gidx.to_format('csr')
@@ -1875,8 +1875,8 @@ def test_reverse(idtype):
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
     g_s, g_d, _ = gidx.edges(0)
     rg_s, rg_d, _ = r_gidx.edges(0)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csc'
     gidx = gidx.to_format('csc')
@@ -1888,14 +1888,14 @@ def test_reverse(idtype):
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
     g_s, g_d, _ = gidx.edges(0)
     rg_s, rg_d, _ = r_gidx.edges(0)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
 
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
         ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
         ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        }, index_dtype=index_dtype)
+        }, idtype=idtype, device=F.ctx())
     gidx = g._graph
     r_gidx = gidx.reverse()
     # three node types and three edge types
@@ -1907,16 +1907,16 @@ def test_reverse(idtype):
     assert gidx.number_of_edges(2) == r_gidx.number_of_edges(2)
     g_s, g_d, _ = gidx.edges(0)
     rg_s, rg_d, _ = r_gidx.edges(0)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
     g_s, g_d, _ = gidx.edges(1)
     rg_s, rg_d, _ = r_gidx.edges(1)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
     g_s, g_d, _ = gidx.edges(2)
     rg_s, rg_d, _ = r_gidx.edges(2)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csr'
     gidx = gidx.to_format('csr')
@@ -1937,16 +1937,16 @@ def test_reverse(idtype):
     assert gidx.number_of_edges(2) == r_gidx.number_of_edges(2)
     g_s, g_d, _ = gidx.edges(0)
     rg_s, rg_d, _ = r_gidx.edges(0)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
     g_s, g_d, _ = gidx.edges(1)
     rg_s, rg_d, _ = r_gidx.edges(1)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
     g_s, g_d, _ = gidx.edges(2)
     rg_s, rg_d, _ = r_gidx.edges(2)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csc'
     gidx = gidx.to_format('csc')
@@ -1967,16 +1967,16 @@ def test_reverse(idtype):
     assert gidx.number_of_edges(2) == r_gidx.number_of_edges(2)
     g_s, g_d, _ = gidx.edges(0)
     rg_s, rg_d, _ = r_gidx.edges(0)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
     g_s, g_d, _ = gidx.edges(1)
     rg_s, rg_d, _ = r_gidx.edges(1)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
     g_s, g_d, _ = gidx.edges(2)
     rg_s, rg_d, _ = r_gidx.edges(2)
-    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
-    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    assert F.array_equal(g_s, rg_d)
+    assert F.array_equal(g_d, rg_s)
 
 if __name__ == '__main__':
     # test_create()
