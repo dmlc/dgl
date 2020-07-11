@@ -823,6 +823,8 @@ def test_flatten(idtype):
     assert len(fg.ntypes) == 2
     assert fg.ntypes == ['user', 'game']
     assert fg.etypes == ['plays+wishes']
+    assert fg.idtype == g.idtype
+    assert fg.device == g.device
 
     assert F.array_equal(fg.nodes['user'].data['h'], F.ones((3, 5)))
     assert F.array_equal(fg.nodes['game'].data['i'], F.ones((2, 5)))
@@ -836,6 +838,8 @@ def test_flatten(idtype):
     check_mapping(g, fg)
 
     fg = g['user', :, 'user']
+    assert fg.idtype == g.idtype
+    assert fg.device == g.device
     # NOTE(gq): The node/edge types from the parent graph is returned if there is only one
     # node/edge type.  This differs from the behavior above.
     assert fg.ntypes == ['user']
@@ -846,6 +850,8 @@ def test_flatten(idtype):
     assert F.array_equal(v1, v2)
 
     fg = g['developer', :, 'game']
+    assert fg.idtype == g.idtype
+    assert fg.device == g.device
     assert fg.ntypes == ['developer', 'game']
     assert fg.etypes == ['develops']
     u1, v1 = g.edges(etype='develops', order='eid')
@@ -854,13 +860,15 @@ def test_flatten(idtype):
     assert F.array_equal(v1, v2)
 
     fg = g[:, :, :]
+    assert fg.idtype == g.idtype
+    assert fg.device == g.device
     assert fg.ntypes == ['developer+user', 'game+user']
     assert fg.etypes == ['develops+follows+plays+wishes']
     check_mapping(g, fg)
 
     # Test another heterograph
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows', idtype=idtype)
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype)
+    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows', idtype=idtype, device=F.ctx())
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype, device=F.ctx())
     g_x.nodes['user'].data['h'] = F.randn((4, 3))
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
     g_y.nodes['user'].data['hh'] = F.randn((4, 5))
@@ -873,11 +881,15 @@ def test_flatten(idtype):
     assert F.array_equal(g.edges['knows'].data['ww'], g_y.edata['ww'])
 
     fg = g['user', :, 'user']
+    assert fg.idtype == g.idtype
+    assert fg.device == g.device
     assert fg.ntypes == ['user']
     assert fg.etypes == ['follows+knows']
     check_mapping(g, fg)
 
     fg = g['user', :, :]
+    assert fg.idtype == g.idtype
+    assert fg.device == g.device
     assert fg.ntypes == ['user']
     assert fg.etypes == ['follows+knows']
     check_mapping(g, fg)
