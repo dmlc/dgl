@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
+import warnings
 import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
@@ -41,7 +42,9 @@ __all__ = [
     'out_subgraph',
     'remove_edges',
     'as_immutable_graph',
-    'as_heterograph']
+    'as_heterograph',
+    'add_reverse',
+    'add_reverse_types']
 
 
 def pairwise_squared_distance(x):
@@ -1835,7 +1838,7 @@ def add_reverse(g, ignore_bipartite=False):
             edata[canonical_etype] = {
                 k: F.cat([v, v], 0) for k, v in g.edges[canonical_etype].data.items()}
 
-    new_g = heterograph(new_edges, num_nodes_dict)
+    new_g = heterograph(new_edges, num_nodes_dict=num_nodes_dict)
     for ntype in g.ntypes:
         new_g.nodes[ntype].data.update(g.nodes[ntype].data)
     for canonical_etype in g.canonical_etypes:
@@ -1918,7 +1921,7 @@ def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
         etype_data[canonical_etype_rev] = etype_data[canonical_etype] = \
             g.edges[canonical_etype].data
 
-    new_g = heterograph(edges, num_nodes_dict)
+    new_g = heterograph(edges, num_nodes_dict=num_nodes_dict)
     for ntype in g.ntypes:
         new_g.nodes[ntype].data.update(g.nodes[ntype].data)
     for etype, edata in etype_data.items():
