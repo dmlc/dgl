@@ -62,7 +62,8 @@ class GSpMM(th.autograd.Function):
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
                 elif op == 'copy_lhs':
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)[0]
-            else: dX = th.zeros((X.shape[0],) + dZ.shape[1:], dtype=X.dtype, device=X.device)
+            else:
+                dX = th.zeros((X.shape[0],) + dZ.shape[1:], dtype=X.dtype, device=X.device)
                 if op in ['mul', 'div']:
                     dX.scatter_add_(0, argX.long(),
                                     _muldiv(op, Y.expand(-1, *dZ.shape[1:]).gather(0, argY.long())) * dZ)
