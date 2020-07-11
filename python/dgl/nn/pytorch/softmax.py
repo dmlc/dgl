@@ -2,12 +2,8 @@
 # pylint: disable= no-member, arguments-differ
 import torch as th
 
-from ...function import TargetCode
 from ...base import ALL, is_all
 from ... import backend as F
-from ... import utils
-from ...graph import DGLGraph
-from ...heterograph import DGLHeteroGraph
 
 __all__ = ['edge_softmax']
 

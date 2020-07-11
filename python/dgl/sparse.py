@@ -7,7 +7,6 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from .utils import to_dgl_context
 from . import backend as F
-from .heterograph_index import HeteroGraphIndex
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -60,6 +59,7 @@ def to_dgl_nd(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
 def to_dgl_nd_for_write(x):
+    """Convert framework-specific tensor/None to dgl ndarray for write."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 target_mapping = {
@@ -141,8 +141,10 @@ def _gspmm(gidx, op, reduce_op, u, e):
     ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
     idtype = getattr(F, ugi.dtype)
     if use_cmp:
-        if use_u: arg_u = F.zeros(v_shp, idtype, ctx)
-        if use_e: arg_e = F.zeros(v_shp, idtype, ctx)
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+        if use_e:
+            arg_e = F.zeros(v_shp, idtype, ctx)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMM(ugi, op, reduce_op,
                             to_dgl_nd(u if use_u else None),
