@@ -520,12 +520,15 @@ def metapath_reachable_graph(g, metapath):
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     if srctype == dsttype:
         assert adj.shape[0] == adj.shape[1]
-        new_g = graph(adj, ntype=srctype, idtype=g.idtype)
+        new_g = graph(adj, ntype=srctype, idtype=g.idtype, device=g.device)
     else:
-        new_g = bipartite(adj, utype=srctype, vtype=dsttype, idtype=g.idtype)
+        new_g = bipartite(adj, utype=srctype, vtype=dsttype,
+                          idtype=g.idtype, device=g.device)
 
+    # copy srcnode features
     for key, value in g.nodes[srctype].data.items():
         new_g.nodes[srctype].data[key] = value
+    # copy dstnode features
     if srctype != dsttype:
         for key, value in g.nodes[dsttype].data.items():
             new_g.nodes[dsttype].data[key] = value

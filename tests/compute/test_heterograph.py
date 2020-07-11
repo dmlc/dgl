@@ -1042,7 +1042,7 @@ def test_convert(idtype):
     assert g.number_of_nodes() == 5
 
 @parametrize_dtype
-def test_transform(idtype):
+def test_metagraph_reachable(idtype):
     g = create_test_heterograph(idtype)
     x = F.randn((3, 5))
     g.nodes['user'].data['h'] = x
@@ -1072,6 +1072,8 @@ def test_subgraph_mask(idtype):
     g.edges['follows'].data['h'] = y
 
     def _check_subgraph(g, sg):
+        assert sg.idtype == g.idtype
+        assert sg.device == g.device
         assert sg.ntypes == g.ntypes
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
@@ -1090,13 +1092,12 @@ def test_subgraph_mask(idtype):
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'][1:2])
 
-    # backend boo input tensor
-    sg1 = g.subgraph({'user': F.tensor([False, True, True], dtype=F.data_type_dict['bool']),
-                      'game': F.tensor([True, False, False, False], dtype=F.data_type_dict['bool'])})
+    sg1 = g.subgraph({'user': F.tensor([False, True, True], dtype=F.bool),
+                      'game': F.tensor([True, False, False, False], dtype=F.bool)})
     _check_subgraph(g, sg1)
-    sg2 = g.edge_subgraph({'follows': F.tensor([False, True], dtype=F.data_type_dict['bool']),
-                           'plays': F.tensor([False, True, False, False], dtype=F.data_type_dict['bool']),
-                           'wishes': F.tensor([False, True], dtype=F.data_type_dict['bool'])})
+    sg2 = g.edge_subgraph({'follows': F.tensor([False, True], dtype=F.bool),
+                           'plays': F.tensor([False, True, False, False], dtype=F.bool),
+                           'wishes': F.tensor([False, True], dtype=F.bool)})
     _check_subgraph(g, sg2)
 
 @parametrize_dtype
@@ -1111,6 +1112,8 @@ def test_subgraph(idtype):
     g.edges['follows'].data['h'] = y
 
     def _check_subgraph(g, sg):
+        assert sg.idtype == g.idtype
+        assert sg.device == g.device
         assert sg.ntypes == g.ntypes
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
@@ -1153,6 +1156,8 @@ def test_subgraph(idtype):
     _check_subgraph(g, sg2)
 
     def _check_subgraph_single_ntype(g, sg, preserve_nodes=False):
+        assert sg.idtype == g.idtype
+        assert sg.device == g.device
         assert sg.ntypes == g.ntypes
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes

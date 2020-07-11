@@ -516,8 +516,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   IdArray ret_indptr = CumSum(count, true);
   
   // Column & data can be obtained by index select.
-  IdArray ret_col = IndexSelect(csr.indices, idx);
-  IdArray ret_data = CSRHasData(csr)? IndexSelect(csr.data, idx) : idx;
+  IdArray ret_col = IndexSelect(subcsr.indices, idx);
+  IdArray ret_data = CSRHasData(subcsr)? IndexSelect(subcsr.data, idx) : idx;
 
   // Relabel column
   IdArray col_hash = NewIdArray(csr.num_cols, ctx, nbits);
