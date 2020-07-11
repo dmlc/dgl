@@ -924,18 +924,12 @@ def test_to_device(idtype):
 @parametrize_dtype
 def test_convert_bound(idtype):
     def _test_bipartite_bound(data, card):
-        try:
-            dgl.bipartite(data, num_nodes=card, idtype=idtype)
-        except dgl.DGLError:
-            return
-        assert False, 'bipartite bound test with wrong uid failed'
+        with pytest.raises(DGLError):
+            dgl.bipartite(data, num_nodes=card, idtype=idtype, device=F.ctx())
 
     def _test_graph_bound(data, card):
-        try:
-            dgl.graph(data, num_nodes=card, idtype=idtype)
-        except dgl.DGLError:
-            return
-        assert False, 'graph bound test with wrong uid failed'
+        with pytest.raises(DGLError):
+            dgl.graph(data, num_nodes=card, idtype=idtype, device=F.ctx())
 
     _test_bipartite_bound(([1,2],[1,2]),(2,3))
     _test_bipartite_bound(([0,1],[1,4]),(2,3))
@@ -961,6 +955,7 @@ def test_convert(idtype):
 
     g = dgl.to_homo(hg)
     assert g.idtype == idtype
+    assert g.device == hg.device
     assert F.array_equal(F.cat(hs, dim=0), g.ndata['h'])
     assert 'x' not in g.ndata
     assert F.array_equal(F.cat(ws, dim=0), g.edata['w'])
@@ -989,6 +984,8 @@ def test_convert(idtype):
         hg2 = dgl.to_hetero(
                 g, hg.ntypes, hg.etypes,
                 ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg)
+        assert hg2.idtype == hg.idtype
+        assert hg2.device == hg.device
         assert set(hg.ntypes) == set(hg2.ntypes)
         assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
         for ntype in hg.ntypes:
@@ -1002,11 +999,12 @@ def test_convert(idtype):
             assert F.array_equal(hg.edges[canonical_etype].data['w'], hg2.edges[canonical_etype].data['w'])
 
     # hetero_from_homo test case 2
-    g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3)], idtype=idtype)
+    g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3)], idtype=idtype, device=F.ctx())
     g.ndata[dgl.NTYPE] = F.tensor([0, 0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0, 1, 2])
     hg = dgl.to_hetero(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
     assert hg.idtype == idtype
+    assert hg.device == g.device
     assert set(hg.canonical_etypes) == set(
         [('l0', 'e0', 'l1'), ('l1', 'e1', 'l2'), ('l0', 'e2', 'l2')])
     assert hg.number_of_nodes('l0') == 2
@@ -1020,12 +1018,13 @@ def test_convert(idtype):
     mg = nx.MultiDiGraph([
         ('user', 'movie', 'watches'),
         ('user', 'TV', 'watches')])
-    g = dgl.graph([(0, 1), (0, 2)], idtype=idtype)
+    g = dgl.graph([(0, 1), (0, 2)], idtype=idtype, device=F.ctx())
     g.ndata[dgl.NTYPE] = F.tensor([0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0])
     for _mg in [None, mg]:
         hg = dgl.to_hetero(g, ['user', 'TV', 'movie'], ['watches'], metagraph=_mg)
-        assert hg.idtype == idtype
+        assert hg.idtype == g.idtype
+        assert hg.device == g.device
         assert set(hg.canonical_etypes) == set(
             [('user', 'watches', 'movie'), ('user', 'watches', 'TV')])
         assert hg.number_of_nodes('user') == 1
@@ -1036,8 +1035,10 @@ def test_convert(idtype):
         assert len(hg.etypes) == 2
 
     # hetero_to_homo test case 2
-    hg = dgl.bipartite([(0, 0), (1, 1)], num_nodes=(2, 3))
+    hg = dgl.bipartite([(0, 0), (1, 1)], num_nodes=(2, 3), idtype=idtype, device=F.ctx())
     g = dgl.to_homo(hg)
+    assert hg.idtype == g.idtype
+    assert hg.device == g.device
     assert g.number_of_nodes() == 5
 
 @parametrize_dtype

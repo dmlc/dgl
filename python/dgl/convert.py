@@ -797,6 +797,7 @@ def to_homo(G):
     for ntype_id, ntype in enumerate(G.ntypes):
         num_nodes = G.number_of_nodes(ntype)
         total_num_nodes += num_nodes
+        # Type ID is always in int64
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
         nids.append(F.arange(0, num_nodes, G.idtype))
 
@@ -806,6 +807,7 @@ def to_homo(G):
         num_edges = len(src)
         srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
         dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
+        # Type ID is always in int64
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges, G.idtype))
 
@@ -821,10 +823,10 @@ def to_homo(G):
         retg.edata.update(comb_ef)
 
     # assign node type and id mapping field.
-    retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
-    retg.ndata[NID] = F.cat(nids, 0)
-    retg.edata[ETYPE] = F.cat(etype_ids, 0)
-    retg.edata[EID] = F.cat(eids, 0)
+    retg.ndata[NTYPE] = F.copy_to(F.cat(ntype_ids, 0), G.device)
+    retg.ndata[NID] = F.copy_to(F.cat(nids, 0), G.device)
+    retg.edata[ETYPE] = F.copy_to(F.cat(etype_ids, 0), G.device)
+    retg.edata[EID] = F.copy_to(F.cat(eids, 0), G.device)
 
     return retg
 
