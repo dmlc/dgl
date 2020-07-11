@@ -1002,10 +1002,10 @@ def test_add_reverse():
     g = dgl.heterograph({
         ('A', 'AA', 'A'): ([0, 1], [1, 3]),
         ('B', 'BB', 'B'): ([2, 4], [2, 3]),})
-    g.nodes['A'].data['x'] = F.randn(4, 3)
-    g.nodes['B'].data['x'] = F.randn(5, 4)
-    g.edges['AA'].data['x'] = F.randn(2, 3)
-    g.edges['BB'].data['x'] = F.randn(2, 6)
+    g.nodes['A'].data['x'] = F.randn((4, 3))
+    g.nodes['B'].data['x'] = F.randn((5, 4))
+    g.edges['AA'].data['x'] = F.randn((2, 3))
+    g.edges['BB'].data['x'] = F.randn((2, 6))
     new_g = dgl.add_reverse(g)
 
     def _check(g, new_g):
