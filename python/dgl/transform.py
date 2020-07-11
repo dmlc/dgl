@@ -506,7 +506,7 @@ def reverse_heterograph(g, share_ndata=True, share_edata=False):
 
     # handle edata
     if share_edata:
-        # for each ntype
+        # for each etype
         for etype in canonical_etypes:
             # for each data field
             for k in g.edges[etype].data:
