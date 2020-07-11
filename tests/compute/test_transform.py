@@ -998,6 +998,90 @@ def test_cast():
     assert F.array_equal(g2src, gsrc)
     assert F.array_equal(g2dst, gdst)
 
+def test_add_reverse():
+    g = dgl.heterograph({
+        ('A', 'AA', 'A'): ([0, 1], [1, 3]),
+        ('B', 'BB', 'B'): ([2, 4], [2, 3]),})
+    g.nodes['A'].data['x'] = F.randn(4, 3)
+    g.nodes['B'].data['x'] = F.randn(5, 4)
+    g.edges['AA'].data['x'] = F.randn(2, 3)
+    g.edges['BB'].data['x'] = F.randn(2, 6)
+    new_g = dgl.add_reverse(g)
+
+    def _check(g, new_g):
+        AA_x = g.edges['AA'].data['x']
+        BB_x = g.edges['BB'].data['x']
+        assert new_g.ntypes == g.ntypes
+        assert new_g.canonical_etypes == g.canonical_etypes
+        assert new_g.number_of_nodes('A') == 4
+        assert new_g.number_of_nodes('B') == 5
+        src_AA, dst_AA = new_g.all_edges(etype='AA', order='eid')
+        src_BB, dst_BB = new_g.all_edges(etype='AA', order='eid')
+        assert F.array_equal(src_AA, F.tensor([0, 1, 1, 3], dtype=F.int64))
+        assert F.array_equal(dst_AA, F.tensor([1, 3, 0, 1], dtype=F.int64))
+        assert F.array_equal(src_BB, F.tensor([2, 4, 2, 3], dtype=F.int64))
+        assert F.array_equal(dst_BB, F.tensor([2, 3, 2, 4], dtype=F.int64))
+        assert F.array_equal(g.nodes['A'].data['x'], new_g.nodes['A'].data['x'])
+        assert F.array_equal(g.nodes['B'].data['x'], new_g.nodes['B'].data['x'])
+        assert F.array_equal(g.edges['AA'].data['x'], F.cat([AA_x, AA_x], 0))
+        assert F.array_equal(g.edges['BB'].data['x'], F.cat([BB_x, BB_x], 0))
+
+    _check(g, new_g)
+
+    g = dgl.heterograph({
+        ('A', 'AA', 'A'): ([0, 1], [1, 3]),
+        ('A', 'AB', 'B'): ([0, 1], [1, 2]),
+        ('B', 'BB', 'B'): ([2, 4], [2, 3]),})
+    g.nodes['A'].data['x'] = F.randn(4, 3)
+    g.nodes['B'].data['x'] = F.randn(5, 4)
+    g.edges['AA'].data['x'] = F.randn(2, 3)
+    g.edges['AB'].data['x'] = F.randn(2, 2)
+    g.edges['BB'].data['x'] = F.randn(2, 6)
+    fail = False
+    try:
+        new_g = dgl.add_reverse(g)
+    except DGLError:
+        fail = True
+    assert fail
+
+    new_g = dgl.add_reverse(g, ignore_bipartite=True)
+    _check(g, new_g)
+    src_AB, dst_AB = new_g.all_edges(etype='AB', order='eid')
+    assert F.array_equal(src_AB, F.tensor([0, 1], dtype=F.int64))
+    assert F.array_equal(dst_AB, F.tensor([1, 2], dtype=F.int64))
+    assert F.array_equal(new_g.edges['AB'].data['x'], g.edges['AB'].data['x'])
+
+def test_add_reverse_types():
+    g = dgl.heterograph({
+        ('A', 'AA', 'A'): ([0, 1], [1, 3]),
+        ('A', 'AB', 'B'): ([0, 1], [1, 2]),
+        ('B', 'BB', 'B'): ([2, 4], [2, 3]),})
+    g.nodes['A'].data['x'] = F.randn(4, 3)
+    g.nodes['B'].data['x'] = F.randn(5, 4)
+    g.edges['AA'].data['x'] = F.randn(2, 3)
+    g.edges['AB'].data['x'] = F.randn(2, 2)
+    g.edges['BB'].data['x'] = F.randn(2, 6)
+
+    new_g = dgl.add_reverse_types(g)
+    assert new_g.ntypes == ['A', 'B']
+    assert new_g.number_of_nodes('A') == 4
+    assert new_g.number_of_nodes('B') == 5
+    assert F.array_equal(new_g.nodes['A'].data['x'], g.nodes['A'].data['x'])
+    assert F.array_equal(new_g.nodes['B'].data['x'], g.nodes['B'].data['x'])
+    for etype in ['AA', 'AB', 'BB']:
+        utype, _, vtype = g.to_canonical_etype(etype)
+        etype_rev = etype + '_inv'
+        utype_rev, _, vtype_rev = g.to_canonical_etype(etype_rev)
+        assert utype == vtype_rev
+        assert vtype == utype_rev
+
+        src, dst = g.all_edges(etype=etype, order='eid')
+        src_rev, dst_rev = g.all_edges(etype=etype_rev, order='eid')
+        assert F.array_equal(src, dst_rev)
+        assert F.array_equal(dst, src_rev)
+
+        assert F.array_equal(g.edges[etype].data['x'], g.edges[etype_rev].data['x'])
+
 if __name__ == '__main__':
     test_reorder_nodes()
     # test_line_graph()
@@ -1021,3 +1105,5 @@ if __name__ == '__main__':
     # test_out_subgraph()
     # test_to_block("int32")
     # test_remove_edges()
+    test_add_reverse()
+    test_add_reverse_types()
