@@ -1578,15 +1578,17 @@ def test_empty_heterograph(idtype):
     # empty networkx graph
     assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
 
-    g = dgl.heterograph({('user', 'follows', 'user'): []}, idtype=idtype)
+    g = dgl.heterograph({('user', 'follows', 'user'): []}, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
+    assert g.device == F.ctx()
     assert g.number_of_nodes('user') == 0
     assert g.number_of_edges('follows') == 0
 
     # empty relation graph with others
     g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [
-                        (0, 0), (1, 1)]}, idtype=idtype)
+                        (0, 0), (1, 1)]}, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
+    assert g.device == F.ctx()
     assert g.number_of_nodes('user') == 0
     assert g.number_of_edges('plays') == 0
     assert g.number_of_nodes('game') == 2

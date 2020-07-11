@@ -3788,9 +3788,10 @@ class DGLHeteroGraph(object):
         """
         with self.local_scope():
             self.apply_nodes(lambda nbatch: {'_mask' : predicate(nbatch)}, nodes, ntype)
+            ntype = self.ntypes[0] if ntype is None else ntype
             mask = self.nodes[ntype].data['_mask']
             if is_all(nodes):
-                return F.nonzero_id(mask)
+                return F.nonzero_1d(mask)
             else:
                 v = utils.prepare_tensor(self, nodes, 'nodes')
                 return F.boolean_mask(v, mask[v])
@@ -3831,9 +3832,10 @@ class DGLHeteroGraph(object):
         """
         with self.local_scope():
             self.apply_edges(lambda ebatch: {'_mask' : predicate(ebatch)}, edges, etype)
+            etype = self.canonical_etypes[0] if etype is None else etype
             mask = self.edges[etype].data['_mask']
             if is_all(edges):
-                return F.nonzero_id(mask)
+                return F.nonzero_1d(mask)
             else:
                 if isinstance(edges, tuple):
                     e = self.edge_id(edges[0], edges[1], etype=etype)
