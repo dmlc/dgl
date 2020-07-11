@@ -41,6 +41,7 @@ def _gen_spmm_func(binary_op, reduce_op):
     return func
 
 def _gen_copy_reduce_func(binary_op, reduce_op):
+
     name = "{}_{}".format(binary_op, reduce_op)
     docstring = """Copy reduce function..."""
 
@@ -54,7 +55,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     func.__doc__ = docstring
     return func
 
-def _register_sddmm_func(mod):
+def _register_sddmm_func(mod, enabled_apis):
     """Register sddmm functions"""
     target = ["u", "v", "e"]
     for lhs, rhs in product(target, target):
@@ -62,9 +63,9 @@ def _register_sddmm_func(mod):
             for binary_op in ["add", "sub", "mul", "div", "dot"]:
                 func = _gen_sddmm_func(lhs, rhs, binary_op)
                 setattr(mod, func.__name__, func)
-                #__all__.append(func.__name__)
+                enabled_apis.add(func.__name__)
 
-def _register_spmm_func(mod):
+def _register_spmm_func(mod, enabled_apis):
     """Register spmm functions"""
     for binary_op in ["add", "sub", "mul", "div", "copy_u", "copy_e"]:
         for reduce_op in ["sum", "max", "min"]:
@@ -73,12 +74,14 @@ def _register_spmm_func(mod):
             else:
                 func = _gen_spmm_func(binary_op, reduce_op)
             setattr(mod, func.__name__, func)
-            #__all__.append(func.__name__)
+            enabled_apis.add(func.__name__)
 
 def copy_u(g, x):
+    """Copy source node features to edges."""
     return gsddmm(g, 'copy_lhs', x, None)
 
 def copy_v(g, x):
+    """Copy destination node features to edges."""
     return gsddmm(g, 'copy_rhs', None, x)
 
 def load_backend(mod_name):
@@ -112,10 +115,12 @@ def load_backend(mod_name):
                 setattr(thismod, api, mod.__dict__[api])
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
-    _register_sddmm_func(thismod)
-    _register_spmm_func(thismod)
+    _register_sddmm_func(thismod, _enabled_apis)
+    _register_spmm_func(thismod, _enabled_apis)
     setattr(thismod, copy_u.__name__, copy_u)
+    _enabled_apis.add(copy_u.__name__)
     setattr(thismod, copy_v.__name__, copy_v)
+    _enabled_apis.add(copy_v.__name__)
 
 
 def get_preferred_backend():
