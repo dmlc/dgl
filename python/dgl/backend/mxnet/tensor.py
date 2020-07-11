@@ -35,14 +35,23 @@ def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
-    # MXNet always returns a float tensor regardless of type inside data.
-    # This is a workaround.
-    if dtype is None:
-        if isinstance(data[0], numbers.Integral):
-            dtype = np.int64
+    if isinstance(data, nd.NDArray):
+        if dtype is None or data.dtype == dtype:
+            return data
         else:
-            dtype = np.float32
-    return nd.array(data, dtype=dtype)
+            return nd.cast(data, dtype)
+    else:
+        if dtype is None:
+            if isinstance(data, numbers.Number):
+                dtype = np.int64 if isinstance(data, numbers.Integral) else np.float32
+            elif isinstance(data, np.ndarray):
+                dtype = data.dtype
+                # mxnet doesn't support bool
+                if dtype == np.bool:
+                    dtype = np.int32
+            else:
+                dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
+        return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
     return data.asscalar()

@@ -284,11 +284,11 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
         new_nframes = []
         for nframe in self._node_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
-            new_nframes.append(FrameRef(Frame(new_feats)))
+            new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
         new_eframes = []
         for eframe in self._edge_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
-            new_eframes.append(FrameRef(Frame(new_feats)))
+            new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
         # TODO(minjie): replace the following line with the commented one to enable GPU graph.
         new_gidx = self._graph
         #new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))

@@ -404,7 +404,8 @@ class DistGraph:
         assert shape[0] == self.number_of_nodes()
         if init_func is None:
             init_func = _default_init_data
-        self._client.init_data(_get_ndata_name(name), shape, dtype, 'node', self._gpb, init_func)
+        policy = PartitionPolicy('node', self._gpb)
+        self._client.init_data(_get_ndata_name(name), shape, dtype, policy, init_func)
         self._ndata._add(name)
 
     def init_edata(self, name, shape, dtype, init_func=None):
@@ -434,7 +435,8 @@ class DistGraph:
         assert shape[0] == self.number_of_edges()
         if init_func is None:
             init_func = _default_init_data
-        self._client.init_data(_get_edata_name(name), shape, dtype, 'edge', self._gpb, init_func)
+        policy = PartitionPolicy('edge', self._gpb)
+        self._client.init_data(_get_edata_name(name), shape, dtype, policy, init_func)
         self._edata._add(name)
 
     @property
@@ -574,8 +576,7 @@ def _get_overlap(mask_arr, ids):
         masks = mask_arr[ids]
         return F.boolean_mask(ids, masks)
     else:
-        mask_arr = utils.toindex(mask_arr)
-        masks = F.gather_row(mask_arr.tousertensor(), ids)
+        masks = F.gather_row(F.tensor(mask_arr), ids)
         return F.boolean_mask(ids, masks)
 
 def _split_local(partition_book, rank, elements, local_eles):
@@ -613,8 +614,7 @@ def _split_even(partition_book, rank, elements):
         # I hope it's OK.
         eles = F.nonzero_1d(elements[0:len(elements)])
     else:
-        elements = utils.toindex(elements)
-        eles = F.nonzero_1d(elements.tousertensor())
+        eles = F.nonzero_1d(F.tensor(elements))
 
     # here we divide the element list as evenly as possible. If we use range partitioning,
     # the split results also respect the data locality. Range partitioning is the default

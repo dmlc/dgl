@@ -35,7 +35,7 @@ class HeteroGraphData(ObjectBase):
     def create(g):
         edata_list = []
         ndata_list = []
-        for etype in g.etypes:
+        for etype in g.canonical_etypes:
             edata_list.append(tensor_dict_to_ndarray_dict(g.edges[etype].data))
         for ntype in g.ntypes:
             ndata_list.append(tensor_dict_to_ndarray_dict(g.nodes[ntype].data))
@@ -49,12 +49,12 @@ class HeteroGraphData(ObjectBase):
         gidx = _CAPI_GetGindexFromHeteroGraphData(self)
         nframes = []
         eframes = []
-        for ntensor in ntensor_list:
+        for ntid, ntensor in enumerate(ntensor_list):
             ndict = {ntensor[i]: F.zerocopy_from_dgl_ndarray(ntensor[i+1]) for i in range(0, len(ntensor), 2)}
-            nframes.append(FrameRef(Frame(ndict)))
+            nframes.append(FrameRef(Frame(ndict, num_rows=gidx.number_of_nodes(ntid))))
         
-        for etensor in etensor_list:
+        for etid, etensor in enumerate(etensor_list):
             edict = {etensor[i]: F.zerocopy_from_dgl_ndarray(etensor[i+1]) for i in range(0, len(etensor), 2)}
-            eframes.append(FrameRef(Frame(edict)))
+            eframes.append(FrameRef(Frame(edict, num_rows=gidx.number_of_edges(etid))))
         
         return DGLHeteroGraph(gidx, ntype_names, etype_names, nframes, eframes)
