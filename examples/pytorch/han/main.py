@@ -29,6 +29,11 @@ def main(args):
     g, features, labels, num_classes, train_idx, val_idx, test_idx, train_mask, \
     val_mask, test_mask = load_data(args['dataset'])
 
+    if hasattr(torch, 'BoolTensor'):
+        train_mask = train_mask.bool()
+        val_mask = val_mask.bool()
+        test_mask = test_mask.bool()
+
     features = features.to(args['device'])
     labels = labels.to(args['device'])
     train_mask = train_mask.to(args['device'])
