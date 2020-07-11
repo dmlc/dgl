@@ -93,7 +93,7 @@ sddmm_shapes = [
 
 @pytest.mark.parametrize('g', graphs)
 @pytest.mark.parametrize('shp', spmm_shapes)
-@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_u', 'copy_e'])
+@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 def test_spmm(g, shp, msg, reducer):
     print(g)

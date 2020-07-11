@@ -105,7 +105,7 @@ class GSpMM(mx.autograd.Function):
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
-                    dX = _gspmm(g_rev, '*', 'sum', dZ, _muldiv(op, Y))[0]
+                    dX = _gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))[0]
                 elif op in ['add', 'sub']:
                     dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
                 elif op == 'copy_lhs':
@@ -122,7 +122,7 @@ class GSpMM(mx.autograd.Function):
         if op != 'copy_lhs' and Y.grad is not None:
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
-                    dY = _gsddmm(gidx, '*', X, dZ)
+                    dY = _gsddmm(gidx, 'mul', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
