@@ -30,13 +30,9 @@ def main(args):
     val_mask, test_mask = load_data(args['dataset'])
 
     if hasattr(torch, 'BoolTensor'):
-        train_mask = torch.BoolTensor(train_mask)
-        val_mask = torch.BoolTensor(val_mask)
-        test_mask = torch.BoolTensor(test_mask)
-    else:
-        train_mask = torch.ByteTensor(train_mask)
-        val_mask = torch.ByteTensor(val_mask)
-        test_mask = torch.ByteTensor(test_mask)
+        train_mask = train_mask.bool()
+        val_mask = val_mask.bool()
+        test_mask = test_mask.bool()
 
     features = features.to(args['device'])
     labels = labels.to(args['device'])
