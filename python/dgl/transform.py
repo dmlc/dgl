@@ -483,7 +483,7 @@ def reverse_heterograph(g, share_ndata=True, share_edata=False):
     {}
     """
     # TODO(0.5 release, xiangsx) need to handle BLOCK
-    # currently reversing a block results in undfined behavior
+    # currently reversing a block results in undefined behavior
     canonical_etypes = g.canonical_etypes
     meta_edges_src = []
     meta_edges_dst = []
