@@ -33,8 +33,8 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
                                                   force_reload=force_reload,
                                                   verbose=verbose)
 
-    def process(self, root_path):
-        npz_path = os.path.join(root_path, self.name + '.npz')
+    def process(self):
+        npz_path = os.path.join(self.raw_path, self.name + '.npz')
         g = self._load_npz(npz_path)
         self._graph = g
         self._data = [g]

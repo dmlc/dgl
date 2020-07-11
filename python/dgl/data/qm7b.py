@@ -75,8 +75,8 @@ class QM7bDataset(DGLDataset):
                                           force_reload=force_reload,
                                           verbose=verbose)
 
-    def process(self, root_path):
-        mat_path = root_path + '.mat'
+    def process(self):
+        mat_path = self.raw_path + '.mat'
         if not check_sha1(mat_path, self._sha1_str):
             raise UserWarning('File {} is downloaded but the content hash does not match.'
                               'The repo may be outdated or download may be incomplete. '
