@@ -3144,23 +3144,19 @@ class DGLHeteroGraph(object):
                 edges, mfunc, rfunc, afunc = args
                 if isinstance(edges, tuple):
                     u, v = edges
-                    # Rewrite u, v to handle edge broadcasting and multigraph.
-                    # Find all edges including parallel edges
-                    u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
-                    # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
-                    u = F.copy_to(u, F.cpu())
-                    v = F.copy_to(v, F.cpu())
-                    u, v, eid = self._graph.edge_ids_all(etid, u, v)
-                    u = utils.toindex(u, self._idtype_str)
-                    v = utils.toindex(v, self._idtype_str)
-                    eid = utils.toindex(eid, self._idtype_str)
+                    u = utils.prepare_tensor(self, u, 'edges[0]')
+                    v = utils.prepare_tensor(self, v, 'edges[1]')
+                    eid = self.edge_id(u, v, etype=etype)
                 else:
-                    eid = utils.toindex(edges, self._idtype_str)
-                    u, v, _ = self._graph.find_edges(etid, eid)
+                    eid = utils.prepare_tensor(self, edges, 'edges')
+                    u, v = self.find_edges(eid, etype=etype)
                 all_vs.append(v)
                 if len(u) == 0:
                     # no edges to be triggered
                     continue
+                u = utils.toindex(u, self._idtype_str)
+                v = utils.toindex(v, self._idtype_str)
+                eid = utils.toindex(eid, self._idtype_str)
                 scheduler.schedule_snr(AdaptedHeteroGraph(self, stid, dtid, etid),
                                        (u, v, eid),
                                        mfunc, rfunc, afunc,
@@ -3172,7 +3168,7 @@ class DGLHeteroGraph(object):
         self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
-            dstnodes = F.unique(F.cat([x.tousertensor() for x in all_vs], 0))
+            dstnodes = F.unique(F.cat(all_vs, 0))
             self.apply_nodes(apply_node_func, dstnodes, ntype, inplace)
 
     def pull(self,
@@ -3245,15 +3241,15 @@ class DGLHeteroGraph(object):
                 [1.],
                 [1.]])
         """
-        check_same_dtype(self._idtype_str, v)
         # only one type of edges
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
-        v = utils.toindex(v, self._idtype_str)
+        v = utils.prepare_tensor(self, v, 'v')
         if len(v) == 0:
             return
         with ir.prog() as prog:
+            v = utils.toindex(v, self._idtype_str)
             scheduler.schedule_pull(AdaptedHeteroGraph(self, stid, dtid, etid),
                                     v,
                                     message_func, reduce_func, apply_node_func,
@@ -3319,8 +3315,7 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [3.]])
         """
-        check_same_dtype(self._idtype_str, v)
-        v = utils.toindex(v, self._idtype_str)
+        v = utils.prepare_tensor(self, v, 'v')
         if len(v) == 0:
             return
         # infer receive node type
@@ -3340,6 +3335,7 @@ class DGLHeteroGraph(object):
                     raise DGLError('Invalid per-type arguments. Should be '
                                    '(msg_func, reduce_func, [apply_node_func])')
                 mfunc, rfunc, afunc = args
+                v = utils.toindex(v, self._idtype_str)
                 scheduler.schedule_pull(AdaptedHeteroGraph(self, stid, dtid, etid),
                                         v,
                                         mfunc, rfunc, afunc,
@@ -3412,15 +3408,15 @@ class DGLHeteroGraph(object):
                 [0.],
                 [0.]])
         """
-        check_same_dtype(self._idtype_str, u)
         # only one type of edges
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
-        u = utils.toindex(u, self._idtype_str)
+        u = utils.prepare_tensor(self, u, 'u')
         if len(u) == 0:
             return
         with ir.prog() as prog:
+            u = utils.toindex(u, self._idtype_str)
             scheduler.schedule_push(AdaptedHeteroGraph(self, stid, dtid, etid),
                                     u,
                                     message_func, reduce_func, apply_node_func,
@@ -3790,22 +3786,14 @@ class DGLHeteroGraph(object):
         >>> g.filter_nodes(lambda nodes: (nodes.data['h'] == 1.).squeeze(1), ntype='user')
         tensor([1, 2])
         """
-        check_same_dtype(self._idtype_str, nodes)
-        ntid = self.get_ntype_id(ntype)
-        if is_all(nodes):
-            v = utils.toindex(slice(0, self._graph.number_of_nodes(ntid)), self._idtype_str)
-        else:
-            v = utils.toindex(nodes, self._idtype_str)
-
-        n_repr = self._get_n_repr(ntid, v)
-        nbatch = NodeBatch(v, n_repr, ntype=self.ntypes[ntid])
-        n_mask = F.copy_to(predicate(nbatch), F.cpu())
-
-        if is_all(nodes):
-            return F.nonzero_1d(n_mask)
-        else:
-            nodes = F.tensor(nodes)
-            return F.boolean_mask(nodes, n_mask)
+        with self.local_scope():
+            self.apply_nodes(lambda nbatch: {'_mask' : predicate(nbatch)}, nodes, ntype)
+            mask = self.nodes[ntype].data['_mask']
+            if is_all(nodes):
+                return F.nonzero_id(mask)
+            else:
+                v = utils.prepare_tensor(self, nodes, 'nodes')
+                return F.boolean_mask(v, mask[v])
 
     def filter_edges(self, predicate, edges=ALL, etype=None):
         """Return a tensor of edge IDs with the given edge type that satisfy
@@ -3841,40 +3829,17 @@ class DGLHeteroGraph(object):
         >>> g.filter_edges(lambda edges: (edges.data['h'] == 1.).squeeze(1), etype='follows')
         tensor([1, 2])
         """
-        check_same_dtype(self._idtype_str, edges)
-        etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
-        if is_all(edges):
-            u, v, _ = self._graph.edges(etid, 'eid')
-            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)), self._idtype_str)
-        elif isinstance(edges, tuple):
-            u, v = edges
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            # Find all edges including parallel edges
-            u, v = F.tensor(u, self.idtype), F.tensor(v, self.idtype)
-            # TODO(minjie): convert input to CPU tensor for now until cuda graph is fully online
-            u = F.copy_to(u, F.cpu())
-            v = F.copy_to(v, F.cpu())
-            u, v, eid = self._graph.edge_ids_all(etid, u, v)
-            u = utils.toindex(u, self._idtype_str)
-            v = utils.toindex(v, self._idtype_str)
-            eid = utils.toindex(eid, self._idtype_str)
-        else:
-            eid = utils.toindex(edges, self._idtype_str)
-            u, v, _ = self._graph.find_edges(etid, eid)
-
-        src_data = self._get_n_repr(stid, u)
-        edge_data = self._get_e_repr(etid, eid)
-        dst_data = self._get_n_repr(dtid, v)
-        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data,
-                           canonical_etype=self.canonical_etypes[etid])
-        e_mask = F.copy_to(predicate(ebatch), F.cpu())
-
-        if is_all(edges):
-            return F.nonzero_1d(e_mask)
-        else:
-            edges = F.tensor(edges)
-            return F.boolean_mask(edges, e_mask)
+        with self.local_scope():
+            self.apply_edges(lambda ebatch: {'_mask' : predicate(ebatch)}, edges, etype)
+            mask = self.edges[etype].data['_mask']
+            if is_all(edges):
+                return F.nonzero_id(mask)
+            else:
+                if isinstance(edges, tuple):
+                    e = self.edge_id(edges[0], edges[1], etype=etype)
+                else:
+                    e = utils.prepare_tensor(self, edges, 'edges')
+                return F.boolean_mask(e, mask[e])
 
     @property
     def device(self):

@@ -1290,19 +1290,11 @@ def test_apply(idtype):
 
     # test fail case
     # fail due to multiple types
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.apply_nodes(node_udf)
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.apply_edges(edge_udf)
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
 @parametrize_dtype
 def test_level2(idtype):
@@ -1338,12 +1330,8 @@ def test_level2(idtype):
     
     # test fail case
     # fail due to multiple types
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.send_and_recv([2, 3], mfunc, rfunc)
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
     # test multi
     g.multi_send_and_recv(
@@ -1377,15 +1365,11 @@ def test_level2(idtype):
 
     # test fail case
     # fail because cannot infer ntype
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.multi_send_and_recv(
             {'plays' : (g.edges(etype='plays'), mfunc, rfunc),
              'follows': (g.edges(etype='follows'), mfunc, rfunc2)},
             'sum')
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
     g.nodes['game'].data.clear()
 
@@ -1404,12 +1388,8 @@ def test_level2(idtype):
     assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
 
     # test fail case
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.pull(1, mfunc, rfunc)
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
     # test multi
     g.multi_pull(
@@ -1447,16 +1427,12 @@ def test_level2(idtype):
 
     # test fail case
     # fail because cannot infer ntype
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.multi_pull(
             1,
             {'plays' : (mfunc, rfunc),
              'follows': (mfunc, rfunc2)},
             'sum')
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
     g.nodes['game'].data.clear()
 
@@ -1476,12 +1452,8 @@ def test_level2(idtype):
 
     # test fail case
     # fail due to multiple types
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.update_all(mfunc, rfunc)
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
     # test multi
     g.multi_update_all(
@@ -1521,15 +1493,11 @@ def test_level2(idtype):
 
     # test fail case
     # fail because cannot infer ntype
-    fail = False
-    try:
+    with pytest.raises(DGLError):
         g.update_all(
             {'plays' : (mfunc, rfunc),
              'follows': (mfunc, rfunc2)},
             'sum')
-    except dgl.DGLError:
-        fail = True
-    assert fail
 
     g.nodes['game'].data.clear()
 
