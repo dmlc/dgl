@@ -271,6 +271,7 @@ def test_edge_softmax():
 @pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
 def test_edge_softmax2(idtype, g):
     g = g.astype(idtype).to(F.ctx())
+    g = g.local_var()
     a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
     a2 = a1.clone().detach().requires_grad_()
     g.edata['s'] = a1

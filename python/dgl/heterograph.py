@@ -1621,6 +1621,9 @@ class DGLHeteroGraph(object):
         (tensor([0, 1]), tensor([0, 2]))
         """
         eid = utils.prepare_tensor(self, eid, 'eid')
+        if len(eid) == 0:
+            empty = F.copy_to(F.tensor([], self.idtype), self.device)
+            return empty, empty
         # sanity check
         max_eid = F.as_scalar(F.max(eid, dim=0))
         if max_eid >= self.number_of_edges(etype):

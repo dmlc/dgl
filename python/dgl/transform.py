@@ -948,7 +948,7 @@ def compact_graphs(graphs, always_preserve=None):
     for ntype in ntypes:
         nodes = always_preserve.get(ntype, None)
         if nodes is None:
-            nodes = F.copy_to(F.tensor([0], idtype), device)
+            nodes = F.copy_to(F.tensor([], idtype), device)
         always_preserve_nd.append(F.to_dgl_nd(nodes))
 
     # Compact and construct heterographs

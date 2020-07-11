@@ -428,7 +428,7 @@ def test_in_subgraph(idtype):
     g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
     hg = dgl.hetero_from_relations([g1, g2, g3, g4])
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg._idtype_str == idtype
+    assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
     assert len(subg.etypes) == 4
     u, v = subg['follow'].edges()
@@ -454,7 +454,7 @@ def test_out_subgraph(idtype):
     g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
     hg = dgl.hetero_from_relations([g1, g2, g3, g4])
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg._idtype_str == idtype
+    assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
     assert len(subg.etypes) == 4
     u, v = subg['follow'].edges()
@@ -512,15 +512,15 @@ def test_compact(idtype):
     new_g1 = dgl.compact_graphs(g1)
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert new_g1._idtype_str == idtype
+    assert new_g1.idtype == idtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
     assert set(induced_nodes['game']) == set([4, 5, 6])
     _check(g1, new_g1, induced_nodes)
 
     # Test with always_preserve given a dict
     new_g1 = dgl.compact_graphs(
-        g1, always_preserve={'game': F.tensor([4, 7], dtype=getattr(F, idtype))})
-    assert new_g1._idtype_str == idtype
+        g1, always_preserve={'game': F.tensor([4, 7], idtype)})
+    assert new_g1.idtype == idtype
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
@@ -529,11 +529,11 @@ def test_compact(idtype):
 
     # Test with always_preserve given a tensor
     new_g3 = dgl.compact_graphs(
-        g3, always_preserve=F.tensor([1, 7], dtype=getattr(F, idtype)))
+        g3, always_preserve=F.tensor([1, 7], idtype))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     
-    assert new_g3._idtype_str == idtype
+    assert new_g3.idtype == idtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 7])
     _check(g3, new_g3, induced_nodes)
 
@@ -541,8 +541,8 @@ def test_compact(idtype):
     new_g1, new_g2 = dgl.compact_graphs([g1, g2])
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert new_g1._idtype_str == idtype
-    assert new_g2._idtype_str == idtype
+    assert new_g1.idtype == idtype
+    assert new_g2.idtype == idtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
     assert set(induced_nodes['game']) == set([3, 4, 5, 6])
     _check(g1, new_g1, induced_nodes)
@@ -550,11 +550,11 @@ def test_compact(idtype):
 
     # Test multiple graphs with always_preserve given a dict
     new_g1, new_g2 = dgl.compact_graphs(
-        [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=getattr(F, idtype))})
+        [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=idtype)})
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}    
-    assert new_g1._idtype_str == idtype
-    assert new_g2._idtype_str == idtype
+    assert new_g1.idtype == idtype
+    assert new_g2.idtype == idtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
     assert set(induced_nodes['game']) == set([3, 4, 5, 6, 7])
     _check(g1, new_g1, induced_nodes)
@@ -562,12 +562,12 @@ def test_compact(idtype):
 
     # Test multiple graphs with always_preserve given a tensor
     new_g3, new_g4 = dgl.compact_graphs(
-        [g3, g4], always_preserve=F.tensor([1, 7], dtype=getattr(F, idtype)))
+        [g3, g4], always_preserve=F.tensor([1, 7], dtype=idtype))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     
-    assert new_g3._idtype_str == idtype
-    assert new_g4._idtype_str == idtype
+    assert new_g3.idtype == idtype
+    assert new_g4.idtype == idtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 3, 5, 7])
     _check(g3, new_g3, induced_nodes)
     _check(g4, new_g4, induced_nodes)
@@ -651,27 +651,27 @@ def test_to_block(idtype):
     assert bg.number_of_src_nodes() == 4
     assert bg.number_of_dst_nodes() == 4
 
-    dst_nodes = F.tensor([4, 3, 2, 1], dtype=getattr(F, idtype))
+    dst_nodes = F.tensor([4, 3, 2, 1], dtype=idtype)
     bg = dgl.to_block(g_a, dst_nodes)
     check(g_a, bg, 'A', 'AA', dst_nodes)
 
     g_ab = g['AB']
 
     bg = dgl.to_block(g_ab)
-    assert bg._idtype_str == idtype
+    assert bg.idtype == idtype
     assert bg.number_of_nodes('SRC/B') == 4
     assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
     assert bg.number_of_nodes('DST/A') == 0
     checkall(g_ab, bg, None)
 
-    dst_nodes = {'B': F.tensor([5, 6, 3, 1], dtype=getattr(F, idtype))}
+    dst_nodes = {'B': F.tensor([5, 6, 3, 1], dtype=idtype)}
     bg = dgl.to_block(g, dst_nodes)
     assert bg.number_of_nodes('SRC/B') == 4
     assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
     assert bg.number_of_nodes('DST/A') == 0
     checkall(g, bg, dst_nodes)
 
-    dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=getattr(F, idtype)), 'B': F.tensor([3, 5, 6, 1], dtype=getattr(F, idtype))}
+    dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=idtype), 'B': F.tensor([3, 5, 6, 1], dtype=idtype)}
     bg = dgl.to_block(g, dst_nodes=dst_nodes)
     checkall(g, bg, dst_nodes)
 
@@ -701,30 +701,30 @@ def test_remove_edges(idtype):
     for fmt in ['coo', 'csr', 'csc']:
         for edges_to_remove in [[2], [2, 2], [3, 2], [1, 3, 1, 2]]:
             g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], restrict_format=fmt, idtype=idtype)
-            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, getattr(F, idtype)))
+            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
             check(g1, None, g, edges_to_remove)
 
             g = dgl.graph(
                 spsp.csr_matrix(([1, 1, 1, 1], ([0, 2, 1, 3], [1, 3, 2, 4])), shape=(5, 5)),
                 restrict_format=fmt, idtype=idtype)
-            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, getattr(F, idtype)))
+            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
             check(g1, None, g, edges_to_remove)
 
     g = dgl.heterograph({
         ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
         ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
         ('B', 'BA', 'A'): [(2, 3), (3, 2)]}, idtype=idtype)
-    g2 = dgl.remove_edges(g, {'AA': F.tensor([2], getattr(F, idtype)), 'AB': F.tensor([3], getattr(F, idtype)), 'BA': F.tensor([1], getattr(F, idtype))})
+    g2 = dgl.remove_edges(g, {'AA': F.tensor([2], idtype), 'AB': F.tensor([3], idtype), 'BA': F.tensor([1], idtype)})
     check(g2, 'AA', g, [2])
     check(g2, 'AB', g, [3])
     check(g2, 'BA', g, [1])
 
-    g3 = dgl.remove_edges(g, {'AA': F.tensor([], getattr(F, idtype)), 'AB': F.tensor([3], getattr(F, idtype)), 'BA': F.tensor([1], getattr(F, idtype))})
+    g3 = dgl.remove_edges(g, {'AA': F.tensor([], idtype), 'AB': F.tensor([3], idtype), 'BA': F.tensor([1], idtype)})
     check(g3, 'AA', g, [])
     check(g3, 'AB', g, [3])
     check(g3, 'BA', g, [1])
 
-    g4 = dgl.remove_edges(g, {'AB': F.tensor([3, 1, 2, 0], getattr(F, idtype))})
+    g4 = dgl.remove_edges(g, {'AB': F.tensor([3, 1, 2, 0], idtype)})
     check(g4, 'AA', g, [])
     check(g4, 'AB', g, [3, 1, 2, 0])
     check(g4, 'BA', g, [])
