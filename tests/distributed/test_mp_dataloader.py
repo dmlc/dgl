@@ -53,7 +53,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
-                              dgl.distributed.sampling.sample_neighbors)
+                              dgl.distributed.sample_neighbors)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DistDataLoader(
