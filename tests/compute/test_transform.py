@@ -787,11 +787,11 @@ def test_add_reverse():
         ('A', 'AA', 'A'): ([0, 1], [1, 3]),
         ('A', 'AB', 'B'): ([0, 1], [1, 2]),
         ('B', 'BB', 'B'): ([2, 4], [2, 3]),})
-    g.nodes['A'].data['x'] = F.randn(4, 3)
-    g.nodes['B'].data['x'] = F.randn(5, 4)
-    g.edges['AA'].data['x'] = F.randn(2, 3)
-    g.edges['AB'].data['x'] = F.randn(2, 2)
-    g.edges['BB'].data['x'] = F.randn(2, 6)
+    g.nodes['A'].data['x'] = F.randn((4, 3))
+    g.nodes['B'].data['x'] = F.randn((5, 4))
+    g.edges['AA'].data['x'] = F.randn((2, 3))
+    g.edges['AB'].data['x'] = F.randn((2, 2))
+    g.edges['BB'].data['x'] = F.randn((2, 6))
     fail = False
     try:
         new_g = dgl.add_reverse(g)
@@ -811,11 +811,11 @@ def test_add_reverse_types():
         ('A', 'AA', 'A'): ([0, 1], [1, 3]),
         ('A', 'AB', 'B'): ([0, 1], [1, 2]),
         ('B', 'BB', 'B'): ([2, 4], [2, 3]),})
-    g.nodes['A'].data['x'] = F.randn(4, 3)
-    g.nodes['B'].data['x'] = F.randn(5, 4)
-    g.edges['AA'].data['x'] = F.randn(2, 3)
-    g.edges['AB'].data['x'] = F.randn(2, 2)
-    g.edges['BB'].data['x'] = F.randn(2, 6)
+    g.nodes['A'].data['x'] = F.randn((4, 3))
+    g.nodes['B'].data['x'] = F.randn((5, 4))
+    g.edges['AA'].data['x'] = F.randn((2, 3))
+    g.edges['AB'].data['x'] = F.randn((2, 2))
+    g.edges['BB'].data['x'] = F.randn((2, 6))
 
     new_g = dgl.add_reverse_types(g)
     assert new_g.ntypes == ['A', 'B']
