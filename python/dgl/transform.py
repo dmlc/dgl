@@ -1383,8 +1383,8 @@ def add_reverse(g, ignore_bipartite=False):
     different source and destination node type exist, an error is raised unless
     ``ignore_bipartite`` is True.
 
-    For each edge with ID ``e`` connecting from node ``u`` to node ``v``, a new
-    edge with ID ``e + |E|`` connecting from node ``v`` to node ``u`` is added,
+    For each edge with ID ``e`` from node ``u`` to node ``v``, a new
+    edge with ID ``e + |E|`` from node ``v`` to node ``u`` is added,
     where ``|E|`` is the number of edges in the original graph.
 
     Parameters
