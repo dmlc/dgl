@@ -909,19 +909,17 @@ def test_to_device(idtype):
     assert F.context(g.edges['plays'].data['e']) == F.cpu()
     if F.is_cuda_available():
         g1 = g.to(F.cuda())
-        assert g.device == F.cuda()
-        assert F.context(g.nodes['user'].data['h']) == F.cuda()
-        assert F.context(g.nodes['game'].data['i']) == F.cuda()
-        assert F.context(g.edges['plays'].data['e']) == F.cuda()
-
-    # set feature after g.to
-    g = create_test_heterograph(index_dtype)
-    if F.is_cuda_available():
-        g1 = g.to(F.cuda())
-        assert g1 is not None
-        g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cuda())
-        g1.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cuda())
-        g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cuda())
+        assert g1.device == F.cuda()
+        assert F.context(g1.nodes['user'].data['h']) == F.cuda()
+        assert F.context(g1.nodes['game'].data['i']) == F.cuda()
+        assert F.context(g1.edges['plays'].data['e']) == F.cuda()
+        assert F.context(g.nodes['user'].data['h']) == F.cpu()
+        assert F.context(g.nodes['game'].data['i']) == F.cpu()
+        assert F.context(g.edges['plays'].data['e']) == F.cpu()
+        with pytest.raises(DGLError):
+            g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
+        with pytest.raises(DGLError):
+            g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
 
 @parametrize_dtype
 def test_convert_bound(idtype):
