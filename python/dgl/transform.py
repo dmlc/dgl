@@ -13,7 +13,7 @@ from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
-from .convert import graph, bipartite
+from .convert import graph, bipartite, heterograph
 from . import utils
 from .base import EID, NID
 from . import ndarray as nd
@@ -1406,8 +1406,17 @@ def add_reverse(g, ignore_bipartite=False):
     --------
     >>> g = dgl.graph(([0, 1, 2], [0, 2, 3]))
     >>> g2 = dgl.add_reverse(g)
-    >>> g.all_edges(order='eid')
+    >>> g2.edges(order='eid')
     (tensor([0, 1, 2, 0, 2, 3]), tensor([0, 2, 3, 0, 1, 2]))
+
+    >>> g = dgl.heterograph({
+    ...     ('A', 'AA', 'A'): ([0, 1, 2], [0, 2, 3]),
+    ...     ('B', 'BB', 'B'): ([1, 2, 3], [2, 3, 4])})
+    >>> g2 = dgl.add_reverse(g)
+    >>> g2.edges(etype='AA', order='eid')
+    (tensor([0, 1, 2, 0, 2, 3]), tensor([0, 2, 3, 0, 1, 2]))
+    >>> g2.edges(etype='BB', order='eid')
+    (tensor([1, 2, 3, 2, 3, 4]), tensor([2, 3, 4, 1, 2, 3]))
     """
     new_edges = {}
     num_nodes_dict = {g.number_of_nodes(ntype) for ntype in g.ntypes}
@@ -1418,10 +1427,10 @@ def add_reverse(g, ignore_bipartite=False):
         if utype != vtype:
             if not ignore_bipartite:
                 raise DGLError('cannot add reverse edge for edge type %s' % canonical_etype)
-            new_edges[canonical_etype] = g.all_edges(etype=canonical_etype, order='eid')
+            new_edges[canonical_etype] = g.edges(etype=canonical_etype, order='eid')
             edata[canonical_etype] = g.edges[canonical_etype].data
         else:
-            src, dst = g.all_edges(etype=canonical_etype, order='eid')
+            src, dst = g.edges(etype=canonical_etype, order='eid')
             new_edges[canonical_etype] = (F.cat([src, dst], 0), F.cat([dst, src], 0))
             edata[canonical_etype] = {
                 k: F.cat([v, v], 0) for k, v in g.edges[canonical_etype].data.items()}
