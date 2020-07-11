@@ -111,7 +111,7 @@ def main(tmpdir, num_server):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_dist_dataloader(tmpdir):
-    main(Path(tmp_dir), 3)
+    main(Path(tmpdir), 3)
 
 if __name__ == "__main__":
     import tempfile
