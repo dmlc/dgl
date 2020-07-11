@@ -13,8 +13,8 @@ udf_msg = {
     'sub': lambda edges: {'m': edges.src['x'] - edges.data['w']},
     'mul': lambda edges: {'m': edges.src['x'] * edges.data['w']},
     'div': lambda edges: {'m': edges.src['x'] / edges.data['w']},
-    'copy_u': lambda edges: {'m': edges.src['x']},
-    'copy_e': lambda edges: {'m': edges.data['w']}
+    'copy_lhs': lambda edges: {'m': edges.src['x']},
+    'copy_rhs': lambda edges: {'m': edges.data['w']}
 }
 
 def select(target, src, edge, dst):
@@ -115,9 +115,9 @@ def test_spmm(g, shp, msg, reducer):
         v = F.gather_row(v, non_degree_indices)
         if g.number_of_edges() > 0:
             F.backward(F.reduce_sum(v))
-            if msg != 'copy_e':
+            if msg != 'copy_rhs':
                 grad_u = F.grad(u)
-            if msg != 'copy_u':
+            if msg != 'copy_lhs':
                 grad_e = F.grad(e)
 
     with F.record_grad():
@@ -128,9 +128,9 @@ def test_spmm(g, shp, msg, reducer):
             print('forward passed')
 
             F.backward(F.reduce_sum(v1))
-            if msg != 'copy_e':
+            if msg != 'copy_rhs':
                 assert F.allclose(F.grad(g.srcdata['x']), grad_u)
-            if msg != 'copy_u':
+            if msg != 'copy_lhs':
                 assert F.allclose(F.grad(g.edata['w']), grad_e)
             print('backward passed')
 
@@ -206,4 +206,4 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg):
     if 'm' in g.edata: g.edata.pop('m')
 
 if __name__ == '__main__':
-    test_spmm(graphs[0], spmm_shapes[5], 'copy_u', 'sum')
+    test_spmm(graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')
