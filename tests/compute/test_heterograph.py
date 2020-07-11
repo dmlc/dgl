@@ -885,6 +885,15 @@ def test_to_device(index_dtype):
         g1 = g.to(F.cuda())
         assert g1 is not None
 
+    # set feature after g.to
+    g = create_test_heterograph(index_dtype)
+    if F.is_cuda_available():
+        g1 = g.to(F.cuda())
+        assert g1 is not None
+        g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cuda())
+        g1.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cuda())
+        g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cuda())
+
 @parametrize_dtype
 def test_convert_bound(index_dtype):
     def _test_bipartite_bound(data, card):
@@ -2068,7 +2077,7 @@ if __name__ == '__main__':
     # test_flatten()
     # test_convert_bound()
     # test_convert()
-    # test_to_device()
+    # test_to_device("int32")
     # test_transform("int32")
     # test_subgraph("int32")
     # test_subgraph_mask("int32")
