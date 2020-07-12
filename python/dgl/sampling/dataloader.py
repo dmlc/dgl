@@ -261,7 +261,8 @@ class Collator(ABC):
 
 class NodeCollator(Collator):
     """
-    DGL collator to combine training node classification or regression on a single graph.
+    DGL collator to combine nodes and their computation dependencies within a minibatch for
+    training node classification or regression on a single graph with neighborhood sampling.
 
     Parameters
     ----------
@@ -338,3 +339,127 @@ class NodeCollator(Collator):
                 for ntype in blocks[0].srctypes}
 
         return input_nodes, output_nodes, blocks
+
+class EdgeCollator(Collator):
+    """
+    DGL collator to combine edges and their computation dependencies within a minibatch for
+    training edge classification, edge regression, or link prediction on a single graph
+    with neighborhood sampling.
+
+    Given a set of edges, the collate function will yield
+
+    * A tensor of input nodes necessary for computing the representation on edges, or
+      a dictionary of node type names and such tensors.
+
+    * A graph that contains only the edges in the minibatch and their incident nodes.
+      Note that the graph has an identical metagraph with the original graph.
+
+    * If a negative sampler is given, another graph that contains the "negative edges",
+      connecting the source and destination nodes yielded from the given negative sampler.
+
+    * A list of blocks necessary for computing the representation of the incident nodes
+      of the edges in the minibatch.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The graph.
+    eids : Tensor or dict[etype, Tensor]
+        The edge set to compute outputs.
+    block_sampler : :py:class:`~dgl.sampling.BlockSampler`
+        The neighborhood sampler.
+    exclude : str, optional
+        Whether and how to exclude dependencies related to the sampled edges in the
+        minibatch.  Possible values are
+
+        * None, which excludes nothing.
+
+        * `'reverse'`, which excludes the reverse edges of the sampled edges.  The said
+          reverse edges have the same edge type as the sampled edges.  Only works
+          on edge types whose source node type is the same as its destination node type
+          (see also :py:func:`dgl.transform.add_reverse`).
+
+        * `'reverse_types'`, which excludes the reverse edges of the sampled edges.  The
+          said reverse edges have different edge types from the sampled edges (see also
+          :py:func:`dgl.transform.add_reverse_types`).
+    reverse_edge_ids : Tensor or dict[etype, Tensor], optional
+        The mapping from original edge ID to its reverse edge ID.
+
+        Only used when ``exclude`` is set to ``reverse``.
+
+        For heterogeneous graph this will be a dict of edge type and edge IDs.  Note that
+        only the edge types whose source node type is the same as destination node type
+        are needed.
+
+        If not given, assumes that the reverse edges are added by the function
+        :py:func:`dgl.transform.add_reverse`.
+    reverse_etypes : dict[etype, etype]
+        The mapping from the edge type to its reverse edge type.
+
+        Only used when ``exclude`` is set to ``reverse_types``.
+
+        If not given, assumes that the reverse edge type name is the original edge
+        type name suffixed by ``'_inv'``, same as the default behavior of
+        :py:func:`dgl.transform.add_reverse_types`.
+    negative_sampler : callable, optional
+        The negative sampler.  Can be omitted if no negative sampling is needed.
+
+        The negative sampler must be a callable that takes in the following arguments:
+
+        * The original (heterogeneous) graph.
+
+        * The ID array of sampled edges in the minibatch, or the dictionary of edge
+          types and ID array of sampled edges in the minibatch if the graph is
+          heterogeneous.
+
+        It should return
+
+        * A pair of source and destination node ID arrays as negative samples,
+          or a dictionary of edge types and such pairs if the graph is heterogenenous.
+
+        A set of builtin negative samplers are provided in
+        :py:mod:`dgl.sampling.negative_sampler`.
+
+    Examples
+    --------
+    The following example shows how to train a 3-layer GNN for edge classification on a
+    set of edges ``train_eid`` on a homogeneous undirected graph.  Each node takes
+    messages from all neighbors.  We first make ``g`` bidirectional by adding reverse
+    edges:
+    >>> g = dgl.add_reverse(g)
+
+    Then we create a ``DataLoader`` for iterating.  Note that the sampled edges as well
+    as their reverse edges are removed from computation dependencies of the incident nodes.
+    This is a common trick to avoid information leakage.
+    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
+    >>> collator = dgl.sampling.EdgeCollator(g, train_eid, sampler, exclude='reverse')
+    >>> dataloader = torch.utils.data.DataLoader(
+    ...     collator.dataset, collate_fn=collator.collate,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pair_graph, blocks in dataloader:
+    ...     train_on(input_nodes, pair_graph, blocks)
+
+    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` on a
+    homogeneous graph where each node takes messages from all neighbors (assume the
+    backend is PyTorch), with 5 uniformly chosen negative samples per edge:
+    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
+    >>> neg_sampler = dgl.sampling.negative_sampler.Uniform(5)
+    >>> collator = dgl.sampling.EdgeCollator(
+    ...     g, train_eid, sampler, exclude='reverse', negative_sampler=neg_sampler)
+    >>> dataloader = torch.utils.data.DataLoader(
+    ...     collator.dataset, collate_fn=collator.collate,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
+    ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
+
+    See also
+    --------
+    Please refer to the following tutorial/examples:
+
+    * Edge classification on heterogeneous graph: GCMC
+
+    * Link prediction on homogeneous graph: GraphSAGE for unsupervised learning
+
+    * Link prediction on heterogeneous graph: RGCN for link prediction.
+    """
+    pass
