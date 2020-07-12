@@ -142,6 +142,141 @@ def segmented_knn_graph(x, k, segs):
     g = DGLGraph(adj, readonly=True)
     return g
 
+def to_bidirected(g, readonly=None, share_ndata=True, 
+                  share_edata=False, ignore_bipartite=False):
+    """Convert the graph to a bidirected one.
+    
+    For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this 
+    function creates a new graph with edges 
+    :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
+    
+    For a heterograph with multiple edge types, we can treat edges corresponding 
+    to each type as a separate graph and convert the graph to a bidirected one 
+    for each of them. 
+    
+    Since **to_bidirected is not well defined for unidirectional bipartite graphs**, 
+    an error will be raised if an edge type of the input heterograph is for a 
+    unidirectional bipartite graph. We can simply skip the edge types corresponding 
+    to unidirectional bipartite graphs by specifying ``ignore_bipartite=True``.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    readonly : bool, default to be True
+        Whether the returned bidirected graph is readonly or not.
+    share_ndata: bool, optional
+        If True, the node features of the bidirected graph will
+        be the same as the original graph. If False, the bidirected
+        graph will not have any node features.
+        (Default: True)
+    share_edata: bool, optional
+        If True, the edge features of the reversed edges will
+        identical to their conrresponding original edges.
+        If False, the bidirected graph will not have any edge
+        features.
+        (Default: False)
+    ignore_bipartite: bool, optional
+        If True, unidirectional bipartite graphs are ignored and 
+        no error is raised. If False, an error  will be raised if
+        an edge type of the input heterograph is for a unidirectional
+        bipartite graph.
+
+    Returns
+    -------
+    DGLGraph
+
+    Examples
+    --------
+    The following two examples use PyTorch backend, one for non-multi graph
+    and one for multi-graph.
+
+    **Homographs**
+
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(2)
+    >>> g.add_edges([0, 0], [0, 1])
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 1, 0]), tensor([0, 0, 1]))
+
+    **Heterographs with Multiple Edge Types**
+
+    g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
+    >>>     ('user', 'follows', 'user): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
+
+    The to_bidirected operation is applied to the subgraph
+    corresponding to ('user', 'wins', 'user') and the
+    subgraph corresponding to ('user', 'follows', 'user).
+    The unidirectional bipartite subgraph ('user', 'plays', 'game')
+    is ignored. Both the node features and edge features
+    are shared.
+
+    >>> bg = dgl.to_bidirected(g, share_ndata=True, 
+                               share_edata=True, ignore_bipartite=True)
+    >>> bg.all_edges(('user', 'wins', 'user'))
+    (tensor([0, 2, 0, 2, 2, 1, 1, 2, 1, 0]), tensor([1, 1, 2, 1, 0, 0, 2, 0, 2, 2]))
+    >>> bg.all_edges(('user', 'follows', 'user'))
+    (tensor([1, 2, 1, 0, 0, 0]), tensor([0, 0, 0, 1, 2, 1]))
+    >>> bg.all_edges(('user', 'plays', 'game'))
+    (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> bg.nodes['game'].data['hv']
+    tensor([0, 0, 0])
+    >>> bg.edges[('user', 'wins', 'user')].data['h']
+    th.tensor([0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
+    """
+    canonical_etypes = g.canonical_etypes
+    metagraph = g._graph.metagraph
+    # fast path
+    if ignore_bipartite is False:
+        for i, c_etype in enumerate(canonical_etypes):
+            if c_etype[0] != c_etype[2]:
+                assert False, "to_bidirected is not well defined for " \
+                    "unidirectional bipartite graphs" \
+                    ", but {} is unidirectional bipartite".format(c_etype)
+        hgidx = joint_union(g._graph,
+                            g._graph.reverse())
+        new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
+    else:
+        gidxes = []
+        for i, c_etype in enumerate(canonical_etypes):
+            if c_etype[0] != c_etype[2]:
+                gidxes.append(g._graph.get_relation_graph(i))
+            else:
+                gidxes.append(joint_union(
+                    g._graph.get_relation_graph(i),
+                    g._graph.get_relation_graph(i).reverse())
+        hgidx = g._graph.create_heterograph_from_relations(metagraph,
+                                                           gidxes)
+        new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
+
+    # handle features
+    if share_ndata:
+        # for each ntype
+        for ntype in g.ntypes:
+            # for each data field
+            for k in g.nodes[ntype].data:
+                new_g.nodes[ntype].data[k] = g.nodes[ntype].data[k]
+
+    if share_edata:
+        # for each etype
+        for c_etype in canonical_etypes:
+            if c_etype[0] != c_etype[2]:
+                # for each data field
+                for k in g.edges[etype].data:
+                    new_g.edges[etype].data[k] = g.edges[etype].data[k]
+            else:
+                for k in g.edges[etype].data:
+                    new_g.edges[etype].data[k] = 
+                        F.cat([g.edges[etype].data[k], g.edges[etype].data[k]], dim=0)
+    return new_g
+
+
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
