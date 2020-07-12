@@ -114,6 +114,52 @@ def test_reverse():
     assert g.edge_id(2, 1) == rg.edge_id(1, 2)
 
     # test dgl.reverse_heterograph
+    # test homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 2]), F.tensor([1, 2, 0])))
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.]])
+    g_r = dgl.reverse_heterograph(g)
+    assert g.number_of_nodes() == g_r.number_of_nodes()
+    assert g.number_of_edges() == g_r.number_of_edges()
+    u_g, v_g, eids_g = g.all_edges(form='all')
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all')
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
+    assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
+    assert len(g_r.edata) == 0
+
+    # without share ndata
+    g_r = dgl.reverse_heterograph(g, share_ndata=False)
+    assert g.number_of_nodes() == g_r.number_of_nodes()
+    assert g.number_of_edges() == g_r.number_of_edges()
+    assert len(g_r.ndata) == 0
+    assert len(g_r.edata) == 0
+
+    # with share ndata and edata
+    g_r = dgl.reverse_heterograph(g, share_ndata=True, share_edata=True)
+    assert g.number_of_nodes() == g_r.number_of_nodes()
+    assert g.number_of_edges() == g_r.number_of_edges()
+    assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
+    assert F.array_equal(g.edata['h'], g_r.edata['h'])
+
+    # inplace update
+    g.ndata['h'] += 1
+    assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
+    # add new node feature to g_r
+    g_r.ndata['hh'] = F.tensor([0, 1, 2])
+    assert ('hh' in g.ndata) is False
+    assert ('hh' in g_r.ndata) is True
+
+    # inplace update
+    g.edata['h'] += 1
+    assert F.array_equal(g.edata['h'], g_r.edata['h'])
+    # add new edge feature to g_r
+    g_r.edata['hh'] = F.tensor([0, 1, 2])
+    assert ('hh' in g.edata) is False
+    assert ('hh' in g_r.edata) is True
+
+    # test heterogeneous graph
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
         ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
@@ -152,6 +198,7 @@ def test_reverse():
     assert F.array_equal(v_g, u_rg)
     assert F.array_equal(eids_g, eids_rg)
 
+    # withour share ndata
     g_r = dgl.reverse_heterograph(g, share_ndata=False)
     for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
         assert etype_g[0] == etype_gr[2]
@@ -172,7 +219,22 @@ def test_reverse():
         assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
     assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
     assert F.array_equal(g.edges['follows'].data['hh'], g_r.edges['follows'].data['hh'])
+    
+    # inplace update
+    g.nodes['user'].data['h'] += 1
+    assert F.array_equal(g.nodes['user'].data['h'], g_r.nodes['user'].data['h'])
+    # add new node feature to g_r
+    g_r.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
+    assert ('hhh' in g.nodes['user'].data) is False
+    assert ('hhh' in g_r.nodes['user'].data) is True
 
+    # inplace update
+    g.edges['follows'].data['h'] += 1
+    assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
+    # add new edge feature to g_r
+    g_r.edges['follows'].data['hhh'] = F.tensor([1, 2, 3, 2, 0, 0, 1])
+    assert ('hhh' in g.edges['follows'].data) is False
+    assert ('hhh' in g_r.edges['follows'].data) is True
 
 def test_reverse_shared_frames():
     g = dgl.DGLGraph()
