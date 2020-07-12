@@ -577,7 +577,7 @@ def test_to_simple(index_dtype):
     g = dgl.graph((F.tensor([0, 1, 2, 1]), F.tensor([1, 2, 0, 2])))
     g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
     g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
-    sg, wb = dgl.to_simple(g)
+    sg, wb = dgl.to_simple(g, writeback_mapping=True)
     u, v = g.all_edges(form='uv', order='eid')
     u = F.asnumpy(u).tolist()
     v = F.asnumpy(v).tolist()
@@ -608,7 +608,7 @@ def test_to_simple(index_dtype):
         index_dtype=index_dtype)
     g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
     g.nodes['user'].data['hh'] = F.tensor([0, 1, 2, 3, 4])
-    sg, wb = dgl.to_simple(g, return_counts='weights')
+    sg, wb = dgl.to_simple(g, return_counts='weights', writeback_mapping=True)
     g.nodes['game'].data['h'] = F.tensor([0, 1, 2, 3, 4, 5])
 
     for etype in g.canonical_etypes:

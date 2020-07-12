@@ -1255,7 +1255,7 @@ def out_subgraph(g, nodes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
 
-def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True):
+def to_simple(g, return_counts='count', writeback_mapping=False, share_ndata=True):
     r"""Convert a graph to a simple graph without duplicate edges.
 
     For a heterograph with multiple edge types, we can
@@ -1289,7 +1289,7 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     writeback_mapping: bool, optional
         If True, a write back mapping is returned for each edge
         type subgraph. If False, only the simple graph is returned.
-        (Default: True)
+        (Default: False)
     share_ndata: bool, optional
         If True, the node features of the simple graph will
         be the same as the original graph. If False, the simple
@@ -1324,7 +1324,7 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     stored in the edge feature 'cnt' and the writeback mapping
     is returned in a tensor.
 
-    >>> sg, wm = dgl.to_simple(g, return_counts='cnt')
+    >>> sg, wm = dgl.to_simple(g, return_counts='cnt', writeback_mapping=True)
     >>> sg.ndata['h']
     tensor([[0.],
             [1.],
@@ -1375,7 +1375,7 @@ def to_simple(g, return_counts='count', writeback_mapping=True, share_ndata=True
     The return counts is stored in the default edge feature
     'count'.
 
-    >>> sg, wm = dgl.to_simple(g, share_ndata=False)
+    >>> sg, wm = dgl.to_simple(g, share_ndata=False, writeback_mapping=True)
     >>> sg
     Graph(num_nodes={'game': 3, 'user': 3},
           num_edges={('user', 'wins', 'user'): 4, ('game', 'plays', 'user'): 3},
