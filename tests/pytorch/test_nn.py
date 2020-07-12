@@ -26,8 +26,8 @@ def test_graph_conv(idtype, g, norm, weight, bias):
     g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
     ext_w = F.randn((5, 2)).to(F.ctx())
-    nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
-    ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
     h = F.randn((nsrc, 5)).to(F.ctx())
     h_dst = F.randn((ndst, 2)).to(F.ctx())
     if weight:

@@ -989,6 +989,16 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
 #endif  // _WIN32
   });
 
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLArrayCastToSigned")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray array = args[0];
+    CHECK_EQ(array->dtype.code, kDLUInt);
+    std::vector<int64_t> shape(array->shape, array->shape + array->ndim);
+    DLDataType dtype = array->dtype;
+    dtype.code = kDLInt;
+    *rv = array.CreateView(shape, dtype, 0);
+  });
+
 }  // namespace aten
 }  // namespace dgl
 

@@ -1051,7 +1051,7 @@ def create_from_networkx(nx_graph,
             for attr in node_attrs:
                 attr_dict[attr].append(nx_graph.nodes[nid][attr])
         for attr in node_attrs:
-            g.ndata[attr] = _batcher(attr_dict[attr])
+            g.ndata[attr] = F.copy_to(_batcher(attr_dict[attr]), g.device)
 
     if edge_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
@@ -1078,7 +1078,7 @@ def create_from_networkx(nx_graph,
             for val in attr_dict[attr]:
                 if val is None:
                     raise DGLError('Not all edges have attribute {}.'.format(attr))
-            g.edata[attr] = _batcher(attr_dict[attr])
+            g.edata[attr] = F.copy_to(_batcher(attr_dict[attr]), g.device)
 
     return g
 

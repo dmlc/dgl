@@ -18,8 +18,8 @@ if not os.getenv("USE_TFDLPACK", False):
     if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
         raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
 
-    def zerocopy_to_dlpack(input):
-        return tf.experimental.dlpack.to_dlpack(input)
+    def zerocopy_to_dlpack(data):
+        return tf.experimental.dlpack.to_dlpack(data)
 
     def zerocopy_from_dlpack(dlpack_tensor):
         # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
@@ -426,11 +426,14 @@ def zerocopy_from_numpy(np_array):
     return t
 
 
-def zerocopy_to_dgl_ndarray(input):
-    print('>>>>>>>', input)
-    ret = nd.from_dlpack(zerocopy_to_dlpack(input))
-    print('>>>>>>!', ret)
-    return ret
+def zerocopy_to_dgl_ndarray(data):
+    if data.dtype == tf.int32 and device_type(data.device) == 'gpu':
+        # NOTE: TF doesn't keep int32 tensors due to legacy issues with shape inference.
+        #   Convert it to uint32 and cast it back afterwards.
+        data = tf.cast(data, tf.uint32)
+        return nd.cast_to_signed(nd.from_dlpack(zerocopy_to_dlpack(data)))
+    else:
+        return nd.from_dlpack(zerocopy_to_dlpack(data))
 
 
 def zerocopy_from_dgl_ndarray(input):

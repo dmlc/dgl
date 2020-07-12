@@ -90,6 +90,26 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
+def cast_to_signed(array):
+    """Cast this NDArray from unsigned integer to signed one.
+
+    uint64 -> int64
+    uint32 -> int32
+
+    Useful for backends with poor signed integer support (e.g., TensorFlow).
+
+    Parameters
+    ----------
+    array : NDArray
+        Input array
+
+    Returns
+    -------
+    NDArray
+        Cased array
+    """
+    return _CAPI_DGLArrayCastToSigned(array)
+
 def exist_shared_mem_array(name):
     """ Check the existence of shared-memory array.
 
