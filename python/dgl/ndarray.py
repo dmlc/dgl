@@ -90,7 +90,7 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
-def cast_to_signed(array):
+def cast_to_signed(arr):
     """Cast this NDArray from unsigned integer to signed one.
 
     uint64 -> int64
@@ -100,7 +100,7 @@ def cast_to_signed(array):
 
     Parameters
     ----------
-    array : NDArray
+    arr : NDArray
         Input array
 
     Returns
@@ -108,7 +108,7 @@ def cast_to_signed(array):
     NDArray
         Cased array
     """
-    return _CAPI_DGLArrayCastToSigned(array)
+    return _CAPI_DGLArrayCastToSigned(arr)
 
 def exist_shared_mem_array(name):
     """ Check the existence of shared-memory array.
