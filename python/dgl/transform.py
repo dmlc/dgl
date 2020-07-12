@@ -306,7 +306,7 @@ def khop_graph(g, k):
     return DGLGraph(from_coo(n, row, col, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
-    """Return the reverse of a graph
+    r"""Return the reverse of a graph.
 
     The reverse (also called converse, transpose) of a graph with edges
     :math:`(i_1, j_1), (i_2, j_2), \cdots` is a new graph with edges
@@ -343,7 +343,7 @@ def reverse(g, share_ndata=False, share_edata=False):
     Examples
     --------
     **Homographs or Heterographs with A Single Edge Type**
-    
+
     Create a graph to reverse.
 
     >>> import dgl
@@ -372,7 +372,7 @@ def reverse(g, share_ndata=False, share_edata=False):
 
     **In-place operations on features of one graph will be reflected on features of
     its reverse. Out-place operations will not be reflected.**
-    
+
     >>> rg.ndata['h'] += 1
     >>> g.ndata['h']
     tensor([[1.],
@@ -395,12 +395,12 @@ def reverse(g, share_ndata=False, share_edata=False):
     >>> })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
-    
+
     The reverse of the graph above can be obtained by combining the reverse of the
     subgraph corresponding to ('user', 'follows', 'user') and the subgraph corresponding
     to ('user', 'plays', 'game'). The reverse for a graph with relation (h, r, t) will
     have relation (t, r, h).
-    
+
     >>> rg = dgl.reverse(g, share_ndata=True)
     >>> rg
     Graph(num_nodes={'game': 3, 'user': 3},
