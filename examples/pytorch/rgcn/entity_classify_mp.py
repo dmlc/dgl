@@ -26,6 +26,8 @@ from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
 
+from ogb.nodeproppred import DglNodePropPredDataset
+
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
     Parameters
@@ -158,7 +160,7 @@ class NeighborSampler:
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset):
     dev_id = devices[proc_id]
-    g, num_of_ntype, num_classes, num_rels, target_idx, \
+    g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
 
     node_tids = g.ndata[dgl.NTYPE]
@@ -172,7 +174,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
     # validation sampler
     val_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
     val_loader = DataLoader(dataset=val_idx.numpy(),
-                            batch_size=args.batch_size,
+                            batch_size=args.eval_batch_size,
                             collate_fn=val_sampler.sample_blocks,
                             shuffle=False,
                             num_workers=args.num_workers)
@@ -180,7 +182,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
     # validation sampler
     test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
     test_loader = DataLoader(dataset=test_idx.numpy(),
-                             batch_size=args.batch_size,
+                             batch_size=args.eval_batch_size,
                              collate_fn=test_sampler.sample_blocks,
                              shuffle=False,
                              num_workers=args.num_workers)
@@ -199,7 +201,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
-    node_feats = [None] * num_of_ntype
     embed_layer = RelGraphEmbedLayer(dev_id,
                                      g.number_of_nodes(),
                                      node_tids,
@@ -254,11 +255,15 @@ def run(proc_id, n_gpus, args, devices, dataset):
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
             t0 = time.time()
-            feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
-                                blocks[0].srcdata[dgl.NTYPE].to(dev_id),
-                                node_feats)
+            if args.mix_cpu_gpu is False:
+                feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
+                                    blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                                    node_feats)
+            else:
+                feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                                    blocks[0].srcdata[dgl.NTYPE],
+                                    node_feats)
             logits = model(blocks, feats)
-
             loss = F.cross_entropy(logits, labels[seeds])
             t1 = time.time()
             loss.backward()
@@ -280,20 +285,26 @@ def run(proc_id, n_gpus, args, devices, dataset):
             model.eval()
             eval_logtis = []
             eval_seeds = []
-            for i, sample_data in enumerate(val_loader):
-                seeds, blocks = sample_data
-                feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
-                                    blocks[0].srcdata[dgl.NTYPE].to(dev_id),
-                                    node_feats)
-                logits = model(blocks, feats)
-                eval_logtis.append(logits)
-                eval_seeds.append(seeds)
-            eval_logtis = th.cat(eval_logtis)
-            eval_seeds = th.cat(eval_seeds)
-            val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds])
-            val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds]).item() / len(eval_seeds)
-            print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
-                    format(val_acc, val_loss.item()))
+            with th.no_grad():
+                for i, sample_data in enumerate(val_loader):
+                    seeds, blocks = sample_data
+                    if args.mix_cpu_gpu is False:
+                        feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
+                                            blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                                            node_feats)
+                    else:
+                        feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                                            blocks[0].srcdata[dgl.NTYPE],
+                                            node_feats)
+                    logits = model(blocks, feats)
+                    eval_logtis.append(logits)
+                    eval_seeds.append(seeds)
+                eval_logtis = th.cat(eval_logtis)
+                eval_seeds = th.cat(eval_seeds)
+                val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds])
+                val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds]).item() / len(eval_seeds)
+                print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
+                        format(val_acc, val_loss.item()))
         if n_gpus > 1:
             th.distributed.barrier()
     print()
@@ -303,20 +314,26 @@ def run(proc_id, n_gpus, args, devices, dataset):
         model.eval()
         test_logtis = []
         test_seeds = []
-        for i, sample_data in enumerate(test_loader):
-            seeds, blocks = sample_data
-            feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
-                                blocks[0].srcdata[dgl.NTYPE].to(dev_id),
-                                [None] * num_of_ntype)
-            logits = model(blocks, feats)
-            test_logtis.append(logits)
-            test_seeds.append(seeds)
-        test_logtis = th.cat(test_logtis)
-        test_seeds = th.cat(test_seeds)
-        test_loss = F.cross_entropy(test_logtis, labels[test_seeds])
-        test_acc = th.sum(test_logtis.argmax(dim=1) == labels[test_seeds]).item() / len(test_seeds)
-        print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
-        print()
+        with th.no_grad():
+            for i, sample_data in enumerate(test_loader):
+                seeds, blocks = sample_data
+                if args.mix_cpu_gpu is False:
+                    feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
+                                        blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                                        node_feats)
+                else:
+                    feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                                        blocks[0].srcdata[dgl.NTYPE],
+                                        node_feats)
+                logits = model(blocks, feats)
+                test_logtis.append(logits)
+                test_seeds.append(seeds)
+            test_logtis = th.cat(test_logtis)
+            test_seeds = th.cat(test_seeds)
+            test_loss = F.cross_entropy(test_logtis, labels[test_seeds])
+            test_acc = th.sum(test_logtis.argmax(dim=1) == labels[test_seeds]).item() / len(test_seeds)
+            print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+            print()
 
     print("{}/{} Mean forward time: {:4f}".format(proc_id, n_gpus,
                                                   np.mean(forward_time[len(forward_time) // 4:])))
@@ -334,26 +351,69 @@ def main(args, devices):
         dataset = BGS()
     elif args.dataset == 'am':
         dataset = AM()
+    elif args.dataset == 'ogbn-mag':
+        dataset = DglNodePropPredDataset(name=args.dataset)
+        ogb_dataset = True
     else:
         raise ValueError()
 
-    # Load from hetero-graph
-    hg = dataset.graph
+    if ogb_dataset is True:
+        split_idx = dataset.get_idx_split()
+        train_idx = split_idx["train"]['paper']
+        val_idx = split_idx["valid"]['paper']
+        test_idx = split_idx["test"]['paper']
+        hg, labels = dataset[0]
+        subgs = {}
+        for etype in hg.canonical_etypes:
+            u, v = hg.all_edges(etype=etype)
+            subgs[etype] = (u, v)
+            subgs[(etype[2], 'rev-'+etype[1], etype[0])] = (v, u)
+        hg = dgl.heterograph(subgs)
+        labels = labels['paper'].squeeze()
 
-    num_rels = len(hg.canonical_etypes)
-    num_of_ntype = len(hg.ntypes)
-    category = dataset.predict_category
-    num_classes = dataset.num_classes
-    train_idx = dataset.train_idx
-    test_idx = dataset.test_idx
-    labels = dataset.labels
+        num_rels = len(hg.canonical_etypes)
+        num_of_ntype = len(hg.ntypes)
+        num_classes = dataset.num_classes
+        if args.dataset == 'ogbn-mag':
+            category = 'paper'
+        print('Number of relations: {}'.format(num_rels))
+        print('Number of class: {}'.format(num_classes))
+        print('Number of train: {}'.format(len(train_idx)))
+        print('Number of valid: {}'.format(len(val_idx)))
+        print('Number of test: {}'.format(len(test_idx)))
 
-    # split dataset into train, validate, test
-    if args.validation:
-        val_idx = train_idx[:len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5:]
+        if args.node_feats:
+            node_feats = []
+            for ntype in g.ntypes:
+                if len(hg.nodes[ntype].data) == 0:
+                    node_feats.append(None)
+                else:
+                    assert en(hg.nodes[ntype].data) == 1
+                    for k in hg.nodes[ntype].data:
+                        feat = hg.nodes[ntype].data[k]
+                        hg.nodes[ntype].data.drop(k)
+                        node_feats.append(feat.share_memory_())
+        else:
+            node_feats = [None] * num_of_ntype
     else:
-        val_idx = train_idx
+        # Load from hetero-graph
+        hg = dataset.graph
+
+        num_rels = len(hg.canonical_etypes)
+        num_of_ntype = len(hg.ntypes)
+        category = dataset.predict_category
+        num_classes = dataset.num_classes
+        train_idx = dataset.train_idx
+        test_idx = dataset.test_idx
+        labels = dataset.labels
+        node_feats = [None] * num_of_ntype
+
+        # split dataset into train, validate, test
+        if args.validation:
+            val_idx = train_idx[:len(train_idx) // 5]
+            train_idx = train_idx[len(train_idx) // 5:]
+        else:
+            val_idx = train_idx
 
     # calculate norm for each edge type and store in edge
     for canonical_etypes in hg.canonical_etypes:
@@ -386,12 +446,12 @@ def main(args, devices):
     # cpu
     if devices[0] == -1:
         run(0, 0, args, ['cpu'], 
-            (g, num_of_ntype, num_classes, num_rels, target_idx,
+            (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels))
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, args, devices,
-            (g, num_of_ntype, num_classes, num_rels, target_idx,
+            (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
             train_idx, val_idx, test_idx, labels))
     # multi gpu
     else:
@@ -404,7 +464,7 @@ def main(args, devices):
                                          if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
                                          else num_train_seeds]
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices,
-                                             (g, num_of_ntype, num_classes, num_rels, target_idx,
+                                             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
                                              proc_train_seeds, val_idx, test_idx, labels)))
             p.start()
             procs.append(p)
@@ -443,6 +503,8 @@ def config():
     fp.add_argument('--testing', dest='validation', action='store_false')
     parser.add_argument("--batch-size", type=int, default=100,
             help="Mini-batch size. ")
+    parser.add_argument("--eval-batch-size", type=int, default=128,
+            help="Mini-batch size. ")
     parser.add_argument("--num-workers", type=int, default=0,
             help="Number of workers for dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
@@ -451,6 +513,8 @@ def config():
             help="Whether store node embeddins in cpu")
     parser.add_argument("--sparse-embedding", action='store_true',
             help='Use sparse embedding for node embeddings.')
+    parser.add_argument('--node-feats', default=False, action='store_true',
+            help='Whether use node features')
     parser.set_defaults(validation=True)
     args = parser.parse_args()
     return args

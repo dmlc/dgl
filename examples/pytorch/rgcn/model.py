@@ -121,9 +121,10 @@ class RelGraphEmbedLayer(nn.Module):
         tsd_idx = node_ids < self.num_nodes
         tsd_ids = node_ids[tsd_idx]
         embeds = self.node_embeds(tsd_ids)
+        embeds = embeds.to(self.dev_id)
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
                 embeds[loc] = features[ntype] @ self.embeds[str(ntype)]
 
-        return embeds.to(self.dev_id)
+        return embeds
