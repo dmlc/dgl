@@ -399,7 +399,7 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
   const auto len = std::max(rowlen, collen);
   if (len == 0)
     return {NullArray(), NullArray(), NullArray()};
-  
+
   const auto& ctx = row->ctx;
   const auto nbits = row->dtype.bits;
   const int64_t nnz = csr.indices->shape[0];
@@ -514,7 +514,7 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 
   // Indptr needs to be adjusted according to the new nnz per row.
   IdArray ret_indptr = CumSum(count, true);
-  
+
   // Column & data can be obtained by index select.
   IdArray ret_col = IndexSelect(csr.indices, idx);
   IdArray ret_data = CSRHasData(csr)? IndexSelect(csr.data, idx) : idx;

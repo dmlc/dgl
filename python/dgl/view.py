@@ -278,7 +278,8 @@ class HeteroNodeView(object):
     def __call__(self, ntype=None):
         """Return the nodes."""
         return F.copy_to(F.arange(0, self._graph.number_of_nodes(ntype),
-                         dtype=self._graph.idtype), self._graph.device)
+                                  dtype=self._graph.idtype),
+                         self._graph.device)
 
 class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""

@@ -3,21 +3,18 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from contextlib import contextmanager
-import copy
+import numbers
 import networkx as nx
 import numpy as np
-import numbers
 
 from . import graph_index
 from . import heterograph_index
 from . import utils
 from . import backend as F
-from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
-from .udf import NodeBatch, EdgeBatch
 from ._ffi.function import _init_api
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
@@ -4633,21 +4630,21 @@ class AdaptedHeteroGraph(GraphAdapter):
         nodes = nodes.tousertensor(self.graph.device)
         src, dst, eid = self.graph._graph.in_edges(self.etid, nodes)
         return (utils.toindex(src, self.graph._graph.dtype),
-               utils.toindex(dst, self.graph._graph.dtype),
-               utils.toindex(eid, self.graph._graph.dtype))
+                utils.toindex(dst, self.graph._graph.dtype),
+                utils.toindex(eid, self.graph._graph.dtype))
 
     def out_edges(self, nodes):
         nodes = nodes.tousertensor(self.graph.device)
         src, dst, eid = self.graph._graph.out_edges(self.etid, nodes)
         return (utils.toindex(src, self.graph._graph.dtype),
-               utils.toindex(dst, self.graph._graph.dtype),
-               utils.toindex(eid, self.graph._graph.dtype))
+                utils.toindex(dst, self.graph._graph.dtype),
+                utils.toindex(eid, self.graph._graph.dtype))
 
     def edges(self, form):
         src, dst, eid = self.graph._graph.edges(self.etid, form)
         return (utils.toindex(src, self.graph._graph.dtype),
-               utils.toindex(dst, self.graph._graph.dtype),
-               utils.toindex(eid, self.graph._graph.dtype))
+                utils.toindex(dst, self.graph._graph.dtype),
+                utils.toindex(eid, self.graph._graph.dtype))
 
     def get_immutable_gidx(self, ctx):
         return self.graph._graph.get_unitgraph(self.etid, ctx)

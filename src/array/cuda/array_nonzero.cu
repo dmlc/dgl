@@ -30,7 +30,7 @@ IdArray NonZero(IdArray array) {
   thrust::device_ptr<IdType> in_data(array.Ptr<IdType>());
   thrust::device_ptr<int64_t> out_data(ret.Ptr<int64_t>());
   // TODO(minjie): should take control of the memory allocator.
-  //   See PyTorch's implementation here: 
+  //   See PyTorch's implementation here:
   //   https://github.com/pytorch/pytorch/blob/1f7557d173c8e9066ed9542ada8f4a09314a7e17/
   //     aten/src/THC/generic/THCTensorMath.cu#L104
   auto startiter = thrust::make_counting_iterator<int64_t>(0);

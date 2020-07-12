@@ -161,7 +161,7 @@ def graph(data,
             data, ntype, etype, restrict_format=restrict_format, idtype=idtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
-    
+
     if (device is not None and utils.to_dgl_context(device).device_type == 2
             and idtype == F.int64):
         dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
@@ -329,8 +329,8 @@ def bipartite(data,
             data, utype, etype, vtype, restrict_format=restrict_format, idtype=idtype)
     elif isinstance(data, nx.Graph):
         g = create_from_networkx_bipartite(data, utype, etype, vtype,
-                                              restrict_format=restrict_format,
-                                              idtype=idtype, **kwargs)
+                                           restrict_format=restrict_format,
+                                           idtype=idtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 

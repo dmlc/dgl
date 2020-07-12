@@ -8,6 +8,7 @@
 
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
+#include <memory>
 
 /*!
  * \brief StreamWithCount counts the bytes that already written into the
