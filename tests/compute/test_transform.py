@@ -573,6 +573,35 @@ def test_compact(index_dtype):
 
 @parametrize_dtype
 def test_to_simple(index_dtype):
+    # homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 2, 1]), F.tensor([1, 2, 0, 2])))
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
+    sg, wb = dgl.to_simple(g)
+    u, v = g.all_edges(form='uv', order='eid')
+    u = F.asnumpy(u).tolist()
+    v = F.asnumpy(v).tolist()
+    uv = list(zip(u, v))
+    eid_map = F.asnumpy(wb)
+
+    su, sv = sg.all_edges(form='uv', order='eid')
+    su = F.asnumpy(su).tolist()
+    sv = F.asnumpy(sv).tolist()
+    suv = list(zip(su, sv))
+    sc = F.asnumpy(sg.edata['count'])
+    assert set(uv) == set(suv)
+    for i, e in enumerate(suv):
+        assert sc[i] == sum(e == _e for _e in uv)
+    for i, e in enumerate(uv):
+        assert eid_map[i] == suv.index(e)
+    assert F.array_equal(sg.ndata['h'], g.ndata['h'])
+    assert ('h' in sg.edata) is False
+
+    sg = dgl.to_simple(g, writeback_mapping=False, share_ndata=False)
+    assert ('h' in sg.ndata) is False
+    assert ('h' in sg.edata) is False
+
+    # heterogeneous graph
     g = dgl.heterograph({
         ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1], [1, 3, 2, 3, 4, 4]),
         ('user', 'plays', 'game'): ([3, 2, 1, 1, 3, 2, 2], [5, 3, 4, 4, 5, 3, 3])},
