@@ -496,8 +496,7 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo']))
-@pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
-def test_agnn_conv(g, idtype, aggregator_type):
+def test_agnn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     agnn = nn.AGNNConv(1)
@@ -508,8 +507,7 @@ def test_agnn_conv(g, idtype, aggregator_type):
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite']))
-@pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
-def test_agnn_conv_bi(g, idtype, aggregator_type):
+def test_agnn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     agnn = nn.AGNNConv(1)
