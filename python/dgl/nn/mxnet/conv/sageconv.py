@@ -107,6 +107,12 @@ class SAGEConv(nn.Block):
 
             h_self = feat_dst
 
+            # Handle the case of graphs without edges
+            if graph.number_of_edges() == 0:
+                dst_neigh = mx.nd.zeros((graph.number_of_dst_nodes(), self._in_src_feats))
+                dst_neigh = dst_neigh.as_in_context(feat_dst.context)
+                graph.dstdata['neigh'] = dst_neigh
+
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = feat_src
                 graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
