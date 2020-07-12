@@ -113,6 +113,7 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_pinsage_sampling():
     def _test_sampler(g, sampler, ntype):
         neighbor_g = sampler(F.tensor([0, 2], dtype=F.int64))
