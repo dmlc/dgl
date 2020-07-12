@@ -374,12 +374,12 @@ class EdgeCollator(Collator):
 
         * None, which excludes nothing.
 
-        * `'reverse'`, which excludes the reverse edges of the sampled edges.  The said
+        * ``'reverse'``, which excludes the reverse edges of the sampled edges.  The said
           reverse edges have the same edge type as the sampled edges.  Only works
           on edge types whose source node type is the same as its destination node type
           (see also :py:func:`dgl.transform.add_reverse`).
 
-        * `'reverse_types'`, which excludes the reverse edges of the sampled edges.  The
+        * ``'reverse_types'``, which excludes the reverse edges of the sampled edges.  The
           said reverse edges have different edge types from the sampled edges (see also
           :py:func:`dgl.transform.add_reverse_types`).
     reverse_edge_ids : Tensor or dict[etype, Tensor], optional
@@ -393,7 +393,7 @@ class EdgeCollator(Collator):
 
         If not given, assumes that the reverse edges are added by the function
         :py:func:`dgl.transform.add_reverse`.
-    reverse_etypes : dict[etype, etype]
+    reverse_etypes : dict[etype, etype], optional
         The mapping from the edge type to its reverse edge type.
 
         Only used when ``exclude`` is set to ``reverse_types``.
