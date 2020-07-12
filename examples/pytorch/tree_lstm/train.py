@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 import dgl
-from dgl.data.tree import SSTDataset, SSTBatch
+from dgl.data import SSTDataset
 
 from tree_lstm import TreeLSTM
 

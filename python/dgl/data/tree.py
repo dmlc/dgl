@@ -5,7 +5,7 @@ Including:
 """
 from __future__ import absolute_import
 
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 import networkx as nx
 
 import numpy as np
@@ -17,7 +17,7 @@ from ..graph import DGLGraph
 from .utils import _get_dgl_url, save_graphs, save_info, load_graphs, \
     load_info, deprecate_property, deprecate_class
 
-__all__ = ['SSTBatch', 'SST', 'SSTDataset']
+__all__ = ['SST', 'SSTDataset']
 
 
 class SSTDataset(DGLBuiltinDataset):
@@ -38,14 +38,23 @@ class SSTDataset(DGLBuiltinDataset):
     .. note::
         All the samples will be loaded and preprocessed in the memory first.
 
+    Statistics
+    ----------
+    Train examples: 8544
+    Dev examples: 2
+    Test examples: 2
+    Number of classes for each node: 5
+
     Parameters
     ----------
     mode : str, optional
         Can be ``'train'``, ``'dev'``, ``'test'`` and specifies which data file to use.
     glove_embed_file : str, optional
         The path to pretrained glove embedding file.
+        Default: None
     vocab_file : str, optional
-        Optional vocabulary file.
+        Optional vocabulary file. If not given, the default vacabulary file is used.
+        Default: None
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
@@ -68,20 +77,24 @@ class SSTDataset(DGLBuiltinDataset):
 
     Examples
     --------
-    >>> data = SSTDataset()
-    >>> len(data.trees)
+    >>> # get dataset
+    >>> train_data = SSTDataset()
+    >>> dev_data = SSTDataset(mode='dev')
+    >>> test_data = SSTDataset(mode='test')
+    >>>
+    >>> len(train_data.trees)
     8544
-    >>> data.num_classes
+    >>> train_data.num_classes
     5
-    >>> glove_embed = data.pretrained_emb
-    >>> data.vocab_size
+    >>> glove_embed = train_data.pretrained_emb
+    >>> train_data.vocab_size
     19536
-    >>> data.trees[0]
+    >>> train_data.trees[0]
     DGLGraph(num_nodes=71, num_edges=70,
          ndata_schemes={'x': Scheme(shape=(), dtype=torch.int64), 'y': Scheme(shape=(),
           dtype=torch.int64), 'mask': Scheme(shape=(), dtype=torch.int64)}
          edata_schemes={})
-    >>> for tree in data:
+    >>> for tree in train_data:
     ...     input_ids = tree.ndata['x']
     ...     labels = tree.ndata['y']
     ...     mask = tree.ndata['mask']
@@ -110,11 +123,11 @@ class SSTDataset(DGLBuiltinDataset):
                                          force_reload=force_reload,
                                          verbose=verbose)
 
-    def process(self, root_path):
+    def process(self):
         from nltk.corpus.reader import BracketParseCorpusReader
         # load vocab file
         self._vocab = OrderedDict()
-        vocab_file = self._vocab_file if self._vocab_file is not None else os.path.join(root_path, 'vocab.txt')
+        vocab_file = self._vocab_file if self._vocab_file is not None else os.path.join(self.raw_path, 'vocab.txt')
         with open(vocab_file, encoding='utf-8') as vf:
             for line in vf.readlines():
                 line = line.strip()
@@ -129,7 +142,7 @@ class SSTDataset(DGLBuiltinDataset):
                     if sp[0].lower() in self._vocab:
                         glove_emb[sp[0].lower()] = np.asarray([float(x) for x in sp[1:]])
         files = ['{}.txt'.format(self.mode)]
-        corpus = BracketParseCorpusReader(root_path, files)
+        corpus = BracketParseCorpusReader(self.raw_path, files)
         sents = corpus.parsed_sents(files[0])
 
         # initialize with glove
@@ -201,42 +214,16 @@ class SSTDataset(DGLBuiltinDataset):
 
     @property
     def vocab(self):
-        r"""
-        Returns
-        -------
-        OrderedDict
-            Vocabulary of the dataset
-        """
         return self._vocab
 
     @property
     def pretrained_emb(self):
-        """ Pretrained Glove Embedding. """
         return self._pretrained_emb
 
     def __getitem__(self, idx):
-        """Get the tree with index idx.
-
-        Parameters
-        ----------
-        idx : int
-            Tree index.
-
-        Returns
-        -------
-        dgl.DGLGraph
-            Tree.
-        """
         return self.trees[idx]
 
     def __len__(self):
-        """Get the number of trees in the dataset.
-
-        Returns
-        -------
-        int
-            Number of trees.
-        """
         return len(self.trees)
 
     @property
@@ -251,9 +238,6 @@ class SSTDataset(DGLBuiltinDataset):
     @property
     def num_classes(self):
         return 5
-
-
-SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
 
 
 class SST(SSTDataset):
