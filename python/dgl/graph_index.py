@@ -1064,6 +1064,9 @@ def from_csr(indptr, indices, direction):
         direction)
     return gidx
 
+def joint_union(metagraph, gidx_list):
+    pass
+
 def from_shared_mem_graph_index(shared_mem_name):
     """Load a graph index from the shared memory.
 
