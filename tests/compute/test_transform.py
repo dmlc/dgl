@@ -56,7 +56,7 @@ def test_hetero_linegraph(index_dtype):
                           np.array([0, 1, 2, 4]))
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csr', index_dtype=index_dtype)
     lg = dgl.line_heterograph(g)
     assert lg.number_of_nodes() == 5
@@ -67,7 +67,7 @@ def test_hetero_linegraph(index_dtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csc', index_dtype=index_dtype)
     lg = dgl.line_heterograph(g)
     assert lg.number_of_nodes() == 5
@@ -213,7 +213,7 @@ def test_reverse():
         assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
     assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
     assert F.array_equal(g.edges['follows'].data['hh'], g_r.edges['follows'].data['hh'])
-    
+
     # add new node feature to g_r
     g_r.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
     assert ('hhh' in g.nodes['user'].data) is False
@@ -232,7 +232,7 @@ def test_reverse_shared_frames():
     g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
     g.edata['h'] = F.tensor([[3.], [4.], [5.]])
 
-    rg = g.reverse(copy_ndata=True, copy_edata=True)
+    rg = g.reverse(share_ndata=True, share_edata=True)
     assert F.allclose(g.ndata['h'], rg.ndata['h'])
     assert F.allclose(g.edata['h'], rg.edata['h'])
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
@@ -640,7 +640,7 @@ def test_compact(index_dtype):
         g3, always_preserve=F.tensor([1, 7], dtype=getattr(F, index_dtype)))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 7])
     _check(g3, new_g3, induced_nodes)
@@ -660,7 +660,7 @@ def test_compact(index_dtype):
     new_g1, new_g2 = dgl.compact_graphs(
         [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=getattr(F, index_dtype))})
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}    
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert new_g1._idtype_str == index_dtype
     assert new_g2._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
@@ -673,7 +673,7 @@ def test_compact(index_dtype):
         [g3, g4], always_preserve=F.tensor([1, 7], dtype=getattr(F, index_dtype)))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3._idtype_str == index_dtype
     assert new_g4._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 3, 5, 7])
