@@ -1944,7 +1944,7 @@ def test_reverse(index_dtype):
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
     }, index_dtype=index_dtype)
     gidx = g._graph
-    r_gidx = gidx.reverse(gidx.metagraph)
+    r_gidx = gidx.reverse()
 
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
@@ -1956,7 +1956,7 @@ def test_reverse(index_dtype):
     # force to start with 'csr'
     gidx = gidx.to_format('csr')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse(gidx.metagraph)
+    r_gidx = gidx.reverse()
     assert gidx.format_in_use(0)[0] == 'csr'
     assert r_gidx.format_in_use(0)[0] == 'csc'
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
@@ -1969,7 +1969,7 @@ def test_reverse(index_dtype):
     # force to start with 'csc'
     gidx = gidx.to_format('csc')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse(gidx.metagraph)
+    r_gidx = gidx.reverse()
     assert gidx.format_in_use(0)[0] == 'csc'
     assert r_gidx.format_in_use(0)[0] == 'csr'
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
@@ -1985,7 +1985,14 @@ def test_reverse(index_dtype):
         ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
         }, index_dtype=index_dtype)
     gidx = g._graph
-    r_gidx = gidx.reverse(gidx.metagraph)
+    r_gidx = gidx.reverse()
+
+    # metagraph
+    mg = gidx.metagraph
+    r_mg = r_gidx.metagraph
+    for etype in range(3):
+        assert mg.find_edge(etype) == r_mg.find_edge(etype)[::-1]
+
     # three node types and three edge types
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
@@ -2009,7 +2016,7 @@ def test_reverse(index_dtype):
     # force to start with 'csr'
     gidx = gidx.to_format('csr')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse(gidx.metagraph)
+    r_gidx = gidx.reverse()
     # three node types and three edge types
     assert gidx.format_in_use(0)[0] == 'csr'
     assert r_gidx.format_in_use(0)[0] == 'csc'
@@ -2039,7 +2046,7 @@ def test_reverse(index_dtype):
     # force to start with 'csc'
     gidx = gidx.to_format('csc')
     gidx = gidx.to_format('any')
-    r_gidx = gidx.reverse(gidx.metagraph)
+    r_gidx = gidx.reverse()
     # three node types and three edge types
     assert gidx.format_in_use(0)[0] == 'csc'
     assert r_gidx.format_in_use(0)[0] == 'csr'
