@@ -44,7 +44,9 @@ def submit_jobs(args):
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
         cmd = cmd + ' ' + args.udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
+        print(cmd)
         execute_remote(cmd, ip)
+    print("----------")
     # launch client tasks
     client_cmd = 'DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
@@ -60,6 +62,7 @@ def submit_jobs(args):
         cmd = client_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
         cmd = cmd + ' ' + args.udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
+        print(cmd)
         execute_remote(cmd, ip)
 
     while True:
@@ -81,8 +84,6 @@ def main():
     parser.add_argument('--udf_command', type=str,
                         help='User-defined command line')
     args, udf_command = parser.parse_known_args()
-    print(args)
-    print(udf_command)
     assert len(udf_command) == 1, 'Please provide user command line.'
     args.udf_command = udf_command[0]
     submit_jobs(args)
