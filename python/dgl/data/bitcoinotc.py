@@ -18,6 +18,13 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
 
     Offical website: https://snap.stanford.edu/data/soc-sign-bitcoin-otc.html
 
+    Statistics
+    ----------
+    Nodes: 5,881
+    Edges: 35,592
+    Range of edge weight: -10 to +10
+    Percentage of positive edges: 89%
+
     Parameters
     ----------
     raw_dir : str
@@ -38,6 +45,8 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
     Examples
     --------
     >>> data = BitcoinOTCDataset()
+    >>> len(data)
+    136
     >>> for g in data:
     ....    # get edge feature
     ....    e_feat = g.edata['h']
@@ -64,8 +73,8 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
                               'Otherwise you can create an issue for it.'.format(self.name + '.csv.gz'))
         extract_archive(gz_file_path, self.raw_path)
 
-    def process(self, root_path):
-        filename = os.path.join(root_path, self.name + '.csv')
+    def process(self):
+        filename = os.path.join(self.save_path, self.name + '.csv')
         data = np.loadtxt(filename, delimiter=',').astype(np.int64)
         data[:, 0:2] = data[:, 0:2] - data[:, 0:2].min()
         num_nodes = data[:, 0:2].max() - data[:, 0:2].min() + 1
@@ -117,4 +126,3 @@ class BitcoinOTC(BitcoinOTCDataset):
     def __init__(self):
         deprecate_class('BitcoinOTC', 'BitcoinOTCDataset')
         super(BitcoinOTC, self).__init__()
-
