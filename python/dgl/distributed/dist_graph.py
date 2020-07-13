@@ -1,8 +1,8 @@
 """Define distributed graph."""
 
 from collections.abc import MutableMapping
-import numpy as np
 import os
+import numpy as np
 
 from ..graph import DGLGraph
 from .. import backend as F
@@ -344,7 +344,7 @@ class DistGraph:
 
     * When a user runs the training script normally, DistGraph will be in the standalone mode.
     In this mode, the input graph has to be constructed with only one partition. This mode is
-    used for testing and debugging purpose. 
+    used for testing and debugging purpose.
     * When a user runs the training script with the distributed launch script, DistGraph will
     be set into the distributed mode. This is used for actual distributed training.
 

@@ -18,7 +18,6 @@ class KVClient(object):
 
     def barrier(self):
         '''barrier'''
-        pass
 
     def register_push_handler(self, name, func):
         '''register push handler'''
@@ -32,7 +31,7 @@ class KVClient(object):
         '''add data to the client'''
         self._data[name] = tensor
 
-    def init_data(self, name, shape, dtype, part_policy, init_func):
+    def init_data(self, name, shape, dtype, _, init_func):
         '''add new data to the client'''
         self._data[name] = init_func(shape, dtype)
 
