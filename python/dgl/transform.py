@@ -1387,6 +1387,9 @@ def add_reverse(g, ignore_bipartite=False):
     edge with ID ``e + |E|`` from node ``v`` to node ``u`` is added,
     where ``|E|`` is the number of edges in the original graph.
 
+    Node features and edge features will inherit from the original graph.  The reverse
+    edges will have the same features as that of the original edges.
+
     Parameters
     ----------
     g : DGLHeteroGraph
@@ -1449,6 +1452,9 @@ def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
     For each edge with ID ``e`` of type ``etype`` connecting from node ``u`` of type ``utype``
     to node ``v`` of type ``vtype``, a new edge with ID ``e`` of type ``etype_inv`` connecting
     from node ``v`` of type ``vtype`` to node ``u`` of type ``utype`` is added.
+
+    Node features and edge features will inherit from the original graph.  The reverse
+    edge types will have the same features as that of the original edge types.
 
     Notes
     -----
