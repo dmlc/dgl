@@ -514,4 +514,14 @@ class EdgeCollator(Collator):
         blocks : list[DGLHeteroGraph]
             The list of blocks necessary for computing the representation of the edges.
         """
-        pass
+        if isinstance(items[0], tuple):
+            items = utils.group_as_dict(items)
+
+        pair_graph = self.g.edge_subgraph(items)
+
+        if self.negative_sampler is not None:
+            neg_edges = self.negative_sampler(items)
+            if isinstance(neg_edges, Mapping):
+                neg_edges = {self.g.to_canonical_etype(k): v for k, v in neg_edges.items()}
+                neg_graph = heterograph(
+                    neg_edges, {ntype: self.g.number_of_ndoes(ntype) for ntype in self.g.ntypes})
