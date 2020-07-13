@@ -1428,7 +1428,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
             for key in g.edges[c_etype].data:
                 feat_idx = F.asnumpy(edge_maps[i])
                 _, indices = np.unique(feat_idx, return_index=True)
-                simple_graph.edges[c_etype].data[key] =
+                simple_graph.edges[c_etype].data[key] = \
                     F.gather_row(g.edges[c_etype].data[key],
                                  F.copy_to(F.tensor(indices),
                                            F.context(g.edges[c_etype].data[key])))
