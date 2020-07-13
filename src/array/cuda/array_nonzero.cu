@@ -6,6 +6,7 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/copy.h>
 #include <thrust/functional.h>
+#include <thrust/device_vector.h>
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
