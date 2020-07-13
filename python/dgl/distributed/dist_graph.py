@@ -296,6 +296,7 @@ class DistGraphServer(KVServer):
         # Load graph partition data.
         self.client_g, node_feats, edge_feats, self.gpb, graph_name = load_partition(conf_file,
                                                                                      server_id)
+        print('load ' + graph_name)
         if not disable_shared_mem:
             self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
@@ -324,6 +325,7 @@ class DistGraphServer(KVServer):
         """
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
+        print('start graph service on server ' + str(self.server_id))
         start_server(server_id=self.server_id, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
 
