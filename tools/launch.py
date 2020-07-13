@@ -1,5 +1,6 @@
 """Launching tool for DGL distributed training"""
 import os
+import stat
 import sys
 import subprocess
 import argparse
@@ -19,20 +20,7 @@ def execute_remote(cmd, ip):
     thread.setDaemon(True)
     thread.start()
 
-def kill_python_proc(args):
-    """Kill all the python processes accross machines via ssh"""
-    ip_config = args.workspace + '/' + args.ip_config
-    with open(ip_config) as f:
-        for line in f:
-            ip, _, _ = line.strip().split(' ')
-            cmd = 'pkill -9 python'
-            execute_remote(cmd, ip)
-
-    # use ctl+C to exit
-    while True:
-        time.sleep(10)
-
-def submit_jobs(server_cmd, client_cmd, args):
+def submit_jobs(args):
     """Submit distributed jobs (server and client processes) via ssh"""
     hosts = []
     server_count_per_machine = 0
@@ -45,84 +33,57 @@ def submit_jobs(server_cmd, client_cmd, args):
             server_count_per_machine = count
             hosts.append((ip, port))
     assert args.num_client % len(hosts) == 0
-    client_count_per_machine = args.num_client / len(hosts)
+    client_count_per_machine = int(args.num_client / len(hosts))
     # launch server tasks
+    server_cmd = 'DGL_ROLE=server'
+    server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
+    server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
+    server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
     for i in range(len(hosts)*server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
-        cmd = server_cmd + ' --id ' + str(i)
+        cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
+        cmd = cmd + ' ' + args.udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip)
     # launch client tasks
+    client_cmd = 'DGL_ROLE=client'
+    client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
+    client_cmd = client_cmd + ' ' + 'python3 -m torch.distributed.launch'
+    client_cmd = client_cmd + ' ' + '--nproc_per_node=' + str(client_count_per_machine)
+    client_cmd = client_cmd + ' ' + '--nnodes=' + str(len(hosts))
+    client_cmd = client_cmd + ' ' + '--node_rank=0'
+    client_cmd = client_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
+    client_cmd = client_cmd + ' ' + '--master_port=1200'
     for i in range(args.num_client):
-        ip, _ = hosts[int(i / client_count_per_machine)]
-        cmd = client_cmd.replace('node_rank=0', 'node_rank='+str(i))
+        node_id = int(i / client_count_per_machine)
+        ip, _ = hosts[node_id]
+        cmd = client_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
+        cmd = cmd + ' ' + args.udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip)
 
-    # use ctl+C to exit
     while True:
         time.sleep(10)
 
-def server_command(args):
-    server_cmd = 'python3 ' + str(args.exe_file) + ' --server'
-    server_cmd = server_cmd + ' --graph-name ' + str(args.graph_name)
-    server_cmd = server_cmd + ' --num-client ' + str(args.num_client)
-    server_cmd = server_cmd + ' --conf_path ' + str(args.conf_path)
-    server_cmd = server_cmd + ' --ip_config ' + str(args.ip_config)
-    return server_cmd
-
-def client_command(args, udf_args):
-    client_cmd = 'python3 -m torch.distributed.launch'
-    client_cmd = client_cmd + ' --nproc_per_node=' + str(args.nproc_per_node)
-    client_cmd = client_cmd + ' --nnodes=' + str(args.nnodes)
-    client_cmd = client_cmd + ' --node_rank=' + str(0)
-    client_cmd = client_cmd + ' --master_addr=' + str(args.master_addr)
-    client_cmd = client_cmd + ' --master_port=' + str(args.master_port)
-    client_cmd = client_cmd + ' ' + str(args.exe_file)
-    client_cmd = client_cmd + ' --graph-name ' + str(args.graph_name)
-    client_cmd = client_cmd + ' --ip_config ' + str(args.ip_config)
-    client_cmd = client_cmd + ' ' + udf_args
-    return client_cmd 
-
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
-    ########## common args ####################
-    parser.add_argument('--kill',  action='store_true',
-                        help='kill all the python processes on cluster')
     parser.add_argument('--workspace', type=str,
-                        help='Path of user workspace')
-    parser.add_argument('--ip_config', type=str, default='ip_config.txt',
-                        help='The file for IP configuration')
-    parser.add_argument('--exe_file', type=str,
-                        help="Python executable file")
-    parser.add_argument('--server', action='store_true',
-                        help='wether this is a server')
-    parser.add_argument('--graph-name', type=str, 
-                        help='graph name')
-    parser.add_argument('--num-client', type=int, 
-                        help='Total number of clients on cluster')
+                        help='Path of user directory of distributed tasks. \
+                        This is used to specify a destination location where \
+                        the contents of current directory will be rsyncd')
+    parser.add_argument('--num_client', type=int, 
+                        help='Total number of client processes in the cluster')
     parser.add_argument('--conf_path', type=str, 
-                        help='The path to the partition config file')
-    ####### Pytorch distributed ################
-    parser.add_argument('--nproc_per_node', type=int, default=1,
-                        help='Number of processes per node')
-    parser.add_argument('--nnodes', type=int, 
-                        help='Total number of nodes')
-    parser.add_argument('--master_addr', type=str, 
-                        help='IP address of master node')
-    parser.add_argument('--master_port', type=int, default=1250,
-                        help='Port of master node')
-    ####### User-defined args ###################
-    parser.add_argument('--udf_args', type=str,
-                        help='user-defined arguments.')
-    args, udf_args = parser.parse_known_args()
-
-    if args.kill:
-        kill_python_proc(args)
-    else:
-        server_cmd = server_command(args)
-        client_cmd = client_command(args, udf_args[0])
-        submit_jobs(server_cmd, client_cmd, args)
+                        help='The path to the partition config file. This path can be \
+                        a remote path like s3 and dgl will download this file automatically')
+    parser.add_argument('--ip_config', type=str, 
+                        help='The file for IP configuration for server processes')
+    parser.add_argument('--udf_command', type=str,
+                        help='User-defined command line')
+    args, udf_command = parser.parse_known_args()
+    assert len(udf_command) == 1, 'Please provide user command line.'
+    args.udf_command = udf_command[0]
+    submit_jobs(args)
 
 def signal_handler(signal, frame):
     logging.info('Stop launcher')
