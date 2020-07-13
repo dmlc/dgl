@@ -683,6 +683,20 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
 HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
 /*!
+ * \brief Joint Union multiple graphs into one graphs.
+ *
+ * All input graphs should have the same metagraph.
+ *
+ * TODO(xiangsx): remove the meta_graph argument
+ * 
+ * \param meta_graph Metagraph of the inputs and result.
+ * \param component_graphs Input graphs
+ * \return One graph that unions all the components
+ */
+HeteroGraphPtr JointUnionHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+/*!
  * \brief Union multiple graphs into one with each input graph as one disjoint component.
  *
  * All input graphs should have the same metagraph.

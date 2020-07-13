@@ -8,6 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
+from dgl.heterograph_index import joint_union
 from utils import parametrize_dtype
 
 def create_test_heterograph(index_dtype):
@@ -2066,6 +2067,219 @@ def test_reverse(index_dtype):
     assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
     assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
 
+@parametrize_dtype
+def test_joint_union(index_dtype):
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
+    }, index_dtype=index_dtype)
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([3, 1, 2, 4, 3 ,1, 0], [1, 2, 3, 2, 0, 0, 1]),
+    }, index_dtype=index_dtype)
+    gidx1 = g1._graph
+    gidx2 = g2._graph
+
+    u_gidx = joint_union(gidx1.metagraph, [gidx1, gidx2])
+    assert gidx1.number_of_nodes(0) == u_gidx.number_of_nodes(0)
+    assert (gidx1.number_of_edges(0) + gidx2.number_of_edges(0)) == u_gidx.number_of_edges(0)
+    g1_s, g1_d, _ = gidx1.edges(0)
+    g2_s, g2_d, _ = gidx2.edges(0)
+    ug_s, ug_d, _ = u_gidx.edges(0)
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+
+    # force to start with 'csr'
+    gidx1 = gidx1.to_format('csr')
+    gidx2 = gidx2.to_format('csr')
+    u_gidx = joint_union(gidx1.metagraph, [gidx1, gidx2])
+    assert gidx1.format_in_use(0)[0] == 'csr'
+    assert u_gidx.format_in_use(0)[0] == 'csr'
+    assert gidx1.number_of_nodes(0) == u_gidx.number_of_nodes(0)
+    assert (gidx1.number_of_edges(0) + gidx2.number_of_edges(0)) == u_gidx.number_of_edges(0)
+    gidx1 = gidx1.to_format('any')
+    gidx2 = gidx2.to_format('any')
+    g1_s, g1_d, _ = gidx1.edges(0, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(0, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(0, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+
+    # force to start with 'csc'
+    gidx1 = gidx1.to_format('csc')
+    gidx2 = gidx2.to_format('csc')
+    u_gidx = joint_union(gidx1.metagraph, [gidx1, gidx2])
+    assert gidx1.format_in_use(0)[0] == 'csc'
+    assert u_gidx.format_in_use(0)[0] == 'csc'
+    assert gidx1.number_of_nodes(0) == u_gidx.number_of_nodes(0)
+    assert (gidx1.number_of_edges(0) + gidx2.number_of_edges(0)) == u_gidx.number_of_edges(0)
+    gidx1 = gidx1.to_format('any')
+    gidx2 = gidx2.to_format('any')
+    g1_s, g1_d, _ = gidx1.edges(0, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(0, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(0, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+
+    # heterograph
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
+        ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
+        ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        }, index_dtype=index_dtype)
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([4, 3, 2, 1], [1, 2, 3, 4]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 4], [1, 0, 1, 0]),
+        ('developer', 'develops', 'game'): ([2, 1], [0, 1]),
+        }, index_dtype=index_dtype)
+    g3 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([3], [4]),
+        ('user', 'plays', 'game'): ([4], [1]),
+        ('developer', 'develops', 'game'): ([2], [0]),
+        }, index_dtype=index_dtype)
+    gidx1 = g1._graph
+    gidx2 = g2._graph
+    gidx3 = g3._graph
+    u_gidx = joint_union(gidx1.metagraph, [gidx1, gidx2, gidx3])
+    # three node types and three edge types
+    assert gidx1.number_of_nodes(0) == u_gidx.number_of_nodes(0)
+    assert gidx1.number_of_nodes(1) == u_gidx.number_of_nodes(1)
+    assert gidx1.number_of_nodes(2) == u_gidx.number_of_nodes(2)
+    assert (gidx1.number_of_edges(0) + gidx2.number_of_edges(0) + gidx3.number_of_edges(0)) \
+        == u_gidx.number_of_edges(0)
+    assert (gidx1.number_of_edges(1) + gidx2.number_of_edges(1) + gidx3.number_of_edges(1)) \
+        == u_gidx.number_of_edges(1)
+    assert (gidx1.number_of_edges(2) + gidx2.number_of_edges(2) + gidx3.number_of_edges(2)) \
+        == u_gidx.number_of_edges(2)
+    g1_s, g1_d, _ = gidx1.edges(0)
+    g2_s, g2_d, _ = gidx2.edges(0)
+    g3_s, g3_d, _ = gidx3.edges(0)
+    ug_s, ug_d, _ = u_gidx.edges(0)
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+    g1_s, g1_d, _ = gidx1.edges(1)
+    g2_s, g2_d, _ = gidx2.edges(1)
+    g3_s, g3_d, _ = gidx3.edges(1)
+    ug_s, ug_d, _ = u_gidx.edges(1)
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+    g1_s, g1_d, _ = gidx1.edges(2)
+    g2_s, g2_d, _ = gidx2.edges(2)
+    g3_s, g3_d, _ = gidx3.edges(2)
+    ug_s, ug_d, _ = u_gidx.edges(2)
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+
+    # force to start with 'csr'
+    gidx1 = gidx1.to_format('csr')
+    gidx2 = gidx2.to_format('csr')
+    gidx3 = gidx3.to_format('csr')
+    u_gidx = joint_union(gidx1.metagraph, [gidx1, gidx2, gidx3])
+    # three node types and three edge types
+    assert gidx1.format_in_use(0)[0] == 'csr'
+    assert u_gidx.format_in_use(0)[0] == 'csr'
+    assert gidx1.format_in_use(1)[0] == 'csr'
+    assert u_gidx.format_in_use(1)[0] == 'csr'
+    assert gidx1.format_in_use(2)[0] == 'csr'
+    assert u_gidx.format_in_use(2)[0] == 'csr'
+    assert gidx1.number_of_nodes(0) == u_gidx.number_of_nodes(0)
+    assert gidx1.number_of_nodes(1) == u_gidx.number_of_nodes(1)
+    assert gidx1.number_of_nodes(2) == u_gidx.number_of_nodes(2)
+    assert (gidx1.number_of_edges(0) + gidx2.number_of_edges(0) + gidx3.number_of_edges(0)) \
+        == u_gidx.number_of_edges(0)
+    assert (gidx1.number_of_edges(1) + gidx2.number_of_edges(1) + gidx3.number_of_edges(1)) \
+        == u_gidx.number_of_edges(1)
+    assert (gidx1.number_of_edges(2) + gidx2.number_of_edges(2) + gidx3.number_of_edges(2)) \
+        == u_gidx.number_of_edges(2)
+    gidx1 = gidx1.to_format('any')
+    gidx2 = gidx2.to_format('any')
+    gidx3 = gidx3.to_format('any')
+    g1_s, g1_d, _ = gidx1.edges(0, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(0, order='eid')
+    g3_s, g3_d, _ = gidx3.edges(0, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(0, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+    g1_s, g1_d, _ = gidx1.edges(1, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(1, order='eid')
+    g3_s, g3_d, _ = gidx3.edges(1, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(1, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+    g1_s, g1_d, _ = gidx1.edges(2, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(2, order='eid')
+    g3_s, g3_d, _ = gidx3.edges(2, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(2, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+
+    # force to start with 'csc'
+    gidx1 = gidx1.to_format('csc')
+    gidx2 = gidx2.to_format('csc')
+    gidx3 = gidx3.to_format('csc')
+    u_gidx = joint_union(gidx1.metagraph, [gidx1, gidx2, gidx3])
+    # three node types and three edge types
+    assert gidx1.format_in_use(0)[0] == 'csc'
+    assert u_gidx.format_in_use(0)[0] == 'csc'
+    assert gidx1.format_in_use(1)[0] == 'csc'
+    assert u_gidx.format_in_use(1)[0] == 'csc'
+    assert gidx1.format_in_use(2)[0] == 'csc'
+    assert u_gidx.format_in_use(2)[0] == 'csc'
+    assert gidx1.number_of_nodes(0) == u_gidx.number_of_nodes(0)
+    assert gidx1.number_of_nodes(1) == u_gidx.number_of_nodes(1)
+    assert gidx1.number_of_nodes(2) == u_gidx.number_of_nodes(2)
+    assert (gidx1.number_of_edges(0) + gidx2.number_of_edges(0) + gidx3.number_of_edges(0)) \
+        == u_gidx.number_of_edges(0)
+    assert (gidx1.number_of_edges(1) + gidx2.number_of_edges(1) + gidx3.number_of_edges(1)) \
+        == u_gidx.number_of_edges(1)
+    assert (gidx1.number_of_edges(2) + gidx2.number_of_edges(2) + gidx3.number_of_edges(2)) \
+        == u_gidx.number_of_edges(2)
+    gidx1 = gidx1.to_format('any')
+    gidx2 = gidx2.to_format('any')
+    gidx3 = gidx3.to_format('any')
+    g1_s, g1_d, _ = gidx1.edges(0, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(0, order='eid')
+    g3_s, g3_d, _ = gidx3.edges(0, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(0, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+    g1_s, g1_d, _ = gidx1.edges(1, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(1, order='eid')
+    g3_s, g3_d, _ = gidx3.edges(1, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(1, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+    g1_s, g1_d, _ = gidx1.edges(2, order='eid')
+    g2_s, g2_d, _ = gidx2.edges(2, order='eid')
+    g3_s, g3_d, _ = gidx3.edges(2, order='eid')
+    ug_s, ug_d, _ = u_gidx.edges(2, order='eid')
+    assert F.array_equal(F.cat([g1_s.tousertensor(), g2_s.tousertensor(), g3_s.tousertensor()], dim=0),
+                         ug_s.tousertensor())
+    assert F.array_equal(F.cat([g1_d.tousertensor(), g2_d.tousertensor(), g3_d.tousertensor()], dim=0),
+                         ug_d.tousertensor())
+
+
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -2093,5 +2307,6 @@ if __name__ == '__main__':
     # test_bipartite()
     # test_dtype_cast()
     # test_reverse("int32")
+    test_joint_union("int32")
     test_format()
     pass

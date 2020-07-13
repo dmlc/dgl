@@ -10,8 +10,8 @@ from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
 from . import backend as F
 from .graph_index import from_coo
-from .graph_index import joint_union as gidx_joint_union
 from .graph_index import _get_halo_subgraph_inner_node
+from .heterograph_index import joint_union as gidx_joint_union
 from .graph import unbatch
 from .convert import graph, bipartite
 from . import utils
@@ -26,6 +26,7 @@ __all__ = [
     'khop_graph',
     'reverse',
     'to_simple_graph',
+    'joint_union',
     'to_bidirected',
     'laplacian_lambda_max',
     'knn_graph',
@@ -145,7 +146,7 @@ def segmented_knn_graph(x, k, segs):
 
 def to_bidirected(g, readonly=None, share_ndata=True, 
                   share_edata=False, ignore_bipartite=False):
-    """Convert the graph to a bidirected one.
+    r"""Convert the graph to a bidirected one.
     
     For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this 
     function creates a new graph with edges 
@@ -249,9 +250,9 @@ def to_bidirected(g, readonly=None, share_ndata=True,
             if c_etype[0] != c_etype[2]:
                 gidxes.append(g._graph.get_relation_graph(i))
             else:
-                gidxes.append(joint_union(
+                gidxes.append(gidx_joint_union(
                     g._graph.get_relation_graph(i),
-                    g._graph.get_relation_graph(i).reverse())
+                    g._graph.get_relation_graph(i).reverse()))
         hgidx = g._graph.create_heterograph_from_relations(metagraph,
                                                            gidxes)
         new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
@@ -273,7 +274,7 @@ def to_bidirected(g, readonly=None, share_ndata=True,
                     new_g.edges[etype].data[k] = g.edges[etype].data[k]
             else:
                 for k in g.edges[etype].data:
-                    new_g.edges[etype].data[k] = 
+                    new_g.edges[etype].data[k] = \
                         F.cat([g.edges[etype].data[k], g.edges[etype].data[k]], dim=0)
     return new_g
 
@@ -316,8 +317,8 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     For heterographs with multiple edge types, all the input
     graphs should have the same canonical edge types.
 
-    If ``share_ndata`` is ``True``, same tensors will be used for
-    the features of the original graph and the joint_unioned graph.
+    If ``share_ndata`` is ``True``, same tensors is used for
+    the features of the original graph.
     As a result, users should avoid performing in-place operations
     on the features of the joint_unioned graph, which will corrupt
     the features of the original graph as well.
@@ -339,7 +340,7 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     >>> g1.edata['h'] = th.tensor([[3.], [4.], [5.], [6.]])
     >>> g2 = dgl.graph((th.tensor([3, 2]), th.tensor([1, 3])))
     >>> g2.ndata['h'] = th.tensor([[7.], [8.], [9.], [8.]])
-    >>> g2.edata['h'] = th.tensor([7.], [8.])
+    >>> g2.edata['h'] = th.tensor([[7.], [8.]])
     
     joint_union the two graphs when both ``share_ndata``
     and ``share_edata`` is ``True``
@@ -405,12 +406,12 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     >>>     ('user', 'follows', 'user'): (th.tensor([2]), th.tensor([1])),
     >>>     ('user', 'plays', 'game'): (th.tensor([0, 0, 1]), th.tensor([2, 1, 0]))
     >>> })
-    >>> g2.edges['plays'].data['he'] = th.zeros(3, 2)
+    >>> g2.edges['plays'].data['he'] = th.zeros(3, 1)
     >>> g3 = dgl.heterograph({
     >>>     ('user', 'follows', 'user'): (th.tensor([1]), th.tensor([2])),
     >>>     ('user', 'plays', 'game'): (th.tensor([1]), th.tensor([0]))
     >>> })
-    >>> g3.edges['plays'].data['he'] = th.zeros(1, 3)
+    >>> g3.edges['plays'].data['he'] = th.zeros(1, 1)
 
     The joint_union of the above three heterographs can be obtained by
     combining joint_union of the subgraphs corresponding to
@@ -436,10 +437,10 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     canonical_etypes_0 = graph_list[0].canonical_etypes
     for i in range(1, len(graph_list)):
         canonical_etypes_i = graph_list[i].canonical_etypes
-        assert len(canonical_etypes_0) == len(canonical_etypes_i),
+        assert len(canonical_etypes_0) == len(canonical_etypes_i), \
             'graph_{} should has the same canonical edge type as graph_0'.format(i)
         for et_0, et_i in zip(canonical_etypes_0, canonical_etypes_i):
-            assert et_0 == et_i,
+            assert et_0 == et_i, \
                 'graph_{} should has the same canonical edge type as graph_0'.format(i)
     
     # do the joint union
