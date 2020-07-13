@@ -140,16 +140,14 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
             F.backward(F.reduce_sum(v1))
             if msg != 'copy_rhs':
                 if reducer in ['min', 'max']: # there might be some numerical errors
-                    rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) /\
-                           (1. + F.reduce_sum(F.abs(grad_u)))
-                    assert F.as_scalar(rate) < 1e-4, rate
+                    rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) / np.prod(F.shape(u))
+                    assert F.as_scalar(rate) < 1e-3, rate
                 else:
                     assert F.allclose(F.grad(g.srcdata['x']), grad_u)
             if msg != 'copy_lhs':
                 if reducer in ['min', 'max']:
-                    rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) /\
-                           (1. + F.reduce_sum(F.abs(grad_e)))
-                    assert F.as_scalar(rate) < 1e-4, rate
+                    rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) / np.prod(F.shape(e))
+                    assert F.as_scalar(rate) < 1e-3, rate
                 else:
                     assert F.allclose(F.grad(g.edata['w']), grad_e)
             print('backward passed')
