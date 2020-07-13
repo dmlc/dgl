@@ -198,6 +198,22 @@ def test_sage_conv_bi(idtype, g, aggre_type):
     assert h.shape[-1] == 2
     assert h.shape[0] == g.number_of_dst_nodes()
 
+    # Test the case for graphs without edges
+    g = dgl.bipartite([], num_nodes=(5, 3))
+    sage = nn.SAGEConv((3, 3), 2, 'gcn')
+    feat = (F.randn((5, 3)), F.randn((3, 3)))
+    sage.initialize(ctx=ctx)
+    h = sage(g, feat)
+    assert h.shape[-1] == 2
+    assert h.shape[0] == 3
+    for aggre_type in ['mean', 'pool']:
+        sage = nn.SAGEConv((3, 1), 2, aggre_type)
+        feat = (F.randn((5, 3)), F.randn((3, 1)))
+        sage.initialize(ctx=ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 3
+
 def test_gg_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     ctx = F.ctx()

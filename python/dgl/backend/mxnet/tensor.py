@@ -10,7 +10,7 @@ import numbers
 import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
-from ...function.base import TargetCode 
+from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
 if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:

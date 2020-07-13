@@ -302,6 +302,14 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
                                      batch_num_nodes=self._batch_num_nodes,
                                      batch_num_edges=self._batch_num_edges)
 
+    def __getstate__(self):
+        state = super().__getstate__()
+        return state, self._batch_size, self._batch_num_nodes, self._batch_num_edges
+
+    def __setstate__(self, state):
+        state, self._batch_size, self._batch_num_nodes, self._batch_num_edges = state
+        super().__setstate__(state)
+
 def unbatch_hetero(graph):
     """Return the list of heterographs in this batch.
 

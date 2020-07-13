@@ -1897,6 +1897,13 @@ def test_reverse(idtype):
         }, idtype=idtype, device=F.ctx())
     gidx = g._graph
     r_gidx = gidx.reverse()
+
+    # metagraph
+    mg = gidx.metagraph
+    r_mg = r_gidx.metagraph
+    for etype in range(3):
+        assert mg.find_edge(etype) == r_mg.find_edge(etype)[::-1]
+
     # three node types and three edge types
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
@@ -1977,6 +1984,7 @@ def test_reverse(idtype):
     assert F.array_equal(g_s, rg_d)
     assert F.array_equal(g_d, rg_s)
 
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -2003,6 +2011,6 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
-    # test_reverse("int32")
+    test_reverse("int32")
     test_format()
     pass

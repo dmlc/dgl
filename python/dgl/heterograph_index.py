@@ -898,10 +898,11 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
 
+    @utils.cached_member(cache='_cache', prefix='reverse')
     def reverse(self):
         """Reverse the heterogeneous graph adjacency
 
-        The node types and edge types are not changed
+        The node types and edge types are not changed.
 
         Returns
         -------

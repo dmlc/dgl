@@ -228,7 +228,7 @@ def uniform_attention(g, shape):
 
 def test_edge_softmax():
     # Basic
-    g = dgl.DGLGraph(nx.path_graph(3))
+    g = dgl.graph(nx.path_graph(3))
     edata = F.ones((g.number_of_edges(), 1))
     a = nn.edge_softmax(g, edata)
     assert len(g.ndata) == 0
@@ -243,12 +243,7 @@ def test_edge_softmax():
     assert F.allclose(a, uniform_attention(g, a.shape))
 
     # Test both forward and backward with PyTorch built-in softmax.
-    g = dgl.DGLGraph()
-    g.add_nodes(30)
-    # build a complete graph
-    for i in range(30):
-        for j in range(30):
-            g.add_edge(i, j)
+    g = dgl.rand_graph(30, 900)
 
     score = F.randn((900, 1))
     score.requires_grad_()
@@ -285,14 +280,34 @@ def test_edge_softmax2(idtype, g):
     assert len(g.dstdata) == 0
     assert len(g.edata) == 2
     assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
+    """
+    # Test 2
+    def generate_rand_graph(n, m=None, ctor=dgl.DGLGraph):
+        if m is None:
+            m = n
+        arr = (sp.sparse.random(m, n, density=0.1, format='coo') != 0).astype(np.int64)
+        return ctor(arr, readonly=True)
+
+    for g in [generate_rand_graph(50),
+              generate_rand_graph(50, ctor=dgl.graph),
+              generate_rand_graph(100, 50, ctor=dgl.bipartite)]:
+        a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
+        a2 = a1.clone().detach().requires_grad_()
+        g.edata['s'] = a1
+        g.group_apply_edges('dst', lambda edges: {'ss':F.softmax(edges.data['s'], 1)})
+        g.edata['ss'].sum().backward()
+        
+        builtin_sm = nn.edge_softmax(g, a2)
+        builtin_sm.sum().backward()
+        print(a1.grad - a2.grad)
+        assert len(g.srcdata) == 0
+        assert len(g.dstdata) == 0
+        assert len(g.edata) == 2
+        assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
+    """
 
 def test_partial_edge_softmax():
-    g = dgl.DGLGraph()
-    g.add_nodes(30)
-    # build a complete graph
-    for i in range(30):
-        for j in range(30):
-            g.add_edge(i, j)
+    g = dgl.rand_graph(30, 900)
 
     score = F.randn((300, 1))
     score.requires_grad_()
@@ -434,6 +449,26 @@ def test_sage_conv_bi(idtype, g, aggre_type):
     h = sage(g, feat)
     assert h.shape[-1] == 2
     assert h.shape[0] == g.number_of_dst_nodes()
+
+@parametrize_dtype
+def test_sage_conv2(idtype):
+    # Test the case for graphs without edges
+    g = dgl.bipartite([], num_nodes=(5, 3))
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    sage = nn.SAGEConv((3, 3), 2, 'gcn')
+    feat = (F.randn((5, 3)), F.randn((3, 3)))
+    sage = sage.to(ctx)
+    h = sage(g, feat)
+    assert h.shape[-1] == 2
+    assert h.shape[0] == 3
+    for aggre_type in ['mean', 'pool', 'lstm']:
+        sage = nn.SAGEConv((3, 1), 2, aggre_type)
+        feat = (F.randn((5, 3)), F.randn((3, 1)))
+        sage = sage.to(ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 3
 
 def test_sgc_conv():
     ctx = F.ctx()

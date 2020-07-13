@@ -315,6 +315,9 @@ def zerocopy_from_numpy(np_array):
 def zerocopy_to_dgl_ndarray(data):
     return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
+
 def zerocopy_from_dgl_ndarray(data):
     if data.shape == (0,):
         # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
@@ -324,7 +327,6 @@ def zerocopy_from_dgl_ndarray(data):
                          device=to_backend_ctx(data.ctx))
     else:
         return dlpack.from_dlpack(data.to_dlpack())
-
 
 
 class BinaryReduce(th.autograd.Function):
