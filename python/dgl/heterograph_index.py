@@ -648,6 +648,18 @@ class HeteroGraphIndex(ObjectBase):
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLHeteroOutDegrees(self, int(etype), v_array), self.dtype)
 
+    def get_coo_dlpack(self, etype):
+        rst = _CAPI_DGLHeteroGetCOOMatrix(self, int(etype))
+        return rst(0), rst(1), rst(2)
+
+    def get_csr_dlpack(self, etype):
+        rst = _CAPI_DGLHeteroGetCSRMatrix(self, int(etype))
+        return rst(0), rst(1), rst(2)
+
+    def get_csc_dlpack(self, etype):
+        rst = _CAPI_DGLHeteroGetCSCMatrix(self, int(etype))
+        return rst(0), rst(1), rst(2)
+
     def adjacency_matrix(self, etype, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 

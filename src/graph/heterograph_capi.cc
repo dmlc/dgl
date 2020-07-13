@@ -347,6 +347,33 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetAdj")
         hg->GetAdj(etype, transpose, fmt));
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCOOMatrix")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    aten::COOMatrix coo = hg->GetCOOMatrix(etype);
+    *rv = ConvertNDArrayVectorToPackedFunc(
+        std::vector<IdArray>{coo.row, coo.col, coo.data});
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCSRMatrix")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    aten::CSRMatrix csr = hg->GetCSRMatrix(etype);
+    *rv = ConvertNDArrayVectorToPackedFunc(
+        std::vector<IdArray>{csr.indptr, csr.indices, csr.data});
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCSCMatrix")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    aten::CSRMatrix csc = hg->GetCSCMatrix(etype);
+    *rv = ConvertNDArrayVectorToPackedFunc(
+        std::vector<IdArray>{csc.indptr, csc.indices, csc.data});
+  });
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
