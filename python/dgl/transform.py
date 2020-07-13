@@ -9,7 +9,7 @@ from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
 from . import backend as F
-from .graph_index import from_coo
+from .graph_index import from_coo, from_edge_list
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
 from .convert import graph, bipartite
@@ -24,6 +24,7 @@ __all__ = [
     'khop_adj',
     'khop_graph',
     'reverse',
+    'reverse_heterograph',
     'to_simple_graph',
     'to_bidirected',
     'laplacian_lambda_max',
@@ -304,14 +305,28 @@ def khop_graph(g, k):
     # in the future.
     return DGLGraph(from_coo(n, row, col, True))
 
-def reverse(g, share_ndata=False, share_edata=False):
+def reverse(g, copy_ndata=False, copy_edata=False):
     """Return the reverse of a graph
-
     The reverse (also called converse, transpose) of a directed graph is another directed
     graph on the same nodes with edges reversed in terms of direction.
-
-    Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
+    Given a :class:`dgl.DGLGraph` object, we return another :class:`dgl.DGLGraph` object
     representing its reverse.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+        The input graph.
+    copy_ndata: bool, optional
+        If True, node attributes are copied from the original graph to the reversed graph.
+        Otherwise the reversed graph will not be initialized with node attributes.
+    copy_edata: bool, optional
+        If True, edge attributes are copied from the original graph to the reversed graph.
+        Otherwise the reversed graph will not have edge attributes.
+
+    Return
+    ------
+    dgl.DGLGraph
+        The reversed graph.
 
     Notes
     -----
@@ -320,21 +335,9 @@ def reverse(g, share_ndata=False, share_edata=False):
       if the topology of both the original graph and its reverse get changed independently,
       you can get a mismatched node/edge feature.
 
-    Parameters
-    ----------
-    g : dgl.DGLGraph
-        The input graph.
-    share_ndata: bool, optional
-        If True, the original graph and the reversed graph share memory for node attributes.
-        Otherwise the reversed graph will not be initialized with node attributes.
-    share_edata: bool, optional
-        If True, the original graph and the reversed graph share memory for edge attributes.
-        Otherwise the reversed graph will not have edge attributes.
-
     Examples
     --------
     Create a graph to reverse.
-
     >>> import dgl
     >>> import torch as th
     >>> g = dgl.DGLGraph()
@@ -342,29 +345,21 @@ def reverse(g, share_ndata=False, share_edata=False):
     >>> g.add_edges([0, 1, 2], [1, 2, 0])
     >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
     >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
-
     Reverse the graph and examine its structure.
-
-    >>> rg = g.reverse(share_ndata=True, share_edata=True)
+    >>> rg = g.reverse(copy_ndata=True, copy_edata=True)
     >>> print(rg)
     DGLGraph with 3 nodes and 3 edges.
     Node data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
     Edge data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-
     The edges are reversed now.
-
     >>> rg.has_edges_between([1, 2, 0], [0, 1, 2])
     tensor([1, 1, 1])
-
     Reversed edges have the same feature as the original ones.
-
     >>> g.edges[[0, 2], [1, 0]].data['h'] == rg.edges[[1, 0], [0, 2]].data['h']
     tensor([[1],
             [1]], dtype=torch.uint8)
-
     The node/edge features of the reversed graph share memory with the original
     graph, which is helpful for both forward computation and back propagation.
-
     >>> g.ndata['h'] = g.ndata['h'] + 1
     >>> rg.ndata['h']
     tensor([[1.],
@@ -377,11 +372,163 @@ def reverse(g, share_ndata=False, share_edata=False):
     g_reversed.add_edges(g_edges[1], g_edges[0])
     g_reversed._batch_num_nodes = g._batch_num_nodes
     g_reversed._batch_num_edges = g._batch_num_edges
-    if share_ndata:
+    if copy_ndata:
         g_reversed._node_frame = g._node_frame
-    if share_edata:
+    if copy_edata:
         g_reversed._edge_frame = g._edge_frame
     return g_reversed
+
+def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
+    r"""Return the reverse of a graph.
+
+    The reverse (also called converse, transpose) of a graph with edges
+    :math:`(i_1, j_1), (i_2, j_2), \cdots` is a new graph with edges
+    :math:`(j_1, i_1), (j_2, i_2), \cdots`.
+
+    For a heterograph with multiple edge types, we can treat edges corresponding
+    to each type as a separate graph and compute the reverse for each of them.
+    If the original edge type is (A, B, C), its reverse will have edge type (C, B, A).
+
+    Given a :class:`dgl.DGLGraph` object, we return another :class:`dgl.DGLGraph`
+    object representing its reverse.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+        The input graph.
+    copy_ndata: bool, optional
+        If True, the node features of the reversed graph are copied from the
+        original graph. If False, the reversed graph will not have any node features.
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the reversed graph are copied from the
+        original graph. If False, the reversed graph will not have any edge features.
+        (Default: False)
+
+    Return
+    ------
+    dgl.DGLGraph
+        The reversed graph.
+
+    Notes
+    -----
+    If ``copy_ndata`` or ``copy_edata`` is ``True``, same tensors will be used for
+    the features of the original graph and the reversed graph to save memory cost.
+    As a result, users
+    should avoid performing in-place operations on the features of the reversed
+    graph, which will corrupt the features of the original graph as well. For
+    concrete examples, refer to the ``Examples`` section below.
+
+    Examples
+    --------
+    **Homographs or Heterographs with A Single Edge Type**
+
+    Create a graph to reverse.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph((th.tensor([0, 1, 2]), th.tensor([1, 2, 0])))
+    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
+    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
+
+    Reverse the graph.
+
+    >>> rg = dgl.reverse(g, copy_edata=True)
+    >>> rg.ndata['h']
+    tensor([[0.],
+            [1.],
+            [2.]])
+
+    The i-th edge in the reversed graph corresponds to the i-th edge in the
+    original graph. When ``copy_edata`` is ``True``, they have the same features.
+
+    >>> rg.edges()
+    (tensor([1, 2, 0]), tensor([0, 1, 2]))
+    >>> rg.edata['h']
+    tensor([[3.],
+            [4.],
+            [5.]])
+
+    **In-place operations on features of one graph will be reflected on features of
+    its reverse, which is dangerous. Out-place operations will not be reflected.**
+
+    >>> rg.ndata['h'] += 1
+    >>> g.ndata['h']
+    tensor([[1.],
+            [2.],
+            [3.]])
+    >>> g.ndata['h'] += 1
+    >>> rg.ndata['h']
+    tensor([[2.],
+            [3.],
+            [4.]])
+    >>> rg.ndata['h2'] = th.ones(3, 1)
+    >>> 'h2' in g.ndata
+    False
+
+    **Heterographs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): (th.tensor([0, 2]), th.tensor([1, 2])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
+
+    The reverse of the graph above can be obtained by combining the reverse of the
+    subgraph corresponding to ('user', 'follows', 'user') and the subgraph corresponding
+    to ('user', 'plays', 'game'). The reverse for a graph with relation (h, r, t) will
+    have relation (t, r, h).
+
+    >>> rg = dgl.reverse(g, copy_ndata=True)
+    >>> rg
+    Graph(num_nodes={'game': 3, 'user': 3},
+          num_edges={('user', 'follows', 'user'): 2, ('game', 'plays', 'user'): 3},
+          metagraph=[('user', 'user'), ('game', 'user')])
+    >>> rg.edges(etype='follows')
+    (tensor([1, 2]), tensor([0, 2]))
+    >>> rg.edges(etype='plays')
+    (tensor([2, 1, 1]), tensor([1, 2, 1]))
+    >>> rg.nodes['game'].data['hv]
+    tensor([[1.],
+            [1.],
+            [1.]])
+    >>> rg.edges['plays'].data
+    {}
+    """
+    # TODO(0.5 release, xiangsx) need to handle BLOCK
+    # currently reversing a block results in undefined behavior
+    canonical_etypes = g.canonical_etypes
+    meta_edges_src = []
+    meta_edges_dst = []
+    etypes = []
+    for c_etype in canonical_etypes:
+        meta_edges_src.append(g.get_ntype_id(c_etype[2]))
+        meta_edges_dst.append(g.get_ntype_id(c_etype[0]))
+        etypes.append(c_etype[1])
+    metagraph = from_edge_list((meta_edges_src, meta_edges_dst), True)
+    gidx = g._graph.reverse(metagraph)
+    new_g = DGLHeteroGraph(gidx, g.ntypes, etypes)
+
+    # handle ndata
+    if copy_ndata:
+        # for each ntype
+        for ntype in g.ntypes:
+            # for each data field
+            for k in g.nodes[ntype].data:
+                new_g.nodes[ntype].data[k] = g.nodes[ntype].data[k]
+
+    # handle edata
+    if copy_edata:
+        # for each etype
+        for etype in canonical_etypes:
+            # for each data field
+            for k in g.edges[etype].data:
+                new_g.edges[etype].data[k] = g.edges[etype].data[k]
+
+    return new_g
+
+DGLHeteroGraph.reverse = reverse_heterograph
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
