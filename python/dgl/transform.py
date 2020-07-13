@@ -1255,13 +1255,13 @@ def out_subgraph(g, nodes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
 
-def to_simple(g, return_counts='count', writeback_mapping=False, share_ndata=True):
+def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True):
     r"""Convert a graph to a simple graph without duplicate edges.
 
     For a heterograph with multiple edge types, we can
     treat edges corresponding
     to each type as a separate graph and convert each
-    of them to a simple graph
+    of them to a simple graph.
 
     Writeback mappings can be returned for each edge
     type subgraph. For the edges in the original graph,
@@ -1290,9 +1290,9 @@ def to_simple(g, return_counts='count', writeback_mapping=False, share_ndata=Tru
         If True, a write back mapping is returned for each edge
         type subgraph. If False, only the simple graph is returned.
         (Default: False)
-    share_ndata: bool, optional
-        If True, the node features of the simple graph will
-        be the same as the original graph. If False, the simple
+    copy_ndata: bool, optional
+        If True, the node features of the simple graph are lazy-copied
+        from the original graph. If False, the simple
         graph will not have any node features.
         (Default: True)
 
@@ -1300,16 +1300,15 @@ def to_simple(g, return_counts='count', writeback_mapping=False, share_ndata=Tru
     -------
     DGLGraph
         A simple graph.
-    Tensor or dict of tensor
+    tensor or dict of tensor
         If writeback_mapping is True, the writeback
         mapping is returned. If the graph has only
         one edge type, a tensor is returned. If the
         graph has multiple edge types, a dictionary
         of tensor is return.
 
-    If ``share_ndata`` is ``True``, same tensors may be used for
-    the features of the original graph and the to_simpled graph to save memory cost
-    when the DL backend is PyTorch or MXNet. As a result, users
+    If ``copy_ndata`` is ``True``, same tensors may be used for
+    the features of the original graph and the to_simpled graph. As a result, users
     should avoid performing in-place operations on the features of the to_simpled
     graph, which will corrupt the features of the original graph as well. For
     concrete examples, refer to the ``Examples`` section below.
@@ -1382,7 +1381,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, share_ndata=Tru
     The return counts is stored in the default edge feature
     'count'.
 
-    >>> sg, wm = dgl.to_simple(g, share_ndata=False, writeback_mapping=True)
+    >>> sg, wm = dgl.to_simple(g, copy_ndata=False, writeback_mapping=True)
     >>> sg
     Graph(num_nodes={'game': 3, 'user': 3},
           num_edges={('user', 'wins', 'user'): 4, ('game', 'plays', 'user'): 3},
@@ -1412,7 +1411,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, share_ndata=Tru
         for count, canonical_etype in zip(counts, g.canonical_etypes):
             simple_graph.edges[canonical_etype].data[return_counts] = count
 
-    if share_ndata:
+    if copy_ndata:
         for ntype in g.ntypes:
             for key in g.nodes[ntype].data:
                 simple_graph.nodes[ntype].data[key] = g.nodes[ntype].data[key]
@@ -1429,6 +1428,8 @@ def to_simple(g, return_counts='count', writeback_mapping=False, share_ndata=Tru
             return simple_graph, wb_map
 
     return simple_graph
+
+DGLHeteroGraph.to_simple = to_simple
 
 def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.

@@ -601,7 +601,7 @@ def test_to_simple(index_dtype):
     sg.ndata['hh'] = F.tensor([[0.], [1.], [2.]])
     assert ('hh' in g.ndata) is False
 
-    sg = dgl.to_simple(g, writeback_mapping=False, share_ndata=False)
+    sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
     assert ('h' in sg.ndata) is False
     assert ('h' in sg.edata) is False
 
@@ -641,7 +641,7 @@ def test_to_simple(index_dtype):
     sg.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
     assert ('hhh' in g.nodes['user'].data) is False
 
-    sg = dgl.to_simple(g, writeback_mapping=False, share_ndata=False)
+    sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
     for ntype in g.ntypes:
         assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
     assert ('h' in sg.nodes['user'].data) is False
