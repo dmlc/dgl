@@ -991,21 +991,17 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
 
-    def reverse(self, metagraph):
+    @utils.cached_member(cache='_cache', prefix='reverse')
+    def reverse(self):
         """Reverse the heterogeneous graph adjacency
 
-        The node types and edge types are not changed
-
-        Parameters
-        ----------
-        metagraph : GraphIndex
-            Meta-graph.
+        The node types and edge types are not changed.
 
         Returns
         -------
         A new graph index.
         """
-        return _CAPI_DGLHeteroReverse(metagraph, self)
+        return _CAPI_DGLHeteroReverse(self)
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):
