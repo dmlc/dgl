@@ -47,6 +47,7 @@ def submit_jobs(args):
         execute_remote(cmd, ip)
     # launch client tasks
     client_cmd = 'DGL_ROLE=client'
+    client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
     for i in range(args.num_client):
         node_id = int(i / client_count_per_machine)
