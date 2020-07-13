@@ -67,7 +67,8 @@ def run(args, device, data):
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
-    model = th.nn.parallel.DistributedDataParallel(model)
+    if not args.standalone:
+        model = th.nn.parallel.DistributedDataParallel(model)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -121,11 +122,12 @@ def run(args, device, data):
             backward_time += compute_end - forward_end
 
             # Aggregate gradients in multiple nodes.
-            for param in model.parameters():
-                if param.requires_grad and param.grad is not None:
-                    th.distributed.all_reduce(param.grad.data,
-                            op=th.distributed.ReduceOp.SUM)
-                    param.grad.data /= args.num_client
+            if not args.standalone:
+                for param in model.parameters():
+                    if param.requires_grad and param.grad is not None:
+                        th.distributed.all_reduce(param.grad.data,
+                                                  op=th.distributed.ReduceOp.SUM)
+                        param.grad.data /= args.num_client
 
             optimizer.step()
             update_time += time.time() - compute_end
@@ -155,13 +157,15 @@ def run(args, device, data):
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
     # clean up
-    g._client.barrier()
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
+    if not args.standalone:
+        g._client.barrier()
+        dgl.distributed.shutdown_servers()
+        dgl.distributed.finalize_client()
 
 def main(args):
-    th.distributed.init_process_group(backend='gloo')
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name)
+    if not args.standalone:
+        th.distributed.init_process_group(backend='gloo')
+    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, conf_file=args.conf_path)
     print('rank:', g.rank())
 
     train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), force_even=True)
@@ -203,6 +207,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
+    parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
 
     print(args)
