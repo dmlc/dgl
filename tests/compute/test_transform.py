@@ -130,14 +130,14 @@ def test_reverse():
     assert len(g_r.edata) == 0
 
     # without share ndata
-    g_r = dgl.reverse_heterograph(g, share_ndata=False)
+    g_r = dgl.reverse_heterograph(g, copy_ndata=False)
     assert g.number_of_nodes() == g_r.number_of_nodes()
     assert g.number_of_edges() == g_r.number_of_edges()
     assert len(g_r.ndata) == 0
     assert len(g_r.edata) == 0
 
     # with share ndata and edata
-    g_r = dgl.reverse_heterograph(g, share_ndata=True, share_edata=True)
+    g_r = dgl.reverse_heterograph(g, copy_ndata=True, copy_edata=True)
     assert g.number_of_nodes() == g_r.number_of_nodes()
     assert g.number_of_edges() == g_r.number_of_edges()
     assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
@@ -193,7 +193,7 @@ def test_reverse():
     assert F.array_equal(eids_g, eids_rg)
 
     # withour share ndata
-    g_r = dgl.reverse_heterograph(g, share_ndata=False)
+    g_r = dgl.reverse_heterograph(g, copy_ndata=False)
     for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
         assert etype_g[0] == etype_gr[2]
         assert etype_g[1] == etype_gr[1]
@@ -204,7 +204,7 @@ def test_reverse():
     assert len(g_r.nodes['user'].data) == 0
     assert len(g_r.nodes['game'].data) == 0
 
-    g_r = dgl.reverse_heterograph(g, share_ndata=True, share_edata=True)
+    g_r = dgl.reverse_heterograph(g, copy_ndata=True, copy_edata=True)
     print(g_r)
     for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
         assert etype_g[0] == etype_gr[2]
@@ -231,7 +231,7 @@ def test_reverse_shared_frames():
     g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
     g.edata['h'] = F.tensor([[3.], [4.], [5.]])
 
-    rg = g.reverse(share_ndata=True, share_edata=True)
+    rg = g.reverse(copy_ndata=True, copy_edata=True)
     assert F.allclose(g.ndata['h'], rg.ndata['h'])
     assert F.allclose(g.edata['h'], rg.edata['h'])
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
