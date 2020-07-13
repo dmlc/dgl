@@ -81,6 +81,8 @@ def main():
     parser.add_argument('--udf_command', type=str,
                         help='User-defined command line')
     args, udf_command = parser.parse_known_args()
+    print(args)
+    print(udf_command)
     assert len(udf_command) == 1, 'Please provide user command line.'
     args.udf_command = udf_command[0]
     submit_jobs(args)
