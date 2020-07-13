@@ -40,15 +40,16 @@ class SSTDataset(DGLBuiltinDataset):
 
     Statistics
     ----------
-    Train examples: 8544
-    Dev examples: 2
-    Test examples: 2
+    Train examples: 8,544
+    Dev examples: 1,101
+    Test examples: 2,210
     Number of classes for each node: 5
 
     Parameters
     ----------
     mode : str, optional
-        Can be ``'train'``, ``'dev'``, ``'test'`` and specifies which data file to use.
+        Should be one of ['train', 'dev', 'test', 'tiny']
+        Default: train
     glove_embed_file : str, optional
         The path to pretrained glove embedding file.
         Default: None
@@ -81,6 +82,7 @@ class SSTDataset(DGLBuiltinDataset):
     >>> train_data = SSTDataset()
     >>> dev_data = SSTDataset(mode='dev')
     >>> test_data = SSTDataset(mode='test')
+    >>> tiny_data = SSTDataset(mode='tiny')
     >>>
     >>> len(train_data.trees)
     8544
@@ -112,7 +114,7 @@ class SSTDataset(DGLBuiltinDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=False):
-        assert mode in ['train', 'dev', 'test']
+        assert mode in ['train', 'dev', 'test', 'tiny']
         _url = _get_dgl_url('dataset/sst.zip')
         self._glove_embed_file = glove_embed_file if mode == 'train' else None
         self.mode = mode
@@ -201,7 +203,7 @@ class SSTDataset(DGLBuiltinDataset):
 
     def load(self):
         graph_path = os.path.join(self.save_path, self.mode + '_dgl_graph.bin')
-        self._trees = load_graphs(graph_path)
+        self._trees = load_graphs(graph_path)[0]
         info_path = os.path.join(self.save_path, 'info.pkl')
         if os.path.exists(info_path):
             info = load_info(info_path)

@@ -2,6 +2,7 @@
 Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
 https://arxiv.org/abs/1503.00075
 """
+import collections
 import time
 import itertools
 import networkx as nx
@@ -10,6 +11,8 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+
+SSTBatch = collections.namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
 
 class TreeLSTMCell(nn.Module):
     def __init__(self, x_size, h_size):
@@ -86,7 +89,7 @@ class TreeLSTM(nn.Module):
         """Compute tree-lstm prediction given a batch.
         Parameters
         ----------
-        batch : dgl.data.SSTBatch
+        batch : SSTBatch
             The data batch.
         h : Tensor
             Initial hidden state.
