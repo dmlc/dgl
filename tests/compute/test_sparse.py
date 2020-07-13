@@ -96,6 +96,8 @@ sddmm_shapes = [
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 def test_spmm(g, shp, msg, reducer):
+    if dgl.backend.backend_name == 'tensorflow' and reducer in ['min', 'max']:
+        pytest.skip()  # tensorflow dlpack has problem writing into int32 arrays on GPU.
     print(g)
 
     hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
