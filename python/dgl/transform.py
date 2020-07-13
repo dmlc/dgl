@@ -145,21 +145,21 @@ def segmented_knn_graph(x, k, segs):
     g = DGLGraph(adj, readonly=True)
     return g
 
-def to_bidirected(g, readonly=None, copy_ndata=True, 
+def to_bidirected(g, readonly=None, copy_ndata=True,
                   copy_edata=False, ignore_bipartite=False):
     r"""Convert the graph to a bidirected one.
-    
-    For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this 
-    function creates a new graph with edges 
+
+    For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
+    function creates a new graph with edges
     :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
-    
-    For a heterograph with multiple edge types, we can treat edges corresponding 
-    to each type as a separate graph and convert the graph to a bidirected one 
-    for each of them. 
-    
-    Since **to_bidirected is not well defined for unidirectional bipartite graphs**, 
-    an error will be raised if an edge type of the input heterograph is for a 
-    unidirectional bipartite graph. We can simply skip the edge types corresponding 
+
+    For a heterograph with multiple edge types, we can treat edges corresponding
+    to each type as a separate graph and convert the graph to a bidirected one
+    for each of them.
+
+    Since **to_bidirected is not well defined for unidirectional bipartite graphs**,
+    an error will be raised if an edge type of the input heterograph is for a
+    unidirectional bipartite graph. We can simply skip the edge types corresponding
     to unidirectional bipartite graphs by specifying ``ignore_bipartite=True``.
 
     Parameters
@@ -180,7 +180,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
         features.
         (Default: False)
     ignore_bipartite: bool, optional
-        If True, unidirectional bipartite graphs are ignored and 
+        If True, unidirectional bipartite graphs are ignored and
         no error is raised. If False, an error  will be raised if
         an edge type of the input heterograph is for a unidirectional
         bipartite graph.
@@ -233,7 +233,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     is ignored. Both the node features and edge features
     are shared.
 
-    >>> bg = dgl.to_bidirected(g, copy_ndata=True, 
+    >>> bg = dgl.to_bidirected(g, copy_ndata=True,
                                copy_edata=True, ignore_bipartite=True)
     >>> bg.all_edges(('user', 'wins', 'user'))
     (tensor([0, 2, 0, 2, 2, 1, 1, 2, 1, 0]), tensor([1, 1, 2, 1, 0, 0, 2, 0, 2, 2]))
@@ -260,8 +260,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
                     "unidirectional bipartite graphs" \
                     ", but {} is unidirectional bipartite".format(c_etype)
         hgidx = gidx_joint_union(g._graph.metagraph,
-                                 [g._graph,
-                                 g._graph.reverse()])
+                                 [g._graph, g._graph.reverse()])
         new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
     else:
         gidxes = []
@@ -276,7 +275,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
 
         num_nodes_per_type = [g.number_of_nodes(ntype) for ntype in g.ntypes]
         hgidx = create_heterograph_from_relations(metagraph, gidxes,
-            utils.toindex(num_nodes_per_type, "int64"))
+                                                  utils.toindex(num_nodes_per_type, "int64"))
         new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
 
     # handle features
@@ -319,14 +318,14 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
     copy_ndata: bool, optional
         If True, the node features of the joint_unioned graph
         are lazy-copied from the **FIRST** graph in the original
-        graph list. If False, the joint_unioned graph will not 
-        have any node features. 
+        graph list. If False, the joint_unioned graph will not
+        have any node features.
         (Default: False)
     copy_edata: bool, optional
         If True, the edge features of the joint_unioned graph
         will be a concatenation of all the edge features from
         the graphs in the original graph list. If False, the
-        joint_unioned graph will not have any edge features. 
+        joint_unioned graph will not have any edge features.
         (Default: False)
 
     Returns
@@ -363,7 +362,7 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
     >>> g2 = dgl.graph((th.tensor([3, 2]), th.tensor([1, 3])))
     >>> g2.ndata['h'] = th.tensor([[7.], [8.], [9.], [8.]])
     >>> g2.edata['h'] = th.tensor([[7.], [8.]])
-    
+
     joint_union the two graphs when both ``copy_ndata``
     and ``copy_edata`` is ``True``
 
@@ -372,13 +371,13 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
     (tensor([0, 1, 3，1, 3, 2]), tensor([1, 2, 0, 2, 1, 3]))
 
     The shared node features are from g1.
-    
+
     >>> ug.ndata['h']
     tensor([[0.],
             [1.],
             [2.],
             [1.]])
-    
+
     The shared edge features are the concatenation of the edge features
     from g1 and g2.
 
@@ -464,7 +463,7 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
         for et_0, et_i in zip(canonical_etypes_0, canonical_etypes_i):
             assert et_0 == et_i, \
                 'graph_{} should has the same canonical edge type as graph_0'.format(i)
-    
+
     # do the joint union
     gidxes = [g._graph for g in graph_list]
 
@@ -482,8 +481,8 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
         for etype in graph_list[0].canonical_etypes:
             for key in graph_list[0].edges[etype].data:
                 edata = []
-                for i in range(len(graph_list)):
-                    edata.append(graph_list[i].edges[etype].data[key])
+                for g in graph_list:
+                    edata.append(g.edges[etype].data[key])
                 hg.edges[etype].data[key] = F.cat(edata, dim=0)
 
     return hg
