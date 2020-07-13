@@ -50,14 +50,6 @@ def submit_jobs(args):
     # launch client tasks
     client_cmd = 'DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
-
-    client_cmd = client_cmd + ' ' + 'python3 -m torch.distributed.launch'
-    client_cmd = client_cmd + ' ' + '--nproc_per_node=' + str(client_count_per_machine)
-    client_cmd = client_cmd + ' ' + '--nnodes=' + str(len(hosts))
-    client_cmd = client_cmd + ' ' + '--node_rank=0'
-    client_cmd = client_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
-    client_cmd = client_cmd + ' ' + '--master_port=1200'
-
     for i in range(args.num_client):
         node_id = int(i / client_count_per_machine)
         ip, _ = hosts[node_id]
