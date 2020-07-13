@@ -1255,7 +1255,7 @@ def out_subgraph(g, nodes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
 
-def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True):
+def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True, copy_edata=False):
     r"""Convert a graph to a simple graph without duplicate edges.
 
     For a heterograph with multiple edge types, we can
@@ -1295,6 +1295,13 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
         from the original graph. If False, the simple
         graph will not have any node features.
         (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the simple graph are lazy-copied
+        from the original graph. If there exists duplicate edges between
+        two vertexes (u, v), the edge feature of the simpled edge is
+        randomly selected from one of the duplicate edges.
+        If False, the simple graph will not have any edge features.
+        (Default: False)
 
     Returns
     -------
@@ -1415,6 +1422,14 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
         for ntype in g.ntypes:
             for key in g.nodes[ntype].data:
                 simple_graph.nodes[ntype].data[key] = g.nodes[ntype].data[key]
+
+    if copy_edata:
+        for i, c_etype in enumerate(g.canonical_etypes):
+            for key in g.edges[c_etype].data:
+                feat_idx = F.asnumpy(edge_maps[i])
+                _, indices = np.unique(feat_idx, return_index=True)
+                simple_graph.edges[c_etype].data[key] = F.gather_row(g.edges[c_etype].data[key],
+                                                                     F.tensor(indices))
 
     if writeback_mapping:
         # single edge type

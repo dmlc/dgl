@@ -607,12 +607,14 @@ def test_to_simple(index_dtype):
 
     # heterogeneous graph
     g = dgl.heterograph({
-        ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1], [1, 3, 2, 3, 4, 4]),
+        ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1],
+                                     [1, 3, 2, 3, 4, 4]),
         ('user', 'plays', 'game'): ([3, 2, 1, 1, 3, 2, 2], [5, 3, 4, 4, 5, 3, 3])},
         index_dtype=index_dtype)
     g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
     g.nodes['user'].data['hh'] = F.tensor([0, 1, 2, 3, 4])
-    sg, wb = dgl.to_simple(g, return_counts='weights', writeback_mapping=True)
+    g.edges['follow'].data['h'] = F.tensor([0, 1, 2, 3, 4, 5])
+    sg, wb = dgl.to_simple(g, return_counts='weights', writeback_mapping=True, copy_edata=True)
     g.nodes['game'].data['h'] = F.tensor([0, 1, 2, 3, 4, 5])
 
     for etype in g.canonical_etypes:
@@ -640,6 +642,11 @@ def test_to_simple(index_dtype):
     # new ndata to sg
     sg.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
     assert ('hhh' in g.nodes['user'].data) is False
+    # share edata
+    feat_idx = F.asnumpy(wb[('user', 'follow', 'user')])
+    _, indices = np.unique(feat_idx, return_index=True)
+    assert F.array_equal(sg.edges['follow'].data['h'],
+                         g.edges['follow'].data['h'][indices])
 
     sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
     for ntype in g.ntypes:
