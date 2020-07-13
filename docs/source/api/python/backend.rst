@@ -81,6 +81,9 @@ here, you can enjoy the same convenience on other frameworks by similar usage):
    >>> F.u_mul_e_sum(g, x, y1).shape  # (2,), (4, 2) -> (4, 2)
    torch.Size([3, 4, 2])
 
+For all operators, the input graph could either be a homograph or a bipartite
+graph.
+
 .. autosummary::
     :toctree: ../../generated/
 
@@ -205,5 +208,20 @@ The following is an example showing how GSDDMM works:
     e_mul_v
     e_dot_v
     e_div_v
+    v_add_u
+    v_sub_u
+    v_mul_u
+    v_dot_u
+    v_div_u
+    e_add_u
+    e_sub_u
+    e_mul_u
+    e_dot_u
+    e_div_u
+    v_add_e
+    v_sub_e
+    v_mul_e
+    v_dot_e
+    v_div_e
     copy_u
     copy_v

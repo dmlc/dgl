@@ -8,8 +8,7 @@ import backend as F
 import numpy as np
 
 random.seed(42)
-np.random.seed(31)
-dgl.random.seed(42)
+np.random.seed(42)
 
 udf_msg = {
     'add': lambda edges: {'m': edges.src['x'] + edges.data['w']},
@@ -109,8 +108,8 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
     print(g)
     print(g.idtype)
 
-    hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
-    he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
+    hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) * 10 + 1)
+    he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) * 10 + 1)
     print('u shape: {}, e shape: {}'.format(F.shape(hu), F.shape(he)))
 
     g.srcdata['x'] = F.attach_grad(F.clone(hu))
@@ -135,7 +134,7 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
         g.update_all(udf_msg[msg], udf_reduce[reducer])
         if g.number_of_edges() > 0:
             v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
-            assert F.allclose(v, v1, rtol=1e-3, atol=1e-3)
+            assert F.allclose(v, v1)
             print('forward passed')
 
             F.backward(F.reduce_sum(v1))
@@ -210,7 +209,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, index_dtype):
         g.apply_edges(udf_apply_edges[msg_func])
         if g.number_of_edges() > 0:
             e1 = g.edata['m']
-            assert F.allclose(e, e1, rtol=1e-3, atol=1e-3)
+            assert F.allclose(e, e1)
             print('forward passed')
 
             F.backward(F.reduce_sum(e1))
