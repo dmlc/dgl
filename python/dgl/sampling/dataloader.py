@@ -462,4 +462,56 @@ class EdgeCollator(Collator):
 
     * Link prediction on heterogeneous graph: RGCN for link prediction.
     """
-    pass
+    def __init__(self, g, eids, block_sampler, exclude=None, reverse_edge_ids=None,
+                 reverse_etypes=None, negative_sampler=None):
+        self.g = g
+        if not isinstance(eids, Mapping):
+            assert len(g.etypes) == 1, \
+                "eids should be a dict of edge type and ids for graph with multiple edge types"
+        self.eids = eids
+        self.block_sampler = block_sampler
+        self.exclude = exclude
+        self.reverse_edge_ids = reverse_edge_ids
+        self.reverse_etypes = reverse_etypes
+        self.negative_sampler = negative_sampler
+
+        if isinstance(eids, Mapping):
+            self._dataset = utils.FlattnedDict(nids)
+        else:
+            self._dataset = nids
+
+    @property
+    def dataset(self):
+        return self._dataset
+
+    def collate(self, items):
+        """Combines the sampled edges into a minibatch for edge classification, edge
+        regression, and link prediction tasks.
+
+        Returns
+        -------
+        Either ``(input_nodes, pair_graph, blocks)``, or
+        ``(input_nodes, pair_graph, negative_pair_graph, blocks)`` if negative sampling is
+        enabled.
+
+        input_nodes : Tensor or dict[ntype, Tensor]
+            The input nodes necessary for computation in this minibatch.
+
+            If the original graph has multiple node types, return a dictionary of
+            node type names and node ID tensors.  Otherwise, return a single tensor.
+        pair_graph : DGLHeteroGraph
+            The graph that contains only the edges in the minibatch as well as their incident
+            nodes.
+
+            Note that the metagraph of this graph will be identical to that of the original
+            graph.
+        negative_pair_graph : DGLHeteroGraph
+            The graph that contains only the edges connecting the source and destination nodes
+            yielded from the given negative sampler, if negative sampling is enabled.
+
+            Note that the metagraph of this graph will be identical to that of the original
+            graph.
+        blocks : list[DGLHeteroGraph]
+            The list of blocks necessary for computing the representation of the edges.
+        """
+        pass
