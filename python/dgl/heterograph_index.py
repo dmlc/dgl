@@ -1126,9 +1126,6 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
         return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
             metagraph, rel_graphs, num_nodes_per_type.todgltensor())
 
-def joint_union(metagraph, gidx_list):
-    return _CAPI_DGLHeteroJointUnion(metagraph, gidx_list)
-
 def disjoint_union(metagraph, graphs):
     """Return a disjoint union of the input heterographs.
 
