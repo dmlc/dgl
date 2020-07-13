@@ -1501,7 +1501,7 @@ class DGLHeteroGraph(object):
         """
         dgl_warning("DGLGraph.edge_id is deprecated. Please use DGLGraph.edge_ids.")
         return self.edge_ids(u, v, force_multi=force_multi,
-                            return_uv=return_uv, etype=etype)
+                             return_uv=return_uv, etype=etype)
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return all edge IDs between source node array `u` and destination
