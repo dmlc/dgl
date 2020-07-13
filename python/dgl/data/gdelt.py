@@ -1,11 +1,9 @@
-from scipy import io
+""" GDELT dataset for temporal graph """
 import numpy as np
 import os
-import datetime
 
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import get_download_dir, download, extract_archive, loadtxt, makedirs
-from ..utils import retry_method_with_fix
+from .utils import loadtxt, save_info, load_info, _get_dgl_url
 from ..graph import DGLGraph
 
 
@@ -13,127 +11,104 @@ class GDELTDataset(DGLBuiltinDataset):
     r"""GDELT dataset for event-based temporal graph
 
     The Global Database of Events, Language, and Tone (GDELT) dataset.
-    Event data consists of coded interactions between socio-political actors
-    (i.e., cooperative or hostile actions between individuals, groups, sectors
-    and nation states). Events are automatically identified and extracted
-    from news articles by the BBN ACCENT event coder. These events are
-    essentially triples consisting of a source actor, an event type (according
-    to the CAMEO taxonomy of events), and a target actor.
+    This contains events happend all over the world (ie every protest held
+    anywhere in Russia on a given day is collapsed to a single entry).
+    This Dataset consists ofevents collected from 1/1/2018 to 1/31/2018
+    (15 minutes time granularity).
 
-    Offical website:
-    https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075
+    Reference:
+    - `Recurrent Event Network for Reasoning over Temporal
+    Knowledge Graphs` <https://arxiv.org/abs/1904.05530>
+    - `The Global Database of Events, Language, and Tone (GDELT) `
+       <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>
+
 
     Statistics
     ----------
+    Train examples: 2,304
+    Valid examples: 288
+    Test examples: 384
+
+    Parameters
+    ----------
+    mode : str
+        Must be one of ('train', 'valid', 'test'). Default: 'train'
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+        Whether to print out progress information. Default: True.
+
+    Returns
+    -------
+    GDELTDataset object with two properties
+        start_time: start time of the temporal graph
+        end_time: end time of the temporal graph
 
     Examples
     ----------
-    >>> data = GDELTDataset()
+    >>> # get train, valid, test dataset
+    >>> train_data = GDELTDataset()
+    >>> valid_data = GDELTDataset(mode='valid')
+    >>> test_data = GDELTDataset(mode='test')
+    >>>
+    >>> # length of train set
+    >>> train_size = len(train_data)
+    >>>
+    >>> for g in train_data:
+    ....    e_feat = g.edata['rel_type']
+    ....    # your code here
+    ....
     >>>
     """
-    _url = {
-        'train': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/train.txt',
-        'valid': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/valid.txt',
-        'test': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/test.txt',
-    }
-    _sha1_str = {
-        'train': '',
-        'valid': '',
-        'test': ''
-    }
-
     def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False):
         mode = mode.lower()
-        assert mode in self._url, "Mode not valid."
-        self.dir = get_download_dir()
+        assert mode in ['train', 'valid', 'test'], "Mode not valid."
         self.mode = mode
+        self.num_nodes = 23033
+        _url = _get_dgl_url('dataset/gdelt.zip')
         super(GDELTDataset, self).__init__(name='GDELT',
-                                           url=self._url[mode],
+                                           url=_url,
                                            raw_dir=raw_dir,
                                            force_reload=force_reload,
                                            verbose=verbose)
 
-    def download(self):
-        makedirs(self.save_path)
-        file_path = os.path.join(self.save_path, self.mode + '.txt')
-        download(self.url, path=file_path)
-
     def process(self):
         file_path = os.path.join(self.raw_path, self.mode + '.txt')
-        self._data = loadtxt(file_path, delimiter='\t').astype(np.int64)
+        self.data = loadtxt(file_path, delimiter='\t').astype(np.int64)
 
         # The source code is not released, but the paper indicates there're
         # totally 137 samples. The cutoff below has exactly 137 samples.
-        self._time_index = np.floor(self._data[:, 3] / 15).astype(np.int64)
-        self._start_time = self._time_index[self._time_index != -1].min()
-        self._end_time = self._time_index.max()
+        self.time_index = np.floor(self.data[:, 3] / 15).astype(np.int64)
+        self._start_time = self.time_index.min()
+        self._end_time = self.time_index.max()
 
+    def has_cache(self):
+        info_path = os.path.join(self.save_path, self.mode + '_info.pkl')
+        return os.path.exists(info_path)
 
-class GDELT(object):
-    """
-    The Global Database of Events, Language, and Tone (GDELT) dataset.
-    This contains events happend all over the world (ie every protest held anywhere
-     in Russia on a given day is collapsed to a single entry).
+    def save(self):
+        info_path = os.path.join(self.save_path, self.mode + '_info.pkl')
+        save_info(info_path, {'data': self.data,
+                              'time_index': self.time_index,
+                              'start_time': self.start_time,
+                              'end_time': self.end_time})
 
-    This Dataset consists of
-    events collected from 1/1/2018 to 1/31/2018 (15 minutes time granularity).
+    def load(self):
+        info_path = os.path.join(self.save_path, self.mode + '_info.pkl')
+        info = load_info(info_path)
+        self.data, self.time_index, self._start_time, self._end_time = \
+            info['data'], info['time_index'], info['start_time'], info['end_time']
 
-    Reference:
-    - `Recurrent Event Network for Reasoning over Temporal
-    Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
-    - `The Global Database of Events, Language, and Tone (GDELT) <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
+    @property
+    def start_time(self):
+        return self._start_time
 
-
-    Parameters
-    ------------
-    mode: str
-      Load train/valid/test data. Has to be one of ['train', 'valid', 'test']
-
-    """
-    _url = {
-        'train': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/train.txt',
-        'valid': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/valid.txt',
-        'test': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/test.txt',
-    }
-
-    def __init__(self, mode):
-        assert mode.lower() in self._url, "Mode not valid"
-        self.dir = get_download_dir()
-        self.mode = mode
-        # self.graphs = []
-        train_data = loadtxt(os.path.join(
-            self.dir, 'GDELT', 'train.txt'), delimiter='\t').astype(np.int64)
-        if self.mode == 'train':
-            self._load(train_data)
-        elif self.mode == 'valid':
-            val_data = loadtxt(os.path.join(
-                self.dir, 'GDELT', 'valid.txt'), delimiter='\t').astype(np.int64)
-            train_data[:, 3] = -1
-            self._load(np.concatenate([train_data, val_data], axis=0))
-        elif self.mode == 'test':
-            val_data = loadtxt(os.path.join(
-                self.dir, 'GDELT', 'valid.txt'), delimiter='\t').astype(np.int64)
-            test_data = loadtxt(os.path.join(
-                self.dir, 'GDELT', 'test.txt'), delimiter='\t').astype(np.int64)
-            train_data[:, 3] = -1
-            val_data[:, 3] = -1
-            self._load(np.concatenate(
-                [train_data, val_data, test_data], axis=0))
-
-    def _download(self):
-        for dname in self._url:
-            dpath = os.path.join(
-                self.dir, 'GDELT', self._url[dname.lower()].split('/')[-1])
-            download(self._url[dname.lower()], path=dpath)
-
-    @retry_method_with_fix(_download)
-    def _load(self, data):
-        # The source code is not released, but the paper indicates there're
-        # totally 137 samples. The cutoff below has exactly 137 samples.
-        self.data = data
-        self.time_index = np.floor(data[:, 3]/15).astype(np.int64)
-        self.start_time = self.time_index[self.time_index != -1].min()
-        self.end_time = self.time_index.max()
+    @property
+    def end_time(self):
+        return self._end_time
 
     def __getitem__(self, idx):
         if idx >= len(self) or idx < 0:
@@ -149,12 +124,11 @@ class GDELT(object):
         return g
 
     def __len__(self):
-        return self.end_time - self.start_time + 1
-
-    @property
-    def num_nodes(self):
-        return 23033
+        return self._end_time - self._start_time + 1
 
     @property
     def is_temporal(self):
         return True
+
+
+GDELT = GDELTDataset
