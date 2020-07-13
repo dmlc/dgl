@@ -6,3 +6,4 @@ Currently it contains:
 
 * OGB-Products
   * GraphSAGE with Neighbor Sampling
+* OGB-Proteins
