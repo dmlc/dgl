@@ -44,9 +44,7 @@ def submit_jobs(args):
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
         cmd = cmd + ' ' + args.udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        print(cmd)
         execute_remote(cmd, ip)
-    print("----------")
     # launch client tasks
     client_cmd = 'DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
@@ -62,7 +60,6 @@ def submit_jobs(args):
         cmd = cmd + ' ' + '--master_addr=' + str(hosts[0][0])
         cmd = cmd + ' ' + '--master_port=1200'
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        print(cmd)
         execute_remote(cmd, ip)
 
     while True:
