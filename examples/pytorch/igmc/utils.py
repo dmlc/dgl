@@ -91,6 +91,8 @@ def links2subgraphs(
     test_graphs = helper(adj, test_indices, test_labels)
     return train_graphs, val_graphs, test_graphs
 
+# import networkx as nx
+# from refex import RecursiveExtractor
 def subgraph_extraction_labeling(g_label, ind, adj, 
                                  hop=1, sample_ratio=1.0, max_node_label=3, max_nodes_per_hop=200):
     # extract the h-hop enclosing subgraph around link 'ind'
@@ -99,6 +101,16 @@ def subgraph_extraction_labeling(g_label, ind, adj,
     u_dist, v_dist = [0], [0]
     u_visited, v_visited = set([ind[0]]), set([ind[1]])
     u_fringe, v_fringe = set([ind[0]]), set([ind[1]])
+
+    # g
+    # u, v = edge
+    # nodes = th.array([u, v])
+    # hop1 = g.in_subgraph(nodes)  # nodes: shape (N,)
+    # src, _ = hop1.edges()
+    # hop2 = g.in_subgraph(th.unique(src))
+    # src2, _ = hop2.edges()
+    # all_nodes = th.unique(th.cat([src, src2]))
+    # sg = g.subgraph(all_nodes)
 
     for dist in range(1, hop+1):
         v_fringe, u_fringe = neighbors(u_fringe, adj, True), neighbors(v_fringe, adj, False)
@@ -145,10 +157,13 @@ def subgraph_extraction_labeling(g_label, ind, adj,
 
     subgraph_info['x'] = np.concatenate([u_x, v_x], axis=0)
     
+    # nx_graph = nx.from_edgelist(list(zip(*(subgraph_info['src'], subgraph_info['dst']))))
+    # recurser = RecursiveExtractor(nx_graph, n_recursion=1, pruning_cutoff=0.5, bins=4)
+    # subgraph_info['refex_feature'] = recurser.create_features()
+
     return subgraph_info
 
 def neighbors(fringe, adj, row=True):
-    # TODO [zhoujf] use sample_neighbors fn
     # find all 1-hop neighbors of nodes in fringe from A
     res = set()
     for node in fringe:
@@ -164,4 +179,68 @@ def one_hot(idx, length):
     idx = np.array(idx)
     x = np.zeros([len(idx), length])
     x[np.arange(len(idx)), idx] = 1.0
+    return x
+
+def dgl_subgraph_extraction_labeling(ind, graph, 
+                                 hop=1, sample_ratio=1.0, max_node_label=3, max_nodes_per_hop=200):
+    # extract the h-hop enclosing subgraph around link 'ind'
+    u, v = ind 
+
+    # 1. neighbor sampling
+    dist = 0
+    u_nodes, v_nodes = ind[0].unsqueeze(dim=0), ind[1].unsqueeze(dim=0)
+    u_dist, v_dist = th.tensor([0]), th.tensor([0])
+    u_visited, v_visited = th.unique(u_nodes), th.unique(v_nodes)
+    u_fringe, v_fringe = th.unique(u_nodes), th.unique(v_nodes)
+
+    for dist in range(1, hop+1):
+        # sample neigh separately as the dist(label) of u nodes is different from v nodes
+        u_fringe, v_fringe = graph.in_edges(v_fringe)[0], graph.out_edges(u_fringe)[1]
+        u_fringe = th.from_numpy(np.setdiff1d(u_fringe.numpy(), u_visited.numpy()))
+        v_fringe = th.from_numpy(np.setdiff1d(v_fringe.numpy(), v_visited.numpy()))
+        u_visited = th.unique(th.cat([u_visited, u_fringe]))
+        v_visited = th.unique(th.cat([v_visited, v_fringe]))
+
+        if sample_ratio < 1.0:
+            shuffled_idx = th.randperm(len(u_fringe))
+            u_fringe = u_fringe[shuffled_idx[:int(sample_ratio*len(u_fringe))]]
+            shuffled_idx = th.randperm(len(v_fringe))
+            v_fringe = v_fringe[shuffled_idx[:int(sample_ratio*len(v_fringe))]]
+        if max_nodes_per_hop is not None:
+            if max_nodes_per_hop < len(u_fringe):
+                shuffled_idx = th.randperm(len(u_fringe))
+                u_fringe = u_fringe[shuffled_idx[: max_nodes_per_hop]]
+            if max_nodes_per_hop < len(v_fringe):
+                shuffled_idx = th.randperm(len(u_fringe))
+                v_fringe = v_fringe[shuffled_idx[: max_nodes_per_hop]]
+        if len(u_fringe) == 0 and len(v_fringe) == 0:
+            break
+        u_nodes = th.cat([u_nodes, u_fringe])
+        v_nodes = th.cat([v_nodes, v_fringe])
+        u_dist = th.cat([u_dist, th.full((len(u_fringe), ), dist, dtype=th.int64)])
+        v_dist = th.cat([v_dist, th.full((len(v_fringe), ), dist, dtype=th.int64)])
+    
+    # 2. subgrpah creation
+    subgraph = train_graph.subgraph(th.cat([u_nodes, v_nodes]))
+
+    su = subgraph.nodes()[subgraph.ndata[dgl.NID]==u]
+    sv = subgraph.nodes()[subgraph.ndata[dgl.NID]==v]
+    target_edges = subgraph.edge_ids([su, sv], [sv, su])
+    # set edge weight 0 as to remove link between target nodes
+    subgraph.edata['weight'] = th.ones(subgraph.number_of_edges())
+    subgraph.edata['weight'][target_edges] = 0.
+    
+    # 3. node labeling
+    u_node_labels = th.stack([x*2 for x in u_dist])
+    v_node_labels = th.stack([x*2+1 for x in v_dist])
+    
+    u_x = dgl_one_hot(u_node_labels, max_node_label+1)
+    v_x = dgl_one_hot(v_node_labels, max_node_label+1)
+    subgraph.ndata['x'] = th.cat([u_x, v_x])
+
+    return subgraph
+
+def dgl_one_hot(idx, length):
+    x = th.zeros([len(idx), length])
+    x[th.arange(len(idx)), idx] = 1.0
     return x

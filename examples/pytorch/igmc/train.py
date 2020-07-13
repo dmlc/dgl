@@ -7,6 +7,7 @@ import glob
 import random
 import argparse
 from shutil import copy
+from pyinstrument import Profiler
 
 import numpy as np
 import torch as th
@@ -41,6 +42,7 @@ def adj_rating_reg(model):
         arr_loss += th.sum((weight[1:, :, :] - weight[:-1, :, :])**2)
     return arr_loss
 
+# @profile
 def train_epoch(model, loss_fn, optimizer, arr_lambda, loader, device, log_interval):
     model.train()
 
@@ -49,11 +51,15 @@ def train_epoch(model, loss_fn, optimizer, arr_lambda, loader, device, log_inter
     iter_mse = 0.
     iter_cnt = 0
     iter_dur = []
+
+    # profiler = Profiler()
+    # profiler.start()
     for iter_idx, batch in enumerate(loader, start=1):
         t_start = time.time()
 
-        preds = model(batch[0].to(device))
+        inputs = batch[0].to(device)
         labels = batch[1].to(device)
+        preds = model(inputs)
         loss = loss_fn(preds, labels).mean() + arr_lambda * adj_rating_reg(model)
         
         optimizer.zero_grad()
@@ -72,11 +78,12 @@ def train_epoch(model, loss_fn, optimizer, arr_lambda, loader, device, log_inter
             iter_loss = 0.
             iter_mse = 0.
             iter_cnt = 0
+    # profiler.stop()
+    # profiler.output_html()
     return epoch_loss / len(loader.dataset)
 
 def train(args):
     ### prepare data and set model
-    # TODO [zhoujf] merge data.py and dataset.py
     movielens = MovieLens(args.data_name, testing=args.testing,
                             test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     if args.testing:
@@ -86,7 +93,7 @@ def train(args):
             mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
     else:
         test_dataset = MovieLensDataset(
-            movielens.valid_rating_pairs, movielens.valid_rating_pairs, movielens.rating_mx_train, 
+            movielens.valid_rating_pairs, movielens.valid_rating_values, movielens.rating_mx_train, 
             args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1, 
             mode='valid', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
     train_dataset = MovieLensDataset(
@@ -101,7 +108,7 @@ def train(args):
 
     model = IGMC(in_feats=(args.hop+1)*2,
                  latent_dim=[32, 32, 32, 32],
-                 num_relations=5, #dataset_base.num_rating, 
+                 num_relations=5, # movielens.num_rating, 
                  num_bases=4, 
                  regression=True, 
                  edge_dropout=args.edge_dropout,
@@ -141,7 +148,10 @@ def train(args):
         if best_rmse > test_rmse:
             best_rmse = test_rmse
             best_epoch = epoch_idx
-    print("Training ends. The best testing rmse is {:.6f} at epoch {}".format(best_rmse, best_epoch))
+    eval_info = "Training ends. The best testing rmse is {:.6f} at epoch {}".format(best_rmse, best_epoch)
+    print(eval_info)
+    with open(os.path.join(args.save_dir, 'log.txt'), 'a') as f:
+        f.write(eval_info)
 
 def config():
     parser = argparse.ArgumentParser(description='IGMC')
@@ -163,7 +173,7 @@ def config():
     #                     help='if True, load a series of model checkpoints and ensemble the results')               
     parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--valid_log_interval', type=int, default=10)
-    parser.add_argument('--save_appendix', type=str, default='', 
+    parser.add_argument('--save_appendix', type=str, default='tmp', 
                         help='what to append to save-names when saving results')
     # subgraph extraction settings
     parser.add_argument('--hop', default=1, metavar='S', 

@@ -144,7 +144,7 @@ def train(proc_id, n_gpus, args, devices, movielens):
         mode='train', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
     train_loader = th.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
                             num_workers=args.num_workers, collate_fn=collate_movielens)
-    if dev_id == 0:
+    if proc_id == 0:
         if args.testing:
             test_dataset = MovieLensDataset(
                 movielens.test_rating_pairs, movielens.test_rating_values, movielens.rating_mx_train, 
@@ -213,8 +213,11 @@ def train(proc_id, n_gpus, args, devices, movielens):
     if n_gpus > 1:
         th.distributed.barrier()
     if proc_id == 0:
-        print("Training ends. The best testing rmse is {:.6f} at epoch {}".format(best_rmse, best_epoch))
-
+        eval_info = "Training ends. The best testing rmse is {:.6f} at epoch {}".format(best_rmse, best_epoch)
+        print(eval_info)
+        with open(os.path.join(args.save_dir, 'log.txt'), 'a') as f:
+            f.write(eval_info)
+            
 def config():
     parser = argparse.ArgumentParser(description='IGMC')
     # general settings
