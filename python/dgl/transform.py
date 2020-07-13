@@ -1298,8 +1298,8 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     copy_edata: bool, optional
         If True, the edge features of the simple graph are copied
         from the original graph. If there exists duplicate edges between
-        two vertexes (u, v), the edge feature of the simpled edge is
-        randomly selected from one of the duplicate edges.
+        two nodes (u, v), the feature of the edge is randomly selected
+        from one of the duplicate edges.
         If False, the simple graph will not have any edge features.
         (Default: False)
 
