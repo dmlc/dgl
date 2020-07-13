@@ -645,8 +645,8 @@ def test_to_simple(index_dtype):
     # share edata
     feat_idx = F.asnumpy(wb[('user', 'follow', 'user')])
     _, indices = np.unique(feat_idx, return_index=True)
-    assert F.array_equal(sg.edges['follow'].data['h'].to(F.cpu()),
-                         g.edges['follow'].data['h'].to(F.cpu())[F.tensor(indices)])
+    assert F.array_equal(F.copy_to(sg.edges['follow'].data['h'], F.cpu()),
+                         F.copy_to(g.edges['follow'].data['h'], F.cpu())[F.tensor(indices)])
 
     sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
     for ntype in g.ntypes:
