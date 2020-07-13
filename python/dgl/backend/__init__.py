@@ -19,6 +19,17 @@ def _gen_missing_api(api, mod_name):
                           ' the DGLBACKEND environment.' % (api, mod_name))
     return _missing_api
 
+_notes_docstring = r"""
+    Notes
+    -----
+    This function supports autograd (computing input gradients given the output gradient). If the
+    feature shape of two input operands do not match, we first broadcasts the features to a unified
+    shape (note that the memory usage will not increase accordingly) and then performs the operation.
+
+    Broadcasting follows NumPy semantics. Please see
+    https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
+    for more details about the NumPy broadcasting semantics."""
+
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)
     target_dict = {
@@ -28,7 +39,8 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     }
     lhs_str = target_dict[lhs_target]
     rhs_str = target_dict[rhs_target]
-    docstring = r"""Generalized SDDMM function. It takes the result of {} feature {} {} feature, leads to a feature on edge.
+    docstring = r"""Generalized SDDMM function.
+    It computes edge features by {} {} features and {} features.
 
     Parameters
     ----------
@@ -43,8 +55,9 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     -------
     tensor
         The result tensor.
-    """.format(lhs_str, binary_op, rhs_str,
-               lhs_str, rhs_str)
+    {}""".format(binary_op, lhs_str, rhs_str,
+                 lhs_str, rhs_str,
+                 _notes_docstring)
 
     def func(g, x, y):
         return gsddmm(g, binary_op, x, y,
@@ -55,8 +68,10 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
 
 def _gen_spmm_func(binary_op, reduce_op):
     name = "u_{}_e_{}".format(binary_op, reduce_op)
-    docstring = """Generalized SpMM function. It takes the result of source node feature {} edge feature, leads to a message on edge.
-    Then aggregates the message by {} on destination nodes.
+    docstring = """Generalized SpMM function.
+    It fuses two steps into one kernel.
+    (1) Computes messages by {} source node and edge features.
+    (2) Aggregate the messages by {} as the features on destination nodes.
 
     Parameters
     ----------
@@ -71,7 +86,8 @@ def _gen_spmm_func(binary_op, reduce_op):
     -------
     tensor
         The result tensor.
-    """.format(binary_op, reduce_op)
+    {}""".format(binary_op, reduce_op,
+                 _notes_docstring)
 
     def func(g, x, y):
         return gspmm(g, binary_op, reduce_op, x, y)
@@ -104,10 +120,15 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     -------
     tensor
         The result tensor.
+
+    Notes
+    -----
+    This function supports autograd (computing input gradients given the output gradient).
     """.format(
         binary_str[binary_op],
         reduce_op,
-        x_str[binary_op])
+        x_str[binary_op],
+        _notes_docstring)
 
     def func(g, x):
         if binary_op == 'copy_u':
@@ -154,7 +175,11 @@ def copy_u(g, x):
     -------
     tensor
         The result tensor.
-    """
+
+    Notes
+    -----
+    This function supports autograd (computing input gradients given the output gradient).
+    """.format(_notes_docstring)
     return gsddmm(g, 'copy_lhs', x, None)
 
 def copy_v(g, x):
@@ -171,7 +196,11 @@ def copy_v(g, x):
     -------
     tensor
         The result tensor.
-    """
+
+    Notes
+    -----
+    This function supports autograd (computing input gradients given the output gradient).
+    """.format(_notes_docstring)
     return gsddmm(g, 'copy_rhs', None, x)
 
 def load_backend(mod_name):

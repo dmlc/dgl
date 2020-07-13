@@ -7,11 +7,11 @@
 #define DGL_ARRAY_CUDA_SDDMM_CUH_
 
 #include <dgl/bcast.h>
-#include <dgl/selector.h>
 #include "macro.cuh"
 #include "atomic.cuh"
 #include "functor.cuh"
 #include "./utils.h"
+#include "../selector.h"
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {

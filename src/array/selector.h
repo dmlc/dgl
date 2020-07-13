@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/selector.h
+ * \file array/selector.h
  * \brief Selector functions to select among src/edge/dst attributes.
  */
-#ifndef DGL_SELECTOR_H_
-#define DGL_SELECTOR_H_
+#ifndef DGL_ARRAY_SELECTOR_H_
+#define DGL_ARRAY_SELECTOR_H_
 
 #include <dmlc/logging.h>
 
@@ -56,4 +56,4 @@ DGLDEVICE DGLINLINE T Selector<2>::Call(T src, T edge, T dst) {
 
 }  // namespace dgl
 
-#endif  // DGL_SELECTOR_H_
+#endif  // DGL_ARRAY_SELECTOR_H_

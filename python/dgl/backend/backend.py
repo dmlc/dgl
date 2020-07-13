@@ -1367,9 +1367,10 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     pass
 
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
-    r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
-    :attr:`op` on source node feature and edge feature, leads to a message on edge.
-    Then aggregates the message by :attr:`reduce_op` on destination nodes.
+    r""" Generalized Sparse Matrix Multiplication interface.
+    It fuses two steps into one kernel.
+    (1) Computes messages by :attr:`op` source node and edge features.
+    (2) Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
 
     .. math::
         x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
@@ -1403,17 +1404,16 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     pass
 
 def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
-    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
-    takes the result of :attr:`op` on source node feature and destination node
-    feature, leads to a feature on edge.
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+    It computes edge features by :attr:`op` lhs features and rhs features.
 
     .. math::
-        x_{e} = \phi(x_u, x_v), \forall (u,e,v)\in \mathcal{G}
+        x_{e} = \phi(x_{lhs}, x_{rhs}), \forall (u,e,v)\in \mathcal{G}
 
     where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
     :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
     is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
-    we apply gsddmm on: :attr:`g`.
+    we apply gsddmm on: :attr:`g`. $lhs$ and $rhs$ are one of $u,v,e$'s.
 
     Parameters
     ----------
