@@ -498,16 +498,7 @@ def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
     """
     # TODO(0.5 release, xiangsx) need to handle BLOCK
     # currently reversing a block results in undefined behavior
-    canonical_etypes = g.canonical_etypes
-    meta_edges_src = []
-    meta_edges_dst = []
-    etypes = []
-    for c_etype in canonical_etypes:
-        meta_edges_src.append(g.get_ntype_id(c_etype[2]))
-        meta_edges_dst.append(g.get_ntype_id(c_etype[0]))
-        etypes.append(c_etype[1])
-    metagraph = from_edge_list((meta_edges_src, meta_edges_dst), True)
-    gidx = g._graph.reverse(metagraph)
+    gidx = g._graph.reverse()
     new_g = DGLHeteroGraph(gidx, g.ntypes, etypes)
 
     # handle ndata

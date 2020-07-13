@@ -70,7 +70,7 @@ graphs = [
 #    dgl.rand_graph(30, 0),
     dgl.rand_graph(100, 30),
     dgl.rand_graph(100, 3000),
-#    dgl.rand_bipartite(80, 160, 3000)
+    dgl.rand_bipartite(80, 160, 3000)
 ]
 
 spmm_shapes = [
