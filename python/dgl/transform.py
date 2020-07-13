@@ -12,6 +12,7 @@ from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .heterograph_index import joint_union as gidx_joint_union
+from .heterograph_index import create_heterograph_from_relations
 from .graph import unbatch
 from .convert import graph, bipartite
 from . import utils
@@ -166,7 +167,7 @@ def to_bidirected(g, readonly=None, share_ndata=True,
     g : DGLGraph
         The input graph.
     readonly : bool, default to be True
-        Whether the returned bidirected graph is readonly or not.
+        Deprecated. There will be no difference between readonly and non-readonly
     share_ndata: bool, optional
         If True, the node features of the bidirected graph will
         be the same as the original graph. If False, the bidirected
@@ -187,6 +188,19 @@ def to_bidirected(g, readonly=None, share_ndata=True,
     Returns
     -------
     DGLGraph
+        The to_bidirected graph
+
+    Notes
+    -----
+    If ``share_ndata`` is ``True``, same tensors is used for
+    the features of the original graph.
+    As a result, users should avoid performing in-place operations
+    on the features of the to_bidirected graph, which will corrupt
+    the features of the original graph as well.
+    While for ``share_edata``, as edge features are concatenated,
+    they are not shared with original graphs.
+    For concrete examples, refer to the ``Examples`` section below.
+
 
     Examples
     --------
@@ -200,14 +214,14 @@ def to_bidirected(g, readonly=None, share_ndata=True,
     >>> g.add_edges([0, 0], [0, 1])
     >>> bg1 = dgl.to_bidirected(g)
     >>> bg1.edges()
-    (tensor([0, 1, 0]), tensor([0, 0, 1]))
+    (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
 
     **Heterographs with Multiple Edge Types**
 
     g = dgl.heterograph({
     >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
     >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
-    >>>     ('user', 'follows', 'user): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
+    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
     >>> })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
@@ -232,6 +246,10 @@ def to_bidirected(g, readonly=None, share_ndata=True,
     >>> bg.edges[('user', 'wins', 'user')].data['h']
     th.tensor([0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
     """
+    if readonly is not None:
+        dgl_warning("Parameter readonly is deprecated" \
+            "There will be no difference between readonly and non-readonly DGLGraph")
+
     canonical_etypes = g.canonical_etypes
     metagraph = g._graph.metagraph
     # fast path
@@ -241,8 +259,9 @@ def to_bidirected(g, readonly=None, share_ndata=True,
                 assert False, "to_bidirected is not well defined for " \
                     "unidirectional bipartite graphs" \
                     ", but {} is unidirectional bipartite".format(c_etype)
-        hgidx = joint_union(g._graph,
-                            g._graph.reverse())
+        hgidx = gidx_joint_union(g._graph.metagraph,
+                                 [g._graph,
+                                 g._graph.reverse()])
         new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
     else:
         gidxes = []
@@ -251,10 +270,13 @@ def to_bidirected(g, readonly=None, share_ndata=True,
                 gidxes.append(g._graph.get_relation_graph(i))
             else:
                 gidxes.append(gidx_joint_union(
-                    g._graph.get_relation_graph(i),
-                    g._graph.get_relation_graph(i).reverse()))
-        hgidx = g._graph.create_heterograph_from_relations(metagraph,
-                                                           gidxes)
+                    g._graph.get_relation_graph(i).metagraph,
+                    [g._graph.get_relation_graph(i),
+                     g._graph.get_relation_graph(i).reverse()]))
+
+        num_nodes_per_type = [g.number_of_nodes(ntype) for ntype in g.ntypes]
+        hgidx = create_heterograph_from_relations(metagraph, gidxes,
+            utils.toindex(num_nodes_per_type, "int64"))
         new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
 
     # handle features
@@ -270,12 +292,12 @@ def to_bidirected(g, readonly=None, share_ndata=True,
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 # for each data field
-                for k in g.edges[etype].data:
-                    new_g.edges[etype].data[k] = g.edges[etype].data[k]
+                for k in g.edges[c_etype].data:
+                    new_g.edges[c_etype].data[k] = g.edges[c_etype].data[k]
             else:
-                for k in g.edges[etype].data:
-                    new_g.edges[etype].data[k] = \
-                        F.cat([g.edges[etype].data[k], g.edges[etype].data[k]], dim=0)
+                for k in g.edges[c_etype].data:
+                    new_g.edges[c_etype].data[k] = \
+                        F.cat([g.edges[c_etype].data[k], g.edges[c_etype].data[k]], dim=0)
     return new_g
 
 
@@ -310,7 +332,7 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     Returns
     -------
     DGLGraph
-        The joint union
+        The joint_unioned graph
 
     Notes
     -----
@@ -725,7 +747,7 @@ def to_simple_graph(g):
     gidx = _CAPI_DGLToSimpleGraph(g._graph)
     return DGLGraph(gidx, readonly=True)
 
-def to_bidirected(g, readonly=True):
+def to_bidirected_stale(g, readonly=True):
     """Convert the graph to a bidirected graph.
 
     The function generates a new graph with no node/edge feature.
@@ -1058,7 +1080,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     '''
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
-    sym_g = to_bidirected(g, readonly=True)
+    sym_g = to_bidirected_stale(g, readonly=True)
     vwgt = []
     # To balance the node types in each partition, we can take advantage of the vertex weights
     # in Metis. When vertex weights are provided, Metis will tries to generate partitions with
