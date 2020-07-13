@@ -2,11 +2,13 @@
 
 from collections.abc import MutableMapping
 import numpy as np
+import os
 
 from ..graph import DGLGraph
 from .. import backend as F
 from ..base import NID, EID
 from .kvstore import KVServer, KVClient
+from .fake_kvstore import KVClient as FakeKVClient
 from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
@@ -354,19 +356,35 @@ class DistGraph:
     gpb : PartitionBook
         The partition book object
     '''
-    def __init__(self, ip_config, graph_name, gpb=None):
-        connect_to_server(ip_config=ip_config)
-        self._client = KVClient(ip_config)
-        g = _get_graph_from_shared_mem(graph_name)
-        if g is not None:
+    def __init__(self, ip_config, graph_name, gpb=None, conf_file=None):
+        if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
+            assert conf_file is not None, \
+                    'When running in the standalone model, the partition config file is required'
+            self._client = FakeKVClient()
+            # Load graph partition data.
+            g, node_feats, edge_feats, self._gpb = load_partition(conf_file, 0)
+            if self._gpb is None:
+                self._gpb = gpb
             self._g = as_heterograph(g)
+            for name in node_feats:
+                self._client.add_data(_get_ndata_name(name), node_feats[name])
+            for name in edge_feats:
+                self._client.add_data(_get_edata_name(name), edge_feats[name])
+            rpc.set_num_client(1)
         else:
-            self._g = None
-        self._gpb = get_shared_mem_partition_book(graph_name, self._g)
-        if self._gpb is None:
-            self._gpb = gpb
-        self._client.barrier()
-        self._client.map_shared_data(self._gpb)
+            connect_to_server(ip_config=ip_config)
+            self._client = KVClient(ip_config)
+            g = _get_graph_from_shared_mem(graph_name)
+            if g is not None:
+                self._g = as_heterograph(g)
+            else:
+                self._g = None
+            self._gpb = get_shared_mem_partition_book(graph_name, self._g)
+            if self._gpb is None:
+                self._gpb = gpb
+            self._client.barrier()
+            self._client.map_shared_data(self._gpb)
+
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
 

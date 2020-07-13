@@ -69,7 +69,9 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
     gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                               part_id, None)
     g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
+    check_dist_graph(g, num_nodes, num_edges)
 
+def check_dist_graph(g, num_nodes, num_edges):
     # Test API
     assert g.number_of_nodes() == num_nodes
     assert g.number_of_edges() == num_edges
@@ -163,8 +165,9 @@ def run_client(graph_name, part_id, num_nodes, num_edges):
         assert n in local_nids
 
     # clean up
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
+    if os.environ['DGL_DIST_MODE'] == 'distributed':
+        dgl.distributed.shutdown_servers()
+        dgl.distributed.finalize_client()
     print('end')
 
 def check_server_client(shared_mem):
@@ -205,8 +208,22 @@ def check_server_client(shared_mem):
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     check_server_client(True)
     check_server_client(False)
+
+def test_standalone():
+    os.environ['DGL_DIST_MODE'] = 'standalone'
+    g = create_random_graph(10000)
+    # Partition the graph
+    num_parts = 1
+    graph_name = 'dist_graph_test_3'
+    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
+    g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
+    dist_g = DistGraph("kv_ip_config.txt", graph_name,
+                  conf_file='/tmp/dist_graph/{}.json'.format(graph_name))
+    check_dist_graph(dist_g, g.number_of_nodes(), g.number_of_edges())
 
 def test_split():
     prepare_dist()
@@ -323,3 +340,4 @@ if __name__ == '__main__':
     test_split()
     test_split_even()
     test_server_client()
+    test_standalone()
