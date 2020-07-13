@@ -1291,12 +1291,12 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
         type subgraph. If False, only the simple graph is returned.
         (Default: False)
     copy_ndata: bool, optional
-        If True, the node features of the simple graph are lazy-copied
+        If True, the node features of the simple graph are copied
         from the original graph. If False, the simple
         graph will not have any node features.
         (Default: True)
     copy_edata: bool, optional
-        If True, the edge features of the simple graph are lazy-copied
+        If True, the edge features of the simple graph are copied
         from the original graph. If there exists duplicate edges between
         two vertexes (u, v), the edge feature of the simpled edge is
         randomly selected from one of the duplicate edges.
@@ -1314,7 +1314,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
         graph has multiple edge types, a dictionary
         of tensor is return.
 
-    If ``copy_ndata`` is ``True``, same tensors may be used for
+    If ``copy_ndata`` is ``True``, same tensors will be used for
     the features of the original graph and the to_simpled graph. As a result, users
     should avoid performing in-place operations on the features of the to_simpled
     graph, which will corrupt the features of the original graph as well. For
