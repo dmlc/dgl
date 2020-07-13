@@ -15,10 +15,17 @@ from .server_state import ServerState
 from .graph_services import sample_neighbors, in_subgraph
 
 if os.environ.get('DGL_ROLE', 'client') == 'server':
-    serv_id = int(os.environ.get('DGL_SERVER_ID'))
-    ip_conf = os.environ.get('DGL_IP_CONFIG')
-    conf_path = os.environ.get('DGL_CONF_PATH')
-    num_clients = int(os.environ.get('DGL_NUM_CLIENT'))
-    serv = DistGraphServer(serv_id, ip_conf, num_clients, conf_path)
+    assert os.environ.get('DGL_SERVER_ID') is not None, \
+            'Please define DGL_SERVER_ID to run DistGraph server'
+    assert os.environ.get('DGL_IP_CONFIG') is not None, \
+            'Please define DGL_IP_CONFIG to run DistGraph server'
+    assert os.environ.get('DGL_NUM_CLIENT') is not None, \
+            'Please define DGL_NUM_CLIENT to run DistGraph server'
+    assert os.environ.get('DGL_CONF_PATH') is not None, \
+            'Please define DGL_CONF_PATH to run DistGraph server'
+    serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
+                           os.environ.get('DGL_IP_CONFIG'),
+                           int(os.environ.get('DGL_NUM_CLIENT')),
+                           os.environ.get('DGL_CONF_PATH'))
     serv.start()
     sys.exit()
