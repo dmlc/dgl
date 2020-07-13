@@ -478,6 +478,22 @@ def test_sage_conv(aggre_type):
     assert h.shape[-1] == 2
     assert h.shape[0] == 200
 
+    # Test the case for graphs without edges
+    g = dgl.bipartite([], num_nodes=(5, 3))
+    sage = nn.SAGEConv((3, 3), 2, 'gcn')
+    feat = (F.randn((5, 3)), F.randn((3, 3)))
+    sage = sage.to(ctx)
+    h = sage(g, feat)
+    assert h.shape[-1] == 2
+    assert h.shape[0] == 3
+    for aggre_type in ['mean', 'pool', 'lstm']:
+        sage = nn.SAGEConv((3, 1), 2, aggre_type)
+        feat = (F.randn((5, 3)), F.randn((3, 1)))
+        sage = sage.to(ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 3
+
 def test_sgc_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)

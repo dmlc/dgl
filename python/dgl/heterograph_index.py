@@ -997,11 +997,16 @@ class HeteroGraphIndex(ObjectBase):
 
         The node types and edge types are not changed
 
+        Parameters
+        ----------
+        metagraph : GraphIndex
+            Meta-graph.
+
         Returns
         -------
         A new graph index.
         """
-        return _CAPI_DGLHeteroReverse(self)
+        return _CAPI_DGLHeteroReverse(metagraph, self)
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):
