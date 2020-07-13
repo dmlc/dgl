@@ -225,3 +225,5 @@ The following is an example showing how GSDDMM works:
     v_div_e
     copy_u
     copy_v
+
+Like GSpMM, GSDDMM operators support both homograph and bipartite graph.

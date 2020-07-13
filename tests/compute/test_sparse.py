@@ -108,8 +108,8 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
     print(g)
     print(g.idtype)
 
-    hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) * 10 + 1)
-    he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) * 10 + 1)
+    hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
+    he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
     print('u shape: {}, e shape: {}'.format(F.shape(hu), F.shape(he)))
 
     g.srcdata['x'] = F.attach_grad(F.clone(hu))
@@ -139,9 +139,19 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
 
             F.backward(F.reduce_sum(v1))
             if msg != 'copy_rhs':
-                assert F.allclose(F.grad(g.srcdata['x']), grad_u)
+                if reducer in ['min', 'max']: # there might be some numerical errors
+                    rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) /\
+                           (1. + F.reduce_sum(F.abs(grad_u)))
+                    assert F.as_scalar(rate) < 1e-4, rate
+                else:
+                    assert F.allclose(F.grad(g.srcdata['x']), grad_u)
             if msg != 'copy_lhs':
-                assert F.allclose(F.grad(g.edata['w']), grad_e)
+                if reducer in ['min', 'max']:
+                    rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) /\
+                           (1. + F.reduce_sum(F.abs(grad_e)))
+                    assert F.as_scalar(rate) < 1e-4, rate
+                else:
+                    assert F.allclose(F.grad(g.edata['w']), grad_e)
             print('backward passed')
 
     g.srcdata.pop('x')
