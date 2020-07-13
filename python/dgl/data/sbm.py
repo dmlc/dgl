@@ -6,7 +6,7 @@ import numpy as np
 import numpy.random as npr
 import scipy as sp
 
-from .utils import deprecate_class
+from .dgl_dataset import DGLDataset
 from ..graph import DGLGraph, batch
 from ..utils import Index
 
@@ -54,7 +54,7 @@ def sbm(n_blocks, block_size, p, q, rng=None):
     return adj
 
 
-class SBMMixtureDataset(object):
+class SBMMixtureDataset(DGLDataset):
     r""" Symmetric Stochastic Block Model Mixture
 
     Reference: Appendix C of "Supervised Community Detection with Hierarchical
@@ -97,20 +97,27 @@ class SBMMixtureDataset(object):
                  avg_deg=3,
                  pq='Appendix_C',
                  rng=None):
+        self._n_graphs = n_graphs
         self._n_nodes = n_nodes
+        self._n_communities = n_communities
         assert n_nodes % n_communities == 0
-        block_size = n_nodes // n_communities
+        self._block_size = n_nodes // n_communities
         self._k = k
         self._avg_deg = avg_deg
-        self._graphs = [DGLGraph() for _ in range(n_graphs)]
-        if type(pq) is list:
-            assert len(pq) == n_graphs
-        elif type(pq) is str:
-            generator = {'Appendix_C': self._appendix_c}[pq]
-            pq = [generator() for _ in range(n_graphs)]
+        self._pq = pq
+        self._rng = rng
+        super(SBMMixtureDataset, self).__init__(name='sbmmixture')
+
+    def process(self):
+        self._graphs = [DGLGraph() for _ in range(self._n_graphs)]
+        if type(self._pq) is list:
+            assert len(self._pq) == self._n_graphs
+        elif type(self._pq) is str:
+            generator = {'Appendix_C': self._appendix_c}[self._pq]
+            pq = [generator() for _ in range(self._n_graphs)]
         else:
             raise RuntimeError()
-        adjs = [sbm(n_communities, block_size, *x, rng=rng) for x in pq]
+        adjs = [sbm(self._n_communities, self._block_size, *x, rng=self._rng) for x in pq]
         for g, adj in zip(self._graphs, adjs):
             g.from_scipy_sparse_matrix(adj)
         self._line_graphs = [g.line_graph(backtracking=False) for g in self._graphs]
