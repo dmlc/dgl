@@ -41,8 +41,8 @@ class MiniGCDataset(DGLDataset):
         Random seed for data generation
     """
 
-    def __init__(self, num_graphs, min_num_v, max_num_v,
-        seed=None, save_graph=True, force_reload=False):
+    def __init__(self, num_graphs, min_num_v, max_num_v, seed=None,
+                 save_graph=True, force_reload=False, verbose=False):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
@@ -50,7 +50,8 @@ class MiniGCDataset(DGLDataset):
         self.save_graph = save_graph
 
         super(MiniGCDataset, self).__init__(name="minigc",
-                                            force_reload=force_reload)
+                                            force_reload=force_reload,
+                                            verbose=verbose)
 
     def process(self):
         self.graphs = []
@@ -85,7 +86,7 @@ class MiniGCDataset(DGLDataset):
 
     def save(self):
         """save the graph list and the labels"""
-        if self.save_graph :
+        if self.save_graph:
             graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
             save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
 
