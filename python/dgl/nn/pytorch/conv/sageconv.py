@@ -1,5 +1,6 @@
 """Torch Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import torch
 from torch import nn
 from torch.nn import functional as F
 
@@ -123,6 +124,11 @@ class SAGEConv(nn.Module):
                 feat_src = feat_dst = self.feat_drop(feat)
 
             h_self = feat_dst
+
+            # Handle the case of graphs without edges
+            if graph.number_of_edges() == 0:
+                graph.dstdata['neigh'] = torch.zeros(
+                    feat_dst.shape[0], self._in_src_feats).to(feat_dst)
 
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = feat_src
