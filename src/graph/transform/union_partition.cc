@@ -22,7 +22,7 @@ HeteroGraphPtr JointUnionHeteroGraph(
     uint64_t num_src_v = component_graphs[0]->NumVertices(src_vtype);
     uint64_t num_dst_v = component_graphs[0]->NumVertices(dst_vtype);
     HeteroGraphPtr rgptr = nullptr;
-  
+
     // ALL = CSC | CSR | COO
     dgl_format_code_t format = (1 << (SparseFormat2Code(SparseFormat::kCOO)-1)) |
                                (1 << (SparseFormat2Code(SparseFormat::kCSR)-1)) |
