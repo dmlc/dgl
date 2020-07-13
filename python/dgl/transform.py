@@ -29,6 +29,7 @@ __all__ = [
     'to_simple_graph',
     'joint_union',
     'to_bidirected',
+    'to_bidirected_stale',
     'laplacian_lambda_max',
     'knn_graph',
     'segmented_knn_graph',
