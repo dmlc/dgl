@@ -74,3 +74,6 @@ def matmul(a, b):
 
 def dot(a, b):
     return nd.sum(mul(a, b), axis=-1)
+
+def abs(a):
+    return nd.abs(a)
