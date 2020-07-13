@@ -143,17 +143,11 @@ def test_reverse():
     assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
     assert F.array_equal(g.edata['h'], g_r.edata['h'])
 
-    # inplace update
-    g.ndata['h'] += 1
-    assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
     # add new node feature to g_r
     g_r.ndata['hh'] = F.tensor([0, 1, 2])
     assert ('hh' in g.ndata) is False
     assert ('hh' in g_r.ndata) is True
 
-    # inplace update
-    g.edata['h'] += 1
-    assert F.array_equal(g.edata['h'], g_r.edata['h'])
     # add new edge feature to g_r
     g_r.edata['hh'] = F.tensor([0, 1, 2])
     assert ('hh' in g.edata) is False
@@ -220,17 +214,11 @@ def test_reverse():
     assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
     assert F.array_equal(g.edges['follows'].data['hh'], g_r.edges['follows'].data['hh'])
     
-    # inplace update
-    g.nodes['user'].data['h'] += 1
-    assert F.array_equal(g.nodes['user'].data['h'], g_r.nodes['user'].data['h'])
     # add new node feature to g_r
     g_r.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
     assert ('hhh' in g.nodes['user'].data) is False
     assert ('hhh' in g_r.nodes['user'].data) is True
 
-    # inplace update
-    g.edges['follows'].data['h'] += 1
-    assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
     # add new edge feature to g_r
     g_r.edges['follows'].data['hhh'] = F.tensor([1, 2, 3, 2, 0, 0, 1])
     assert ('hhh' in g.edges['follows'].data) is False
