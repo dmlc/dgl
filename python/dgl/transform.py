@@ -311,16 +311,16 @@ def reverse(g, copy_ndata=False, copy_edata=False):
     graph on the same nodes with edges reversed in terms of direction.
     Given a :class:`dgl.DGLGraph` object, we return another :class:`dgl.DGLGraph` object
     representing its reverse.
-    
+
     Parameters
     ----------
     g : dgl.DGLGraph
         The input graph.
     copy_ndata: bool, optional
-        If True, node attributes are lazy-copied from the original graph to the reversed graph.
+        If True, node attributes are copied from the original graph to the reversed graph.
         Otherwise the reversed graph will not be initialized with node attributes.
     copy_edata: bool, optional
-        If True, edge attributes are lazy-copied from the original graph to the reversed graph.
+        If True, edge attributes are copied from the original graph to the reversed graph.
         Otherwise the reversed graph will not have edge attributes.
 
     Return
@@ -334,7 +334,7 @@ def reverse(g, copy_ndata=False, copy_edata=False):
       This can be particularly problematic when the node/edge attrs are shared. For example,
       if the topology of both the original graph and its reverse get changed independently,
       you can get a mismatched node/edge feature.
-    
+
     Examples
     --------
     Create a graph to reverse.
@@ -397,11 +397,11 @@ def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
     g : dgl.DGLGraph
         The input graph.
     copy_ndata: bool, optional
-        If True, the node features of the reversed graph are lazy-copied from the
+        If True, the node features of the reversed graph are copied from the
         original graph. If False, the reversed graph will not have any node features.
         (Default: True)
     copy_edata: bool, optional
-        If True, the edge features of the reversed graph are lazy-copied from the
+        If True, the edge features of the reversed graph are copied from the
         original graph. If False, the reversed graph will not have any edge features.
         (Default: False)
 
@@ -412,7 +412,7 @@ def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
 
     Notes
     -----
-    If ``copy_ndata`` or ``copy_edata`` is ``True``, same tensors may be used for
+    If ``copy_ndata`` or ``copy_edata`` is ``True``, same tensors will be used for
     the features of the original graph and the reversed graph to save memory cost.
     As a result, users
     should avoid performing in-place operations on the features of the reversed
