@@ -435,7 +435,7 @@ def test_to_bidirected():
 
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
-    g = dgl.DGLGraph(elist, share_edata=False)
+    g = dgl.DGLGraph(elist, readonly=True)
     assert g.is_multigraph
     sg = dgl.to_simple_graph(g)
     assert not sg.is_multigraph
