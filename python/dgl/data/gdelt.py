@@ -22,7 +22,6 @@ class GDELTDataset(DGLBuiltinDataset):
     - `The Global Database of Events, Language, and Tone (GDELT) `
        <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>
 
-
     Statistics
     ----------
     Train examples: 2,304
