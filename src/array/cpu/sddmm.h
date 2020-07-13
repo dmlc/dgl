@@ -6,9 +6,9 @@
 #ifndef DGL_ARRAY_CPU_SDDMM_H_
 #define DGL_ARRAY_CPU_SDDMM_H_
 
-#include "../selector.h"
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include "../selector.h"
 
 namespace dgl {
 namespace aten {
