@@ -594,8 +594,12 @@ def test_to_simple(index_dtype):
         assert sc[i] == sum(e == _e for _e in uv)
     for i, e in enumerate(uv):
         assert eid_map[i] == suv.index(e)
+    # shared ndata
     assert F.array_equal(sg.ndata['h'], g.ndata['h'])
     assert ('h' in sg.edata) is False
+    # new ndata to sg
+    sg.ndata['hh'] = F.tensor([[0.], [1.], [2.]])
+    assert ('hh' in g.ndata) is False
 
     sg = dgl.to_simple(g, writeback_mapping=False, share_ndata=False)
     assert ('h' in sg.ndata) is False
@@ -629,9 +633,13 @@ def test_to_simple(index_dtype):
             assert sw[i] == sum(e == _e for _e in uv)
         for i, e in enumerate(uv):
             assert eid_map[i] == suv.index(e)
+    # shared ndata
     assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
     assert F.array_equal(sg.nodes['user'].data['hh'], g.nodes['user'].data['hh'])
     assert ('h' in sg.nodes['game'].data) is False
+    # new ndata to sg
+    sg.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
+    assert ('hhh' in g.nodes['user'].data) is False
 
     sg = dgl.to_simple(g, writeback_mapping=False, share_ndata=False)
     for ntype in g.ntypes:
