@@ -600,7 +600,8 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef hg = args[0];
+    GraphRef meta_graph = args[0];
+    HeteroGraphRef hg = args[1];
     CHECK_GT(hg->NumEdgeTypes(), 0);
     auto g = std::dynamic_pointer_cast<HeteroGraph>(hg.sptr());
     std::vector<HeteroGraphPtr> rev_ugs;
@@ -613,6 +614,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
     }
     // node types are not changed
     const auto& num_nodes = g->NumVerticesPerType();
-    *rv = CreateHeteroGraph(hg->meta_graph(), rev_ugs, num_nodes);
+    auto hgptr = CreateHeteroGraph(meta_graph.sptr(), rev_ugs, num_nodes);
+    *rv = HeteroGraphRef(hgptr);
   });
 }  // namespace dgl
