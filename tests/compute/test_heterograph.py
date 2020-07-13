@@ -207,12 +207,12 @@ def test_query(idtype):
         for etype in etypes:
             srcs, dsts = edges[etype]
             for src, dst in zip(srcs, dsts):
-                assert g.has_edge_between(src, dst, etype)
+                assert g.has_edges_between(src, dst, etype)
             assert F.asnumpy(g.has_edges_between(srcs, dsts, etype)).all()
 
             srcs, dsts = negative_edges[etype]
             for src, dst in zip(srcs, dsts):
-                assert not g.has_edge_between(src, dst, etype)
+                assert not g.has_edges_between(src, dst, etype)
             assert not F.asnumpy(g.has_edges_between(srcs, dsts, etype)).any()
 
             srcs, dsts = edges[etype]
@@ -224,7 +224,7 @@ def test_query(idtype):
             u, v = g.in_edges([0], etype=etype)
             assert F.asnumpy(v).tolist() == [0] * len(pred)
             assert set(F.asnumpy(u).tolist()) == set(pred)
-            assert g.in_degree(0, etype) == len(pred)
+            assert g.in_degrees(0, etype) == len(pred)
 
             # successors & out_edges & out_degree
             succ = [d for s, d in zip(srcs, dsts) if s == 0]
@@ -232,15 +232,15 @@ def test_query(idtype):
             u, v = g.out_edges([0], etype=etype)
             assert F.asnumpy(u).tolist() == [0] * len(succ)
             assert set(F.asnumpy(v).tolist()) == set(succ)
-            assert g.out_degree(0, etype) == len(succ)
+            assert g.out_degrees(0, etype) == len(succ)
 
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
-                assert g.edge_id(src, dst, etype=etype) == i
-                _, _, eid = g.edge_id(src, dst, etype=etype, return_uv=True)
+                assert g.edge_ids(src, dst, etype=etype) == i
+                _, _, eid = g.edge_ids(src, dst, etype=etype, return_uv=True)
                 assert eid == i
-            assert F.asnumpy(g.edge_id(srcs, dsts, etype=etype)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_id(srcs, dsts, etype=etype, return_uv=True)
+            assert F.asnumpy(g.edge_ids(srcs, dsts, etype=etype)).tolist() == list(range(n_edges))
+            u, v, e = g.edge_ids(srcs, dsts, etype=etype, return_uv=True)
             u, v, e = F.asnumpy(u), F.asnumpy(v), F.asnumpy(e)
             assert u[e].tolist() == srcs
             assert v[e].tolist() == dsts
@@ -332,13 +332,13 @@ def test_hypersparse():
     assert g.number_of_edges('follows') == 1
     assert g.number_of_edges('plays') == 1
 
-    assert g.has_edge_between(0, 1, 'follows')
-    assert not g.has_edge_between(0, 0, 'follows')
+    assert g.has_edges_between(0, 1, 'follows')
+    assert not g.has_edges_between(0, 0, 'follows')
     mask = F.asnumpy(g.has_edges_between([0, 0], [0, 1], 'follows')).tolist()
     assert mask == [0, 1]
 
-    assert g.has_edge_between(0, N2, 'plays')
-    assert not g.has_edge_between(0, 0, 'plays')
+    assert g.has_edges_between(0, N2, 'plays')
+    assert not g.has_edges_between(0, 0, 'plays')
     mask = F.asnumpy(g.has_edges_between([0, 0], [0, N2], 'plays')).tolist()
     assert mask == [0, 1]
 
@@ -352,8 +352,8 @@ def test_hypersparse():
     assert F.asnumpy(g.predecessors(N2, 'plays')).tolist() == [0]
     assert F.asnumpy(g.successors(N2, 'plays')).tolist() == []
 
-    assert g.edge_id(0, 1, etype='follows') == 0
-    assert g.edge_id(0, N2, etype='plays') == 0
+    assert g.edge_ids(0, 1, etype='follows') == 0
+    assert g.edge_ids(0, N2, etype='plays') == 0
 
     u, v = g.find_edges([0], 'follows')
     assert F.asnumpy(u).tolist() == [0]
@@ -370,17 +370,17 @@ def test_hypersparse():
     assert F.asnumpy(v).tolist() == [N2]
     assert F.asnumpy(e).tolist() == [0]
 
-    assert g.in_degree(0, 'follows') == 0
-    assert g.in_degree(1, 'follows') == 1
+    assert g.in_degrees(0, 'follows') == 0
+    assert g.in_degrees(1, 'follows') == 1
     assert F.asnumpy(g.in_degrees([0, 1], 'follows')).tolist() == [0, 1]
-    assert g.in_degree(0, 'plays') == 0
-    assert g.in_degree(N2, 'plays') == 1
+    assert g.in_degrees(0, 'plays') == 0
+    assert g.in_degrees(N2, 'plays') == 1
     assert F.asnumpy(g.in_degrees([0, N2], 'plays')).tolist() == [0, 1]
-    assert g.out_degree(0, 'follows') == 1
-    assert g.out_degree(1, 'follows') == 0
+    assert g.out_degrees(0, 'follows') == 1
+    assert g.out_degrees(1, 'follows') == 0
     assert F.asnumpy(g.out_degrees([0, 1], 'follows')).tolist() == [1, 0]
-    assert g.out_degree(0, 'plays') == 1
-    assert g.out_degree(N2, 'plays') == 0
+    assert g.out_degrees(0, 'plays') == 1
+    assert g.out_degrees(N2, 'plays') == 0
     assert F.asnumpy(g.out_degrees([0, N2], 'plays')).tolist() == [1, 0]
 
 def test_edge_ids():
@@ -392,14 +392,14 @@ def test_edge_ids():
         ('user', 'plays', 'game'): [(0, N2)]},
         {'user': N1, 'game': N1})
     with pytest.raises(DGLError):
-        eid = g.edge_id(0, 0, etype='follows')
+        eid = g.edge_ids(0, 0, etype='follows')
 
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (0, 1)],
         ('user', 'plays', 'game'): [(0, N2)]},
         {'user': N1, 'game': N1})
 
-    eid = g2.edge_id(0, 1, etype='follows')
+    eid = g2.edge_ids(0, 1, etype='follows')
     assert eid == 0
 
 @parametrize_dtype
@@ -666,12 +666,12 @@ def test_view1(idtype):
             g = HG[etype]
             srcs, dsts = edges[etype]
             for src, dst in zip(srcs, dsts):
-                assert g.has_edge_between(src, dst)
+                assert g.has_edges_between(src, dst)
             assert F.asnumpy(g.has_edges_between(srcs, dsts)).all()
 
             srcs, dsts = negative_edges[etype]
             for src, dst in zip(srcs, dsts):
-                assert not g.has_edge_between(src, dst)
+                assert not g.has_edges_between(src, dst)
             assert not F.asnumpy(g.has_edges_between(srcs, dsts)).any()
 
             srcs, dsts = edges[etype]
@@ -683,7 +683,7 @@ def test_view1(idtype):
             u, v = g.in_edges([0])
             assert F.asnumpy(v).tolist() == [0] * len(pred)
             assert set(F.asnumpy(u).tolist()) == set(pred)
-            assert g.in_degree(0) == len(pred)
+            assert g.in_degrees(0) == len(pred)
 
             # successors & out_edges & out_degree
             succ = [d for s, d in zip(srcs, dsts) if s == 0]
@@ -691,15 +691,15 @@ def test_view1(idtype):
             u, v = g.out_edges([0])
             assert F.asnumpy(u).tolist() == [0] * len(succ)
             assert set(F.asnumpy(v).tolist()) == set(succ)
-            assert g.out_degree(0) == len(succ)
+            assert g.out_degrees(0) == len(succ)
 
             # edge_id & edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
-                assert g.edge_id(src, dst, etype=etype) == i
-                _, _, eid = g.edge_id(src, dst, etype=etype, return_uv=True)
+                assert g.edge_ids(src, dst, etype=etype) == i
+                _, _, eid = g.edge_ids(src, dst, etype=etype, return_uv=True)
                 assert eid == i
-            assert F.asnumpy(g.edge_id(srcs, dsts)).tolist() == list(range(n_edges))
-            u, v, e = g.edge_id(srcs, dsts, return_uv=True)
+            assert F.asnumpy(g.edge_ids(srcs, dsts)).tolist() == list(range(n_edges))
+            u, v, e = g.edge_ids(srcs, dsts, return_uv=True)
             u, v, e = F.asnumpy(u), F.asnumpy(v), F.asnumpy(e)
             assert u[e].tolist() == srcs
             assert v[e].tolist() == dsts

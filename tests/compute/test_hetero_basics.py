@@ -330,7 +330,7 @@ def test_apply_edges(idtype):
     u = F.tensor([0, 0, 0, 4, 5, 6], idtype)
     v = F.tensor([1, 2, 3, 9, 9, 9], idtype)
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
-    eid = F.tensor(g.edge_id(u, v), idtype)
+    eid = F.tensor(g.edge_ids(u, v), idtype)
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
 @parametrize_dtype

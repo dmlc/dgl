@@ -1277,7 +1277,7 @@ class DGLHeteroGraph(object):
         """
         return self._graph.dtype
 
-    def has_node(self, vid, ntype=None):
+    def has_nodes(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
 
         Parameters
@@ -1295,11 +1295,11 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g.has_node(0, 'user')
+        >>> g.has_nodes(0, 'user')
         True
-        >>> g.has_node(4, 'user')
+        >>> g.has_nodes(4, 'user')
         False
-        >>> g.has_node([0, 1, 2, 3, 4], 'user')
+        >>> g.has_nodes([0, 1, 2, 3, 4], 'user')
         tensor([1, 1, 1, 0, 0])
         """
         ret = self._graph.has_node(
@@ -1310,15 +1310,15 @@ class DGLHeteroGraph(object):
         else:
             return ret
 
-    def has_nodes(self, vids, ntype=None):
-        """Whether the graph has nodes with ids and a particular type.
+    def has_node(self, vid, ntype=None):
+        """Whether the graph has a node with ids and a particular type.
 
-        DEPRECATED: see :func:`~DGLGraph.has_node`
+        DEPRECATED: see :func:`~DGLGraph.has_nodes`
 
         Parameters
         ----------
-        vid : list or tensor
-            The array of node IDs.
+        vid : int
+            Node ID
         ntype : str, optional
             The node type. Can be omitted if there is only one node type
             in the graph.
@@ -1329,10 +1329,10 @@ class DGLHeteroGraph(object):
             Binary tensor indicating the existence of nodes with the specified ids and type.
             ``a[i]=1`` if the graph contains node ``vids[i]`` of type ``ntype``, 0 otherwise.
         """
-        dgl_warning("DGLGraph.has_nodes is deprecated. Please use DGLGraph.has_node")
-        return self.has_node(vids, ntype)
+        dgl_warning("DGLGraph.has_node is deprecated. Please use DGLGraph.has_nodes")
+        return self.has_nodes(vid, ntype)
 
-    def has_edge_between(self, u, v, etype=None):
+    def has_edges_between(self, u, v, etype=None):
         """Whether the graph has an edge (u, v) of type ``etype``.
 
         Parameters
@@ -1370,17 +1370,17 @@ class DGLHeteroGraph(object):
         else:
             return ret
 
-    def has_edges_between(self, u, v, etype=None):
+    def has_edge_between(self, u, v, etype=None):
         """Whether the graph has edges of type ``etype``.
 
         DEPRECATED: please use :func:`~DGLGraph.has_edge_between`.
 
         Parameters
         ----------
-        u : list, tensor
-            The node ID array of source type.
-        v : list, tensor
-            The node ID array of destination type.
+        u : int
+            Source node ID.
+        v : int
+            Destination node ID.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
@@ -1391,9 +1391,9 @@ class DGLHeteroGraph(object):
             Binary tensor indicating the existence of edges. ``a[i]=1`` if the graph
             contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
         """
-        dgl_warning("DGLGraph.has_edges_between is deprecated. "
-                    "Please use DGLGraph.has_edge_between")
-        return self.has_edge_between(u, v, etype)
+        dgl_warning("DGLGraph.has_edge_between is deprecated. "
+                    "Please use DGLGraph.has_edges_between")
+        return self.has_edges_between(u, v, etype)
 
     def predecessors(self, v, etype=None):
         """Return the predecessors of node `v` in the graph with the specified
@@ -1471,7 +1471,7 @@ class DGLHeteroGraph(object):
         """
         return self._graph.successors(self.get_etype_id(etype), v)
 
-    def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
+    def edge_id(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return the edge ID, or an array of edge IDs, between source node
         `u` and destination node `v`, with the specified edge type
 
@@ -1499,11 +1499,11 @@ class DGLHeteroGraph(object):
             The edge ID if ``return_array == False``.
             The edge ID array otherwise.
         """
-        dgl_warning("DGLGraph.edge_ids is deprecated. Please use DGLGraph.edge_id")
-        return self.edge_id(u, v, force_multi=force_multi,
+        dgl_warning("DGLGraph.edge_id is deprecated. Please use DGLGraph.edge_ids.")
+        return self.edge_ids(u, v, force_multi=force_multi,
                             return_uv=return_uv, etype=etype)
 
-    def edge_id(self, u, v, force_multi=None, return_uv=False, etype=None):
+    def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return all edge IDs between source node array `u` and destination
         node array `v` with the specified edge type.
 
@@ -1555,9 +1555,9 @@ class DGLHeteroGraph(object):
 
         Query for edge ids.
 
-        >>> plays_g.edge_id([0], [2], etype=('user', 'plays', 'game'))
+        >>> plays_g.edge_ids([0], [2], etype=('user', 'plays', 'game'))
         tensor([], dtype=torch.int64)
-        >>> plays_g.edge_id([1], [2], etype=('user', 'plays', 'game'))
+        >>> plays_g.edge_ids([1], [2], etype=('user', 'plays', 'game'))
         tensor([2])
         >>> g.edge_ids([1], [2], return_uv=True, etype=('user', 'follows', 'user'))
         (tensor([1, 1]), tensor([2, 2]), tensor([1, 2]))
@@ -2680,7 +2680,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u = utils.prepare_tensor(self, u, 'edges[0]')
             v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_id(u, v, etype=self.canonical_etypes[etid])
+            eid = self.edge_ids(u, v, etype=self.canonical_etypes[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
 
@@ -2735,7 +2735,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u = utils.prepare_tensor(self, u, 'edges[0]')
             v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_id(u, v, etype=self.canonical_etypes[etid])
+            eid = self.edge_ids(u, v, etype=self.canonical_etypes[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
 
@@ -2856,7 +2856,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u = utils.prepare_tensor(self, u, 'edges[0]')
             v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_id(u, v, etype=etype)
+            eid = self.edge_ids(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
@@ -2920,7 +2920,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u = utils.prepare_tensor(self, u, 'edges[0]')
             v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_id(u, v, etype=etype)
+            eid = self.edge_ids(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
@@ -3032,7 +3032,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u = utils.prepare_tensor(self, u, 'edges[0]')
             v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_id(u, v, etype=etype)
+            eid = self.edge_ids(u, v, etype=etype)
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
             u, v = self.find_edges(eid, etype=etype)
@@ -3147,7 +3147,7 @@ class DGLHeteroGraph(object):
                     u, v = edges
                     u = utils.prepare_tensor(self, u, 'edges[0]')
                     v = utils.prepare_tensor(self, v, 'edges[1]')
-                    eid = self.edge_id(u, v, etype=etype)
+                    eid = self.edge_ids(u, v, etype=etype)
                 else:
                     eid = utils.prepare_tensor(self, edges, 'edges')
                     u, v = self.find_edges(eid, etype=etype)
@@ -3839,7 +3839,7 @@ class DGLHeteroGraph(object):
                 return F.nonzero_1d(mask)
             else:
                 if isinstance(edges, tuple):
-                    e = self.edge_id(edges[0], edges[1], etype=etype)
+                    e = self.edge_ids(edges[0], edges[1], etype=etype)
                 else:
                     e = utils.prepare_tensor(self, edges, 'edges')
                 return F.boolean_mask(e, mask[e])
