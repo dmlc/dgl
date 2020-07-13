@@ -1,12 +1,14 @@
 from dgl.backend import gspmm, gsddmm
 from utils import parametrize_dtype
 import dgl
+import random
 import pytest
 import networkx as nx
 import backend as F
 import numpy as np
 
-np.random.seed(42)
+random.seed(42)
+np.random.seed(31)
 dgl.random.seed(42)
 
 udf_msg = {
