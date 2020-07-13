@@ -31,7 +31,7 @@ def check_partition(part_method, reshuffle):
                     part_method=part_method, reshuffle=reshuffle)
     part_sizes = []
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, gpb = load_partition('/tmp/partition/test.json', i)
+        part_g, node_feats, edge_feats, gpb, _ = load_partition('/tmp/partition/test.json', i)
 
         # Check the metadata
         assert gpb._num_nodes() == g.number_of_nodes()
