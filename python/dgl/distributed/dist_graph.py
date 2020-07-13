@@ -340,7 +340,16 @@ class DistGraph:
     This provides the graph interface to access the partitioned graph data for distributed GNN
     training. All data of partitions are loaded by the DistGraph server.
 
-    By default, `DistGraph` uses shared-memory to access the partition data in the local machine.
+    DistGraph can run in two modes: the standalone mode and the distributed mode.
+
+    * When a user runs the training script normally, DistGraph will be in the standalone mode.
+    In this mode, the input graph has to be constructed with only one partition. This mode is
+    used for testing and debugging purpose. 
+    * When a user runs the training script with the distributed launch script, DistGraph will
+    be set into the distributed mode. This is used for actual distributed training.
+
+    When running in the distributed mode, `DistGraph` uses shared-memory to access
+    the partition data in the local machine.
     This gives the best performance for distributed training when we run `DistGraphServer`
     and `DistGraph` on the same machine. However, a user may want to run them in separate
     machines. In this case, a user may want to disable shared memory by passing
@@ -355,6 +364,8 @@ class DistGraph:
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
         The partition book object
+    conf_file : str
+        The partition config file. It's used in the standalone mode.
     '''
     def __init__(self, ip_config, graph_name, gpb=None, conf_file=None):
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
@@ -363,6 +374,8 @@ class DistGraph:
             self._client = FakeKVClient()
             # Load graph partition data.
             g, node_feats, edge_feats, self._gpb = load_partition(conf_file, 0)
+            assert self._gpb.num_partitions() == 1, \
+                    'The standalone mode can only work with the graph data with one partition'
             if self._gpb is None:
                 self._gpb = gpb
             self._g = as_heterograph(g)
