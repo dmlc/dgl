@@ -21,7 +21,30 @@ def _gen_missing_api(api, mod_name):
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)
-    docstring = """Generalized SDDMM function that computes"""
+    target_dict = {
+        'u': "source node",
+        'e': "edge",
+        'v': "destination node"
+    }
+    lhs_str = target_dict[lhs_target]
+    rhs_str = target_dict[rhs_target]
+    docstring = r"""Generalized SDDMM function. It takes the result of {} feature {} {} feature, leads to a feature on edge.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph
+    x : tensor
+        The {} features.
+    y : tensor
+        The {} features.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """.format(lhs_str, binary_op, rhs_str,
+               lhs_str, rhs_str)
 
     def func(g, x, y):
         return gsddmm(g, binary_op, x, y,
@@ -32,7 +55,23 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
 
 def _gen_spmm_func(binary_op, reduce_op):
     name = "u_{}_e_{}".format(binary_op, reduce_op)
-    docstring = """Generalized SpMM function that computes ..."""
+    docstring = """Generalized SpMM function. It takes the result of source node feature {} edge feature, leads to a message on edge.
+    Then aggregates the message by {} on destination nodes.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph
+    x : tensor
+        The source node features.
+    y : tensor
+        The edge features.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """.format(binary_op, reduce_op)
 
     def func(g, x, y):
         return gspmm(g, binary_op, reduce_op, x, y)
@@ -43,7 +82,32 @@ def _gen_spmm_func(binary_op, reduce_op):
 def _gen_copy_reduce_func(binary_op, reduce_op):
 
     name = "{}_{}".format(binary_op, reduce_op)
-    docstring = """Copy reduce function..."""
+    binary_str = {
+        "copy_u": "It copies node feature to edge as the message.",
+        'copy_e': "It regards edge feature as message."
+    }
+    x_str = {
+        "copy_u": "source node",
+        "copy_e": "edge"
+    }
+    docstring = lambda binary_op: """Generalized SpMM function. {}
+    Then aggregates the message by {} on destination nodes.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph
+    x : tensor
+        The {} features.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """.format(
+        binary_str[binary_op],
+        reduce_op,
+        x_str[binary_op])
 
     def func(g, x):
         if binary_op == 'copy_u':
@@ -52,7 +116,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
             return gspmm(g, 'copy_rhs', reduce_op, None, x)
 
     func.__name__ = name
-    func.__doc__ = docstring
+    func.__doc__ = docstring(binary_op)
     return func
 
 def _register_sddmm_func(mod, enabled_apis):
@@ -77,11 +141,37 @@ def _register_spmm_func(mod, enabled_apis):
             enabled_apis.add(func.__name__)
 
 def copy_u(g, x):
-    """Copy source node features to edges."""
+    r"""Generalized SDDMM function that copies source node features to edges.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    x : tensor
+        The source node features.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
     return gsddmm(g, 'copy_lhs', x, None)
 
 def copy_v(g, x):
-    """Copy destination node features to edges."""
+    r"""Generalized SDDMM function that copies destination node features to edges.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    x : tensor
+        The destination node features.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
     return gsddmm(g, 'copy_rhs', None, x)
 
 def load_backend(mod_name):
