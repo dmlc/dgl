@@ -145,8 +145,8 @@ def segmented_knn_graph(x, k, segs):
     g = DGLGraph(adj, readonly=True)
     return g
 
-def to_bidirected(g, readonly=None, share_ndata=True, 
-                  share_edata=False, ignore_bipartite=False):
+def to_bidirected(g, readonly=None, copy_ndata=True, 
+                  copy_edata=False, ignore_bipartite=False):
     r"""Convert the graph to a bidirected one.
     
     For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this 
@@ -168,12 +168,12 @@ def to_bidirected(g, readonly=None, share_ndata=True,
         The input graph.
     readonly : bool, default to be True
         Deprecated. There will be no difference between readonly and non-readonly
-    share_ndata: bool, optional
-        If True, the node features of the bidirected graph will
-        be the same as the original graph. If False, the bidirected
+    copy_ndata: bool, optional
+        If True, the node features of the bidirected graph are lazy-copied from
+        the original graph. If False, the bidirected
         graph will not have any node features.
         (Default: True)
-    share_edata: bool, optional
+    copy_edata: bool, optional
         If True, the edge features of the reversed edges will
         identical to their conrresponding original edges.
         If False, the bidirected graph will not have any edge
@@ -192,12 +192,12 @@ def to_bidirected(g, readonly=None, share_ndata=True,
 
     Notes
     -----
-    If ``share_ndata`` is ``True``, same tensors is used for
+    If ``copy_ndata`` is ``True``, same tensors is used for
     the features of the original graph.
     As a result, users should avoid performing in-place operations
     on the features of the to_bidirected graph, which will corrupt
     the features of the original graph as well.
-    While for ``share_edata``, as edge features are concatenated,
+    While for ``copy_edata``, as edge features are concatenated,
     they are not shared with original graphs.
     For concrete examples, refer to the ``Examples`` section below.
 
@@ -233,8 +233,8 @@ def to_bidirected(g, readonly=None, share_ndata=True,
     is ignored. Both the node features and edge features
     are shared.
 
-    >>> bg = dgl.to_bidirected(g, share_ndata=True, 
-                               share_edata=True, ignore_bipartite=True)
+    >>> bg = dgl.to_bidirected(g, copy_ndata=True, 
+                               copy_edata=True, ignore_bipartite=True)
     >>> bg.all_edges(('user', 'wins', 'user'))
     (tensor([0, 2, 0, 2, 2, 1, 1, 2, 1, 0]), tensor([1, 1, 2, 1, 0, 0, 2, 0, 2, 2]))
     >>> bg.all_edges(('user', 'follows', 'user'))
@@ -280,14 +280,14 @@ def to_bidirected(g, readonly=None, share_ndata=True,
         new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
 
     # handle features
-    if share_ndata:
+    if copy_ndata:
         # for each ntype
         for ntype in g.ntypes:
             # for each data field
             for k in g.nodes[ntype].data:
                 new_g.nodes[ntype].data[k] = g.nodes[ntype].data[k]
 
-    if share_edata:
+    if copy_edata:
         # for each etype
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
@@ -301,7 +301,7 @@ def to_bidirected(g, readonly=None, share_ndata=True,
     return new_g
 
 
-def joint_union(graph_list, share_ndata=False, share_edata=False):
+def joint_union(graph_list, copy_ndata=False, copy_edata=False):
     r"""Return a joint union of the input graphs.
 
     The new graph will include all the edges in the given
@@ -316,13 +316,13 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     ----------
     graphs : List of DGLGraph
         The input graphs
-    share_ndata: bool, optional
+    copy_ndata: bool, optional
         If True, the node features of the joint_unioned graph
-        will be the same as the **FIRST** graph in the original
+        are lazy-copied from the **FIRST** graph in the original
         graph list. If False, the joint_unioned graph will not 
         have any node features. 
         (Default: False)
-    share_edata: bool, optional
+    copy_edata: bool, optional
         If True, the edge features of the joint_unioned graph
         will be a concatenation of all the edge features from
         the graphs in the original graph list. If False, the
@@ -339,12 +339,12 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     For heterographs with multiple edge types, all the input
     graphs should have the same canonical edge types.
 
-    If ``share_ndata`` is ``True``, same tensors is used for
+    If ``copy_ndata`` is ``True``, same tensors is used for
     the features of the original graph.
     As a result, users should avoid performing in-place operations
     on the features of the joint_unioned graph, which will corrupt
     the features of the original graph as well.
-    While for ``share_edata``, as edge features are concatenated,
+    While for ``copy_edata``, as edge features are concatenated,
     they are not shared with original graphs.
     For concrete examples, refer to the ``Examples`` section below.
 
@@ -364,10 +364,10 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     >>> g2.ndata['h'] = th.tensor([[7.], [8.], [9.], [8.]])
     >>> g2.edata['h'] = th.tensor([[7.], [8.]])
     
-    joint_union the two graphs when both ``share_ndata``
-    and ``share_edata`` is ``True``
+    joint_union the two graphs when both ``copy_ndata``
+    and ``copy_edata`` is ``True``
 
-    >>> ug = dgl.joint_union([g1, g2], share_ndata=True, share_edata=True)
+    >>> ug = dgl.joint_union([g1, g2], copy_ndata=True, copy_edata=True)
     >>> ug.edges()
     (tensor([0, 1, 3，1, 3, 2]), tensor([1, 2, 0, 2, 1, 3]))
 
@@ -472,13 +472,13 @@ def joint_union(graph_list, share_ndata=False, share_edata=False):
     hg = DGLHeteroGraph(graph_index, graph_list[0].ntypes, graph_list[0].etypes)
 
     # handle shared ndata
-    if share_ndata:
+    if copy_ndata:
         for ntype in graph_list[0].ntypes:
             for key in graph_list[0].nodes[ntype].data:
                 hg.nodes[ntype].data[key] = graph_list[0].nodes[ntype].data[key]
 
     # handle shared edata
-    if share_edata:
+    if copy_edata:
         for etype in graph_list[0].canonical_etypes:
             for key in graph_list[0].edges[etype].data:
                 edata = []

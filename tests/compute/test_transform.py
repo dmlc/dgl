@@ -150,7 +150,7 @@ def test_joint_union():
     g2.ndata['h'] = F.tensor([[7.], [8.], [9.], [8.]])
     g2.edata['h'] = F.tensor([[7.], [8.]])
 
-    ug = dgl.joint_union([g1, g2], share_ndata=True, share_edata=True)
+    ug = dgl.joint_union([g1, g2], copy_ndata=True, copy_edata=True)
     u1, v1 = g1.edges()
     u2, v2 = g2.edges()
     u_ug, v_ug = ug.edges()
@@ -171,7 +171,7 @@ def test_joint_union():
     assert ('hh' in g2.edata) is False
 
     # donot share data
-    ug = dgl.joint_union([g1, g2], share_ndata=False, share_edata=False)
+    ug = dgl.joint_union([g1, g2], copy_ndata=False, copy_edata=False)
     assert ('h' in ug.ndata) is False
     assert ('h' in ug.edata) is False
     u_ug, v_ug = ug.edges()
@@ -197,7 +197,7 @@ def test_joint_union():
         ('user', 'plays', 'game'): (F.tensor([1]), F.tensor([2]))
     })
     g3.edges['plays'].data['he'] = F.tensor([0])
-    ug = dgl.joint_union([g1, g2, g3], share_ndata=True, share_edata=True)
+    ug = dgl.joint_union([g1, g2, g3], copy_ndata=True, copy_edata=True)
     print(ug)
     assert 'hv' in ug.nodes['game'].data
     assert len(ug.nodes['user'].data) == 0
@@ -226,7 +226,7 @@ def test_joint_union():
                          ug.edges['plays'].data['he'])
 
     # no edge and node sharing
-    ug = dgl.joint_union([g1, g2, g3], share_ndata=False, share_edata=False)
+    ug = dgl.joint_union([g1, g2, g3], copy_ndata=False, copy_edata=False)
     assert len(ug.nodes['game'].data) == 0
     assert len(ug.nodes['user'].data) == 0
     assert len(ug.edges['follows'].data) == 0
@@ -254,7 +254,7 @@ def test_to_bidirected():
     g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
     g.ndata['h'] = F.tensor([[0.], [1.], [2.], [1.]])
     g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
-    bg = dgl.to_bidirected(g, share_ndata=True, share_edata=True)
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
     u, v = g.edges()
     ub, vb = bg.edges()
     assert F.array_equal(F.cat([u, v], dim=0), ub)
@@ -267,7 +267,7 @@ def test_to_bidirected():
     assert ('hh' in g.edata) is False
 
     # donot share ndata and edata
-    bg = dgl.to_bidirected(g, share_ndata=False, share_edata=False)
+    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False)
     ub, vb = bg.edges()
     assert F.array_equal(F.cat([u, v], dim=0), ub)
     assert F.array_equal(F.cat([v, u], dim=0), vb)
@@ -283,7 +283,7 @@ def test_to_bidirected():
     g.nodes['game'].data['hv'] = F.ones((3, 1))
     g.nodes['user'].data['hv'] = F.ones((3, 1))
     g.edges['wins'].data['h'] = F.tensor([0, 1, 2, 3, 4])
-    bg = dgl.to_bidirected(g, share_ndata=True, share_edata=True, ignore_bipartite=True)
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True, ignore_bipartite=True)
     assert F.array_equal(g.nodes['game'].data['hv'], bg.nodes['game'].data['hv'])
     assert F.array_equal(g.nodes['user'].data['hv'], bg.nodes['user'].data['hv'])
     u, v = g.all_edges(order='eid', etype=('user', 'wins', 'user'))
@@ -304,7 +304,7 @@ def test_to_bidirected():
     assert len(bg.edges['follows'].data) == 0
 
     # donot share ndata and edata
-    bg = dgl.to_bidirected(g, share_ndata=True, share_edata=True, ignore_bipartite=True)
+    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False, ignore_bipartite=True)
     assert len(bg.edges['wins'].data) == 0
     assert len(bg.edges['plays'].data) == 0
     assert len(bg.edges['follows'].data) == 0
