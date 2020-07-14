@@ -358,14 +358,6 @@ class DistGraph:
         self.ip_config = ip_config
         self.graph_name = graph_name
         self._gpb_input = gpb
-        # skip_init is used to avoid blocking before start dataloader
-        if not skip_init:
-            self._init()
-
-    def _init(self):
-        ip_config, graph_name, gpb = self.ip_config, self.graph_name, self._gpb_input
-        connect_to_server(ip_config=ip_config)
-        self._client = KVClient(ip_config)
         g = _get_graph_from_shared_mem(graph_name)
         if g is not None:
             self._g = as_heterograph(g)
@@ -374,6 +366,14 @@ class DistGraph:
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
         if self._gpb is None:
             self._gpb = gpb
+        # skip_init is used to avoid blocking before start dataloader
+        if not skip_init:
+            self._init()
+
+    def _init(self):
+        ip_config, graph_name, gpb = self.ip_config, self.graph_name, self._gpb_input
+        connect_to_server(ip_config=ip_config)
+        self._client = KVClient(ip_config)
         self._client.barrier()
         self._client.map_shared_data(self._gpb)
         self._ndata = NodeDataView(self)
