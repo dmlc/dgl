@@ -16,7 +16,7 @@ from dgl.distributed import DistGraphServer, DistGraph
 
 
 def start_server(rank, tmpdir, disable_shared_mem, graph_name):
-    g = DistGraphServer(rank, "rpc_ip_config.txt", 1, graph_name,
+    g = DistGraphServer(rank, "rpc_ip_config.txt", 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem)
     g.start()
 
@@ -24,7 +24,7 @@ def start_server(rank, tmpdir, disable_shared_mem, graph_name):
 def start_sample_client(rank, tmpdir, disable_shared_mem):
     gpb = None
     if disable_shared_mem:
-        _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
+        _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     dgl.distributed.shutdown_servers()
@@ -107,7 +107,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
     orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
     for i in range(num_server):
-        part, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
+        part, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
         orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
 
@@ -159,7 +159,7 @@ def test_standalone_sampling():
 def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
     if disable_shared_mem:
-        _, _, _, gpb = load_partition(tmpdir / 'test_in_subgraph.json', rank)
+        _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
     dgl.distributed.shutdown_servers()

@@ -43,11 +43,6 @@ class NeighborSampler(object):
             blocks.insert(0, block)
         return blocks
 
-def start_server(args):
-    serv = dgl.distributed.DistGraphServer(args.id, args.ip_config, args.num_client,
-                                           args.graph_name, args.conf_path)
-    serv.start()
-
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, in_feats, n_classes, g = data
@@ -185,8 +180,6 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument('--server', action='store_true',
-            help='whether this is a server.')
     parser.add_argument('--graph-name', type=str, help='graph name')
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
@@ -211,8 +204,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print(args)
-
-    if args.server:
-        start_server(args)
-    else:
-        main(args)
+    main(args)

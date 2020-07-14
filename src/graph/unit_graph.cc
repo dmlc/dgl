@@ -1295,7 +1295,7 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   CSRPtr ret = in_csr_;
   if (!in_csr_->defined()) {
     if (out_csr_->defined()) {
-      const auto& newadj = aten::CSRTranspose(out_csr_->adj());
+      const auto& newadj = aten::CSRSort(aten::CSRTranspose(out_csr_->adj()));
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->in_csr_) = CSR(meta_graph(), newadj);
@@ -1494,6 +1494,31 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
   return GraphPtr(new dgl::ImmutableGraph(in_csr_ptr, out_csr_ptr, coo_ptr));
 }
 
+HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
+  // TODO(xiangsx) currently we only support homogeneous graph
+  auto fmt = SelectFormat(SparseFormat::kAny);
+  switch (fmt) {
+    case SparseFormat::kCOO: {
+      return CreateFromCOO(1, aten::COOLineGraph(coo_->adj(), backtracking), SparseFormat::kAny);
+    }
+    case SparseFormat::kCSR: {
+      const aten::CSRMatrix csr = GetCSRMatrix(0);
+      const aten::COOMatrix coo = aten::COOLineGraph(aten::CSRToCOO(csr, true), backtracking);
+      return CreateFromCOO(1, coo, SparseFormat::kAny);
+    }
+    case SparseFormat::kCSC: {
+      const aten::CSRMatrix csc = GetCSCMatrix(0);
+      const aten::CSRMatrix csr = aten::CSRTranspose(csc);
+      const aten::COOMatrix coo = aten::COOLineGraph(aten::CSRToCOO(csr, true), backtracking);
+      return CreateFromCOO(1, coo, SparseFormat::kAny);
+    }
+    default:
+      LOG(FATAL) << "None of CSC, CSR, COO exist";
+      break;
+  }
+  return nullptr;
+}
+
 constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
 
 bool UnitGraph::Load(dmlc::Stream* fs) {
@@ -1569,6 +1594,46 @@ UnitGraphPtr UnitGraph::Reverse() const {
   }
 
   return UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo));
+}
+
+std::tuple<UnitGraphPtr, IdArray, IdArray>
+UnitGraph::ToSimple() const {
+  CSRPtr new_incsr = nullptr, new_outcsr = nullptr;
+  COOPtr new_coo = nullptr;
+  IdArray count;
+  IdArray edge_map;
+
+  auto avail_fmt = SelectFormat(SparseFormat::kAny);
+  switch (avail_fmt) {
+    case SparseFormat::kCOO: {
+      auto ret = aten::COOToSimple(coo_->adj());
+      count = std::get<1>(ret);
+      edge_map = std::get<2>(ret);
+      new_coo = COOPtr(new COO(coo_->meta_graph(), std::get<0>(ret)));
+      break;
+    }
+    case SparseFormat::kCSR: {
+      auto ret = aten::CSRToSimple(in_csr_->adj());
+      count = std::get<1>(ret);
+      edge_map = std::get<2>(ret);
+      new_incsr = CSRPtr(new CSR(in_csr_->meta_graph(), std::get<0>(ret)));
+      break;
+    }
+    case SparseFormat::kCSC: {
+      auto ret = aten::CSRToSimple(out_csr_->adj());
+      count = std::get<1>(ret);
+      edge_map = std::get<2>(ret);
+      new_outcsr = CSRPtr(new CSR(out_csr_->meta_graph(), std::get<0>(ret)));
+      break;
+    }
+    default:
+      LOG(FATAL) << "At lease one of COO, CSR or CSC adj should exist.";
+      break;
+  }
+
+  return std::make_tuple(UnitGraphPtr(new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo)),
+                         count,
+                         edge_map);
 }
 
 }  // namespace dgl
