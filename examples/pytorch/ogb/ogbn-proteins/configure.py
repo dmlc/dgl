@@ -6,7 +6,7 @@ MWE_GCN_proteins = {
     'num_epochs': 2000,
     'in_feats': 1,
     'hidden_feats': 10,
-    'out_feats': 112,       ## number of node labels to predict
+    'out_feats': 112,      
     'n_layers': 3,
     'lr': 2e-2,
     'weight_decay': 0,
@@ -21,13 +21,13 @@ MWE_DGCN_proteins = {
     'num_epochs': 2000,
     'in_feats': 1,
     'hidden_feats': 10,
-    'out_feats': 112,       ## number of node labels to predict
+    'out_feats': 112,     
     'n_layers': 2,
     'lr': 1e-2,
     'weight_decay': 0,
     'patience': 300,
     'dropout': 0.5,           
-    'aggr_mode': 'sum',     ## 'sum' or 'concat' for the aggregation across channels
+    'aggr_mode': 'sum',   
     'residual': True,
     'ewnorm': 'none'
     }
