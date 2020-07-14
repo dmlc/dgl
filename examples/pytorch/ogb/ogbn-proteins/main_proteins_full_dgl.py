@@ -97,10 +97,6 @@ def main(args):
     print ('hidden dim', args['hidden_feats'])
     print ('lr', args['lr'])
     
-    # train_writer = SummaryWriter('./dgl_runs_full/' + str(args['exp_name']) + '_nl' + str(args['n_layers']) + '_nhid' + str(args['hidden_feats']) + '_lr' + str(args['lr']) + '_' + str(args['block']) + '_' + str(args['postfix']) + 'train')
-    # valid_writer = SummaryWriter('./dgl_runs_full/' + str(args['exp_name']) + '_nl' + str(args['n_layers']) + '_nhid' + str(args['hidden_feats']) + '_lr' + str(args['lr']) + '_' + str(args['block']) + '_' + str(args['postfix']) + 'valid')
-    # test_writer = SummaryWriter('./dgl_runs_full/' + str(args['exp_name']) + '_nl' + str(args['n_layers']) + '_nhid' + str(args['hidden_feats']) + '_lr' + str(args['lr']) + '_' +str(args['block']) + '_' + str(args['postfix'])  + 'test')
-
     dur = []
     best_val_score = 0.
     num_patient_epochs = 0
@@ -142,11 +138,6 @@ def main(args):
 
         if num_patient_epochs == args['patience']:
             break
-
-        # train_writer.add_scalar('loss', loss, epoch)
-        # train_writer.add_scalar('rocauc', train_score, epoch)
-        # valid_writer.add_scalar('rocauc', val_score, epoch)
-        # test_writer.add_scalar('rocauc', test_score, epoch)
 
     model.load_state_dict(torch.load(model_path))
     train_score, val_score, test_score = run_an_eval_epoch(graph, splitted_idx, model, evaluator)
