@@ -11,6 +11,7 @@ Dependencies
 - PyTorch 1.1.0+
 - metis
 - sklearn
+- networkx==2.2 or 2.3
 
 
 * install clustering toolkit: metis and its Python interface.
@@ -24,7 +25,8 @@ Dependencies
 2) cd metis-5.1.0
 3) make config shared=1 prefix=~/.local/
 4) make install
-5) export METIS_DLL=~/.local/lib/libmetis.so
+5) export METIS_DLL=~/.local/lib/libmetis.so 
+   (in Mac OS X: export METIS_DLL=~/.local/lib/libmetis.dylib)
 6) `pip install metis`
 ```
 

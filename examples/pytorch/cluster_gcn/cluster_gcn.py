@@ -76,7 +76,7 @@ def main(args):
     # create GCN model
     g = data.graph
     if args.self_loop and not args.dataset.startswith('reddit'):
-        g.remove_edges_from(nx.selfloop_edges(g))
+        g.remove_edges_from(list(nx.selfloop_edges(g)))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
         print("adding self-loop edges")
     g = DGLGraph(g, readonly=True)
@@ -92,8 +92,6 @@ def main(args):
         train_mask = train_mask.cuda()
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
-
-    print(torch.cuda.get_device_name(0))
 
     g.ndata['features'] = features
     g.ndata['labels'] = labels
@@ -138,8 +136,8 @@ def main(args):
     # set train_nids to cuda tensor
     if cuda:
         train_nid = torch.from_numpy(train_nid).cuda()
-    print("current memory after model before training",
-          torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
+        print("current memory after model before training",
+              torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
     start_time = time.time()
     best_f1 = -1
 

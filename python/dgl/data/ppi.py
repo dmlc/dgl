@@ -21,6 +21,12 @@ class PPIDataset(DGLBuiltinDataset):
 
     Reference: http://snap.stanford.edu/graphsage/
 
+    Statistics
+    ----------
+    Train examples: 20
+    Valid examples: 2
+    Test examples: 2
+
     Parameters
     ----------
     mode : str
@@ -39,8 +45,8 @@ class PPIDataset(DGLBuiltinDataset):
         graphs: list of DGLGraph objects that contains graph structure, node features and node labels:
             - ndata['feat']: node features
             - ndata['label']: nodel labels
+        graph: DGLGraph, the graph of the dataset
         num_labels: int, number of labels for each node
-
     Examples
     --------
     >>> data = PPIDataset(mode='valid')
@@ -60,18 +66,20 @@ class PPIDataset(DGLBuiltinDataset):
                                          force_reload=force_reload,
                                          verbose=verbose)
 
-    def process(self, root_path):
-        graph_file = os.path.join(root_path, '{}_graph.json'.format(self.mode))
-        label_file = os.path.join(root_path, '{}_labels.npy'.format(self.mode))
-        feat_file = os.path.join(root_path, '{}_feats.npy'.format(self.mode))
-        graph_id_file = os.path.join(root_path, '{}_graph_id.npy'.format(self.mode))
+    def process(self):
+        graph_file = os.path.join(self.save_path, '{}_graph.json'.format(self.mode))
+        label_file = os.path.join(self.save_path, '{}_labels.npy'.format(self.mode))
+        feat_file = os.path.join(self.save_path, '{}_feats.npy'.format(self.mode))
+        graph_id_file = os.path.join(self.save_path, '{}_graph_id.npy'.format(self.mode))
 
         g_data = json.load(open(graph_file))
         self._labels = np.load(label_file)
         self._feats = np.load(feat_file)
-        self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
+        self._graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
         graph_id = np.load(graph_id_file)
 
+        # lo, hi means the range of graph ids for different portion of the dataset,
+        # 20 graphs for training, 2 for validation and 2 for testing.
         lo, hi = 1, 21
         if self.mode == 'valid':
             lo, hi = 21, 23
@@ -83,34 +91,42 @@ class PPIDataset(DGLBuiltinDataset):
         for g_id in range(lo, hi):
             g_mask = np.where(graph_id == g_id)[0]
             graph_masks.append(g_mask)
-            g = self.graph.subgraph(g_mask)
+            g = self._graph.subgraph(g_mask)
             g.ndata['feat'] = F.tensor(self._feats[g_mask], dtype=F.data_type_dict['float32'])
             g.ndata['label'] = F.tensor(self._labels[g_mask], dtype=F.data_type_dict['int64'])
             self._graphs.append(g)
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        graph_list_path = os.path.join(self.save_path, '{}_dgl_graph_list.bin'.format(self.mode))
+        g_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
         info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
-        return os.path.exists(graph_path) and os.path.exists(info_path)
+        return os.path.exists(graph_list_path) and os.path.exists(g_path) and os.path.exists(info_path)
 
     def save(self):
-        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        graph_list_path = os.path.join(self.save_path, '{}_dgl_graph_list.bin'.format(self.mode))
+        g_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
         info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
-        save_graphs(graph_path, self._graphs)
-        save_info(info_path, {'labels': self._labels, 'feats': self._feats, 'graph': self.graph})
+        save_graphs(graph_list_path, self._graphs)
+        save_graphs(g_path, self._graph)
+        save_info(info_path, {'labels': self._labels, 'feats': self._feats})
 
     def load(self):
-        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        graph_list_path = os.path.join(self.save_path, '{}_dgl_graph_list.bin'.format(self.mode))
+        g_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
         info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
-        self._graphs, _ = load_graphs(graph_path)
+        self._graphs = load_graphs(graph_list_path)[0]
+        g, _ = load_graphs(g_path)
+        self._graph = g[0]
         info = load_info(info_path)
         self._labels = info['labels']
-        self.graph = info['graph']
         self._feats = info['feats']
 
     @property
+    def graph(self):
+        return self._graph
+
+    @property
     def num_labels(self):
-        """Number of labels for each node."""
         return 121
 
     @property
