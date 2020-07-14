@@ -17,5 +17,5 @@ To use MWE-DGCN:
 python main_proteins_full_dgl.py --model MWE_DGCN
 ```
 
-Additional optional arguments include 'rand_seed', 'cuda', 'postfix', whose effects can be found in main_proteins_full_dgl.py
+Additional optional arguments include 'rand_seed', 'cuda', 'postfix', whose roles can be found in main_proteins_full_dgl.py
 
