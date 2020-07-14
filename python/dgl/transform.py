@@ -170,7 +170,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     readonly : bool, default to be True
         Deprecated. There will be no difference between readonly and non-readonly
     copy_ndata: bool, optional
-        If True, the node features of the bidirected graph are lazy-copied from
+        If True, the node features of the bidirected graph are copied from
         the original graph. If False, the bidirected
         graph will not have any node features.
         (Default: True)
@@ -315,16 +315,16 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
     graphs : List of DGLGraph
         The input graphs
     copy_ndata: bool, optional
-        If True, the node features of the joint_unioned graph
-        are lazy-copied from the **FIRST** graph in the original
+        If True, the node features of the new graph
+        are copied from the **FIRST** graph in the original
         graph list. If False, the joint_unioned graph will not
         have any node features.
         (Default: False)
     copy_edata: bool, optional
-        If True, the edge features of the joint_unioned graph
-        will be a concatenation of all the edge features from
-        the graphs in the original graph list. If False, the
-        joint_unioned graph will not have any edge features.
+        If True, the edge features of the new graph
+        will be a concatenation of the edge features from
+        all graphs in the list. If False, the
+        new graph will not have any edge features.
         (Default: False)
 
     Returns
@@ -337,13 +337,12 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
     For heterographs with multiple edge types, all the input
     graphs should have the same canonical edge types.
 
-    If ``copy_ndata`` is ``True``, same tensors is used for
-    the features of the original graph.
+    If ``copy_ndata`` is ``True``, same tensors are used as
+    the node features of the original graph and the new graph.
     As a result, users should avoid performing in-place operations
-    on the features of the joint_unioned graph, which will corrupt
-    the features of the original graph as well.
-    While for ``copy_edata``, as edge features are concatenated,
-    they are not shared with original graphs.
+    on the node features of the new graph to avoid feature corruption.
+    On the contrary, edge features are concatenated,
+    they are not shared due to concatenation.
     For concrete examples, refer to the ``Examples`` section below.
 
 
@@ -351,7 +350,7 @@ def joint_union(graph_list, copy_ndata=False, copy_edata=False):
     ---------
     **Homographs or Heterographs with A Single Edge Type**
 
-    Create two graphs to joint_union.
+    Create two graphs to for demonstrating joint_union.
 
     >>> import dgl
     >>> import torch as th
