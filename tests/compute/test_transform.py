@@ -357,6 +357,29 @@ def test_joint_union():
     assert F.array_equal(F.cat([v1, v2, v3], dim=0),
                          v_ug)
 
+    # test for zero edge graph
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([0, 2]), F.tensor([1, 2])),
+        ('user', 'plays', 'game'): (F.tensor([1, 2, 1]), F.tensor([2, 1, 1]))
+    })
+    g1.nodes['game'].data['hv'] = F.tensor([1, 1, 1])
+    g1.edges['plays'].data['he'] = F.tensor([0, 0, 0])
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): [],
+        ('user', 'plays', 'game'): (F.tensor([2]), F.tensor([2]))
+    })
+    ug = dgl.joint_union([g1, g2], copy_ndata=True)
+    assert 'hv' in ug.nodes['game'].data
+    assert len(ug.nodes['user'].data) == 0
+    assert F.array_equal(g1.nodes['game'].data['hv'], ug.nodes['game'].data['hv'])
+    u1, v1 = g1.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    u2, v2 = g2.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    u_ug, v_ug = ug.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    assert F.array_equal(F.cat([u1, u2], dim=0),
+                         u_ug)
+    assert F.array_equal(F.cat([v1, v2], dim=0),
+                         v_ug)
+
 
 def test_to_bidirected():
     # homogeneous graph
@@ -382,6 +405,10 @@ def test_to_bidirected():
     assert F.array_equal(F.cat([v, u], dim=0), vb)
     assert ('h' in bg.ndata) is False
     assert ('h' in bg.edata) is False
+
+    # zero edge graph
+    g = dgl.graph([])
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
 
     # heterogeneous graph
     g = dgl.heterograph({
