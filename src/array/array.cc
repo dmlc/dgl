@@ -465,14 +465,6 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArr
   return ret;
 }
 
-COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
-  COOMatrix ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOReorder", {
-    ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
-  });
-  return ret;
-}
-
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRRemove", {
@@ -505,6 +497,38 @@ COOMatrix CSRRowWiseTopk(
       ret = impl::CSRRowWiseTopk<XPU, IdType, DType>(
           mat, rows, k, weight, ascending);
     });
+  });
+  return ret;
+}
+
+
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
+  CSRMatrix ret;
+  CHECK_GT(csrs.size(), 1) << "UnionCsr creates a union of multiple CSRMatrixes";
+  // sanity check
+  for (size_t i = 1; i < csrs.size(); ++i) {
+    CHECK_EQ(csrs[0].num_rows, csrs[i].num_rows) <<
+      "UnionCsr requires both CSRMatrix have same number of rows";
+    CHECK_EQ(csrs[0].num_cols, csrs[i].num_cols) <<
+      "UnionCsr requires both CSRMatrix have same number of cols";
+    CHECK_SAME_CONTEXT(csrs[0].indptr, csrs[i].indptr);
+    CHECK_SAME_DTYPE(csrs[0].indptr, csrs[i].indptr);
+  }
+
+  ATEN_CSR_SWITCH(csrs[0], XPU, IdType, "UnionCsr", {
+    ret = impl::UnionCsr<XPU, IdType>(csrs);
+  });
+  return ret;
+}
+
+
+std::tuple<CSRMatrix, IdArray, IdArray>
+CSRToSimple(const CSRMatrix& csr) {
+  std::tuple<CSRMatrix, IdArray, IdArray> ret;
+
+  CSRMatrix sorted_csr = (CSRIsSorted(csr)) ? csr : CSRSort(csr);
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRToSimple", {
+    ret = impl::CSRToSimple<XPU, IdType>(sorted_csr);
   });
   return ret;
 }
@@ -634,6 +658,14 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   return ret;
 }
 
+COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOReorder", {
+    ret = impl::COOReorder<XPU, IdType>(coo, new_row_ids, new_col_ids);
+  });
+  return ret;
+}
+
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COORemove", {
@@ -676,6 +708,121 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
   });
   return ret;
+}
+
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOLineGraph", {
+    ret = impl::COOLineGraph<XPU, IdType>(coo, backtracking);
+  });
+  return ret;
+}
+
+COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
+  COOMatrix ret;
+  CHECK_GT(coos.size(), 1) << "UnionCoo creates a union of multiple COOMatrixes";
+  // sanity check
+  for (size_t i = 1; i < coos.size(); ++i) {
+    CHECK_EQ(coos[0].num_rows, coos[i].num_rows) <<
+      "UnionCoo requires both COOMatrix have same number of rows";
+    CHECK_EQ(coos[0].num_cols, coos[i].num_cols) <<
+      "UnionCoo requires both COOMatrix have same number of cols";
+    CHECK_SAME_CONTEXT(coos[0].row, coos[i].row);
+    CHECK_SAME_DTYPE(coos[0].row, coos[i].row);
+  }
+
+  // we assume the number of coos is not large in common cases
+  std::vector<IdArray> coo_row;
+  std::vector<IdArray> coo_col;
+  bool has_data = false;
+
+  for (size_t i = 0; i < coos.size(); ++i) {
+    coo_row.push_back(coos[i].row);
+    coo_col.push_back(coos[i].col);
+    has_data |= COOHasData(coos[i]);
+  }
+
+  IdArray row = Concat(coo_row);
+  IdArray col = Concat(coo_col);
+  IdArray data = NullArray();
+
+  if (has_data) {
+    std::vector<IdArray> eid_data;
+    eid_data.push_back(COOHasData(coos[0]) ?
+                       coos[0].data :
+                       Range(0,
+                             coos[0].row->shape[0],
+                             coos[0].row->dtype.bits,
+                             coos[0].row->ctx));
+    int64_t num_edges = coos[0].row->shape[0];
+    for (size_t i = 1; i < coos.size(); ++i) {
+      eid_data.push_back(COOHasData(coos[i]) ?
+                         coos[i].data + num_edges :
+                         Range(num_edges,
+                               num_edges + coos[i].row->shape[0],
+                               coos[i].row->dtype.bits,
+                               coos[i].row->ctx));
+      num_edges += coos[i].row->shape[0];
+    }
+
+    data = Concat(eid_data);
+  }
+
+  return COOMatrix(
+    coos[0].num_rows,
+    coos[0].num_cols,
+    row,
+    col,
+    data,
+    false,
+    false);
+}
+
+
+std::tuple<COOMatrix, IdArray, IdArray>
+COOToSimple(const COOMatrix& coo) {
+  // coo column sorted
+  const COOMatrix sorted_coo = COOSort(coo, true);
+  const IdArray eids_shuffled = COOHasData(sorted_coo) ?
+    sorted_coo.data :
+    Range(0, sorted_coo.row->shape[0], sorted_coo.row->dtype.bits, sorted_coo.row->ctx);
+  const auto &coalesced_result = COOCoalesce(sorted_coo);
+  const COOMatrix &coalesced_adj = coalesced_result.first;
+  const IdArray &count = coalesced_result.second;
+
+  /*
+   * eids_shuffled actually already contains the mapping from old edge space to the
+   * new one:
+   *
+   * * eids_shuffled[0:count[0]] indicates the original edge IDs that coalesced into new
+   *   edge #0.
+   * * eids_shuffled[count[0]:count[0] + count[1]] indicates those that coalesced into
+   *   new edge #1.
+   * * eids_shuffled[count[0] + count[1]:count[0] + count[1] + count[2]] indicates those
+   *   that coalesced into new edge #2.
+   * * etc.
+   *
+   * Here, we need to translate eids_shuffled to an array "eids_remapped" such that
+   * eids_remapped[i] indicates the new edge ID the old edge #i is mapped to.  The
+   * translation can simply be achieved by (in numpy code):
+   *
+   *     new_eid_for_eids_shuffled = np.range(len(count)).repeat(count)
+   *     eids_remapped = np.zeros_like(new_eid_for_eids_shuffled)
+   *     eids_remapped[eids_shuffled] = new_eid_for_eids_shuffled
+   */
+  const IdArray new_eids = Range(
+    0, coalesced_adj.row->shape[0], coalesced_adj.row->dtype.bits, coalesced_adj.row->ctx);
+  const IdArray eids_remapped = Scatter(Repeat(new_eids, count), eids_shuffled);
+
+  COOMatrix ret = COOMatrix(
+    coalesced_adj.num_rows,
+    coalesced_adj.num_cols,
+    coalesced_adj.row,
+    coalesced_adj.col,
+    NullArray(),
+    true,
+    true);
+  return std::make_tuple(ret, count, eids_remapped);
 }
 
 ///////////////////////// Graph Traverse routines //////////////////////////

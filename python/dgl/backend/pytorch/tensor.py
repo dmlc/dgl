@@ -31,7 +31,7 @@ def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.tensor(data, dtype=dtype)
+    return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
@@ -272,6 +272,8 @@ def clone(input):
     return input.clone()
 
 def unique(input):
+    if input.dtype == th.bool:
+        input = input.type(th.int8)
     return th.unique(input)
 
 def full_1d(length, fill_value, dtype, ctx):
@@ -306,6 +308,9 @@ def zerocopy_from_numpy(np_array):
 
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(input):
     return dlpack.from_dlpack(input.to_dlpack())

@@ -46,10 +46,17 @@ template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp,
           bool UseBcast = false, bool UseIdx = false>
 __global__ void SpMMCooKernel(
-  const DType *ufeat, const DType *efeat, DType *out, Idx *arg_u, Idx *arg_e,
-  const Idx *row, const Idx *col, const Idx* edge_map,
+  const DType* __restrict__ ufeat,
+  const DType* __restrict__ efeat,
+  DType* __restrict__ out,
+  Idx* __restrict__ arg_u,
+  Idx* __restrict__ arg_e,
+  const Idx* __restrict__ row,
+  const Idx* __restrict__ col,
+  const Idx* __restrict__ edge_map,
   int64_t N, int64_t M, int64_t E,
-  int64_t *ubcast_off, int64_t *ebcast_off,
+  const int64_t* __restrict__ ubcast_off,
+  const int64_t* __restrict__ ebcast_off,
   int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
   // SPMM with COO.
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
@@ -87,10 +94,17 @@ template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp,
           bool UseBcast = false, bool UseIdx = false>
 __global__ void ArgSpMMCooKernel(
-  const DType *ufeat, const DType *efeat, DType *out, Idx *arg_u, Idx *arg_e,
-  const Idx *row, const Idx *col, const Idx* edge_map,
+  const DType* __restrict__ ufeat,
+  const DType* __restrict__ efeat,
+  DType* __restrict__ out,
+  Idx* __restrict__ arg_u,
+  Idx* __restrict__ arg_e,
+  const Idx* __restrict__ row,
+  const Idx* __restrict__ col,
+  const Idx* __restrict__ edge_map,
   int64_t N, int64_t M, int64_t E,
-  int64_t *ubcast_off, int64_t *ebcast_off,
+  const int64_t* __restrict__ ubcast_off,
+  const int64_t* __restrict__ ebcast_off,
   int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
   // SPMM with COO arg max/min.
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
@@ -128,10 +142,17 @@ template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp,
           bool UseBcast = false, bool UseIdx = false>
 __global__ void SpMMCsrKernel(
-  const DType *ufeat, const DType *efeat, DType *out, Idx *arg_u, Idx *arg_e,
-  const Idx *indptr, const Idx *indices, const Idx *edge_map,
+  const DType* __restrict__ ufeat,
+  const DType* __restrict__ efeat,
+  DType* __restrict__ out,
+  Idx* __restrict__ arg_u,
+  Idx* __restrict__ arg_e,
+  const Idx* __restrict__ indptr,
+  const Idx* __restrict__ indices,
+  const Idx* __restrict__ edge_map,
   int64_t num_rows, int64_t num_cols, int64_t nnz,
-  int64_t *ubcast_off, int64_t *ebcast_off,
+  const int64_t* __restrict__ ubcast_off,
+  const int64_t* __restrict__ ebcast_off,
   int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
   // SPMM with CSR.
   int ty = blockIdx.y * blockDim.y + threadIdx.y;

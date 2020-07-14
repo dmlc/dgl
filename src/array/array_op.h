@@ -152,6 +152,12 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+// Union CSRMatrixes
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
+
+template <DLDeviceType XPU, typename IdType>
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -222,6 +228,8 @@ template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
 
+///////////////////////// Graph Traverse routines //////////////////////////
+
 template <DLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
 
@@ -241,7 +249,8 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              const bool has_nontree_edge,
                              const bool return_labels);
 
-
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
 
 }  // namespace impl
 }  // namespace aten

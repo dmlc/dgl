@@ -885,6 +885,15 @@ def test_to_device(index_dtype):
         g1 = g.to(F.cuda())
         assert g1 is not None
 
+    # set feature after g.to
+    g = create_test_heterograph(index_dtype)
+    if F.is_cuda_available():
+        g1 = g.to(F.cuda())
+        assert g1 is not None
+        g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cuda())
+        g1.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cuda())
+        g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cuda())
+
 @parametrize_dtype
 def test_convert_bound(index_dtype):
     def _test_bipartite_bound(data, card):
@@ -1977,6 +1986,13 @@ def test_reverse(index_dtype):
         }, index_dtype=index_dtype)
     gidx = g._graph
     r_gidx = gidx.reverse()
+
+    # metagraph
+    mg = gidx.metagraph
+    r_mg = r_gidx.metagraph
+    for etype in range(3):
+        assert mg.find_edge(etype) == r_mg.find_edge(etype)[::-1]
+
     # three node types and three edge types
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
@@ -2057,6 +2073,7 @@ def test_reverse(index_dtype):
     assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
     assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
 
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -2068,7 +2085,7 @@ if __name__ == '__main__':
     # test_flatten()
     # test_convert_bound()
     # test_convert()
-    # test_to_device()
+    # test_to_device("int32")
     # test_transform("int32")
     # test_subgraph("int32")
     # test_subgraph_mask("int32")
@@ -2083,7 +2100,6 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
-    # test_reverse("int32")
+    test_reverse("int32")
     test_format()
-
     pass

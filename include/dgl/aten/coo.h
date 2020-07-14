@@ -11,6 +11,7 @@
 #include <dmlc/serializer.h>
 #include <vector>
 #include <utility>
+#include <tuple>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -372,7 +373,39 @@ COOMatrix COORowWiseTopk(
     bool ascending = false);
 
 /*!
- * \brief Union a list COOMatrix into one COOMatrix.
+ * \brief Union two COOMatrix into one COOMatrix.
+ * 
+ * Two Matrix must have the same shape.
+ *
+ * Example:
+ *
+ * A = [[0, 0, 1, 0],
+ *      [1, 0, 1, 1],
+ *      [0, 1, 0, 0]]
+ *
+ * B = [[0, 1, 1, 0],
+ *      [0, 0, 0, 1],
+ *      [0, 0, 1, 0]]
+ *
+ * COOMatrix_A.num_rows : 3
+ * COOMatrix_A.num_cols : 4
+ * COOMatrix_B.num_rows : 3
+ * COOMatrix_B.num_cols : 4
+ *
+ * C = UnionCoo({A, B});
+ *
+ * C = [[0, 1, 2, 0],
+ *      [1, 0, 1, 2],
+ *      [0, 1, 1, 0]]
+ *
+ * COOMatrix_C.num_rows : 3
+ * COOMatrix_C.num_cols : 4
+ */
+COOMatrix UnionCoo(
+  const std::vector<COOMatrix>& coos);
+
+/*!
+ * \brief DisjointUnion a list COOMatrix into one COOMatrix.
  *
  * Examples:
  *
@@ -405,6 +438,30 @@ COOMatrix COORowWiseTopk(
  */
 COOMatrix DisjointUnionCoo(
   const std::vector<COOMatrix>& coos);
+
+/*!
+ * \brief COOMatrix toSimple.
+ *
+ * A = [[0, 0, 0],
+ *      [3, 0, 2],
+ *      [1, 1, 0],
+ *      [0, 0, 4]]
+ * 
+ * B, cnt, edge_map = COOToSimple(A)
+ *
+ * B = [[0, 0, 0],
+ *      [1, 0, 1],
+ *      [1, 1, 0],
+ *      [0, 0, 1]]
+ * cnt = [3, 2, 1, 1, 4]
+ * edge_map = [0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4]
+ *
+ * \return The simplified COOMatrix
+ *         The count recording the number of duplicated edges from the original graph.
+ *         The edge mapping from the edge IDs of original graph to those of the
+ *         returned graph.
+ */
+std::tuple<COOMatrix, IdArray, IdArray> COOToSimple(const COOMatrix& coo);
 
 /*!
  * \brief Split a COOMatrix into multiple disjoin components.
@@ -456,6 +513,38 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const std::vector<uint64_t> &edge_cumsum,
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum);
+
+/*!
+ * \brief Create a LineGraph of input coo
+ * 
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [1, 1, 0]]
+ * A.row = [0, 1, 1, 2, 2]
+ * A.col = [2, 0, 2, 0, 1]
+ * A.eid = [0, 1, 2, 3, 4]
+ *
+ * B = COOLineGraph(A, backtracking=False)
+ *
+ * B = [[0, 0, 0, 0, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 1, 0, 0, 0]]
+ *
+ * C = COOLineGraph(A, backtracking=True)
+ *
+ * C = [[0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 1, 1, 0, 0]]
+ *
+ * \param coo COOMatrix to create the LineGraph
+ * \param backtracking whether the pair of (v, u) (u, v) edges are treated as linked
+ * \return LineGraph in COO format
+ */
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
 
 }  // namespace aten
 }  // namespace dgl

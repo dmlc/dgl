@@ -417,6 +417,8 @@ def zerocopy_from_numpy(np_array):
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(zerocopy_to_dlpack(input))
 
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(input):
     return zerocopy_from_dlpack(input.to_dlpack())

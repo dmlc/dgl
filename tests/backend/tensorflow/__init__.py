@@ -96,3 +96,6 @@ def matmul(a, b):
 
 def dot(a, b):
     return sum(mul(a, b), dim=-1)
+
+def abs(a):
+    return tf.abs(a)
