@@ -10,7 +10,7 @@ import string
 import numpy as np
 import torch as th
 import torch.nn as nn
-from data import MovieLens
+from dgl.data.movielens import MovieLen100kDataset, MovieLen1MDataset, MovieLen10MDataset
 from model import BiDecoder, GCMCLayer
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
@@ -37,6 +37,7 @@ class Net(nn.Module):
             enc_graph,
             ufeat,
             ifeat)
+
         pred_ratings = self.decoder(dec_graph, user_out, movie_out)
         return pred_ratings
 
@@ -45,21 +46,25 @@ def evaluate(args, net, dataset, segment='valid'):
     nd_possible_rating_values = th.FloatTensor(possible_rating_values).to(args.device)
 
     if segment == "valid":
-        rating_values = dataset.valid_truths
-        enc_graph = dataset.valid_enc_graph
-        dec_graph = dataset.valid_dec_graph
+        rating_values = dataset.valid_truths.to(args.device)
+        enc_graph = dataset.valid_enc_graph.to(args.device)
+        dec_graph = dataset.valid_dec_graph.to(args.device)
     elif segment == "test":
-        rating_values = dataset.test_truths
-        enc_graph = dataset.test_enc_graph
-        dec_graph = dataset.test_dec_graph
+        rating_values = dataset.test_truths.to(args.device)
+        enc_graph = dataset.test_enc_graph.to(args.device)
+        dec_graph = dataset.test_dec_graph.to(args.device)
     else:
         raise NotImplementedError
 
+    user_feature = None if dataset.user_feature is None \
+                        else dataset.user_feature.to(args.device)
+    movie_feature = None if dataset.movie_feature is None \
+                         else dataset.movie_feature.to(args.device)
     # Evaluate RMSE
     net.eval()
     with th.no_grad():
         pred_ratings = net(enc_graph, dec_graph,
-                           dataset.user_feature, dataset.movie_feature)
+                           user_feature, movie_feature)
     real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
                          nd_possible_rating_values.view(1, -1)).sum(dim=1)
     rmse = ((real_pred_ratings - rating_values) ** 2.).mean().item()
@@ -68,8 +73,23 @@ def evaluate(args, net, dataset, segment='valid'):
 
 def train(args):
     print(args)
-    dataset = MovieLens(args.data_name, args.device, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
-                        test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
+    use_node_feat = (args.use_one_hot_fea == False)
+    if args.data_name == 'ml-100k':
+        dataset = MovieLen100kDataset(node_feat=use_node_feat,
+                                      test_ratio=args.data_test_ratio,
+                                      valid_ratio=args.data_valid_ratio,
+                                      symm=args.gcn_agg_norm_symm)
+    elif args.data_name == 'ml-1m':
+        dataset = MovieLen1MDataset(node_feat=use_node_feat,
+                                    test_ratio=args.data_test_ratio,
+                                    valid_ratio=args.data_valid_ratio,
+                                    symm=args.gcn_agg_norm_symm)
+    elif args.data_name == 'ml-10m':
+        dataset = MovieLen10MDataset(node_feat=use_node_feat,
+                                     test_ratio=args.data_test_ratio,
+                                     valid_ratio=args.data_valid_ratio,
+                                     symm=args.gcn_agg_norm_symm)
+
     print("Loading data finished ...\n")
 
     args.src_in_units = dataset.user_feature_shape[1]
@@ -86,8 +106,8 @@ def train(args):
     print("Loading network finished ...\n")
 
     ### perpare training data
-    train_gt_labels = dataset.train_labels
-    train_gt_ratings = dataset.train_truths
+    train_gt_labels = dataset.train_labels.to(args.device)
+    train_gt_ratings = dataset.train_truths.to(args.device)
 
     ### prepare the logger
     train_loss_logger = MetricLogger(['iter', 'loss', 'rmse'], ['%d', '%.4f', '%.4f'],
@@ -105,14 +125,22 @@ def train(args):
     count_num = 0
     count_loss = 0
 
+    train_enc_graph = dataset.train_enc_graph
+    train_dec_graph = dataset.train_dec_graph
+    user_feature = None if dataset.user_feature is None \
+                        else dataset.user_feature.to(args.device)
+    movie_feature = None if dataset.movie_feature is None \
+                         else dataset.movie_feature.to(args.device)
+    train_enc_graph = train_enc_graph.to(args.device)
+    train_dec_graph = train_dec_graph.to(args.device)
     print("Start training ...")
     dur = []
     for iter_idx in range(1, args.train_max_iter):
         if iter_idx > 3:
             t0 = time.time()
         net.train()
-        pred_ratings = net(dataset.train_enc_graph, dataset.train_dec_graph,
-                           dataset.user_feature, dataset.movie_feature)
+        pred_ratings = net(train_enc_graph, train_dec_graph,
+                           user_feature, movie_feature)
         loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
         count_loss += loss.item()
         optimizer.zero_grad()
