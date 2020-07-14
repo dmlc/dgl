@@ -8,7 +8,7 @@ from ..graph import DGLGraph
 from .. import backend as F
 from ..base import NID, EID
 from .kvstore import KVServer, KVClient
-from .fake_kvstore import KVClient as FakeKVClient
+from .standalone_kvstore import KVClient as SA_KVClient
 from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
@@ -371,7 +371,7 @@ class DistGraph:
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert conf_file is not None, \
                     'When running in the standalone model, the partition config file is required'
-            self._client = FakeKVClient()
+            self._client = SA_KVClient()
             # Load graph partition data.
             g, node_feats, edge_feats, self._gpb = load_partition(conf_file, 0)
             assert self._gpb.num_partitions() == 1, \

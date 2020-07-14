@@ -31,7 +31,8 @@ will be able to access the partitioned data.
 
 ### Step 3: run servers
 
-We need to run a server on each machine. Before running the servers, we need to update `ip_config.txt` with the right IP addresses.
+To perform actual distributed training (running training jobs in multiple machines), we need to run
+a server on each machine. Before running the servers, we need to update `ip_config.txt` with the right IP addresses.
 
 On each of the machines, set the following environment variables.
 
