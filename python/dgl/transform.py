@@ -12,7 +12,6 @@ from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .heterograph_index import joint_union as gidx_joint_union
-from .heterograph_index import create_heterograph_from_relations
 from .graph import unbatch
 from .convert import graph, bipartite, heterograph
 from . import utils
@@ -253,11 +252,10 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
             "There will be no difference between readonly and non-readonly DGLGraph")
 
     canonical_etypes = g.canonical_etypes
-    metagraph = g._graph.metagraph
     # fast path
     if ignore_bipartite is False:
         subgs = {}
-        for i, c_etype in enumerate(canonical_etypes):
+        for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 assert False, "to_bidirected is not well defined for " \
                     "unidirectional bipartite graphs" \
@@ -269,8 +267,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
         new_g = heterograph(subgs)
     else:
         subgs = {}
-        gidxes = []
-        for i, c_etype in enumerate(canonical_etypes):
+        for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 u, v = g.all_edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (u, v)
