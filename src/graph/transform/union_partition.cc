@@ -72,6 +72,7 @@ HeteroGraphPtr JointUnionHeteroGraph(
         (src_vtype == dst_vtype) ? 1 : 2, res,
         SparseFormat::kAny);
     } else if (FORMAT_HAS_CSC(format)) {
+      // CSR and CSC have the same storage format, i.e. CSRMatrix
       std::vector<aten::CSRMatrix> cscs;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
         const auto& cg = component_graphs[i];
@@ -157,6 +158,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
         (src_vtype == dst_vtype) ? 1 : 2, res,
         SparseFormat::kAny);
     } else if (FORMAT_HAS_CSC(format)) {
+      // CSR and CSC have the same storage format, i.e. CSRMatrix
       std::vector<aten::CSRMatrix> cscs;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
         const auto& cg = component_graphs[i];
@@ -270,6 +272,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
       auto pair = meta_graph->FindEdge(etype);
       const dgl_type_t src_vtype = pair.first;
       const dgl_type_t dst_vtype = pair.second;
+      // CSR and CSC have the same storage format, i.e. CSRMatrix
       aten::CSRMatrix csc = batched_graph->GetCSCMatrix(etype);
       auto res = aten::DisjointPartitionCsrBySizes(csc,
                                                    batch_size,

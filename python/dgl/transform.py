@@ -14,7 +14,7 @@ from .graph_index import _get_halo_subgraph_inner_node
 from .heterograph_index import joint_union as gidx_joint_union
 from .heterograph_index import create_heterograph_from_relations
 from .graph import unbatch
-from .convert import graph, bipartite
+from .convert import graph, bipartite, heterograph
 from . import utils
 from .base import EID, NID
 from . import ndarray as nd
@@ -256,29 +256,29 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     metagraph = g._graph.metagraph
     # fast path
     if ignore_bipartite is False:
+        subgs = {}
         for i, c_etype in enumerate(canonical_etypes):
             if c_etype[0] != c_etype[2]:
                 assert False, "to_bidirected is not well defined for " \
                     "unidirectional bipartite graphs" \
                     ", but {} is unidirectional bipartite".format(c_etype)
-        hgidx = gidx_joint_union(g._graph.metagraph,
-                                 [g._graph, g._graph.reverse()])
-        new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
+
+            u, v = g.all_edges(form='uv', order='eid', etype=c_etype)
+            subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+
+        new_g = heterograph(subgs)
     else:
+        subgs = {}
         gidxes = []
         for i, c_etype in enumerate(canonical_etypes):
             if c_etype[0] != c_etype[2]:
-                gidxes.append(g._graph.get_relation_graph(i))
+                u, v = g.all_edges(form='uv', order='eid', etype=c_etype)
+                subgs[c_etype] = (u, v)
             else:
-                gidxes.append(gidx_joint_union(
-                    g._graph.get_relation_graph(i).metagraph,
-                    [g._graph.get_relation_graph(i),
-                     g._graph.get_relation_graph(i).reverse()]))
+                u, v = g.all_edges(form='uv', order='eid', etype=c_etype)
+                subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        num_nodes_per_type = [g.number_of_nodes(ntype) for ntype in g.ntypes]
-        hgidx = create_heterograph_from_relations(metagraph, gidxes,
-                                                  utils.toindex(num_nodes_per_type, "int64"))
-        new_g = DGLHeteroGraph(hgidx, g.ntypes, g.etypes)
+        new_g = heterograph(subgs)
 
     # handle features
     if copy_ndata:

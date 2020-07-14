@@ -439,7 +439,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")
     GraphRef meta_graph = args[0];
     List<HeteroGraphRef> component_graphs = args[1];
     CHECK(component_graphs.size() > 1)
-      << "Expect graph list has at least two graphs";
+      << "Expect graph list to have at least two graphs";
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
