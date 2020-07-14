@@ -72,7 +72,6 @@ class DistDataLoader:
         if queue_size is None:
             queue_size = num_workers * 4
         self.queue_size = queue_size
-        self.dataset = dataset
         self.batch_size = batch_size
         self.queue_size = queue_size
         self.collate_fn = collate_fn
@@ -82,23 +81,30 @@ class DistDataLoader:
         self.queue = self.m.Queue(maxsize=queue_size)
         ctx = mp.get_context("spawn")
         self.drop_last = drop_last
-        self.expected_idxs = len(dataset) // batch_size
-        if not drop_last and len(dataset) % batch_size != 0:
-            self.expected_idxs += 1
         self.send_idxs = 0
         self.recv_idxs = 0
+        self.started = False
         self.pool = ctx.Pool(
             num_workers, initializer=init_fn, initargs=(collate_fn, self.queue))
-        for _ in range(queue_size):
-            self._request_next_batch()
+    
+    def set_dataset(self, dataset):
+        self.dataset = dataset
+        self.expected_idxs = len(dataset) // self.batch_size
+        if not self.drop_last and len(dataset) % self.batch_size != 0:
+            self.expected_idxs += 1
 
     def __next__(self):
+        if not self.started:
+            for _ in range(self.queue_size):
+                self._request_next_batch()
         self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
             result = self.queue.get(timeout=DGL_QUEUE_TIMEOUT)
             self.recv_idxs += 1
             return result
         else:
+            self.recv_idxs = 0
+            self.current_pos = 0
             raise StopIteration
 
     def __iter__(self):
@@ -133,4 +139,5 @@ class DistDataLoader:
         self.pool.join()
 
 if backend_name == 'pytorch':
-    deregister_torch_ipc()
+    pass
+    # deregister_torch_ipc()
