@@ -373,7 +373,7 @@ class DistGraph:
                     'When running in the standalone model, the partition config file is required'
             self._client = SA_KVClient()
             # Load graph partition data.
-            g, node_feats, edge_feats, self._gpb = load_partition(conf_file, 0)
+            g, node_feats, edge_feats, self._gpb, _ = load_partition(conf_file, 0)
             assert self._gpb.num_partitions() == 1, \
                     'The standalone mode can only work with the graph data with one partition'
             if self._gpb is None:
