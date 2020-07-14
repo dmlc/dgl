@@ -1,13 +1,14 @@
 from dgl.backend import gspmm, gsddmm
 from utils import parametrize_dtype
 import dgl
+import random
 import pytest
 import networkx as nx
 import backend as F
 import numpy as np
 
+random.seed(42)
 np.random.seed(42)
-dgl.random.seed(42)
 
 udf_msg = {
     'add': lambda edges: {'m': edges.src['x'] + edges.data['w']},
@@ -133,14 +134,24 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
         g.update_all(udf_msg[msg], udf_reduce[reducer])
         if g.number_of_edges() > 0:
             v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
-            assert F.allclose(v, v1, rtol=1e-3, atol=1e-3)
+            assert F.allclose(v, v1)
             print('forward passed')
 
             F.backward(F.reduce_sum(v1))
             if msg != 'copy_rhs':
-                assert F.allclose(F.grad(g.srcdata['x']), grad_u)
+                if reducer in ['min', 'max']: # there might be some numerical errors
+                    rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) /\
+                           F.reduce_sum(F.abs(grad_u))
+                    assert F.as_scalar(rate) < 1e-3, rate
+                else:
+                    assert F.allclose(F.grad(g.srcdata['x']), grad_u)
             if msg != 'copy_lhs':
-                assert F.allclose(F.grad(g.edata['w']), grad_e)
+                if reducer in ['min', 'max']:
+                    rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) /\
+                           F.reduce_sum(F.abs(grad_e))
+                    assert F.as_scalar(rate) < 1e-3, rate
+                else:
+                    assert F.allclose(F.grad(g.edata['w']), grad_e)
             print('backward passed')
 
     g.srcdata.pop('x')
@@ -208,7 +219,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, index_dtype):
         g.apply_edges(udf_apply_edges[msg_func])
         if g.number_of_edges() > 0:
             e1 = g.edata['m']
-            assert F.allclose(e, e1, rtol=1e-3, atol=1e-3)
+            assert F.allclose(e, e1)
             print('forward passed')
 
             F.backward(F.reduce_sum(e1))
