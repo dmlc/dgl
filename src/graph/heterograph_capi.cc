@@ -5,6 +5,7 @@
  */
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 
 #include "../c_api_common.h"
@@ -597,7 +598,6 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
     *rv = ret_list;
   });
 
-
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
@@ -613,6 +613,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
     }
     // node types are not changed
     const auto& num_nodes = g->NumVerticesPerType();
-    *rv = CreateHeteroGraph(hg->meta_graph(), rev_ugs, num_nodes);
+    const auto& meta_edges = hg->meta_graph()->Edges("eid");
+    // reverse the metagraph
+    const auto& rev_meta = ImmutableGraph::CreateFromCOO(hg->meta_graph()->NumVertices(),
+                                                         meta_edges.dst, meta_edges.src);
+    *rv = CreateHeteroGraph(rev_meta, rev_ugs, num_nodes);
   });
 }  // namespace dgl
