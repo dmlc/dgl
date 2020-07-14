@@ -212,6 +212,7 @@ def test_server_client():
     check_server_client(True)
     check_server_client(False)
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_standalone():
     os.environ['DGL_DIST_MODE'] = 'standalone'
     g = create_random_graph(10000)
