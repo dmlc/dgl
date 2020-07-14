@@ -10,7 +10,7 @@ import numbers
 import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
-from ...function.base import TargetCode 
+from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
 if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
@@ -35,14 +35,23 @@ def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
-    # MXNet always returns a float tensor regardless of type inside data.
-    # This is a workaround.
-    if dtype is None:
-        if isinstance(data[0], numbers.Integral):
-            dtype = np.int64
+    if isinstance(data, nd.NDArray):
+        if dtype is None or data.dtype == dtype:
+            return data
         else:
-            dtype = np.float32
-    return nd.array(data, dtype=dtype)
+            return nd.cast(data, dtype)
+    else:
+        if dtype is None:
+            if isinstance(data, numbers.Number):
+                dtype = np.int64 if isinstance(data, numbers.Integral) else np.float32
+            elif isinstance(data, np.ndarray):
+                dtype = data.dtype
+                # mxnet doesn't support bool
+                if dtype == np.bool:
+                    dtype = np.int32
+            else:
+                dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
+        return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
     return data.asscalar()
@@ -109,6 +118,15 @@ def device_type(ctx):
 def device_id(ctx):
     return ctx.device_id
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return mx.cpu()
+    elif dev_type == 2:
+        return mx.gpu(dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
+
 def astype(input, ty):
     return nd.cast(input, ty)
 
@@ -156,6 +174,9 @@ def argsort(input, dim, descending):
 
 def exp(input):
     return nd.exp(input)
+
+def sqrt(input):
+    return nd.sqrt(input)
 
 def softmax(input, dim=-1):
     return nd.softmax(input, axis=dim)
@@ -214,6 +235,9 @@ def take(data, indices, dim):
 
 def narrow_row(data, start, stop):
     return data[start:stop]
+
+def index_add_inplace(data, row_idx, value):
+    raise NotImplementedError("MXNet doesn't support inplace index_add")
 
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
@@ -567,3 +591,28 @@ def sync():
     that all computation is complete after this function call.
     """
     mx.nd.waitall()
+
+def attach_grad(tensor):
+    tensor.attach_grad()
+    return tensor
+
+def backward(x, head_gradient=None):
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return (x != 0).sum() == 0
+
+record_grad = mx.autograd.record
+
+class no_grad(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass

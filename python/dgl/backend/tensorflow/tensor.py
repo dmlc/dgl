@@ -59,6 +59,8 @@ def cpu():
 def tensor(data, dtype=None):
     return tf.convert_to_tensor(data, dtype=dtype)
 
+def initialize_context():
+    tf.zeros(1)
 
 def as_scalar(data):
     return data.numpy().asscalar()
@@ -116,6 +118,14 @@ def device_type(ctx):
 def device_id(ctx):
     return tf.DeviceSpec.from_string(ctx).device_index
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return "/cpu:0"
+    elif dev_type == 2:
+        return "/gpu:%d" % (dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
     return tf.cast(input, dtype=ty)
@@ -203,6 +213,8 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return tf.exp(input)
 
+def sqrt(input):
+    return tf.sqrt(input)
 
 def softmax(input, dim=-1):
     return tf.math.softmax(input, axis=dim)
@@ -249,6 +261,9 @@ def narrow_row(x, start, stop):
 def scatter_row(data, row_index, value):
     row_index = tf.expand_dims(row_index, 1)
     return tf.tensor_scatter_nd_update(data, row_index, value)
+
+def index_add_inplace(data, row_idx, value):
+    raise NotImplementedError("Tensorflow doesn't support inplace index_add")
 
 
 def scatter_row_inplace(data, row_index, value):
@@ -402,6 +417,8 @@ def zerocopy_from_numpy(np_array):
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(zerocopy_to_dlpack(input))
 
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(input):
     return zerocopy_from_dlpack(input.to_dlpack())
@@ -582,3 +599,91 @@ def _reduce_grad(grad, shape):
 def sync():
     context = context().context()
     context.async_wait()
+
+
+class GradContext:
+    def __init__(self):
+        self.tensor_for_grad = []
+        self.grad_list = []
+        self.tape = None
+
+    def set_tape(self, tape):
+        self.tape = tape
+
+    def add_tensor(self, x):
+        idx_pop = []
+        for idx, ele in enumerate(self.tensor_for_grad):
+            if ele._id == x._id:
+                idx_pop.append(idx)
+        if len(idx_pop) > 0:
+            self.tensor_for_grad.pop(idx_pop[0])
+        if self.tape is not None:
+            self.tape.watch(x)
+        self.tensor_for_grad.append(x)
+
+    def backward(self, x, head_gradient=None):
+        if head_gradient is not None:
+            x = x * head_gradient
+        self.grad_list = self.tape.gradient(x, self.tensor_for_grad)
+
+    def is_no_grad(self, x):
+        idx_pop = []
+        for idx, ele in enumerate(self.tensor_for_grad):
+            if ele._id == x._id:
+                idx_pop.append(idx)
+        if len(idx_pop) == 0:
+            return True
+        else:
+            return self.grad_list[idx_pop[0]] is None
+
+    def grad(self, x):
+        idx_pop = []
+        for idx, ele in enumerate(self.tensor_for_grad):
+            if ele._id == x._id:
+                idx_pop.append(idx)
+        assert len(idx_pop) == 1
+        t = self.grad_list[idx_pop[0]]
+        return tf.convert_to_tensor(t)
+
+
+cgrad = GradContext()
+
+
+def get_cgrad():
+    return cgrad
+
+
+class record_grad:
+    def __init__(self):
+        self.tape = tf.GradientTape()
+
+    def __enter__(self):
+        cgrad.set_tape(self.tape)
+        self.tape.__enter__()
+        for x in cgrad.tensor_for_grad:
+            self.tape.watch(x)
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        # pass
+        self.tape.__exit__(exc_type, exc_value, exc_traceback)
+        cgrad.tape = None
+
+
+def attach_grad(x):
+    cgrad.add_tensor(x)
+    return x
+
+
+def backward(x, head_gradient=None):
+    cgrad.backward(x, head_gradient)
+
+
+def grad(x):
+    return cgrad.grad(x)
+
+def is_no_grad(x):
+    return cgrad.is_no_grad(x)
+
+no_grad = None
+
+initialize_context()

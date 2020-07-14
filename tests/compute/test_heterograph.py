@@ -494,6 +494,31 @@ def test_inc(index_dtype):
 
 @parametrize_dtype
 def test_view(index_dtype):
+    # test single node type
+    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    f1 = F.randn((3, 6))
+    g.ndata['h'] = f1
+    f2 = g.nodes['user'].data['h']
+    assert F.array_equal(f1, f2)
+    fail = False
+    try:
+        g.ndata['h'] = {'user' : f1}
+    except Exception:
+        fail = True
+    assert fail
+
+    # test single edge type
+    f3 = F.randn((2, 4))
+    g.edata['h'] = f3
+    f4 = g.edges['follows'].data['h']
+    assert F.array_equal(f3, f4)
+    fail = False
+    try:
+        g.edata['h'] = {'follows' : f3}
+    except Exception:
+        fail = True
+    assert fail
+
     # test data view
     g = create_test_heterograph(index_dtype)
 
@@ -502,6 +527,31 @@ def test_view(index_dtype):
     f2 = g.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
     assert F.array_equal(F.tensor(g.nodes('user')), F.arange(0, 3))
+    g.nodes['user'].data.pop('h')
+
+    # multi type ndata
+    f1 = F.randn((3, 6))
+    f2 = F.randn((2, 6))
+    fail = False
+    try:
+        g.ndata['h'] = f1
+    except Exception:
+        fail = True
+    assert fail
+    g.ndata['h'] = {'user' : f1,
+                    'game' : f2}
+    f3 = g.nodes['user'].data['h']
+    f4 = g.nodes['game'].data['h']
+    assert F.array_equal(f1, f3)
+    assert F.array_equal(f2, f4)
+    data = g.ndata['h']
+    assert F.array_equal(f1, data['user'])
+    assert F.array_equal(f2, data['game'])
+    # test repr
+    print(g.ndata)
+    g.ndata.pop('h')
+    # test repr
+    print(g.ndata)
 
     f3 = F.randn((2, 4))
     g.edges['user', 'follows', 'user'].data['h'] = f3
@@ -510,6 +560,87 @@ def test_view(index_dtype):
     assert F.array_equal(f3, f4)
     assert F.array_equal(f3, f5)
     assert F.array_equal(F.tensor(g.edges(etype='follows', form='eid')), F.arange(0, 2))
+    g.edges['follows'].data.pop('h')
+
+    f3 = F.randn((2, 4))
+    fail = False
+    try:
+        g.edata['h'] = f3
+    except Exception:
+        fail = True
+    assert fail
+    g.edata['h'] = {('user', 'follows', 'user') : f3}
+    f4 = g.edges['user', 'follows', 'user'].data['h']
+    f5 = g.edges['follows'].data['h']
+    assert F.array_equal(f3, f4)
+    assert F.array_equal(f3, f5)
+    data = g.edata['h']
+    assert F.array_equal(f3, data[('user', 'follows', 'user')])
+    # test repr
+    print(g.edata)
+    g.edata.pop('h')
+    # test repr
+    print(g.edata)
+
+    # test srcdata
+    f1 = F.randn((3, 6))
+    g.srcnodes['user'].data['h'] = f1       # ok
+    f2 = g.srcnodes['user'].data['h']
+    assert F.array_equal(f1, f2)
+    assert F.array_equal(F.tensor(g.srcnodes('user')), F.arange(0, 3))
+    g.srcnodes['user'].data.pop('h')
+
+    # multi type ndata
+    f1 = F.randn((3, 6))
+    f2 = F.randn((2, 6))
+    fail = False
+    try:
+        g.srcdata['h'] = f1
+    except Exception:
+        fail = True
+    assert fail
+    g.srcdata['h'] = {'user' : f1,
+                      'developer' : f2}
+    f3 = g.srcnodes['user'].data['h']
+    f4 = g.srcnodes['developer'].data['h']
+    assert F.array_equal(f1, f3)
+    assert F.array_equal(f2, f4)
+    data = g.srcdata['h']
+    assert F.array_equal(f1, data['user'])
+    assert F.array_equal(f2, data['developer'])
+    # test repr
+    print(g.srcdata)
+    g.srcdata.pop('h')
+
+    # test dstdata
+    f1 = F.randn((3, 6))
+    g.dstnodes['user'].data['h'] = f1       # ok
+    f2 = g.dstnodes['user'].data['h']
+    assert F.array_equal(f1, f2)
+    assert F.array_equal(F.tensor(g.dstnodes('user')), F.arange(0, 3))
+    g.dstnodes['user'].data.pop('h')
+
+    # multi type ndata
+    f1 = F.randn((3, 6))
+    f2 = F.randn((2, 6))
+    fail = False
+    try:
+        g.dstdata['h'] = f1
+    except Exception:
+        fail = True
+    assert fail
+    g.dstdata['h'] = {'user' : f1,
+                      'game' : f2}
+    f3 = g.dstnodes['user'].data['h']
+    f4 = g.dstnodes['game'].data['h']
+    assert F.array_equal(f1, f3)
+    assert F.array_equal(f2, f4)
+    data = g.dstdata['h']
+    assert F.array_equal(f1, data['user'])
+    assert F.array_equal(f2, data['game'])
+    # test repr
+    print(g.dstdata)
+    g.dstdata.pop('h')
 
 @parametrize_dtype
 def test_view1(index_dtype):
@@ -639,21 +770,14 @@ def test_view1(index_dtype):
     assert F.array_equal(f3, f4)
     assert F.array_equal(F.tensor(g.edges(form='eid')), F.arange(0, 2))
 
-    # test fail case
-    # fail due to multiple types
-    fail = False
-    try:
-        HG.ndata['h']
-    except dgl.DGLError:
-        fail = True
-    assert fail
-
-    fail = False
-    try:
-        HG.edata['h']
-    except dgl.DGLError:
-        fail = True
-    assert fail
+    # multiple types
+    ndata = HG.ndata['h']
+    assert isinstance(ndata, dict)
+    assert F.array_equal(ndata['user'], f2)
+    
+    edata = HG.edata['h']
+    assert isinstance(edata, dict)
+    assert F.array_equal(edata[('user', 'follows', 'user')], f4)
 
 @parametrize_dtype
 def test_flatten(index_dtype):
@@ -753,10 +877,22 @@ def test_flatten(index_dtype):
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @parametrize_dtype
 def test_to_device(index_dtype):
-    hg = create_test_heterograph(index_dtype)
+    g = create_test_heterograph(index_dtype)
+    g.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
+    g.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cpu())
+    g.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
     if F.is_cuda_available():
-        hg = hg.to(F.cuda())
-        assert hg is not None
+        g1 = g.to(F.cuda())
+        assert g1 is not None
+
+    # set feature after g.to
+    g = create_test_heterograph(index_dtype)
+    if F.is_cuda_available():
+        g1 = g.to(F.cuda())
+        assert g1 is not None
+        g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cuda())
+        g1.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cuda())
+        g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cuda())
 
 @parametrize_dtype
 def test_convert_bound(index_dtype):
@@ -895,6 +1031,46 @@ def test_transform(index_dtype):
     assert new_g.number_of_edges() == 2
     assert F.asnumpy(new_g.has_edges_between([0, 1], [1, 2])).all()
 
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support bool tensor")
+@parametrize_dtype
+def test_subgraph_mask(index_dtype):
+    g = create_test_heterograph(index_dtype)
+    g_graph = g['follows']
+    g_bipartite = g['plays']
+
+    x = F.randn((3, 5))
+    y = F.randn((2, 4))
+    g.nodes['user'].data['h'] = x
+    g.edges['follows'].data['h'] = y
+
+    def _check_subgraph(g, sg):
+        assert sg.ntypes == g.ntypes
+        assert sg.etypes == g.etypes
+        assert sg.canonical_etypes == g.canonical_etypes
+        assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
+                             F.tensor([1, 2], F.int64))
+        assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
+                             F.tensor([0], F.int64))
+        assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
+                             F.tensor([1], F.int64))
+        assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
+                             F.tensor([1], F.int64))
+        assert F.array_equal(F.tensor(sg.edges['wishes'].data[dgl.EID]),
+                             F.tensor([1], F.int64))
+        assert sg.number_of_nodes('developer') == 0
+        assert sg.number_of_edges('develops') == 0
+        assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
+        assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'][1:2])
+
+    # backend boo input tensor
+    sg1 = g.subgraph({'user': F.tensor([False, True, True], dtype=F.data_type_dict['bool']),
+                      'game': F.tensor([True, False, False, False], dtype=F.data_type_dict['bool'])})
+    _check_subgraph(g, sg1)
+    sg2 = g.edge_subgraph({'follows': F.tensor([False, True], dtype=F.data_type_dict['bool']),
+                           'plays': F.tensor([False, True, False, False], dtype=F.data_type_dict['bool']),
+                           'wishes': F.tensor([False, True], dtype=F.data_type_dict['bool'])})
+    _check_subgraph(g, sg2)
+
 @parametrize_dtype
 def test_subgraph(index_dtype):
     g = create_test_heterograph(index_dtype)
@@ -930,32 +1106,70 @@ def test_subgraph(index_dtype):
     sg2 = g.edge_subgraph({'follows': [1], 'plays': [1], 'wishes': [1]})
     _check_subgraph(g, sg2)
 
-    def _check_subgraph_single_ntype(g, sg):
+    # backend tensor input
+    sg1 = g.subgraph({'user': F.tensor([1, 2], dtype=F.data_type_dict[index_dtype]),
+                      'game': F.tensor([0], dtype=F.data_type_dict[index_dtype])})
+    _check_subgraph(g, sg1)
+    sg2 = g.edge_subgraph({'follows': F.tensor([1], dtype=F.data_type_dict[index_dtype]),
+                           'plays': F.tensor([1], dtype=F.data_type_dict[index_dtype]),
+                           'wishes': F.tensor([1], dtype=F.data_type_dict[index_dtype])})
+    _check_subgraph(g, sg2)
+
+    # numpy input
+    sg1 = g.subgraph({'user': np.array([1, 2]),
+                      'game': np.array([0])})
+    _check_subgraph(g, sg1)
+    sg2 = g.edge_subgraph({'follows': np.array([1]),
+                           'plays': np.array([1]),
+                           'wishes': np.array([1])})
+    _check_subgraph(g, sg2)
+
+    def _check_subgraph_single_ntype(g, sg, preserve_nodes=False):
         assert sg.ntypes == g.ntypes
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
-        assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([1, 2], F.int64))
+
+        if not preserve_nodes:
+            assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
+                                 F.tensor([1, 2], F.int64))
+        else:
+            for ntype in sg.ntypes:
+                assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
                              F.tensor([1], F.int64))
-        assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
+
+        if not preserve_nodes:
+            assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'][1:2])
 
-    def _check_subgraph_single_etype(g, sg):
+    def _check_subgraph_single_etype(g, sg, preserve_nodes=False):
         assert sg.ntypes == g.ntypes
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
-        assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([0, 1], F.int64))
-        assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                             F.tensor([0], F.int64))
+
+        if not preserve_nodes:
+            assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
+                                 F.tensor([0, 1], F.int64))
+            assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
+                                 F.tensor([0], F.int64))
+        else:
+            for ntype in sg.ntypes:
+                assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
                              F.tensor([0, 1], F.int64))
 
     sg1_graph = g_graph.subgraph([1, 2])
     _check_subgraph_single_ntype(g_graph, sg1_graph)
+    sg1_graph = g_graph.edge_subgraph([1])
+    _check_subgraph_single_ntype(g_graph, sg1_graph)
+    sg1_graph = g_graph.edge_subgraph([1], preserve_nodes=True)
+    _check_subgraph_single_ntype(g_graph, sg1_graph, True)
     sg2_bipartite = g_bipartite.edge_subgraph([0, 1])
     _check_subgraph_single_etype(g_bipartite, sg2_bipartite)
+    sg2_bipartite = g_bipartite.edge_subgraph([0, 1], preserve_nodes=True)
+    _check_subgraph_single_etype(g_bipartite, sg2_bipartite, True)
 
     def _check_typed_subgraph1(g, sg):
         assert set(sg.ntypes) == {'user', 'game'}
@@ -1711,29 +1925,181 @@ def test_format():
         assert g.restrict_format(rel_type) == 'csr'
         assert g.format_in_use(rel_type) == ['csr']
 
+def test_edges_order():
+    # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)
+    g = dgl.graph((
+        np.array([0, 1, 0, 0, 2]),
+        np.array([2, 2, 1, 1, 1])
+    ))
+
+    src, dst = g.all_edges(order='srcdst')
+    assert F.array_equal(F.copy_to(src, F.cpu()),
+                         F.copy_to(F.tensor([0, 0, 0, 1, 2]), F.cpu()))
+    assert F.array_equal(F.copy_to(dst, F.cpu()),
+                         F.copy_to(F.tensor([1, 1, 2, 2, 1]), F.cpu()))
+
+@parametrize_dtype
+def test_reverse(index_dtype):
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
+    }, index_dtype=index_dtype)
+    gidx = g._graph
+    r_gidx = gidx.reverse()
+
+    assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
+    assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
+    g_s, g_d, _ = gidx.edges(0)
+    rg_s, rg_d, _ = r_gidx.edges(0)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+
+    # force to start with 'csr'
+    gidx = gidx.to_format('csr')
+    gidx = gidx.to_format('any')
+    r_gidx = gidx.reverse()
+    assert gidx.format_in_use(0)[0] == 'csr'
+    assert r_gidx.format_in_use(0)[0] == 'csc'
+    assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
+    assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
+    g_s, g_d, _ = gidx.edges(0)
+    rg_s, rg_d, _ = r_gidx.edges(0)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+
+    # force to start with 'csc'
+    gidx = gidx.to_format('csc')
+    gidx = gidx.to_format('any')
+    r_gidx = gidx.reverse()
+    assert gidx.format_in_use(0)[0] == 'csc'
+    assert r_gidx.format_in_use(0)[0] == 'csr'
+    assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
+    assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
+    g_s, g_d, _ = gidx.edges(0)
+    rg_s, rg_d, _ = r_gidx.edges(0)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
+        ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
+        ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        }, index_dtype=index_dtype)
+    gidx = g._graph
+    r_gidx = gidx.reverse()
+
+    # metagraph
+    mg = gidx.metagraph
+    r_mg = r_gidx.metagraph
+    for etype in range(3):
+        assert mg.find_edge(etype) == r_mg.find_edge(etype)[::-1]
+
+    # three node types and three edge types
+    assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
+    assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
+    assert gidx.number_of_nodes(2) == r_gidx.number_of_nodes(2)
+    assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
+    assert gidx.number_of_edges(1) == r_gidx.number_of_edges(1)
+    assert gidx.number_of_edges(2) == r_gidx.number_of_edges(2)
+    g_s, g_d, _ = gidx.edges(0)
+    rg_s, rg_d, _ = r_gidx.edges(0)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    g_s, g_d, _ = gidx.edges(1)
+    rg_s, rg_d, _ = r_gidx.edges(1)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    g_s, g_d, _ = gidx.edges(2)
+    rg_s, rg_d, _ = r_gidx.edges(2)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+
+    # force to start with 'csr'
+    gidx = gidx.to_format('csr')
+    gidx = gidx.to_format('any')
+    r_gidx = gidx.reverse()
+    # three node types and three edge types
+    assert gidx.format_in_use(0)[0] == 'csr'
+    assert r_gidx.format_in_use(0)[0] == 'csc'
+    assert gidx.format_in_use(1)[0] == 'csr'
+    assert r_gidx.format_in_use(1)[0] == 'csc'
+    assert gidx.format_in_use(2)[0] == 'csr'
+    assert r_gidx.format_in_use(2)[0] == 'csc'
+    assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
+    assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
+    assert gidx.number_of_nodes(2) == r_gidx.number_of_nodes(2)
+    assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
+    assert gidx.number_of_edges(1) == r_gidx.number_of_edges(1)
+    assert gidx.number_of_edges(2) == r_gidx.number_of_edges(2)
+    g_s, g_d, _ = gidx.edges(0)
+    rg_s, rg_d, _ = r_gidx.edges(0)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    g_s, g_d, _ = gidx.edges(1)
+    rg_s, rg_d, _ = r_gidx.edges(1)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    g_s, g_d, _ = gidx.edges(2)
+    rg_s, rg_d, _ = r_gidx.edges(2)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+
+    # force to start with 'csc'
+    gidx = gidx.to_format('csc')
+    gidx = gidx.to_format('any')
+    r_gidx = gidx.reverse()
+    # three node types and three edge types
+    assert gidx.format_in_use(0)[0] == 'csc'
+    assert r_gidx.format_in_use(0)[0] == 'csr'
+    assert gidx.format_in_use(1)[0] == 'csc'
+    assert r_gidx.format_in_use(1)[0] == 'csr'
+    assert gidx.format_in_use(2)[0] == 'csc'
+    assert r_gidx.format_in_use(2)[0] == 'csr'
+    assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
+    assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
+    assert gidx.number_of_nodes(2) == r_gidx.number_of_nodes(2)
+    assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
+    assert gidx.number_of_edges(1) == r_gidx.number_of_edges(1)
+    assert gidx.number_of_edges(2) == r_gidx.number_of_edges(2)
+    g_s, g_d, _ = gidx.edges(0)
+    rg_s, rg_d, _ = r_gidx.edges(0)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    g_s, g_d, _ = gidx.edges(1)
+    rg_s, rg_d, _ = r_gidx.edges(1)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+    g_s, g_d, _ = gidx.edges(2)
+    rg_s, rg_d, _ = r_gidx.edges(2)
+    assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
+    assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
+
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
     # test_hypersparse()
     # test_adj("int32")
     # test_inc()
-    # test_view()
+    # test_view("int32")
     # test_view1("int32")
     # test_flatten()
     # test_convert_bound()
     # test_convert()
-    # test_to_device()
+    # test_to_device("int32")
     # test_transform("int32")
-    # test_subgraph()
+    # test_subgraph("int32")
+    # test_subgraph_mask("int32")
     # test_apply()
     # test_level1()
     # test_level2()
     # test_updates()
     # test_backward()
-    # test_empty_heterograph()
+    # test_empty_heterograph('int32')
     # test_types_in_function()
     # test_stack_reduce()
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
+    test_reverse("int32")
     test_format()
+    pass

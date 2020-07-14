@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division
 
 from collections.abc import Mapping, Iterable
+from collections import defaultdict
 from functools import wraps
 import numpy as np
 
@@ -598,3 +599,64 @@ def retry_method_with_fix(fix_method):
 
         return wrapper
     return _creator
+
+def group_as_dict(pairs):
+    """Combines a list of key-value pairs to a dictionary of keys and value lists.
+
+    Does not require the pairs to be sorted by keys.
+
+    Parameters
+    ----------
+    pairs : iterable
+        Iterable of key-value pairs
+
+    Returns
+    -------
+    dict
+        The dictionary of keys and value lists.
+    """
+    dic = defaultdict(list)
+    for key, value in pairs:
+        dic[key].append(value)
+    return dic
+
+class FlattenedDict(object):
+    """Iterates over each item in a dictionary of groups.
+
+    Parameters
+    ----------
+    groups : dict
+        The item groups.
+
+    Examples
+    --------
+    >>> groups = FlattenedDict({'a': [1, 3], 'b': [2, 5, 8], 'c': [7]})
+    >>> list(groups)
+    [('a', 1), ('a', 3), ('b', 2), ('b', 5), ('b', 8), ('c', 7)]
+    >>> groups[2]
+    ('b', 2)
+    >>> len(groups)
+    6
+    """
+    def __init__(self, groups):
+        self._groups = groups
+        group_sizes = {k: len(v) for k, v in groups.items()}
+        self._group_keys, self._group_sizes = zip(*group_sizes.items())
+        self._group_offsets = np.insert(np.cumsum(self._group_sizes), 0, 0)
+
+    def __len__(self):
+        """Return the total number of items."""
+        return self._group_offsets[-1]
+
+    def __iter__(self):
+        """Return the iterator of all items with the key of its original group."""
+        for i, k in enumerate(self._group_keys):
+            for j in range(self._group_sizes[i]):
+                yield k, self._groups[k][j]
+
+    def __getitem__(self, idx):
+        """Return the item at the given position with the key of its original group."""
+        i = np.searchsorted(self._group_offsets, idx, 'right') - 1
+        k = self._group_keys[i]
+        j = idx - self._group_offsets[i]
+        return k, self._groups[k][j]

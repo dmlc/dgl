@@ -2,12 +2,8 @@
 # pylint: disable= no-member, arguments-differ
 import torch as th
 
-from ...function import TargetCode
 from ...base import ALL, is_all
 from ... import backend as F
-from ... import utils
-from ...graph import DGLGraph
-from ...heterograph import DGLHeteroGraph
 
 __all__ = ['edge_softmax']
 
@@ -49,36 +45,12 @@ class EdgeSoftmax(th.autograd.Function):
         if not is_all(eids):
             g = g.edge_subgraph(eids.long())
 
-        n_nodes = g.number_of_dst_nodes()
-        n_edges = g.number_of_edges()
+        score_max = F.copy_e_max(g, score)
+        score = th.exp(F.e_sub_v(g, score, score_max))
+        score_sum = F.copy_e_sum(g, score)
+        out = F.e_div_v(g, score, score_sum)
 
-        # TODO(BarclayII): this is a temporary fix of memory leakage in PyTorch
-        # in PR #1139.  We should investigate further on what was actually happening
-        # when implementing EdgeSoftmax with message passing API instead of
-        # operators.
-        score_context = utils.to_dgl_context(score.device)
-        if isinstance(g, DGLGraph):
-            gidx = g._graph.get_immutable_gidx(score_context)
-        elif isinstance(g, DGLHeteroGraph):
-            assert g._graph.number_of_etypes() == 1, \
-                "EdgeSoftmax only support one edge type"
-            gidx = g._graph.get_unitgraph(0, score_context)
-
-        ctx.backward_cache = n_nodes, n_edges, gidx
-
-        #g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        smax = F.copy_reduce('max', gidx, TargetCode.EDGE, score, n_nodes)
-        #g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
-        out = F.binary_reduce(
-            'none', 'sub', gidx, TargetCode.EDGE, TargetCode.DST, score, smax, n_edges)
-        #g.edata['out'] = th.exp(g.edata['out'])
-        out = th.exp(out)
-        #g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        out_sum = F.copy_reduce('sum', gidx, TargetCode.EDGE, out, n_nodes)
-        #g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = F.binary_reduce(
-            'none', 'div', gidx, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
-
+        ctx.backward_cache = g
         ctx.save_for_backward(out)
         return out
 
@@ -95,22 +67,14 @@ class EdgeSoftmax(th.autograd.Function):
             out = dgl.EData(g, out)
             sds = out * grad_out  # type dgl.EData
             sds_sum = sds.dst_sum()  # type dgl.NData
-            grad_score = sds - sds * sds_sum  # multiple expressions
+            grad_score = sds - out * sds_sum  # multiple expressions
             return grad_score.data
         """
-        n_nodes, n_edges, gidx = ctx.backward_cache
+        g = ctx.backward_cache
         out, = ctx.saved_tensors
-
-        #g.edata['grad_s'] = out * grad_out
-        grad_s = out * grad_out
-        #g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
-        accum = F.copy_reduce('sum', gidx, TargetCode.EDGE, grad_s, n_nodes)
-        #g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
-        out = F.binary_reduce(
-            'none', 'mul', gidx, TargetCode.EDGE, TargetCode.DST, out, accum, n_edges)
-        #grad_score = g.edata['grad_s'] - g.edata['out']
-        grad_score = grad_s - out
-
+        sds = out * grad_out
+        accum = F.copy_e_sum(g, sds)
+        grad_score = sds - F.e_mul_v(g, out, accum)
         return None, grad_score, None
 
 

@@ -17,63 +17,43 @@ template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   CHECK(sizeof(IdType) == 4) << "CUDA COOToCSR does not support int64.";
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  auto device = runtime::DeviceAPI::Get(coo.row->ctx);
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
   CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
 
-
-  NDArray row = coo.row, col = coo.col, data = coo.data;
-  int32_t* row_ptr = static_cast<int32_t*>(row->data);
-  int32_t* col_ptr = static_cast<int32_t*>(col->data);
-  int32_t* data_ptr = aten::IsNullArray(data) ? nullptr : static_cast<int32_t*>(data->data);
-
-  if (!coo.row_sorted) {
-    // make a copy of row and col because sort is done in-place
-    row = row.CopyTo(row->ctx);
-    col = col.CopyTo(col->ctx);
-    row_ptr = static_cast<int32_t*>(row->data);
-    col_ptr = static_cast<int32_t*>(col->data);
-    if (aten::IsNullArray(data)) {
-      // create the index array
-      data = aten::Range(0, row->shape[0], row->dtype.bits, row->ctx);
-      data_ptr = static_cast<int32_t*>(data->data);
-    }
-    // sort row
-    size_t workspace_size = 0;
-    CUSPARSE_CALL(cusparseXcoosort_bufferSizeExt(
-        thr_entry->cusparse_handle,
-        coo.num_rows, coo.num_cols,
-        row->shape[0],
-        row_ptr,
-        col_ptr,
-        &workspace_size));
-    void* workspace = device->AllocWorkspace(row->ctx, workspace_size);
-    CUSPARSE_CALL(cusparseXcoosortByRow(
-        thr_entry->cusparse_handle,
-        coo.num_rows, coo.num_cols,
-        row->shape[0],
-        row_ptr,
-        col_ptr,
-        data_ptr,
-        workspace));
-    device->FreeWorkspace(row->ctx, workspace);
+  bool row_sorted = coo.row_sorted;
+  bool col_sorted = coo.col_sorted;
+  if (!row_sorted) {
+    // It is possible that the flag is simply not set (default value is false),
+    // so we still perform a linear scan to check the flag.
+    std::tie(row_sorted, col_sorted) = COOIsSorted(coo);
+  }
+  if (!row_sorted) {
+    coo = COOSort(coo);
   }
 
-  NDArray indptr = aten::NewIdArray(coo.num_rows + 1, row->ctx, row->dtype.bits);
+  const int64_t nnz = coo.row->shape[0];
+  // TODO(minjie): Many of our current implementation assumes that CSR must have
+  //   a data array. This is a temporary workaround. Remove this after:
+  //   - The old immutable graph implementation is deprecated.
+  //   - The old binary reduce kernel is deprecated.
+  if (!COOHasData(coo))
+    coo.data = aten::Range(0, nnz, coo.row->dtype.bits, coo.row->ctx);
+
+  NDArray indptr = aten::NewIdArray(coo.num_rows + 1, coo.row->ctx, coo.row->dtype.bits);
   int32_t* indptr_ptr = static_cast<int32_t*>(indptr->data);
   CUSPARSE_CALL(cusparseXcoo2csr(
         thr_entry->cusparse_handle,
-        row_ptr,
-        row->shape[0],
+        coo.row.Ptr<int32_t>(),
+        nnz,
         coo.num_rows,
         indptr_ptr,
         CUSPARSE_INDEX_BASE_ZERO));
 
   return CSRMatrix(coo.num_rows, coo.num_cols,
-                   indptr, col, data, false);
+                   indptr, coo.col, coo.data, col_sorted);
 }
 
 template CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo);

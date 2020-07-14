@@ -69,10 +69,6 @@ start2 = dgl.DGLGraph((0, v))
 adj = spp.coo_matrix((np.ones(len(u)), (u.numpy(), v.numpy())))
 star3 = dgl.DGLGraph(adj)
 
-# Create the same graph from a list of integer pairs.
-elist = [(0, 1), (0, 2), (0, 3), (0, 4), (0, 5)]
-star4 = dgl.DGLGraph(elist)
-
 ###############################################################################
 # You can also create a graph by progressively adding more nodes and edges.
 # Although it is not as efficient as the above constructors, it is suitable

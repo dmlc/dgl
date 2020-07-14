@@ -682,7 +682,6 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
  */
 HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
-
 /*!
  * \brief Union multiple graphs into one with each input graph as one disjoint component.
  *
@@ -697,6 +696,9 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
  */
 template <class IdType>
 HeteroGraphPtr DisjointUnionHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+HeteroGraphPtr DisjointUnionHeteroGraph2(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
 /*!
@@ -726,6 +728,13 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     IdArray vertex_sizes,
     IdArray edge_sizes);
 
+
+std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray vertex_sizes,
+    IdArray edge_sizes);
+
 /*! 
  * \brief Structure for pickle/unpickle.
  *
@@ -739,6 +748,22 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
  * This class can be used as arguments and return values of a C API.
  */
 struct HeteroPickleStates : public runtime::Object {
+  /*! \brief version number */
+  int64_t version = 0;
+
+  /*! \brief Metainformation 
+   *
+   * metagraph, number of nodes per type, format, flags
+   */
+  std::string meta;
+
+  /*! \brief Arrays representing graph structure (coo or csr) */
+  std::vector<IdArray> arrays;
+
+  /* To support backward compatibility, we have to retain fields in the old 
+   * version of HeteroPickleStates
+   */
+
   /*! \brief Metagraph(64bits ImmutableGraph) */
   GraphPtr metagraph;
 
@@ -766,9 +791,26 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states);
 /*!
  * \brief Get the pickling state of the relation graph structure in backend tensors.
  *
- * \returnAdjacency matrices of all relation graphs in a list of arrays.
+ * \return a HeteroPickleStates object
  */
 HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
+
+/*!
+ * \brief Old version of HeteroUnpickle, for backward compatibility
+ *
+ * \param states Pickle states
+ * \return A heterograph pointer
+ */
+HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
+
+#define FORMAT_HAS_CSC(format) \
+  (format & (1<<2))
+
+#define FORMAT_HAS_CSR(format) \
+  (format & (1<<1))
+
+#define FORMAT_HAS_COO(format) \
+  (format & 1)
 
 }  // namespace dgl
 

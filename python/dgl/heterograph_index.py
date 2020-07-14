@@ -161,6 +161,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroDataType(self)
 
+    @property
     def ctx(self):
         """Return the context of this graph index.
 
@@ -990,6 +991,17 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
 
+    @utils.cached_member(cache='_cache', prefix='reverse')
+    def reverse(self):
+        """Reverse the heterogeneous graph adjacency
+
+        The node types and edge types are not changed.
+
+        Returns
+        -------
+        A new graph index.
+        """
+        return _CAPI_DGLHeteroReverse(self)
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):
@@ -1016,7 +1028,7 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced nodes
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedVertices(self)
-        return [utils.toindex(v.data, self.graph.dtype) for v in ret]
+        return [utils.toindex(v, self.graph.dtype) for v in ret]
 
     @property
     def induced_edges(self):
@@ -1029,7 +1041,7 @@ class HeteroSubgraphIndex(ObjectBase):
             Induced edges
         """
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
-        return [utils.toindex(v.data, self.graph.dtype) for v in ret]
+        return [utils.toindex(v, self.graph.dtype) for v in ret]
 
 
 #################################################################
@@ -1130,7 +1142,7 @@ def disjoint_union(metagraph, graphs):
     HeteroGraphIndex
         Batched Heterograph.
     """
-    return _CAPI_DGLHeteroDisjointUnion(metagraph, graphs)
+    return _CAPI_DGLHeteroDisjointUnion_v2(metagraph, graphs)
 
 def disjoint_partition(graph, bnn_all_types, bne_all_types):
     """Partition the graph disjointly.
@@ -1151,7 +1163,7 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     """
     bnn_all_types = utils.toindex(list(itertools.chain.from_iterable(bnn_all_types)))
     bne_all_types = utils.toindex(list(itertools.chain.from_iterable(bne_all_types)))
-    return _CAPI_DGLHeteroDisjointPartitionBySizes(
+    return _CAPI_DGLHeteroDisjointPartitionBySizes_v2(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
 #################################################################
@@ -1166,45 +1178,53 @@ class FlattenedHeteroGraph(ObjectBase):
 class HeteroPickleStates(ObjectBase):
     """Pickle states object class in C++ backend."""
     @property
-    def metagraph(self):
-        """Metagraph
+    def version(self):
+        """Version number
 
         Returns
         -------
-        GraphIndex
-            Metagraph structure
+        int
+            version number
         """
-        return _CAPI_DGLHeteroPickleStatesGetMetagraph(self)
+        return _CAPI_DGLHeteroPickleStatesGetVersion(self)
 
     @property
-    def num_nodes_per_type(self):
-        """Number of nodes per edge type
+    def meta(self):
+        """Meta info
 
         Returns
         -------
-        Tensor
-            Array of number of nodes for each type
+        bytearray
+            Serialized meta info
         """
-        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLHeteroPickleStatesGetNumVertices(self))
+        return bytearray(_CAPI_DGLHeteroPickleStatesGetMeta(self))
 
     @property
-    def adjs(self):
-        """Adjacency matrices of all the relation graphs
+    def arrays(self):
+        """Arrays representing the graph structure (COO or CSR)
 
         Returns
         -------
-        list of dgl.ndarray.SparseMatrix
-            Adjacency matrices
+        list of dgl.ndarray.NDArray
+            Arrays
         """
-        return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
+        num_arr = _CAPI_DGLHeteroPickleStatesGetArraysNum(self)
+        arr_func = _CAPI_DGLHeteroPickleStatesGetArrays(self)
+        return [arr_func(i) for i in range(num_arr)]
 
     def __getstate__(self):
-        return self.metagraph, self.num_nodes_per_type, self.adjs
+        arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
+        return self.version, self.meta, arrays
 
     def __setstate__(self, state):
-        metagraph, num_nodes_per_type, adjs = state
-        num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
-        self.__init_handle_by_constructor__(
-            _CAPI_DGLCreateHeteroPickleStates, metagraph, num_nodes_per_type, adjs)
-
+        if isinstance(state[0], int):
+            _, meta, arrays = state
+            arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
+            self.__init_handle_by_constructor__(
+                _CAPI_DGLCreateHeteroPickleStates, meta, arrays)
+        else:
+            metagraph, num_nodes_per_type, adjs = state
+            num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
+            self.__init_handle_by_constructor__(
+                _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
 _init_api("dgl.heterograph_index")

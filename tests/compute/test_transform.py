@@ -35,6 +35,52 @@ def test_line_graph():
     L.ndata['w'] = data
     assert F.allclose(G.edata['w'], data)
 
+@parametrize_dtype
+def test_hetero_linegraph(index_dtype):
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
+        'user', 'follows', index_dtype=index_dtype)
+    lg = dgl.line_heterograph(g)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 8
+    row, col = lg.edges()
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
+
+    lg = dgl.line_heterograph(g, backtracking=False)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 4
+    row, col = lg.edges()
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 1, 2, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([4, 0, 3, 1]))
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
+        'user', 'follows', restrict_format='csr', index_dtype=index_dtype)
+    lg = dgl.line_heterograph(g)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 8
+    row, col = lg.edges()
+    assert np.array_equal(F.asnumpy(row),
+                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
+    assert np.array_equal(F.asnumpy(col),
+                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
+
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
+        'user', 'follows', restrict_format='csc', index_dtype=index_dtype)
+    lg = dgl.line_heterograph(g)
+    assert lg.number_of_nodes() == 5
+    assert lg.number_of_edges() == 8
+    row, col, eid = lg.edges('all')
+    row = F.asnumpy(row)
+    col = F.asnumpy(col)
+    eid = F.asnumpy(eid).astype(int)
+    order = np.argsort(eid)
+    assert np.array_equal(row[order],
+                          np.array([0, 0, 1, 2, 2, 3, 4, 4]))
+    assert np.array_equal(col[order],
+                          np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
 def test_no_backtracking():
     N = 5
@@ -48,8 +94,6 @@ def test_no_backtracking():
         assert not L.has_edge_between(e2, e1)
 
 # reverse graph related
-
-
 def test_reverse():
     g = dgl.DGLGraph()
     g.add_nodes(5)
@@ -68,6 +112,117 @@ def test_reverse():
     assert g.edge_id(0, 1) == rg.edge_id(1, 0)
     assert g.edge_id(1, 2) == rg.edge_id(2, 1)
     assert g.edge_id(2, 1) == rg.edge_id(1, 2)
+
+    # test dgl.reverse_heterograph
+    # test homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 2]), F.tensor([1, 2, 0])))
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.]])
+    g_r = dgl.reverse_heterograph(g)
+    assert g.number_of_nodes() == g_r.number_of_nodes()
+    assert g.number_of_edges() == g_r.number_of_edges()
+    u_g, v_g, eids_g = g.all_edges(form='all')
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all')
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
+    assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
+    assert len(g_r.edata) == 0
+
+    # without share ndata
+    g_r = dgl.reverse_heterograph(g, copy_ndata=False)
+    assert g.number_of_nodes() == g_r.number_of_nodes()
+    assert g.number_of_edges() == g_r.number_of_edges()
+    assert len(g_r.ndata) == 0
+    assert len(g_r.edata) == 0
+
+    # with share ndata and edata
+    g_r = dgl.reverse_heterograph(g, copy_ndata=True, copy_edata=True)
+    assert g.number_of_nodes() == g_r.number_of_nodes()
+    assert g.number_of_edges() == g_r.number_of_edges()
+    assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
+    assert F.array_equal(g.edata['h'], g_r.edata['h'])
+
+    # add new node feature to g_r
+    g_r.ndata['hh'] = F.tensor([0, 1, 2])
+    assert ('hh' in g.ndata) is False
+    assert ('hh' in g_r.ndata) is True
+
+    # add new edge feature to g_r
+    g_r.edata['hh'] = F.tensor([0, 1, 2])
+    assert ('hh' in g.edata) is False
+    assert ('hh' in g_r.edata) is True
+
+    # test heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
+        ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
+        ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])})
+    g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
+    g.nodes['user'].data['hh'] = F.tensor([1, 1, 1, 1, 1])
+    g.nodes['game'].data['h'] = F.tensor([0, 1])
+    g.edges['follows'].data['h'] = F.tensor([0, 1, 2, 4, 3 ,1, 3])
+    g.edges['follows'].data['hh'] = F.tensor([1, 2, 3, 2, 0, 0, 1])
+    g_r = dgl.reverse_heterograph(g)
+
+    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
+        assert etype_g[0] == etype_gr[2]
+        assert etype_g[1] == etype_gr[1]
+        assert etype_g[2] == etype_gr[0]
+        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+    for ntype in g.ntypes:
+        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
+    assert F.array_equal(g.nodes['user'].data['h'], g_r.nodes['user'].data['h'])
+    assert F.array_equal(g.nodes['user'].data['hh'], g_r.nodes['user'].data['hh'])
+    assert F.array_equal(g.nodes['game'].data['h'], g_r.nodes['game'].data['h'])
+    assert len(g_r.edges['follows'].data) == 0
+    u_g, v_g, eids_g = g.all_edges(form='all', etype=('user', 'follows', 'user'))
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('user', 'follows', 'user'))
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
+    u_g, v_g, eids_g = g.all_edges(form='all', etype=('user', 'plays', 'game'))
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('game', 'plays', 'user'))
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
+    u_g, v_g, eids_g = g.all_edges(form='all', etype=('developer', 'develops', 'game'))
+    u_rg, v_rg, eids_rg = g_r.all_edges(form='all', etype=('game', 'develops', 'developer'))
+    assert F.array_equal(u_g, v_rg)
+    assert F.array_equal(v_g, u_rg)
+    assert F.array_equal(eids_g, eids_rg)
+
+    # withour share ndata
+    g_r = dgl.reverse_heterograph(g, copy_ndata=False)
+    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
+        assert etype_g[0] == etype_gr[2]
+        assert etype_g[1] == etype_gr[1]
+        assert etype_g[2] == etype_gr[0]
+        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+    for ntype in g.ntypes:
+        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
+    assert len(g_r.nodes['user'].data) == 0
+    assert len(g_r.nodes['game'].data) == 0
+
+    g_r = dgl.reverse_heterograph(g, copy_ndata=True, copy_edata=True)
+    print(g_r)
+    for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
+        assert etype_g[0] == etype_gr[2]
+        assert etype_g[1] == etype_gr[1]
+        assert etype_g[2] == etype_gr[0]
+        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+    assert F.array_equal(g.edges['follows'].data['h'], g_r.edges['follows'].data['h'])
+    assert F.array_equal(g.edges['follows'].data['hh'], g_r.edges['follows'].data['hh'])
+
+    # add new node feature to g_r
+    g_r.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
+    assert ('hhh' in g.nodes['user'].data) is False
+    assert ('hhh' in g_r.nodes['user'].data) is True
+
+    # add new edge feature to g_r
+    g_r.edges['follows'].data['hhh'] = F.tensor([1, 2, 3, 2, 0, 0, 1])
+    assert ('hhh' in g.edges['follows'].data) is False
+    assert ('hhh' in g_r.edges['follows'].data) is True
 
 
 def test_reverse_shared_frames():
@@ -242,6 +397,12 @@ def test_partition_with_halo():
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
+    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
+    for part_id, subg in subgs.items():
+        node_ids = np.nonzero(node_part == part_id)[0]
+        lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+        assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
@@ -249,9 +410,33 @@ def test_metis_partition():
     check_metis_partition(g, 0)
     check_metis_partition(g, 1)
     check_metis_partition(g, 2)
+    check_metis_partition_with_constraint(g)
+
+def check_metis_partition_with_constraint(g):
+    ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
+    ntypes[0:int(g.number_of_nodes()/4)] = 1
+    ntypes[int(g.number_of_nodes()*3/4):] = 2
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1, balance_ntypes=ntypes)
+    if subgs is not None:
+        for i in subgs:
+            subg = subgs[i]
+            parent_nids = F.asnumpy(subg.ndata[dgl.NID])
+            sub_ntypes = ntypes[parent_nids]
+            print('type0:', np.sum(sub_ntypes == 0))
+            print('type1:', np.sum(sub_ntypes == 1))
+            print('type2:', np.sum(sub_ntypes == 2))
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1,
+                                          balance_ntypes=ntypes, balance_edges=True)
+    if subgs is not None:
+        for i in subgs:
+            subg = subgs[i]
+            parent_nids = F.asnumpy(subg.ndata[dgl.NID])
+            sub_ntypes = ntypes[parent_nids]
+            print('type0:', np.sum(sub_ntypes == 0))
+            print('type1:', np.sum(sub_ntypes == 1))
+            print('type2:', np.sum(sub_ntypes == 2))
 
 def check_metis_partition(g, extra_hops):
-    # partitions with 1-hop HALO nodes
     subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops)
     num_inner_nodes = 0
     num_inner_edges = 0
@@ -268,7 +453,7 @@ def check_metis_partition(g, extra_hops):
     if extra_hops == 0:
         return
 
-    # partitions with 1-hop HALO nodes and reshuffling nodes
+    # partitions with node reshuffling
     subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops, reshuffle=True)
     num_inner_nodes = 0
     num_inner_edges = 0
@@ -322,6 +507,13 @@ def test_reorder_nodes():
     assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
     assert np.all(F.asnumpy(new_out_deg == new_out_deg1))
     orig_ids = F.asnumpy(new_g.ndata['orig_id'])
+    for nid in range(g.number_of_nodes()):
+        neighs = F.asnumpy(g.successors(nid))
+        new_neighs1 = new_nids[neighs]
+        new_nid = new_nids[nid]
+        new_neighs2 = new_g.successors(new_nid)
+        assert np.all(np.sort(new_neighs1) == np.sort(F.asnumpy(new_neighs2)))
+
     for nid in range(new_g.number_of_nodes()):
         neighs = F.asnumpy(new_g.successors(nid))
         old_neighs1 = orig_ids[neighs]
@@ -448,7 +640,7 @@ def test_compact(index_dtype):
         g3, always_preserve=F.tensor([1, 7], dtype=getattr(F, index_dtype)))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 7])
     _check(g3, new_g3, induced_nodes)
@@ -468,7 +660,7 @@ def test_compact(index_dtype):
     new_g1, new_g2 = dgl.compact_graphs(
         [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=getattr(F, index_dtype))})
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}    
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert new_g1._idtype_str == index_dtype
     assert new_g2._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
@@ -481,7 +673,7 @@ def test_compact(index_dtype):
         [g3, g4], always_preserve=F.tensor([1, 7], dtype=getattr(F, index_dtype)))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3._idtype_str == index_dtype
     assert new_g4._idtype_str == index_dtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 3, 5, 7])
@@ -566,10 +758,6 @@ def test_to_block(index_dtype):
     assert bg.number_of_src_nodes() == 4
     assert bg.number_of_dst_nodes() == 4
 
-    dst_nodes = F.tensor([3, 4], dtype=getattr(F, index_dtype))
-    bg = dgl.to_block(g_a, dst_nodes)
-    check(g_a, bg, 'A', 'AA', dst_nodes)
-
     dst_nodes = F.tensor([4, 3, 2, 1], dtype=getattr(F, index_dtype))
     bg = dgl.to_block(g_a, dst_nodes)
     check(g_a, bg, 'A', 'AA', dst_nodes)
@@ -583,15 +771,11 @@ def test_to_block(index_dtype):
     assert bg.number_of_nodes('DST/A') == 0
     checkall(g_ab, bg, None)
 
-    dst_nodes = {'B': F.tensor([5, 6], dtype=getattr(F, index_dtype))}
+    dst_nodes = {'B': F.tensor([5, 6, 3, 1], dtype=getattr(F, index_dtype))}
     bg = dgl.to_block(g, dst_nodes)
-    assert bg.number_of_nodes('SRC/B') == 2
+    assert bg.number_of_nodes('SRC/B') == 4
     assert F.array_equal(bg.srcnodes['B'].data[dgl.NID], bg.dstnodes['B'].data[dgl.NID])
     assert bg.number_of_nodes('DST/A') == 0
-    checkall(g, bg, dst_nodes)
-
-    dst_nodes = {'A': F.tensor([3, 4], dtype=getattr(F, index_dtype)), 'B': F.tensor([5, 6], dtype=getattr(F, index_dtype))}
-    bg = dgl.to_block(g, dst_nodes)
     checkall(g, bg, dst_nodes)
 
     dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=getattr(F, index_dtype)), 'B': F.tensor([3, 5, 6, 1], dtype=getattr(F, index_dtype))}
@@ -682,7 +866,7 @@ if __name__ == '__main__':
     test_reorder_nodes()
     # test_line_graph()
     # test_no_backtracking()
-    # test_reverse()
+    test_reverse()
     # test_reverse_shared_frames()
     # test_simple_graph()
     # test_bidirected_graph()
@@ -692,10 +876,11 @@ if __name__ == '__main__':
     # test_remove_self_loop()
     # test_add_self_loop()
     # test_partition_with_halo()
-    test_metis_partition()
+    # test_metis_partition()
+    test_hetero_linegraph('int32')
     # test_compact()
-    # test_to_simple()
+    test_to_simple("int32")
     # test_in_subgraph("int32")
     # test_out_subgraph()
-    test_to_block("int32")
+    # test_to_block("int32")
     # test_remove_edges()

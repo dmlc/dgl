@@ -101,6 +101,7 @@ a useful manual for in-depth developers.
 
    api/python/graph
    api/python/heterograph
+   api/python/backend
    api/python/readout
    api/python/batch_heterograph
    api/python/nn
@@ -110,6 +111,7 @@ a useful manual for in-depth developers.
    api/python/propagate
    api/python/transform
    api/python/sampler
+   api/python/sampling
    api/python/data
    api/python/nodeflow
    api/python/random

@@ -7,6 +7,7 @@ from ..base import NID, EID
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
+from ..ndarray import exist_shared_mem_array
 
 def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
                                  num_partitions, node_map, edge_map, is_range_part):
@@ -70,6 +71,8 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     GraphPartitionBook or RangePartitionBook
         A graph partition book for a particular partition.
     '''
+    if not exist_shared_mem_array(_get_ndata_path(graph_name, 'meta')):
+        return None
     is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
     if is_range_part == 1:
         return RangePartitionBook(part_id, num_parts, node_map, edge_map)
@@ -95,12 +98,14 @@ class GraphPartitionBook:
     def __init__(self, part_id, num_parts, node_map, edge_map, part_graph):
         assert part_id >= 0, 'part_id cannot be a negative number.'
         assert num_parts > 0, 'num_parts must be greater than zero.'
-        self._part_id = part_id
-        self._num_partitions = num_parts
-        node_map = utils.toindex(node_map)
-        self._nid2partid = node_map.tousertensor()
-        edge_map = utils.toindex(edge_map)
-        self._eid2partid = edge_map.tousertensor()
+        self._part_id = int(part_id)
+        self._num_partitions = int(num_parts)
+        self._nid2partid = F.tensor(node_map)
+        assert F.dtype(self._nid2partid) in (F.int32, F.int64), \
+                'the node map must be stored in an integer array'
+        self._eid2partid = F.tensor(edge_map)
+        assert F.dtype(self._eid2partid) in (F.int32, F.int64), \
+                'the edge map must be stored in an integer array'
         # Get meta data of the partition book.
         self._partition_meta_data = []
         _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
@@ -144,8 +149,8 @@ class GraphPartitionBook:
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
         # node size and edge size
-        self._edge_size = len(self.partid2eids(part_id))
-        self._node_size = len(self.partid2nids(part_id))
+        self._edge_size = len(self.partid2eids(self._part_id))
+        self._node_size = len(self.partid2nids(self._part_id))
 
     def shared_memory(self, graph_name):
         """Move data to shared memory.
@@ -336,6 +341,17 @@ class GraphPartitionBook:
         """
         return self._edge_size
 
+    @property
+    def partid(self):
+        """Get the current partition id
+
+        Return
+        ------
+        int
+            The partition id of current machine
+        """
+        return self._part_id
+
 
 class RangePartitionBook:
     """RangePartitionBook is used to store parition information.
@@ -356,10 +372,12 @@ class RangePartitionBook:
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._partid = part_id
         self._num_partitions = num_parts
-        node_map = utils.toindex(node_map)
-        edge_map = utils.toindex(edge_map)
-        self._node_map = node_map.tonumpy()
-        self._edge_map = edge_map.tonumpy()
+        if not isinstance(node_map, np.ndarray):
+            node_map = F.asnumpy(node_map)
+        if not isinstance(edge_map, np.ndarray):
+            edge_map = F.asnumpy(edge_map)
+        self._node_map = node_map
+        self._edge_map = edge_map
         # Get meta data of the partition book
         self._partition_meta_data = []
         for partid in range(self._num_partitions):
@@ -524,8 +542,10 @@ class RangePartitionBook:
             raise RuntimeError('Now RangePartitionBook does not support \
                 getting remote tensor of nid2localnid.')
 
+        nids = utils.toindex(nids)
+        nids = nids.tousertensor()
         start = self._node_map[partid - 1] if partid > 0 else 0
-        return nids - start
+        return nids - int(start)
 
 
     def eid2localeid(self, eids, partid):
@@ -547,8 +567,10 @@ class RangePartitionBook:
             raise RuntimeError('Now RangePartitionBook does not support \
                 getting remote tensor of eid2localeid.')
 
+        eids = utils.toindex(eids)
+        eids = eids.tousertensor()
         start = self._edge_map[partid - 1] if partid > 0 else 0
-        return eids - start
+        return eids - int(start)
 
 
     def get_partition(self, partid):
@@ -590,6 +612,17 @@ class RangePartitionBook:
         range_end = self._edge_map[self._partid]
         return range_end - range_start
 
+    @property
+    def partid(self):
+        """Get the current partition id
+
+        Return
+        ------
+        int
+            The partition id of current machine
+        """
+        return self._partid
+
 class PartitionPolicy(object):
     """Wrapper for GraphPartitionBook and RangePartitionBook.
 
@@ -599,17 +632,14 @@ class PartitionPolicy(object):
     ----------
     policy_str : str
         partition-policy string, e.g., 'edge' or 'node'.
-    part_id : int
-        partition ID
     partition_book : GraphPartitionBook or RangePartitionBook
         Main class storing the partition information
     """
-    def __init__(self, policy_str, part_id, partition_book):
+    def __init__(self, policy_str, partition_book):
         # TODO(chao): support more policies for HeteroGraph
         assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
-        assert part_id >= 0, 'part_id %d cannot be a negative number.' % part_id
         self._policy_str = policy_str
-        self._part_id = part_id
+        self._part_id = partition_book.partid
         self._partition_book = partition_book
 
     @property

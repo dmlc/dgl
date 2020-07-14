@@ -7,6 +7,7 @@
 #define DGL_ARRAY_ARRAY_OP_H_
 
 #include <dgl/array.h>
+#include <dgl/graph_traversal.h>
 #include <vector>
 #include <tuple>
 #include <utility>
@@ -33,6 +34,9 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs);
 template <DLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdType lhs, IdArray rhs);
 
+template <DLDeviceType XPU, typename IdType, typename Op>
+IdArray UnaryElewise(IdArray array);
+
 template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2);
 
@@ -40,7 +44,10 @@ template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index);
 
 template <DLDeviceType XPU, typename DType>
-DType IndexSelect(NDArray array, uint64_t index);
+DType IndexSelect(NDArray array, int64_t index);
+
+template <DLDeviceType XPU, typename DType>
+IdArray NonZero(BoolArray bool_arr);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);
@@ -51,11 +58,17 @@ NDArray Repeat(NDArray array, IdArray repeats);
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
+template <DLDeviceType XPU, typename IdType>
+NDArray Concat(const std::vector<IdArray>& arrays);
+
 template <DLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
+
+template <DLDeviceType XPU, typename IdType>
+IdArray CumSum(IdArray array, bool prepend_zero);
 
 // sparse arrays
 
@@ -79,6 +92,9 @@ runtime::NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
+
+template <DLDeviceType XPU, typename IdType>
+bool CSRIsSorted(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
@@ -136,6 +152,13 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+// Union CSRMatrixes
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
+
+template <DLDeviceType XPU, typename IdType>
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr);
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -183,7 +206,10 @@ template <DLDeviceType XPU, typename IdType>
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COOSort(COOMatrix mat, bool sort_column);
+void COOSort_(COOMatrix* mat, bool sort_column);
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
@@ -201,6 +227,30 @@ COOMatrix COORowWiseSamplingUniform(
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
+
+///////////////////////// Graph Traverse routines //////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
+
+template <DLDeviceType XPU, typename IdType>
+Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
+                             IdArray source,
+                             const bool has_reverse_edge,
+                             const bool has_nontree_edge,
+                             const bool return_labels);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
 
 }  // namespace impl
 }  // namespace aten

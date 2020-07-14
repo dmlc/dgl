@@ -80,11 +80,21 @@ def test_graph_conv2(g, norm, weight, bias):
     nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
     ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
     h = F.randn((nsrc, 5))
+    h_dst = F.randn((ndst, 2))
     if weight:
-        h = conv(g, h)
+        h_out = conv(g, h)
     else:
-        h = conv(g, h, weight=ext_w)
-    assert h.shape == (ndst, 2)
+        h_out = conv(g, h, weight=ext_w)
+    assert h_out.shape == (ndst, 2)
+
+    if not isinstance(g, dgl.DGLGraph) and len(g.ntypes) == 2:
+        # bipartite, should also accept pair of tensors
+        if weight:
+            h_out2 = conv(g, (h, h_dst))
+        else:
+            h_out2 = conv(g, (h, h_dst), weight=ext_w)
+        assert h_out2.shape == (ndst, 2)
+        assert F.array_equal(h_out, h_out2)
 
 def test_simple_pool():
     ctx = F.ctx()
@@ -367,6 +377,20 @@ def test_sage_conv(aggre_type):
     h = sage(g, feat)
     assert h.shape[-1] == 2
     assert h.shape[0] == 200
+
+    # Test the case for graphs without edges
+    g = dgl.bipartite([], num_nodes=(5, 3))
+    sage = nn.SAGEConv((3, 3), 2, 'gcn')
+    feat = (F.randn((5, 3)), F.randn((3, 3)))
+    h = sage(g, feat)
+    assert h.shape[-1] == 2
+    assert h.shape[0] == 3
+    for aggre_type in ['mean', 'pool', 'lstm']:
+        sage = nn.SAGEConv((3, 1), 2, aggre_type)
+        feat = (F.randn((5, 3)), F.randn((3, 1)))
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 3
 
 def test_sgc_conv():
     ctx = F.ctx()
