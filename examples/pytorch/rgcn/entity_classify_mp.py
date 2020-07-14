@@ -151,6 +151,7 @@ class NeighborSampler:
             norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
             block = dgl.to_block(frontier, cur)
             block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
+            block.srcdata['type_id'] =self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
             block.edata['etype'] = etypes
             block.edata['norm'] = norm
             cur = block.srcdata[dgl.NID]
@@ -228,6 +229,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
         # embedding layer may not fit into GPU, then use mix_cpu_gpu
         if args.mix_cpu_gpu is False:
             embed_layer.cuda(dev_id)
+        else:
+            embed_layer.part_to(dev_id)
 
     if n_gpus > 1:
         embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
@@ -235,8 +238,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
 
     # optimizer
     if args.sparse_embedding:
-        optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
-        emb_optimizer = th.optim.SparseAdam(embed_layer.parameters(), lr=args.lr)
+        optimizer = th.optim.Adam(list(model.parameters()) + list(embed_layer.embeds.parameters()), lr=args.lr, weight_decay=args.l2norm)
+        emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
     else:
         all_params = itertools.chain(model.parameters(), embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
@@ -258,10 +261,12 @@ def run(proc_id, n_gpus, args, devices, dataset):
             if args.mix_cpu_gpu is False:
                 feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
                                     blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                                    blocks[0].srcdata['type_id'],
                                     node_feats)
             else:
                 feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                     blocks[0].srcdata[dgl.NTYPE],
+                                    blocks[0].srcdata['type_id'],
                                     node_feats)
             logits = model(blocks, feats)
             loss = F.cross_entropy(logits, labels[seeds])
@@ -291,14 +296,18 @@ def run(proc_id, n_gpus, args, devices, dataset):
                     if args.mix_cpu_gpu is False:
                         feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
                                             blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                                            blocks[0].srcdata['type_id'],
                                             node_feats)
                     else:
                         feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                             blocks[0].srcdata[dgl.NTYPE],
+                                            blocks[0].srcdata['type_id'],
                                             node_feats)
                     logits = model(blocks, feats)
-                    eval_logtis.append(logits)
-                    eval_seeds.append(seeds)
+                    eval_logtis.append(logits.detach())
+                    eval_seeds.append(seeds.detach())
+                    if i % 10:
+                        print("handle {} valid samples".format(i * seeds.shape[0]))
                 eval_logtis = th.cat(eval_logtis)
                 eval_seeds = th.cat(eval_seeds)
                 val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds])
@@ -326,8 +335,10 @@ def run(proc_id, n_gpus, args, devices, dataset):
                                         blocks[0].srcdata[dgl.NTYPE],
                                         node_feats)
                 logits = model(blocks, feats)
-                test_logtis.append(logits)
-                test_seeds.append(seeds)
+                test_logtis.append(logits.detach())
+                test_seeds.append(seeds.detach())
+                if i % 10:
+                    print("handle {} test samples".format(i * seeds.shape[0]))
             test_logtis = th.cat(test_logtis)
             test_seeds = th.cat(test_seeds)
             test_loss = F.cross_entropy(test_logtis, labels[test_seeds])
@@ -338,7 +349,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
     print("{}/{} Mean forward time: {:4f}".format(proc_id, n_gpus,
                                                   np.mean(forward_time[len(forward_time) // 4:])))
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
-                                                   np.mean(backward_time[len(backward_time) // 4:]))) 
+                                                   np.mean(backward_time[len(backward_time) // 4:])))
 
 def main(args, devices):
     # load graph data
@@ -362,13 +373,14 @@ def main(args, devices):
         train_idx = split_idx["train"]['paper']
         val_idx = split_idx["valid"]['paper']
         test_idx = split_idx["test"]['paper']
-        hg, labels = dataset[0]
+        hg_orig, labels = dataset[0]
         subgs = {}
-        for etype in hg.canonical_etypes:
-            u, v = hg.all_edges(etype=etype)
+        for etype in hg_orig.canonical_etypes:
+            u, v = hg_orig.all_edges(etype=etype)
             subgs[etype] = (u, v)
             subgs[(etype[2], 'rev-'+etype[1], etype[0])] = (v, u)
         hg = dgl.heterograph(subgs)
+        hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
         labels = labels['paper'].squeeze()
 
         num_rels = len(hg.canonical_etypes)
@@ -384,15 +396,13 @@ def main(args, devices):
 
         if args.node_feats:
             node_feats = []
-            for ntype in g.ntypes:
+            for ntype in hg.ntypes:
                 if len(hg.nodes[ntype].data) == 0:
                     node_feats.append(None)
                 else:
-                    assert en(hg.nodes[ntype].data) == 1
-                    for k in hg.nodes[ntype].data:
-                        feat = hg.nodes[ntype].data[k]
-                        hg.nodes[ntype].data.drop(k)
-                        node_feats.append(feat.share_memory_())
+                    assert len(hg.nodes[ntype].data) == 1
+                    feat = hg.nodes[ntype].data.pop('feat')
+                    node_feats.append(feat.share_memory_())
         else:
             node_feats = [None] * num_of_ntype
     else:
@@ -423,7 +433,7 @@ def main(args, devices):
         norm = th.ones(eid.shape[0]) / degrees
         norm = norm.unsqueeze(1)
         hg.edges[canonical_etypes].data['norm'] = norm
-    
+
     # get target category id
     category_id = len(hg.ntypes)
     for i, ntype in enumerate(hg.ntypes):
@@ -445,7 +455,7 @@ def main(args, devices):
     n_gpus = len(devices)
     # cpu
     if devices[0] == -1:
-        run(0, 0, args, ['cpu'], 
+        run(0, 0, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels))
     # gpu
