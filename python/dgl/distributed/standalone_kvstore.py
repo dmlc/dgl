@@ -48,11 +48,11 @@ class KVClient(object):
         if name in self._push_handlers:
             self._push_handlers[name](self._data, name, id_tensor, data_tensor)
         else:
-            self._data[name][id_tensor] = data_tensor
+            F.scatter_row_inplace(self._data[name], id_tensor, data_tensor)
 
     def pull(self, name, id_tensor):
         '''pull data from kvstore'''
         if name in self._pull_handlers:
             return self._pull_handlers[name](self._data, name, id_tensor)
         else:
-            return self._data[name][id_tensor]
+            return F.gather_row(self._data[name], id_tensor)
