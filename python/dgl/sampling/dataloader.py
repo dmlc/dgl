@@ -326,17 +326,8 @@ class NodeCollator(Collator):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
         blocks = self.block_sampler.sample_blocks(self.g, items)
-
-        if len(self.g.ntypes) == 1:
-            output_nodes = blocks[-1].dstdata[NID]
-            input_nodes = blocks[0].srcdata[NID]
-        else:
-            output_nodes = {
-                ntype: blocks[-1].dstnodes[ntype].data[NID]
-                for ntype in blocks[-1].dsttypes}
-            input_nodes = {
-                ntype: blocks[0].srcnodes[ntype].data[NID]
-                for ntype in blocks[0].srctypes}
+        output_nodes = blocks[-1].dstdata[NID]
+        input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, output_nodes, blocks
 
@@ -476,13 +467,49 @@ class EdgeCollator(Collator):
         self.negative_sampler = negative_sampler
 
         if isinstance(eids, Mapping):
-            self._dataset = utils.FlattnedDict(nids)
+            self._dataset = utils.FlattenedDict(nids)
         else:
             self._dataset = nids
 
     @property
     def dataset(self):
         return self._dataset
+
+    def _collate(self, items):
+        if isinstance(items[0], tuple):
+            items = utils.group_as_dict(items)
+
+        pair_graph = self.g.edge_subgraph(items)
+        seed_nodes = pair_graph.ndata[NID]
+        blocks = self.block_sampler.sample_blocks(self.g, items)
+        input_nodes = blocks[0].srcdata[NID]
+
+        return input_nodes, pair_graph, blocks
+
+    def _collate_with_negative_sampling(self, items):
+        if isinstance(items[0], tuple):
+            items = utils.group_as_dict(items)
+
+        pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+
+        neg_srcdst = self.negative_sampler(items)
+        if not isinstance(neg_srcdst, Mapping):
+            assert len(self.g.etypes) == 1, \
+                'graph has multiple or no edge types; '\
+                'please return a dict in negative sampler.'
+            neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
+        neg_edges = {
+            etype: neg_srcdst.get(etype, ()) for etype in self.g.canonical_etypes}
+        neg_pair_graph = heterograph(
+            neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
+
+        pair_graph, neg_pair_graph = compact_graphs([pair_graph, neg_pair_graph])
+
+        seed_nodes = pair_graph.ndata[NID]
+        blocks = self.block_sampler.sample_blocks(self.g, items)
+        input_nodes = blocks[0].srcdata[NID]
+
+        return input_nodes, pair_graph, neg_pair_graph, blocks
 
     def collate(self, items):
         """Combines the sampled edges into a minibatch for edge classification, edge
@@ -514,14 +541,7 @@ class EdgeCollator(Collator):
         blocks : list[DGLHeteroGraph]
             The list of blocks necessary for computing the representation of the edges.
         """
-        if isinstance(items[0], tuple):
-            items = utils.group_as_dict(items)
-
-        pair_graph = self.g.edge_subgraph(items)
-
-        if self.negative_sampler is not None:
-            neg_edges = self.negative_sampler(items)
-            if isinstance(neg_edges, Mapping):
-                neg_edges = {self.g.to_canonical_etype(k): v for k, v in neg_edges.items()}
-                neg_graph = heterograph(
-                    neg_edges, {ntype: self.g.number_of_ndoes(ntype) for ntype in self.g.ntypes})
+        if self.negative_sampler is None:
+            return self._collate(items)
+        else:
+            return self._collate_with_negative_sampling(items)
