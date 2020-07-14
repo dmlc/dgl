@@ -19,11 +19,6 @@ the number of nodes, the number of edges and the number of labelled nodes.
 python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges
 ```
 
-When testing the standalone mode of the training script, we should construct a graph with one partition.
-```bash
-python3 partition_graph.py --dataset ogb-product --num_parts 1
-```
-
 ### Step 2: copy the partitioned data to the cluster
 
 When copying data to the cluster, we recommend users to copy the partitioned data to NFS so that all worker machines
@@ -61,8 +56,6 @@ export DGL_SERVER_ID=3
 python3 train_dist.py
 ```
 
-When testing in the standalone mode, we don't need to run the servers.
-
 ### Step 4: run trainers
 We run a trainer process on each machine. Here we use Pytorch distributed. We need to use pytorch distributed launch to run each trainer process.
 Pytorch distributed requires one of the trainer process to be the master. Here we use the first machine to run the master process.
@@ -80,7 +73,21 @@ python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=2 
 python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=3 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --lr 0.1
 ```
 
-To run the training script in the standalone mode:
+## Distributed code runs in the standalone mode
+
+The standalone mode is mainly used for development and testing. The procedure to run the code is much simpler.
+
+### Step 1: graph construction.
+
+When testing the standalone mode of the training script, we should construct a graph with one partition.
+```bash
+python3 partition_graph.py --dataset ogb-product --num_parts 1
+```
+
+### Step 2: run the training script
+
 ```bash
 python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --conf_path data/ogb-product.json --standalone
 ```
+
+Note: please ensure that all environment variables shown above are unset if they were set for testing distributed training.
