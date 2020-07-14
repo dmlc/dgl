@@ -1,10 +1,12 @@
-"""  """
+""" BitcoinOTC dataset for fraud detection """
 import numpy as np
 import os
 import datetime
+import gzip
+import shutil
 
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import deprecate_class, download, extract_archive, save_graphs, load_graphs, check_sha1
+from .utils import deprecate_class, download, makedirs, save_graphs, load_graphs, check_sha1
 from ..graph import DGLGraph
 
 
@@ -71,7 +73,7 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
             raise UserWarning('File {} is downloaded but the content hash does not match.'
                               'The repo may be outdated or download may be incomplete. '
                               'Otherwise you can create an issue for it.'.format(self.name + '.csv.gz'))
-        extract_archive(gz_file_path, self.raw_path)
+        self._extract_gz(gz_file_path, self.raw_path)
 
     def process(self):
         filename = os.path.join(self.save_path, self.name + '.csv')
@@ -120,6 +122,17 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
     @property
     def is_temporal(self):
         return True
+
+    def _extract_gz(self, file, target_dir, overwrite=False):
+        if os.path.exists(target_dir) and not overwrite:
+            return
+        print('Extracting file to {}'.format(target_dir))
+        fname = os.path.basename(file)
+        makedirs(target_dir)
+        out_file_path = os.path.join(target_dir, fname[:-3])
+        with gzip.open(file, 'rb') as f_in:
+            with open(out_file_path, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
 
 
 class BitcoinOTC(BitcoinOTCDataset):
