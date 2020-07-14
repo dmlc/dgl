@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include "../selector.h"
 
 namespace dgl {
 namespace aten {
@@ -17,22 +18,23 @@ namespace cpu {
  * \brief CPU kernel of g-SDDMM on Csr format.
  * \param bcast Broadcast information.
  * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param vfeat The feature on destination nodes.
+ * \param lhs The left hand side operand feature.
+ * \param rhs The right hand size operand feature.
  * \param out The result feature on edges.
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
-template <typename IdType, typename DType, typename Op>
+template <typename IdType, typename DType, typename Op,
+          int LhsTarget = 0, int RhsTarget = 2>
 void SDDMMCsr(const BcastOff& bcast,
               const CSRMatrix& csr,
-              NDArray ufeat, NDArray vfeat, NDArray out) {
+              NDArray lhs, NDArray rhs, NDArray out) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
   const IdType* edges = csr.data.Ptr<IdType>();
-  const DType* X = ufeat.Ptr<DType>();
-  const DType* Y = vfeat.Ptr<DType>();
+  const DType* X = lhs.Ptr<DType>();
+  const DType* Y = rhs.Ptr<DType>();
   const int64_t dim = bcast.out_len,
                 lhs_dim = bcast.lhs_len,
                 rhs_dim = bcast.rhs_len,
@@ -48,10 +50,10 @@ void SDDMMCsr(const BcastOff& bcast,
       for (int64_t k = 0; k < dim; ++k) {
         const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
         const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-        const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim +\
-                               lhs_add * reduce_size : nullptr;
-        const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim +\
-                               rhs_add * reduce_size : nullptr;
+        const DType* lhs_off = Op::use_lhs?
+          X + Selector<LhsTarget>::Call(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
+        const DType* rhs_off = Op::use_rhs?
+          Y + Selector<RhsTarget>::Call(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
         out_off[k] = Op::Call(lhs_off, rhs_off, reduce_size);
       }
     }
@@ -62,22 +64,23 @@ void SDDMMCsr(const BcastOff& bcast,
  * \brief CPU kernel of g-SDDMM on Coo format.
  * \param bcast Broadcast information.
  * \param coo The COO matrix.
- * \param ufeat The feature on source nodes.
- * \param vfeat The feature on destination nodes.
+ * \param lhs The left hand side operand feature.
+ * \param rhs The right hand size operand feature.
  * \param out The result feature on edges.
  * \note it uses edge parallel strategy, different threads are responsible
  *       for the computation of different edges.
  */
-template <typename IdType, typename DType, typename Op>
+template <typename IdType, typename DType, typename Op,
+          int LhsTarget = 0, int RhsTarget = 2>
 void SDDMMCoo(const BcastOff& bcast,
               const COOMatrix& coo,
-              NDArray ufeat, NDArray vfeat, NDArray out) {
+              NDArray lhs, NDArray rhs, NDArray out) {
   const bool has_idx = !IsNullArray(coo.data);
   const IdType* row = coo.row.Ptr<IdType>();
   const IdType* col = coo.col.Ptr<IdType>();
   const IdType* edges = coo.data.Ptr<IdType>();
-  const DType* X = ufeat.Ptr<DType>();
-  const DType* Y = vfeat.Ptr<DType>();
+  const DType* X = lhs.Ptr<DType>();
+  const DType* Y = rhs.Ptr<DType>();
   const int64_t dim = bcast.out_len,
                 lhs_dim = bcast.lhs_len,
                 rhs_dim = bcast.rhs_len,
@@ -93,10 +96,10 @@ void SDDMMCoo(const BcastOff& bcast,
     for (int64_t k = 0; k < dim; ++k) {
       const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
       const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-      const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim +\
-                             lhs_add * reduce_size : nullptr;
-      const DType* rhs_off = Op::use_rhs? Y + cid * rhs_dim +\
-                             rhs_add * reduce_size : nullptr;
+      const DType* lhs_off = Op::use_lhs ?
+        X + Selector<LhsTarget>::Call(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
+      const DType* rhs_off = Op::use_rhs ?
+        Y + Selector<RhsTarget>::Call(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
       out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
     }
   }
@@ -186,10 +189,10 @@ struct Dot {
     } else if ((op) == "div") {                                     \
       typedef dgl::aten::cpu::op::Div<DType> Op;                    \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_u") {                                  \
+    } else if ((op) == "copy_lhs") {                                \
       typedef dgl::aten::cpu::op::CopyLhs<DType> Op;                \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_e") {                                  \
+    } else if ((op) == "copy_rhs") {                                \
       typedef dgl::aten::cpu::op::CopyRhs<DType> Op;                \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \

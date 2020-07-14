@@ -24,11 +24,11 @@ namespace aten {
     } else if ((op) == "div") {                                     \
       typedef cuda::binary::Div<DType> Op;                          \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_u") {                                  \
-      typedef cuda::binary::CopyU<DType> Op;                        \
+    } else if ((op) == "copy_lhs") {                                \
+      typedef cuda::binary::CopyLhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_e") {                                  \
-      typedef cuda::binary::CopyE<DType> Op;                        \
+    } else if ((op) == "copy_rhs") {                                \
+      typedef cuda::binary::CopyRhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
     } else if ((op) == "dot") {                                     \
       typedef cuda::binary::Dot<DType> Op;                          \
@@ -38,6 +38,37 @@ namespace aten {
     }                                                               \
   } while (0)
 
+#define SWITCH_RHS(rhs_target, RhsTarget, ...)                        \
+  do {                                                                \
+    if ((rhs_target) == 0) {                                          \
+      constexpr int RhsTarget = 0;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 1) {                                   \
+      constexpr int RhsTarget = 1;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 2) {                                   \
+      constexpr int RhsTarget = 2;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else {                                                          \
+      LOG(INFO) << "Invalid rhs target: " << (rhs_target);            \
+    }                                                                 \
+  } while (0)
+
+#define SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, ...)\
+  do {                                                                  \
+    if ((lhs_target) == 0) {                                            \
+      constexpr int LhsTarget = 0;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 1) {                                     \
+      constexpr int LhsTarget = 1;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 2) {                                     \
+      constexpr int LhsTarget = 2;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else {                                                            \
+      LOG(INFO) << "Invalid lhs target: " << (lhs_target);              \
+    }                                                                   \
+  } while (0)
 
 /*!
  * \brief CUDA implementation of g-SDDMM on Csr format.
@@ -46,11 +77,15 @@ template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
               const CSRMatrix& csr,
-              NDArray ufeat,
-              NDArray vfeat,
-              NDArray out) {
+              NDArray lhs,
+              NDArray rhs,
+              NDArray out,
+              int lhs_target,
+              int rhs_target) {
   SWITCH_OP(op, Op, {
-    cuda::SDDMMCsr<IdType, DType, Op>(bcast, csr, ufeat, vfeat, out);
+    SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
+      cuda::SDDMMCsr<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, csr, lhs, rhs, out);
+    });
   });
 }
 
@@ -61,39 +96,51 @@ template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
               const COOMatrix& coo,
-              NDArray ufeat,
-              NDArray vfeat,
-              NDArray out) {
+              NDArray lhs,
+              NDArray rhs,
+              NDArray out,
+              int lhs_target,
+              int rhs_target) {
   SWITCH_OP(op, Op, {
-    cuda::SDDMMCoo<IdType, DType, Op>(bcast, coo, ufeat, vfeat, out);
+    SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
+      cuda::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, lhs, rhs, out);
+    });
   });
 }
 
 template void SDDMMCsr<kDLGPU, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 template void SDDMMCsr<kDLGPU, int64_t, float>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 template void SDDMMCsr<kDLGPU, int32_t, double>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 template void SDDMMCsr<kDLGPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 
 template void SDDMMCoo<kDLGPU, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 template void SDDMMCoo<kDLGPU, int64_t, float>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 template void SDDMMCoo<kDLGPU, int32_t, double>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 template void SDDMMCoo<kDLGPU, int64_t, double>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
-    NDArray ufeat, NDArray vfeat, NDArray out);
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
 
 }  // namespace aten
 }  // namespace dgl
