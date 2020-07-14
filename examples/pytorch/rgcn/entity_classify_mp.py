@@ -159,10 +159,15 @@ class NeighborSampler:
         return seeds, blocks
 
 @thread_wrapped_func
-def run(proc_id, n_gpus, args, devices, dataset):
+def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id]
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
+    if split is not None:
+        train_seed, valid_seed, test_seed = split
+        train_idx = train_idx[train_seed]
+        valid_idx = valid_idx[valid_seed]
+        test_idx = test_idx[test_seed]
 
     node_tids = g.ndata[dgl.NTYPE]
     sampler = NeighborSampler(g, target_idx, [args.fanout] * args.n_layers)
@@ -286,7 +291,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
                   format(train_acc, loss.item()))
 
         # only process 0 will do the evaluation
-        if proc_id == 0:
+        if (queue is not None) or (proc_id == 0):
             model.eval()
             eval_logtis = []
             eval_seeds = []
@@ -310,16 +315,32 @@ def run(proc_id, n_gpus, args, devices, dataset):
                         print("handle {} valid samples".format(i * seeds.shape[0]))
                 eval_logtis = th.cat(eval_logtis)
                 eval_seeds = th.cat(eval_seeds)
-                val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds])
+                val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds]).item()
                 val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds]).item() / len(eval_seeds)
+
+                if queue is not None:
+                    queue.put((val_loss, val_acc))
+
+            if proc_id == 0:
+                if queue is not None:
+                    val_loss = []
+                    val_acc = []
+                    for i in range(n_gpus):
+                        log = queue.get()
+                        val_l, val_a = log
+                        val_loss.append(val_l)
+                        val_acc.append(val_a)
+                    val_loss = sum(val_loss) / len(val_loss)
+                    val_acc = sum(val_acc) / len(val_acc)
+
                 print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
-                        format(val_acc, val_loss.item()))
+                        format(val_acc, val_loss)
         if n_gpus > 1:
             th.distributed.barrier()
     print()
 
-    # only process 0 will do the testing
-    if proc_id == 0:
+    # only process 0 will do the evaluation
+    if (queue is not None) or (proc_id == 0):
         model.eval()
         test_logtis = []
         test_seeds = []
@@ -341,9 +362,24 @@ def run(proc_id, n_gpus, args, devices, dataset):
                     print("handle {} test samples".format(i * seeds.shape[0]))
             test_logtis = th.cat(test_logtis)
             test_seeds = th.cat(test_seeds)
-            test_loss = F.cross_entropy(test_logtis, labels[test_seeds])
+            test_loss = F.cross_entropy(test_logtis, labels[test_seeds]).item()
             test_acc = th.sum(test_logtis.argmax(dim=1) == labels[test_seeds]).item() / len(test_seeds)
-            print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+
+            if queue is not None:
+                queue.put((test_loss, test_acc))
+
+        if proc_id == 0:
+            if queue is not None:
+                test_loss = []
+                test_acc = []
+                for i in range(n_gpus):
+                    log = queue.get()
+                    val_l, val_a = log
+                    test_loss.append(val_l)
+                    test_acc.append(val_a)
+                test_loss = sum(test_loss) / len(test_loss)
+                test_acc = sum(test_acc) / len(test_acc)
+            print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
             print()
 
     print("{}/{} Mean forward time: {:4f}".format(proc_id, n_gpus,
@@ -451,31 +487,50 @@ def main(args, devices):
     loc = (node_tids == category_id)
     target_idx = node_ids[loc]
     target_idx.share_memory_()
+    val_idx.share_memory_()
+    test_idx.share_memory_()
 
     n_gpus = len(devices)
     # cpu
     if devices[0] == -1:
         run(0, 0, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             train_idx, val_idx, test_idx, labels))
+             train_idx, val_idx, test_idx, labels), None)
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-            train_idx, val_idx, test_idx, labels))
+            train_idx, val_idx, test_idx, labels), None)
     # multi gpu
     else:
+        queue = mp.Queue(n_gpus)
         procs = []
         num_train_seeds = train_idx.shape[0]
+        num_valid_seeds = val_idx.shape[0]
+        num_test_seeds = test_idx.shape[0]
         tseeds_per_proc = num_train_seeds // n_gpus
+        vseeds_per_proc = num_valid_seeds // n_gpus
+        tstseeds_per_proc = num_test_seeds // n_gpus
         for proc_id in range(n_gpus):
-            proc_train_seeds = train_idx[proc_id * tseeds_per_proc :
-                                         (proc_id + 1) * tseeds_per_proc \
-                                         if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
-                                         else num_train_seeds]
+            # we have multi-gpu for training, evaluation and testing
+            # so split trian set, valid set and test set into num-of-gpu parts.
+            proc_train_seeds = train_seeds[proc_id * tseeds_per_proc :
+                                           (proc_id + 1) * tseeds_per_proc \
+                                           if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
+                                           else num_train_seeds]
+            proc_valid_seeds = valid_seeds[proc_id * vseeds_per_proc :
+                                           (proc_id + 1) * vseeds_per_proc \
+                                           if (proc_id + 1) * vseeds_per_proc < num_valid_seeds \
+                                           else num_valid_seeds]
+            proc_test_seeds = test_seeds[proc_id * tstseeds_per_proc :
+                                         (proc_id + 1) * tstseeds_per_proc \
+                                         if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
+                                         else num_test_seeds]
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices,
                                              (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-                                             proc_train_seeds, val_idx, test_idx, labels)))
+                                             train_idx, val_idx, test_idx, labels),
+                                             (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
+                                             queue))
             p.start()
             procs.append(p)
         for p in procs:
