@@ -47,8 +47,8 @@ def submit_jobs(args, udf_command):
         cmd = cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         print(cmd)
-        execute_remote(cmd, ip, thread_list)
-    print(cmd)
+        #execute_remote(cmd, ip, thread_list)
+    print("-------------------")
     # launch client tasks
     client_cmd = 'DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
@@ -66,7 +66,7 @@ def submit_jobs(args, udf_command):
         cmd = cmd + ' ' + '--master_port=1200'
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         print(cmd)
-        execute_remote(cmd, ip, thread_list)
+        #execute_remote(cmd, ip, thread_list)
 
     for thread in thread_list:
         thread.join()
