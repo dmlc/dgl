@@ -121,7 +121,7 @@ pipeline {
           agent { 
             docker {
               label "linux-c52x-node"
-              image "dgllib/dgl-ci-cpu:conda_new" 
+              image "dgllib/dgl-ci-cpu:conda" 
               alwaysPull true
             }
           }
@@ -138,7 +138,7 @@ pipeline {
           agent {
             docker {
               label "linux-c52x-node"
-              image "dgllib/dgl-ci-gpu:conda_new"
+              image "dgllib/dgl-ci-gpu:conda"
               args "-u root"
               alwaysPull true
             }
@@ -175,7 +175,7 @@ pipeline {
           agent { 
             docker { 
               label "linux-c52x-node"
-              image "dgllib/dgl-ci-cpu:conda_new"
+              image "dgllib/dgl-ci-cpu:conda"
               alwaysPull true
             }
           }
@@ -203,7 +203,7 @@ pipeline {
           agent { 
             docker {
               label "linux-c52x-node"
-              image "dgllib/dgl-ci-cpu:conda_new" 
+              image "dgllib/dgl-ci-cpu:conda" 
               alwaysPull true
             }
           }
@@ -224,7 +224,7 @@ pipeline {
           agent { 
             docker { 
               label "linux-gpu-node"
-              image "dgllib/dgl-ci-gpu:conda_new" 
+              image "dgllib/dgl-ci-gpu:conda" 
               args "--runtime nvidia"
               alwaysPull true
             }
@@ -246,7 +246,7 @@ pipeline {
           agent { 
             docker {
               label "linux-c52x-node"
-              image "dgllib/dgl-ci-cpu:conda_new" 
+              image "dgllib/dgl-ci-cpu:conda" 
               alwaysPull true
             }
           }
@@ -297,7 +297,7 @@ pipeline {
           agent {
             docker {
               label "linux-gpu-node"
-              image "dgllib/dgl-ci-gpu:conda_new"
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
               alwaysPull true
             }
@@ -325,7 +325,7 @@ pipeline {
           agent { 
             docker {
               label "linux-c52x-node"
-              image "dgllib/dgl-ci-cpu:conda_new" 
+              image "dgllib/dgl-ci-cpu:conda" 
               alwaysPull true
             }
           }
@@ -351,7 +351,7 @@ pipeline {
           agent {
             docker {
               label "linux-gpu-node" 
-              image "dgllib/dgl-ci-gpu:conda_new"
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
               alwaysPull true
             }
