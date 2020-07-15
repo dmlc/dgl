@@ -1,12 +1,14 @@
 """Define distributed graph."""
 
 from collections.abc import MutableMapping
+import os
 import numpy as np
 
 from ..graph import DGLGraph
 from .. import backend as F
 from ..base import NID, EID
 from .kvstore import KVServer, KVClient
+from .standalone_kvstore import KVClient as SA_KVClient
 from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
@@ -338,7 +340,16 @@ class DistGraph:
     This provides the graph interface to access the partitioned graph data for distributed GNN
     training. All data of partitions are loaded by the DistGraph server.
 
-    By default, `DistGraph` uses shared-memory to access the partition data in the local machine.
+    DistGraph can run in two modes: the standalone mode and the distributed mode.
+
+    * When a user runs the training script normally, DistGraph will be in the standalone mode.
+    In this mode, the input graph has to be constructed with only one partition. This mode is
+    used for testing and debugging purpose.
+    * When a user runs the training script with the distributed launch script, DistGraph will
+    be set into the distributed mode. This is used for actual distributed training.
+
+    When running in the distributed mode, `DistGraph` uses shared-memory to access
+    the partition data in the local machine.
     This gives the best performance for distributed training when we run `DistGraphServer`
     and `DistGraph` on the same machine. However, a user may want to run them in separate
     machines. In this case, a user may want to disable shared memory by passing
@@ -353,20 +364,40 @@ class DistGraph:
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
         The partition book object
+    conf_file : str
+        The partition config file. It's used in the standalone mode.
     '''
-    def __init__(self, ip_config, graph_name, gpb=None):
-        connect_to_server(ip_config=ip_config)
-        self._client = KVClient(ip_config)
-        g = _get_graph_from_shared_mem(graph_name)
-        if g is not None:
+    def __init__(self, ip_config, graph_name, gpb=None, conf_file=None):
+        if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
+            assert conf_file is not None, \
+                    'When running in the standalone model, the partition config file is required'
+            self._client = SA_KVClient()
+            # Load graph partition data.
+            g, node_feats, edge_feats, self._gpb, _ = load_partition(conf_file, 0)
+            assert self._gpb.num_partitions() == 1, \
+                    'The standalone mode can only work with the graph data with one partition'
+            if self._gpb is None:
+                self._gpb = gpb
             self._g = as_heterograph(g)
+            for name in node_feats:
+                self._client.add_data(_get_ndata_name(name), node_feats[name])
+            for name in edge_feats:
+                self._client.add_data(_get_edata_name(name), edge_feats[name])
+            rpc.set_num_client(1)
         else:
-            self._g = None
-        self._gpb = get_shared_mem_partition_book(graph_name, self._g)
-        if self._gpb is None:
-            self._gpb = gpb
-        self._client.barrier()
-        self._client.map_shared_data(self._gpb)
+            connect_to_server(ip_config=ip_config)
+            self._client = KVClient(ip_config)
+            g = _get_graph_from_shared_mem(graph_name)
+            if g is not None:
+                self._g = as_heterograph(g)
+            else:
+                self._g = None
+            self._gpb = get_shared_mem_partition_book(graph_name, self._g)
+            if self._gpb is None:
+                self._gpb = gpb
+            self._client.barrier()
+            self._client.map_shared_data(self._gpb)
+
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
 
