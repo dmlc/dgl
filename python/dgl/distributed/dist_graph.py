@@ -137,9 +137,9 @@ class DistTensor:
         self._dtype = dtype
 
         if part_policy is None:
-            if shape[0] == g.number_of_nodes() and shape[0] == g.number_of_edges():
-                raise DGLError('Cannot determine the partition policy. Please provide it.')
-            elif shape[0] == g.number_of_nodes():
+            assert shape[0] != g.number_of_nodes() or shape[0] != g.number_of_edges(), \
+                    'Cannot determine the partition policy. Please provide it.'
+            if shape[0] == g.number_of_nodes():
                 part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
             elif shape[0] == g.number_of_edges():
                 part_policy = PartitionPolicy(EDGE_PART_POLICY, g.get_partition_book())
