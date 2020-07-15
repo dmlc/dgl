@@ -65,16 +65,11 @@ class DistSAGE(SAGE):
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
                                            g.get_partition_book(), force_even=True)
+        y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_hidden), th.float32, 'h')
         for l, layer in enumerate(self.layers):
-            # If this isn't the last layer
-            if l != len(self.layers) - 1:
-                if 'h' not in g.ndata:
-                    g.init_ndata('h', (g.number_of_nodes(), self.n_hidden), th.float32)
-                y = g.ndata['h']
-            else:
-                if 'h_last' not in g.ndata:
-                    g.init_ndata('h_last', (g.number_of_nodes(), self.n_classes), th.float32)
-                y = g.ndata['h_last']
+            if l == len(self.layers) - 1:
+                y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_classes),
+                                               th.float32, 'h_last')
 
             sampler = NeighborSampler(g, [100], dgl.distributed.sample_neighbors)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))

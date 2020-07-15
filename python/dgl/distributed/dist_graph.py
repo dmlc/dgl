@@ -42,28 +42,23 @@ FIELD_DICT = {'inner_node': F.int64,
               'inner_edge': F.int64,
               NID: F.int64,
               EID: F.int64}
+NODE_PART_POLICY = 'node'
+EDGE_PART_POLICY = 'edge'
 
-def _get_ndata_name(name):
-    ''' This is to get the name of node data in the kvstore.
-
-    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
-    '''
-    return 'node:' + name
-
-def _get_edata_name(name):
-    ''' This is to get the name of edge data in the kvstore.
+def _get_data_name(name, part_policy):
+    ''' This is to get the name of data in the kvstore.
 
     KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
     '''
-    return 'edge:' + name
+    return part_policy + ':' + name
 
 def _is_ndata_name(name):
     ''' Is this node data in the kvstore '''
-    return name[:5] == 'node:'
+    return name[:5] == NODE_PART_POLICY + ':'
 
 def _is_edata_name(name):
     ''' Is this edge data in the kvstore '''
-    return name[:5] == 'edge:'
+    return name[:5] == EDGE_PART_POLICY + ':'
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -124,13 +119,29 @@ class DistTensor:
     part_policy : PartitionPolicy
         The partition policy of the tensor
     '''
-    def __init__(self, g, name, part_policy):
+    def __init__(self, g, shape, dtype, name, part_policy=None, init_func=None):
         self.kvstore = g._client
         self._name = name
-        dtype, shape, _ = g._client.get_data_meta(name)
         self._shape = shape
         self._dtype = dtype
+
+        if part_policy is None:
+            if shape[0] == g.number_of_nodes() and shape[0] == g.number_of_edges():
+                raise DGLError('Cannot determine the partition policy. Please provide it.')
+            elif shape[0] == g.number_of_nodes():
+                part_policy = NODE_PART_POLICY
+            elif shape[0] == g.number_of_edges():
+                part_policy = EDGE_PART_POLICY
+            else:
+                raise DGLError('Cannot determine the partition policy. Please provide it.')
+
         self._part_policy = part_policy
+
+        if init_func is None:
+            init_func = _default_init_data
+        policy = PartitionPolicy(part_policy, g.get_partition_book())
+        name = _get_data_name(name, policy.policy_str)
+        g._client.init_data(name, shape, dtype, policy, init_func)
 
     def __getitem__(self, idx):
         idx = utils.toindex(idx)
@@ -178,21 +189,22 @@ class NodeDataView(MutableMapping):
         # initialize the node data in advance.
         names = g._get_all_ndata_names()
         policy = PartitionPolicy("node", g.get_partition_book())
-        self._data = {name: DistTensor(g, _get_ndata_name(name), policy) for name in names}
+        name = _get_data_name(name, policy.policy_str)
+        self._data = {name: DistTensor(g, name, policy) for name in names}
 
     def _get_names(self):
         return list(self._data.keys())
 
     def _add(self, name):
         policy = PartitionPolicy("node", self._graph.get_partition_book())
-        self._data[name] = DistTensor(self._graph, _get_ndata_name(name), policy)
+        name = _get_data_name(name, policy.policy_str)
+        self._data[name] = DistTensor(self._graph, name, policy)
 
     def __getitem__(self, key):
         return self._data[key]
 
     def __setitem__(self, key, val):
-        raise DGLError("DGL doesn't support assignment. "
-                       + "Please call init_ndata to initialize new node data.")
+        self._data[key] = val
 
     def __delitem__(self, key):
         #TODO(zhengda) how to delete data in the kvstore.
@@ -225,21 +237,22 @@ class EdgeDataView(MutableMapping):
         # initialize the edge data in advance.
         names = g._get_all_edata_names()
         policy = PartitionPolicy("edge", g.get_partition_book())
-        self._data = {name: DistTensor(g, _get_edata_name(name), policy) for name in names}
+        name = _get_data_name(name, policy.policy_str)
+        self._data = {name: DistTensor(g, name, policy) for name in names}
 
     def _get_names(self):
         return list(self._data.keys())
 
     def _add(self, name):
         policy = PartitionPolicy("edge", self._graph.get_partition_book())
-        self._data[name] = DistTensor(self._graph, _get_edata_name(name), policy)
+        name = _get_data_name(name, policy.policy_str)
+        self._data[name] = DistTensor(self._graph, name, policy)
 
     def __getitem__(self, key):
         return self._data[key]
 
     def __setitem__(self, key, val):
-        raise DGLError("DGL doesn't support assignment. "
-                       + "Please call init_edata to initialize new edge data.")
+        self._data[key] = val
 
     def __delitem__(self, key):
         #TODO(zhengda) how to delete data in the kvstore.
@@ -306,21 +319,25 @@ class DistGraphServer(KVServer):
         if not disable_shared_mem:
             self.gpb.shared_memory(graph_name)
         assert self.gpb.partid == server_id
-        self.add_part_policy(PartitionPolicy('node', self.gpb))
-        self.add_part_policy(PartitionPolicy('edge', self.gpb))
+        self.add_part_policy(PartitionPolicy(NODE_PART_POLICY, self.gpb))
+        self.add_part_policy(PartitionPolicy(EDGE_PART_POLICY, self.gpb))
 
         if not self.is_backup_server():
             for name in node_feats:
-                self.init_data(name=_get_ndata_name(name), policy_str='node',
+                self.init_data(name=_get_data_name(name, NODE_PART_POLICY),
+                               policy_str=NODE_PART_POLICY,
                                data_tensor=node_feats[name])
             for name in edge_feats:
-                self.init_data(name=_get_edata_name(name), policy_str='edge',
+                self.init_data(name=_get_data_name(name, EDGE_PART_POLICY),
+                               policy_str=EDGE_PART_POLICY,
                                data_tensor=edge_feats[name])
         else:
             for name in node_feats:
-                self.init_data(name=_get_ndata_name(name), policy_str='node')
+                self.init_data(name=_get_data_name(name, NODE_PART_POLICY),
+                               policy_str=NODE_PART_POLICY)
             for name in edge_feats:
-                self.init_data(name=_get_edata_name(name), policy_str='edge')
+                self.init_data(name=_get_data_name(name, EDGE_PART_POLICY),
+                               policy_str=EDGE_PART_POLICY)
 
     def start(self):
         """ Start graph store server.
@@ -380,9 +397,9 @@ class DistGraph:
                 self._gpb = gpb
             self._g = as_heterograph(g)
             for name in node_feats:
-                self._client.add_data(_get_ndata_name(name), node_feats[name])
+                self._client.add_data(_get_data_name(name, NODE_PART_POLICY), node_feats[name])
             for name in edge_feats:
-                self._client.add_data(_get_edata_name(name), edge_feats[name])
+                self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
             rpc.set_num_client(1)
         else:
             connect_to_server(ip_config=ip_config)
@@ -406,69 +423,6 @@ class DistGraph:
         for part_md in self._gpb.metadata():
             self._num_nodes += int(part_md['num_nodes'])
             self._num_edges += int(part_md['num_edges'])
-
-
-    def init_ndata(self, name, shape, dtype, init_func=None):
-        '''Initialize node data
-
-        This initializes the node data in the distributed graph storage.
-        Users can provide a init function to initialize data. The signature of
-        the init function is
-
-        ```
-        def init_func(shape, dtype)
-        ```
-        The inputs are the shape and data type and the output is a tensor with
-        the initialized values.
-
-        Parameters
-        ----------
-        name : string
-            The name of the node data.
-        shape : tuple
-            The shape of the node data.
-        dtype : dtype
-            The data type of the node data.
-        init_func : callable
-            The function to initialize the data
-        '''
-        assert shape[0] == self.number_of_nodes()
-        if init_func is None:
-            init_func = _default_init_data
-        policy = PartitionPolicy('node', self._gpb)
-        self._client.init_data(_get_ndata_name(name), shape, dtype, policy, init_func)
-        self._ndata._add(name)
-
-    def init_edata(self, name, shape, dtype, init_func=None):
-        '''Initialize edge data
-
-        This initializes the edge data in the distributed graph storage.
-        Users can provide a init function to initialize data. The signature of
-        the init function is
-
-        ```
-        def init_func(shape, dtype)
-        ```
-        The inputs are the shape and data type and the output is a tensor with
-        the initialized values.
-
-        Parameters
-        ----------
-        name : string
-            The name of the edge data.
-        shape : tuple
-            The shape of the edge data.
-        dtype : dtype
-            The data type of the edge data.
-        init_func : callable
-            The function to initialize the data
-        '''
-        assert shape[0] == self.number_of_edges()
-        if init_func is None:
-            init_func = _default_init_data
-        policy = PartitionPolicy('edge', self._gpb)
-        self._client.init_data(_get_edata_name(name), shape, dtype, policy, init_func)
-        self._edata._add(name)
 
     @property
     def local_partition(self):
