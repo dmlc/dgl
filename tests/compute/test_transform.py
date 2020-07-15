@@ -680,19 +680,59 @@ def test_compact(index_dtype):
     _check(g3, new_g3, induced_nodes)
     _check(g4, new_g4, induced_nodes)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU to simple not implemented")
 @parametrize_dtype
 def test_to_simple(index_dtype):
+    # homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 2, 1]), F.tensor([1, 2, 0, 2])))
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
+    sg, wb = dgl.to_simple(g, writeback_mapping=True)
+    u, v = g.all_edges(form='uv', order='eid')
+    u = F.asnumpy(u).tolist()
+    v = F.asnumpy(v).tolist()
+    uv = list(zip(u, v))
+    eid_map = F.asnumpy(wb)
+
+    su, sv = sg.all_edges(form='uv', order='eid')
+    su = F.asnumpy(su).tolist()
+    sv = F.asnumpy(sv).tolist()
+    suv = list(zip(su, sv))
+    sc = F.asnumpy(sg.edata['count'])
+    assert set(uv) == set(suv)
+    for i, e in enumerate(suv):
+        assert sc[i] == sum(e == _e for _e in uv)
+    for i, e in enumerate(uv):
+        assert eid_map[i] == suv.index(e)
+    # shared ndata
+    assert F.array_equal(sg.ndata['h'], g.ndata['h'])
+    assert 'h' not in sg.edata
+    # new ndata to sg
+    sg.ndata['hh'] = F.tensor([[0.], [1.], [2.]])
+    assert 'hh' not in g.ndata
+
+    sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
+    assert 'h' not in sg.ndata
+    assert 'h' not in sg.edata
+
+    # heterogeneous graph
     g = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)],
-        ('user', 'plays', 'game'): [(3, 5), (2, 3), (1, 4), (1, 4), (3, 5), (2, 3), (2, 3)]}, index_dtype=index_dtype)
-    sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
+        ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1],
+                                     [1, 3, 2, 3, 4, 4]),
+        ('user', 'plays', 'game'): ([3, 2, 1, 1, 3, 2, 2], [5, 3, 4, 4, 5, 3, 3])},
+        index_dtype=index_dtype)
+    g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
+    g.nodes['user'].data['hh'] = F.tensor([0, 1, 2, 3, 4])
+    g.edges['follow'].data['h'] = F.tensor([0, 1, 2, 3, 4, 5])
+    sg, wb = dgl.to_simple(g, return_counts='weights', writeback_mapping=True, copy_edata=True)
+    g.nodes['game'].data['h'] = F.tensor([0, 1, 2, 3, 4, 5])
 
     for etype in g.canonical_etypes:
         u, v = g.all_edges(form='uv', order='eid', etype=etype)
         u = F.asnumpy(u).tolist()
         v = F.asnumpy(v).tolist()
         uv = list(zip(u, v))
-        eid_map = F.asnumpy(g.edges[etype].data['new_eid'])
+        eid_map = F.asnumpy(wb[etype])
 
         su, sv = sg.all_edges(form='uv', order='eid', etype=etype)
         su = F.asnumpy(su).tolist()
@@ -705,6 +745,24 @@ def test_to_simple(index_dtype):
             assert sw[i] == sum(e == _e for _e in uv)
         for i, e in enumerate(uv):
             assert eid_map[i] == suv.index(e)
+    # shared ndata
+    assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
+    assert F.array_equal(sg.nodes['user'].data['hh'], g.nodes['user'].data['hh'])
+    assert 'h' not in sg.nodes['game'].data
+    # new ndata to sg
+    sg.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
+    assert 'hhh' not in g.nodes['user'].data
+    # share edata
+    feat_idx = F.asnumpy(wb[('user', 'follow', 'user')])
+    _, indices = np.unique(feat_idx, return_index=True)
+    assert np.array_equal(F.asnumpy(sg.edges['follow'].data['h']),
+                          F.asnumpy(g.edges['follow'].data['h'])[indices])
+
+    sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
+    for ntype in g.ntypes:
+        assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+    assert 'h' not in sg.nodes['user'].data
+    assert 'hh' not in sg.nodes['user'].data
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
@@ -877,7 +935,7 @@ if __name__ == '__main__':
     # test_add_self_loop()
     # test_partition_with_halo()
     # test_metis_partition()
-    test_hetero_linegraph('int32')
+    # test_hetero_linegraph('int32')
     # test_compact()
     test_to_simple("int32")
     # test_in_subgraph("int32")

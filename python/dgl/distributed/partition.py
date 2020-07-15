@@ -119,6 +119,8 @@ def load_partition(conf_file, part_id):
         All edge features.
     GraphPartitionBook
         The global partition information.
+    str
+        The graph name
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
@@ -134,8 +136,8 @@ def load_partition(conf_file, part_id):
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    gpb = load_partition_book(conf_file, part_id, graph)
-    return graph, node_feats, edge_feats, gpb
+    gpb, graph_name = load_partition_book(conf_file, part_id, graph)
+    return graph, node_feats, edge_feats, gpb, graph_name
 
 def load_partition_book(conf_file, part_id, graph=None):
     ''' Load a graph partition book from the partition config file.
@@ -153,6 +155,8 @@ def load_partition_book(conf_file, part_id, graph=None):
     -------
     GraphPartitionBook
         The global partition information.
+    str
+        The graph name
     '''
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
@@ -162,6 +166,7 @@ def load_partition_book(conf_file, part_id, graph=None):
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
     assert 'node_map' in part_metadata, "cannot get the node map."
     assert 'edge_map' in part_metadata, "cannot get the edge map."
+    assert 'graph_name' in part_metadata, "cannot get the graph name"
 
     # If this is a range partitioning, node_map actually stores a list, whose elements
     # indicate the boundary of range partitioning. Otherwise, node_map stores a filename
@@ -173,9 +178,11 @@ def load_partition_book(conf_file, part_id, graph=None):
             "The node map and edge map need to have the same format"
 
     if is_range_part:
-        return RangePartitionBook(part_id, num_parts, np.array(node_map), np.array(edge_map))
+        return RangePartitionBook(part_id, num_parts, np.array(node_map),
+                                  np.array(edge_map)), part_metadata['graph_name']
     else:
-        return GraphPartitionBook(part_id, num_parts, node_map, edge_map, graph)
+        return GraphPartitionBook(part_id, num_parts, node_map, edge_map,
+                                  graph), part_metadata['graph_name']
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False):

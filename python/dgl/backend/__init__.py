@@ -70,8 +70,9 @@ def _gen_spmm_func(binary_op, reduce_op):
     name = "u_{}_e_{}".format(binary_op, reduce_op)
     docstring = """Generalized SpMM function.
     It fuses two steps into one kernel.
-    (1) Computes messages by {} source node and edge features.
-    (2) Aggregate the messages by {} as the features on destination nodes.
+
+    1. Computes messages by {} source node and edge features.
+    2. Aggregate the messages by {} as the features on destination nodes.
 
     Parameters
     ----------
@@ -179,7 +180,7 @@ def copy_u(g, x):
     Notes
     -----
     This function supports autograd (computing input gradients given the output gradient).
-    """.format(_notes_docstring)
+    """
     return gsddmm(g, 'copy_lhs', x, None)
 
 def copy_v(g, x):
@@ -200,7 +201,7 @@ def copy_v(g, x):
     Notes
     -----
     This function supports autograd (computing input gradients given the output gradient).
-    """.format(_notes_docstring)
+    """
     return gsddmm(g, 'copy_rhs', None, x)
 
 def load_backend(mod_name):
