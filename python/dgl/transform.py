@@ -11,7 +11,6 @@ from . import ndarray as nd
 from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
-from .heterograph_index import joint_union as gidx_joint_union
 from .graph import unbatch
 from .convert import graph, bipartite, heterograph
 from . import utils
@@ -27,7 +26,6 @@ __all__ = [
     'reverse',
     'reverse_heterograph',
     'to_simple_graph',
-    'joint_union',
     'to_bidirected',
     'to_bidirected_stale',
     'laplacian_lambda_max',
@@ -206,9 +204,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     --------
     **Homographs**
 
-    >>> g = dgl.DGLGraph()
-    >>> g.add_nodes(2)
-    >>> g.add_edges([0, 0], [0, 1])
+    >>> g = dgl.graph(th.tensor([0, 0]), th.tensor([0, 1]))
     >>> bg1 = dgl.to_bidirected(g)
     >>> bg1.edges()
     (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
@@ -234,11 +230,11 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
 
     >>> bg = dgl.to_bidirected(g, copy_ndata=True,
                                copy_edata=True, ignore_bipartite=True)
-    >>> bg.all_edges(('user', 'wins', 'user'))
+    >>> bg.edges(('user', 'wins', 'user'))
     (tensor([0, 2, 0, 2, 2, 1, 1, 2, 1, 0]), tensor([1, 1, 2, 1, 0, 0, 2, 0, 2, 2]))
-    >>> bg.all_edges(('user', 'follows', 'user'))
+    >>> bg.edges(('user', 'follows', 'user'))
     (tensor([1, 2, 1, 0, 0, 0]), tensor([0, 0, 0, 1, 2, 1]))
-    >>> bg.all_edges(('user', 'plays', 'game'))
+    >>> bg.edges(('user', 'plays', 'game'))
     (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
     >>> bg.nodes['game'].data['hv']
     tensor([0, 0, 0])
@@ -259,7 +255,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
                     "unidirectional bipartite graphs" \
                     ", but {} is unidirectional bipartite".format(c_etype)
 
-            u, v = g.all_edges(form='uv', order='eid', etype=c_etype)
+            u, v = g.edges(form='uv', order='eid', etype=c_etype)
             subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
         new_g = heterograph(subgs)
@@ -267,10 +263,10 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
         subgs = {}
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
-                u, v = g.all_edges(form='uv', order='eid', etype=c_etype)
+                u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (u, v)
             else:
-                u, v = g.all_edges(form='uv', order='eid', etype=c_etype)
+                u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
         new_g = heterograph(subgs)
@@ -295,186 +291,6 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
                     new_g.edges[c_etype].data[k] = \
                         F.cat([g.edges[c_etype].data[k], g.edges[c_etype].data[k]], dim=0)
     return new_g
-
-
-def joint_union(graph_list, copy_ndata=False, copy_edata=False):
-    r"""Return a joint union of the input graphs.
-
-    The new graph will include all the edges in the given
-    graphs. All the input graphs should have the same graph
-    structure and meta-information.
-
-    For heterographs with multiple edge types, we can
-    treat edges corresponding to each type as separate
-    graphs, and joint_union the graphs for each edge type.
-
-    Parameters
-    ----------
-    graphs : List of DGLGraph
-        The input graphs
-    copy_ndata: bool, optional
-        If True, the node features of the new graph
-        are copied from the **FIRST** graph in the original
-        graph list. If False, the joint_unioned graph will not
-        have any node features.
-        (Default: False)
-    copy_edata: bool, optional
-        If True, the edge features of the new graph
-        will be a concatenation of the edge features from
-        all graphs in the list. If False, the
-        new graph will not have any edge features.
-        (Default: False)
-
-    Returns
-    -------
-    DGLGraph
-        The joint_unioned graph
-
-    Notes
-    -----
-    For heterographs with multiple edge types, all the input
-    graphs should have the same canonical edge types.
-
-    If ``copy_ndata`` is ``True``, same tensors are used as
-    the node features of the original graph and the new graph.
-    As a result, users should avoid performing in-place operations
-    on the node features of the new graph to avoid feature corruption.
-    On the contrary, edge features are concatenated,
-    they are not shared due to concatenation.
-    For concrete examples, refer to the ``Examples`` section below.
-
-
-    Examples:
-    ---------
-    **Homographs or Heterographs with A Single Edge Type**
-
-    Create two graphs to for demonstrating joint_union.
-
-    >>> import dgl
-    >>> import torch as th
-    >>> g1 = dgl.graph((th.tensor([0, 1, 3, 1]), th.tensor([1, 2, 0, 2])))
-    >>> g1.ndata['h'] = th.tensor([[0.], [1.], [2.], [1.]])
-    >>> g1.edata['h'] = th.tensor([[3.], [4.], [5.], [6.]])
-    >>> g2 = dgl.graph((th.tensor([3, 2]), th.tensor([1, 3])))
-    >>> g2.ndata['h'] = th.tensor([[7.], [8.], [9.], [8.]])
-    >>> g2.edata['h'] = th.tensor([[7.], [8.]])
-
-    Apply joint_union the two graphs when both ``copy_ndata``
-    and ``copy_edata`` is ``True``
-
-    >>> ug = dgl.joint_union([g1, g2], copy_ndata=True, copy_edata=True)
-    >>> ug.edges()
-    (tensor([0, 1, 3，1, 3, 2]), tensor([1, 2, 0, 2, 1, 3]))
-
-    The node features are copied from g1.
-
-    >>> ug.ndata['h']
-    tensor([[0.],
-            [1.],
-            [2.],
-            [1.]])
-
-    The edge features of g1 and g2 are copied and concatenated.
-
-    >>> ug.edata['h']
-    tensor([[3.],
-            [4.],
-            [5.],
-            [6.],
-            [7.],
-            [8.]])
-
-    **In-place operations on features of FIRST graph will be reflected
-    on features of the new graph. Out-place operations will not
-    be reflected.**
-
-    >>> ug.ndata['h'] += 1
-    >>> g.ndata['h']
-    tensor([[1.],
-            [2.],
-            [3.],
-            [1.]])
-    >>> g.ndata['h'] += 1
-    >>> ug.ndata['h']
-    tensor([[2.],
-            [3.],
-            [4.],
-            [2.]])
-    >>> ug.ndata['h2'] = th.ones(4, 1)
-    >>> 'h2' in g.ndata
-    False
-
-    **Heterographs with Multiple Edge Types**
-
-    >>> g1 = dgl.heterograph({
-    >>>     ('user', 'follows', 'user'): (th.tensor([0, 2]), th.tensor([1, 2])),
-    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
-    >>> })
-    >>> g1.nodes['game'].data['hv'] = th.ones(3, 1)
-    >>> g1.edges['plays'].data['he'] = th.zeros(3, 1)
-    >>> g2 = dgl.heterograph({
-    >>>     ('user', 'follows', 'user'): (th.tensor([2]), th.tensor([1])),
-    >>>     ('user', 'plays', 'game'): (th.tensor([0, 0, 1]), th.tensor([2, 1, 0]))
-    >>> })
-    >>> g2.edges['plays'].data['he'] = th.zeros(3, 1)
-    >>> g3 = dgl.heterograph({
-    >>>     ('user', 'follows', 'user'): (th.tensor([1]), th.tensor([2])),
-    >>>     ('user', 'plays', 'game'): (th.tensor([1]), th.tensor([0]))
-    >>> })
-    >>> g3.edges['plays'].data['he'] = th.zeros(1, 1)
-
-    The joint union of the above three heterographs can be obtained by
-    combining joint union of the subgraphs corresponding to
-    ('user', 'follows', 'user') and the subgraphs corresponding to
-    ('user', 'plays', 'game').
-
-    >>> ug = dgl.joint_union([g1, g2, g3])
-    >>> ug
-    Graph(num_nodes={'game': 3, 'user': 3},
-          num_edges={('user', 'follows', 'user'): 4, ('user', 'plays', 'game'): 7},
-          metagraph=[('user', 'user'), ('user', 'game')])
-    >>> ug.edges(etype='follows')
-    (tensor([0, 2, 2, 1]), tensor([1, 2, 1, 2]))
-    >>> ug.edges(etype='plays')
-    (tensor([1, 2, 1, 0, 0, 1, 1]), tensor([2, 1, 1, 2, 1, 0, 0]))
-    >>> ug.nodes['game'].data
-    {}
-    >>> ug.edges['plays'].data
-    {}
-    """
-    assert len(graph_list) > 1, 'joint_union requires at least two graphs as input'
-    # check all graphs have the same canonical etypes
-    canonical_etypes_0 = graph_list[0].canonical_etypes
-    for i in range(1, len(graph_list)):
-        canonical_etypes_i = graph_list[i].canonical_etypes
-        assert len(canonical_etypes_0) == len(canonical_etypes_i), \
-            '{}-th graph should has the same canonical edge type as the first graph'.format(i)
-        for et_0, et_i in zip(canonical_etypes_0, canonical_etypes_i):
-            assert et_0 == et_i, \
-                '{}-th graph should has the same canonical edge type as the first graph'.format(i)
-
-    # do the joint union
-    gidxes = [g._graph for g in graph_list]
-
-    graph_index = gidx_joint_union(graph_list[0]._graph.metagraph, gidxes)
-    hg = DGLHeteroGraph(graph_index, graph_list[0].ntypes, graph_list[0].etypes)
-
-    # handle shared ndata
-    if copy_ndata:
-        for ntype in graph_list[0].ntypes:
-            for key in graph_list[0].nodes[ntype].data:
-                hg.nodes[ntype].data[key] = graph_list[0].nodes[ntype].data[key]
-
-    # handle shared edata
-    if copy_edata:
-        for etype in graph_list[0].canonical_etypes:
-            for key in graph_list[0].edges[etype].data:
-                edata = []
-                for g in graph_list:
-                    edata.append(g.edges[etype].data[key])
-                hg.edges[etype].data[key] = F.cat(edata, dim=0)
-
-    return hg
 
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
