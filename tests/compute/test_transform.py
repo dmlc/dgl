@@ -94,7 +94,8 @@ def test_no_backtracking():
         assert not L.has_edge_between(e2, e1)
 
 # reverse graph related
-def test_reverse():
+@parametrize_dtype
+def test_reverse(idtype):
     g = dgl.DGLGraph()
     g.add_nodes(5)
     # The graph need not to be completely connected.
@@ -157,7 +158,8 @@ def test_reverse():
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
         ('user', 'plays', 'game'): ([0, 0, 2, 3, 3, 4, 1], [1, 0, 1, 0, 1, 0, 0]),
-        ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])})
+        ('developer', 'develops', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])},
+        idtype=idtype, device=F.ctx())
     g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
     g.nodes['user'].data['hh'] = F.tensor([1, 1, 1, 1, 1])
     g.nodes['game'].data['h'] = F.tensor([0, 1])
