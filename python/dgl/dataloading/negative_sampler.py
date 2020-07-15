@@ -3,37 +3,9 @@ from collections.abc import Mapping
 import numpy as np
 from .. import backend as F
 
-class Uniform(object):
-    """Uniform negative sampler.
-
-    For each edge with type `(utype, etype, vtype)`, ``k`` pairs of random nodes
-    with node type ``utype`` and ``vtype`` will be returned.  The nodes will be
-    chosen uniformly.
-
-    Parameters
-    ----------
-    k : int
-        The number of negative examples.
-
-    Examples
-    --------
-    >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
-    >>> neg_sampler = dgl.sampling.negative_sampler.Uniform(2)
-    >>> neg_sampler(g, [0, 1])
-    (tensor([2, 3, 2, 1]), tensor([1, 0, 2, 3]))
-    """
-    def __init__(self, k):
-        self.k = k
-
+class _BaseNegativeSampler(object):
     def _generate(self, g, eids, canonical_etype):
-        utype, _, vtype = canonical_etype
-        shape = F.shape(v)
-        dtype = F.dtype(v)
-        ctx = F.context(v)
-        shape = (shape[0] * self.k,)
-        src = F.randint(shape, dtype, ctx, 0, g.number_of_nodes(utype))
-        dst = F.randint(shape, dtype, ctx, 0, g.number_of_nodes(vtype))
-        return src, dst
+        raise NotImplementedError
 
     def __call__(self, g, eids):
         """Returns negative examples.
@@ -60,9 +32,9 @@ class Uniform(object):
 
         return neg_pair
 
-class UniformBySource(Uniform):
-    """Uniform negative sampler that randomly chooses negative destination nodes
-    for each source node.
+class Uniform(_BaseNegativeSampler):
+    """Negative sampler that randomly chooses negative destination nodes
+    for each source node according to a uniform distribution.
 
     For each edge with type `(utype, etype, vtype)`, ``k`` pairs of nodes
     with node type ``utype`` and ``vtype`` will be returned.  The source nodes
@@ -81,6 +53,9 @@ class UniformBySource(Uniform):
     >>> neg_sampler(g, [0, 1])
     (tensor([0, 0, 1, 1]), tensor([1, 0, 2, 3]))
     """
+    def __init__(self, k):
+        self.k = k
+
     def _generate(self, g, eids, canonical_etype):
         _, _, vtype = canonical_etype
         shape = F.shape(v)
@@ -88,5 +63,35 @@ class UniformBySource(Uniform):
         ctx = F.context(v)
         shape = (shape[0] * self.k,)
         src, _ = g.find_edges(eids, etype=canonical_etype)
+        src = F.
         dst = F.randint(shape, dtype, ctx, 0, g.number_of_nodes(vtype))
         return src, dst
+
+class DegreeExponential(_BaseNegativeSampler):
+    """Negative sampler that randomly chooses negative destination nodes
+    for each source node according to a distribution proportional to
+    :math:`d^p`, where :math:`d` is the degree of the sampled destination node
+    and :math:`p` is a given constant (usually between 0 and 1).
+
+    For each edge with type `(utype, etype, vtype)`, ``k`` pairs of nodes
+    with node type ``utype`` and ``vtype`` will be returned.  The source nodes
+    will always be the source node of the edge, while the destination nodes
+    are chosen uniformly.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The graph.
+    k : int
+        The number of negative examples.
+    p : float
+        The exponent of degree.
+
+    Examples
+    --------
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
+    >>> neg_sampler = dgl.sampling.negative_sampler.Uniform(2, 0.9)
+    >>> neg_sampler(g, [0, 1])
+    (tensor([0, 0, 1, 1]), tensor([1, 0, 2, 3]))
+    """
+    pass
