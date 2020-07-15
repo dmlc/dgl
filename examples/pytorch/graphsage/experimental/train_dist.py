@@ -71,7 +71,7 @@ class DistSAGE(SAGE):
                 y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_classes),
                                                th.float32, 'h_last')
 
-            sampler = NeighborSampler(g, [100], dgl.distributed.sample_neighbors)
+            sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
             # Create PyTorch DataLoader for constructing blocks
             dataloader = DataLoader(
