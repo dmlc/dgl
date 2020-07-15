@@ -55,7 +55,7 @@ def create_random_graph(n):
     return dgl.DGLGraph(ig)
 
 def run_server(graph_name, server_id, num_clients, shared_mem):
-    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, graph_name,
+    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
@@ -66,8 +66,8 @@ def emb_init(shape, dtype):
 
 def run_client(graph_name, part_id, num_nodes, num_edges):
     time.sleep(5)
-    gpb = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
-                              part_id, None)
+    gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
+                                          part_id, None)
     g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
 
     # Test API
@@ -221,7 +221,7 @@ def test_split():
     selected_edges = np.nonzero(edge_mask)[0]
     for i in range(num_parts):
         dgl.distributed.set_num_client(num_parts)
-        part_g, node_feats, edge_feats, gpb = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
+        part_g, node_feats, edge_feats, gpb, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
@@ -270,7 +270,7 @@ def test_split_even():
     all_edges2 = []
     for i in range(num_parts):
         dgl.distributed.set_num_client(num_parts)
-        part_g, node_feats, edge_feats, gpb = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
+        part_g, node_feats, edge_feats, gpb, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes = node_split(node_mask, gpb, i, force_even=True)
