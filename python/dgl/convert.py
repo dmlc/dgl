@@ -952,7 +952,6 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
     -------
     DGLHeteroGraph
     """
-    print(idtype)
     num_src, num_dst = spmat.shape
     num_ntypes = 1 if utype == vtype else 2
     if spmat.getformat() == 'coo':
