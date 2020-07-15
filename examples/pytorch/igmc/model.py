@@ -55,12 +55,14 @@ class IGMC(nn.Module):
 
     # @profile
     def forward(self, block):
-        # block = edge_drop(block, self.edge_dropout, self.force_undirected, self.training)
+        block = edge_drop(block, self.edge_dropout, self.training)
 
         concat_states = []
         x = block.ndata['x']
         for conv in self.convs:
-            x = th.tanh(conv(block, x, block.edata['etype']))
+            # edge weight zero denotes the edge dropped
+            x = th.tanh(conv(block, x, block.edata['etype'], 
+                             norm=block.edata['weight'].unsqueeze(1)))
             concat_states.append(x)
         concat_states = th.cat(concat_states, 1)
         
@@ -82,31 +84,16 @@ class IGMC(nn.Module):
     def __repr__(self):
         return self.__class__.__name__
 
-# XXX [zhoujf] slower than dropout_link fn that directly manipulates on array
-def edge_drop(dgl_graph, edge_dropout=0.2, force_undirected=False, training=True):
+def edge_drop(graph, edge_dropout=0.2, training=True):
     assert edge_dropout >= 0.0 and edge_dropout <= 1.0, 'Invalid dropout rate.'
 
     if not training:
-        return dgl_graph
+        return graph
 
     # cal dropout mask
-    src, dst = dgl_graph.edges()
-    n_edges = dgl_graph.number_of_edges() // 2 if force_undirected else dgl_graph.number_of_edges()
+    src, _ = graph.edges()
+    to_drop = src.new_full((graph.number_of_edges(), ), edge_dropout, dtype=th.float)
+    to_drop = th.bernoulli(to_drop).to(th.bool)
+    graph.edata['weight'][to_drop] = 0
 
-    mask = src.new_full((n_edges, ), 1 - edge_dropout, dtype=th.float)
-    mask = th.bernoulli(mask).to(th.bool)
-    if force_undirected:
-        mask = th.concat([mask, mask], axis=0)
-        
-    src, dst = src[mask], dst[mask]
-    edges_to_keep = dgl_graph.edge_ids(src, dst)
-    # the pair of first user and movie nodes may be isolated
-    subgraph = dgl_graph.edge_subgraph(edges_to_keep, preserve_nodes=True)
-
-    # restore node and edge features
-    for k in dgl_graph.ndata.keys():
-        subgraph.ndata[k] = dgl_graph.ndata[k][subgraph.parent_nid]
-    for k in dgl_graph.edata.keys():
-        subgraph.edata[k] = dgl_graph.edata[k][subgraph.parent_eid]
-
-    return subgraph
+    return graph

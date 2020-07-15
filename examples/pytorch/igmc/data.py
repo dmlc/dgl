@@ -126,27 +126,29 @@ class MovieLens(object):
                 None, 1.0
             )
             
-        self.rating_mx_train = adj_train
-        self.train_rating_pairs = (train_u_indices, train_v_indices)
-        self.valid_rating_pairs = (val_u_indices, val_v_indices)
-        self.test_rating_pairs = (test_u_indices, test_v_indices)
-        self.train_rating_values = train_labels
-        self.valid_rating_values = val_labels
-        self.test_rating_values = test_labels
+        self._num_user = u_features.shape[0]
+        self._num_movie = v_features.shape[0]
+
+        # reindex u and v, v nodes start after u
+        train_v_indices += self.num_user
+        val_v_indices += self.num_user
+        test_v_indices += self.num_user
+
+        self.train_rating_pairs = (th.LongTensor(train_u_indices), th.LongTensor(train_v_indices))
+        self.valid_rating_pairs = (th.LongTensor(val_u_indices), th.LongTensor(val_v_indices))
+        self.test_rating_pairs = (th.LongTensor(test_u_indices), th.LongTensor(test_v_indices))
+        self.train_rating_values = th.FloatTensor(train_labels)
+        self.valid_rating_values = th.FloatTensor(val_labels)
+        self.test_rating_values = th.FloatTensor(test_labels)
 
         print("\tTrain rating pairs : {}".format(len(train_labels)))
         print("\tValid rating pairs : {}".format(len(val_labels)))
         print("\tTest rating pairs  : {}".format(len(test_labels)))
 
-        # build to train graph, which is homogeneous and bidirectional
-        # self.train_rating_pairs = (th.LongTensor(self.train_rating_pairs[0]), 
-        #                            th.LongTensor(self.train_rating_pairs[1]))
-        # self.train_rating_values = th.FloatTensor(self.train_raiting_values)
-
-        # src = self.train_rating_pairs[0]
-        # dst = self.train_rating_pairs[1] + self.num_user
-        # train_graph = dgl.graph((th.cat([src, dst], th.cat(src, dst)))
-        # train_graph.edata['rating'] = th.cat([self.train_rating_values, self.train_rating_values])
+        # build dgl graph object, which is homogeneous and bidirectional and contains only training edges
+        self.train_graph = dgl.graph((th.cat([self.train_rating_pairs[0], self.train_rating_pairs[1]]), 
+                                      th.cat([self.train_rating_pairs[1], self.train_rating_pairs[0]])))
+        self.train_graph.edata['etype'] = th.cat([self.train_rating_values, self.train_rating_values]).to(th.long)
 
     @property
     def num_rating(self):
@@ -937,5 +939,4 @@ def load_official_trainvaltest_split(dataset, testing=False, rating_map=None, po
         val_labels, u_val_idx, v_val_idx, test_labels, u_test_idx, v_test_idx, class_values
 
 if __name__ == '__main__':
-    from utils import links2subgraphs
-    dataset = MovieLens("ml-1m", testing=True)
+    dataset = MovieLens("ml-100k", testing=True)

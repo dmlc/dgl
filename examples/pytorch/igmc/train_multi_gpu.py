@@ -135,26 +135,30 @@ def train(proc_id, n_gpus, args, devices, movielens):
     th.cuda.set_device(dev_id)
 
     # Split train_dataset and set dataloader
-    train_rating_pairs = np.array_split(np.stack(movielens.train_rating_pairs), args.n_gpus, axis=1)[proc_id]
-    train_rating_values = np.array_split(movielens.train_rating_values, args.n_gpus, axis=0)[proc_id]
+    train_rating_pairs = th.split(th.stack(movielens.train_rating_pairs), 
+                                len(movielens.train_rating_values)//args.n_gpus, 
+                                dim=1)[proc_id]
+    train_rating_values = th.split(movielens.train_rating_values, 
+                                len(movielens.train_rating_values)//args.n_gpus, 
+                                dim=0)[proc_id]
 
     train_dataset = MovieLensDataset(
-        train_rating_pairs, train_rating_values, movielens.rating_mx_train, 
-        args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1, 
-        mode='train', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+        train_rating_pairs, train_rating_values, movielens.train_graph, 
+        args.hop, args.sample_ratio, args.max_nodes_per_hop)
+        # mode='train', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
     train_loader = th.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
                             num_workers=args.num_workers, collate_fn=collate_movielens)
     if proc_id == 0:
         if args.testing:
             test_dataset = MovieLensDataset(
-                movielens.test_rating_pairs, movielens.test_rating_values, movielens.rating_mx_train, 
-                args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1, 
-                mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+                movielens.test_rating_pairs, movielens.test_rating_values, movielens.train_graph, 
+                args.hop, args.sample_ratio, args.max_nodes_per_hop)
+                # mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
         else:
             test_dataset = MovieLensDataset(
-                movielens.valid_rating_pairs, movielens.valid_rating_pairs, movielens.rating_mx_train, 
-                args.hop, args.sample_ratio, args.max_nodes_per_hop, max_node_label=args.hop*2+1, 
-                mode='valid', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
+                movielens.valid_rating_pairs, movielens.valid_rating_pairs, movielens.train_graph, 
+                args.hop, args.sample_ratio, args.max_nodes_per_hop)
+                # mode='valid', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
         test_loader = th.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                                 num_workers=args.num_workers, collate_fn=collate_movielens)
 
