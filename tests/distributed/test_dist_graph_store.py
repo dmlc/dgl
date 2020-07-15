@@ -64,6 +64,9 @@ def run_server(graph_name, server_id, num_clients, shared_mem):
 def emb_init(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
+def rand_init(shape, dtype):
+    return F.tensor(np.random.normal(size=shape))
+
 def run_client(graph_name, part_id, num_nodes, num_edges):
     time.sleep(5)
     gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -93,6 +96,13 @@ def check_dist_graph(g, num_nodes, num_edges):
     g.ndata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32, 'test1')
     feats = g.ndata['test1'][nids]
     assert np.all(F.asnumpy(feats) == 0)
+
+    # Test reuse_if_exist
+    g.ndata['test2'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2',
+                                                  init_func=rand_init)
+    g.ndata['test3'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2',
+                                                  reuse_if_exist=True)
+    assert np.all(F.asnumpy(g.ndata['test2'][nids]) == F.asnumpy(g.ndata['test3'][nids]))
 
     # Test init edge data
     new_shape = (g.number_of_edges(), 2)
