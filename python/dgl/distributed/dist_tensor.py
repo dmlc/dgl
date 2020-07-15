@@ -22,7 +22,8 @@ class DistTensor:
     This wrapper provides an interface similar to the local tensor.
 
     If a user tries to create a new tensor with a name that exists in the KVStore,
-    the creation will fail.
+    the creation will fail by default. However, if reuse_if_exist=True, it tries
+    to reuse the existing tensor in the KVStore if the shape and dtype match.
 
     Parameters
     ----------
@@ -40,9 +41,11 @@ class DistTensor:
         The function to initialize data in the tensor.
     create_new : bool
         Whether or not to create a new tensor in the KVStore.
+    reuse_if_exist : bool
+        Reuse the existing tensor if create_new=True.
     '''
     def __init__(self, g, shape, dtype, name, part_policy=None, init_func=None,
-                 create_new=True):
+                 create_new=True, reuse_if_exist=False):
         self.kvstore = g._client
         self._shape = shape
         self._dtype = dtype
@@ -63,11 +66,16 @@ class DistTensor:
             init_func = _default_init_data
         self._name = _get_data_name(name, part_policy.policy_str)
         if create_new:
-            g._client.init_data(self._name, shape, dtype, part_policy, init_func)
+            if reuse_if_exist and self._name in g._client.data_name_list():
+                dtype1, shape1, _ = g._client.get_data_meta(self._name)
+                assert dtype == dtype1, 'The dtype does not match with the existing tensor'
+                assert shape == shape1, 'The shape does not match with the existing tensor'
+            else:
+                g._client.init_data(self._name, shape, dtype, part_policy, init_func)
         else:
             dtype1, shape1, _ = g._client.get_data_meta(self._name)
-            assert dtype == dtype1
-            assert shape == shape1
+            assert dtype == dtype1, 'The dtype does not match with the existing tensor'
+            assert shape == shape1, 'The shape does not match with the existing tensor'
 
     def __getitem__(self, idx):
         idx = utils.toindex(idx)
