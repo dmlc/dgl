@@ -1447,28 +1447,6 @@ class DGLHeteroGraph(object):
         `u` and destination node `v`, with the specified edge type
 
         **DEPRECATED**: See edge_ids
-
-        Parameters
-        ----------
-        u : int, list, tensor
-            The node ID array of source type.
-        v : int, list, tensor
-            The node ID array of destination type.
-        force_multi : bool, optional
-            Deprecated (Will be deleted in the future).
-            Whether to always treat the graph as a multigraph. See the
-            "Returns" for their effects. (Default: False)
-        return_uv : bool
-            See the "Returns" for their effects. (Default: False)
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-
-        Returns
-        -------
-        int or tensor
-            The edge ID if ``return_array == False``.
-            The edge ID array otherwise.
         """
         dgl_warning("DGLGraph.edge_id is deprecated. Please use DGLGraph.edge_ids.")
         return self.edge_ids(u, v, force_multi=force_multi,
@@ -2913,7 +2891,10 @@ class DGLHeteroGraph(object):
 
         DEPRECATE: please use send_and_recv, update_all.
         """
-        raise DGLError('send API is deprecated. Please use send_and_recv, update_all.')
+        raise DGLError('DGLGraph.send is deprecated. As a replacement, use DGLGraph.apply_edges\n'
+                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
+                       ' and set the message function as dgl.function.copy_e to conduct message\n'
+                       ' aggregation.')
 
     def recv(self,
              v,
@@ -2925,15 +2906,20 @@ class DGLHeteroGraph(object):
 
         DEPRECATE: please use send_and_recv, update_all.
         """
-        raise DGLError('recv API is deprecated. Please use send_and_recv, update_all.')
+        raise DGLError('DGLGraph.recv is deprecated. As a replacement, use DGLGraph.apply_edges\n'
+                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
+                       ' and set the message function as dgl.function.copy_e to conduct message\n'
+                       ' aggregation.')
 
     def multi_recv(self, v, reducer_dict, cross_reducer, apply_node_func=None, inplace=False):
         r"""Receive messages from multiple edge types and perform aggregation.
 
         DEPRECATE: please use multi_send_and_recv, multi_update_all.
         """
-        raise DGLError('multi_recv API is deprecated. Please use multi_send_and_recv, '
-                       'multi_update_all.')
+        raise DGLError('DGLGraph.multi_recv is deprecated. As a replacement,\n'
+                       ' use DGLGraph.apply_edges API to compute messages as edge data.\n'
+                       ' Then use DGLGraph.multi_send_and_recv and set the message function\n'
+                       ' as dgl.function.copy_e to conduct message aggregation.')
 
     def send_and_recv(self,
                       edges,
