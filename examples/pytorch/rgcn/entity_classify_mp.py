@@ -10,6 +10,7 @@ import argparse
 import itertools
 import numpy as np
 import time
+import gc
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -164,9 +165,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
     if split is not None:
-        train_seed, valid_seed, test_seed = split
+        train_seed, val_seed, test_seed = split
         train_idx = train_idx[train_seed]
-        valid_idx = valid_idx[valid_seed]
+        val_idx = val_idx[val_seed]
         test_idx = test_idx[test_seed]
 
     node_tids = g.ndata[dgl.NTYPE]
@@ -197,7 +198,8 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
         world_size = n_gpus
-        backend = 'nccl'
+        backend = 'gloo'
+        # backend = 'nccl'
         if args.sparse_embedding:
             backend = 'gloo'
         th.distributed.init_process_group(backend=backend,
@@ -227,26 +229,29 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                            use_self_loop=args.use_self_loop,
                            low_mem=args.low_mem)
 
-    if dev_id >= 0:
+    if dev_id >= 0 and n_gpus == 1:
         th.cuda.set_device(dev_id)
         labels = labels.to(dev_id)
         model.cuda(dev_id)
         # embedding layer may not fit into GPU, then use mix_cpu_gpu
         if args.mix_cpu_gpu is False:
             embed_layer.cuda(dev_id)
-        else:
-            embed_layer.part_to(dev_id)
 
     if n_gpus > 1:
-        embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
+        labels = labels.to(dev_id)
+        model.cuda(dev_id)
+        embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     # optimizer
     if args.sparse_embedding:
-        optimizer = th.optim.Adam(list(model.parameters()) + list(embed_layer.embeds.parameters()), lr=args.lr, weight_decay=args.l2norm)
-        emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
+        dense_params = list(model.parameters())
+        if args.node_feats:
+            dense_params += list(embed_layer.embeds.parameters())
+        optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
+        emb_optimizer = th.optim.SparseAdam(embed_layer.module.sparse_embeds, lr=args.lr)
     else:
-        all_params = itertools.chain(model.parameters(), embed_layer.parameters())
+        all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
 
     # training loop
@@ -264,8 +269,8 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             seeds, blocks = sample_data
             t0 = time.time()
             if args.mix_cpu_gpu is False:
-                feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
-                                    blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                                    blocks[0].srcdata[dgl.NTYPE],
                                     blocks[0].srcdata['type_id'],
                                     node_feats)
             else:
@@ -290,6 +295,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                   format(train_acc, loss.item()))
 
+        gc.collect()
         # only process 0 will do the evaluation
         if (queue is not None) or (proc_id == 0):
             model.eval()
@@ -299,8 +305,8 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                 for i, sample_data in enumerate(val_loader):
                     seeds, blocks = sample_data
                     if args.mix_cpu_gpu is False:
-                        feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
-                                            blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                        feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                                            blocks[0].srcdata[dgl.NTYPE],
                                             blocks[0].srcdata['type_id'],
                                             node_feats)
                     else:
@@ -309,14 +315,14 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                                             blocks[0].srcdata['type_id'],
                                             node_feats)
                     logits = model(blocks, feats)
-                    eval_logtis.append(logits.detach())
-                    eval_seeds.append(seeds.detach())
-                    if i % 10:
+                    eval_logtis.append(logits.cpu().detach())
+                    eval_seeds.append(seeds.cpu().detach())
+                    if i % 100:
                         print("handle {} valid samples".format(i * seeds.shape[0]))
                 eval_logtis = th.cat(eval_logtis)
                 eval_seeds = th.cat(eval_seeds)
-                val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds]).item()
-                val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds]).item() / len(eval_seeds)
+                val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds].cpu()).item()
+                val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds].cpu()).item() / len(eval_seeds)
 
                 if queue is not None:
                     queue.put((val_loss, val_acc))
@@ -334,7 +340,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                     val_acc = sum(val_acc) / len(val_acc)
 
                 print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
-                        format(val_acc, val_loss)
+                        format(val_acc, val_loss))
         if n_gpus > 1:
             th.distributed.barrier()
     print()
@@ -348,12 +354,14 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             for i, sample_data in enumerate(test_loader):
                 seeds, blocks = sample_data
                 if args.mix_cpu_gpu is False:
-                    feats = embed_layer(blocks[0].srcdata[dgl.NID].to(dev_id),
-                                        blocks[0].srcdata[dgl.NTYPE].to(dev_id),
+                    feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                                        blocks[0].srcdata[dgl.NTYPE],
+                                        blocks[0].srcdata['type_id'],
                                         node_feats)
                 else:
                     feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                         blocks[0].srcdata[dgl.NTYPE],
+                                        blocks[0].srcdata['type_id'],
                                         node_feats)
                 logits = model(blocks, feats)
                 test_logtis.append(logits.detach())
@@ -495,12 +503,12 @@ def main(args, devices):
     if devices[0] == -1:
         run(0, 0, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             train_idx, val_idx, test_idx, labels), None)
+             train_idx, val_idx, test_idx, labels), None, None)
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-            train_idx, val_idx, test_idx, labels), None)
+            train_idx, val_idx, test_idx, labels), None, None)
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
@@ -508,6 +516,9 @@ def main(args, devices):
         num_train_seeds = train_idx.shape[0]
         num_valid_seeds = val_idx.shape[0]
         num_test_seeds = test_idx.shape[0]
+        train_seeds = th.arange(num_train_seeds)
+        valid_seeds = th.arange(num_valid_seeds)
+        test_seeds = th.arange(num_test_seeds)
         tseeds_per_proc = num_train_seeds // n_gpus
         vseeds_per_proc = num_valid_seeds // n_gpus
         tstseeds_per_proc = num_test_seeds // n_gpus
