@@ -212,6 +212,9 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
 
+def randint(shape, dtype, ctx, low, high):
+    return th.randint(low, high, shape, dtype=dtype, device=ctx)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, th.Tensor):

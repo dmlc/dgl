@@ -4,63 +4,117 @@ from collections.abc import Mapping
 from abc import ABC, abstractproperty, abstractmethod
 from .. import transform
 from ..base import NID, EID
+from .. import backend as F
 from .. import utils
 
 # pylint: disable=unused-argument
-def assign_block_eids(block, frontier, block_id, g, seed_nodes, *args, **kwargs):
+def assign_block_eids(block, frontier):
     """Assigns edge IDs from the original graph to the block.
-
-    This is the default block postprocessor for samplers created with
-    ``return_eids`` as True.
 
     See also
     --------
     BlockSampler
-    MultiLayerNeighborSampler
     """
     for etype in block.canonical_etypes:
         block.edges[etype].data[EID] = frontier.edges[etype].data[EID][
             block.edges[etype].data[EID]]
     return block
 
-def _default_frontier_postprocessor(frontier, block_id, g, seed_nodes, *args, **kwargs):
-    return frontier
+def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
+    eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
+    if isinstance(eids, Mapping):
+        exclude_eids = {
+            k: F.cat([v, F.gather_row(reverse_eid_map[k], v)], 0)
+            for k, v in eids.items()}
+    else:
+        exclude_eids = F.cat([eids, F.gather_row(reverse_eid_map, eids)], 0)
+    return exclude_eids
 
-def _default_block_postprocessor(block, frontier, block_id, g, seed_nodes, *args, **kwargs):
-    return block
+def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
+    exclude_eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
+    reverse_etype_map = {
+        g.to_canonical_etype(k): g.to_canonical_etype(v)
+        for k, v in reverse_etype_map.items()}
+    exclude_eids.update({reverse_etype_map(k): v for k, v in exclude_eids})
+    return exclude_eids
+
+def find_exclude_eids(g, exclude_mode, eids, **kwargs):
+    """Find all edge IDs to exclude according to ``exclude_mode``.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The graph.
+    exclude_mode : str, optional
+        Can be either of the following,
+
+        None (default)
+            Does not exclude any edge.
+        'reverse_id'
+            Exclude all edges specified in ``eids``, as well as their reverse edges
+            of the same edge type.
+
+            The mapping from each edge ID to its reverse edge ID is specified in
+            the keyword argument ``reverse_eid_map``.
+
+            This mode assumes that the reverse of an edge with ID ``e`` and type
+            ``etype`` will have ID ``reverse_eid_map[e]`` and type ``etype``.
+        'reverse_types'
+            Exclude all edges specified in ``eids``, as well as their reverse
+            edges of the corresponding edge types.
+
+            The mapping from each edge type to its reverse edge type is specified
+            in the keyword argument ``reverse_etype_map``.
+
+            This mode assumes that the reverse of an edge with ID ``e`` and type ``etype``
+            will have ID ``e`` and type ``reverse_etype_map[etype]``.
+    eids : Tensor or dict[etype, Tensor]
+        The edge IDs.
+    reverse_eid_map : Tensor or dict[etype, Tensor]
+        The mapping from edge ID to its reverse edge ID.
+    reverse_etype_map : dict[etype, etype]
+        The mapping from edge etype to its reverse edge type.
+    """
+    if exclude_mode is None:
+        return None
+    elif exclude_mode == 'reverse_id':
+        return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
+    elif exclude_mode == 'reverse_types':
+        return _find_exclude_eids_with_reverse_types(g, eids, kwargs['reverse_etype_map'])
+
 
 class BlockSampler(object):
     """Abstract class specifying the neighborhood sampling strategy for DGL data loaders.
 
-    The main method for BlockSampler is :func:`~dgl.sampling.BlockSampler.sample_blocks`,
+    The main method for BlockSampler is :func:`~dgl.dataloading.BlockSampler.sample_blocks`,
     which generates a list of blocks for a multi-layer GNN given a set of seed nodes to
     have their outputs computed.
 
-    The default implementation of :py:meth:`~dgl.sampling.BlockSampler.sample_blocks` is
+    The default implementation of :py:meth:`~dgl.dataloading.BlockSampler.sample_blocks` is
     to repeat ``num_hops`` times the following:
 
     * Obtain a frontier with the same nodes as the original graph but only the edges
       involved in message passing on the last layer.
-      Customizable via :py:meth:`~dgl.sampling.BlockSampler.sample_frontier`.
+      Customizable via :py:meth:`~dgl.dataloading.BlockSampler.sample_frontier`.
 
-    * Optionally, post-process the obtained frontier (e.g. by removing edges connecting training
-      node pairs).  One can add such postprocessors via
-      :py:meth:`~dgl.sampling.BlockSampler.add_frontier_postprocessor`.
+    * Optionally, if the task is link prediction or edge classfication, remove edges
+      connecting training node pairs.  If the graph is undirected, also remove the
+      reverse edges.  This is controlled by the argument ``exclude_eids`` in
+      :py:meth:``~dgl.dataloading.BlockSampler.sample_blocks`` method.
 
     * Convert the frontier into a block.
 
-    * Optionally, post-process the block (e.g. by assigning edge IDs).  One can add such
-      postprocessors via
-      :py:meth:`~dgl.sampling.BlockSampler.add_block_postprocessor`.
+    * Optionally assign the edge IDs to the block, controlled by the argument
+      ``return_eids`` in :py:meth:``~dgl.dataloading.BlockSampler.sample_blocks`` method.
 
     * Prepend the block to the block list to be returned.
 
     All subclasses should either
 
-    * Override :py:meth:`~dgl.sampling.BlockSampler.sample_blocks` method, or
+    * Override :py:meth:`~dgl.dataloading.BlockSampler.sample_blocks` method, or
 
     * Override
-      :py:meth:`~dgl.sampling.BlockSampler.sample_frontier` method while specifying
+      :py:meth:`~dgl.dataloading.BlockSampler.sample_frontier` method while specifying
       the number of layers to sample in ``num_hops`` argument.
 
     See also
@@ -69,91 +123,8 @@ class BlockSampler(object):
     """
     def __init__(self, num_hops):
         self.num_hops = num_hops
-        self._frontier_postprocessor = _default_frontier_postprocessor
-        self._block_postprocessor = _default_block_postprocessor
 
-    @property
-    def frontier_postprocessor(self):
-        """Frontier postprocessor."""
-        return self._frontier_postprocessor
-
-    @property
-    def block_postprocessor(self):
-        """B;pcl postprocessor."""
-        return self._block_postprocessor
-
-    def set_frontier_postprocessor(self, postprocessor):
-        """Set a frontier postprocessor.
-
-        The postprocessor must have the following signature:
-
-        .. code::
-
-           postprocessor(frontier, block_id, g, seed_nodes, *args, **kwargs)
-
-        where
-
-        * ``frontier`` represents the frontier obtained by
-          :py:meth:`~dgl.sampling.BlockSampler.sample_frontier` method.
-
-        * ``block_id`` represents which GNN layer the block is currently generated for.
-
-        * ``g`` represents the original graph.
-
-        * ``seed_nodes`` represents the output nodes on the current layer.
-
-        * Other arguments are the same ones passed into
-          :py:meth:`~dgl.sampling.BlockSampler.sample_blocks` method.
-
-        Parameters
-        ----------
-        postprocessor : callable
-            The postprocessor.
-        """
-        self._frontier_postprocessor = postprocessor
-
-    def set_block_postprocessor(self, postprocessor):
-        """Set a block postprocessor.
-
-        The postprocessor must have the following signature:
-
-        .. code::
-
-           postprocessor(block, frontier, block_id, g, seed_nodes, *args, **kwargs)
-
-        where
-
-        * ``block`` represents the block converted from the frontier.
-
-        * ``frontier`` represents the frontier the block is generated from.
-
-        * ``block_id`` represents which GNN layer the block is currently generated for.
-
-        * ``g`` represents the original graph.
-
-        * ``seed_nodes`` represents the output nodes on the current layer.
-
-        * Other arguments are the same ones passed into
-          :py:meth:`~dgl.sampling.BlockSampler.sample_blocks` method.
-
-        Parameters
-        ----------
-        postprocessor : callable
-            The postprocessor.
-        """
-        self._block_postprocessor = postprocessor
-
-    def _postprocess_frontier(self, frontier, block_id, g, seed_nodes, *args, **kwargs):
-        """Post-processes the generated frontier."""
-        return self._frontier_postprocessor(
-            frontier, block_id, g, seed_nodes, *args, **kwargs)
-
-    def _postprocess_block(self, block, frontier, block_id, g, seed_nodes, *args, **kwargs):
-        """Post-processes the generated block."""
-        return self._block_postprocessor(
-            block, frontier, block_id, g, seed_nodes, *args, **kwargs)
-
-    def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
+    def sample_frontier(self, block_id, g, seed_nodes):
         """
         Generate the frontier given the output nodes.
 
@@ -168,9 +139,6 @@ class BlockSampler(object):
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
-        args, kwargs :
-            Other arguments being passed by
-            :py:meth:`~dgl.sampling.BlockSampler.sample_blocks`.
 
         Returns
         -------
@@ -183,7 +151,7 @@ class BlockSampler(object):
         """
         raise NotImplementedError
 
-    def sample_blocks(self, g, seed_nodes, *args, **kwargs):
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None, return_eids=False):
         """
         Generate the a list of blocks given the output nodes.
 
@@ -196,9 +164,11 @@ class BlockSampler(object):
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
-        args, kwargs :
-            Other arguments being passed by
-            :py:meth:`~dgl.sampling.BlockSampler.sample_blocks`.
+        exclude_eids : Tensor or dict[etype, Tensor]
+            The edges to exclude from computation dependency.
+        return_eids : bool, default False
+            Whether to return the edge IDs involved in message passing in the block.
+            If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
         Returns
         -------
@@ -214,14 +184,12 @@ class BlockSampler(object):
             frontier = self.sample_frontier(block_id, g, seed_nodes, *args, **kwargs)
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
-            frontier = self._postprocess_frontier(
-                frontier, block_id, g, seed_nodes, *args, **kwargs)
+            if exclude_eids is not None:
+                frontier = transform.remove_edges(frontier, exclude_eids)
 
             block = transform.to_block(frontier, seed_nodes)
-            # Assigning edge IDs and/or node/edge features falls into the category of block
-            # postprocessing
-            block = self._postprocess_block(
-                block, frontier, block_id, g, seed_nodes, *args, **kwargs)
+            if self.return_eids:
+                assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
             blocks.insert(0, block)
@@ -270,29 +238,33 @@ class NodeCollator(Collator):
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : :py:class:`~dgl.sampling.BlockSampler`
+    block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
         The neighborhood sampler.
+    return_eids : bool, default False
+        Whether to return the edge IDs involved in message passing in the block.
+        If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Examples
     --------
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
-    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
-    >>> collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
+    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> collator = dgl.dataloading.NodeCollator(g, train_nid, sampler)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
     """
-    def __init__(self, g, nids, block_sampler):
+    def __init__(self, g, nids, block_sampler, return_eids=False):
         self.g = g
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
         self.nids = nids
         self.block_sampler = block_sampler
+        self.return_eids = return_eids
 
         if isinstance(nids, Mapping):
             self._dataset = utils.FlattenedDict(nids)
@@ -325,7 +297,7 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-        blocks = self.block_sampler.sample_blocks(self.g, items)
+        blocks = self.block_sampler.sample_blocks(self.g, items, return_eids=self.return_eids)
         output_nodes = blocks[-1].dstdata[NID]
         input_nodes = blocks[0].srcdata[NID]
 
@@ -357,7 +329,7 @@ class EdgeCollator(Collator):
         The graph.
     eids : Tensor or dict[etype, Tensor]
         The edge set to compute outputs.
-    block_sampler : :py:class:`~dgl.sampling.BlockSampler`
+    block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
         The neighborhood sampler.
     exclude : str, optional
         Whether and how to exclude dependencies related to the sampled edges in the
@@ -365,7 +337,7 @@ class EdgeCollator(Collator):
 
         * None, which excludes nothing.
 
-        * ``'reverse'``, which excludes the reverse edges of the sampled edges.  The said
+        * ``'reverse_id'``, which excludes the reverse edges of the sampled edges.  The said
           reverse edges have the same edge type as the sampled edges.  Only works
           on edge types whose source node type is the same as its destination node type
           (see also :py:func:`dgl.transform.add_reverse`).
@@ -373,10 +345,10 @@ class EdgeCollator(Collator):
         * ``'reverse_types'``, which excludes the reverse edges of the sampled edges.  The
           said reverse edges have different edge types from the sampled edges (see also
           :py:func:`dgl.transform.add_reverse_types`).
-    reverse_edge_ids : Tensor or dict[etype, Tensor], optional
+    reverse_eids : Tensor or dict[etype, Tensor], optional
         The mapping from original edge ID to its reverse edge ID.
 
-        Only used when ``exclude`` is set to ``reverse``.
+        Only used when ``exclude`` is set to ``reverse_id``.
 
         For heterogeneous graph this will be a dict of edge type and edge IDs.  Note that
         only the edge types whose source node type is the same as destination node type
@@ -409,21 +381,35 @@ class EdgeCollator(Collator):
           or a dictionary of edge types and such pairs if the graph is heterogenenous.
 
         A set of builtin negative samplers are provided in
-        :py:mod:`dgl.sampling.negative_sampler`.
+        :py:mod:`dgl.dataloading.negative_sampler`.
+    return_eids : bool, default False
+        Whether to return the edge IDs involved in message passing in the block.
+        If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Examples
     --------
     The following example shows how to train a 3-layer GNN for edge classification on a
     set of edges ``train_eid`` on a homogeneous undirected graph.  Each node takes
-    messages from all neighbors.  We first make ``g`` bidirectional by adding reverse
-    edges:
-    >>> g = dgl.add_reverse(g)
+    messages from all neighbors.
 
-    Then we create a ``DataLoader`` for iterating.  Note that the sampled edges as well
-    as their reverse edges are removed from computation dependencies of the incident nodes.
-    This is a common trick to avoid information leakage.
-    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
-    >>> collator = dgl.sampling.EdgeCollator(g, train_eid, sampler, exclude='reverse')
+    Say that you have an array of source node IDs ``src`` and another array of destination
+    node IDs ``dst``.  One can make it bidirectional by adding another set of edges
+    that connects from ``dst`` to ``src``:
+    >>> g = dgl.graph((torch.cat([src, dst]), torch.cat([dst, src])))
+
+    One can then know that the ID difference of an edge and its reverse edge is ``|E|``,
+    where ``|E|`` is the length of your source/destination array.  The reverse edge
+    mapping can be obtained by
+    >>> E = len(src)
+    >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
+
+    Note that the sampled edges as well as their reverse edges are removed from
+    computation dependencies of the incident nodes.  This is a common trick to avoid
+    information leakage.
+    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> collator = dgl.dataloading.EdgeCollator(
+    ...     g, train_eid, sampler, exclude='reverse',
+    ...     reverse_eids=reverse_eids)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
@@ -433,28 +419,54 @@ class EdgeCollator(Collator):
     To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` on a
     homogeneous graph where each node takes messages from all neighbors (assume the
     backend is PyTorch), with 5 uniformly chosen negative samples per edge:
-    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
-    >>> neg_sampler = dgl.sampling.negative_sampler.Uniform(5)
-    >>> collator = dgl.sampling.EdgeCollator(
-    ...     g, train_eid, sampler, exclude='reverse', negative_sampler=neg_sampler)
+    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
+    >>> collator = dgl.dataloading.EdgeCollator(
+    ...     g, train_eid, sampler, exclude='reverse',
+    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
     ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
 
-    See also
-    --------
-    Please refer to the following tutorial/examples:
+    For heterogeneous graphs, the reverse of an edge may have a different edge type
+    from the original edge.  For instance, consider that you have an array of
+    user-item clicks, representated by a user array ``user`` and an item array ``item``.
+    You may want to build a heterogeneous graph with a user-click-item relation and an
+    item-clicked-by-user relation.
+    >>> g = dgl.heterograph({
+    ...     ('user', 'click', 'item'): (user, item),
+    ...     ('item', 'clicked-by', 'user'): (item, user)})
 
-    * Edge classification on heterogeneous graph: GCMC
+    To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
+    type ``click``, you can write
+    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> collator = dgl.dataloading.EdgeCollator(
+    ...     g, {'click': train_eid}, sampler, exclude='reverse_types',
+    ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'})
+    >>> dataloader = torch.utils.data.DataLoader(
+    ...     collator.dataset, collate_fn=collator.collate,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pair_graph, blocks in dataloader:
+    ...     train_on(input_nodes, pair_graph, blocks)
 
-    * Link prediction on homogeneous graph: GraphSAGE for unsupervised learning
-
-    * Link prediction on heterogeneous graph: RGCN for link prediction.
+    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
+    ``click``, you can write
+    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
+    >>> collator = dgl.dataloading.EdgeCollator(
+    ...     g, train_eid, sampler, exclude='reverse_types',
+    ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
+    ...     negative_sampler=neg_sampler)
+    >>> dataloader = torch.utils.data.DataLoader(
+    ...     collator.dataset, collate_fn=collator.collate,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
+    ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
     """
-    def __init__(self, g, eids, block_sampler, exclude=None, reverse_edge_ids=None,
-                 reverse_etypes=None, negative_sampler=None):
+    def __init__(self, g, eids, block_sampler, exclude=None, reverse_eids=None,
+                 reverse_etypes=None, negative_sampler=None, return_eids=False):
         self.g = g
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
@@ -462,9 +474,10 @@ class EdgeCollator(Collator):
         self.eids = eids
         self.block_sampler = block_sampler
         self.exclude = exclude
-        self.reverse_edge_ids = reverse_edge_ids
+        self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.negative_sampler = negative_sampler
+        self.return_eids = return_eids
 
         if isinstance(eids, Mapping):
             self._dataset = utils.FlattenedDict(nids)
@@ -481,7 +494,15 @@ class EdgeCollator(Collator):
 
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
-        blocks = self.block_sampler.sample_blocks(self.g, items)
+
+        exclude_eids = find_exclude_eids(
+            self.exclude,
+            items,
+            reverse_eid_map=self.reverse_eids,
+            reverse_etype_map=self.reverse_etypes)
+
+        blocks = self.block_sampler.sample_blocks(
+            self.g, seed_nodes, exclude_eids=exclude_eids, return_eids=self.return_eids)
         input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, blocks
@@ -506,7 +527,15 @@ class EdgeCollator(Collator):
         pair_graph, neg_pair_graph = compact_graphs([pair_graph, neg_pair_graph])
 
         seed_nodes = pair_graph.ndata[NID]
-        blocks = self.block_sampler.sample_blocks(self.g, items)
+
+        exclude_eids = find_exclude_eids(
+            self.exclude,
+            items,
+            reverse_eid_map=self.reverse_eids,
+            reverse_etype_map=self.reverse_etypes)
+
+        blocks = self.block_sampler.sample_blocks(
+            self.g, seed_nodes, exclude_eids=exclude_eids, return_eids=self.return_eids)
         input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, neg_pair_graph, blocks
