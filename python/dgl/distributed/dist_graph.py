@@ -107,21 +107,32 @@ def _get_graph_from_shared_mem(graph_name):
 class DistTensor:
     ''' Distributed tensor.
 
-    This is a wrapper to access a tensor stored in multiple machines.
+    This is a wrapper to access a tensor stored in the distributed KVStore.
     This wrapper provides an interface similar to the local tensor.
+
+    If a user tries to create a new tensor with a name that exists in the KVStore,
+    the creation will fail.
 
     Parameters
     ----------
     g : DistGraph
         The distributed graph object.
+    shape : tuple
+        The shape of the tensor
+    dtype : dtype
+        The dtype of the tensor
     name : string
         The name of the tensor.
     part_policy : PartitionPolicy
         The partition policy of the tensor
+    init_func : callable
+        The function to initialize data in the tensor.
+    create_new : bool
+        Whether or not to create a new tensor in the KVStore.
     '''
-    def __init__(self, g, shape, dtype, name, part_policy=None, init_func=None):
+    def __init__(self, g, shape, dtype, name, part_policy=None, init_func=None,
+                 create_new=True):
         self.kvstore = g._client
-        self._name = name
         self._shape = shape
         self._dtype = dtype
 
@@ -129,9 +140,9 @@ class DistTensor:
             if shape[0] == g.number_of_nodes() and shape[0] == g.number_of_edges():
                 raise DGLError('Cannot determine the partition policy. Please provide it.')
             elif shape[0] == g.number_of_nodes():
-                part_policy = NODE_PART_POLICY
+                part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
             elif shape[0] == g.number_of_edges():
-                part_policy = EDGE_PART_POLICY
+                part_policy = PartitionPolicy(EDGE_PART_POLICY, g.get_partition_book())
             else:
                 raise DGLError('Cannot determine the partition policy. Please provide it.')
 
@@ -139,9 +150,13 @@ class DistTensor:
 
         if init_func is None:
             init_func = _default_init_data
-        policy = PartitionPolicy(part_policy, g.get_partition_book())
-        name = _get_data_name(name, policy.policy_str)
-        g._client.init_data(name, shape, dtype, policy, init_func)
+        self._name = _get_data_name(name, part_policy.policy_str)
+        if create_new:
+            g._client.init_data(self._name, shape, dtype, part_policy, init_func)
+        else:
+            dtype1, shape1, _ = g._client.get_data_meta(self._name)
+            assert dtype == dtype1
+            assert shape == shape1
 
     def __getitem__(self, idx):
         idx = utils.toindex(idx)
@@ -188,17 +203,17 @@ class NodeDataView(MutableMapping):
         # When this is created, the server may already load node data. We need to
         # initialize the node data in advance.
         names = g._get_all_ndata_names()
-        policy = PartitionPolicy("node", g.get_partition_book())
-        name = _get_data_name(name, policy.policy_str)
-        self._data = {name: DistTensor(g, name, policy) for name in names}
+        policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
+        self._data = {}
+        for name in names:
+            name1 = _get_data_name(name, policy.policy_str)
+            dtype, shape, _ = g._client.get_data_meta(name1)
+            # We create a wrapper on the existing tensor in the kvstore.
+            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy,
+                                          create_new=False)
 
     def _get_names(self):
         return list(self._data.keys())
-
-    def _add(self, name):
-        policy = PartitionPolicy("node", self._graph.get_partition_book())
-        name = _get_data_name(name, policy.policy_str)
-        self._data[name] = DistTensor(self._graph, name, policy)
 
     def __getitem__(self, key):
         return self._data[key]
@@ -236,17 +251,17 @@ class EdgeDataView(MutableMapping):
         # When this is created, the server may already load edge data. We need to
         # initialize the edge data in advance.
         names = g._get_all_edata_names()
-        policy = PartitionPolicy("edge", g.get_partition_book())
-        name = _get_data_name(name, policy.policy_str)
-        self._data = {name: DistTensor(g, name, policy) for name in names}
+        policy = PartitionPolicy(EDGE_PART_POLICY, g.get_partition_book())
+        self._data = {}
+        for name in names:
+            name1 = _get_data_name(name, policy.policy_str)
+            dtype, shape, _ = g._client.get_data_meta(name1)
+            # We create a wrapper on the existing tensor in the kvstore.
+            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy,
+                                          create_new=False)
 
     def _get_names(self):
         return list(self._data.keys())
-
-    def _add(self, name):
-        policy = PartitionPolicy("edge", self._graph.get_partition_book())
-        name = _get_data_name(name, policy.policy_str)
-        self._data[name] = DistTensor(self._graph, name, policy)
 
     def __getitem__(self, key):
         return self._data[key]
