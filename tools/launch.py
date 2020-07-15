@@ -9,7 +9,7 @@ import logging
 import time
 from threading import Thread
 
-def execute_remote(cmd, ip):
+def execute_remote(cmd, ip, thread_list):
     """execute command line on remote machine via ssh"""
     cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
     # thread func to run the job
@@ -19,10 +19,12 @@ def execute_remote(cmd, ip):
     thread = Thread(target = run, args=(cmd,))
     thread.setDaemon(True)
     thread.start()
+    thread_list.append(thread)
 
-def submit_jobs(args):
+def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
     hosts = []
+    thread_list = []
     server_count_per_machine = 0
     ip_config = args.workspace + '/' + args.ip_config
     with open(ip_config) as f:
@@ -42,9 +44,9 @@ def submit_jobs(args):
     for i in range(len(hosts)*server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
-        cmd = cmd + ' ' + args.udf_command
+        cmd = cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip)
+        execute_remote(cmd, ip, thread_list)
     # launch client tasks
     client_cmd = 'DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
@@ -53,7 +55,7 @@ def submit_jobs(args):
         node_id = int(i / client_count_per_machine)
         ip, _ = hosts[node_id]
         cmd = client_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
-        cmd = cmd + ' ' + args.udf_command
+        cmd = cmd + ' ' + udf_command
         cmd = cmd + ' ' + '-m torch.distributed.launch'
         cmd = cmd + ' ' + '--nproc_per_node=' + str(client_count_per_machine)
         cmd = cmd + ' ' + '--nnodes=' + str(len(hosts))
@@ -61,10 +63,10 @@ def submit_jobs(args):
         cmd = cmd + ' ' + '--master_addr=' + str(hosts[0][0])
         cmd = cmd + ' ' + '--master_port=1200'
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip)
+        execute_remote(cmd, ip, thread_list)
 
-    while True:
-        time.sleep(10)
+    for thread in thread_list:
+        thread.join()
 
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
@@ -79,12 +81,9 @@ def main():
                         a remote path like s3 and dgl will download this file automatically')
     parser.add_argument('--ip_config', type=str, 
                         help='The file for IP configuration for server processes')
-    parser.add_argument('--udf_command', type=str,
-                        help='User-defined command line')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
-    args.udf_command = udf_command[0]
-    submit_jobs(args)
+    submit_jobs(args, udf_command)
 
 def signal_handler(signal, frame):
     logging.info('Stop launcher')
