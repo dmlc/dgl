@@ -83,6 +83,7 @@ def main():
                         help='The file for IP configuration for server processes')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
+    udf_command = str(udf_command[0])
     submit_jobs(args, udf_command)
 
 def signal_handler(signal, frame):
