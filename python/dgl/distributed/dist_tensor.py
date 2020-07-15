@@ -3,6 +3,7 @@
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
 from ..base import DGLError
 from .. import utils
+from .. import backend as F
 
 def _get_data_name(name, part_policy):
     ''' This is to get the name of data in the kvstore.
@@ -10,6 +11,9 @@ def _get_data_name(name, part_policy):
     KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
     '''
     return part_policy + ':' + name
+
+def _default_init_data(shape, dtype):
+    return F.zeros(shape, dtype, F.cpu())
 
 class DistTensor:
     ''' Distributed tensor.

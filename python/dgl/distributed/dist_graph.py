@@ -21,7 +21,7 @@ from . import rpc
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
-from .dist_tensor import DistTensor
+from .dist_tensor import DistTensor, _get_data_name
 from ..transform import as_heterograph
 
 def _get_graph_path(graph_name):
@@ -266,9 +266,6 @@ class DistGraphServer(KVServer):
         print('start graph service on server ' + str(self.server_id))
         start_server(server_id=self.server_id, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
-
-def _default_init_data(shape, dtype):
-    return F.zeros(shape, dtype, F.cpu())
 
 class DistGraph:
     ''' The DistGraph client.
