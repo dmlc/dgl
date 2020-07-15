@@ -531,6 +531,13 @@ class DistGraph:
         """
         return self._gpb
 
+    def barrier(self):
+        '''Barrier for all client nodes.
+
+        This API will be blocked untill all the clients invoke this API.
+        '''
+        self._client.barrier()
+
     def _get_all_ndata_names(self):
         ''' Get the names of all node data.
         '''

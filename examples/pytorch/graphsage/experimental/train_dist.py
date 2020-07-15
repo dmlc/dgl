@@ -96,6 +96,7 @@ class DistSAGE(SAGE):
                 y[output_nodes] = h.cpu()
 
             x = y
+            g.barrier()
         return y
 
 def run(args, device, data):
@@ -177,7 +178,7 @@ def run(args, device, data):
                     if param.requires_grad and param.grad is not None:
                         th.distributed.all_reduce(param.grad.data,
                                                   op=th.distributed.ReduceOp.SUM)
-                        param.grad.data /= args.num_client
+                        param.grad.data /= dgl.distributed.get_num_client()
 
             optimizer.step()
             update_time += time.time() - compute_end
