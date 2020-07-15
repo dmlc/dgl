@@ -90,13 +90,13 @@ def check_dist_graph(g, num_nodes, num_edges):
 
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
-    g.init_ndata('test1', new_shape, F.int32)
+    g.ndata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32, 'test1')
     feats = g.ndata['test1'][nids]
     assert np.all(F.asnumpy(feats) == 0)
 
     # Test init edge data
     new_shape = (g.number_of_edges(), 2)
-    g.init_edata('test1', new_shape, F.int32)
+    g.edata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32, 'test1')
     feats = g.edata['test1'][eids]
     assert np.all(F.asnumpy(feats) == 0)
 
