@@ -164,6 +164,7 @@ def graph(data,
 
     if (device is not None and utils.to_dgl_context(device).device_type == 2
             and idtype == F.int64):
+        # device_type 2 is an internal code for GPU
         dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
                     ' int() to convert to int32 first.')
 
@@ -336,6 +337,7 @@ def bipartite(data,
 
     if (device is not None and utils.to_dgl_context(device).device_type == 2
             and idtype == F.int64):
+        # device_type 2 is an internal code for GPU
         dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
                     ' int() to convert to int32 first.')
 

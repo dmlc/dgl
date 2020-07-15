@@ -1396,56 +1396,159 @@ def out_subgraph(g, nodes):
         ret.edges[etype].data[EID] = induced_edges[i]
     return ret
 
-def to_simple(g, return_counts='count', writeback_mapping=None):
-    """Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
-    duplicate edges into one.
+def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True, copy_edata=False):
+    r"""Convert a graph to a simple graph without duplicate edges.
 
-    This function does not preserve node and edge features.
+    For a heterograph with multiple edge types, we
+    treat edges corresponding
+    to each type as a separate graph and convert each
+    of them to a simple graph.
 
-    TODO(xiangsx): Don't save writeback_mapping into g, but put it into return value.
+    When writeback_mapping=True, an extra mapping is returned.
+    For the edges in the original graph,
+    a writeback mapping is a tensor recording their new
+    ids in the simple graph. If the graph has
+    only one edge type, a single tensor is returned.
+    If the graph has multiple edge types, a dictionary
+    of tensor is returned using canonical edge types
+    as the key.
+
+    Given a :class:`dgl.DGLGraph` object, we return
+    another :class:`dgl.DGLGraph` object representing the
+    simple graph corresponding to it.
+
 
     Parameters
     ----------
-    g : DGLHeteroGraph
-        The heterogeneous graph
+    g : DGLGraph
+        The input graph.
     return_counts : str, optional
-        If given, the returned graph would have a column with the same name that stores
-        the number of duplicated edges from the original graph.
-    writeback_mapping : str, optional
-        If given, the mapping from the edge IDs of original graph to those of the returned
-        graph would be written into edge feature with this name in the original graph for
-        each edge type.
+        If given, the count of each edge in the original graph
+        will be stored as edge features under the name
+        eturn_counts.
+        (Default: "count")
+    writeback_mapping: bool, optional
+        If True, a write back mapping is returned for each edge
+        type subgraph. If False, only the simple graph is returned.
+        (Default: False)
+    copy_ndata: bool, optional
+        If True, the node features of the simple graph are copied
+        from the original graph. If False, the simple
+        graph will not have any node features.
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the simple graph are copied
+        from the original graph. If there exists duplicate edges between
+        two nodes (u, v), the feature of the edge is randomly selected
+        from one of the duplicate edges.
+        If False, the simple graph will not have any edge features.
+        (Default: False)
 
     Returns
     -------
-    DGLHeteroGraph
-        The new heterogeneous simple graph.
+    DGLGraph
+        A simple graph.
+    tensor or dict of tensor
+        If writeback_mapping is True, the writeback
+        mapping is returned. If the graph has only
+        one edge type, a tensor is returned. If the
+        graph has multiple edge types, a dictionary
+        of tensor is return.
+
+    If ``copy_ndata`` is ``True``, same tensors will be used for
+    the features of the original graph and the to_simpled graph. As a result, users
+    should avoid performing in-place operations on the features of the to_simpled
+    graph, which will corrupt the features of the original graph as well. For
+    concrete examples, refer to the ``Examples`` section below.
 
     Examples
     --------
-    Consider the following graph
-    >>> g = dgl.graph(([0, 1, 2, 1, 1, 1], [1, 3, 2, 3, 4, 4]))
-    >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
+    **Homographs or Heterographs with A Single Edge Type**
 
-    The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
-    >>> sg.all_edges(form='uv', order='eid')
-    (tensor([0, 1, 1, 2]), tensor([1, 3, 4, 2]))
+    Create a graph for demonstrating to_simple API.
+    In the original graph, there are multiple edges between 1 and 2.
 
-    If ``return_counts`` is set, the returned graph will also return how many edges
-    in the original graph are connecting the endpoints of the edges in the new graph:
-    >>> sg.edata['weights']
-    tensor([1, 2, 2, 1])
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph((th.tensor([0, 1, 2, 1]), th.tensor([1, 2, 0, 2])))
+    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
+    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.], [6.]])
 
-    This essentially reads that one edge is connecting (0, 1) in ``g``, whereas 2 edges
-    are connecting (1, 3) in ``g``, etc.
+    Convert the graph to a simple graph. The return counts is
+    stored in the edge feature 'cnt' and the writeback mapping
+    is returned in a tensor.
 
-    One can also retrieve the mapping from the edges in the original graph to edges in
-    the new graph by setting ``writeback_mapping`` and running
-    >>> g.edata['new_eid']
-    tensor([0, 1, 3, 1, 2, 2])
+    >>> sg, wm = dgl.to_simple(g, return_counts='cnt', writeback_mapping=True)
+    >>> sg.ndata['h']
+    tensor([[0.],
+            [1.],
+            [2.]])
+    >>> u, v, eid = sg.edges(form='all')
+    >>> u
+    tensor([0, 1, 2])
+    >>> v
+    tensor([1, 2, 0])
+    >>> eid
+    tensor([0, 1, 2])
+    >>> sg.edata['cnt']
+    tensor([1, 2, 1])
+    >>> wm
+    tensor([0, 1, 2, 1])
+    >>> 'h' in g.edata
+    False
 
-    This tells us that the first edge in ``g`` is mapped to the first edge in ``sg``, and
-    the second and the fourth edge are mapped to the second edge in ``sg``, etc.
+    **In-place operations on features of one graph will be reflected on features of
+    the simple graph, which is dangerous. Out-place operations will not be reflected.**
+
+    >>> sg.ndata['h'] += 1
+    >>> g.ndata['h']
+    tensor([[1.],
+            [2.],
+            [3.]])
+    >>> g.ndata['h'] += 1
+    >>> sg.ndata['h']
+    tensor([[2.],
+            [3.],
+            [4.]])
+    >>> sg.ndata['h2'] = th.ones(3, 1)
+    >>> 'h2' in g.ndata
+    False
+
+    **Heterographs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
+
+    The to_simple operation is applied to the subgraph
+    corresponding to ('user', 'wins', 'user') and the
+    subgraph corresponding to ('user', 'plays', 'game').
+    The return counts is stored in the default edge feature
+    'count'.
+
+    >>> sg, wm = dgl.to_simple(g, copy_ndata=False, writeback_mapping=True)
+    >>> sg
+    Graph(num_nodes={'game': 3, 'user': 3},
+          num_edges={('user', 'wins', 'user'): 4, ('game', 'plays', 'user'): 3},
+          metagraph=[('user', 'user'), ('game', 'user')])
+    >>> sg.edges(etype='wins')
+    (tensor([0, 2, 0, 2]), tensor([1, 1, 2, 0]))
+    >>> wm[('user', 'wins', 'user')]
+    tensor([0, 1, 2, 1, 3])
+    >>> sg.edges(etype='plays')
+    (tensor([2, 1, 1]), tensor([1, 2, 1]))
+    >>> wm[('user', 'plays', 'game')]
+    tensor([0, 1, 2])
+    >>> 'hv' in sg.nodes['game'].data
+    False
+    >>> 'he' in sg.edges['plays'].data
+    False
+    >>> sg.edata['count']
+    {('user', 'wins', 'user'): tensor([1, 2, 1, 1])
+     ('user', 'plays', 'game'): tensor([1, 1, 1])}
     """
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
     simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
@@ -1456,11 +1559,35 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
         for count, canonical_etype in zip(counts, g.canonical_etypes):
             simple_graph.edges[canonical_etype].data[return_counts] = count
 
-    if writeback_mapping is not None:
-        for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
-            g.edges[canonical_etype].data[writeback_mapping] = edge_map
+    if copy_ndata:
+        for ntype in g.ntypes:
+            for key in g.nodes[ntype].data:
+                simple_graph.nodes[ntype].data[key] = g.nodes[ntype].data[key]
+
+    if copy_edata:
+        for i, c_etype in enumerate(g.canonical_etypes):
+            for key in g.edges[c_etype].data:
+                feat_idx = F.asnumpy(edge_maps[i])
+                _, indices = np.unique(feat_idx, return_index=True)
+                simple_graph.edges[c_etype].data[key] = \
+                    F.gather_row(g.edges[c_etype].data[key],
+                                 F.copy_to(F.tensor(indices),
+                                           F.context(g.edges[c_etype].data[key])))
+
+    if writeback_mapping:
+        # single edge type
+        if len(edge_maps) == 1:
+            return simple_graph, edge_maps[0]
+        # multiple edge type
+        else:
+            wb_map = {}
+            for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
+                wb_map[canonical_etype] = edge_map
+            return simple_graph, wb_map
 
     return simple_graph
+
+DGLHeteroGraph.to_simple = to_simple
 
 def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.

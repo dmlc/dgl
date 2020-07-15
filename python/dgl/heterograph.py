@@ -1290,8 +1290,9 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        bool
-            True if the node exists, False otherwise
+        bool or bool Tensor
+            Each element is a bool flag, which is True if the node exists,
+            and is False otherwise.
 
         Examples
         --------
@@ -1300,7 +1301,7 @@ class DGLHeteroGraph(object):
         >>> g.has_nodes(4, 'user')
         False
         >>> g.has_nodes([0, 1, 2, 3, 4], 'user')
-        tensor([1, 1, 1, 0, 0])
+        tensor([True, True, True, False, False])
         """
         ret = self._graph.has_node(
             self.get_ntype_id(ntype),
@@ -1308,7 +1309,7 @@ class DGLHeteroGraph(object):
         if isinstance(vid, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
-            return ret
+            return F.astype(ret, F.bool)
 
     def has_node(self, vid, ntype=None):
         """Whether the graph has a node with ids and a particular type.
@@ -1368,7 +1369,7 @@ class DGLHeteroGraph(object):
         if isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
-            return ret
+            return F.astype(ret, F.bool)
 
     def has_edge_between(self, u, v, etype=None):
         """Whether the graph has edges of type ``etype``.
@@ -3898,6 +3899,7 @@ class DGLHeteroGraph(object):
             return self
 
         if utils.to_dgl_context(device).device_type == 2 and self.idtype == F.int64:
+            # device_type 2 is an internal code for GPU
             dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
                         ' int() to convert to int32 first.')
 

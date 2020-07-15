@@ -29,7 +29,7 @@ def data_type_dict():
             'int16'   : np.int16,
             'int32'   : np.int32,
             'int64'   : np.int64,
-            'bool'    : np.bool}
+            'bool'    : np.bool}  # mxnet does not support bool
 
 def cpu():
     return mx.cpu()
@@ -128,6 +128,8 @@ def to_backend_ctx(dglctx):
         raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
+    if ty == np.bool:
+        ty = np.int32
     return nd.cast(input, ty)
 
 def asnumpy(input):
