@@ -14,14 +14,14 @@ from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
-from .graph_partition_book import NODE_PART_POLICY, NODE_PART_POLICY
+from .graph_partition_book import NODE_PART_POLICY, EDGE_PART_POLICY
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
-from .dist_tensor import DistTesnor
+from .dist_tensor import DistTensor
 from ..transform import as_heterograph
 
 def _get_graph_path(graph_name):
