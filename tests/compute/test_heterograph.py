@@ -8,6 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
+from dgl.heterograph_index import joint_union
 from utils import parametrize_dtype
 
 def create_test_heterograph(index_dtype):
@@ -717,7 +718,7 @@ def test_view1(index_dtype):
             for i in range(g.number_of_nodes(utype)):
                 assert out_degrees[i] == src_count[i]
             for i in range(g.number_of_nodes(vtype)):
-                assert in_degrees[i] == dst_count[i]   
+                assert in_degrees[i] == dst_count[i]
 
     edges = {
         'follows': ([0, 1], [1, 2]),
@@ -774,7 +775,7 @@ def test_view1(index_dtype):
     ndata = HG.ndata['h']
     assert isinstance(ndata, dict)
     assert F.array_equal(ndata['user'], f2)
-    
+
     edata = HG.edata['h']
     assert isinstance(edata, dict)
     assert F.array_equal(edata[('user', 'follows', 'user')], f4)
@@ -1381,7 +1382,7 @@ def test_level2(index_dtype):
     g['plays'].send_and_recv([2, 3], mfunc, rfunc)
     y = g.nodes['game'].data['y']
     assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
-    
+
     # test fail case
     # fail due to multiple types
     fail = False
@@ -2073,7 +2074,6 @@ def test_reverse(index_dtype):
     assert F.array_equal(g_s.tousertensor(), rg_d.tousertensor())
     assert F.array_equal(g_d.tousertensor(), rg_s.tousertensor())
 
-
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -2100,6 +2100,7 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
+    # test_reverse("int32")
     test_reverse("int32")
     test_format()
     pass

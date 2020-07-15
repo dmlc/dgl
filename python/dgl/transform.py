@@ -12,7 +12,7 @@ from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
-from .convert import graph, bipartite
+from .convert import graph, bipartite, heterograph
 from . import utils
 from .base import EID, NID
 from . import ndarray as nd
@@ -27,6 +27,7 @@ __all__ = [
     'reverse_heterograph',
     'to_simple_graph',
     'to_bidirected',
+    'to_bidirected_stale',
     'laplacian_lambda_max',
     'knn_graph',
     'segmented_knn_graph',
@@ -142,6 +143,154 @@ def segmented_knn_graph(x, k, segs):
 
     g = DGLGraph(adj, readonly=True)
     return g
+
+def to_bidirected(g, readonly=None, copy_ndata=True,
+                  copy_edata=False, ignore_bipartite=False):
+    r"""Convert the graph to a bidirected one.
+
+    For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
+    function creates a new graph with edges
+    :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
+
+    For a heterograph with multiple edge types, we can treat edges corresponding
+    to each type as a separate graph and convert the graph to a bidirected one
+    for each of them.
+
+    Since **to_bidirected is not well defined for unidirectional bipartite graphs**,
+    an error will be raised if an edge type of the input heterograph is for a
+    unidirectional bipartite graph. We can simply skip the edge types corresponding
+    to unidirectional bipartite graphs by specifying ``ignore_bipartite=True``.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    readonly : bool, default to be True
+        Deprecated. There will be no difference between readonly and non-readonly
+    copy_ndata: bool, optional
+        If True, the node features of the bidirected graph are copied from
+        the original graph. If False, the bidirected
+        graph will not have any node features.
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the features of the reversed edges will be identical to
+        the original ones."
+        If False, the bidirected graph will not have any edge
+        features.
+        (Default: False)
+    ignore_bipartite: bool, optional
+        If True, unidirectional bipartite graphs are ignored and
+        no error is raised. If False, an error  will be raised if
+        an edge type of the input heterograph is for a unidirectional
+        bipartite graph.
+
+    Returns
+    -------
+    DGLGraph
+        The bidirected graph
+
+    Notes
+    -----
+    If ``copy_ndata`` is ``True``, same tensors are used as
+    the node features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+    On the contrary, edge features are concatenated,
+    and they are not shared due to concatenation.
+    For concrete examples, refer to the ``Examples`` section below.
+
+
+    Examples
+    --------
+    **Homographs**
+
+    >>> g = dgl.graph(th.tensor([0, 0]), th.tensor([0, 1]))
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
+
+    To remove duplicate edges, see :func:to_simple
+
+    **Heterographs with Multiple Edge Types**
+
+    g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
+    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
+
+    The to_bidirected operation is applied to the subgraph
+    corresponding to ('user', 'wins', 'user') and the
+    subgraph corresponding to ('user', 'follows', 'user).
+    The unidirectional bipartite subgraph ('user', 'plays', 'game')
+    is ignored. Both the node features and edge features
+    are shared.
+
+    >>> bg = dgl.to_bidirected(g, copy_ndata=True,
+                               copy_edata=True, ignore_bipartite=True)
+    >>> bg.edges(('user', 'wins', 'user'))
+    (tensor([0, 2, 0, 2, 2, 1, 1, 2, 1, 0]), tensor([1, 1, 2, 1, 0, 0, 2, 0, 2, 2]))
+    >>> bg.edges(('user', 'follows', 'user'))
+    (tensor([1, 2, 1, 0, 0, 0]), tensor([0, 0, 0, 1, 2, 1]))
+    >>> bg.edges(('user', 'plays', 'game'))
+    (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> bg.nodes['game'].data['hv']
+    tensor([0, 0, 0])
+    >>> bg.edges[('user', 'wins', 'user')].data['h']
+    th.tensor([0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
+    """
+    if readonly is not None:
+        dgl_warning("Parameter readonly is deprecated" \
+            "There will be no difference between readonly and non-readonly DGLGraph")
+
+    canonical_etypes = g.canonical_etypes
+    # fast path
+    if ignore_bipartite is False:
+        subgs = {}
+        for c_etype in canonical_etypes:
+            if c_etype[0] != c_etype[2]:
+                assert False, "to_bidirected is not well defined for " \
+                    "unidirectional bipartite graphs" \
+                    ", but {} is unidirectional bipartite".format(c_etype)
+
+            u, v = g.edges(form='uv', order='eid', etype=c_etype)
+            subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+
+        new_g = heterograph(subgs)
+    else:
+        subgs = {}
+        for c_etype in canonical_etypes:
+            if c_etype[0] != c_etype[2]:
+                u, v = g.edges(form='uv', order='eid', etype=c_etype)
+                subgs[c_etype] = (u, v)
+            else:
+                u, v = g.edges(form='uv', order='eid', etype=c_etype)
+                subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+
+        new_g = heterograph(subgs)
+
+    # handle features
+    if copy_ndata:
+        # for each ntype
+        for ntype in g.ntypes:
+            # for each data field
+            for k in g.nodes[ntype].data:
+                new_g.nodes[ntype].data[k] = g.nodes[ntype].data[k]
+
+    if copy_edata:
+        # for each etype
+        for c_etype in canonical_etypes:
+            if c_etype[0] != c_etype[2]:
+                # for each data field
+                for k in g.edges[c_etype].data:
+                    new_g.edges[c_etype].data[k] = g.edges[c_etype].data[k]
+            else:
+                for k in g.edges[c_etype].data:
+                    new_g.edges[c_etype].data[k] = \
+                        F.cat([g.edges[c_etype].data[k], g.edges[c_etype].data[k]], dim=0)
+    return new_g
 
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
@@ -539,7 +688,7 @@ def to_simple_graph(g):
     gidx = _CAPI_DGLToSimpleGraph(g._graph)
     return DGLGraph(gidx, readonly=True)
 
-def to_bidirected(g, readonly=True):
+def to_bidirected_stale(g, readonly=True):
     """Convert the graph to a bidirected graph.
 
     The function generates a new graph with no node/edge feature.
@@ -872,7 +1021,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     '''
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
-    sym_g = to_bidirected(g, readonly=True)
+    sym_g = to_bidirected_stale(g, readonly=True)
     vwgt = []
     # To balance the node types in each partition, we can take advantage of the vertex weights
     # in Metis. When vertex weights are provided, Metis will tries to generate partitions with
