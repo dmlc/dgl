@@ -1303,7 +1303,7 @@ class DGLHeteroGraph(object):
         >>> g.has_nodes([0, 1, 2, 3, 4], 'user')
         tensor([True, True, True, False, False])
         """
-        ret = self._graph.has_node(
+        ret = self._graph.has_nodes(
             self.get_ntype_id(ntype),
             utils.prepare_tensor(self, vid, "vid"))
         if isinstance(vid, numbers.Integral):
@@ -1315,20 +1315,6 @@ class DGLHeteroGraph(object):
         """Whether the graph has a node with ids and a particular type.
 
         DEPRECATED: see :func:`~DGLGraph.has_nodes`
-
-        Parameters
-        ----------
-        vid : int
-            Node ID
-        ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph.
-
-        Returns
-        -------
-        a : tensor
-            Binary tensor indicating the existence of nodes with the specified ids and type.
-            ``a[i]=1`` if the graph contains node ``vids[i]`` of type ``ntype``, 0 otherwise.
         """
         dgl_warning("DGLGraph.has_node is deprecated. Please use DGLGraph.has_nodes")
         return self.has_nodes(vid, ntype)
@@ -1362,7 +1348,7 @@ class DGLHeteroGraph(object):
         >>> g.has_edge_between([0, 0], [1, 2], ('user', 'plays', 'game'))
         tensor([1, 0])
         """
-        ret = self._graph.has_edge_between(
+        ret = self._graph.has_edges_between(
             self.get_etype_id(etype),
             utils.prepare_tensor(self, u, 'u'),
             utils.prepare_tensor(self, v, 'v'))
@@ -1375,22 +1361,6 @@ class DGLHeteroGraph(object):
         """Whether the graph has edges of type ``etype``.
 
         DEPRECATED: please use :func:`~DGLGraph.has_edge_between`.
-
-        Parameters
-        ----------
-        u : int
-            Source node ID.
-        v : int
-            Destination node ID.
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-
-        Returns
-        -------
-        a : tensor
-            Binary tensor indicating the existence of edges. ``a[i]=1`` if the graph
-            contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
         """
         dgl_warning("DGLGraph.has_edge_between is deprecated. "
                     "Please use DGLGraph.has_edges_between")

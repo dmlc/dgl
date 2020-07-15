@@ -278,7 +278,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroNumEdges(self, int(etype))
 
-    def has_node(self, ntype, vids):
+    def has_nodes(self, ntype, vids):
         """Return true if the nodes exist.
 
         Parameters
@@ -296,7 +296,7 @@ class HeteroGraphIndex(ObjectBase):
         return F.from_dgl_nd(_CAPI_DGLHeteroHasVertices(
             self, int(ntype), F.to_dgl_nd(vids)))
 
-    def has_edge_between(self, etype, u, v):
+    def has_edges_between(self, etype, u, v):
         """Return true if the edge exists.
 
         Parameters
