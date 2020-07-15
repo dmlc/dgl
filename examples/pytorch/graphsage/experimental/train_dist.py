@@ -21,6 +21,8 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from pyinstrument import Profiler
 
+from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
+
 from train_sampling import run, SAGE, compute_acc, evaluate, load_subtensor
 
 class NeighborSampler(object):
@@ -48,22 +50,9 @@ def start_server(args):
                                            args.graph_name, args.conf_path)
     serv.start()
 
-def run(args, device, data):
+def run(args, device, data, dataloader):
     # Unpack data
     train_nid, val_nid, in_feats, n_classes, g = data
-    # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
-                              dgl.distributed.sample_neighbors)
-
-    # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
-        dataset=train_nid.numpy(),
-        batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
-        shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers)
-
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
@@ -161,12 +150,29 @@ def run(args, device, data):
 
 def main(args):
     th.distributed.init_process_group(backend='gloo')
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name)
+    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, skip_init=True)
+
+    # Create sampler
+    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
+                              dgl.distributed.sample_neighbors)
+
+    # Create PyTorch DataLoader for constructing blocks
+    dataloader = DistDataLoader(
+        dataset=None,
+        batch_size=args.batch_size,
+        collate_fn=sampler.sample_blocks,
+        # shuffle=True,
+        drop_last=False,
+        num_workers=args.num_workers)
+    g._init()
+
+
     print('rank:', g.rank())
 
     train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), force_even=True)
     val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), force_even=True)
     test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), force_even=True)
+    dataloader.set_dataset(train_nid.numpy())
     print('part {}, train: {}, val: {}, test: {}'.format(g.rank(), len(train_nid),
                                                          len(val_nid), len(test_nid)))
     device = th.device('cpu')
@@ -175,7 +181,7 @@ def main(args):
     # Pack data
     in_feats = g.ndata['features'].shape[1]
     data = train_nid, val_nid, in_feats, n_classes, g
-    run(args, device, data)
+    run(args, device, data, dataloader)
     print("parent ends")
 
 if __name__ == '__main__':
@@ -200,7 +206,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval-every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--num-workers', type=int, default=0,
+    parser.add_argument('--num-workers', type=int, default=4,
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     args = parser.parse_args()
