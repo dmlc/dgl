@@ -171,6 +171,10 @@ IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
   IdArray ret = Full(-1, retlen, rows->dtype.bits, rows->ctx);
   IdType* ret_data = ret.Ptr<IdType>();
 
+  // TODO(minjie): We might need to consider sorting the COO beforehand especially
+  //   when the number of (row, col) pairs is large. Need more benchmarks to justify
+  //   the choice.
+
   if (coo.row_sorted) {
 #pragma omp parallel for
     for (int64_t p = 0; p < retlen; ++p) {

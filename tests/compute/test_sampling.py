@@ -229,7 +229,7 @@ def _test_sample_neighbors(hypersparse):
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 1}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((4,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
@@ -259,7 +259,7 @@ def _test_sample_neighbors(hypersparse):
             assert subg.number_of_edges() == num_edges
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 2}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((num_edges,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
@@ -327,7 +327,7 @@ def _test_sample_neighbors_outedge(hypersparse):
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 1}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((4,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
@@ -357,7 +357,7 @@ def _test_sample_neighbors_outedge(hypersparse):
             assert subg.number_of_edges() == num_edges
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 2}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((num_edges,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:

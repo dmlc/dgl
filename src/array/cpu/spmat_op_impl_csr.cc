@@ -184,6 +184,10 @@ IdArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   IdArray ret = Full(-1, retlen, rows->dtype.bits, rows->ctx);
   IdType* ret_data = ret.Ptr<IdType>();
 
+  // NOTE: In most cases, the input csr is already sorted. If not, we might need to
+  //   consider sorting it especially when the number of (row, col) pairs is large.
+  //   Need more benchmarks to justify the choice.
+
   if (csr.sorted) {
     // use binary search on each row
 #pragma omp parallel for

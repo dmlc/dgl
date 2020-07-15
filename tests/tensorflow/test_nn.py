@@ -391,6 +391,7 @@ def test_sage_conv(idtype, g, aggre_type):
 
     # Test the case for graphs without edges
     g = dgl.bipartite([], num_nodes=(5, 3))
+    g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
     h = sage(g, feat)
