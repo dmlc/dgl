@@ -680,6 +680,7 @@ def test_compact(index_dtype):
     _check(g3, new_g3, induced_nodes)
     _check(g4, new_g4, induced_nodes)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU to simple not implemented")
 @parametrize_dtype
 def test_to_simple(index_dtype):
     # homogeneous graph
@@ -705,14 +706,14 @@ def test_to_simple(index_dtype):
         assert eid_map[i] == suv.index(e)
     # shared ndata
     assert F.array_equal(sg.ndata['h'], g.ndata['h'])
-    assert ('h' in sg.edata) is False
+    assert 'h' not in sg.edata
     # new ndata to sg
     sg.ndata['hh'] = F.tensor([[0.], [1.], [2.]])
-    assert ('hh' in g.ndata) is False
+    assert 'hh' not in g.ndata
 
     sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
-    assert ('h' in sg.ndata) is False
-    assert ('h' in sg.edata) is False
+    assert 'h' not in sg.ndata
+    assert 'h' not in sg.edata
 
     # heterogeneous graph
     g = dgl.heterograph({
@@ -747,10 +748,10 @@ def test_to_simple(index_dtype):
     # shared ndata
     assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
     assert F.array_equal(sg.nodes['user'].data['hh'], g.nodes['user'].data['hh'])
-    assert ('h' in sg.nodes['game'].data) is False
+    assert 'h' not in sg.nodes['game'].data
     # new ndata to sg
     sg.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
-    assert ('hhh' in g.nodes['user'].data) is False
+    assert 'hhh' not in g.nodes['user'].data
     # share edata
     feat_idx = F.asnumpy(wb[('user', 'follow', 'user')])
     _, indices = np.unique(feat_idx, return_index=True)
@@ -760,8 +761,8 @@ def test_to_simple(index_dtype):
     sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
     for ntype in g.ntypes:
         assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
-    assert ('h' in sg.nodes['user'].data) is False
-    assert ('hh' in sg.nodes['user'].data) is False
+    assert 'h' not in sg.nodes['user'].data
+    assert 'hh' not in sg.nodes['user'].data
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype

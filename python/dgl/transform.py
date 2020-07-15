@@ -1396,13 +1396,13 @@ def out_subgraph(g, nodes):
 def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True, copy_edata=False):
     r"""Convert a graph to a simple graph without duplicate edges.
 
-    For a heterograph with multiple edge types, we can
+    For a heterograph with multiple edge types, we
     treat edges corresponding
     to each type as a separate graph and convert each
     of them to a simple graph.
 
-    Writeback mappings can be returned for each edge
-    type subgraph. For the edges in the original graph,
+    When writeback_mapping=True, an extra mapping is returned.
+    For the edges in the original graph,
     a writeback mapping is a tensor recording their new
     ids in the simple graph. If the graph has
     only one edge type, a single tensor is returned.
@@ -1423,7 +1423,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
         If given, the count of each edge in the original graph
         will be stored as edge features under the name
         eturn_counts.
-        (Default: count)
+        (Default: "count")
     writeback_mapping: bool, optional
         If True, a write back mapping is returned for each edge
         type subgraph. If False, only the simple graph is returned.
