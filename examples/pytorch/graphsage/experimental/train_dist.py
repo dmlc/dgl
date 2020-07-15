@@ -194,18 +194,16 @@ def run(args, device, data):
             start = time.time()
 
         toc = time.time()
-        print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
-            toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
+        print('Part {}, Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
+            g.rank(), toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
         epoch += 1
 
 
-        toc = time.time()
-        print('Epoch Time(s): {:.4f}'.format(toc - tic))
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
             eval_acc = evaluate(model, g, g.ndata['features'],
                                 g.ndata['labels'], val_nid, 10000, device)
-            print('Eval Acc {:.4f}, time: {:.4f}'.format(eval_acc, time.time() - start))
+            print('Part {}, Eval Acc {:.4f}, time: {:.4f}'.format(g.rank(), eval_acc, time.time() - start))
 
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
@@ -221,11 +219,15 @@ def main(args):
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, conf_file=args.conf_path)
     print('rank:', g.rank())
 
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], g.get_partition_book(), force_even=True)
-    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], g.get_partition_book(), force_even=True)
-    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], g.get_partition_book(), force_even=True)
-    print('part {}, train: {}, val: {}, test: {}'.format(g.rank(), len(train_nid),
-                                                         len(val_nid), len(test_nid)))
+    pb = g.get_partition_book()
+    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
+    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
+    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
+    local_nid = pb.partid2nids(pb.partid).detach().numpy()
+    print('part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})'.format(
+        g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
+        len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
+        len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
     device = th.device('cpu')
     n_classes = len(th.unique(g.ndata['labels'][np.arange(g.number_of_nodes())]))
 
