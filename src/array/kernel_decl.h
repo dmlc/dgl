@@ -47,9 +47,11 @@ template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
               const aten::CSRMatrix& csr,
-              NDArray ufeat,
-              NDArray efeat,
-              NDArray out);
+              NDArray lhs,
+              NDArray rhs,
+              NDArray out,
+              int lhs_target,
+              int rhs_target);
 
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format.
@@ -58,9 +60,11 @@ template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
               const aten::COOMatrix& coo,
-              NDArray ufeat,
-              NDArray efeat,
-              NDArray out);
+              NDArray lhs,
+              NDArray rhs,
+              NDArray out,
+              int lhs_target,
+              int rhs_target);
 
 }  // namespace aten
 }  // namespace dgl

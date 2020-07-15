@@ -5,6 +5,7 @@
  */
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 
 #include "../c_api_common.h"
@@ -433,6 +434,30 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     *rv = HeteroGraphRef(hg_new);
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef meta_graph = args[0];
+    List<HeteroGraphRef> component_graphs = args[1];
+    CHECK(component_graphs.size() > 1)
+      << "Expect graph list to have at least two graphs";
+    std::vector<HeteroGraphPtr> component_ptrs;
+    component_ptrs.reserve(component_graphs.size());
+    const int64_t bits = component_graphs[0]->NumBits();
+    const DLContext ctx = component_graphs[0]->Context();
+    for (const auto& component : component_graphs) {
+      component_ptrs.push_back(component.sptr());
+      CHECK_EQ(component->NumBits(), bits)
+        << "Expect graphs to joint union have the same index dtype(int" << bits
+        << "), but got int" << component->NumBits();
+      CHECK_EQ(component->Context(), ctx)
+        << "Expect graphs to joint union have the same context" << ctx
+        << "), but got " << component->Context();
+    }
+
+    auto hgptr = JointUnionHeteroGraph(meta_graph.sptr(), component_ptrs);
+    *rv = HeteroGraphRef(hgptr);
+});
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion_v2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef meta_graph = args[0];
@@ -595,5 +620,27 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
     ret_list.push_back(srclist);
     ret_list.push_back(dstlist);
     *rv = ret_list;
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    CHECK_GT(hg->NumEdgeTypes(), 0);
+    auto g = std::dynamic_pointer_cast<HeteroGraph>(hg.sptr());
+    std::vector<HeteroGraphPtr> rev_ugs;
+    const auto &ugs = g->relation_graphs();
+    rev_ugs.resize(ugs.size());
+
+    for (size_t i = 0; i < ugs.size(); ++i) {
+      const auto &rev_ug = ugs[i]->Reverse();
+      rev_ugs[i] = rev_ug;
+    }
+    // node types are not changed
+    const auto& num_nodes = g->NumVerticesPerType();
+    const auto& meta_edges = hg->meta_graph()->Edges("eid");
+    // reverse the metagraph
+    const auto& rev_meta = ImmutableGraph::CreateFromCOO(hg->meta_graph()->NumVertices(),
+                                                         meta_edges.dst, meta_edges.src);
+    *rv = CreateHeteroGraph(rev_meta, rev_ugs, num_nodes);
   });
 }  // namespace dgl

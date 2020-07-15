@@ -409,4 +409,16 @@ GraphPtr HeteroGraph::AsImmutableGraph() const {
   return unit_graph->AsImmutableGraph();
 }
 
+HeteroGraphPtr HeteroGraph::LineGraph(bool backtracking) const {
+  CHECK_EQ(1, meta_graph_->NumEdges()) << "Only support Homogeneous graph now (one edge type)";
+  CHECK_EQ(1, meta_graph_->NumVertices()) << "Only support Homogeneous graph now (one node type)";
+  CHECK_EQ(1, relation_graphs_.size()) << "Only support Homogeneous graph now";
+  UnitGraphPtr ug = relation_graphs_[0];
+
+  const auto &ulg = ug->LineGraph(backtracking);
+  std::vector<HeteroGraphPtr> rel_graph = {ulg};
+  std::vector<int64_t> num_nodes_per_type = {static_cast<int64_t>(ulg->NumVertices(0))};
+  return HeteroGraphPtr(new HeteroGraph(meta_graph_, rel_graph, std::move(num_nodes_per_type)));
+}
+
 }  // namespace dgl
