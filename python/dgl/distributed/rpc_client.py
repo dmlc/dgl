@@ -186,17 +186,15 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    if rpc.get_rank() == 0: # Only client_0 issue this command
-        req = rpc.ShutDownRequest(rpc.get_rank())
-        for server_id in range(rpc.get_num_server()):
-            rpc.send_request(server_id, req)
+    req = rpc.ShutDownRequest(rpc.get_rank())
+    for server_id in range(rpc.get_num_server()):
+        rpc.send_request(server_id, req)
 
 sampler_pool = None
 num_sampler_workers = 0
 
 def _close():
     """Finalize client and close servers when finished"""
-    shutdown_servers()
     rpc.finalize_sender()
     rpc.finalize_receiver()
 
