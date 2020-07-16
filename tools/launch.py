@@ -52,22 +52,20 @@ def submit_jobs(args, udf_command):
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
-    client_cmd = client_cmd + ' ' + '--nproc_per_node=' + str(args.client_count_per_machine)
-    client_cmd = client_cmd + ' ' + '--nnodes=' + str(len(hosts))
-    client_cmd = client_cmd + ' ' + '--node_rank=' + str(0)
-    client_cmd = client_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
-    client_cmd = client_cmd + ' ' + '--master_port=' + str(1234)
+
+    torch_cmd = '-m torch.distributed.launch'
+    torch_cmd = torch_cmd + ' ' + '--nproc_per_node=' + str(args.client_count_per_machine)
+    torch_cmd = torch_cmd + ' ' + '--nnodes=' + str(len(hosts))
+    torch_cmd = torch_cmd + ' ' + '--node_rank=' + str(0)
+    torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
+    torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
+
     for i in range(args.num_client):
         node_id = int(i / client_count_per_machine)
         ip, _ = hosts[node_id]
-        cmd = client_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
+        torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
+        udf_command = udf_command.replace('python3', 'python3 ' + torch_cmd)
         cmd = cmd + ' ' + udf_command
-        cmd = cmd + ' ' + '-m torch.distributed.launch'
-        cmd = cmd + ' ' + '--nproc_per_node=' + str(client_count_per_machine)
-        cmd = cmd + ' ' + '--nnodes=' + str(len(hosts))
-        cmd = cmd + ' ' + '--node_rank=' + str(node_id)
-        cmd = cmd + ' ' + '--master_addr=' + str(hosts[0][0])
-        cmd = cmd + ' ' + '--master_port=1200'
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, thread_list)
 
@@ -89,7 +87,10 @@ def main():
                         help='The file for IP configuration for server processes')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
+    assert args.num_client > 0, '--num_client must be a positive number.'
     udf_command = str(udf_command[0])
+    if 'python3' in udf_command == False:
+        raise RuntimeError("DGL launch can only support: python3 ...")
     submit_jobs(args, udf_command)
 
 def signal_handler(signal, frame):
