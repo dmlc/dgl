@@ -243,9 +243,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
     if n_gpus > 1:
         labels = labels.to(dev_id)
         model.cuda(dev_id)
-        if args.sparse_embedding or args.mix_cpu_gpu:
+        if args.mix_cpu_gpu:
             embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
         else:
+            embed_layer.cuda(dev_id)
             embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
@@ -253,9 +254,15 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
     if args.sparse_embedding:
         dense_params = list(model.parameters())
         if args.node_feats:
-            dense_params += list(embed_layer.embeds.parameters())
+            if  n_gpus > 1:
+                dense_params += list(embed_layer.module.embeds.parameters())
+            else:
+                dense_params += list(embed_layer.embeds.parameters())
         optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
-        emb_optimizer = th.optim.SparseAdam(embed_layer.module.sparse_embeds, lr=args.lr)
+        if  n_gpus > 1:
+            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr)
+        else:
+            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
@@ -267,11 +274,12 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
 
     for epoch in range(args.n_epochs):
         model.train()
-        optimizer.zero_grad()
-        if args.sparse_embedding:
-            emb_optimizer.zero_grad()
 
         for i, sample_data in enumerate(loader):
+            optimizer.zero_grad()
+            if args.sparse_embedding:
+                emb_optimizer.zero_grad()
+
             seeds, blocks = sample_data
             t0 = time.time()
             if args.mix_cpu_gpu is False:
@@ -295,11 +303,11 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
 
             forward_time.append(t1 - t0)
             backward_time.append(t2 - t1)
-            print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
-                   format(epoch, i, forward_time[-1], backward_time[-1]))
             train_acc = th.sum(logits.argmax(dim=1) == labels[seeds]).item() / len(seeds)
             print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                   format(train_acc, loss.item()))
+        print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
+            format(epoch, i, forward_time[-1], backward_time[-1]))
 
         gc.collect()
         # only process 0 will do the evaluation
@@ -323,7 +331,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                     logits = model(blocks, feats)
                     eval_logtis.append(logits.cpu().detach())
                     eval_seeds.append(seeds.cpu().detach())
-                    if i % 100:
+                    if i % 1000 and proc_id == 0:
                         print("handle {} valid samples".format(i * seeds.shape[0]))
                 eval_logtis = th.cat(eval_logtis)
                 eval_seeds = th.cat(eval_seeds)

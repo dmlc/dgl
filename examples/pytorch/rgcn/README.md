@@ -65,7 +65,7 @@ python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 
 Test-bd: P3-2xlarge
 
-OGBN-MAG
+OGBN-MAG accuracy 40.59
 ```
 python3 entity_classify_mp.py -d ogbn-mag --testing --fanout=20 --batch-size 1024 --n-hidden 64 --lr 0.001 --num-worker 8 --eval-batch-size 32 --low-mem --node-feats --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases -1
 ```

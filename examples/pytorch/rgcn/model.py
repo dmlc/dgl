@@ -117,14 +117,14 @@ class RelGraphEmbedLayer(nn.Module):
         tensor
             embeddings as the input of the next layer
         """
-        tsd_idx = node_ids < self.num_nodes
-        tsd_ids = node_ids[tsd_idx]
-        tsd_ids = tsd_ids.to(self.node_embeds.weight.device)
-        embeds = self.node_embeds(tsd_ids)
-        embeds = embeds.to(self.dev_id)
+        tsd_ids = node_ids.to(self.node_embeds.weight.device)
+        embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.dev_id)
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
                 embeds[loc] = features[ntype][type_ids[loc]].to(self.dev_id) @ self.embeds[str(ntype)].to(self.dev_id)
+            else:
+                loc = node_tids == ntype
+                embeds[loc] = self.node_embeds(tsd_ids[loc]).to(self.dev_id)
 
         return embeds
