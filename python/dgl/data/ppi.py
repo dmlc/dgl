@@ -87,14 +87,14 @@ class PPIDataset(DGLBuiltinDataset):
             lo, hi = 23, 25
 
         graph_masks = []
-        self._graphs = []
+        self.graphs = []
         for g_id in range(lo, hi):
             g_mask = np.where(graph_id == g_id)[0]
             graph_masks.append(g_mask)
             g = self.graph.subgraph(g_mask)
             g.ndata['feat'] = F.tensor(self._feats[g_mask], dtype=F.data_type_dict['float32'])
             g.ndata['label'] = F.tensor(self._labels[g_mask], dtype=F.data_type_dict['int64'])
-            self._graphs.append(g)
+            self.graphs.append(g)
 
     def has_cache(self):
         graph_list_path = os.path.join(self.save_path, '{}_dgl_graph_list.bin'.format(self.mode))
@@ -106,7 +106,7 @@ class PPIDataset(DGLBuiltinDataset):
         graph_list_path = os.path.join(self.save_path, '{}_dgl_graph_list.bin'.format(self.mode))
         g_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
         info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
-        save_graphs(graph_list_path, self._graphs)
+        save_graphs(graph_list_path, self.graphs)
         save_graphs(g_path, self.graph)
         save_info(info_path, {'labels': self._labels, 'feats': self._feats})
 
@@ -126,10 +126,6 @@ class PPIDataset(DGLBuiltinDataset):
         return 121
 
     @property
-    def graphs(self):
-        return self._graphs
-
-    @property
     def labels(self):
         deprecate_property('dataset.labels', 'dataset.graphs[i].ndata[\'label\']')
         return self._labels
@@ -141,7 +137,7 @@ class PPIDataset(DGLBuiltinDataset):
 
     def __len__(self):
         """Return number of samples in this dataset."""
-        return len(self._graphs)
+        return len(self.graphs)
 
     def __getitem__(self, item):
         """Get the i^th sample.
