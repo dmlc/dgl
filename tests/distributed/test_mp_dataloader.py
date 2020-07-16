@@ -53,12 +53,10 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     train_nid = th.arange(202)
     dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb)
-    print('create dist graph')
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
                               dgl.distributed.sample_neighbors)
-    print('create sampler')
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DistDataLoader(
@@ -68,7 +66,6 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
         # shuffle=True,
         drop_last=False,
         num_workers=4) 
-    print('create data loader')
     
     dist_graph._init()
 
@@ -76,8 +73,6 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
         print(block)
         print(idx)
     
-    dataloader.close()
-
     dgl.distributed.shutdown_servers()
     dgl.distributed.finalize_client()
 
