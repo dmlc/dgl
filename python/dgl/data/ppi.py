@@ -75,7 +75,7 @@ class PPIDataset(DGLBuiltinDataset):
         g_data = json.load(open(graph_file))
         self._labels = np.load(label_file)
         self._feats = np.load(feat_file)
-        self._graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
+        self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
         graph_id = np.load(graph_id_file)
 
         # lo, hi means the range of graph ids for different portion of the dataset,
@@ -91,7 +91,7 @@ class PPIDataset(DGLBuiltinDataset):
         for g_id in range(lo, hi):
             g_mask = np.where(graph_id == g_id)[0]
             graph_masks.append(g_mask)
-            g = self._graph.subgraph(g_mask)
+            g = self.graph.subgraph(g_mask)
             g.ndata['feat'] = F.tensor(self._feats[g_mask], dtype=F.data_type_dict['float32'])
             g.ndata['label'] = F.tensor(self._labels[g_mask], dtype=F.data_type_dict['int64'])
             self._graphs.append(g)
@@ -107,23 +107,19 @@ class PPIDataset(DGLBuiltinDataset):
         g_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
         info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
         save_graphs(graph_list_path, self._graphs)
-        save_graphs(g_path, self._graph)
+        save_graphs(g_path, self.graph)
         save_info(info_path, {'labels': self._labels, 'feats': self._feats})
 
     def load(self):
         graph_list_path = os.path.join(self.save_path, '{}_dgl_graph_list.bin'.format(self.mode))
         g_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
         info_path = os.path.join(self.save_path, '{}_info.pkl'.format(self.mode))
-        self._graphs = load_graphs(graph_list_path)[0]
+        self.graphs = load_graphs(graph_list_path)[0]
         g, _ = load_graphs(g_path)
-        self._graph = g[0]
+        self.graph = g[0]
         info = load_info(info_path)
         self._labels = info['labels']
         self._feats = info['feats']
-
-    @property
-    def graph(self):
-        return self._graph
 
     @property
     def num_labels(self):

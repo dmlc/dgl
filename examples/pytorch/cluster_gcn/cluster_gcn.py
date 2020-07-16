@@ -31,7 +31,10 @@ def main(args):
     # load and preprocess dataset
     data = load_data(args)
 
-    train_nid = np.nonzero(data.train_mask)[0].astype(np.int64)
+    if 'reddit' in args.dataset:
+        train_nid = np.nonzero(data.train_mask.data.numpy())[0].astype(np.int64)
+    else:
+        train_nid = np.nonzero(data.train_mask)[0].astype(np.int64)
 
     # Normalize features
     if args.normalize:
@@ -47,7 +50,11 @@ def main(args):
         labels = torch.LongTensor(data.labels)
     else:
         labels = torch.FloatTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
+    if 'reddit' in args.dataset:
+        train_mask = data.train_mask
+        val_mask = data.val_mask
+        test_mask = data.test_mask
+    elif hasattr(torch, 'BoolTensor'):
         train_mask = torch.BoolTensor(data.train_mask)
         val_mask = torch.BoolTensor(data.val_mask)
         test_mask = torch.BoolTensor(data.test_mask)
@@ -98,8 +105,7 @@ def main(args):
     g.ndata['train_mask'] = train_mask
     print('labels shape:', labels.shape)
 
-    cluster_iterator = ClusterIter(
-        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
+    cluster_iterator = ClusterIter(g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
 
     print("features shape, ", features.shape)
 
