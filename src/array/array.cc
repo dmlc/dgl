@@ -734,6 +734,13 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOLineGraph", {
+    ret = impl::COOLineGraph<XPU, IdType>(coo, backtracking);
+  });
+  return ret;
+}
 
 COOMatrix UnionCoo(const std::vector<COOMatrix>& coos) {
   COOMatrix ret;

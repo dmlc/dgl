@@ -69,7 +69,7 @@ template <typename DType> constexpr bool Div<DType>::use_rhs;
 template <typename DType> constexpr bool Div<DType>::reduce_last_dim;
 
 template <typename DType>
-struct CopyU {
+struct CopyLhs {
   static constexpr bool use_lhs = true;
   static constexpr bool use_rhs = false;
   static constexpr bool reduce_last_dim = false;
@@ -78,12 +78,12 @@ struct CopyU {
     return lhs[0];
   }
 };
-template <typename DType> constexpr bool CopyU<DType>::use_lhs;
-template <typename DType> constexpr bool CopyU<DType>::use_rhs;
-template <typename DType> constexpr bool CopyU<DType>::reduce_last_dim;
+template <typename DType> constexpr bool CopyLhs<DType>::use_lhs;
+template <typename DType> constexpr bool CopyLhs<DType>::use_rhs;
+template <typename DType> constexpr bool CopyLhs<DType>::reduce_last_dim;
 
 template <typename DType>
-struct CopyE {
+struct CopyRhs {
   static constexpr bool use_lhs = false;
   static constexpr bool use_rhs = true;
   static constexpr bool reduce_last_dim = false;
@@ -92,9 +92,9 @@ struct CopyE {
     return rhs[0];
   }
 };
-template <typename DType> constexpr bool CopyE<DType>::use_lhs;
-template <typename DType> constexpr bool CopyE<DType>::use_rhs;
-template <typename DType> constexpr bool CopyE<DType>::reduce_last_dim;
+template <typename DType> constexpr bool CopyRhs<DType>::use_lhs;
+template <typename DType> constexpr bool CopyRhs<DType>::use_rhs;
+template <typename DType> constexpr bool CopyRhs<DType>::reduce_last_dim;
 
 template <typename DType>
 struct Dot {

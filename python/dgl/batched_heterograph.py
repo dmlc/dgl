@@ -284,11 +284,11 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
         new_nframes = []
         for nframe in self._node_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in nframe.items()}
-            new_nframes.append(FrameRef(Frame(new_feats)))
+            new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
         new_eframes = []
         for eframe in self._edge_frames:
             new_feats = {k : F.copy_to(feat, ctx) for k, feat in eframe.items()}
-            new_eframes.append(FrameRef(Frame(new_feats)))
+            new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
         # TODO(minjie): replace the following line with the commented one to enable GPU graph.
         new_gidx = self._graph
         #new_gidx = self._graph.copy_to(utils.to_dgl_context(ctx))
@@ -301,6 +301,14 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
                                      batch_size=self.batch_size,
                                      batch_num_nodes=self._batch_num_nodes,
                                      batch_num_edges=self._batch_num_edges)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        return state, self._batch_size, self._batch_num_nodes, self._batch_num_edges
+
+    def __setstate__(self, state):
+        state, self._batch_size, self._batch_num_nodes, self._batch_num_edges = state
+        super().__setstate__(state)
 
 def unbatch_hetero(graph):
     """Return the list of heterographs in this batch.

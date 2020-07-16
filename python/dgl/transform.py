@@ -12,7 +12,7 @@ from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
-from .convert import graph, bipartite
+from .convert import graph, bipartite, heterograph
 from . import utils
 from .base import EID, NID
 from . import ndarray as nd
@@ -20,11 +20,14 @@ from . import ndarray as nd
 
 __all__ = [
     'line_graph',
+    'line_heterograph',
     'khop_adj',
     'khop_graph',
     'reverse',
+    'reverse_heterograph',
     'to_simple_graph',
     'to_bidirected',
+    'to_bidirected_stale',
     'laplacian_lambda_max',
     'knn_graph',
     'segmented_knn_graph',
@@ -141,6 +144,154 @@ def segmented_knn_graph(x, k, segs):
     g = DGLGraph(adj, readonly=True)
     return g
 
+def to_bidirected(g, readonly=None, copy_ndata=True,
+                  copy_edata=False, ignore_bipartite=False):
+    r"""Convert the graph to a bidirected one.
+
+    For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
+    function creates a new graph with edges
+    :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
+
+    For a heterograph with multiple edge types, we can treat edges corresponding
+    to each type as a separate graph and convert the graph to a bidirected one
+    for each of them.
+
+    Since **to_bidirected is not well defined for unidirectional bipartite graphs**,
+    an error will be raised if an edge type of the input heterograph is for a
+    unidirectional bipartite graph. We can simply skip the edge types corresponding
+    to unidirectional bipartite graphs by specifying ``ignore_bipartite=True``.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    readonly : bool, default to be True
+        Deprecated. There will be no difference between readonly and non-readonly
+    copy_ndata: bool, optional
+        If True, the node features of the bidirected graph are copied from
+        the original graph. If False, the bidirected
+        graph will not have any node features.
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the features of the reversed edges will be identical to
+        the original ones."
+        If False, the bidirected graph will not have any edge
+        features.
+        (Default: False)
+    ignore_bipartite: bool, optional
+        If True, unidirectional bipartite graphs are ignored and
+        no error is raised. If False, an error  will be raised if
+        an edge type of the input heterograph is for a unidirectional
+        bipartite graph.
+
+    Returns
+    -------
+    DGLGraph
+        The bidirected graph
+
+    Notes
+    -----
+    If ``copy_ndata`` is ``True``, same tensors are used as
+    the node features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+    On the contrary, edge features are concatenated,
+    and they are not shared due to concatenation.
+    For concrete examples, refer to the ``Examples`` section below.
+
+
+    Examples
+    --------
+    **Homographs**
+
+    >>> g = dgl.graph(th.tensor([0, 0]), th.tensor([0, 1]))
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
+
+    To remove duplicate edges, see :func:to_simple
+
+    **Heterographs with Multiple Edge Types**
+
+    g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
+    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
+
+    The to_bidirected operation is applied to the subgraph
+    corresponding to ('user', 'wins', 'user') and the
+    subgraph corresponding to ('user', 'follows', 'user).
+    The unidirectional bipartite subgraph ('user', 'plays', 'game')
+    is ignored. Both the node features and edge features
+    are shared.
+
+    >>> bg = dgl.to_bidirected(g, copy_ndata=True,
+                               copy_edata=True, ignore_bipartite=True)
+    >>> bg.edges(('user', 'wins', 'user'))
+    (tensor([0, 2, 0, 2, 2, 1, 1, 2, 1, 0]), tensor([1, 1, 2, 1, 0, 0, 2, 0, 2, 2]))
+    >>> bg.edges(('user', 'follows', 'user'))
+    (tensor([1, 2, 1, 0, 0, 0]), tensor([0, 0, 0, 1, 2, 1]))
+    >>> bg.edges(('user', 'plays', 'game'))
+    (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> bg.nodes['game'].data['hv']
+    tensor([0, 0, 0])
+    >>> bg.edges[('user', 'wins', 'user')].data['h']
+    th.tensor([0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
+    """
+    if readonly is not None:
+        dgl_warning("Parameter readonly is deprecated" \
+            "There will be no difference between readonly and non-readonly DGLGraph")
+
+    canonical_etypes = g.canonical_etypes
+    # fast path
+    if ignore_bipartite is False:
+        subgs = {}
+        for c_etype in canonical_etypes:
+            if c_etype[0] != c_etype[2]:
+                assert False, "to_bidirected is not well defined for " \
+                    "unidirectional bipartite graphs" \
+                    ", but {} is unidirectional bipartite".format(c_etype)
+
+            u, v = g.edges(form='uv', order='eid', etype=c_etype)
+            subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+
+        new_g = heterograph(subgs)
+    else:
+        subgs = {}
+        for c_etype in canonical_etypes:
+            if c_etype[0] != c_etype[2]:
+                u, v = g.edges(form='uv', order='eid', etype=c_etype)
+                subgs[c_etype] = (u, v)
+            else:
+                u, v = g.edges(form='uv', order='eid', etype=c_etype)
+                subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+
+        new_g = heterograph(subgs)
+
+    # handle features
+    if copy_ndata:
+        # for each ntype
+        for ntype in g.ntypes:
+            # for each data field
+            for k in g.nodes[ntype].data:
+                new_g.nodes[ntype].data[k] = g.nodes[ntype].data[k]
+
+    if copy_edata:
+        # for each etype
+        for c_etype in canonical_etypes:
+            if c_etype[0] != c_etype[2]:
+                # for each data field
+                for k in g.edges[c_etype].data:
+                    new_g.edges[c_etype].data[k] = g.edges[c_etype].data[k]
+            else:
+                for k in g.edges[c_etype].data:
+                    new_g.edges[c_etype].data[k] = \
+                        F.cat([g.edges[c_etype].data[k], g.edges[c_etype].data[k]], dim=0)
+    return new_g
+
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
@@ -161,6 +312,53 @@ def line_graph(g, backtracking=True, shared=False):
     graph_data = g._graph.line_graph(backtracking)
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
+
+def line_heterograph(g, backtracking=True):
+    """Return the line graph of this graph.
+
+    The graph should be an directed homogeneous graph. Aother type of graphs
+    are not supported right now.
+
+    All node features and edge features are not copied to the output
+
+    Parameters
+    ----------
+    backtracking : bool
+        Whether the pair of (v, u) (u, v) edges are treated as linked. Default True.
+
+    Returns
+    -------
+    G : DGLHeteroGraph
+        The line graph of this graph.
+
+    Examples:
+    A = [[0, 0, 1],
+            [1, 0, 1],
+            [1, 1, 0]]
+    >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows')
+    >>> lg = g.line_graph()
+    >>> lg
+    ... Graph(num_nodes=5, num_edges=8,
+    ... ndata_schemes={}
+    ... edata_schemes={})
+    >>> lg.edges()
+    ... (tensor([0, 0, 1, 2, 2, 3, 4, 4]), tensor([3, 4, 0, 3, 4, 0, 1, 2]))
+    >>>
+    >>> lg = g.line_graph(backtracking=False)
+    >>> lg
+    ... Graph(num_nodes=5, num_edges=4,
+    ... ndata_schemes={}
+    ... edata_schemes={})
+    >>> lg.edges()
+    ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
+
+    """
+    assert g.is_homograph(), \
+        'line_heterograph only support directed homogeneous graph right now'
+
+    hgidx = _CAPI_DGLHeteroLineGraph(g._graph, backtracking)
+    hg = DGLHeteroGraph(hgidx, g._etypes, g._ntypes)
+    return hg
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
@@ -256,14 +454,28 @@ def khop_graph(g, k):
     # in the future.
     return DGLGraph(from_coo(n, row, col, True))
 
-def reverse(g, share_ndata=False, share_edata=False):
+def reverse(g, copy_ndata=False, copy_edata=False):
     """Return the reverse of a graph
-
     The reverse (also called converse, transpose) of a directed graph is another directed
     graph on the same nodes with edges reversed in terms of direction.
-
-    Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
+    Given a :class:`dgl.DGLGraph` object, we return another :class:`dgl.DGLGraph` object
     representing its reverse.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+        The input graph.
+    copy_ndata: bool, optional
+        If True, node attributes are copied from the original graph to the reversed graph.
+        Otherwise the reversed graph will not be initialized with node attributes.
+    copy_edata: bool, optional
+        If True, edge attributes are copied from the original graph to the reversed graph.
+        Otherwise the reversed graph will not have edge attributes.
+
+    Return
+    ------
+    dgl.DGLGraph
+        The reversed graph.
 
     Notes
     -----
@@ -272,21 +484,9 @@ def reverse(g, share_ndata=False, share_edata=False):
       if the topology of both the original graph and its reverse get changed independently,
       you can get a mismatched node/edge feature.
 
-    Parameters
-    ----------
-    g : dgl.DGLGraph
-        The input graph.
-    share_ndata: bool, optional
-        If True, the original graph and the reversed graph share memory for node attributes.
-        Otherwise the reversed graph will not be initialized with node attributes.
-    share_edata: bool, optional
-        If True, the original graph and the reversed graph share memory for edge attributes.
-        Otherwise the reversed graph will not have edge attributes.
-
     Examples
     --------
     Create a graph to reverse.
-
     >>> import dgl
     >>> import torch as th
     >>> g = dgl.DGLGraph()
@@ -294,29 +494,21 @@ def reverse(g, share_ndata=False, share_edata=False):
     >>> g.add_edges([0, 1, 2], [1, 2, 0])
     >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
     >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
-
     Reverse the graph and examine its structure.
-
-    >>> rg = g.reverse(share_ndata=True, share_edata=True)
+    >>> rg = g.reverse(copy_ndata=True, copy_edata=True)
     >>> print(rg)
     DGLGraph with 3 nodes and 3 edges.
     Node data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
     Edge data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-
     The edges are reversed now.
-
     >>> rg.has_edges_between([1, 2, 0], [0, 1, 2])
     tensor([1, 1, 1])
-
     Reversed edges have the same feature as the original ones.
-
     >>> g.edges[[0, 2], [1, 0]].data['h'] == rg.edges[[1, 0], [0, 2]].data['h']
     tensor([[1],
             [1]], dtype=torch.uint8)
-
     The node/edge features of the reversed graph share memory with the original
     graph, which is helpful for both forward computation and back propagation.
-
     >>> g.ndata['h'] = g.ndata['h'] + 1
     >>> rg.ndata['h']
     tensor([[1.],
@@ -329,11 +521,154 @@ def reverse(g, share_ndata=False, share_edata=False):
     g_reversed.add_edges(g_edges[1], g_edges[0])
     g_reversed._batch_num_nodes = g._batch_num_nodes
     g_reversed._batch_num_edges = g._batch_num_edges
-    if share_ndata:
+    if copy_ndata:
         g_reversed._node_frame = g._node_frame
-    if share_edata:
+    if copy_edata:
         g_reversed._edge_frame = g._edge_frame
     return g_reversed
+
+def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
+    r"""Return the reverse of a graph.
+
+    The reverse (also called converse, transpose) of a graph with edges
+    :math:`(i_1, j_1), (i_2, j_2), \cdots` is a new graph with edges
+    :math:`(j_1, i_1), (j_2, i_2), \cdots`.
+
+    For a heterograph with multiple edge types, we can treat edges corresponding
+    to each type as a separate graph and compute the reverse for each of them.
+    If the original edge type is (A, B, C), its reverse will have edge type (C, B, A).
+
+    Given a :class:`dgl.DGLGraph` object, we return another :class:`dgl.DGLGraph`
+    object representing its reverse.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+        The input graph.
+    copy_ndata: bool, optional
+        If True, the node features of the reversed graph are copied from the
+        original graph. If False, the reversed graph will not have any node features.
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the reversed graph are copied from the
+        original graph. If False, the reversed graph will not have any edge features.
+        (Default: False)
+
+    Return
+    ------
+    dgl.DGLGraph
+        The reversed graph.
+
+    Notes
+    -----
+    If ``copy_ndata`` or ``copy_edata`` is ``True``, same tensors will be used for
+    the features of the original graph and the reversed graph to save memory cost.
+    As a result, users
+    should avoid performing in-place operations on the features of the reversed
+    graph, which will corrupt the features of the original graph as well. For
+    concrete examples, refer to the ``Examples`` section below.
+
+    Examples
+    --------
+    **Homographs or Heterographs with A Single Edge Type**
+
+    Create a graph to reverse.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph((th.tensor([0, 1, 2]), th.tensor([1, 2, 0])))
+    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
+    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
+
+    Reverse the graph.
+
+    >>> rg = dgl.reverse(g, copy_edata=True)
+    >>> rg.ndata['h']
+    tensor([[0.],
+            [1.],
+            [2.]])
+
+    The i-th edge in the reversed graph corresponds to the i-th edge in the
+    original graph. When ``copy_edata`` is ``True``, they have the same features.
+
+    >>> rg.edges()
+    (tensor([1, 2, 0]), tensor([0, 1, 2]))
+    >>> rg.edata['h']
+    tensor([[3.],
+            [4.],
+            [5.]])
+
+    **In-place operations on features of one graph will be reflected on features of
+    its reverse, which is dangerous. Out-place operations will not be reflected.**
+
+    >>> rg.ndata['h'] += 1
+    >>> g.ndata['h']
+    tensor([[1.],
+            [2.],
+            [3.]])
+    >>> g.ndata['h'] += 1
+    >>> rg.ndata['h']
+    tensor([[2.],
+            [3.],
+            [4.]])
+    >>> rg.ndata['h2'] = th.ones(3, 1)
+    >>> 'h2' in g.ndata
+    False
+
+    **Heterographs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): (th.tensor([0, 2]), th.tensor([1, 2])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
+
+    The reverse of the graph above can be obtained by combining the reverse of the
+    subgraph corresponding to ('user', 'follows', 'user') and the subgraph corresponding
+    to ('user', 'plays', 'game'). The reverse for a graph with relation (h, r, t) will
+    have relation (t, r, h).
+
+    >>> rg = dgl.reverse(g, copy_ndata=True)
+    >>> rg
+    Graph(num_nodes={'game': 3, 'user': 3},
+          num_edges={('user', 'follows', 'user'): 2, ('game', 'plays', 'user'): 3},
+          metagraph=[('user', 'user'), ('game', 'user')])
+    >>> rg.edges(etype='follows')
+    (tensor([1, 2]), tensor([0, 2]))
+    >>> rg.edges(etype='plays')
+    (tensor([2, 1, 1]), tensor([1, 2, 1]))
+    >>> rg.nodes['game'].data['hv]
+    tensor([[1.],
+            [1.],
+            [1.]])
+    >>> rg.edges['plays'].data
+    {}
+    """
+    # TODO(0.5 release, xiangsx) need to handle BLOCK
+    # currently reversing a block results in undefined behavior
+    gidx = g._graph.reverse()
+    new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes)
+
+    # handle ndata
+    if copy_ndata:
+        # for each ntype
+        for ntype in g.ntypes:
+            # for each data field
+            for k in g.nodes[ntype].data:
+                new_g.nodes[ntype].data[k] = g.nodes[ntype].data[k]
+
+    # handle edata
+    if copy_edata:
+        # for each etype
+        for etype in g.etypes:
+            # for each data field
+            for k in g.edges[etype].data:
+                new_g.edges[etype].data[k] = g.edges[etype].data[k]
+
+    return new_g
+
+DGLHeteroGraph.reverse = reverse_heterograph
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
@@ -353,7 +688,7 @@ def to_simple_graph(g):
     gidx = _CAPI_DGLToSimpleGraph(g._graph)
     return DGLGraph(gidx, readonly=True)
 
-def to_bidirected(g, readonly=True):
+def to_bidirected_stale(g, readonly=True):
     """Convert the graph to a bidirected graph.
 
     The function generates a new graph with no node/edge feature.
@@ -686,7 +1021,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     '''
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
-    sym_g = to_bidirected(g, readonly=True)
+    sym_g = to_bidirected_stale(g, readonly=True)
     vwgt = []
     # To balance the node types in each partition, we can take advantage of the vertex weights
     # in Metis. When vertex weights are provided, Metis will tries to generate partitions with
@@ -1207,56 +1542,159 @@ def out_subgraph(g, nodes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
 
-def to_simple(g, return_counts='count', writeback_mapping=None):
-    """Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
-    duplicate edges into one.
+def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True, copy_edata=False):
+    r"""Convert a graph to a simple graph without duplicate edges.
 
-    This function does not preserve node and edge features.
+    For a heterograph with multiple edge types, we
+    treat edges corresponding
+    to each type as a separate graph and convert each
+    of them to a simple graph.
 
-    TODO(xiangsx): Don't save writeback_mapping into g, but put it into return value.
+    When writeback_mapping=True, an extra mapping is returned.
+    For the edges in the original graph,
+    a writeback mapping is a tensor recording their new
+    ids in the simple graph. If the graph has
+    only one edge type, a single tensor is returned.
+    If the graph has multiple edge types, a dictionary
+    of tensor is returned using canonical edge types
+    as the key.
+
+    Given a :class:`dgl.DGLGraph` object, we return
+    another :class:`dgl.DGLGraph` object representing the
+    simple graph corresponding to it.
+
 
     Parameters
     ----------
-    g : DGLHeteroGraph
-        The heterogeneous graph
+    g : DGLGraph
+        The input graph.
     return_counts : str, optional
-        If given, the returned graph would have a column with the same name that stores
-        the number of duplicated edges from the original graph.
-    writeback_mapping : str, optional
-        If given, the mapping from the edge IDs of original graph to those of the returned
-        graph would be written into edge feature with this name in the original graph for
-        each edge type.
+        If given, the count of each edge in the original graph
+        will be stored as edge features under the name
+        eturn_counts.
+        (Default: "count")
+    writeback_mapping: bool, optional
+        If True, a write back mapping is returned for each edge
+        type subgraph. If False, only the simple graph is returned.
+        (Default: False)
+    copy_ndata: bool, optional
+        If True, the node features of the simple graph are copied
+        from the original graph. If False, the simple
+        graph will not have any node features.
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the simple graph are copied
+        from the original graph. If there exists duplicate edges between
+        two nodes (u, v), the feature of the edge is randomly selected
+        from one of the duplicate edges.
+        If False, the simple graph will not have any edge features.
+        (Default: False)
 
     Returns
     -------
-    DGLHeteroGraph
-        The new heterogeneous simple graph.
+    DGLGraph
+        A simple graph.
+    tensor or dict of tensor
+        If writeback_mapping is True, the writeback
+        mapping is returned. If the graph has only
+        one edge type, a tensor is returned. If the
+        graph has multiple edge types, a dictionary
+        of tensor is return.
+
+    If ``copy_ndata`` is ``True``, same tensors will be used for
+    the features of the original graph and the to_simpled graph. As a result, users
+    should avoid performing in-place operations on the features of the to_simpled
+    graph, which will corrupt the features of the original graph as well. For
+    concrete examples, refer to the ``Examples`` section below.
 
     Examples
     --------
-    Consider the following graph
-    >>> g = dgl.graph(([0, 1, 2, 1, 1, 1], [1, 3, 2, 3, 4, 4]))
-    >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
+    **Homographs or Heterographs with A Single Edge Type**
 
-    The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
-    >>> sg.all_edges(form='uv', order='eid')
-    (tensor([0, 1, 1, 2]), tensor([1, 3, 4, 2]))
+    Create a graph for demonstrating to_simple API.
+    In the original graph, there are multiple edges between 1 and 2.
 
-    If ``return_counts`` is set, the returned graph will also return how many edges
-    in the original graph are connecting the endpoints of the edges in the new graph:
-    >>> sg.edata['weights']
-    tensor([1, 2, 2, 1])
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph((th.tensor([0, 1, 2, 1]), th.tensor([1, 2, 0, 2])))
+    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
+    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.], [6.]])
 
-    This essentially reads that one edge is connecting (0, 1) in ``g``, whereas 2 edges
-    are connecting (1, 3) in ``g``, etc.
+    Convert the graph to a simple graph. The return counts is
+    stored in the edge feature 'cnt' and the writeback mapping
+    is returned in a tensor.
 
-    One can also retrieve the mapping from the edges in the original graph to edges in
-    the new graph by setting ``writeback_mapping`` and running
-    >>> g.edata['new_eid']
-    tensor([0, 1, 3, 1, 2, 2])
+    >>> sg, wm = dgl.to_simple(g, return_counts='cnt', writeback_mapping=True)
+    >>> sg.ndata['h']
+    tensor([[0.],
+            [1.],
+            [2.]])
+    >>> u, v, eid = sg.edges(form='all')
+    >>> u
+    tensor([0, 1, 2])
+    >>> v
+    tensor([1, 2, 0])
+    >>> eid
+    tensor([0, 1, 2])
+    >>> sg.edata['cnt']
+    tensor([1, 2, 1])
+    >>> wm
+    tensor([0, 1, 2, 1])
+    >>> 'h' in g.edata
+    False
 
-    This tells us that the first edge in ``g`` is mapped to the first edge in ``sg``, and
-    the second and the fourth edge are mapped to the second edge in ``sg``, etc.
+    **In-place operations on features of one graph will be reflected on features of
+    the simple graph, which is dangerous. Out-place operations will not be reflected.**
+
+    >>> sg.ndata['h'] += 1
+    >>> g.ndata['h']
+    tensor([[1.],
+            [2.],
+            [3.]])
+    >>> g.ndata['h'] += 1
+    >>> sg.ndata['h']
+    tensor([[2.],
+            [3.],
+            [4.]])
+    >>> sg.ndata['h2'] = th.ones(3, 1)
+    >>> 'h2' in g.ndata
+    False
+
+    **Heterographs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> })
+    >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
+    >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
+
+    The to_simple operation is applied to the subgraph
+    corresponding to ('user', 'wins', 'user') and the
+    subgraph corresponding to ('user', 'plays', 'game').
+    The return counts is stored in the default edge feature
+    'count'.
+
+    >>> sg, wm = dgl.to_simple(g, copy_ndata=False, writeback_mapping=True)
+    >>> sg
+    Graph(num_nodes={'game': 3, 'user': 3},
+          num_edges={('user', 'wins', 'user'): 4, ('game', 'plays', 'user'): 3},
+          metagraph=[('user', 'user'), ('game', 'user')])
+    >>> sg.edges(etype='wins')
+    (tensor([0, 2, 0, 2]), tensor([1, 1, 2, 0]))
+    >>> wm[('user', 'wins', 'user')]
+    tensor([0, 1, 2, 1, 3])
+    >>> sg.edges(etype='plays')
+    (tensor([2, 1, 1]), tensor([1, 2, 1]))
+    >>> wm[('user', 'plays', 'game')]
+    tensor([0, 1, 2])
+    >>> 'hv' in sg.nodes['game'].data
+    False
+    >>> 'he' in sg.edges['plays'].data
+    False
+    >>> sg.edata['count']
+    {('user', 'wins', 'user'): tensor([1, 2, 1, 1])
+     ('user', 'plays', 'game'): tensor([1, 1, 1])}
     """
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
     simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
@@ -1267,11 +1705,35 @@ def to_simple(g, return_counts='count', writeback_mapping=None):
         for count, canonical_etype in zip(counts, g.canonical_etypes):
             simple_graph.edges[canonical_etype].data[return_counts] = count
 
-    if writeback_mapping is not None:
-        for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
-            g.edges[canonical_etype].data[writeback_mapping] = edge_map
+    if copy_ndata:
+        for ntype in g.ntypes:
+            for key in g.nodes[ntype].data:
+                simple_graph.nodes[ntype].data[key] = g.nodes[ntype].data[key]
+
+    if copy_edata:
+        for i, c_etype in enumerate(g.canonical_etypes):
+            for key in g.edges[c_etype].data:
+                feat_idx = F.asnumpy(edge_maps[i])
+                _, indices = np.unique(feat_idx, return_index=True)
+                simple_graph.edges[c_etype].data[key] = \
+                    F.gather_row(g.edges[c_etype].data[key],
+                                 F.copy_to(F.tensor(indices),
+                                           F.context(g.edges[c_etype].data[key])))
+
+    if writeback_mapping:
+        # single edge type
+        if len(edge_maps) == 1:
+            return simple_graph, edge_maps[0]
+        # multiple edge type
+        else:
+            wb_map = {}
+            for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
+                wb_map[canonical_etype] = edge_map
+            return simple_graph, wb_map
 
     return simple_graph
+
+DGLHeteroGraph.to_simple = to_simple
 
 def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.

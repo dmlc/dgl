@@ -995,10 +995,11 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
 
+    @utils.cached_member(cache='_cache', prefix='reverse')
     def reverse(self):
         """Reverse the heterogeneous graph adjacency
 
-        The node types and edge types are not changed
+        The node types and edge types are not changed.
 
         Returns
         -------
@@ -1159,6 +1160,23 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
     else:
         return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
             metagraph, rel_graphs, num_nodes_per_type.todgltensor())
+
+def joint_union(metagraph, gidx_list):
+    """Return a joint union of the input heterographs.
+
+    Parameters
+    ----------
+    metagraph : GraphIndex
+        Meta-graph.
+    gidx_list : list of HeteroGraphIndex
+        Heterographs to be joint_unioned.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        joint_unioned Heterograph.
+    """
+    return _CAPI_DGLHeteroJointUnion(metagraph, gidx_list)
 
 def disjoint_union(metagraph, graphs):
     """Return a disjoint union of the input heterographs.

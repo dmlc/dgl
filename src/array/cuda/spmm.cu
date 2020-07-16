@@ -173,11 +173,11 @@ void CusparseCsrmm2(
     } else if ((op) == "div") {                                     \
       typedef cuda::binary::Div<DType> Op;                          \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_u") {                                  \
-      typedef cuda::binary::CopyU<DType> Op;                        \
+    } else if ((op) == "copy_lhs") {                                \
+      typedef cuda::binary::CopyLhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_e") {                                  \
-      typedef cuda::binary::CopyE<DType> Op;                        \
+    } else if ((op) == "copy_rhs") {                                \
+      typedef cuda::binary::CopyRhs<DType> Op;                      \
       { __VA_ARGS__ }                                               \
     } else {                                                        \
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op;     \
@@ -198,7 +198,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray out,
              std::vector<NDArray> out_aux) {
   if (reduce == "sum") {
-    if (sizeof(IdType) == 4 && op == "copy_u") {
+    if (sizeof(IdType) == 4 && op == "copy_lhs") {
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
