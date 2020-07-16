@@ -56,7 +56,7 @@ def submit_jobs(args, udf_command):
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
 
     torch_cmd = '-m torch.distributed.launch'
-    torch_cmd = torch_cmd + ' ' + '--nproc_per_node=' + str(args.client_count_per_machine)
+    torch_cmd = torch_cmd + ' ' + '--nproc_per_node=' + str(client_count_per_machine)
     torch_cmd = torch_cmd + ' ' + '--nnodes=' + str(len(hosts))
     torch_cmd = torch_cmd + ' ' + '--node_rank=' + str(0)
     torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
