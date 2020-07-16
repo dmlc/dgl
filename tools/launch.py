@@ -46,9 +46,7 @@ def submit_jobs(args, udf_command):
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
         cmd = cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        print(cmd)
-        #execute_remote(cmd, ip, thread_list)
-    print('-----------------------')
+        execute_remote(cmd, ip, thread_list)
     # launch client tasks
     client_cmd = 'DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
@@ -69,11 +67,10 @@ def submit_jobs(args, udf_command):
         new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
         cmd = client_cmd + ' ' + new_udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        print(cmd)
-        #execute_remote(cmd, ip, thread_list)
+        execute_remote(cmd, ip, thread_list)
 
-    #for thread in thread_list:
-    #    thread.join()
+    for thread in thread_list:
+        thread.join()
 
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
