@@ -242,14 +242,24 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeId")
     *rv = hg->EdgeId(etype, src, dst);
   });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeIds")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeIdsAll")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     IdArray src = args[2];
     IdArray dst = args[3];
-    const auto& ret = hg->EdgeIds(etype, src, dst);
+    const auto& ret = hg->EdgeIdsAll(etype, src, dst);
     *rv = ConvertEdgeArrayToPackedFunc(ret);
+  });
+
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeIdsOne")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    IdArray src = args[2];
+    IdArray dst = args[3];
+    *rv = hg->EdgeIdsOne(etype, src, dst);
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroFindEdges")

@@ -5,7 +5,8 @@ import random
 import pytest
 import networkx as nx
 import backend as F
-import numpy as np
+import numpy as np 
+from utils import parametrize_dtype
 
 random.seed(42)
 np.random.seed(42)
@@ -98,13 +99,10 @@ sddmm_shapes = [
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 @parametrize_dtype
-def test_spmm(g, shp, msg, reducer, index_dtype):
-    if dgl.backend.backend_name == 'tensorflow' and (reducer in ['min', 'max'] or index_dtype == 'int32'):
+def test_spmm(idtype, g, shp, msg, reducer):
+    g = g.astype(idtype).to(F.ctx())
+    if dgl.backend.backend_name == 'tensorflow' and (reducer in ['min', 'max'] or idtype == F.int32):
         pytest.skip()  # tensorflow dlpack has problem writing into int32 arrays on GPU.
-    if index_dtype == 'int32':
-        g = g.int()
-    else:
-        g = g.long()
     print(g)
     print(g.idtype)
 
@@ -164,15 +162,12 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
 @pytest.mark.parametrize('rhs_target', ['u', 'v', 'e'])
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_lhs', 'copy_rhs'])
 @parametrize_dtype
-def test_sddmm(g, shp, lhs_target, rhs_target, msg, index_dtype):
+def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
+    g = g.astype(idtype).to(F.ctx())
     if dgl.backend.backend_name == 'mxnet' and g.number_of_edges() == 0:
         pytest.skip()   # mxnet do not support zero shape tensor
-    if dgl.backend.backend_name == 'tensorflow' and index_dtype == 'int32':
+    if dgl.backend.backend_name == 'tensorflow' and idtype == F.int32:
         pytest.skip()   # tensorflow dlpack has problem with int32 ndarray.
-    if index_dtype == 'int32':
-        g = g.int()
-    else:
-        g = g.long()
     print(g)
     print(g.idtype)
 

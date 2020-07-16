@@ -116,7 +116,9 @@ class UnitGraph : public BaseHeteroGraph {
 
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override;
 
-  EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override;
+  EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const override;
+
+  IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override;
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override;
 

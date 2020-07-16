@@ -179,17 +179,26 @@ class BaseHeteroGraph : public runtime::Object {
 
   /*!
    * \brief Get all edge ids between the given endpoint pairs.
-   * \note Edges are associated with an integer id start from zero.
-   *       The id is assigned when the edge is being added to the graph.
-   *       If duplicate pairs exist, the returned edge IDs will also duplicate.
-   *       The order of returned edge IDs will follow the order of src-dst pairs
-   *       first, and ties are broken by the order of edge ID.
+   *
    * \param etype The edge type
    * \param src The src vertex ids.
    * \param dst The dst vertex ids.
    * \return EdgeArray containing all edges between all pairs.
    */
-  virtual EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const = 0;
+  virtual EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const = 0;
+
+  /*!
+   * \brief Get edge ids between the given endpoint pairs.
+   *
+   * Only find one matched edge Ids even if there are multiple matches due to parallel
+   * edges. The i^th Id in the returned array is for edge (src[i], dst[i]).
+   *
+   * \param etype The edge type
+   * \param src The src vertex ids.
+   * \param dst The dst vertex ids.
+   * \return EdgeArray containing all edges between all pairs.
+   */
+  virtual IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const = 0;
 
   /*!
    * \brief Find the edge ID and return the pair of endpoints

@@ -61,9 +61,9 @@ def test_random_walk_with_restart():
             assert (trace_diff % 2 == 0).all()
 
 @parametrize_dtype
-def test_metapath_random_walk(index_dtype):
-    g1 = dgl.bipartite(([0, 1, 2, 3], [0, 1, 2, 3]), 'a', 'ab', 'b', index_dtype=index_dtype)
-    g2 = dgl.bipartite(([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2]), 'b', 'ba', 'a', index_dtype=index_dtype)
+def test_metapath_random_walk(idtype):
+    g1 = dgl.bipartite(([0, 1, 2, 3], [0, 1, 2, 3]), 'a', 'ab', 'b', idtype=idtype)
+    g2 = dgl.bipartite(([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2]), 'b', 'ba', 'a', idtype=idtype)
     G = dgl.hetero_from_relations([g1, g2])
     seeds = [0, 1]
     traces = dgl.contrib.sampling.metapath_random_walk(G, ['ab', 'ba'] * 4, seeds, 3)

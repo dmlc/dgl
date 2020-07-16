@@ -12,7 +12,6 @@
 #include "../../src/graph/unit_graph.h"
 
 using namespace dgl;
-using namespace dgl::aten;
 using namespace dgl::runtime;
 
 template <typename IdType>
@@ -83,8 +82,8 @@ void _TestUnitGraph(DLContext ctx) {
   g = hg->relation_graphs()[0];
   ASSERT_EQ(g->GetFormatInUse(), 1);
 
-  auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
-  auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
+  auto src = aten::VecToIdArray<int64_t>({1, 2, 5, 3});
+  auto dst = aten::VecToIdArray<int64_t>({1, 6, 2, 6});
   auto mg = std::dynamic_pointer_cast<UnitGraph>(
       dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCOO));
   ASSERT_EQ(mg->GetFormatInUse(), 1);

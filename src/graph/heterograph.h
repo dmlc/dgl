@@ -102,8 +102,12 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->EdgeId(0, src, dst);
   }
 
-  EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
-    return GetRelationGraph(etype)->EdgeIds(0, src, dst);
+  EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const override {
+    return GetRelationGraph(etype)->EdgeIdsAll(0, src, dst);
+  }
+
+  IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override {
+    return GetRelationGraph(etype)->EdgeIdsOne(0, src, dst);
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {

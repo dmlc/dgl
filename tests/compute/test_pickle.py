@@ -10,6 +10,7 @@ import dgl.function as fn
 import pickle
 import io
 import unittest
+from utils import parametrize_dtype
 
 def _assert_is_identical(g, g2):
     assert g.is_readonly == g2.is_readonly
@@ -243,7 +244,9 @@ def test_pickling_batched_graph():
     new_bg = _reconstruct_pickle(bg)
     _assert_is_identical_batchedgraph(bg, new_bg)
 
-def test_pickling_heterograph():
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+@parametrize_dtype
+def test_pickling_heterograph(idtype):
     # copied from test_heterograph.create_test_heterograph()
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     wishes_nx = nx.DiGraph()
@@ -252,10 +255,10 @@ def test_pickling_heterograph():
     wishes_nx.add_edge('u0', 'g1', id=0)
     wishes_nx.add_edge('u2', 'g0', id=1)
 
-    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
-    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game')
-    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', idtype=idtype, device=F.ctx())
+    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game', idtype=idtype, device=F.ctx())
+    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game', idtype=idtype, device=F.ctx())
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
 
     g.nodes['user'].data['u_h'] = F.randn((3, 4))
@@ -265,6 +268,7 @@ def test_pickling_heterograph():
     new_g = _reconstruct_pickle(g)
     _assert_is_identical_hetero(g, new_g)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_pickling_batched_heterograph():
     # copied from test_heterograph.create_test_heterograph()
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
@@ -292,6 +296,7 @@ def test_pickling_batched_heterograph():
     new_bg = _reconstruct_pickle(bg)
     _assert_is_identical_batchedhetero(bg, new_bg)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")
 def test_pickling_heterograph_index_compatibility():
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
