@@ -1295,7 +1295,7 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   CSRPtr ret = in_csr_;
   if (!in_csr_->defined()) {
     if (out_csr_->defined()) {
-      const auto& newadj = aten::CSRTranspose(out_csr_->adj());
+      const auto& newadj = aten::CSRSort(aten::CSRTranspose(out_csr_->adj()));
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->in_csr_) = CSR(meta_graph(), newadj);
