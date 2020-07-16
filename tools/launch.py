@@ -48,7 +48,7 @@ def submit_jobs(args, udf_command):
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, thread_list)
     # launch client tasks
-    client_cmd = 'DGL_ROLE=client'
+    client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
