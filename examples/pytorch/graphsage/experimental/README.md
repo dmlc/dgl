@@ -24,7 +24,7 @@ python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train -
 When copying data to the cluster, we recommend users to copy the partitioned data to NFS so that all worker machines
 will be able to access the partitioned data.
 
-### Step 2: Launch distributed jobs
+### Step 3: Launch distributed jobs
 
 First make sure that the master node has the right permission to ssh to all the other nodes. Then run script:
 

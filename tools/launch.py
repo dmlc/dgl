@@ -52,6 +52,10 @@ def submit_jobs(args, udf_command):
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
+    if os.environ.get('OMP_NUM_THREADS') is not None:
+        client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + os.environ.get('OMP_NUM_THREADS')
+    if os.environ.get('PYTHONPATH') is not None:
+        client_cmd = client_cmd + ' ' + 'PYTHONPATH=' + os.environ.get('PYTHONPATH')
 
     torch_cmd = '-m torch.distributed.launch'
     torch_cmd = torch_cmd + ' ' + '--nproc_per_node=' + str(client_count_per_machine)
@@ -89,8 +93,8 @@ def main():
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_client > 0, '--num_client must be a positive number.'
     udf_command = str(udf_command[0])
-    if 'python3' in udf_command == False:
-        raise RuntimeError("DGL launch can only support: python3 ...")
+    if 'python' not in udf_command:
+        raise RuntimeError("DGL launch can only support: python ...")
     submit_jobs(args, udf_command)
 
 def signal_handler(signal, frame):
