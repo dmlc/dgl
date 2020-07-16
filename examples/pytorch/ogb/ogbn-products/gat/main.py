@@ -17,29 +17,6 @@ import tqdm
 import traceback
 from ogb.nodeproppred import DglNodePropPredDataset
 
-#### Neighbor sampler
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts):
-        self.g = g
-        self.fanouts = fanouts
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            if fanout == 0:
-                frontier = dgl.in_subgraph(self.g, seeds)
-            else:
-                frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
 
 class GAT(nn.Module):
     def __init__(self,
@@ -101,8 +78,8 @@ class GAT(nn.Module):
             else:
                 y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
@@ -176,9 +153,9 @@ def run(args, device, data):
     train_nid, val_nid, test_nid, in_feats, labels, n_classes, g, num_heads = data
 
     # Create PyTorch DataLoader for constructing blocks
-    sampler = dgl.sampling.MultiLayerNeighborSampler(
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
-    dataloader = dgl.sampling.NodeDataLoader(
+    dataloader = dgl.dataloading.NodeDataLoader(
         g,
         train_nid,
         sampler,

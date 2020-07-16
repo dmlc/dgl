@@ -233,8 +233,8 @@ class EntityClassify(nn.Module):
                     self.h_dim if l != len(self.layers) - 1 else self.out_dim)
                 for k in g.ntypes}
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 {k: th.arange(g.number_of_nodes(k)) for k in g.ntypes},
                 sampler,

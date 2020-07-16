@@ -95,21 +95,21 @@ def main(args):
         model.cuda()
 
     # train sampler
-    sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    loader = dgl.sampling.NodeDataLoader(
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    loader = dgl.dataloading.NodeDataLoader(
         g, {category: train_idx}, sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # validation sampler
-    val_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    val_loader = dgl.sampling.NodeDataLoader(
+    val_sampler = dgl.dataloading.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    val_loader = dgl.dataloading.NodeDataLoader(
         g, {category: val_idx}, val_sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # test sampler
 
-    test_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    test_loader = dgl.sampling.NodeDataLoader(
+    test_sampler = dgl.dataloading.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    test_loader = dgl.dataloading.NodeDataLoader(
         g, {category: test_idx}, test_sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 

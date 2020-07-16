@@ -2,10 +2,12 @@
 
 from collections.abc import Mapping
 from abc import ABC, abstractproperty, abstractmethod
+import numpy as np
 from .. import transform
 from ..base import NID, EID
 from .. import backend as F
 from .. import utils
+from ..convert import heterograph
 
 # pylint: disable=unused-argument
 def assign_block_eids(block, frontier):
@@ -181,14 +183,14 @@ class BlockSampler(object):
         """
         blocks = []
         for block_id in reversed(range(self.num_hops)):
-            frontier = self.sample_frontier(block_id, g, seed_nodes, *args, **kwargs)
+            frontier = self.sample_frontier(block_id, g, seed_nodes)
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
             if exclude_eids is not None:
                 frontier = transform.remove_edges(frontier, exclude_eids)
 
             block = transform.to_block(frontier, seed_nodes)
-            if self.return_eids:
+            if return_eids:
                 assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
@@ -480,9 +482,9 @@ class EdgeCollator(Collator):
         self.return_eids = return_eids
 
         if isinstance(eids, Mapping):
-            self._dataset = utils.FlattenedDict(nids)
+            self._dataset = utils.FlattenedDict(eids)
         else:
-            self._dataset = nids
+            self._dataset = eids
 
     @property
     def dataset(self):
@@ -491,11 +493,15 @@ class EdgeCollator(Collator):
     def _collate(self, items):
         if isinstance(items[0], tuple):
             items = utils.group_as_dict(items)
+            items = {k: F.zerocopy_from_numpy(np.asarray(v)) for k, v in items.items()}
+        else:
+            items = F.zerocopy_from_numpy(np.asarray(items))
 
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = find_exclude_eids(
+            self.g,
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,
@@ -510,25 +516,29 @@ class EdgeCollator(Collator):
     def _collate_with_negative_sampling(self, items):
         if isinstance(items[0], tuple):
             items = utils.group_as_dict(items)
+            items = {k: F.zerocopy_from_numpy(np.asarray(v)) for k, v in items.items()}
+        else:
+            items = F.zerocopy_from_numpy(np.asarray(items))
 
         pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
 
-        neg_srcdst = self.negative_sampler(items)
+        neg_srcdst = self.negative_sampler(self.g, items)
         if not isinstance(neg_srcdst, Mapping):
             assert len(self.g.etypes) == 1, \
                 'graph has multiple or no edge types; '\
                 'please return a dict in negative sampler.'
-            neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
+            neg_srcdst = {self.g.canonical_etypes[0]: neg_srcdst}
         neg_edges = {
             etype: neg_srcdst.get(etype, ()) for etype in self.g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
 
-        pair_graph, neg_pair_graph = compact_graphs([pair_graph, neg_pair_graph])
+        pair_graph, neg_pair_graph = transform.compact_graphs([pair_graph, neg_pair_graph])
 
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = find_exclude_eids(
+            self.g,
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,
