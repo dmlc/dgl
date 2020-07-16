@@ -418,6 +418,14 @@ class DistGraph:
         self.ip_config, self.graph_name, self._gpb_input = state
         self._init()
 
+        self._ndata = NodeDataView(self)
+        self._edata = EdgeDataView(self)
+        self._num_nodes = 0
+        self._num_edges = 0
+        for part_md in self._gpb.metadata():
+            self._num_nodes += int(part_md['num_nodes'])
+            self._num_edges += int(part_md['num_edges'])
+
     def init_ndata(self, name, shape, dtype, init_func=None):
         '''Initialize node data
 
