@@ -341,31 +341,22 @@ class EdgeCollator(Collator):
 
         * ``'reverse_id'``, which excludes the reverse edges of the sampled edges.  The said
           reverse edges have the same edge type as the sampled edges.  Only works
-          on edge types whose source node type is the same as its destination node type
-          (see also :py:func:`dgl.transform.add_reverse`).
+          on edge types whose source node type is the same as its destination node type.
 
         * ``'reverse_types'``, which excludes the reverse edges of the sampled edges.  The
-          said reverse edges have different edge types from the sampled edges (see also
-          :py:func:`dgl.transform.add_reverse_types`).
+          said reverse edges have different edge types from the sampled edges.
     reverse_eids : Tensor or dict[etype, Tensor], optional
         The mapping from original edge ID to its reverse edge ID.
 
-        Only used when ``exclude`` is set to ``reverse_id``.
+        Required and only used when ``exclude`` is set to ``reverse_id``.
 
         For heterogeneous graph this will be a dict of edge type and edge IDs.  Note that
         only the edge types whose source node type is the same as destination node type
         are needed.
-
-        If not given, assumes that the reverse edges are added by the function
-        :py:func:`dgl.transform.add_reverse`.
     reverse_etypes : dict[etype, etype], optional
         The mapping from the edge type to its reverse edge type.
 
-        Only used when ``exclude`` is set to ``reverse_types``.
-
-        If not given, assumes that the reverse edge type name is the original edge
-        type name suffixed by ``'_inv'``, same as the default behavior of
-        :py:func:`dgl.transform.add_reverse_types`.
+        Required and only used when ``exclude`` is set to ``reverse_types``.
     negative_sampler : callable, optional
         The negative sampler.  Can be omitted if no negative sampling is needed.
 

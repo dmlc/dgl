@@ -42,9 +42,7 @@ __all__ = [
     'out_subgraph',
     'remove_edges',
     'as_immutable_graph',
-    'as_heterograph',
-    'add_reverse',
-    'add_reverse_types']
+    'as_heterograph']
 
 
 def pairwise_squared_distance(x):
@@ -728,9 +726,6 @@ def to_bidirected_stale(g, readonly=True):
     >>> bg1.edges()
     (tensor([0, 1, 0]), tensor([0, 0, 1]))
     """
-    warnings.warn(
-        'to_bidirected() will be deprecated.  Please use add_reverse() instead.',
-        DeprecationWarning)
     if readonly:
         newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
     else:
@@ -1786,158 +1781,5 @@ def as_immutable_graph(hg):
     g.ndata.update(hg.ndata)
     g.edata.update(hg.edata)
     return g
-
-def add_reverse(g, ignore_bipartite=False):
-    """Return a new graph with reverse edges added to the given graph.
-
-    If the graph is heterogeneous, the edge types whose source node type is the same
-    as the destination node type will have reverse edges added.  If an edge type with
-    different source and destination node type exist, an error is raised unless
-    ``ignore_bipartite`` is True.
-
-    For each edge with ID ``e`` from node ``u`` to node ``v``, a new
-    edge with ID ``e + |E|`` from node ``v`` to node ``u`` is added,
-    where ``|E|`` is the number of edges in the original graph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        The graph
-    ignore_bipartite : bool, default False
-        Ignore edge types with different source and destination node type.
-
-        An error will be raised if ``ignore_bipartite`` is False and an edge type with
-        different source and destination node type exist.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The new graph
-
-    Examples
-    --------
-    >>> g = dgl.graph(([0, 1, 2], [0, 2, 3]))
-    >>> g2 = dgl.add_reverse(g)
-    >>> g2.edges(order='eid')
-    (tensor([0, 1, 2, 0, 2, 3]), tensor([0, 2, 3, 0, 1, 2]))
-
-    >>> g = dgl.heterograph({
-    ...     ('A', 'AA', 'A'): ([0, 1, 2], [0, 2, 3]),
-    ...     ('B', 'BB', 'B'): ([1, 2, 3], [2, 3, 4])})
-    >>> g2 = dgl.add_reverse(g)
-    >>> g2.edges(etype='AA', order='eid')
-    (tensor([0, 1, 2, 0, 2, 3]), tensor([0, 2, 3, 0, 1, 2]))
-    >>> g2.edges(etype='BB', order='eid')
-    (tensor([1, 2, 3, 2, 3, 4]), tensor([2, 3, 4, 1, 2, 3]))
-    """
-    new_edges = {}
-    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
-    edata = {}
-
-    for canonical_etype in g.canonical_etypes:
-        utype, _, vtype = canonical_etype
-        if utype != vtype:
-            if not ignore_bipartite:
-                raise DGLError('cannot add reverse edge for edge type %s' % (canonical_etype,))
-            new_edges[canonical_etype] = g.edges(etype=canonical_etype, order='eid')
-            edata[canonical_etype] = g.edges[canonical_etype].data
-        else:
-            src, dst = g.edges(etype=canonical_etype, order='eid')
-            new_edges[canonical_etype] = (F.cat([src, dst], 0), F.cat([dst, src], 0))
-            edata[canonical_etype] = {
-                k: F.cat([v, v], 0) for k, v in g.edges[canonical_etype].data.items()}
-
-    new_g = heterograph(new_edges, num_nodes_dict=num_nodes_dict)
-    for ntype in g.ntypes:
-        new_g.nodes[ntype].data.update(g.nodes[ntype].data)
-    for canonical_etype in g.canonical_etypes:
-        new_g.edges[canonical_etype].data.update(edata[canonical_etype])
-
-    return new_g
-
-def add_reverse_types(g, reverse_type_names=None, reverse_type_suffix='_inv'):
-    """Return a new graph with reverse edges added to the given graph as another edge type.
-
-    For each edge with ID ``e`` of type ``etype`` connecting from node ``u`` of type ``utype``
-    to node ``v`` of type ``vtype``, a new edge with ID ``e`` of type ``etype_inv`` connecting
-    from node ``v`` of type ``vtype`` to node ``u`` of type ``utype`` is added.
-
-    Notes
-    -----
-    The name of the reverse edge types should not exist in the original graph.  An error
-    will be raised otherwise.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        The graph
-    reverse_type_names : dict of [etype, str], optional
-        If given, defines the mapping from the names of the existing edge types to the names
-        of their reverse edge types.
-    reverse_type_suffix : str
-        The suffix appended to the original type name as the reverse type name.
-
-        Will be ignored if ``reverse_type_names`` is given.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The new graph
-
-    Examples
-    --------
-    >>> g = dgl.heterograph({
-    ...     ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 3]),
-    ...     ('user', 'view', 'item'): ([0, 0, 2], [2, 0, 3])})
-    >>> g2 = dgl.add_reverse_types(g, reverse_type_suffix='_by')
-    >>> g2.all_edges(etype='follow_by')
-    (tensor([1, 2, 3]), tensor([0, 1, 2]))
-    >>> g2.all_edges(etype='view_by')
-    (tensor([2, 0, 3]), tensor([0, 0, 2]))
-
-    Alternatively one can also supply the mapping from the edge type name to the reverse
-    edge type name.
-    >>> g3 = dgl.add_reverse_types(
-    ...     g, reverse_type_names={'follow': 'followed-by', 'view': 'viewed-by'})
-    >>> g3.all_edges(etype='followed-by')
-    (tensor([1, 2, 3]), tensor([0, 1, 2]))
-    >>> g3.all_edges(etype='viewed-by')
-    (tensor([2, 0, 3]), tensor([0, 0, 2]))
-    """
-    if reverse_type_names is None:
-        reverse_type_names = {
-            etype: etype + reverse_type_suffix
-            for etype in g.etypes}
-
-    etype_data = {}
-    edges = {}
-    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
-    for canonical_etype in g.canonical_etypes:
-        utype, etype, vtype = canonical_etype
-        etype_rev = reverse_type_names.get(
-            canonical_etype, reverse_type_names.get(etype, None))
-        if etype_rev is None:
-            raise DGLError(
-                'cannot find the name of the reverse edge type of %s' %
-                (canonical_etype,))
-
-        canonical_etype_rev = vtype, etype_rev, utype
-        if canonical_etype_rev in g.canonical_etypes:
-            raise DGLError('edge type %s already exists in the graph' % (canonical_etype,))
-
-        src, dst = g.all_edges(etype=canonical_etype, order='eid')
-        edges[canonical_etype] = src, dst
-        edges[canonical_etype_rev] = dst, src
-
-        etype_data[canonical_etype_rev] = etype_data[canonical_etype] = \
-            g.edges[canonical_etype].data
-
-    new_g = heterograph(edges, num_nodes_dict=num_nodes_dict)
-    for ntype in g.ntypes:
-        new_g.nodes[ntype].data.update(g.nodes[ntype].data)
-    for etype, edata in etype_data.items():
-        new_g.edges[etype].data.update(edata)
-
-    return new_g
 
 _init_api("dgl.transform")
