@@ -198,9 +198,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
         world_size = n_gpus
-        backend = 'gloo'
-        # backend = 'nccl'
-        if args.sparse_embedding:
+        backend = 'nccl'
+
+        # using sparse embedding or usig mix_cpu_gpu model (embedding model can not be stored in GPU)
+        if args.sparse_embedding or args.mix_cpu_gpu:
             backend = 'gloo'
         th.distributed.init_process_group(backend=backend,
                                           init_method=dist_init_method,
@@ -209,6 +210,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
+    # 
     embed_layer = RelGraphEmbedLayer(dev_id,
                                      g.number_of_nodes(),
                                      node_tids,
@@ -218,6 +220,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                                      sparse_emb=args.sparse_embedding)
 
     # create model
+    # all model params are in device.
     model = EntityClassify(dev_id,
                            g.number_of_nodes(),
                            args.n_hidden,
@@ -240,7 +243,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
     if n_gpus > 1:
         labels = labels.to(dev_id)
         model.cuda(dev_id)
-        embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
+        if args.sparse_embedding or args.mix_cpu_gpu:
+            embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
+        else:
+            embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     # optimizer

@@ -91,7 +91,6 @@ class RelGraphEmbedLayer(nn.Module):
 
         for ntype in range(num_of_ntype):
             if input_size[ntype] is not None:
-                print(input_size[ntype].shape)
                 input_emb_size = input_size[ntype].shape[1]
                 embed = nn.Parameter(th.Tensor(input_emb_size, self.embed_size))
                 nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
@@ -99,9 +98,6 @@ class RelGraphEmbedLayer(nn.Module):
 
         self.node_embeds = th.nn.Embedding(node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)
         nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
-
-    def part_to(self, dev_id):
-        self.embeds = self.embeds.to(dev_id)
 
     def forward(self, node_ids, node_tids, type_ids, features):
         """Forward computation
@@ -123,6 +119,7 @@ class RelGraphEmbedLayer(nn.Module):
         """
         tsd_idx = node_ids < self.num_nodes
         tsd_ids = node_ids[tsd_idx]
+        tsd_ids = tsd_ids.to(self.node_embeds.weight.device)
         embeds = self.node_embeds(tsd_ids)
         embeds = embeds.to(self.dev_id)
         for ntype in range(self.num_of_ntype):
