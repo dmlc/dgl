@@ -250,6 +250,84 @@ def test_reverse_shared_frames():
     rg.update_all(src_msg, sum_reduce)
     assert F.allclose(g.ndata['h'], rg.ndata['h'])
 
+def test_to_bidirected():
+    # homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.], [1.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
+    u, v = g.edges()
+    ub, vb = bg.edges()
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    assert F.array_equal(g.ndata['h'], bg.ndata['h'])
+    assert F.array_equal(F.cat([g.edata['h'], g.edata['h']], dim=0), bg.edata['h'])
+    bg.ndata['hh'] = F.tensor([[0.], [1.], [2.], [1.]])
+    assert ('hh' in g.ndata) is False
+    bg.edata['hh'] = F.tensor([[0.], [1.], [2.], [1.], [0.], [1.], [2.], [1.]])
+    assert ('hh' in g.edata) is False
+
+    # donot share ndata and edata
+    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False)
+    ub, vb = bg.edges()
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    assert ('h' in bg.ndata) is False
+    assert ('h' in bg.edata) is False
+
+    # zero edge graph
+    g = dgl.graph([])
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
+
+    # heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'wins', 'user'): (F.tensor([0, 2, 0, 2, 2]), F.tensor([1, 1, 2, 1, 0])),
+        ('user', 'plays', 'game'): (F.tensor([1, 2, 1]), F.tensor([2, 1, 1])),
+        ('user', 'follows', 'user'): (F.tensor([1, 2, 1]), F.tensor([0, 0, 0]))
+    })
+    g.nodes['game'].data['hv'] = F.ones((3, 1))
+    g.nodes['user'].data['hv'] = F.ones((3, 1))
+    g.edges['wins'].data['h'] = F.tensor([0, 1, 2, 3, 4])
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True, ignore_bipartite=True)
+    assert F.array_equal(g.nodes['game'].data['hv'], bg.nodes['game'].data['hv'])
+    assert F.array_equal(g.nodes['user'].data['hv'], bg.nodes['user'].data['hv'])
+    u, v = g.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    assert F.array_equal(F.cat([g.edges['wins'].data['h'], g.edges['wins'].data['h']], dim=0),
+                         bg.edges['wins'].data['h'])
+    u, v = g.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    u, v = g.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    assert F.array_equal(u, ub)
+    assert F.array_equal(v, vb)
+    assert len(bg.edges['plays'].data) == 0
+    assert len(bg.edges['follows'].data) == 0
+
+    # donot share ndata and edata
+    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False, ignore_bipartite=True)
+    assert len(bg.edges['wins'].data) == 0
+    assert len(bg.edges['plays'].data) == 0
+    assert len(bg.edges['follows'].data) == 0
+    assert len(bg.nodes['game'].data) == 0
+    assert len(bg.nodes['user'].data) == 0
+    u, v = g.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    u, v = g.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    u, v = g.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    assert F.array_equal(u, ub)
+    assert F.array_equal(v, vb)
+
 
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
@@ -271,7 +349,7 @@ def test_bidirected_graph():
         g = dgl.DGLGraph(elist, readonly=in_readonly)
         elist.append((1, 2))
         elist = set(elist)
-        big = dgl.to_bidirected(g, out_readonly)
+        big = dgl.to_bidirected_stale(g, out_readonly)
         assert big.number_of_edges() == num_edges
         src, dst = big.edges()
         eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
@@ -680,19 +758,59 @@ def test_compact(index_dtype):
     _check(g3, new_g3, induced_nodes)
     _check(g4, new_g4, induced_nodes)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU to simple not implemented")
 @parametrize_dtype
 def test_to_simple(index_dtype):
+    # homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 2, 1]), F.tensor([1, 2, 0, 2])))
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
+    sg, wb = dgl.to_simple(g, writeback_mapping=True)
+    u, v = g.all_edges(form='uv', order='eid')
+    u = F.asnumpy(u).tolist()
+    v = F.asnumpy(v).tolist()
+    uv = list(zip(u, v))
+    eid_map = F.asnumpy(wb)
+
+    su, sv = sg.all_edges(form='uv', order='eid')
+    su = F.asnumpy(su).tolist()
+    sv = F.asnumpy(sv).tolist()
+    suv = list(zip(su, sv))
+    sc = F.asnumpy(sg.edata['count'])
+    assert set(uv) == set(suv)
+    for i, e in enumerate(suv):
+        assert sc[i] == sum(e == _e for _e in uv)
+    for i, e in enumerate(uv):
+        assert eid_map[i] == suv.index(e)
+    # shared ndata
+    assert F.array_equal(sg.ndata['h'], g.ndata['h'])
+    assert 'h' not in sg.edata
+    # new ndata to sg
+    sg.ndata['hh'] = F.tensor([[0.], [1.], [2.]])
+    assert 'hh' not in g.ndata
+
+    sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
+    assert 'h' not in sg.ndata
+    assert 'h' not in sg.edata
+
+    # heterogeneous graph
     g = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)],
-        ('user', 'plays', 'game'): [(3, 5), (2, 3), (1, 4), (1, 4), (3, 5), (2, 3), (2, 3)]}, index_dtype=index_dtype)
-    sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
+        ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1],
+                                     [1, 3, 2, 3, 4, 4]),
+        ('user', 'plays', 'game'): ([3, 2, 1, 1, 3, 2, 2], [5, 3, 4, 4, 5, 3, 3])},
+        index_dtype=index_dtype)
+    g.nodes['user'].data['h'] = F.tensor([0, 1, 2, 3, 4])
+    g.nodes['user'].data['hh'] = F.tensor([0, 1, 2, 3, 4])
+    g.edges['follow'].data['h'] = F.tensor([0, 1, 2, 3, 4, 5])
+    sg, wb = dgl.to_simple(g, return_counts='weights', writeback_mapping=True, copy_edata=True)
+    g.nodes['game'].data['h'] = F.tensor([0, 1, 2, 3, 4, 5])
 
     for etype in g.canonical_etypes:
         u, v = g.all_edges(form='uv', order='eid', etype=etype)
         u = F.asnumpy(u).tolist()
         v = F.asnumpy(v).tolist()
         uv = list(zip(u, v))
-        eid_map = F.asnumpy(g.edges[etype].data['new_eid'])
+        eid_map = F.asnumpy(wb[etype])
 
         su, sv = sg.all_edges(form='uv', order='eid', etype=etype)
         su = F.asnumpy(su).tolist()
@@ -705,6 +823,24 @@ def test_to_simple(index_dtype):
             assert sw[i] == sum(e == _e for _e in uv)
         for i, e in enumerate(uv):
             assert eid_map[i] == suv.index(e)
+    # shared ndata
+    assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
+    assert F.array_equal(sg.nodes['user'].data['hh'], g.nodes['user'].data['hh'])
+    assert 'h' not in sg.nodes['game'].data
+    # new ndata to sg
+    sg.nodes['user'].data['hhh'] = F.tensor([0, 1, 2, 3, 4])
+    assert 'hhh' not in g.nodes['user'].data
+    # share edata
+    feat_idx = F.asnumpy(wb[('user', 'follow', 'user')])
+    _, indices = np.unique(feat_idx, return_index=True)
+    assert np.array_equal(F.asnumpy(sg.edges['follow'].data['h']),
+                          F.asnumpy(g.edges['follow'].data['h'])[indices])
+
+    sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
+    for ntype in g.ntypes:
+        assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+    assert 'h' not in sg.nodes['user'].data
+    assert 'hh' not in sg.nodes['user'].data
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
@@ -868,6 +1004,7 @@ if __name__ == '__main__':
     # test_no_backtracking()
     test_reverse()
     # test_reverse_shared_frames()
+    test_to_bidirected()
     # test_simple_graph()
     # test_bidirected_graph()
     # test_khop_adj()
@@ -877,7 +1014,7 @@ if __name__ == '__main__':
     # test_add_self_loop()
     # test_partition_with_halo()
     # test_metis_partition()
-    test_hetero_linegraph('int32')
+    # test_hetero_linegraph('int32')
     # test_compact()
     test_to_simple("int32")
     # test_in_subgraph("int32")
