@@ -8,11 +8,9 @@ import os
 from . import shutdown_servers, finalize_client
 from ..backend import backend_name
 from .rpc_client import get_sampler_pool
-
-DGL_QUEUE_TIMEOUT = 10
+from .. import backend as F
 
 __all__ = ["DistDataLoader"]
-
 
 def deregister_torch_ipc():
     """
@@ -38,19 +36,19 @@ def call_collate_fn(next_data):
 
 def init_fn(collate_fn, queue):
     """Initialize setting collate function and mp.Queue in the subprocess"""
-    print('initialize the sampler process')
     global DGL_GLOBAL_COLLATE_FN
     global DGL_GLOBAL_MP_QUEUE
     DGL_GLOBAL_MP_QUEUE = queue
     DGL_GLOBAL_COLLATE_FN = collate_fn
     time.sleep(1)
-    print('init proc complete', os.getpid())
 
 
 class DistDataLoader:
     """DGL customized multiprocessing dataloader"""
 
-    def __init__(self, dataset, batch_size, num_workers, collate_fn, drop_last, queue_size=None):
+    def __init__(self, dataset, batch_size, shuffle=False,
+                 num_workers=1, collate_fn=None, drop_last=False,
+                 queue_size=None):
         """
         dataset (Dataset): dataset from which to load the data.
         batch_size (int, optional): how many samples per batch to load
@@ -82,12 +80,13 @@ class DistDataLoader:
         self.send_idxs = 0
         self.recv_idxs = 0
         self.started = False
+        self.shuffle = shuffle
 
         self.pool, num_sampler_workers = get_sampler_pool()
         for i in range(num_sampler_workers):
             self.pool.apply_async(init_fn, args=(collate_fn, self.queue))
     
-        self.dataset = dataset
+        self.dataset = F.tensor(dataset)
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
@@ -98,7 +97,7 @@ class DistDataLoader:
                 self._request_next_batch()
         self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
-            result = self.queue.get(timeout=DGL_QUEUE_TIMEOUT)
+            result = self.queue.get()
             self.recv_idxs += 1
             return result
         else:
@@ -107,6 +106,8 @@ class DistDataLoader:
             raise StopIteration
 
     def __iter__(self):
+        if self.shuffle:
+            self.dataset = F.rand_shuffle(self.dataset)
         return self
 
     def _request_next_batch(self):
@@ -120,6 +121,9 @@ class DistDataLoader:
             return async_result
 
     def _next_data(self):
+        if self.current_pos == len(self.dataset):
+            return None
+
         end_pos = 0
         if self.current_pos + self.batch_size > len(self.dataset):
             if self.drop_last:

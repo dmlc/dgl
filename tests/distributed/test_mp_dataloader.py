@@ -63,7 +63,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
         dataset=train_nid.numpy(),
         batch_size=32,
         collate_fn=sampler.sample_blocks,
-        # shuffle=True,
+        shuffle=True,
         drop_last=False,
         num_workers=4) 
     
