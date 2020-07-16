@@ -90,16 +90,13 @@ def train(args):
         test_dataset = MovieLensDataset(
             movielens.test_rating_pairs, movielens.test_rating_values, movielens.train_graph, 
             args.hop, args.sample_ratio, args.max_nodes_per_hop) 
-            # mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
     else:
         test_dataset = MovieLensDataset(
             movielens.valid_rating_pairs, movielens.valid_rating_values, movielens.train_graph, 
             args.hop, args.sample_ratio, args.max_nodes_per_hop)
-            # mode='valid', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
     train_dataset = MovieLensDataset(
         movielens.train_rating_pairs, movielens.train_rating_values, movielens.train_graph, 
         args.hop, args.sample_ratio, args.max_nodes_per_hop)
-        # mode='train', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
 
     train_loader = th.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
                             num_workers=args.num_workers, collate_fn=collate_movielens)

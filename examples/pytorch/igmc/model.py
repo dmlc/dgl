@@ -90,7 +90,7 @@ def edge_drop(graph, edge_dropout=0.2, training=True):
     if not training:
         return graph
 
-    # cal dropout mask
+    # set edge weight to zero in directional mode
     src, _ = graph.edges()
     to_drop = src.new_full((graph.number_of_edges(), ), edge_dropout, dtype=th.float)
     to_drop = th.bernoulli(to_drop).to(th.bool)

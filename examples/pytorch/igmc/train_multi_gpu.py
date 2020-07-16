@@ -133,6 +133,9 @@ def train(proc_id, n_gpus, args, devices, movielens):
                                           world_size=world_size,
                                           rank=proc_id)
     th.cuda.set_device(dev_id)
+    th.manual_seed(args.seed)
+    if th.cuda.is_available():
+        th.cuda.manual_seed_all(args.seed)
 
     # Split train_dataset and set dataloader
     train_rating_pairs = th.split(th.stack(movielens.train_rating_pairs), 
@@ -145,7 +148,6 @@ def train(proc_id, n_gpus, args, devices, movielens):
     train_dataset = MovieLensDataset(
         train_rating_pairs, train_rating_values, movielens.train_graph, 
         args.hop, args.sample_ratio, args.max_nodes_per_hop)
-        # mode='train', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
     train_loader = th.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
                             num_workers=args.num_workers, collate_fn=collate_movielens)
     if proc_id == 0:
@@ -153,12 +155,10 @@ def train(proc_id, n_gpus, args, devices, movielens):
             test_dataset = MovieLensDataset(
                 movielens.test_rating_pairs, movielens.test_rating_values, movielens.train_graph, 
                 args.hop, args.sample_ratio, args.max_nodes_per_hop)
-                # mode='test', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
         else:
             test_dataset = MovieLensDataset(
                 movielens.valid_rating_pairs, movielens.valid_rating_pairs, movielens.train_graph, 
                 args.hop, args.sample_ratio, args.max_nodes_per_hop)
-                # mode='valid', edge_dropout=args.edge_dropout, force_undirected=args.force_undirected)
         test_loader = th.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                                 num_workers=args.num_workers, collate_fn=collate_movielens)
 
@@ -300,12 +300,8 @@ def config():
 
 if __name__ == '__main__':
     args = config()
-    # will triger error 
-    # random.seed(args.seed)
-    # np.random.seed(args.seed)
-    # th.manual_seed(args.seed)
-    # if th.cuda.is_available():
-    #     th.cuda.manual_seed_all(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     movielens = MovieLens(args.data_name, testing=args.testing,
                             test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
