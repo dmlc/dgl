@@ -12,6 +12,7 @@
 #include <vector>
 #include <utility>
 #include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -125,6 +126,28 @@ struct COOMatrix {
     return COOMatrix(num_rows, num_cols,
                      row.CopyTo(ctx), col.CopyTo(ctx),
                      aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     row_sorted, col_sorted);
+  }
+
+  /*! \brief Save arrays of the coo matrix into the shared memory with the given name 
+   *  Note: It does not save the metainfo 
+   */
+  COOMatrix CopyToSharedMem(const std::string &name) const {
+    auto row_shared_mem = NDArray::EmptyShared(
+        name + "_row", {row->shape[0]}, row->dtype, row->ctx, true);
+    row_shared_mem.CopyFrom(row);
+    auto col_shared_mem = NDArray::EmptyShared(
+        name + "_col", {col->shape[0]}, col->dtype, col->ctx, true);
+    col_shared_mem.CopyFrom(col);
+    NDArray data_shared_mem;
+    if (aten::IsNullArray(data)) {
+      data_shared_mem = aten::NullArray();
+    } else {
+      NDArray::EmptyShared(
+          name + "_data", {data->shape[0]}, data->dtype, data->ctx, true);
+      data_shared_mem.CopyFrom(data);
+    }
+    return COOMatrix(num_rows, num_cols, row_shared_mem, col_shared_mem, data_shared_mem,
                      row_sorted, col_sorted);
   }
 };

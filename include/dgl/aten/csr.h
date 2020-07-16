@@ -10,6 +10,7 @@
 #include <dmlc/serializer.h>
 #include <vector>
 #include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -118,6 +119,28 @@ struct CSRMatrix {
                      indptr.CopyTo(ctx), indices.CopyTo(ctx),
                      aten::IsNullArray(data)? data : data.CopyTo(ctx),
                      sorted);
+  }
+
+  /*! \brief Save arrays of the coo matrix into the shared memory with the given name 
+  *  Note: It does not save the metainfo 
+  */
+  CSRMatrix CopyToSharedMem(const std::string &name) const {
+    auto indptr_shared_mem = NDArray::EmptyShared(
+        name + "_indptr", {indptr->shape[0]}, indptr->dtype, indptr->ctx, true);
+    indptr_shared_mem.CopyFrom(indptr);
+    auto indices_shared_mem = NDArray::EmptyShared(
+        name + "_indices", {indices->shape[0]}, indices->dtype, indices->ctx, true);
+    indices_shared_mem.CopyFrom(indices);
+    NDArray data_shared_mem;
+    if (aten::IsNullArray(data)) {
+      data_shared_mem = aten::NullArray();
+    } else {
+      data_shared_mem = NDArray::EmptyShared(
+          name + "_data", {data->shape[0]}, data->dtype, data->ctx, true);
+      data_shared_mem.CopyFrom(data);
+    }
+    return CSRMatrix(
+        num_rows, num_cols, indptr_shared_mem, indices_shared_mem, data_shared_mem, sorted);
   }
 };
 
