@@ -67,7 +67,7 @@ def submit_jobs(args, udf_command):
         ip, _ = hosts[node_id]
         torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
         udf_command = udf_command.replace('python3', 'python3 ' + torch_cmd)
-        cmd = cmd + ' ' + udf_command
+        cmd = client_cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         print(cmd)
         #execute_remote(cmd, ip, thread_list)
