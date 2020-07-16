@@ -338,6 +338,15 @@ template NDArray CSRGetData<kDLGPU, int64_t>(CSRMatrix csr, NDArray rows, NDArra
 /*!
  * \brief Generate a 0-1 mask for each index that hits the provided (row, col)
  *        index.
+ * 
+ * Examples:
+ * Given a CSR matrix (with duplicate entries) as follows:
+ * [[0, 1, 2, 0, 0],
+ *  [1, 0, 0, 0, 0],
+ *  [0, 0, 1, 1, 0],
+ *  [0, 0, 0, 0, 0]]
+ * Given rows: [0, 1], cols: [0, 2, 3]
+ * The result mask is: [0, 1, 1, 1, 0, 0]
  */
 template <typename IdType>
 __global__ void _SegmentMaskKernel(
