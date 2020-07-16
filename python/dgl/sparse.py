@@ -138,15 +138,14 @@ def _gspmm(gidx, op, reduce_op, u, e):
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = reduce_op in ['max', 'min']
     arg_u, arg_e = None, None
-    ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
-    idtype = getattr(F, ugi.dtype)
+    idtype = getattr(F, gidx.dtype)
     if use_cmp:
         if use_u:
             arg_u = F.zeros(v_shp, idtype, ctx)
         if use_e:
             arg_e = F.zeros(v_shp, idtype, ctx)
     if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSpMM(ugi, op, reduce_op,
+        _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
                             to_dgl_nd(u if use_u else None),
                             to_dgl_nd(e if use_e else None),
                             to_dgl_nd_for_write(v),
@@ -217,8 +216,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
     out = F.zeros(out_shp, dtype, ctx)
     if gidx.number_of_edges(0) > 0:
-        ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
-        _CAPI_DGLKernelSDDMM(ugi, op,
+        _CAPI_DGLKernelSDDMM(gidx, op,
                              to_dgl_nd(lhs if use_lhs else None),
                              to_dgl_nd(rhs if use_rhs else None),
                              to_dgl_nd_for_write(out),
