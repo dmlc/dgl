@@ -17,7 +17,6 @@ from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
-from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
 from ..transform import as_heterograph
@@ -401,7 +400,6 @@ class DistGraph:
 
     def _init(self):
         ip_config, graph_name, gpb = self.ip_config, self.graph_name, self._gpb_input
-        connect_to_server(ip_config=ip_config)
         self._client = KVClient(ip_config)
         g = _get_graph_from_shared_mem(graph_name)
         if g is not None:
@@ -411,7 +409,6 @@ class DistGraph:
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
         if self._gpb is None:
             self._gpb = gpb
-        self._client.barrier()
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):

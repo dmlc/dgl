@@ -37,7 +37,8 @@ class NeighborSampler(object):
 
 def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     import dgl
-    g = DistGraphServer(rank, "mp_ip_config.txt", num_clients, "test_sampling",
+    print('server: #clients=' + str(num_clients))
+    g = DistGraphServer(rank, "mp_ip_config.txt", num_clients,
                         tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem)
     g.start()
 
@@ -45,15 +46,19 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients):
 def start_client(rank, tmpdir, disable_shared_mem, num_workers):
     import dgl
     import torch as th
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    dgl.distributed.init_rpc("mp_ip_config.txt", num_workers=4)
     gpb = None
     if disable_shared_mem:
-        _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
+        _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     train_nid = th.arange(202)
-    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb, skip_init=True)
+    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb)
+    print('create dist graph')
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
                               dgl.distributed.sample_neighbors)
+    print('create sampler')
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DistDataLoader(
@@ -63,6 +68,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
         # shuffle=True,
         drop_last=False,
         num_workers=4) 
+    print('create data loader')
     
     dist_graph._init()
 

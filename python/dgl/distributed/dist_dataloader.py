@@ -1,28 +1,17 @@
 # pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
+import numpy as np
 import multiprocessing as mp
+import time
+import os
+
 from . import shutdown_servers, finalize_client
 from ..backend import backend_name
+from .rpc_client import get_sampler_pool
 
 DGL_QUEUE_TIMEOUT = 10
 
 __all__ = ["DistDataLoader"]
-
-
-def close():
-    """Finalize client and close servers when finished"""
-    shutdown_servers()
-    finalize_client()
-
-
-def init_fn(collate_fn, mp_queue):
-    """Initialize setting collate function and mp.Queue in the subprocess"""
-    global DGL_GLOBAL_COLLATE_FN
-    global DGL_GLOBAL_MP_QUEUE
-    DGL_GLOBAL_MP_QUEUE = mp_queue
-    DGL_GLOBAL_COLLATE_FN = collate_fn
-    import atexit
-    atexit.register(close)
 
 
 def deregister_torch_ipc():
@@ -46,6 +35,16 @@ def call_collate_fn(next_data):
     result = DGL_GLOBAL_COLLATE_FN(next_data)
     DGL_GLOBAL_MP_QUEUE.put(result)
     return 1
+
+def init_fn(collate_fn, queue):
+    """Initialize setting collate function and mp.Queue in the subprocess"""
+    print('initialize the sampler process')
+    global DGL_GLOBAL_COLLATE_FN
+    global DGL_GLOBAL_MP_QUEUE
+    DGL_GLOBAL_MP_QUEUE = queue
+    DGL_GLOBAL_COLLATE_FN = collate_fn
+    time.sleep(1)
+    print('init proc complete', os.getpid())
 
 
 class DistDataLoader:
@@ -79,15 +78,15 @@ class DistDataLoader:
         self.num_workers = num_workers
         self.m = mp.Manager()
         self.queue = self.m.Queue(maxsize=queue_size)
-        ctx = mp.get_context("spawn")
         self.drop_last = drop_last
         self.send_idxs = 0
         self.recv_idxs = 0
         self.started = False
-        self.pool = ctx.Pool(
-            num_workers, initializer=init_fn, initargs=(collate_fn, self.queue))
+
+        self.pool, num_sampler_workers = get_sampler_pool()
+        for i in range(num_sampler_workers):
+            self.pool.apply_async(init_fn, args=(collate_fn, self.queue))
     
-    def set_dataset(self, dataset):
         self.dataset = dataset
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
@@ -132,11 +131,6 @@ class DistDataLoader:
         ret = self.dataset[self.current_pos:end_pos]
         self.current_pos = end_pos
         return ret
-
-    def close(self):
-        """Close the multiprocessing pool"""
-        self.pool.close()
-        self.pool.join()
 
 if backend_name == 'pytorch':
     pass
