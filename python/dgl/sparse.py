@@ -5,7 +5,6 @@ from __future__ import absolute_import
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
-from .utils import to_dgl_context
 from . import backend as F
 
 def infer_broadcast_shape(op, shp1, shp2):
