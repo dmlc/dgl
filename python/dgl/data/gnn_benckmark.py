@@ -2,6 +2,7 @@ import scipy.sparse as sp
 import numpy as np
 import os
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..utils import retry_method_with_fix
 from ..graph import DGLGraph
 
 __all__=["AmazonCoBuy", "Coauthor", 'CoraFull']
@@ -24,12 +25,15 @@ class GNNBenchmarkDataset(object):
         self.dir = get_download_dir()
         self.path = os.path.join(
             self.dir, 'gnn_benckmark', self._url[name.lower()].split('/')[-1])
-        download(self._url[name.lower()], path=self.path)
+        self._name = name
         g = self.load_npz(self.path)
         self.data = [g]
 
-    @staticmethod
-    def load_npz(file_name):
+    def _download(self):
+        download(self._url[self._name.lower()], path=self.path)
+
+    @retry_method_with_fix(_download)
+    def load_npz(self, file_name):
         with np.load(file_name, allow_pickle=True) as loader:
             loader = dict(loader)
             num_nodes = loader['adj_shape'][0]

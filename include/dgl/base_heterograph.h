@@ -369,6 +369,27 @@ class BaseHeteroGraph : public runtime::Object {
   virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
 
   /*!
+   * \brief Get restrict sparse format of the graph.
+   *
+   * \return a string representing the sparse format: 'coo'/'csr'/'csc'/'any'
+   */
+  virtual std::string GetRestrictFormat() const = 0;
+
+  /*!
+   * \brief Return the sparse format in use for the graph.
+   *
+   * \return a number of type dgl_format_code_t.
+   */
+  virtual dgl_format_code_t GetFormatInUse() const = 0;
+
+  /*!
+   * \brief Return the graph in specified restrict format.
+   *
+   * \return The new graph.
+   */
+  virtual HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const = 0;
+
+  /*!
    * \brief Get adjacency matrix in COO format.
    * \param etype Edge type.
    * \return COO matrix.
@@ -400,7 +421,7 @@ class BaseHeteroGraph : public runtime::Object {
 
   /*!
    * \brief Extract the induced subgraph by the given vertices.
-   * 
+   *
    * The length of the given vector should be equal to the number of vertex types.
    * Empty arrays can be provided if no vertex is needed for the type. The result
    * subgraph has the same meta graph with the parent, but some types can have no
@@ -413,7 +434,7 @@ class BaseHeteroGraph : public runtime::Object {
 
   /*!
    * \brief Extract the induced subgraph by the given edges.
-   * 
+   *
    * The length of the given vector should be equal to the number of edge types.
    * Empty arrays can be provided if no edge is needed for the type. The result
    * subgraph has the same meta graph with the parent, but some types can have no
@@ -458,7 +479,7 @@ class BaseHeteroGraph : public runtime::Object {
 // Define HeteroGraphRef
 DGL_DEFINE_OBJECT_REF(HeteroGraphRef, BaseHeteroGraph);
 
-/*! 
+/*!
  * \brief Hetero-subgraph data structure.
  *
  * This class can be used as arguments and return values of a C API.
@@ -661,6 +682,19 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
  */
 HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
+/*!
+ * \brief Joint union multiple graphs into one graph.
+ *
+ * All input graphs should have the same metagraph.
+ *
+ * TODO(xiangsx): remove the meta_graph argument
+ *
+ * \param meta_graph Metagraph of the inputs and result.
+ * \param component_graphs Input graphs
+ * \return One graph that unions all the components
+ */
+HeteroGraphPtr JointUnionHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
 /*!
  * \brief Union multiple graphs into one with each input graph as one disjoint component.
@@ -668,12 +702,17 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
  * All input graphs should have the same metagraph.
  *
  * TODO(minjie): remove the meta_graph argument
- * 
+ *
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param meta_graph Metagraph of the inputs and result.
  * \param component_graphs Input graphs
  * \return One graph that unions all the components
  */
+template <class IdType>
 HeteroGraphPtr DisjointUnionHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+HeteroGraphPtr DisjointUnionHeteroGraph2(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
 /*!
@@ -689,19 +728,28 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
  * TODO(minjie): remove the meta_graph argument; use vector<IdArray> for vertex_sizes
  *   and edge_sizes.
  *
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param meta_graph Metagraph.
  * \param batched_graph Input graph.
  * \param vertex_sizes Number of vertices of each component.
  * \param edge_sizes Number of vertices of each component.
  * \return A list of graphs representing each disjoint components.
  */
+template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     GraphPtr meta_graph,
     HeteroGraphPtr batched_graph,
     IdArray vertex_sizes,
     IdArray edge_sizes);
 
-/*! 
+
+std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray vertex_sizes,
+    IdArray edge_sizes);
+
+/*!
  * \brief Structure for pickle/unpickle.
  *
  * The design principle is to leverage the NDArray class as much as possible so
@@ -714,7 +762,23 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
  * This class can be used as arguments and return values of a C API.
  */
 struct HeteroPickleStates : public runtime::Object {
-  /*! \brief Metagraph. */
+  /*! \brief version number */
+  int64_t version = 0;
+
+  /*! \brief Metainformation
+   *
+   * metagraph, number of nodes per type, format, flags
+   */
+  std::string meta;
+
+  /*! \brief Arrays representing graph structure (coo or csr) */
+  std::vector<IdArray> arrays;
+
+  /* To support backward compatibility, we have to retain fields in the old
+   * version of HeteroPickleStates
+   */
+
+  /*! \brief Metagraph(64bits ImmutableGraph) */
   GraphPtr metagraph;
 
   /*! \brief Number of nodes per type */
@@ -741,9 +805,26 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states);
 /*!
  * \brief Get the pickling state of the relation graph structure in backend tensors.
  *
- * \returnAdjacency matrices of all relation graphs in a list of arrays.
+ * \return a HeteroPickleStates object
  */
 HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
+
+/*!
+ * \brief Old version of HeteroUnpickle, for backward compatibility
+ *
+ * \param states Pickle states
+ * \return A heterograph pointer
+ */
+HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
+
+#define FORMAT_HAS_CSC(format) \
+  (format & (1<<2))
+
+#define FORMAT_HAS_CSR(format) \
+  (format & (1<<1))
+
+#define FORMAT_HAS_COO(format) \
+  (format & 1)
 
 }  // namespace dgl
 

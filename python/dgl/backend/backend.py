@@ -28,6 +28,7 @@ def data_type_dict():
     int16
     int32
     int64
+    bool
 
     This function will be called only *once* during the initialization fo the
     backend module. The returned dictionary will become the attributes of the
@@ -227,11 +228,49 @@ def context(input):
     pass
 
 def device_type(ctx):
-    """Return a str representing device type"""
+    """Return a str representing device type.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    str
+    """
     pass
 
 def device_id(ctx):
-    """Return device index"""
+    """Return device index.
+
+    For CPU, the index does not matter. For GPU, the index means which GPU
+    device on the machine.
+    
+    Parameters
+    ----------
+    ctx : Device context object.
+        Device context.
+
+    Returns
+    -------
+    int
+        The device index.
+    """
+    pass
+
+def to_backend_ctx(dglctx):
+    """Convert a DGL context object to a backend context.
+
+    Parameters
+    ----------
+    dglctx : dgl.ndarray.DGLContext
+        DGL context object. See _ffi.runtime_types for definition.
+
+    Returns
+    -------
+    ctx : framework-specific context object.
+    """
     pass
 
 def astype(input, ty):
@@ -268,7 +307,7 @@ def asnumpy(input):
     """
     pass
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     """Copy the given tensor to the context.
 
     Parameters
@@ -492,6 +531,21 @@ def exp(input):
     """
     pass
 
+def sqrt(input):
+    """Returns a new tensor with the square root of the elements of the input tensor `input`.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 def softmax(input, dim=-1):
     """Apply the softmax function on given dimension.
 
@@ -676,6 +730,31 @@ def scatter_row(data, row_index, value):
     -------
     Tensor
         The new data.
+    """
+    pass
+
+def index_add_inplace(data, row_idx, value):
+    """Add the values into the data tensor using the row index inplace.
+
+    If two row indices are the same, the corresponding values are sum up before
+    adding to the data tensor.
+
+    Examples
+    --------
+    >>> import torch as th
+    >>> arr = th.zeros((10))
+    >>> F. index_add_inplace(arr, th.tensor([0, 1, 1]), th.tensor([1.0, 1.0, 1.0]))
+    >>> arr
+    tensor([1., 2., 0., 0., 0., 0., 0., 0., 0., 0.])
+
+    Parameters
+    ----------
+    data : Tensor
+        The data tensor to be updated.
+    row_index : Tensor
+        A 1-D integer tensor containing which rows to be updated.
+    value : Tensor
+        The new value.
     """
     pass
 
@@ -981,6 +1060,24 @@ def logical_not(input):
     """
     pass
 
+def logical_and(input1, input2):
+    pass
+
+def clone(input):
+    """Return a clone of the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        Input tensor.
+
+    Returns
+    -------
+    Tensor
+        A clone tensor.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1057,7 +1154,7 @@ def sort_1d(input):
     """
     pass
 
-def arange(start, stop):
+def arange(start, stop, dtype):
     """Create a 1D range int64 tensor.
 
     Parameters
@@ -1066,6 +1163,8 @@ def arange(start, stop):
         The range start.
     stop : int
         The range stop.
+    dtype: str
+        The dtype of result tensor
 
     Returns
     -------
@@ -1164,6 +1263,21 @@ def zerocopy_to_dgl_ndarray(input):
     """
     pass
 
+def zerocopy_to_dgl_ndarray_for_write(input):
+    """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
+    that is ready for write (required in MXNet).
+
+    Parameters
+    ----------
+    input : Tensor
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+    """
+    pass
+
+
 def zerocopy_from_dgl_ndarray(input):
     """Zerocopy a dgl.ndarray.NDArray to framework-specific Tensor
 
@@ -1252,6 +1366,79 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     """
     pass
 
+def gspmm(g, op, reduce_op, lhs_data, rhs_data):
+    r""" Generalized Sparse Matrix Multiplication interface.
+    It fuses two steps into one kernel.
+    (1) Computes messages by :attr:`op` source node and edge features.
+    (2) Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
+
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+
+    Note that this function does not handle gradients.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
+        ``copy_lhs``, ``copy_rhs``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by the op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by the op.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
+    pass
+
+def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+    It computes edge features by :attr:`op` lhs features and rhs features.
+
+    .. math::
+        x_{e} = \phi(x_{lhs}, x_{rhs}), \forall (u,e,v)\in \mathcal{G}
+
+    where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
+    :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
+    is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
+    we apply gsddmm on: :attr:`g`. $lhs$ and $rhs$ are one of $u,v,e$'s.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``.
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by op.
+    lhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for left operand.
+    rhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for right operand.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
+    pass
+
+
 ###############################################################################
 # Other interfaces
 # ----------------
@@ -1266,3 +1453,46 @@ def sync():
     that all computation is complete after this function call.
     """
     pass
+
+def attach_grad(tensor):
+    """ Attach gradients to the input tensor
+    """
+    pass
+
+def backward(x, head_gradient=None):
+    """Invoke backward computation with an optional head gradient.
+    """
+    pass
+
+def grad(x):
+    """Fetches the gradient from the tensor after backward computation.
+    """
+    pass
+
+def is_no_grad(x):
+    """ Test if the input tensor has gradient
+    """
+    pass
+
+class record_grad(object):
+    """Context manager that records the gradients"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+
+class no_grad(object):
+    """Context manager that explicitly disables gradient computation"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass

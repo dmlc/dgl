@@ -12,6 +12,7 @@
 #include <utility>
 #include <tuple>
 #include <algorithm>
+#include <memory>
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
 #include "lazy.h"
@@ -939,7 +940,7 @@ class ImmutableGraph: public GraphInterface {
   /*! \return Save ImmutableGraph to stream, using out csr */
   void Save(dmlc::Stream* fs) const;
 
-  void SortCSR() {
+  void SortCSR() override {
     GetInCSR()->SortCSR();
     GetOutCSR()->SortCSR();
   }

@@ -1,5 +1,5 @@
 """Gluon layer for graph related softmax."""
-# pylint: disable= no-member, arguments-differ
+# pylint: disable= no-member, arguments-differ, access-member-before-definition, unpacking-non-sequence
 import mxnet as mx
 
 from ... import function as fn
@@ -45,16 +45,17 @@ class EdgeSoftmax(mx.autograd.Function):
             out = score / score_sum    # edge_div_dst, ret dgl.EData
             return out.data
         """
-        g = self.g.local_var()
-        g.edata['s'] = score
-        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
-        g.edata['out'] = g.edata['out'].exp()
-        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = g.edata['out']
-        self.save_for_backward(out)
-        return out
+        g = self.g
+        with g.local_scope():
+            g.edata['s'] = score
+            g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+            g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+            g.edata['out'] = g.edata['out'].exp()
+            g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+            g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+            out = g.edata['out']
+            self.save_for_backward(out)
+            return out
 
     def backward(self, grad_out):
         """Backward function.
@@ -70,16 +71,17 @@ class EdgeSoftmax(mx.autograd.Function):
             sds_sum = sds.dst_sum()  # type dgl.NData
             grad_score = sds - sds * sds_sum  # multiple expressions
         """
-        g = self.g.local_var()
-        out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
-        # clear saved tensors explicitly
-        self.saved_tensors = None
-        g.edata['out'] = out
-        g.edata['grad_score'] = out * grad_out
-        g.update_all(fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
-        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
-        grad_score = g.edata['grad_score'] - g.edata['out']
-        return grad_score
+        g = self.g
+        with g.local_scope():
+            out, = self.saved_tensors
+            # clear saved tensors explicitly
+            self.saved_tensors = None
+            g.edata['out'] = out
+            g.edata['grad_score'] = out * grad_out
+            g.update_all(fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
+            g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+            grad_score = g.edata['grad_score'] - g.edata['out']
+            return grad_score
 
 def edge_softmax(graph, logits, eids=ALL):
     r"""Compute edge softmax.

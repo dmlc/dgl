@@ -64,7 +64,7 @@ def unit_test_linux(backend, dev) {
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 2, unit: 'MINUTES') {
+  timeout(time: 10, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
   }
 }
@@ -100,8 +100,9 @@ pipeline {
     stage("Lint Check") {
       agent { 
         docker {
-          label "linux-cpu-node"
-          image "dgllib/dgl-ci-lint" 
+          label "linux-c52x-node"
+          image "dgllib/dgl-ci-lint"  
+          alwaysPull true
         }
       }
       steps {
@@ -119,8 +120,9 @@ pipeline {
         stage("CPU Build") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
             }
           }
           steps {
@@ -135,9 +137,10 @@ pipeline {
         stage("GPU Build") {
           agent {
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-gpu:conda"
               args "-u root"
+              alwaysPull true
             }
           }
           steps {
@@ -171,8 +174,9 @@ pipeline {
         stage("C++ CPU") {
           agent { 
             docker { 
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda"
+              alwaysPull true
             }
           }
           steps {
@@ -198,8 +202,9 @@ pipeline {
         stage("Tensorflow CPU") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
             }
           }
           stages {
@@ -221,6 +226,7 @@ pipeline {
               label "linux-gpu-node"
               image "dgllib/dgl-ci-gpu:conda" 
               args "--runtime nvidia"
+              alwaysPull true
             }
           }
           stages {
@@ -239,8 +245,9 @@ pipeline {
         stage("Torch CPU") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
             }
           }
           stages {
@@ -292,6 +299,7 @@ pipeline {
               label "linux-gpu-node"
               image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
+              alwaysPull true
             }
           }
           stages {
@@ -316,8 +324,9 @@ pipeline {
         stage("MXNet CPU") {
           agent { 
             docker {
-              label "linux-cpu-node"
+              label "linux-c52x-node"
               image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
             }
           }
           stages {
@@ -344,6 +353,7 @@ pipeline {
               label "linux-gpu-node" 
               image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
+              alwaysPull true
             }
           }
           stages {

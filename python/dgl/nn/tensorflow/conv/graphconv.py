@@ -5,6 +5,7 @@ from tensorflow.keras import layers
 import numpy as np
 
 from .... import function as fn
+from ....utils import expand_as_pair
 
 # pylint: disable=W0235
 
@@ -112,8 +113,14 @@ class GraphConv(layers.Layer):
         ----------
         graph : DGLGraph
             The graph.
-        feat : tf.Tensor
-            The input feature
+        feat : tf.Tensor or pair of tf.Tensor
+            If a single tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tensors are given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+
+            Note that in the special case of graph convolutional networks, if a pair of
+            tensors is given, the latter element will not participate in computation.
         weight : torch.Tensor, optional
             Optional external weight tensor.
 
@@ -122,61 +129,62 @@ class GraphConv(layers.Layer):
         tf.Tensor
             The output feature
         """
-        graph = graph.local_var()
+        with graph.local_scope():
+            feat_src, feat_dst = expand_as_pair(feat)
 
-        if self._norm == 'both':
-            degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32),
-                                    clip_value_min=1,
-                                    clip_value_max=np.inf)
-            norm = tf.pow(degs, -0.5)
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = tf.reshape(norm, shp)
-            feat = feat * norm
-
-        if weight is not None:
-            if self.weight is not None:
-                raise DGLError('External weight is provided while at the same time the'
-                               ' module has defined its own weight parameter. Please'
-                               ' create the module with flag weight=False.')
-        else:
-            weight = self.weight
-
-        if self._in_feats > self._out_feats:
-            # mult W first to reduce the feature size for aggregation.
-            if weight is not None:
-                feat = tf.matmul(feat, weight)
-            graph.srcdata['h'] = feat
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.dstdata['h']
-        else:
-            # aggregate first then mult W
-            graph.srcdata['h'] = feat
-            graph.update_all(fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'))
-            rst = graph.dstdata['h']
-            if weight is not None:
-                rst = tf.matmul(rst, weight)
-
-        if self._norm != 'none':
-            degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
-                                    clip_value_min=1,
-                                    clip_value_max=np.inf)
             if self._norm == 'both':
+                degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32),
+                                        clip_value_min=1,
+                                        clip_value_max=np.inf)
                 norm = tf.pow(degs, -0.5)
+                shp = norm.shape + (1,) * (feat_src.ndim - 1)
+                norm = tf.reshape(norm, shp)
+                feat_src = feat_src * norm
+
+            if weight is not None:
+                if self.weight is not None:
+                    raise DGLError('External weight is provided while at the same time the'
+                                   ' module has defined its own weight parameter. Please'
+                                   ' create the module with flag weight=False.')
             else:
-                norm = 1.0 / degs
-            shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = tf.reshape(norm, shp)
-            rst = rst * norm
+                weight = self.weight
 
-        if self.bias is not None:
-            rst = rst + self.bias
+            if self._in_feats > self._out_feats:
+                # mult W first to reduce the feature size for aggregation.
+                if weight is not None:
+                    feat_src = tf.matmul(feat_src, weight)
+                graph.srcdata['h'] = feat_src
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.dstdata['h']
+            else:
+                # aggregate first then mult W
+                graph.srcdata['h'] = feat_src
+                graph.update_all(fn.copy_src(src='h', out='m'),
+                                 fn.sum(msg='m', out='h'))
+                rst = graph.dstdata['h']
+                if weight is not None:
+                    rst = tf.matmul(rst, weight)
 
-        if self._activation is not None:
-            rst = self._activation(rst)
+            if self._norm != 'none':
+                degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
+                                        clip_value_min=1,
+                                        clip_value_max=np.inf)
+                if self._norm == 'both':
+                    norm = tf.pow(degs, -0.5)
+                else:
+                    norm = 1.0 / degs
+                shp = norm.shape + (1,) * (feat_dst.ndim - 1)
+                norm = tf.reshape(norm, shp)
+                rst = rst * norm
 
-        return rst
+            if self.bias is not None:
+                rst = rst + self.bias
+
+            if self._activation is not None:
+                rst = self._activation(rst)
+
+            return rst
 
     def extra_repr(self):
         """Set the extra representation of the module,

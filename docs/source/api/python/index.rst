@@ -10,11 +10,13 @@ API Reference
    batch_heterograph
    nn
    init
+   backend
    function
    traversal
    propagate
    udf
    sampler
+   sampling
    data
    transform
    graph_store

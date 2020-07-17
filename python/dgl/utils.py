@@ -2,16 +2,27 @@
 from __future__ import absolute_import, division
 
 from collections.abc import Mapping, Iterable
+from collections import defaultdict
 from functools import wraps
 import numpy as np
 
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from . import ndarray as nd
 
+
+class InconsistentDtypeException(DGLError):
+    """Exception class for inconsistent dtype between graph and tensor"""
+    def __init__(self, msg='', *args, **kwargs): #pylint: disable=W1113
+        prefix_message = 'DGL now requires the input tensor to have\
+            the same dtype as the graph index\'s dtype(which you can get by g.idype). '
+        super().__init__(prefix_message + msg, *args, **kwargs)
+
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
-    def __init__(self, data):
+    def __init__(self, data, dtype="int64"):
+        assert dtype in ['int32', 'int64']
+        self.dtype = dtype
         self._initialize_data(data)
 
     def _initialize_data(self, data):
@@ -43,18 +54,22 @@ class Index(object):
     def _dispatch(self, data):
         """Store data based on its type."""
         if F.is_tensor(data):
-            if F.dtype(data) != F.int64:
-                raise DGLError('Index data must be an int64 vector, but got: %s' % str(data))
+            if F.dtype(data) != F.data_type_dict[self.dtype]:
+                raise InconsistentDtypeException('Index data specified as %s, but got: %s' %
+                                                 (self.dtype,
+                                                  F.reverse_data_type_dict[F.dtype(data)]))
             if len(F.shape(data)) > 1:
-                raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                raise InconsistentDtypeException('Index data must be 1D int32/int64 vector,\
+                    but got shape: %s' % str(F.shape(data)))
             if len(F.shape(data)) == 0:
                 # a tensor of one int
                 self._dispatch(int(data))
             else:
                 self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
-            if not (data.dtype == 'int64' and len(data.shape) == 1):
-                raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
+            if not (data.dtype == self.dtype and len(data.shape) == 1):
+                raise InconsistentDtypeException('Index data must be 1D %s vector, but got: %s' %
+                                                 (self.dtype, data.dtype))
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
             # save it in the _pydata temporarily; materialize it if `tonumpy` is called
@@ -63,7 +78,7 @@ class Index(object):
             self._slice_data = slice(data.start, data.stop)
         else:
             try:
-                data = np.asarray(data, dtype=np.int64)
+                data = np.asarray(data, dtype=self.dtype)
             except Exception:  # pylint: disable=broad-except
                 raise DGLError('Error index data: %s' % str(data))
             if data.ndim == 0:  # scalar array
@@ -79,7 +94,7 @@ class Index(object):
         if self._pydata is None:
             if self._slice_data is not None:
                 slc = self._slice_data
-                self._pydata = np.arange(slc.start, slc.stop).astype(np.int64)
+                self._pydata = np.arange(slc.start, slc.stop).astype(self.dtype)
             elif self._dgl_tensor_data is not None:
                 self._pydata = self._dgl_tensor_data.asnumpy()
             else:
@@ -128,12 +143,22 @@ class Index(object):
     def __getstate__(self):
         if self._slice_data is not None:
             # the index can be represented by a slice
-            return self._slice_data
+            return self._slice_data, self.dtype
         else:
-            return self.tousertensor()
+            return self.tousertensor(), self.dtype
 
     def __setstate__(self, state):
-        self._initialize_data(state)
+        # Pickle compatibility check
+        # TODO: we should store a storage version number in later releases.
+        if isinstance(state, tuple) and len(state) == 2:
+            # post-0.4.4
+            data, self.dtype = state
+            self._initialize_data(data)
+        else:
+            # pre-0.4.3
+            dgl_warning("The object is pickled before 0.4.3.  Setting dtype of graph to int64")
+            self.dtype = 'int64'
+            self._initialize_data(state)
 
     def get_items(self, index):
         """Return values at given positions of an Index
@@ -155,18 +180,22 @@ class Index(object):
             # the provided index is not a slice
             tensor = self.tousertensor()
             index = index.tousertensor()
-            return Index(F.gather_row(tensor, index))
+            # TODO(Allen): Change F.gather_row to dgl operation
+            return Index(F.gather_row(tensor, index), self.dtype)
         elif self._slice_data is None:
             # the current index is not a slice but the provided is a slice
             tensor = self.tousertensor()
             index = index._slice_data
-            return Index(F.narrow_row(tensor, index.start, index.stop))
+            # TODO(Allen): Change F.narrow_row to dgl operation
+            return Index(F.astype(F.narrow_row(tensor, index.start, index.stop),
+                                  F.data_type_dict[self.dtype]),
+                         self.dtype)
         else:
             # both self and index wrap a slice object, then return another
             # Index wrapping a slice
             start = self._slice_data.start
             index = index._slice_data
-            return Index(slice(start + index.start, start + index.stop))
+            return Index(slice(start + index.start, start + index.stop), self.dtype)
 
     def set_items(self, index, value):
         """Set values at given positions of an Index. Set is not done in place,
@@ -191,7 +220,7 @@ class Index(object):
             value = F.full_1d(len(index), value, dtype=F.int64, ctx=F.cpu())
         else:
             value = value.tousertensor()
-        return Index(F.scatter_row(tensor, index, value))
+        return Index(F.scatter_row(tensor, index, value), self.dtype)
 
     def append_zeros(self, num):
         """Append zeros to an Index
@@ -205,24 +234,24 @@ class Index(object):
             return self
         new_items = F.zeros((num,), dtype=F.int64, ctx=F.cpu())
         if len(self) == 0:
-            return Index(new_items)
+            return Index(new_items, self.dtype)
         else:
             tensor = self.tousertensor()
             tensor = F.cat((tensor, new_items), dim=0)
-            return Index(tensor)
+            return Index(tensor, self.dtype)
 
     def nonzero(self):
         """Return the nonzero positions"""
         tensor = self.tousertensor()
         mask = F.nonzero_1d(tensor != 0)
-        return Index(mask)
+        return Index(mask, self.dtype)
 
     def has_nonzero(self):
         """Check if there is any nonzero value in this Index"""
         tensor = self.tousertensor()
         return F.sum(tensor, 0) > 0
 
-def toindex(data):
+def toindex(data, dtype='int64'):
     """Convert the given data to Index object.
 
     Parameters
@@ -239,16 +268,17 @@ def toindex(data):
     --------
     Index
     """
-    return data if isinstance(data, Index) else Index(data)
+    return data if isinstance(data, Index) else Index(data, dtype)
 
-def zero_index(size):
+def zero_index(size, dtype="int64"):
     """Create a index with provided size initialized to zero
 
     Parameters
     ----------
     size: int
     """
-    return Index(F.zeros((size,), dtype=F.int64, ctx=F.cpu()))
+    return Index(F.zeros((size,), dtype=F.data_type_dict[dtype], ctx=F.cpu()),
+                 dtype=dtype)
 
 def set_diff(ar1, ar2):
     """Find the set difference of two index arrays.
@@ -539,3 +569,94 @@ def check_eq_shape(input_):
         raise DGLError("The feature shape of source nodes: {} \
             should be equal to the feature shape of destination \
             nodes: {}.".format(src_feat_shape, dst_feat_shape))
+
+def retry_method_with_fix(fix_method):
+    """Decorator that executes a fix method before retrying again when the decorated method
+    fails once with any exception.
+
+    If the decorated method fails again, the execution fails with that exception.
+
+    Notes
+    -----
+    This decorator only works on class methods, and the fix function must also be a class method.
+    It would not work on functions.
+
+    Parameters
+    ----------
+    fix_func : callable
+        The fix method to execute.  It should not accept any arguments.  Its return values are
+        ignored.
+    """
+    def _creator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # pylint: disable=W0703,bare-except
+            try:
+                return func(self, *args, **kwargs)
+            except:
+                fix_method(self)
+                return func(self, *args, **kwargs)
+
+        return wrapper
+    return _creator
+
+def group_as_dict(pairs):
+    """Combines a list of key-value pairs to a dictionary of keys and value lists.
+
+    Does not require the pairs to be sorted by keys.
+
+    Parameters
+    ----------
+    pairs : iterable
+        Iterable of key-value pairs
+
+    Returns
+    -------
+    dict
+        The dictionary of keys and value lists.
+    """
+    dic = defaultdict(list)
+    for key, value in pairs:
+        dic[key].append(value)
+    return dic
+
+class FlattenedDict(object):
+    """Iterates over each item in a dictionary of groups.
+
+    Parameters
+    ----------
+    groups : dict
+        The item groups.
+
+    Examples
+    --------
+    >>> groups = FlattenedDict({'a': [1, 3], 'b': [2, 5, 8], 'c': [7]})
+    >>> list(groups)
+    [('a', 1), ('a', 3), ('b', 2), ('b', 5), ('b', 8), ('c', 7)]
+    >>> groups[2]
+    ('b', 2)
+    >>> len(groups)
+    6
+    """
+    def __init__(self, groups):
+        self._groups = groups
+        group_sizes = {k: len(v) for k, v in groups.items()}
+        self._group_keys, self._group_sizes = zip(*group_sizes.items())
+        self._group_offsets = np.insert(np.cumsum(self._group_sizes), 0, 0)
+
+    def __len__(self):
+        """Return the total number of items."""
+        return self._group_offsets[-1]
+
+    def __iter__(self):
+        """Return the iterator of all items with the key of its original group."""
+        for i, k in enumerate(self._group_keys):
+            for j in range(self._group_sizes[i]):
+                yield k, self._groups[k][j]
+
+    def __getitem__(self, idx):
+        """Return the item at the given position with the key of its original group."""
+        i = np.searchsorted(self._group_offsets, idx, 'right') - 1
+        k = self._group_keys[i]
+        j = idx - self._group_offsets[i]
+        return k, self._groups[k][j]

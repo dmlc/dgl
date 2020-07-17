@@ -24,13 +24,14 @@ def data_type_dict():
             'int8'    : th.int8,
             'int16'   : th.int16,
             'int32'   : th.int32,
-            'int64'   : th.int64}
+            'int64'   : th.int64,
+            'bool'    : th.bool}
 
 def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.tensor(data, dtype=dtype)
+    return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
@@ -69,13 +70,23 @@ def context(input):
     return input.device
 
 def device_type(ctx):
-    return ctx.type
+    return th.device(ctx).type
 
 def device_id(ctx):
+    ctx = th.device(ctx)
     if ctx.index is None:
         return 0
     else:
         return ctx.index
+
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return th.device('cpu')
+    elif dev_type == 2:
+        return th.device('cuda', dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
     return input.type(ty)
@@ -86,13 +97,13 @@ def asnumpy(input):
     else:
         return input.cpu().detach().numpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
         if ctx.index is not None:
             th.cuda.set_device(ctx.index)
-        return input.cuda()
+        return input.cuda(**kwargs)
     else:
         raise RuntimeError('Invalid context', ctx)
 
@@ -134,6 +145,9 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return th.exp(input)
 
+def sqrt(input):
+    return th.sqrt(input)
+
 def softmax(input, dim=-1):
     return th.softmax(input, dim=dim)
 
@@ -153,7 +167,7 @@ def repeat(input, repeats, dim):
     return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
 
 def gather_row(data, row_index):
-    return th.index_select(data, 0, row_index)
+    return th.index_select(data, 0, row_index.long())
 
 def slice_axis(data, axis, begin, end):
     return th.narrow(data, axis, begin, end - begin)
@@ -165,8 +179,11 @@ def take(data, indices, dim):
 def narrow_row(x, start, stop):
     return x[start:stop]
 
+def index_add_inplace(data, row_idx, value):
+    data.index_add_(0, row_idx, value)
+
 def scatter_row(data, row_index, value):
-    return data.index_copy(0, row_index, value)
+    return data.index_copy(0, row_index.long(), value)
 
 def scatter_row_inplace(data, row_index, value):
     data[row_index] = value
@@ -238,6 +255,8 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     return y
 
 def boolean_mask(input, mask):
+    if 'bool' not in str(mask.dtype):
+        mask = th.tensor(mask, dtype=th.bool)
     return input[mask]
 
 def equal(x, y):
@@ -246,7 +265,15 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def logical_and(input1, input2):
+    return input1 & input2
+
+def clone(input):
+    return input.clone()
+
 def unique(input):
+    if input.dtype == th.bool:
+        input = input.type(th.int8)
     return th.unique(input)
 
 def full_1d(length, fill_value, dtype, ctx):
@@ -259,8 +286,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop):
-    return th.arange(start, stop, dtype=th.int64)
+def arange(start, stop, dtype="int64"):
+    return th.arange(start, stop, dtype=data_type_dict()[dtype])
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))
@@ -281,6 +308,9 @@ def zerocopy_from_numpy(np_array):
 
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(input):
     return dlpack.from_dlpack(input.to_dlpack())
@@ -467,3 +497,34 @@ def _reduce_grad(grad, shape):
 def sync():
     # Pytorch performs computation synchronously, so no need for synchronization.
     pass
+
+def attach_grad(x):
+    if x.grad is not None:
+        x.grad.zero_()
+        return x
+    else:
+        return x.requires_grad_()
+
+def backward(x, head_gradient=None):
+    if head_gradient is not None and head_gradient.shape[0] == 1 and len(head_gradient.shape) == 1:
+        # Fix for torch 1.3.1
+        head_gradient = th.tensor(head_gradient.item()).to(head_gradient.device)
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return x.grad is None or (x.grad == 0).all()
+
+class record_grad(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+no_grad = th.no_grad

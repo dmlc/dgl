@@ -80,11 +80,21 @@ def test_graph_conv2(g, norm, weight, bias):
     nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
     ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
     h = F.randn((nsrc, 5))
+    h_dst = F.randn((ndst, 2))
     if weight:
-        h = conv(g, h)
+        h_out = conv(g, h)
     else:
-        h = conv(g, h, weight=ext_w)
-    assert h.shape == (ndst, 2)
+        h_out = conv(g, h, weight=ext_w)
+    assert h_out.shape == (ndst, 2)
+
+    if not isinstance(g, dgl.DGLGraph) and len(g.ntypes) == 2:
+        # bipartite, should also accept pair of tensors
+        if weight:
+            h_out2 = conv(g, (h, h_dst))
+        else:
+            h_out2 = conv(g, (h, h_dst), weight=ext_w)
+        assert h_out2.shape == (ndst, 2)
+        assert F.array_equal(h_out, h_out2)
 
 def test_simple_pool():
     ctx = F.ctx()
@@ -272,38 +282,66 @@ def test_rgcn():
     O = 8
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
+    rgc_basis_low.weight = rgc_basis.weight
+    rgc_basis_low.w_comp = rgc_basis.w_comp
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_basis(g, h, r)
+    h_new_low = rgc_basis_low(g, h, r)
     assert list(h_new.shape) == [100, O]
+    assert list(h_new_low.shape) == [100, O]
+    assert F.allclose(h_new, h_new_low)
 
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True)
+    rgc_bdd_low.weight = rgc_bdd.weight
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_bdd(g, h, r)
+    h_new_low = rgc_bdd_low(g, h, r)
     assert list(h_new.shape) == [100, O]
+    assert list(h_new_low.shape) == [100, O]
+    assert F.allclose(h_new, h_new_low)
 
     # with norm
     norm = tf.zeros((g.number_of_edges(), 1))
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
+    rgc_basis_low.weight = rgc_basis.weight
+    rgc_basis_low.w_comp = rgc_basis.w_comp
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_basis(g, h, r, norm)
+    h_new_low = rgc_basis_low(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
+    assert list(h_new_low.shape) == [100, O]
+    assert F.allclose(h_new, h_new_low)
 
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True)
+    rgc_bdd_low.weight = rgc_bdd.weight
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_bdd(g, h, r, norm)
+    h_new_low = rgc_bdd_low(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
+    assert list(h_new_low.shape) == [100, O]
+    assert F.allclose(h_new, h_new_low)
 
     # id input
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
+    rgc_basis_low.weight = rgc_basis.weight
+    rgc_basis_low.w_comp = rgc_basis.w_comp
     h = tf.constant(np.random.randint(0, I, (100,)))
     r = tf.constant(etype)
     h_new = rgc_basis(g, h, r)
+    h_new_low = rgc_basis_low(g, h, r)
     assert list(h_new.shape) == [100, O]
+    assert list(h_new_low.shape) == [100, O]
+    assert F.allclose(h_new, h_new_low)
 
 def test_gat_conv():
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
@@ -339,6 +377,20 @@ def test_sage_conv(aggre_type):
     h = sage(g, feat)
     assert h.shape[-1] == 2
     assert h.shape[0] == 200
+
+    # Test the case for graphs without edges
+    g = dgl.bipartite([], num_nodes=(5, 3))
+    sage = nn.SAGEConv((3, 3), 2, 'gcn')
+    feat = (F.randn((5, 3)), F.randn((3, 3)))
+    h = sage(g, feat)
+    assert h.shape[-1] == 2
+    assert h.shape[0] == 3
+    for aggre_type in ['mean', 'pool', 'lstm']:
+        sage = nn.SAGEConv((3, 1), 2, aggre_type)
+        feat = (F.randn((5, 3)), F.randn((3, 1)))
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 3
 
 def test_sgc_conv():
     ctx = F.ctx()
