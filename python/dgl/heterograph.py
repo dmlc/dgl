@@ -311,28 +311,305 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def add_nodes(self, num, data=None, ntype=None):
-        """Add multiple new nodes of the same node type
+        r"""Add new nodes of the same node type
 
-        Currently not supported.
+        Parameters
+        ----------
+        num : int
+            Number of nodes to add.
+        data : dict, optional
+            Feature data of the added nodes.
+        ntype : str, optional
+            The type of the new nodes. Can be omitted if there is
+            only one node type in the graph.
+
+        Notes
+        -----
+
+        * Inplace update is applied to the current graph.
+        * If the key of ``data`` does not contain some existing feature fields,
+        those features for the new nodes will be created by initializers
+        defined with :func:`set_n_initializer` (default initializer fills zeros).
+        * If the key of ``data`` contains new feature fields, those features for
+        the old nodes will be created by initializers defined with
+        :func:`set_n_initializer` (default initializer fills zeros).
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.num_nodes()
+        3
+        >>> g.add_nodes(2)
+        >>> g.num_nodes()
+        5
+
+        If the graph has some node features and new nodes are added without
+        features, their features will be created by initializers defined
+        with :func:`set_n_initializer`.
+
+        >>> g.ndata['h'] = torch.ones(5, 1)
+        >>> g.add_nodes(1)
+        >>> g.ndata['h']
+        tensor([[1.], [1.], [1.], [1.], [1.], [0.]])
+
+        We can also assign features for the new nodes in adding new nodes.
+
+        >>> g.add_nodes(1, {'h': torch.ones(1, 1), 'w': torch.ones(1, 1)})
+        >>> g.ndata['h']
+        tensor([[1.], [1.], [1.], [1.], [1.], [0.], [1.]])
+
+        Since ``data`` contains new feature fields, the features for old nodes
+        will be created by initializers defined with :func:`set_n_initializer`.
+
+        >>> g.ndata['w']
+        tensor([[0.], [0.], [0.], [0.], [0.], [0.], [1.]])
+
+
+        **Heterogeneous Graphs with Multiple Node Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.add_nodes(2)
+        DGLError: Node type name must be specified
+        if there are more than one node types.
+        >>> g.num_nodes('user')
+        3
+        >>> g.add_nodes(2, ntype='user')
+        >>> g.num_nodes('user')
+        5
+
+        See Also
+        --------
+        remove_nodes
+        add_edges
+        remove_edges
         """
-        raise DGLError('Mutation is not supported in heterograph.')
+        ntid = self.get_ntype_id(ntype)
 
-    def add_edge(self, u, v, data=None, etype=None):
-        """Add an edge of ``etype`` between u of the source node type, and v
-        of the destination node type..
+        # update graph idx
+        metagraph = self._graph.metagraph
+        num_nodes_per_type = []
+        for c_ntype in self.ntypes:
+            if self.get_ntype_id(c_ntype) == ntid:
+                num_nodes_per_type.append(self.number_of_nodes(c_ntype) + num)
+            else:
+                num_nodes_per_type.append(self.number_of_nodes(c_ntype))
 
-        Currently not supported.
-        """
-        raise DGLError('Mutation is not supported in heterograph.')
+        relation_graphs = []
+        for c_etype in self.canonical_etypes:
+            # src or dst == ntype, update the relation graph
+            if self.get_ntype_id(c_etype[0]) == ntid or self.get_ntype_id(c_etype[2]) == ntid:
+                u, v = self.edges(form='uv', order='eid', etype=c_etype)
+                hgidx = heterograph_index.create_unitgraph_from_coo(
+                    1 if c_etype[0] == c_etype[2] else 2,
+                    self.number_of_nodes(c_etype[0]) + \
+                        (num if self.get_ntype_id(c_etype[0]) == ntid else 0),
+                    self.number_of_nodes(c_etype[2]) + \
+                        (num if self.get_ntype_id(c_etype[2]) == ntid else 0),
+                    u,
+                    v,
+                    'any')
+                relation_graphs.append(hgidx)
+            else:
+                # do nothing
+                relation_graphs.append(self._graph.get_relation_graph(self.get_etype_id(c_etype)))
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        self._graph = hgidx
+
+        # update data frames
+        if data is None:
+            # Initialize feature with :func:`set_n_initializer`
+            self._node_frames[ntid].add_rows(num)
+        else:
+            self._node_frames[ntid].append(data)
 
     def add_edges(self, u, v, data=None, etype=None):
-        """Add multiple edges of ``etype`` between list of source nodes ``u``
-        and list of destination nodes ``v`` of type ``vtype``.  A single edge
-        is added between every pair of ``u[i]`` and ``v[i]``.
+        r"""Add multiple new edges for the specified edge type
 
-        Currently not supported.
+        The i-th new edge will be from ``u[i]`` to ``v[i]``.
+
+        Parameters
+        ----------
+        u : tensor, numpy.ndarray, list
+            Source node IDs, ``u[i]`` gives the source node for the i-th new edge.
+        v : tensor, numpy.ndarray, list
+            Destination node IDs, ``v[i]`` gives the destination node for the i-th new edge.
+        data : dict, optional
+            Feature data of the added edges. The i-th row of the feature data
+            corresponds to the i-th new edge.
+        etype : str or tuple of str, optional
+            The type of the new edges. Can be omitted if there is
+            only one edge type in the graph.
+
+        Notes
+        -----
+
+        * Inplace update is applied to the current graph.
+        * If end nodes of adding edges does not exists, add_nodes is invoked
+        to add new nodes. The node features of the new nodes will be created
+        by initializers defined with :func:`set_n_initializer` (default
+        initializer fills zeros). In certain cases, it is recommanded to
+        add_nodes first and then add_edges.
+        * If the key of ``data`` does not contain some existing feature fields,
+        those features for the new edges will be created by initializers
+        defined with :func:`set_n_initializer` (default initializer fills zeros).
+        * If the key of ``data`` contains new feature fields, those features for
+        the old edges will be created by initializers defined with
+        :func:`set_n_initializer` (default initializer fills zeros).
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.num_edges()
+        2
+        >>> g.add_edges(torch.tensor([1, 3]), torch.tensor([0, 1]))
+        >>> g.num_edges()
+        4
+
+        Since ``u`` or ``v`` contains a non-existing node ID, the nodes are
+        added implicitly.
+        >>> g.num_nodes()
+        4
+
+        If the graph has some edge features and new edges are added without
+        features, their features will be created by initializers defined
+        with :func:`set_n_initializer`.
+
+        >>> g.edata['h'] = torch.ones(4, 1)
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]))
+        >>> g.edata['h']
+        tensor([[1.], [1.], [1.], [1.], [0.]])
+
+        We can also assign features for the new edges in adding new edges.
+
+        >>> g.add_edges(torch.tensor([0, 0]), torch.tensor([2, 2]),
+        >>>             {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
+        >>> g.edata['h']
+        tensor([[1.], [1.], [1.], [1.], [0.], [1.], [2.]])
+
+        Since ``data`` contains new feature fields, the features for old edges
+        will be created by initializers defined with :func:`set_n_initializer`.
+
+        >>> g.edata['w']
+        tensor([[0.], [0.], [0.], [0.], [0.], [1.], [1.]])
+
+        **Heterogeneous Graphs with Multiple Edge Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.add_edges(torch.tensor([3]), torch.tensor([3]))
+        DGLError: Edge type name must be specified
+        if there are more than one edge types.
+        >>> g.number_of_edges('plays')
+        4
+        >>>  g.add_edges(torch.tensor([3]), torch.tensor([3]), etype='plays')
+        >>> g.number_of_edges('plays')
+        5
+
+        See Also
+        --------
+        add_nodes
+        remove_nodes
+        remove_edges
         """
-        raise DGLError('Mutation is not supported in heterograph.')
+        u = utils.prepare_tensor(self, u, 'u')
+        v = utils.prepare_tensor(self, v, 'v')
+
+        if etype is None:
+            if self._graph.number_of_etypes() != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+
+        # nothing changed
+        if len(u) == 0 or len(v) == 0:
+            return self
+
+        assert len(u) == len(v) or len(u) == 1 or len(v) == 1, \
+            'need the number of source nodes and the number of destination nodes are same, ' \
+            'or either the number of source nodes or the number of destination nodes is 1.'
+
+        if len(u) == 1 and len(v) > 1:
+            u = F.full_1d(len(v), F.as_scalar(u), dtype=F.dtype(u), ctx=F.context(u))
+        if len(v) == 1 and len(u) > 1:
+            v = F.full_1d(len(u), F.as_scalar(v), dtype=F.dtype(v), ctx=F.context(v))
+
+        u_type, e_type, v_type = self.to_canonical_etype(etype)
+        # if end nodes of adding edges does not exists
+        # use add_nodes to add new nodes first.
+        num_of_u = self.number_of_nodes(u_type)
+        num_of_v = self.number_of_nodes(v_type)
+        u_max = F.as_scalar(F.max(u, dim=0)) + 1
+        v_max = F.as_scalar(F.max(v, dim=0)) + 1
+
+        if u_type == v_type:
+            num_nodes = max(u_max, v_max)
+            if num_nodes > num_of_u:
+                self.add_nodes(num_nodes - num_of_u, ntype=u_type)
+        else:
+            if u_max > num_of_u:
+                self.add_nodes(u_max - num_of_u, ntype=u_type)
+            if v_max > num_of_v:
+                self.add_nodes(v_max - num_of_v, ntype=v_type)
+
+        # metagraph is not changed
+        metagraph = self._graph.metagraph
+        num_nodes_per_type = []
+        for ntype in self.ntypes:
+            num_nodes_per_type.append(self.number_of_nodes(ntype))
+        # update graph idx
+        relation_graphs = []
+        for c_etype in self.canonical_etypes:
+            # the target edge type
+            if c_etype == (u_type, e_type, v_type):
+                old_u, old_v = self.edges(form='uv', order='eid', etype=c_etype)
+                hgidx = heterograph_index.create_unitgraph_from_coo(
+                    1 if u_type == v_type else 2,
+                    self.number_of_nodes(u_type),
+                    self.number_of_nodes(v_type),
+                    F.cat([old_u, u], dim=0),
+                    F.cat([old_v, v], dim=0),
+                    'any')
+                relation_graphs.append(hgidx)
+            else:
+                # do nothing
+                # Note: node range change has been handled in add_nodes()
+                relation_graphs.append(self._graph.get_relation_graph(self.get_etype_id(c_etype)))
+
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        self._graph = hgidx
+
+        # handle data
+        etid = self.get_etype_id(etype)
+        if data is None:
+            self._edge_frames[etid].add_rows(len(u))
+        else:
+            self._edge_frames[etid].append(data)
 
     #################################################################
     # Metagraph query
