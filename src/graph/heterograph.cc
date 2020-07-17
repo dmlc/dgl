@@ -310,13 +310,15 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
   memcpy(mem_buf, buf.c_str(), strm->Tell());
   auto ret = HeteroGraphPtr(new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
-  std::dynamic_pointer_cast<HeteroGraph>(ret)->shared_mem_name_ = name;
+  auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
+  hg_index->shared_mem_name_ = name;
+  hg_index->shared_mem_ = mem;
   return ret;
 }
 
 aten::COOMatrix CreateCOOFromSharedMem(const std::string &name, uint8_t nbits,
     int64_t num_src, int64_t num_dst, int64_t num_edges, bool rsorted, bool csorted) {
-  DLDataType dtype = {kDLInt, nbits / 8, 1};
+  DLDataType dtype = {kDLInt, nbits, 1};
   DLContext ctx = {kDLCPU, 0};
   NDArray row = NDArray::EmptyShared(name+"_row", {num_edges}, dtype, ctx, false);
   NDArray col = NDArray::EmptyShared(name+"_col", {num_edges}, dtype, ctx, false);
@@ -325,7 +327,7 @@ aten::COOMatrix CreateCOOFromSharedMem(const std::string &name, uint8_t nbits,
 
 aten::CSRMatrix CreateCSRFromSharedMem(const std::string &name, uint8_t nbits,
     int64_t num_src, int64_t num_dst, int64_t num_edges, bool sorted) {
-  DLDataType dtype = {kDLInt, nbits / 8, 1};
+  DLDataType dtype = {kDLInt, nbits, 1};
   DLContext ctx = {kDLCPU, 0};
   NDArray indptr = NDArray::EmptyShared(name + "_indptr", {num_src + 1}, dtype, ctx, false);
   NDArray indices = NDArray::EmptyShared(name + "_indices", {num_edges}, dtype, ctx, false);
@@ -334,8 +336,8 @@ aten::CSRMatrix CreateCSRFromSharedMem(const std::string &name, uint8_t nbits,
 }
 
 HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
-  SharedMemory mem(name);
-  auto mem_buf = mem.Open(SHARED_MEM_METAINFO_SIZE_MAX);
+  auto mem = std::make_shared<SharedMemory>(name);
+  auto mem_buf = mem->Open(SHARED_MEM_METAINFO_SIZE_MAX);
   dmlc::MemoryFixedSizeStream ifs(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
   dmlc::SeekStream *strm = &ifs;
 
@@ -392,7 +394,9 @@ HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
   }
 
   auto ret = HeteroGraphPtr(new HeteroGraph(metagraph, relgraphs, num_verts_per_type));
-  std::dynamic_pointer_cast<HeteroGraph>(ret)->shared_mem_name_ = name;
+  auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
+  hg_index->shared_mem_name_ = name;
+  hg_index->shared_mem_ = mem;
   return ret;
 }
 

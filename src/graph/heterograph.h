@@ -7,6 +7,7 @@
 #ifndef DGL_GRAPH_HETEROGRAPH_H_
 #define DGL_GRAPH_HETEROGRAPH_H_
 
+#include <dgl/runtime/shared_mem.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
 #include <utility>
@@ -247,6 +248,9 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief The name of the shared memory */
   std::string shared_mem_name_;
+
+  /*! \brief The shared memory object for meta info*/
+  std::shared_ptr<runtime::SharedMemory> shared_mem_;
 
   /*! \brief template class for Flatten operation
   * 
