@@ -3,6 +3,7 @@ import time
 import warnings
 import zipfile
 import os
+from collections import namedtuple
 
 os.environ['DGLBACKEND'] = 'mxnet'
 os.environ['MXNET_GPU_MEM_POOL_TYPE'] = 'Round'
@@ -16,10 +17,12 @@ import dgl.data as data
 
 from tree_lstm import TreeLSTM
 
+SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
+
 def batcher(ctx):
     def batcher_dev(batch):
         batch_trees = dgl.batch(batch)
-        return data.SSTBatch(graph=batch_trees,
+        return SSTBatch(graph=batch_trees,
                              mask=batch_trees.ndata['mask'].as_in_context(ctx),
                              wordid=batch_trees.ndata['x'].as_in_context(ctx),
                              label=batch_trees.ndata['y'].as_in_context(ctx))
@@ -56,20 +59,20 @@ def main(args):
     if args.use_glove:
         prepare_glove()
 
-    trainset = data.SST()
+    trainset = data.SSTDataset()
     train_loader = gluon.data.DataLoader(dataset=trainset,
                                          batch_size=args.batch_size,
                                          batchify_fn=batcher(ctx),
                                          shuffle=True,
                                          num_workers=0)
-    devset = data.SST(mode='dev')
+    devset = data.SSTDataset(mode='dev')
     dev_loader = gluon.data.DataLoader(dataset=devset,
                                        batch_size=100,
                                        batchify_fn=batcher(ctx),
                                        shuffle=True,
                                        num_workers=0)
 
-    testset = data.SST(mode='test')
+    testset = data.SSTDataset(mode='test')
     test_loader = gluon.data.DataLoader(dataset=testset,
                                         batch_size=100,
                                         batchify_fn=batcher(ctx),
