@@ -306,15 +306,17 @@ def test_edge_softmax2(idtype, g):
         assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
     """
 
-def test_partial_edge_softmax():
+@parametrize_dtype
+def test_partial_edge_softmax(idtype):
     g = dgl.rand_graph(30, 900)
+    g = g.astype(idtype).to(F.ctx())
 
     score = F.randn((300, 1))
     score.requires_grad_()
     grad = F.randn((300, 1))
     import numpy as np
     eids = np.random.choice(900, 300, replace=False).astype('int64')
-    eids = F.zerocopy_from_numpy(eids)
+    eids = F.zerocopy_from_numpy(eids).type(g.idtype)
     # compute partial edge softmax
     y_1 = nn.edge_softmax(g, score, eids)
     y_1.backward(grad)
