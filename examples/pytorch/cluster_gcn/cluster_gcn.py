@@ -31,7 +31,10 @@ def main(args):
     # load and preprocess dataset
     data = load_data(args)
 
-    train_nid = np.nonzero(data.train_mask)[0].astype(np.int64)
+    if 'reddit' in args.dataset:
+        train_nid = np.nonzero(data.train_mask.data.numpy())[0].astype(np.int64)
+    else:
+        train_nid = np.nonzero(data.train_mask)[0].astype(np.int64)
 
     # Normalize features
     if args.normalize:
@@ -47,7 +50,11 @@ def main(args):
         labels = torch.LongTensor(data.labels)
     else:
         labels = torch.FloatTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
+    if 'reddit' in args.dataset:
+        train_mask = data.train_mask
+        val_mask = data.val_mask
+        test_mask = data.test_mask
+    elif hasattr(torch, 'BoolTensor'):
         train_mask = torch.BoolTensor(data.train_mask)
         val_mask = torch.BoolTensor(data.val_mask)
         test_mask = torch.BoolTensor(data.test_mask)
@@ -76,7 +83,7 @@ def main(args):
     # create GCN model
     g = data.graph
     if args.self_loop and not args.dataset.startswith('reddit'):
-        g.remove_edges_from(nx.selfloop_edges(g))
+        g.remove_edges_from(list(nx.selfloop_edges(g)))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
         print("adding self-loop edges")
     g = DGLGraph(g, readonly=True)
@@ -98,8 +105,7 @@ def main(args):
     g.ndata['train_mask'] = train_mask
     print('labels shape:', labels.shape)
 
-    cluster_iterator = ClusterIter(
-        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
+    cluster_iterator = ClusterIter(g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
 
     print("features shape, ", features.shape)
 
@@ -136,8 +142,8 @@ def main(args):
     # set train_nids to cuda tensor
     if cuda:
         train_nid = torch.from_numpy(train_nid).cuda()
-    print("current memory after model before training",
-          torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
+        print("current memory after model before training",
+              torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
     start_time = time.time()
     best_f1 = -1
 

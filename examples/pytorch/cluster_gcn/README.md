@@ -11,32 +11,7 @@ Dependencies
 - PyTorch 1.1.0+
 - metis
 - sklearn
-
-
-* install clustering toolkit: metis and its Python interface.
-
-  download and install metis: http://glaros.dtc.umn.edu/gkhome/metis/metis/download
-
-  METIS - Serial Graph Partitioning and Fill-reducing Matrix Ordering ([official website](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview))
-
-```
-1) Download metis-5.1.0.tar.gz from http://glaros.dtc.umn.edu/gkhome/metis/metis/download and unpack it
-2) cd metis-5.1.0
-3) make config shared=1 prefix=~/.local/
-4) make install
-5) export METIS_DLL=~/.local/lib/libmetis.so
-6) `pip install metis`
-```
-
-quick test to see whether you install metis correctly:
-
-```
->>> import networkx as nx
->>> import metis
->>> G = metis.example_networkx()
->>> (edgecuts, parts) = metis.part_graph(G, 3)
-```
-
+- networkx==2.2 or 2.3
 
 ## Run Experiments.
 * For reddit data, you may run the following scripts
