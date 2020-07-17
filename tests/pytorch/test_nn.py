@@ -226,9 +226,11 @@ def uniform_attention(g, shape):
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
     return a / g.in_degrees(g.edges(order='eid')[1]).view(target_shape).float()
 
-def test_edge_softmax():
+@parametrize_dtype
+def test_edge_softmax(idtype):
     # Basic
     g = dgl.graph(nx.path_graph(3))
+    g = g.astype(idtype).to(F.ctx())
     edata = F.ones((g.number_of_edges(), 1))
     a = nn.edge_softmax(g, edata)
     assert len(g.ndata) == 0
