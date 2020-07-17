@@ -16,7 +16,7 @@ from .gnn_benckmark import AmazonCoBuyComputerDataset, AmazonCoBuyPhotoDataset, 
 from .knowledge_graph import FB15k237Dataset, FB15kDataset, WN18Dataset
 from .karate import KarateClubDataset, KarateClub
 from .gindt import GINDataset
-from .bitcoinotc import BitcoinOTC
+from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
 from .gdelt import GDELT, GDELTDataset
 from .icews18 import ICEWS18, ICEWS18Dataset
 from .qm7b import QM7b, QM7bDataset
