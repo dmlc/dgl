@@ -224,7 +224,7 @@ def test_set_trans():
 def uniform_attention(g, shape):
     a = th.ones(shape)
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
-    return a / g.in_degrees(g.edges()[1]).view(target_shape).float()
+    return a / g.in_degrees(g.edges(order='eid')[1]).view(target_shape).float()
 
 def test_edge_softmax():
     # Basic
