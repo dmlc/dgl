@@ -306,10 +306,12 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
 
   // Copy buffer to share memory
   CHECK_LE(strm->Tell(), SHARED_MEM_METAINFO_SIZE_MAX);
-  SharedMemory mem(name);
-  auto mem_buf = mem.Open(SHARED_MEM_METAINFO_SIZE_MAX);
+  auto mem = std::make_shared<SharedMemory>(name);
+  auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
   memcpy(mem_buf, buf.c_str(), strm->Tell());
-  return HeteroGraphPtr(new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
+  auto ret = HeteroGraphPtr(new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
+  std::dynamic_pointer_cast<HeteroGraph>(ret)->shared_mem_name_ = name;
+  return ret;
 }
 
 aten::COOMatrix CreateCOOFromSharedMem(const std::string &name, uint8_t nbits,
@@ -389,7 +391,9 @@ HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
   }
 
-  return HeteroGraphPtr(new HeteroGraph(metagraph, relgraphs, num_verts_per_type));
+  auto ret = HeteroGraphPtr(new HeteroGraph(metagraph, relgraphs, num_verts_per_type));
+  std::dynamic_pointer_cast<HeteroGraph>(ret)->shared_mem_name_ = name;
+  return ret;
 }
 
 HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {
