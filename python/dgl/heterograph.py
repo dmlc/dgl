@@ -1682,7 +1682,7 @@ class DGLHeteroGraph(object):
         else:
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
-    def all_edges(self, form='uv', order=None, etype=None):
+    def all_edges(self, form='uv', order='eid', etype=None):
         """Return all edges with the specified type.
 
         Parameters
@@ -1698,7 +1698,6 @@ class DGLHeteroGraph(object):
 
             - ``'srcdst'`` : sorted by their src and dst ids.
             - ``'eid'``    : sorted by edge Ids.
-            - ``None``     : arbitrary order, default
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)

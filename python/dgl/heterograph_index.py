@@ -490,7 +490,7 @@ class HeteroGraphIndex(ObjectBase):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, etype, order=None):
+    def edges(self, etype, order='eid'):
         """Return all the edges
 
         Parameters
@@ -502,7 +502,6 @@ class HeteroGraphIndex(ObjectBase):
 
             - 'srcdst' : sorted by their src and dst ids.
             - 'eid'    : sorted by edge Ids.
-            - None     : the arbitrary order.
 
         Returns
         -------
@@ -513,8 +512,6 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             The edge ids.
         """
-        if order is None:
-            order = ""
         edge_array = _CAPI_DGLHeteroEdges(self, int(etype), order)
         src = F.from_dgl_nd(edge_array(0))
         dst = F.from_dgl_nd(edge_array(1))

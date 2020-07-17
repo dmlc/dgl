@@ -43,7 +43,7 @@ class EdgeSoftmax(th.autograd.Function):
         # remember to save the graph to backward cache before making it
         # a local variable
         if not is_all(eids):
-            g = g.edge_subgraph(eids.type(g.idtype))
+            g = g.edge_subgraph(eids.type(g.idtype), preserve_nodes=True)
 
         score_max = F.copy_e_max(g, score)
         score = th.exp(F.e_sub_v(g, score, score_max))
