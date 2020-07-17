@@ -80,6 +80,7 @@ Two useful functions in this module:
 import json
 import os
 import numpy as np
+import time
 
 from .. import backend as F
 from ..base import NID, EID
@@ -274,6 +275,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     # Let's calculate edge assignment.
     # TODO(zhengda) we should replace int64 with int16. int16 should be sufficient.
+    start = time.time()
     if not reshuffle:
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
     num_edges = 0
@@ -294,6 +296,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         ledges_list.append(local_edges)
     assert num_edges == g.number_of_edges()
     assert num_nodes == g.number_of_nodes()
+    print('Calculate edge assignment: {:.3f} seconds'.format(time.time() - start))
 
     os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
@@ -317,6 +320,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             node_map_val = [g.number_of_nodes()]
             edge_map_val = [g.number_of_edges()]
 
+    start = time.time()
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
                      'num_edges': g.number_of_edges(),
@@ -363,6 +367,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:
         json.dump(part_metadata, outfile, sort_keys=True, indent=4)
+    print('Save partitions: {:.3f} seconds'.format(time.time() - start))
 
     num_cuts = g.number_of_edges() - tot_num_inner_edges
     if num_parts == 1:

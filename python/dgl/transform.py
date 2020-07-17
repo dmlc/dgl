@@ -4,6 +4,8 @@ from collections.abc import Iterable, Mapping
 from collections import defaultdict
 import numpy as np
 from scipy import sparse
+import time
+
 from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
@@ -949,6 +951,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     assert len(node_part) == g.number_of_nodes()
     node_part = utils.toindex(node_part)
     if reshuffle:
+        start = time.time()
         node_part = node_part.tousertensor()
         sorted_part, new2old_map = F.sort_1d(node_part)
         new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
@@ -960,10 +963,14 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         orig_eids = _CAPI_DGLReassignEdges(g._graph, True)
         orig_eids = utils.toindex(orig_eids)
         g.edata['orig_id'] = orig_eids.tousertensor()
+        print('Reshuffle nodes and edges: {:.3f} seconds'.format(time.time() - start))
 
+    start = time.time()
     subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), extra_cached_hops)
+    print('Split the graph: {:.3f} seconds'.format(time.time() - start))
     subg_dict = {}
     node_part = node_part.tousertensor()
+    start = time.time()
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
         subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
@@ -986,6 +993,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             inner_edge = F.ones((subg.number_of_edges(),), F.int64, F.cpu())
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
+    print('Construct subgraphs: {:.3f} seconds'.format(time.time() - start))
     return subg_dict
 
 def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
@@ -1021,7 +1029,9 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     '''
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
+    start = time.time()
     sym_g = to_bidirected_stale(g, readonly=True)
+    print('Convert a graph into a bidirected graph: {:.3f} seconds'.format(time.time() - start))
     vwgt = []
     # To balance the node types in each partition, we can take advantage of the vertex weights
     # in Metis. When vertex weights are provided, Metis will tries to generate partitions with
@@ -1033,6 +1043,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     # if a node belongs to the first node type, its weight is set to 1; otherwise, 0.
     # Similary, we set the second weight for the second node type and so on. The number
     # of weights is the same as the number of node types.
+    start = time.time()
     if balance_ntypes is not None:
         assert len(balance_ntypes) == g.number_of_nodes(), \
                 "The length of balance_ntypes should be equal to #nodes in the graph"
@@ -1051,11 +1062,14 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         shape = (np.prod(F.shape(vwgt),),)
         vwgt = F.reshape(vwgt, shape)
         vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
+        print('Construct multi-constraint weights: {:.3f} seconds'.format(time.time() - start))
     else:
         vwgt = F.zeros((0,), F.int64, F.cpu())
         vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
 
+    start = time.time()
     node_part = _CAPI_DGLMetisPartition(sym_g._graph, k, vwgt)
+    print('Metis partitioning: {:.3f} seconds'.format(time.time() - start))
     if len(node_part) == 0:
         return None
     else:
