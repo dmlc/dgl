@@ -5,7 +5,7 @@ from . import citation_graph as citegrh
 from . import synthetic_graph as syngrh
 from .citation_graph import CoraBinary, CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from .minigc import *
-from .tree import *
+from .tree import SST, SSTDataset
 from .utils import *
 from .sbm import SBMMixture
 from .reddit import RedditDataset
@@ -18,7 +18,7 @@ from .karate import KarateClubDataset, KarateClub
 from .gindt import GINDataset
 from .bitcoinotc import BitcoinOTC
 from .gdelt import GDELT, GDELTDataset
-from .icews18 import ICEWS18
+from .icews18 import ICEWS18, ICEWS18Dataset
 from .qm7b import QM7b, QM7bDataset
 
 

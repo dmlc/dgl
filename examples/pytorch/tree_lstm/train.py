@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 import dgl
-from dgl.data.tree import SST, SSTBatch
+from dgl.data import SSTDataset
 
 from tree_lstm import TreeLSTM
 
@@ -36,20 +36,20 @@ def main(args):
     if cuda:
         th.cuda.set_device(args.gpu)
 
-    trainset = SST()
+    trainset = SSTDataset()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
                               collate_fn=batcher(device),
                               shuffle=True,
                               num_workers=0)
-    devset = SST(mode='dev')
+    devset = SSTDataset(mode='dev')
     dev_loader = DataLoader(dataset=devset,
                             batch_size=100,
                             collate_fn=batcher(device),
                             shuffle=False,
                             num_workers=0)
 
-    testset = SST(mode='test')
+    testset = SSTDataset(mode='test')
     test_loader = DataLoader(dataset=testset,
                              batch_size=100, collate_fn=batcher(device), shuffle=False, num_workers=0)
 
