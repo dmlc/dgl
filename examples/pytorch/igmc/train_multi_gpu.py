@@ -133,6 +133,7 @@ def train(proc_id, n_gpus, args, devices, movielens):
                                           world_size=world_size,
                                           rank=proc_id)
     th.cuda.set_device(dev_id)
+    # set random seed in each gpu
     th.manual_seed(args.seed)
     if th.cuda.is_available():
         th.cuda.manual_seed_all(args.seed)
@@ -231,8 +232,8 @@ def config():
                         train/val/test and evaluate on val only')
     parser.add_argument('--gpu', default='0', type=str,
                         help="Comma separated list of GPU device IDs.")
-    parser.add_argument('--seed', type=int, default=1234, metavar='S',
-                        help='random seed (default: 1234)')
+    parser.add_argument('--seed', type=int, default=42, metavar='S',
+                        help='random seed (default: 42)')
     parser.add_argument('--data_name', default='ml-100k', type=str,
                         help='The dataset name: ml-100k, ml-1m')
     parser.add_argument('--data_test_ratio', type=float, default=0.1) # for ml-100k the test ration is 0.2
@@ -242,7 +243,7 @@ def config():
     #                     help='if True, load a series of model checkpoints and ensemble the results')               
     parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--valid_log_interval', type=int, default=10)
-    parser.add_argument('--save_appendix', type=str, default='', 
+    parser.add_argument('--save_appendix', type=str, default='debug', 
                         help='what to append to save-names when saving results')
     # subgraph extraction settings
     parser.add_argument('--hop', default=1, metavar='S', 

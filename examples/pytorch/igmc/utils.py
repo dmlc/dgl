@@ -1,9 +1,5 @@
 import os
-import time
 import random
-from tqdm import tqdm
-import multiprocessing as mp
-from collections import OrderedDict
 
 import scipy.sparse as sp
 import warnings
@@ -54,6 +50,7 @@ def one_hot(idx, length):
     return x
 
 def cal_dist(csr_graph, node_to_remove):
+    # cal dist to node 0, with target edge nodes 0/1 removed
     nodes = list(set(range(csr_graph.shape[1])) - set([node_to_remove]))
     csr_graph = csr_graph[nodes, :][:, nodes]
     dists = np.clip(sp.csgraph.dijkstra(
@@ -176,8 +173,8 @@ def get_neighbor_nodes_labels(ind, graph, mode="bipartite",
        
         # 2. node labeling
         csr_subgraph = graph.subgraph(nodes).adjacency_matrix_scipy(return_edge_ids=False)
-        dists = th.stack([th.tensor(cal_dist(csr_subgraph, 0)), 
-                          th.tensor(cal_dist(csr_subgraph, 1))], axis=1)
+        dists = th.stack([th.tensor(cal_dist(csr_subgraph, 1)), 
+                          th.tensor(cal_dist(csr_subgraph, 0))], axis=1)
         ind_labels = th.tensor([[0, 1], [1, 0]])
         node_labels = th.cat([ind_labels, dists]) if dists.size() else ind_labels
 
