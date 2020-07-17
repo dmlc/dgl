@@ -315,8 +315,8 @@ def test_partial_edge_softmax(idtype):
     score.requires_grad_()
     grad = F.randn((300, 1))
     import numpy as np
-    eids = np.random.choice(900, 300, replace=False).astype('int64')
-    eids = F.zerocopy_from_numpy(eids).type(g.idtype)
+    eids = np.random.choice(900, 300, replace=False)
+    eids = F.tensor(eids, dtype=g.idtype)
     # compute partial edge softmax
     y_1 = nn.edge_softmax(g, score, eids)
     y_1.backward(grad)
