@@ -79,8 +79,8 @@ Two useful functions in this module:
 
 import json
 import os
-import numpy as np
 import time
+import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID

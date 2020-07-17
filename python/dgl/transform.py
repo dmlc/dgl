@@ -2,9 +2,9 @@
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
+import time
 import numpy as np
 from scipy import sparse
-import time
 
 from ._ffi.function import _init_api
 from .graph import DGLGraph
