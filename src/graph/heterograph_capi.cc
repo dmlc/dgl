@@ -11,6 +11,8 @@
 #include "../c_api_common.h"
 #include "./heterograph.h"
 
+#include <set>
+
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -432,6 +434,27 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     ctx.device_id = device_id;
     HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
     *rv = HeteroGraphRef(hg_new);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    std::string name = args[1];
+    List<Value> fmts = args[2];
+    std::set<std::string> fmts_set;
+    for (const auto &fmt : fmts) {
+      std::string fmt_data = fmt->data;
+      fmts_set.insert(fmt_data);
+    }
+    auto hg_share = HeteroGraph::CopyToSharedMem(hg.sptr(), name, fmts_set);
+    *rv = HeteroGraphRef(hg_share);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFromSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string name = args[0];
+    auto hg = HeteroGraph::CreateFromSharedMem(name);
+    *rv = HeteroGraphRef(hg);
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")

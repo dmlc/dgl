@@ -220,6 +220,10 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
+  static HeteroGraphPtr CopyToSharedMem(
+      HeteroGraphPtr g, const std::string& name, const std::set<std::string>& fmts);
+
+  static HeteroGraphPtr CreateFromSharedMem(const std::string &name);
 
   /*! \brief Creat a LineGraph of self */
   HeteroGraphPtr LineGraph(bool backtracking) const;
@@ -241,6 +245,9 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
 
+  /*! \brief The name of the shared memory */
+  std::string shared_mem_name_;
+
   /*! \brief template class for Flatten operation
   * 
   * \tparam IdType Graph's index data type, can be int32_t or int64_t
@@ -250,6 +257,8 @@ class HeteroGraph : public BaseHeteroGraph {
   template <class IdType>
   FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
 };
+
+const int64_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 16; // at most 16k
 
 }  // namespace dgl
 

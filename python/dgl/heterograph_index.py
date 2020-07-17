@@ -227,6 +227,23 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
 
+    def shared_memory(self, name, formats=['coo', 'csr', 'csc']):
+        """Return a copy of this graph in shared memory
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory.
+        format : list of str
+            Desired formats to be materialized.
+        
+        Returns
+        -------
+        HeteroGraphIndex
+            The graph index in shared memory
+        """
+        return _CAPI_DGLHeteroCopyToSharedMem(self, name, formats)
+
     def is_multigraph(self):
         """Return whether the graph is a multigraph
         The time cost will be O(E)
@@ -1126,6 +1143,9 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
     else:
         return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
             metagraph, rel_graphs, num_nodes_per_type.todgltensor())
+
+def create_heterograph_from_shared_memory(name):
+    return _CAPI_DGLHeteroCreateFromSharedMem(name)
 
 def joint_union(metagraph, gidx_list):
     """Return a joint union of the input heterographs.
