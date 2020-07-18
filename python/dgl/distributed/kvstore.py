@@ -463,6 +463,49 @@ class SendMetaToBackupRequest(rpc.Request):
         res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
         return res
 
+DELETE_DATA = 901240
+DELETE_MSG = "Delete_Data"
+
+class DeleteDataResponse(rpc.Response):
+    """Send a confirmation signal (just a short string message)
+    of DeleteDataRequest to client.
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __getstate__(self):
+        return self.msg
+
+    def __setstate__(self, state):
+        self.msg = state
+
+class DeleteDataRequest(rpc.Request):
+    """Send message to server to delete data tensor
+
+    Parameters
+    ----------
+    name : str
+        data name
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def __getstate__(self):
+        return self.name
+
+    def __setstate__(self, state):
+        self.name = state
+
+    def process_request(self, server_state):
+        kv_store = server_state.kv_store
+        assert self.name in kv_store.data_store, 'data name %s not exists.' % self.name
+        del kvstore.data_store[name]
+        del kvstore.part_policy[name]
+        del kvstore.push_handlers[name]
+        del kvstore.pull_handlers[name]
+        res = DeleteDataResponse(DELETE_MSG)
+        return res
+
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
@@ -899,6 +942,34 @@ class KVClient(object):
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
+        self.barrier()
+
+    def delete_data(self, name):
+        """Send message to kvserver to delete tensor and clear the meta data
+
+        Parameters
+        ----------
+        name : str
+            data name
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert name in self._data_name_list, 'data name: %s not exists.' % name
+        self.barrier()
+        if self._client_id % num_clients_per_part == 0:
+            request = DeleteDataRequest(name)
+            for n in range(self._group_count):
+                server_id = part_policy.part_id * self._group_count + n
+                rpc.send_request(server_id, request)
+            for _ in range(self._group_count):
+                response = rpc.recv_response()
+                assert response.msg == DELETE_MSG
+        self.barrier()
+        self.data_name_list.remove(name)
+        del self._data_store[name]
+        del self._full_data_shape[name]
+        del self._part_policy[name]
+        del self._pull_handlers[name]
+        del self._push_handlers[name]
         self.barrier()
 
     def map_shared_data(self, partition_book):
