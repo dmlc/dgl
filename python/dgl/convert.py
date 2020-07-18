@@ -456,8 +456,12 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
 
-def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto',
-                idtype=F.int64, device=None):
+def heterograph(data_dict,
+                num_nodes_dict=None,
+                validate=True,
+                restrict_format='auto',
+                idtype=F.int64,
+                device=None):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.
 
     Parameters
@@ -475,6 +479,10 @@ def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto',
 
         By default DGL infers the number of nodes for each node type from ``data_dict``
         by taking the maximum node ID plus one for each node type.
+    validate : bool, optional
+        If True, check if node ids are within cardinality, the check process may take
+        some time. (Default: True)
+        If False and num_nodes_dict is not None, user would receive a warning.
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
     idtype : int32, int64, optional
@@ -548,14 +556,14 @@ def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto',
             rel_graphs.append(graph(
                 data, srctype, etype,
                 num_nodes=num_nodes_dict[srctype],
-                validate=False,
+                validate=validate,
                 restrict_format=restrict_format,
                 idtype=idtype, device=device))
         else:
             rel_graphs.append(bipartite(
                 data, srctype, etype, dsttype,
                 num_nodes=(num_nodes_dict[srctype], num_nodes_dict[dsttype]),
-                validate=False,
+                validate=validate,
                 restrict_format=restrict_format,
                 idtype=idtype, device=device))
 
