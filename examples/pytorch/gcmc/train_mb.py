@@ -85,9 +85,34 @@ def load_subtensor(input_nodes, pair_graph, blocks, dataset, parent_graph):
 
     return head_feat, tail_feat, blocks
 
-def flatten_etypes(pair_graph, dataset):
-    # TODO
-    pass
+def flatten_etypes(pair_graph, dataset, segment):
+    n_users = pair_graph.number_of_nodes('user')
+    n_movies = pair_graph.number_of_nodes('movie')
+    src = []
+    dst = []
+    labels = []
+    ratings = []
+
+    for etype in pair_graph.etypes:
+        src_etype, dst_etype = pair_graph.edges(order='eid', etype=etype)
+        src.append(src_etype)
+        dst.append(dst_etype)
+        rating = int(etype)
+        label = np.searchsorted(dataset.possible_rating_values, rating)
+        ratings.append(th.LongTensor(np.full_like(src_etype, rating)))
+        labels.append(th.LongTensor(np.full_like(src_etype, label)))
+    src = th.cat(src)
+    dst = th.cat(dst)
+    ratings = th.cat(ratings)
+    labels = th.cat(labels)
+
+    flattened_pair_graph = dgl.heterograph({
+        ('user', 'rate', 'movie'): (src, dst)},
+        num_nodes_dict={'user': n_users, 'movie': n_movies})
+    flattened_pair_graph.edata['rating'] = ratings
+    flattened_pair_graph.edata['label'] = labels
+
+    return flattened_pair_graph
 
 def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
     possible_rating_values = dataset.possible_rating_values
@@ -95,9 +120,12 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
 
     real_pred_ratings = []
     true_rel_ratings = []
-    for sample_data in dataloader:
-        compact_g, frontier, head_feat, tail_feat, \
-                _, true_relation_ratings = sample_data
+    for input_nodes, pair_graph, blocks in dataloader:
+        head_feat, tail_feat, blocks = load_subtensor(
+            input_nodes, pair_graph, blocks, dataset,
+            dataset.valid_enc_graph if segment == 'valid' else dataset.test_enc_graph)
+        frontier = blocks[0]
+        compact_g = flatten_etypes(pair_graph, dataset)
 
         head_feat = head_feat.to(dev_id)
         tail_feat = tail_feat.to(dev_id)
@@ -310,32 +338,11 @@ def run(proc_id, n_gpus, args, devices, dataset):
             t0 = time.time()
         net.train()
         for step, (input_nodes, pair_graph, blocks) in enumerate(dataloader):
+            head_feat, tail_feat, blocks = load_subtensor(
+                input_nodes, pair_graph, blocks, dataset, dataset.train_enc_graph)
             frontier = blocks[0]
+            compact_g = flatten_etypes(pair_graph, dataset)
 
-            input_user_id = frontier.srcnodes['user'].data[dgl.NID].long()
-            input_movie_id = frontier.srcnodes['movie'].data[dgl.NID].long()
-            output_user_id = frontier.dstnodes['user'].data[dgl.NID].long()
-            output_movie_id = frontier.dstnodes['movie'].data[dgl.NID].long()
-            head_feat = input_user_id if dataset.user_feature is None else \
-                        dataset.user_feature[input_user_id]
-            tail_feat = input_movie_id if dataset.movie_feature is None else \
-                        dataset.movie_feature[input_movie_id]
-
-            # copy precomputed normalization constant from the original graph
-            frontier.dstnodes['user'].data['ci'] = \
-                dataset.train_enc_graph.nodes['user'].data['ci'][output_user_id]
-            frontier.srcnodes['user'].data['cj'] = \
-                dataset.train_enc_graph.nodes['user'].data['cj'][input_user_id]
-            frontier.dstnodes['movie'].data['ci'] = \
-                dataset.train_enc_graph.nodes['movie'].data['ci'][output_movie_id]
-            frontier.srcnodes['movie'].data['cj'] = \
-                dataset.train_enc_graph.nodes['movie'].data['cj'][input_movie_id]
-
-            compact_g, true_relation_labels, true_relation_ratings = \
-                flatten_etypes(pair_graph, dataset)
-
-            compact_g, frontier, head_feat, tail_feat, \
-                true_relation_labels, true_relation_ratings = sample_data
             head_feat = head_feat.to(dev_id)
             tail_feat = tail_feat.to(dev_id)
 
