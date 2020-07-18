@@ -962,27 +962,38 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         # that all edges in a partition are in the contiguous Id space.
         orig_eids = _CAPI_DGLReassignEdges(g._graph, True)
         orig_eids = utils.toindex(orig_eids)
-        g.edata['orig_id'] = orig_eids.tousertensor()
+        orig_eids = orig_eids.tousertensor()
+        orig_nids = g.ndata['orig_id']
         print('Reshuffle nodes and edges: {:.3f} seconds'.format(time.time() - start))
 
     start = time.time()
     subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), extra_cached_hops)
+    # g is no longer needed. Free memory.
+    g = None
     print('Split the graph: {:.3f} seconds'.format(time.time() - start))
     subg_dict = {}
     node_part = node_part.tousertensor()
     start = time.time()
+
+    # This creaets a subgraph from subgraphs returned from the CAPI above.
+    def create_subgraph(subg, induced_nodes, induced_edges):
+        subg1 = DGLGraph(graph_data=subg.graph, readonly=True)
+        subg1.ndata[NID] = induced_nodes.tousertensor()
+        subg1.edata[EID] = induced_edges.tousertensor()
+        return subg1
+
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
-        subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
+        subg = create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
         subg.ndata['inner_node'] = inner_node
-        subg.ndata['part_id'] = F.gather_row(node_part, subg.parent_nid)
+        subg.ndata['part_id'] = F.gather_row(node_part, subg.ndata[NID])
         if reshuffle:
-            subg.ndata['orig_id'] = F.gather_row(g.ndata['orig_id'], subg.ndata[NID])
-            subg.edata['orig_id'] = F.gather_row(g.edata['orig_id'], subg.edata[EID])
+            subg.ndata['orig_id'] = F.gather_row(orig_nids, subg.ndata[NID])
+            subg.edata['orig_id'] = F.gather_row(orig_eids, subg.edata[EID])
 
         if extra_cached_hops >= 1:
-            inner_edge = F.zeros((subg.number_of_edges(),), F.int64, F.cpu())
+            inner_edge = F.zeros((subg.number_of_edges(),), F.int8, F.cpu())
             inner_nids = F.nonzero_1d(subg.ndata['inner_node'])
             # TODO(zhengda) we need to fix utils.toindex() to avoid the dtype cast below.
             inner_nids = F.astype(inner_nids, F.int64)
@@ -990,7 +1001,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             inner_edge = F.scatter_row(inner_edge, inner_eids,
                                        F.ones((len(inner_eids),), F.dtype(inner_edge), F.cpu()))
         else:
-            inner_edge = F.ones((subg.number_of_edges(),), F.int64, F.cpu())
+            inner_edge = F.ones((subg.number_of_edges(),), F.int8, F.cpu())
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
     print('Construct subgraphs: {:.3f} seconds'.format(time.time() - start))
