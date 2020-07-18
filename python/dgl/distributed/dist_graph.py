@@ -408,6 +408,11 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
 
+    def __del__(self):
+        """Finalize rpc client and shutdown servers
+        """
+        
+
     def init_ndata(self, name, shape, dtype, init_func=None):
         '''Initialize node data
 

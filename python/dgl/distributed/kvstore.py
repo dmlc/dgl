@@ -693,8 +693,10 @@ class KVClient(object):
     ----------
     ip_config : str
         Path of IP configuration file.
+    group : str
+        A client can belong to a group.
     """
-    def __init__(self, ip_config):
+    def __init__(self, ip_config, group='default'):
         assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() \
         before creating KVClient.'
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config

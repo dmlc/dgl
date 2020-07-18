@@ -259,8 +259,6 @@ def start_client(num_clients):
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # clean up
     kvclient.barrier()
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():
