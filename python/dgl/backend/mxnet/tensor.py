@@ -137,6 +137,8 @@ def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
+    if input.dtype in (np.int8, np.int16, np.int32):
+        input = nd.cast(input, np.int64)
     return nd.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):
@@ -356,7 +358,7 @@ def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = np.nonzero(tmp)[0]
-    return nd.array(tmp, ctx=input.context, dtype=input.dtype)
+    return nd.array(tmp, ctx=input.context, dtype=tmp.dtype)
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.
