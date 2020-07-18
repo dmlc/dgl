@@ -6,8 +6,10 @@ import numpy as np
 import numpy.random as npr
 import scipy as sp
 
+from .dgl_dataset import DGLDataset
 from ..graph import DGLGraph, batch
 from ..utils import Index
+
 
 def sbm(n_blocks, block_size, p, q, rng=None):
     """ (Symmetric) Stochastic Block Model
@@ -22,6 +24,8 @@ def sbm(n_blocks, block_size, p, q, rng=None):
         Probability for intra-community edge.
     q : float
         Probability for inter-community edge.
+    rng : numpy.random.RandomState, optional
+        Random number generator.
 
     Returns
     -------
@@ -49,9 +53,12 @@ def sbm(n_blocks, block_size, p, q, rng=None):
     adj = sp.sparse.triu(a) + sp.sparse.triu(a, 1).transpose()
     return adj
 
-class SBMMixture:
-    """ Symmetric Stochastic Block Model Mixture
-    Please refer to Appendix C of "Supervised Community Detection with Hierarchical Graph Neural Networks" (https://arxiv.org/abs/1705.08415) for details.
+
+class SBMMixtureDataset(DGLDataset):
+    r""" Symmetric Stochastic Block Model Mixture
+
+    Reference: Appendix C of "Supervised Community Detection with Hierarchical
+               Graph Neural Networks" (https://arxiv.org/abs/1705.08415).
 
     Parameters
     ----------
@@ -69,38 +76,63 @@ class SBMMixture:
         Random densities.
     rng : numpy.random.RandomState, optional
         Random number generator.
+
+    Returns
+    -------
+    SBMMixtureDataset object
+
+    Examples
+    --------
+    >>> data = SBMMixtureDataset(n_graphs=16, n_nodes=10000, n_communities=2)
+    >>> from torch.utils.data import DataLoader
+    >>> dataloader = DataLoader(data, batch_size=1, collate_fn=data.collate_fn)
+    >>> for graph, line_graph, graph_degrees, line_graph_degrees, pm_pd in dataloader:
+    ...     # your code here
     """
-    def __init__(self, n_graphs, n_nodes, n_communities,
-                 k=2, avg_deg=3, pq='Appendix C', rng=None):
+    def __init__(self,
+                 n_graphs,
+                 n_nodes,
+                 n_communities,
+                 k=2,
+                 avg_deg=3,
+                 pq='Appendix_C',
+                 rng=None):
+        self._n_graphs = n_graphs
         self._n_nodes = n_nodes
+        self._n_communities = n_communities
         assert n_nodes % n_communities == 0
-        block_size = n_nodes // n_communities
+        self._block_size = n_nodes // n_communities
         self._k = k
         self._avg_deg = avg_deg
-        self._gs = [DGLGraph() for i in range(n_graphs)]
-        if type(pq) is list:
-            assert len(pq) == n_graphs
-        elif type(pq) is str:
-            generator = {'Appendix C' : self._appendix_c}[pq]
-            pq = [generator() for i in range(n_graphs)]
+        self._pq = pq
+        self._rng = rng
+        super(SBMMixtureDataset, self).__init__(name='sbmmixture')
+
+    def process(self):
+        self._graphs = [DGLGraph() for _ in range(self._n_graphs)]
+        if type(self._pq) is list:
+            assert len(self._pq) == self._n_graphs
+        elif type(self._pq) is str:
+            generator = {'Appendix_C': self._appendix_c}[self._pq]
+            pq = [generator() for _ in range(self._n_graphs)]
         else:
             raise RuntimeError()
-        adjs = [sbm(n_communities, block_size, *x) for x in pq]
-        for g, adj in zip(self._gs, adjs):
+        adjs = [sbm(self._n_communities, self._block_size, *x, rng=self._rng) for x in pq]
+        for g, adj in zip(self._graphs, adjs):
             g.from_scipy_sparse_matrix(adj)
-        self._lgs = [g.line_graph(backtracking=False) for g in self._gs]
+        self._line_graphs = [g.line_graph(backtracking=False) for g in self._graphs]
         in_degrees = lambda g: g.in_degrees(
-                Index(np.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
-        self._g_degs = [in_degrees(g) for g in self._gs]
-        self._lg_degs = [in_degrees(lg) for lg in self._lgs]
-        self._pm_pds = list(zip(*[g.edges() for g in self._gs]))[0]
+            Index(np.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
+        self._graph_degrees = [in_degrees(g) for g in self._graphs]
+        self._line_graph_degrees = [in_degrees(lg) for lg in self._line_graphs]
+        self._pm_pds = list(zip(*[g.edges() for g in self._graphs]))[0]
 
     def __len__(self):
-        return len(self._gs)
+        return len(self._graphs)
 
     def __getitem__(self, idx):
-        return self._gs[idx], self._lgs[idx], \
-                self._g_degs[idx], self._lg_degs[idx], self._pm_pds[idx]
+        return self._graphs[idx], self._line_graphs[idx], \
+                self._graph_degrees[idx], self._line_graph_degrees[idx], self._pm_pds[idx]
 
     def _appendix_c(self):
         q = npr.uniform(0, self._avg_deg - math.sqrt(self._avg_deg))
@@ -118,3 +150,6 @@ class SBMMixture:
         deglg_batch = np.concatenate(deg_lg, axis=0)
         pm_pd_batch = np.concatenate([x + i * self._n_nodes for i, x in enumerate(pm_pd)], axis=0)
         return g_batch, lg_batch, degg_batch, deglg_batch, pm_pd_batch
+
+
+SBMMixture = SBMMixtureDataset
