@@ -3920,8 +3920,17 @@ class DGLHeteroGraph(object):
             new_feats = {k : F.copy_to(feat, device) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
         new_gidx = self._graph.copy_to(utils.to_dgl_context(device))
-        return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
-                              new_nframes, new_eframes)
+        ret = DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
+                             new_nframes, new_eframes)
+
+        if self._batch_num_nodes is not None:
+            new_bnn = {k : F.copy_to(num, device) for k, num in self._batch_num_nodes.items()}
+            ret._batch_num_nodes = new_bnn
+        if self._batch_num_edges is not None:
+            new_bne = {k : F.copy_to(num, device) for k, num in self._batch_num_edges.items()}
+            ret._batch_num_edges = new_bne
+
+        return ret
 
     def cpu(self):
         """Return a new copy of this graph on CPU.

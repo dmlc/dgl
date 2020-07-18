@@ -403,45 +403,6 @@ def test_empty_relation(idtype):
     g2 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(1, 5))
     dgl.batch([g1, g2])
 
-@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
-@parametrize_dtype
-def test_to_device(idtype):
-    g1 = dgl.heterograph({
-        ('user', 'plays', 'game'): [(0, 0), (1, 1)]
-    }, idtype=idtype)
-    g1.nodes['user'].data['h1'] = F.copy_to(F.tensor([[0.], [1.]]), F.cpu())
-    g1.nodes['user'].data['h2'] = F.copy_to(F.tensor([[3.], [4.]]), F.cpu())
-    g1.edges['plays'].data['h1'] = F.copy_to(F.tensor([[2.], [3.]]), F.cpu())
-
-    g2 = dgl.heterograph({
-        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, idtype=idtype)
-    g2.nodes['user'].data['h1'] = F.copy_to(F.tensor([[1.], [2.]]), F.cpu())
-    g2.nodes['user'].data['h2'] = F.copy_to(F.tensor([[4.], [5.]]), F.cpu())
-    g2.edges['plays'].data['h1'] = F.copy_to(F.tensor([[0.], [1.]]), F.cpu())
-
-    bg = dgl.batch_hetero([g1, g2])
-
-    if F.is_cuda_available():
-        bg1 = bg.to(F.cuda())
-        assert bg1 is not None
-        assert bg.batch_size == bg1.batch_size
-        assert bg.batch_num_nodes('user') == bg1.batch_num_nodes('user')
-        assert bg.batch_num_edges('plays') == bg1.batch_num_edges('plays')
-
-    # set feature
-    g1 = dgl.heterograph({
-        ('user', 'plays', 'game'): [(0, 0), (1, 1)]
-    }, idtype=idtype)
-    g2 = dgl.heterograph({
-        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
-    }, idtype=idtype)
-    bg = dgl.batch_hetero([g1, g2])
-    if F.is_cuda_available():
-        bg1 = bg.to(F.cuda())
-        bg1.nodes['user'].data['test'] = F.copy_to(F.tensor([0,1,2,3]), F.cuda())
-        bg1.edata['test'] = F.copy_to(F.tensor([0,1,2,3]), F.cuda())
-
 if __name__ == '__main__':
     #test_topology('int32')
     #test_batching_batched('int32')
