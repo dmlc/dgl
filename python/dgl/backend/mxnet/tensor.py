@@ -137,8 +137,6 @@ def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
-    if input.dtype in (np.int8, np.int16, np.int32):
-        input = nd.cast(input, np.int64)
     return nd.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):
