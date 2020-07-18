@@ -193,7 +193,7 @@ def shutdown_servers():
 def exit_client():
     """Register exit callback
     """
-    print("exit......")
+    print(SERVER_CONNECTED)
     if SERVER_CONNECTED:
         shutdown_servers()
         finalize_client()
