@@ -277,7 +277,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     if not reshuffle:
         start = time.time()
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int32) - 1
-        for part_id, part in enumerate(parts):
+        for part_id in parts:
+            part = parts[part_id]
             # To get the edges in the input graph, we should use original node Ids.
             local_edges = F.boolean_mask(part.edata[EID], part.edata['inner_edge'])
             edge_parts[F.asnumpy(local_edges)] = part_id
