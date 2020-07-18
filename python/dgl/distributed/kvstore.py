@@ -955,7 +955,8 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert name in self._data_name_list, 'data name: %s not exists.' % name
         self.barrier()
-        if self._client_id % self.num_clients_per_part == 0:
+        num_clients_per_part = rpc.get_num_client() / part_policy.partition_book.num_partitions()
+        if self._client_id % num_clients_per_part == 0:
             request = DeleteDataRequest(name)
             for n in range(self._group_count):
                 server_id = part_policy.part_id * self._group_count + n
