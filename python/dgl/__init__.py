@@ -20,9 +20,9 @@ from ._ffi.base import DGLError, __version__
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
 from .readout import *
-from .batched_heterograph import *
+from .batch import *
 from .convert import *
-from .graph import DGLGraph, batch, unbatch
+from .graph import DGLGraph#, batch, unbatch
 from .generators import *
 from .heterograph import DGLHeteroGraph
 from .nodeflow import *

@@ -338,6 +338,12 @@ class HeteroNodeDataView(MutableMapping):
             'can not be iterated.'
         return iter(self._graph._node_frames[self._ntid])
 
+    def keys(self):
+        return self._graph._node_frames[self._ntid].keys()
+
+    def values(self):
+        return self._graph._node_frames[self._ntid].values()
+
     def __repr__(self):
         if isinstance(self._ntype, list):
             ret = {}
@@ -444,6 +450,12 @@ class HeteroEdgeDataView(MutableMapping):
             'Current HeteroEdgeDataView has multiple edge types, ' \
             'can not be iterated.'
         return iter(self._graph._edge_frames[self._etid])
+
+    def keys(self):
+        return self._graph._edge_frames[self._etid].keys()
+
+    def values(self):
+        return self._graph._edge_frames[self._etid].values()
 
     def __repr__(self):
         if isinstance(self._etype, list):

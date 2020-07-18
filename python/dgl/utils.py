@@ -739,3 +739,48 @@ def check_all_same_device(glist, name):
         if g.device != device:
             raise DGLError('Expect {}[{}] to be on device {}, but got {}.'.format(
                 name, i, device, g.device))
+
+def check_all_same_keys(dict_list, name):
+    """Check all the dictionaries have the same set of keys."""
+    if len(dict_list) == 0:
+        return
+    keys = dict_list[0].keys()
+    for dct in dict_list:
+        if keys != dct.keys():
+            raise DGLError('Expect all {} to have the same set of keys, but got'
+                           ' {} and {}.'.format(name, keys, dct.keys()))
+
+def check_all_have_keys(dict_list, keys, name):
+    """Check the dictionaries all have the given keys."""
+    if len(dict_list) == 0:
+        return
+    keys = set(keys)
+    for dct in dict_list:
+        if not keys.issubset(dct.keys()):
+            raise DGLError('Expect all {} to include keys {}, but got {}.'.format(
+                name, keys, dct.keys()))
+
+def check_all_same_schema(feat_dict_list, keys, name):
+    """Check the features of the given keys all have the same schema.
+
+    Suggest calling ``check_all_have_keys`` first.
+
+    Parameters
+    ----------
+    feat_dict_list : list[dict[str, Tensor]]
+        Feature dictionaries.
+    keys : list[str]
+        Keys
+    name : str
+        Name of this feature dict.
+    """
+    if len(feat_dict_list) == 0:
+        return
+    for fdict in feat_dict_list:
+        for k in keys:
+            t1 = feat_dict_list[0][k]
+            t2 = fdict[k]
+            if F.dtype(t1) != F.dtype(t2) or F.shape(t1)[1:] != F.shape(t2)[1:]:
+                raise DGLError('Expect all feature "{}" to have the data type'
+                               ' and feature size, but got\n\t{} {}\nand\n\t{} {}.'.format(
+                                   k, F.dtype(t1), F.shape(t1)[1:], F.dtype(t2), F.shape(t2)[1:]))
