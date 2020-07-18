@@ -299,10 +299,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         # With reshuffling, we can ensure that all nodes and edges are reshuffled
         # and are in contiguous Id space.
         if num_parts > 1:
-            node_map_val = np.cumsum([F.as_scalar(F.sum(parts[i].ndata['inner_node'], 0)) for i in parts])
-            node_map_val = node_map_val.tolist()
-            edge_map_val = np.cumsum([F.as_scalar(F.sum(parts[i].edata['inner_edge'], 0)) for i in parts])
-            edge_map_val = edge_map_val.tolist()
+            node_map_val = [F.as_scalar(F.sum(parts[i].ndata['inner_node'], 0)) for i in parts]
+            node_map_val = np.cumsum(node_map_val).tolist()
+            edge_map_val = [F.as_scalar(F.sum(parts[i].edata['inner_edge'], 0)) for i in parts]
+            edge_map_val = np.cumsum(edge_map_val).tolist()
         else:
             node_map_val = [g.number_of_nodes()]
             edge_map_val = [g.number_of_edges()]
