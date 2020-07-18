@@ -158,6 +158,8 @@ def run(args, device, data):
             # Load the input features as well as output labels
             start = time.time()
             batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
+            assert th.all(th.logical_not(th.isnan(batch_labels)))
+            batch_labels = batch_labels.long()
             copy_time += time.time() - start
 
             num_seeds += len(blocks[-1].dstdata[dgl.NID])
@@ -230,7 +232,9 @@ def main(args):
         len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
         len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
     device = th.device('cpu')
-    n_classes = len(th.unique(g.ndata['labels'][np.arange(g.number_of_nodes())]))
+    labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
+    n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
+    print('#labels:', n_classes)
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
