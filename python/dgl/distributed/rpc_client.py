@@ -194,6 +194,7 @@ def exit_client():
     """Register exit callback
     """
     if SERVER_CONNECTED:
+        print("exit......")
         shutdown_servers()
         finalize_client()
 
