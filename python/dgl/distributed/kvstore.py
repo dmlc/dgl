@@ -499,10 +499,10 @@ class DeleteDataRequest(rpc.Request):
     def process_request(self, server_state):
         kv_store = server_state.kv_store
         assert self.name in kv_store.data_store, 'data name %s not exists.' % self.name
-        del kvstore.data_store[name]
-        del kvstore.part_policy[name]
-        del kvstore.push_handlers[name]
-        del kvstore.pull_handlers[name]
+        del kvstore.data_store[self.name]
+        del kvstore.part_policy[self.name]
+        del kvstore.push_handlers[self.name]
+        del kvstore.pull_handlers[self.name]
         res = DeleteDataResponse(DELETE_MSG)
         return res
 
