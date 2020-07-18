@@ -255,7 +255,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     '''
     if num_parts == 1:
         parts = {0: g}
-        node_parts = F.zeros((g.number_of_nodes(),), F.int8, F.cpu())
+        node_parts = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
         g.ndata[NID] = F.arange(0, g.number_of_nodes())
         g.edata[EID] = F.arange(0, g.number_of_edges())
         g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int8, F.cpu())
@@ -276,7 +276,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     # Let's calculate edge assignment.
     if not reshuffle:
         start = time.time()
-        edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int32) - 1
+        # We only optimize for reshuffled case. So it's fine to use int64 here.
+        edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
         for part_id in parts:
             part = parts[part_id]
             # To get the edges in the input graph, we should use original node Ids.
