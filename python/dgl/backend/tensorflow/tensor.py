@@ -63,7 +63,8 @@ def initialize_context():
     tf.zeros(1)
 
 def as_scalar(data):
-    return data.numpy().asscalar()
+    data = data.numpy()
+    return data if np.isscalar(data) else data.asscalar()
 
 
 def get_preferred_sparse_format():
@@ -384,7 +385,7 @@ def full_1d(length, fill_value, dtype, ctx):
 
 
 def nonzero_1d(input):
-    nonzero_bool = (input != False)
+    nonzero_bool = tf.cast(input, tf.bool)
     return tf.reshape(tf.where(nonzero_bool), (-1, ))
 
 
