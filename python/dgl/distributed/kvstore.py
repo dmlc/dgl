@@ -973,7 +973,7 @@ class KVClient(object):
                 response = rpc.recv_response()
                 assert response.msg == DELETE_MSG
         self.barrier()
-        self.data_name_list.remove(name)
+        self._data_name_list.remove(name)
         del self._data_store[name]
         del self._full_data_shape[name]
         del self._part_policy[name]
