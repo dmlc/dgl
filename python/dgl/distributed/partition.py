@@ -325,8 +325,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_feats = {}
         edge_feats = {}
         if num_parts > 1:
-            local_nodes = F.boolean_mask(part.ndata[NID], part.ndata['inner_node'])
-            local_edges = F.boolean_mask(part.edata[EID], part.edata['inner_edge'])
+            # To get the edges in the input graph, we should use original node Ids. 
+            ndata_name = 'orig_id' if reshuffle else NID
+            edata_name = 'orig_id' if reshuffle else EID
+            local_nodes = F.boolean_mask(part.ndata[ndata_name], part.ndata['inner_node'])
+            local_edges = F.boolean_mask(part.edata[edata_name], part.edata['inner_edge'])
             print('part {} has {} nodes and {} edges.'.format(
                 part_id, part.number_of_nodes(), part.number_of_edges()))
             print('{} nodes and {} edges are inside the partition'.format(
