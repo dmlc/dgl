@@ -10,6 +10,8 @@ if os.name != 'nt':
     import fcntl
     import struct
 
+import atexit
+
 def local_ip4_addr_list():
     """Return a set of IPv4 address
     """
@@ -95,8 +97,6 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
-SERVER_CONNECTED = False
-
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
 
@@ -171,7 +171,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
-    SERVER_CONNECTED = True
+    atexit.register(exit_client)
 
 def finalize_client():
     """Release resources of this client."""
@@ -193,10 +193,6 @@ def shutdown_servers():
 def exit_client():
     """Register exit callback
     """
-    print(SERVER_CONNECTED)
-    if SERVER_CONNECTED:
-        shutdown_servers()
-        finalize_client()
+    shutdown_servers()
+    finalize_client()
 
-import atexit
-atexit.register(exit_client)
