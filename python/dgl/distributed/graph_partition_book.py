@@ -101,10 +101,10 @@ class GraphPartitionBook:
         self._part_id = int(part_id)
         self._num_partitions = int(num_parts)
         self._nid2partid = F.tensor(node_map)
-        assert F.dtype(self._nid2partid) in (F.int32, F.int64), \
+        assert F.dtype(self._nid2partid) == F.int64, \
                 'the node map must be stored in an integer array'
         self._eid2partid = F.tensor(edge_map)
-        assert F.dtype(self._eid2partid) in (F.int32, F.int64), \
+        assert F.dtype(self._eid2partid) == F.int64, \
                 'the edge map must be stored in an integer array'
         # Get meta data of the partition book.
         self._partition_meta_data = []

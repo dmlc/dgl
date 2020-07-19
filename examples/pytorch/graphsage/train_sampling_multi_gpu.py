@@ -207,13 +207,6 @@ def run(proc_id, n_gpus, args, devices, data):
             loss = loss_fcn(batch_pred, batch_labels)
             optimizer.zero_grad()
             loss.backward()
-
-            if n_gpus > 1:
-                for param in model.parameters():
-                    if param.requires_grad and param.grad is not None:
-                        th.distributed.all_reduce(param.grad.data,
-                                                  op=th.distributed.ReduceOp.SUM)
-                        param.grad.data /= n_gpus
             optimizer.step()
 
             if proc_id == 0:
