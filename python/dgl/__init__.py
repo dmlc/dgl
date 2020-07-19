@@ -13,6 +13,7 @@ from . import container
 from . import distributed
 from . import random
 from . import sampling
+from . import dataloading
 
 from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs

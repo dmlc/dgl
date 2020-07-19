@@ -270,6 +270,9 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
 
+def randint(shape, dtype, ctx, low, high):
+    return nd.random.randint(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):

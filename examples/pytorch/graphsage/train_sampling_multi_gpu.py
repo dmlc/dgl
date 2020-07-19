@@ -72,8 +72,8 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
@@ -167,9 +167,9 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
 
     # Create PyTorch DataLoader for constructing blocks
-    sampler = dgl.sampling.MultiLayerNeighborSampler(
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
-    dataloader = dgl.sampling.NodeDataLoader(
+    dataloader = dgl.dataloading.NodeDataLoader(
         train_g,
         train_nid,
         sampler,

@@ -16,7 +16,7 @@ from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
 from .convert import graph, bipartite, heterograph
 from . import utils
-from .base import EID, NID
+from .base import EID, NID, DGLError
 from . import ndarray as nd
 
 
