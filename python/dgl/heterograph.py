@@ -864,7 +864,7 @@ class DGLHeteroGraph(object):
             self_loops[c_etype] = nodes
 
         for c_type, nodes in self_loops.items():
-            self.add_edges(nodes, nodes, etype=c_etype)
+            self.add_edges(nodes, nodes, etype=c_type)
 
     def remove_selfloop(self):
         r""" Remove self loops for each node in the graph.
