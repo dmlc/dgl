@@ -37,10 +37,10 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
     reverse_etype_map = {
         g.to_canonical_etype(k): g.to_canonical_etype(v)
         for k, v in reverse_etype_map.items()}
-    exclude_eids.update({reverse_etype_map(k): v for k, v in exclude_eids})
+    exclude_eids.update({reverse_etype_map[k]: v for k, v in exclude_eids.items()})
     return exclude_eids
 
-def find_exclude_eids(g, exclude_mode, eids, **kwargs):
+def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     """Find all edge IDs to exclude according to ``exclude_mode``.
 
     Parameters
@@ -333,6 +333,10 @@ class EdgeCollator(Collator):
         The edge set to compute outputs.
     block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
         The neighborhood sampler.
+    g_sampling : DGLHeteroGraph, optional
+        The graph where neighborhood sampling is performed.
+
+        If None, assume to be the same as ``g``.
     exclude : str, optional
         Whether and how to exclude dependencies related to the sampled edges in the
         minibatch.  Possible values are
@@ -345,6 +349,8 @@ class EdgeCollator(Collator):
 
         * ``'reverse_types'``, which excludes the reverse edges of the sampled edges.  The
           said reverse edges have different edge types from the sampled edges.
+
+        If ``g_sampling`` is given, ``exclude`` is ignored and will be always ``None``.
     reverse_eids : Tensor or dict[etype, Tensor], optional
         The mapping from original edge ID to its reverse edge ID.
 
@@ -458,15 +464,28 @@ class EdgeCollator(Collator):
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
     ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
     """
-    def __init__(self, g, eids, block_sampler, exclude=None, reverse_eids=None,
-                 reverse_etypes=None, negative_sampler=None, return_eids=False):
+    def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
+                 reverse_eids=None, reverse_etypes=None, negative_sampler=None,
+                 return_eids=False):
         self.g = g
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
                 "eids should be a dict of edge type and ids for graph with multiple edge types"
         self.eids = eids
         self.block_sampler = block_sampler
-        self.exclude = exclude
+
+        # One may wish to iterate over the edges in one graph while perform sampling in
+        # another graph.  This may be the case for iterating over validation and test
+        # edge set while perform neighborhood sampling on the graph formed by only
+        # the training edge set.
+        # See GCMC for an example usage.
+        if g_sampling is not None:
+            self.g_sampling = g_sampling
+            self.exclude = None
+        else:
+            self.g_sampling = self.g
+            self.exclude = exclude
+
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.negative_sampler = negative_sampler
@@ -491,7 +510,7 @@ class EdgeCollator(Collator):
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
 
-        exclude_eids = find_exclude_eids(
+        exclude_eids = _find_exclude_eids(
             self.g,
             self.exclude,
             items,
@@ -499,7 +518,8 @@ class EdgeCollator(Collator):
             reverse_etype_map=self.reverse_etypes)
 
         blocks = self.block_sampler.sample_blocks(
-            self.g, seed_nodes, exclude_eids=exclude_eids, return_eids=self.return_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids,
+            return_eids=self.return_eids)
         input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, blocks
@@ -528,7 +548,7 @@ class EdgeCollator(Collator):
 
         seed_nodes = pair_graph.ndata[NID]
 
-        exclude_eids = find_exclude_eids(
+        exclude_eids = _find_exclude_eids(
             self.g,
             self.exclude,
             items,
@@ -536,7 +556,8 @@ class EdgeCollator(Collator):
             reverse_etype_map=self.reverse_etypes)
 
         blocks = self.block_sampler.sample_blocks(
-            self.g, seed_nodes, exclude_eids=exclude_eids, return_eids=self.return_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids,
+            return_eids=self.return_eids)
         input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, neg_pair_graph, blocks

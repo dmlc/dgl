@@ -46,6 +46,10 @@ class EdgeDataLoader(DataLoader):
         The node set to compute outputs.
     block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
         The neighborhood sampler.
+    g_sampling : DGLHeteroGraph, optional
+        The graph where neighborhood sampling is performed.
+
+        If None, assume to be the same as ``g``.
     exclude : str, optional
         Whether and how to exclude dependencies related to the sampled edges in the
         minibatch.  Possible values are
@@ -149,10 +153,11 @@ class EdgeDataLoader(DataLoader):
 
     * Link prediction on heterogeneous graph: RGCN for link prediction.
     """
-    def __init__(self, g, eids, block_sampler, exclude=None, reverse_eids=None,
+    def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None, reverse_eids=None,
                  reverse_etypes=None, negative_sampler=None, return_eids=False, **kwargs):
         self.collator = EdgeCollator(
-            g, eids, block_sampler, exclude=exclude, reverse_eids=reverse_eids,
+            g, eids, block_sampler,
+            g_sampling=g_sampling, exclude=exclude, reverse_eids=reverse_eids,
             reverse_etypes=reverse_etypes, negative_sampler=negative_sampler,
             return_eids=return_eids)
         super().__init__(self.collator.dataset, collate_fn=self.collator.collate, **kwargs)
