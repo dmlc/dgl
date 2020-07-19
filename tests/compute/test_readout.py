@@ -2,66 +2,81 @@ import dgl
 import backend as F
 import networkx as nx
 import unittest
+import pytest
+from test_utils.graph_cases import get_cases
+from utils import parametrize_dtype
 
-def test_simple_readout():
-    g1 = dgl.DGLGraph()
-    g1.add_nodes(3)
-    g2 = dgl.DGLGraph()
-    g2.add_nodes(4) # no edges
-    g1.add_edges([0, 1, 2], [2, 0, 1])
+@parametrize_dtype
+def test_sum_case1(idtype):
+    # NOTE: If you want to update this test case, remember to update the docstring
+    #  example too!!!
+    g1 = dgl.graph(([0, 1], [1, 0]), idtype=idtype, device=F.ctx())
+    g1.ndata['h'] = F.tensor([1., 2.])
+    g2 = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g2.ndata['h'] = F.tensor([1., 2., 3.])
+    bg = dgl.batch([g1, g2])
+    bg.ndata['w'] = F.tensor([.1, .2, .1, .5, .2])
+    assert F.allclose(F.tensor([3.]), dgl.sum_nodes(g1, 'h'))
+    assert F.allclose(F.tensor([3., 6.]), dgl.sum_nodes(bg, 'h'))
+    assert F.allclose(F.tensor([.5, 1.7]), dgl.sum_nodes(bg, 'h', 'w'))
 
-    n1 = F.randn((3, 5))
-    n2 = F.randn((4, 5))
-    e1 = F.randn((3, 5))
-    s1 = F.sum(n1, 0)   # node sums
-    s2 = F.sum(n2, 0)
-    se1 = F.sum(e1, 0)  # edge sums
-    m1 = F.mean(n1, 0)  # node means
-    m2 = F.mean(n2, 0)
-    me1 = F.mean(e1, 0) # edge means
-    w1 = F.randn((3,))
-    w2 = F.randn((4,))
-    max1 = F.max(n1, 0)
-    max2 = F.max(n2, 0)
-    maxe1 = F.max(e1, 0)
-    ws1 = F.sum(n1 * F.unsqueeze(w1, 1), 0)
-    ws2 = F.sum(n2 * F.unsqueeze(w2, 1), 0)
-    wm1 = F.sum(n1 * F.unsqueeze(w1, 1), 0) / F.sum(F.unsqueeze(w1, 1), 0)
-    wm2 = F.sum(n2 * F.unsqueeze(w2, 1), 0) / F.sum(F.unsqueeze(w2, 1), 0)
-    g1.ndata['x'] = n1
-    g2.ndata['x'] = n2
-    g1.ndata['w'] = w1
-    g2.ndata['w'] = w2
-    g1.edata['x'] = e1
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+@pytest.mark.parametrize('reducer', ['sum', 'max', 'mean'])
+def test_reduce_readout(g, idtype, reducer):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['h'] = F.randn((g.number_of_nodes(), 3))
+    g.edata['h'] = F.randn((g.number_of_edges(), 2))
 
-    assert F.allclose(dgl.sum_nodes(g1, 'x'), s1)
-    assert F.allclose(dgl.sum_nodes(g1, 'x', 'w'), ws1)
-    assert F.allclose(dgl.sum_edges(g1, 'x'), se1)
-    assert F.allclose(dgl.mean_nodes(g1, 'x'), m1)
-    assert F.allclose(dgl.mean_nodes(g1, 'x', 'w'), wm1)
-    assert F.allclose(dgl.mean_edges(g1, 'x'), me1)
-    assert F.allclose(dgl.max_nodes(g1, 'x'), max1)
-    assert F.allclose(dgl.max_edges(g1, 'x'), maxe1)
+    # Test.1: node readout
+    x = getattr(dgl, '{}_nodes'.format(reducer))(g, 'h')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_nodes'.format(reducer))(sg, 'h')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-    g = dgl.batch([g1, g2])
-    s = dgl.sum_nodes(g, 'x')
-    m = dgl.mean_nodes(g, 'x')
-    max_bg = dgl.max_nodes(g, 'x')
-    assert F.allclose(s, F.stack([s1, s2], 0))
-    assert F.allclose(m, F.stack([m1, m2], 0))
-    assert F.allclose(max_bg, F.stack([max1, max2], 0))
-    ws = dgl.sum_nodes(g, 'x', 'w')
-    wm = dgl.mean_nodes(g, 'x', 'w')
-    assert F.allclose(ws, F.stack([ws1, ws2], 0))
-    assert F.allclose(wm, F.stack([wm1, wm2], 0))
-    s = dgl.sum_edges(g, 'x')
-    m = dgl.mean_edges(g, 'x')
-    max_bg_e = dgl.max_edges(g, 'x')
-    assert F.allclose(s, F.stack([se1, F.zeros(5)], 0))
-    assert F.allclose(m, F.stack([me1, F.zeros(5)], 0))
-    # TODO(zihao): fix -inf issue
-    # assert F.allclose(max_bg_e, F.stack([maxe1, F.zeros(5)], 0)) 
+    # Test.2: edge readout
+    x = getattr(dgl, '{}_edges'.format(reducer))(g, 'h')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_edges'.format(reducer))(sg, 'h')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+@pytest.mark.parametrize('reducer', ['sum', 'max', 'mean'])
+def test_weighted_reduce_readout(g, idtype, reducer):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['h'] = F.randn((g.number_of_nodes(), 3))
+    g.ndata['w'] = F.randn((g.number_of_nodes(), 1))
+    g.edata['h'] = F.randn((g.number_of_edges(), 2))
+    g.edata['w'] = F.randn((g.number_of_edges(), 1))
+
+    # Test.1: node readout
+    x = getattr(dgl, '{}_nodes'.format(reducer))(g, 'h', 'w')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_nodes'.format(reducer))(sg, 'h', 'w')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
+
+    # Test.2: edge readout
+    x = getattr(dgl, '{}_edges'.format(reducer))(g, 'h', 'w')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_edges'.format(reducer))(sg, 'h', 'w')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
 def test_topk_nodes():
     # test#1: basic

@@ -266,7 +266,7 @@ class HeteroNodeView(object):
             ntype = None
         elif isinstance(key, tuple):
             nodes, ntype = key
-        elif isinstance(key, str):
+        elif key is None or isinstance(key, str):
             nodes = ALL
             ntype = key
         else:
@@ -373,6 +373,9 @@ class HeteroEdgeView(object):
                 raise DGLError('Currently only full slice ":" is supported')
             edges = ALL
             etype = None
+        elif key is None:
+            edges = ALL
+            etype = None
         elif isinstance(key, tuple):
             if len(key) == 3:
                 edges = ALL
@@ -380,7 +383,7 @@ class HeteroEdgeView(object):
             else:
                 edges = key
                 etype = None
-        elif isinstance(key, (str, tuple)):
+        elif isinstance(key, str):
             edges = ALL
             etype = key
         else:

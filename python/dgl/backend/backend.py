@@ -636,7 +636,7 @@ def repeat(input, repeats, dim):
     ----------
     input : Tensor
         Input data array
-    repeats : int
+    repeats : int, Tensor
         The number of repetitions for each element
     dim : int
         The dim along which to repeat values.
