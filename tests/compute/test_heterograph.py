@@ -909,9 +909,9 @@ def test_to_device(idtype):
     assert F.context(g.nodes['game'].data['i']) == F.cpu()
     assert F.context(g.edges['plays'].data['e']) == F.cpu()
     for ntype in g.ntypes:
-        assert F.context(g.batch_num_nodes[ntype]) == F.cpu()
+        assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
     for etype in g.canonical_etypes:
-        assert F.context(g.batch_num_edges[etype]) == F.cpu()
+        assert F.context(g.batch_num_edges(etype)) == F.cpu()
 
     if F.is_cuda_available():
         g1 = g.to(F.cuda())
@@ -920,16 +920,16 @@ def test_to_device(idtype):
         assert F.context(g1.nodes['game'].data['i']) == F.cuda()
         assert F.context(g1.edges['plays'].data['e']) == F.cuda()
         for ntype in g1.ntypes:
-            assert F.context(g1.batch_num_nodes[ntype]) == F.cuda()
+            assert F.context(g1.batch_num_nodes(ntype)) == F.cuda()
         for etype in g1.canonical_etypes:
-            assert F.context(g1.batch_num_edges[etype]) == F.cuda()
+            assert F.context(g1.batch_num_edges(etype)) == F.cuda()
         assert F.context(g.nodes['user'].data['h']) == F.cpu()
         assert F.context(g.nodes['game'].data['i']) == F.cpu()
         assert F.context(g.edges['plays'].data['e']) == F.cpu()
         for ntype in g.ntypes:
-            assert F.context(g.batch_num_nodes[ntype]) == F.cpu()
+            assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
         for etype in g.canonical_etypes:
-            assert F.context(g.batch_num_edges[etype]) == F.cpu()
+            assert F.context(g.batch_num_edges(etype)) == F.cpu()
         with pytest.raises(DGLError):
             g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
         with pytest.raises(DGLError):

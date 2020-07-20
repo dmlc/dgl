@@ -185,6 +185,7 @@ def test_pickling_graph():
     assert new_g._reduce_func.out_field == 'x'
 
     # test batched graph with partial set case
+    '''
     g2 = dgl.DGLGraph()
     g2.add_nodes(4)
     src2 = F.tensor([0, 1])
@@ -209,6 +210,7 @@ def test_pickling_graph():
     new_g, new_g2 = dgl.unbatch(bg2)
     _assert_is_identical(g, new_g)
     _assert_is_identical(g2, new_g2)
+    '''
 
     # readonly graph
     g = dgl.DGLGraph([(0, 1), (1, 2)], readonly=True)
@@ -235,7 +237,7 @@ def test_pickling_nodeflow():
     new_nf = _reconstruct_pickle(nf)
     _assert_is_identical_nodeflow(nf, new_nf)
 
-def test_pickling_batched_graph():
+def _test_pickling_batched_graph():
     glist = [nx.path_graph(i + 5) for i in range(5)]
     glist = [dgl.DGLGraph(g) for g in glist]
     bg = dgl.batch(glist)
@@ -269,7 +271,7 @@ def test_pickling_heterograph(idtype):
     _assert_is_identical_hetero(g, new_g)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-def test_pickling_batched_heterograph():
+def _test_pickling_batched_heterograph():
     # copied from test_heterograph.create_test_heterograph()
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     wishes_nx = nx.DiGraph()
