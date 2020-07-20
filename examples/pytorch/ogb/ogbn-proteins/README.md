@@ -7,6 +7,7 @@
 - DGL 0.4.3
 - PyTorch 1.4.0
 - OGB 1.2.0
+- Tensorboard 2.1.1
 
 ## Usage
 
