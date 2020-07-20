@@ -56,7 +56,7 @@ def test_hetero_linegraph(idtype):
                           np.array([0, 1, 2, 4]))
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csr', idtype=idtype)
     lg = dgl.line_heterograph(g)
     assert lg.number_of_nodes() == 5
@@ -67,7 +67,7 @@ def test_hetero_linegraph(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csc', idtype=idtype)
     lg = dgl.line_heterograph(g)
     assert lg.number_of_nodes() == 5
@@ -643,7 +643,7 @@ def test_compact(idtype):
         g3, always_preserve=F.tensor([1, 7], idtype))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3.idtype == idtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 7])
     _check(g3, new_g3, induced_nodes)
@@ -663,7 +663,7 @@ def test_compact(idtype):
     new_g1, new_g2 = dgl.compact_graphs(
         [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=idtype)})
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}    
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert new_g1.idtype == idtype
     assert new_g2.idtype == idtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
@@ -676,7 +676,7 @@ def test_compact(idtype):
         [g3, g4], always_preserve=F.tensor([1, 7], dtype=idtype))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3.idtype == idtype
     assert new_g4.idtype == idtype
 
@@ -924,11 +924,67 @@ def _test_cast():  # disabled; prepare for DGLGraph/HeteroGraph merge
     assert F.array_equal(g2src, gsrc)
     assert F.array_equal(g2dst, gdst)
 
+@parametrize_dtype
+def test_add_edges(idtype):
+    pass
+
+@parametrize_dtype
+def test_add_nodes(idtype):
+    # homogeneous Graphs
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([1,1,1], dtype=idtype), ctx=F.ctx())
+    new_g = dgl.add_nodes(g, 1)
+    assert g.number_of_nodes() == 3
+    assert new_g.number_of_nodes() == 4
+    assert F.array_equal(new_g.ndata['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
+
+    # zero node graph
+    g = dgl.graph([], num_nodes=3, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([1,1,1], dtype=idtype), ctx=F.ctx())
+    g = dgl.add_nodes(g, 1, data={'h' : F.copy_to(F.tensor([2],  dtype=idtype), ctx=F.ctx())})
+    assert g.number_of_nodes() == 4
+    assert F.array_equal(g.ndata['h'], F.tensor([1, 1, 1, 2], dtype=idtype))
+
+    # bipartite graph
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    g = dgl.add_nodes(g, 2, data={'h' : F.copy_to(F.tensor([2, 2],  dtype=idtype), ctx=F.ctx())}, ntype='user')
+    assert g.number_of_nodes('user') == 4
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([0, 0, 2, 2], dtype=idtype))
+    g = dgl.add_nodes(g, 2, ntype='game')
+    assert g.number_of_nodes('game') == 5
+
+    # heterogeneous graph
+    g = create_test_heterograph4(idtype)
+    g = dgl.add_nodes(g, 1, ntype='user')
+    g = dgl.add_nodes(g, 2, data={'h' : F.copy_to(F.tensor([2, 2],  dtype=idtype), ctx=F.ctx())}, ntype='game')
+    g = dgl.add_nodes(g, 0, ntype='developer')
+    assert g.number_of_nodes('user') == 4
+    assert g.number_of_nodes('game') == 4
+    assert g.number_of_nodes('developer') == 2
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
+
+@parametrize_dtype
+def test_remove_edges(idtype):
+    pass
+
+@parametrize_dtype
+def test_remove_nodes(idtype):
+    pass
+
+@parametrize_dtype
+def test_add_selfloop(idtype):
+    pass
+
+@parametrize_dtype
+def test_remove_selfloop(idtype):
+    pass
+
 if __name__ == '__main__':
-    test_reorder_nodes()
+    #test_reorder_nodes()
     # test_line_graph()
     # test_no_backtracking()
-    test_reverse()
+    #test_reverse()
     # test_reverse_shared_frames()
     # test_simple_graph()
     # test_bidirected_graph()
@@ -941,8 +997,14 @@ if __name__ == '__main__':
     # test_metis_partition()
     # test_hetero_linegraph('int32')
     # test_compact()
-    test_to_simple("int32")
+    #test_to_simple("int32")
     # test_in_subgraph("int32")
     # test_out_subgraph()
     # test_to_block("int32")
     # test_remove_edges()
+    test_add_edges(F.int32)
+    test_add_nodes(F.int32)
+    test_remove_edges(F.int32)
+    test_remove_nodes(F.int32)
+    test_add_selfloop(F.int32)
+    test_remove_selfloop(F.int32)

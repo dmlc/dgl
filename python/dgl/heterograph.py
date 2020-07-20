@@ -561,7 +561,7 @@ class DGLHeteroGraph(object):
             return
 
         assert len(u) == len(v) or len(u) == 1 or len(v) == 1, \
-            'need the number of source nodes and the number of destination nodes are same, ' \
+            'The number of source nodes and the number of destination nodes should be same, ' \
             'or either the number of source nodes or the number of destination nodes is 1.'
 
         if len(u) == 1 and len(v) > 1:
