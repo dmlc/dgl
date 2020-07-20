@@ -194,4 +194,3 @@ def exit_client():
     """
     shutdown_servers()
     finalize_client()
-
