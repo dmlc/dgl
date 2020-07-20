@@ -209,7 +209,11 @@ def split(x, sizes_or_sections, dim):
         return nd.split(x, sizes_or_sections, axis=dim)
 
 def repeat(input, repeats, dim):
-    return nd.repeat(input, repeats, axis=dim)
+    if isinstance(repeats, nd.NDArray):
+        return nd.array(np.repeat(input.asnumpy(), repeats.asnumpy(), axis=dim),
+                        ctx=input.context)
+    else:
+        return nd.repeat(input, repeats, axis=dim)
 
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
@@ -275,9 +279,8 @@ def uniform(shape, dtype, ctx, low, high):
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):
-        max_len = as_scalar(input.max())
-    else:
-        max_len = builtins.max(lengths)
+        lengths = list(lengths.asnumpy())
+    max_len = builtins.max(lengths)
 
     if l_min is not None:
         max_len = builtins.max(max_len, l_min)

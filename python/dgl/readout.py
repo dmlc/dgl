@@ -506,7 +506,7 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     batch_num_objs = getattr(graph, batch_num_objs_attr)(ntype_or_etype)
     batch_size = len(batch_num_objs)
 
-    length = max(max(batch_num_objs), k)
+    length = max(max(F.asnumpy(batch_num_objs)), k)
     fill_val = -float('inf') if descending else float('inf')
     feat_ = F.pad_packed_tensor(feat, batch_num_objs, fill_val, l_min=k)
 
