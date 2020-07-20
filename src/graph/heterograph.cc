@@ -311,9 +311,9 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
   }
 
-  auto ret = HeteroGraphPtr(new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
-  auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
-  hg_index->shared_mem_ = mem;
+  auto ret = std::shared_ptr<HeteroGraph>(
+      new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
+  ret->shared_mem_ = mem;
   return ret;
 }
 
