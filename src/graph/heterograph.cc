@@ -266,7 +266,7 @@ std::string HeteroGraph::SharedMemName() const {
   return shared_mem_ ? shared_mem_->GetName() : "";
 #else
   return "";
-#endif  //_WIN32
+#endif  // _WIN32
 }
 
 HeteroGraphPtr HeteroGraph::CopyToSharedMem(
