@@ -830,7 +830,7 @@ class HeteroGraphIndex(ObjectBase):
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
-    def format_in_use(self, etype):
+    def format(self):
         """Return the sparse formats in use of the given edge/relation type.
 
         Parameters
@@ -842,46 +842,33 @@ class HeteroGraphIndex(ObjectBase):
         -------
         list of string : return all the formats currently in use (could be multiple).
         """
-        format_code = _CAPI_DGLHeteroGetFormatInUse(self, etype)
-        ret = []
-        if format_code & 1:
-            ret.append('coo')
-        format_code >>= 1
-        if format_code & 1:
-            ret.append('csr')
-        format_code >>= 1
-        if format_code & 1:
-            ret.append('csc')
-        return ret
+        format_all = _CAPI_DGLHeteroGetFormatAll(self)
+        format_in_use = _CAPI_DGLHeteroGetFormatInUse(self)
+        created = []
+        not_created = []
+        if format_all & 1:
+            if format_in_use & 1:
+                created.append('coo')
+            else:
+                not_created.append('coo')
+        format_all >>= 1
+        format_in_use >>= 1
+        if format_all & 1:
+            if format_in_use & 1:
+                created.append('csr')
+            else:
+                not_created.append('csr')
+        if format_all & 1:
+            if format_in_use & 1:
+                created.append('csc')
+            else:
+                not_created.append('csc')
+        return {
+            'created': created,
+            'not created': not_created
+        }
 
-    def restrict_format(self, etype):
-        """Return restrict sparse format of the given edge/relation type.
-
-        Parameters
-        ----------
-        etype : int
-            The edge/relation type.
-
-        Returns
-        -------
-        string : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
-        """
-        ret = _CAPI_DGLHeteroGetRestrictFormat(self, etype)
-        return ret
-
-    def request_format(self, sparse_format, etype):
-        """Create a sparse matrix representation in given format immediately.
-
-        Parameters
-        ----------
-        etype : int
-            The edge/relation type.
-        sparse_format : str
-            ``'coo'``, ``'csr'``, or ``'csc'``
-        """
-        _CAPI_DGLHeteroRequestFormat(self, sparse_format, etype)
-
-    def to_format(self, restrict_format):
+    def to_format(self, format_list):
         """Return a clone graph index but stored in the given sparse format.
 
         If 'any' is given, the restrict formats of the returned graph index
@@ -896,7 +883,11 @@ class HeteroGraphIndex(ObjectBase):
         -------
         A new graph index.
         """
-        return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
+        return _CAPI_DGLHeteroGetFormatGraph(self, format_list)
+
+    def create_format(self):
+        """"""
+        return _CAPI_DGLHeteroCreateFormat(self)
 
     @utils.cached_member(cache='_cache', prefix='reverse')
     def reverse(self):

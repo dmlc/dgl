@@ -206,7 +206,7 @@ class HeteroGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
-  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t restrict_formats) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 

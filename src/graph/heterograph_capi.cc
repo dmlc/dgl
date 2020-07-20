@@ -523,37 +523,48 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     *rv = ret_list;
 });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRestrictFormat")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef hg = args[0];
-    dgl_type_t etype = args[1];
-    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    *rv = hg->GetRelationGraph(etype)->GetRestrictFormat();
-});
-
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    dgl_type_t etype = args[1];
-    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    *rv = hg->GetRelationGraph(etype)->GetFormatInUse();
+    List<Value> format_list;
+    for (std::string format : hg->GetRelationGraph(0)->GetFormatInUse()) {
+      format_list.push_back(Value(MakeValue(format)));
+    }
+    *rv = format_list;
 });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroRequestFormat")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatAll")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    const std::string sparse_format = args[1];
-    dgl_type_t etype = args[2];
-    CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
-    bg->GetFormat(ParseSparseFormat(sparse_format));
+    List<Value> format_list;
+    for (std::string format : hg->GetRelationGraph(0)->GetFormatAll()) {
+      format_list.push_back(Value(MakeValue(format)));
+    }
+    *rv = format_list;
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    std::vector<std::string> format_all = hg->GetRelationGraph(0)->GetFormatAll();
+    for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
+      auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
+      for (std::string format : format_all) {
+        bg->GetFormat(ParseSparseFormat(sparse_format));
+      }
+    }
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    const std::string restrict_format = args[1];
-    auto hgptr = hg->GetGraphInFormat(ParseSparseFormat(restrict_format));
+    List<Value> formats = args[1];
+    std::vector<SparseFormat> formats_vec;
+    for (Value val : formats) {
+      std::string fmt = val->data;
+      formats_vec.push_back(ParseSparseFormat(fmt));
+    }
+    auto hgptr = hg->GetGraphInFormat(formats_vec);
     *rv = HeteroGraphRef(hgptr);
 });
 
