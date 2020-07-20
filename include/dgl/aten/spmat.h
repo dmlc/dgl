@@ -49,6 +49,20 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
   return SparseFormat::kAny;
 }
 
+// Create string from sparse format.
+inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
+  if (sparse_format == SparseFormat::kCOO)
+    return std::string("coo");
+  else if (sparse_format == SparseFormat::kCSR)
+    return std::string("csr");
+  else if (sparse_format == SparseFormat::kCSC)
+    return std::string("csc");
+  else if (sparse_format == SparseFormat::kAny)
+    return std::string("any");
+  else
+    return std::string("auto");
+}
+
 inline std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
   std::vector<SparseFormat> ret;
   if (code & coo_code)
@@ -60,8 +74,19 @@ inline std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
   return ret;
 }
 
-inline dgl_format_code_t SparseFormatsToCode(
-    const std::vector<SparseFormat>& formats) {
+inline std::string CodeToStr(dgl_format_code_t code) {
+  std::string ret = "";
+  if (code & coo_code)
+    ret += "coo ";
+  if (code & csr_code)
+    ret += "csr ";
+  if (code & csc_code)
+    ret += "csc ";
+  return ret;
+}
+
+inline dgl_format_code_t
+SparseFormatsToCode(const std::vector<SparseFormat> &formats) {
   dgl_format_code_t ret = 0;
   for (auto format : formats) {
     switch (format) {
@@ -79,20 +104,6 @@ inline dgl_format_code_t SparseFormatsToCode(
     }
   }
   return ret;
-}
-
-// Create string from sparse format.
-inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
-  if (sparse_format == SparseFormat::kCOO)
-    return std::string("coo");
-  else if (sparse_format == SparseFormat::kCSR)
-    return std::string("csr");
-  else if (sparse_format == SparseFormat::kCSC)
-    return std::string("csc");
-  else if (sparse_format == SparseFormat::kAny)
-    return std::string("any");
-  else
-    return std::string("auto");
 }
 
 // Sparse matrix object that is exposed to python API.

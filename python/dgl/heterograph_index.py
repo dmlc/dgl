@@ -846,23 +846,12 @@ class HeteroGraphIndex(ObjectBase):
         format_in_use = _CAPI_DGLHeteroGetFormatInUse(self)
         created = []
         not_created = []
-        if format_all & 1:
-            if format_in_use & 1:
-                created.append('coo')
-            else:
-                not_created.append('coo')
-        format_all >>= 1
-        format_in_use >>= 1
-        if format_all & 1:
-            if format_in_use & 1:
-                created.append('csr')
-            else:
-                not_created.append('csr')
-        if format_all & 1:
-            if format_in_use & 1:
-                created.append('csc')
-            else:
-                not_created.append('csc')
+        for format in ['coo', 'csr', 'csc']:
+            if format in format_all:
+                if format in format_in_use:
+                    created.append(format)
+                else:
+                    not_created.append(format)
         return {
             'created': created,
             'not created': not_created
@@ -885,7 +874,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetFormatGraph(self, format_list)
 
-    def create_format(self):
+    def create_format_(self):
         """"""
         return _CAPI_DGLHeteroCreateFormat(self)
 
@@ -969,6 +958,8 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
     -------
     HeteroGraphIndex
     """
+    if restrict_format == 'auto':
+        restrict_format = ['csr', 'csc', 'coo']
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(row), F.to_dgl_nd(col),

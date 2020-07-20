@@ -1284,9 +1284,9 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
 
 UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   if (inplace)
-    if (restrict_formats_ & csc_code)
-      LOG(FATAL) << "The graph have restricted sparse format " << restrict_formats_ <<
-        ", cannot create CSC matrix.";
+    if (!(restrict_formats_ & csc_code))
+      LOG(FATAL) << "The graph have restricted sparse format " <<
+        CodeToStr(restrict_formats_) << ", cannot create CSC matrix.";
   CSRPtr ret = in_csr_;
   if (!in_csr_->defined()) {
     if (out_csr_->defined()) {
@@ -1313,9 +1313,9 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   if (inplace)
-    if (restrict_formats_ & csr_code)
-      LOG(FATAL) << "The graph have restricted sparse format " << restrict_formats_ <<
-        ", cannot create CSR matrix.";
+    if (!(restrict_formats_ & csr_code))
+      LOG(FATAL) << "The graph have restricted sparse format " <<
+        CodeToStr(restrict_formats_) << ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
   if (!out_csr_->defined()) {
     if (in_csr_->defined()) {
@@ -1341,9 +1341,9 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
 /* !\brief Return coo. If not exist, create from csr.*/
 UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
   if (inplace)
-    if (restrict_formats_ & coo_code)
-      LOG(FATAL) << "The graph have restricted sparse format " << restrict_formats_ <<
-        ", cannot create COO matrix.";
+    if (!(restrict_formats_ & coo_code))
+      LOG(FATAL) << "The graph have restricted sparse format " <<
+        CodeToStr(restrict_formats_) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
   if (!coo_->defined()) {
     if (in_csr_->defined()) {
@@ -1423,9 +1423,9 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t restrict_formats) c
   return HeteroGraphPtr(
     // TODO(xiangsx) Make it as graph storage.Clone()
     new UnitGraph(meta_graph_,
-                  (in_csr_->defined()) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
-                  (out_csr_->defined()) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
-                  (coo_->defined()) ? COOPtr(new COO(*coo_)) : nullptr,
+                  (in_csr_->defined() && (restrict_formats & csc_code)) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
+                  (out_csr_->defined() && (restrict_formats & csr_code)) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
+                  (coo_->defined() && (restrict_formats & coo_code)) ? COOPtr(new COO(*coo_)) : nullptr,
                   restrict_formats));
 }
 
