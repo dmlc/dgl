@@ -112,6 +112,7 @@ def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
     """
+    labels = labels.long()
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
 def evaluate(model, g, inputs, labels, val_nid, batch_size, device):

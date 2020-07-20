@@ -192,8 +192,8 @@ def run(args, device, data):
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
-                    epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
+                print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
+                    g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
             start = time.time()
 
         toc = time.time()
@@ -205,7 +205,7 @@ def run(args, device, data):
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
             eval_acc = evaluate(model.module, g, g.ndata['features'],
-                                g.ndata['labels'], val_nid, 10000, device)
+                                g.ndata['labels'], val_nid, args.batch_size_eval, device)
             print('Part {}, Eval Acc {:.4f}, time: {:.4f}'.format(g.rank(), eval_acc, time.time() - start))
 
     profiler.stop()
@@ -258,6 +258,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-layers', type=int, default=2)
     parser.add_argument('--fan-out', type=str, default='10,25')
     parser.add_argument('--batch-size', type=int, default=1000)
+    parser.add_argument('--batch-size-eval', type=int, default=100000)
     parser.add_argument('--log-every', type=int, default=20)
     parser.add_argument('--eval-every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
