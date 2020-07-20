@@ -213,26 +213,19 @@ def test_softmax(g, idtype):
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 def test_broadcast(idtype, g):
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(10))
-    feat0 = F.randn((1, 40))
-    ground_truth = F.stack([feat0] * g0.number_of_nodes(), 0)
-    assert F.allclose(dgl.broadcast_nodes(g0, feat0), ground_truth)
+    g = g.astype(idtype).to(F.ctx())
+    gfeat = F.randn((g.batch_size, 3))
 
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(3))
-    g2 = dgl.DGLGraph()
-    g3 = dgl.DGLGraph(nx.path_graph(12))
-    bg = dgl.batch([g0, g1, g2, g3])
-    feat1 = F.randn((1, 40))
-    feat2 = F.randn((1, 40))
-    feat3 = F.randn((1, 40))
-    ground_truth = F.cat(
-        [feat0] * g0.number_of_nodes() +\
-        [feat1] * g1.number_of_nodes() +\
-        [feat2] * g2.number_of_nodes() +\
-        [feat3] * g3.number_of_nodes(), 0
-    )
-    assert F.allclose(dgl.broadcast_nodes(
-        bg, F.cat([feat0, feat1, feat2, feat3], 0)
-    ), ground_truth)
+    # Test.0: broadcast_nodes
+    g.ndata['h'] = dgl.broadcast_nodes(g, gfeat)
+    subg = dgl.unbatch(g)
+    for i, sg in enumerate(subg):
+        assert F.allclose(sg.ndata['h'],
+                F.repeat(F.reshape(gfeat[i], (1,3)), sg.number_of_nodes(), dim=0))
+
+    # Test.1: broadcast_edges
+    g.edata['h'] = dgl.broadcast_edges(g, gfeat)
+    subg = dgl.unbatch(g)
+    for i, sg in enumerate(subg):
+        assert F.allclose(sg.edata['h'],
+                F.repeat(F.reshape(gfeat[i], (1,3)), sg.number_of_edges(), dim=0))

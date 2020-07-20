@@ -449,7 +449,7 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     --------
     broadcast_nodes
     """
-    return F.repeat(feat, graph.batch_num_edges(etype), dim=0)
+    return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
 def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     """Internal function to take graph-wise top-k node/edge features of
@@ -539,7 +539,7 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
            topk_indices
 
-def topk_nodes(graph, feat, k, descending=True, idx=None):
+def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
     """Return graph-wise top-k node features of field :attr:`feat` in
     :attr:`graph` ranked by keys at given index :attr:`idx`. If :attr:
     `descending` is set to False, return the k smallest elements instead.
