@@ -1,4 +1,7 @@
-# DGL for OGB-proteins
+# DGL for ogbn-proteins
+
+## Models
+[MWE-GCN and MWE-DGCN](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf) are GCN models designed for graphs whose edges contain multi-dimensional edge weights that indicate the strengths of the relations represented by the edges.
 
 ## Dependencies
 - DGL 0.4.3
