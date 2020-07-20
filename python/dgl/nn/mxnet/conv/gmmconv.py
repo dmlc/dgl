@@ -53,7 +53,7 @@ class GMMConv(nn.Block):
                  bias=True):
         super(GMMConv, self).__init__()
 
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(None, in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
@@ -115,7 +115,7 @@ class GMMConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         """
-        feat_src, feat_dst = expand_as_pair(graph, feat)
+        feat_src, feat_dst = expand_as_pair(feat, graph)
         with graph.local_scope():
             graph.srcdata['h'] = self.fc(feat_src).reshape(
                 -1, self._n_kernels, self._out_feats)

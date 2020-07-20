@@ -8,7 +8,7 @@ from scipy import sparse
 
 from ._ffi.function import _init_api
 from .graph import DGLGraph
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLHeteroGraph, DGLBlock
 from . import ndarray as nd
 from . import backend as F
 from .graph_index import from_coo

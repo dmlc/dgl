@@ -46,7 +46,7 @@ class GMMConv(nn.Module):
                  residual=False,
                  bias=True):
         super(GMMConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(None, in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
@@ -111,7 +111,7 @@ class GMMConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(graph, feat)
+            feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = self.fc(feat_src).view(-1, self._n_kernels, self._out_feats)
             E = graph.number_of_edges()
             # compute gaussian weight

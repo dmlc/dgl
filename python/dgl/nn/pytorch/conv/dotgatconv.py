@@ -30,7 +30,7 @@ class DotGatConv(nn.Module):
                  out_feats
                  ):
         super(DotGatConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(None, in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
 
         if isinstance(in_feats, tuple):

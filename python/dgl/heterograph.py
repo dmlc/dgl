@@ -282,7 +282,11 @@ class DGLHeteroGraph(object):
             self._msg_frames.append(frame)
 
     def __getstate__(self):
-        return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
+        if self.is_block:
+            ntypes = (list(self._srctypes_invmap.keys()), list(self._dsttypes_invmap.keys()))
+        else:
+            ntypes = self._ntypes
+        return self._graph, ntypes, self._etypes, self._node_frames, self._edge_frames
 
     def __setstate__(self, state):
         # Compatibility check

@@ -360,7 +360,7 @@ def test_gat_conv():
     seed_nodes = np.unique(g.edges()[1].numpy())
     block = dgl.to_block(g, seed_nodes)
     gat = nn.GATConv(5, 2, 4)
-    feat = F.randn((100, 5))
+    feat = F.randn((block.number_of_src_nodes(), 5))
     h = gat(block, feat)
     assert h.shape == (block.number_of_dst_nodes(), 4, 2)
 
@@ -391,7 +391,7 @@ def test_sage_conv(aggre_type):
     seed_nodes = np.unique(g.edges()[1].numpy())
     block = dgl.to_block(g, seed_nodes)
     sage = nn.SAGEConv(5, 10, aggre_type)
-    feat = F.randn((100, 5))
+    feat = F.randn((block.number_of_src_nodes(), 5))
     h = sage(block, feat)
     assert h.shape[0] == block.number_of_dst_nodes()
     assert h.shape[-1] == 10
@@ -463,9 +463,9 @@ def test_gin_conv(aggregator_type):
         tf.keras.layers.Dense(12),
         aggregator_type
     )
-    feat = F.randn((100, 5))
+    feat = F.randn((block.number_of_src_nodes(), 5))
     h = gin(block, feat)
-    assert h.shape == (100, 12)
+    assert h.shape == (block.number_of_dst_nodes(), 12)
 
 def myagg(alist, dsttype):
     rst = alist[0]

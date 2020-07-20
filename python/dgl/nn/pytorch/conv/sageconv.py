@@ -57,7 +57,7 @@ class SAGEConv(nn.Module):
                  activation=None):
         super(SAGEConv, self).__init__()
 
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(None, in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         self.norm = norm

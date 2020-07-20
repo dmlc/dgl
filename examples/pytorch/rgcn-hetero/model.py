@@ -101,7 +101,7 @@ class RelGraphConvLayer(nn.Module):
                      for i, w in enumerate(th.split(weight, 1, dim=0))}
         else:
             wdict = {}
-        inputs_src, inputs_dst = dglnn.expand_as_pair(g, inputs)
+        inputs_src, inputs_dst = dglnn.expand_as_pair(inputs, g)
         hs = self.conv(g, inputs, mod_kwargs=wdict)
 
         def _apply(ntype, h):

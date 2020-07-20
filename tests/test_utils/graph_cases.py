@@ -39,7 +39,7 @@ def bipartite_full():
 
 @register_case(['block'])
 def block():
-    g = dgl.DGLGraph(nx.path_graph(5))
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
     return dgl.to_block(g, [1, 2, 3, 4])
 
 def random_dglgraph(size):

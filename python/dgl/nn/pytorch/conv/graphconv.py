@@ -134,7 +134,7 @@ class GraphConv(nn.Module):
             The output feature
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(graph, feat)
+            feat_src, feat_dst = expand_as_pair(feat, graph)
 
             if self._norm == 'both':
                 degs = graph.out_degrees().to(feat_src.device).float().clamp(min=1)
