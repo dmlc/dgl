@@ -638,45 +638,42 @@ class DGLHeteroGraph(object):
     #################################################################
     @property
     def batch_size(self):
-        if len(self.ntypes) == 1:
-            return len(self.batch_num_nodes)
-        else:
-            return len(next(iter(self.batch_num_nodes.values())))
+        return len(self.batch_num_nodes(self.ntypes[0]))
 
-    @property
-    def batch_num_nodes(self):
+    def batch_num_nodes(self, ntype=None):
         if self._batch_num_nodes is None:
             self._batch_num_nodes = {}
-            for ntype in self.ntypes:
-                bne = F.copy_to(F.tensor([self.number_of_nodes(ntype)], F.int64), self.device)
-                self._batch_num_nodes[ntype] = bne
-        if len(self._batch_num_nodes) == 1:
-            return next(iter(self._batch_num_nodes.values()))
-        else:
-            return self._batch_num_nodes
+            for ty in self.ntypes:
+                bnn = F.copy_to(F.tensor([self.number_of_nodes(ty)], F.int64), self.device)
+                self._batch_num_nodes[ty] = bnn
+        if ntype is None:
+            if len(self.ntypes) != 1:
+                raise DGLError('Node type name must be specified if there are more than one '
+                               'node types.')
+            ntype = self.ntypes[0]
+        return self._batch_num_nodes[ntype]
 
-    @batch_num_nodes.setter
-    def batch_num_nodes(self, val):
+    def set_batch_num_nodes(self, val):
         if not isinstance(val, Mapping):
             if len(self.ntypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple node types.')
             val = {self.ntypes[0] : val}
         self._batch_num_nodes = val
 
-    @property
-    def batch_num_edges(self):
+    def batch_num_edges(self, etype=None):
         if self._batch_num_edges is None:
             self._batch_num_edges = {}
-            for etype in self.canonical_etypes:
-                bne = F.copy_to(F.tensor([self.number_of_edges(etype)], F.int64), self.device)
-                self._batch_num_edges[etype] = bne
-        if len(self._batch_num_edges) == 1:
-            return next(iter(self._batch_num_edges.values()))
-        else:
-            return self._batch_num_edges
+            for ty in self.canonical_etypes:
+                bne = F.copy_to(F.tensor([self.number_of_edges(ty)], F.int64), self.device)
+                self._batch_num_edges[ty] = bne
+        if etype is None:
+            if len(self.etypes) != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+            etype = self.canonical_etypes[0]
+        return self._batch_num_edges[etype]
 
-    @batch_num_edges.setter
-    def batch_num_edges(self, val):
+    def set_batch_num_edges(self, val):
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple edge types.')

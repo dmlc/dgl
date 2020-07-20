@@ -59,7 +59,6 @@ def sum_nodes(graph, feat, weight=None, ntype=None):
     >>> g1.ndata['h'] = th.tensor([1., 2.])
     >>> g2 = dgl.graph(([0, 1], [1, 2]))              # Graph 2
     >>> g2.ndata['h'] = th.tensor([1., 2., 3.])
-
     Sum over one graph:
 
     >>> dgl.sum_nodes(g1, 'h')
@@ -84,7 +83,10 @@ def sum_nodes(graph, feat, weight=None, ntype=None):
     x = graph.nodes[ntype].data[feat]
     if weight is not None:
         x = x * graph.nodes[ntype].data[weight]
-    return segment.segment_reduce(graph.batch_num_nodes, x)
+    if ntype is None:
+        return segment.segment_reduce(graph.batch_num_nodes, x)
+    else:
+        return segment.segment_reduce(graph.batch_num_nodes[ntype], x)
 
 def sum_edges(graph, feat, weight=None, etype=None):
     """
@@ -93,7 +95,11 @@ def sum_edges(graph, feat, weight=None, etype=None):
     x = graph.edges[etype].data[feat]
     if weight is not None:
         x = x * graph.edges[etype].data[weight]
-    return segment.segment_reduce(graph.batch_num_edges, x)
+    if etype is None:
+        return segment.segment_reduce(graph.batch_num_edges, x)
+    else:
+        etype = graph.to_canonical_etype(etype)
+        return segment.segment_reduce(graph.batch_num_edges[etype], x)
 
 def mean_nodes(graph, feat, weight=None, ntype=None):
     """
@@ -102,7 +108,10 @@ def mean_nodes(graph, feat, weight=None, ntype=None):
     x = graph.nodes[ntype].data[feat]
     if weight is not None:
         x = x * graph.nodes[ntype].data[weight]
-    return segment.segment_reduce(graph.batch_num_nodes, x, reducer='mean')
+    if ntype is None:
+        return segment.segment_reduce(graph.batch_num_nodes, x, reducer='mean')
+    else:
+        return segment.segment_reduce(graph.batch_num_nodes[ntype], x, reducer='mean')
 
 def mean_edges(graph, feat, weight=None, etype=None):
     """
@@ -111,7 +120,11 @@ def mean_edges(graph, feat, weight=None, etype=None):
     x = graph.edges[etype].data[feat]
     if weight is not None:
         x = x * graph.edges[etype].data[weight]
-    return segment.segment_reduce(graph.batch_num_edges, x, reducer='mean')
+    if etype is None:
+        return segment.segment_reduce(graph.batch_num_edges, x, reducer='mean')
+    else:
+        etype = graph.to_canonical_etype(etype)
+        return segment.segment_reduce(graph.batch_num_edges[etype], x, reducer='mean')
 
 def max_nodes(graph, feat, weight=None, ntype=None):
     """
@@ -120,7 +133,10 @@ def max_nodes(graph, feat, weight=None, ntype=None):
     x = graph.nodes[ntype].data[feat]
     if weight is not None:
         x = x * graph.nodes[ntype].data[weight]
-    return segment.segment_reduce(graph.batch_num_nodes, x, reducer='max')
+    if ntype is None:
+        return segment.segment_reduce(graph.batch_num_nodes, x, reducer='max')
+    else:
+        return segment.segment_reduce(graph.batch_num_nodes[ntype], x, reducer='max')
 
 def max_edges(graph, feat, weight=None, etype=None):
     """
@@ -129,35 +145,44 @@ def max_edges(graph, feat, weight=None, etype=None):
     x = graph.edges[etype].data[feat]
     if weight is not None:
         x = x * graph.edges[etype].data[weight]
-    return segment.segment_reduce(graph.batch_num_edges, x, reducer='max')
+    if etype is None:
+        return segment.segment_reduce(graph.batch_num_edges, x, reducer='max')
+    else:
+        etype = graph.to_canonical_etype(etype)
+        return segment.segment_reduce(graph.batch_num_edges[etype], x, reducer='max')
 
 def softmax_nodes(graph, feat, ntype=None):
     """
     TBD
     """
     x = graph.nodes[ntype].data[feat]
-    return segment.segment_softmax(graph.batch_num_nodes, x)
+    if ntype is None:
+        return segment.segment_softmax(graph.batch_num_nodes, x)
+    else:
+        return segment.segment_softmax(graph.batch_num_nodes[ntype], x)
 
-def softmax_edges(graph, feat):
+def softmax_edges(graph, feat, etype=None):
     """
     TBD
     """
     x = graph.edges[etype].data[feat]
-    return segment.segment_softmax(graph.batch_num_edges, x)
+    if etype is None:
+        return segment.segment_softmax(graph.batch_num_edges, x)
+    else:
+        etype = graph.to_canonical_etype(etype)
+        return segment.segment_softmax(graph.batch_num_edges[etype], x)
 
 def broadcast_nodes(graph, feat, ntype=None):
     """
     TBD
     """
-    x = graph.nodes[ntype].data[feat]
-    return F.repeat(x, graph.batch_num_nodes, dim=0)
+    return F.repeat(feat, graph.batch_num_nodes, dim=0)
 
 def broadcast_edges(graph, feat, etype=None):
     """
     TBD
     """
-    x = graph.edges[etype].data[feat]
-    return F.repeat(x, graph.batch_num_edges, dim=0)
+    return F.repeat(feat, graph.batch_num_edges, dim=0)
 
 def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     """Internal function to take graph-wise top-k node/edge features of

@@ -34,7 +34,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     Thus, the result is also a heterograph and has the same set of relations as the inputs.
     
     The numbers of nodes and edges of the input graphs are accessible via the
-    :attr:`DGLGraph.batch_num_nodes` and :attr:`DGLGraph.batch_num_edges` attributes
+    :func:`DGLGraph.batch_num_nodes` and :func:`DGLGraph.batch_num_edges` attributes
     of the result graph. For homographs, they are 1D integer tensors, with each element
     being the number of nodes/edges of the corresponding input graph. For
     heterographs, they are dictionaries of 1D integer tensors, with node
@@ -83,9 +83,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
           edata_schemes={})
     >>> bg.batch_size
     2
-    >>> bg.batch_num_nodes
+    >>> bg.batch_num_nodes()
     tensor([4, 3])
-    >>> bg.batch_num_edges
+    >>> bg.batch_num_edges()
     tensor([3, 4])
     >>> bg.edges()
     (tensor([0, 1, 2, 4, 4, 4, 5], tensor([1, 2, 3, 4, 5, 6, 4]))
@@ -95,9 +95,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     >>> bbg = dgl.batch([bg, bg])
     >>> bbg.batch_size
     4
-    >>> bbg.batch_num_nodes
+    >>> bbg.batch_num_nodes()
     tensor([4, 3, 4, 3])
-    >>> bbg.batch_num_edges
+    >>> bbg.batch_num_edges()
     tensor([3, 4, 3, 4])
     
     Batch graphs with feature data
@@ -135,9 +135,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
           metagraph=[('drug', 'game')])
     >>> bhg.batch_size
     2
-    >>> bhg.batch_num_nodes
+    >>> bhg.batch_num_nodes()
     {'user' : tensor([2, 1]), 'game' : tensor([1, 3])}
-    >>> bhg.batch_num_edges
+    >>> bhg.batch_num_edges()
     {('user', 'plays', 'game') : tensor([2, 3])}
     
     See Also
@@ -185,22 +185,16 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
     
     # Compute batch num nodes
-    if len(graphs[0].ntypes) == 1:
-        retg.batch_num_nodes = F.cat([g.batch_num_nodes for g in graphs], 0)
-    else:
-        batch_num_nodes = {}
-        for ntype in graphs[0].ntypes:
-            batch_num_nodes[ntype] = F.cat([g.batch_num_nodes[ntype] for g in graphs], 0)
-        retg.batch_num_nodes = batch_num_nodes
+    bnn = {}
+    for ntype in graphs[0].ntypes:
+        bnn[ntype] = F.cat([g.batch_num_nodes(ntype) for g in graphs], 0)
+    retg.set_batch_num_nodes(bnn)
 
     # Compute batch num edges
-    if len(graphs[0].etypes) == 1:
-        retg.batch_num_edges = F.cat([g.batch_num_edges for g in graphs], 0)
-    else:
-        batch_num_edges = {}
-        for etype in graphs[0].canonical_etypes:
-            batch_num_edges[etype] = F.cat([g.batch_num_edges[etype] for g in graphs], 0)
-        retg.batch_num_edges = batch_num_edges
+    batch_num_edges = {}
+    for etype in graphs[0].canonical_etypes:
+        batch_num_edges[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
+    retg.set_batch_num_edges(batch_num_edges)
 
     # Batch node feature
     if ndata is not None:
@@ -252,8 +246,8 @@ def unbatch(g, node_split=None, edge_split=None):
     """Revert the batch operation by split the given graph into a list of small ones.
 
     This is the reverse operation of :func:``dgl.batch``. If the ``node_split``
-    or the ``edge_split`` is not given, it uses the ``batch_num_nodes``
-    and ``batch_num_edges`` attributes of the input graph.
+    or the ``edge_split`` is not given, it uses the :func:`DGLGraph.batch_num_nodes`
+    and :func:`DGLGraph.batch_num_edges` of the input graph.
 
     If the ``node_split`` or the ``edge_split`` arguments are given,
     it will partition the graph according to the given segments. One must assure
@@ -261,8 +255,9 @@ def unbatch(g, node_split=None, edge_split=None):
     belong to the i^th graph. Otherwise, an error will be thrown.
 
     The function supports heterograph input, in which case the two split
-    section arguments shall be of dictionary type -- similar to the ``batch_num_nodes``
-    and ``batch_num_edges`` attributes of a heterograph.
+    section arguments shall be of dictionary type -- similar to the
+    :func:`DGLGraph.batch_num_nodes`
+    and :func:`DGLGraph.batch_num_edges` attributes of a heterograph.
 
     Parameters
     ----------
@@ -311,9 +306,9 @@ def unbatch(g, node_split=None, edge_split=None):
     >>> g2 = dgl.graph((th.tensor([0, 0, 0, 1]), th.tensor([0, 1, 2, 0])))
     >>> g3 = dgl.graph((th.tensor([0]), th.tensor([1])))
     >>> bg = dgl.batch([g1, g2, g3])
-    >>> bg.batch_num_nodes
+    >>> bg.batch_num_nodes()
     tensor([4, 3, 2])
-    >>> bg.batch_num_edges
+    >>> bg.batch_num_edges()
     tensor([3, 4, 1])
     >>> # unbatch but merge g2 and g3
     >>> f1, f2 = dgl.unbatch(bg, th.tensor([4, 5]), th.tensor([3, 5]))
@@ -346,21 +341,22 @@ def unbatch(g, node_split=None, edge_split=None):
     batch
     """
     if node_split is None:
-        node_split = g.batch_num_nodes
-    if edge_split is None:
-        edge_split = g.batch_num_edges
-    if not isinstance(node_split, Mapping):
+        node_split = {ntype : g.batch_num_nodes(ntype) for ntype in g.ntypes}
+    elif not isinstance(node_split, Mapping):
         if len(g.ntypes) != 1:
             raise DGLError('Must provide a dictionary for argument node_split when'
                            ' there are multiple node types.')
         node_split = {g.ntypes[0] : node_split}
-    if not isinstance(edge_split, Mapping):
+    if node_split.keys() != set(g.ntypes):
+        raise DGLError('Must specify node_split for each node type.')
+
+    if edge_split is None:
+        edge_split = {etype : g.batch_num_edges(etype) for etype in g.canonical_etypes}
+    elif not isinstance(edge_split, Mapping):
         if len(g.etypes) != 1:
             raise DGLError('Must provide a dictionary for argument edge_split when'
                            ' there are multiple edge types.')
         edge_split = {g.canonical_etypes[0] : edge_split}
-    if node_split.keys() != set(g.ntypes):
-        raise DGLError('Must specify node_split for each node type.')
     if edge_split.keys() != set(g.canonical_etypes):
         raise DGLError('Must specify edge_split for each canonical edge type.')
 

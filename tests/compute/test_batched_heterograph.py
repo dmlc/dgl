@@ -62,17 +62,16 @@ def test_topology(idtype):
     assert bg.batch_size == 2
 
     # Test number of nodes
-    bnn = bg.batch_num_nodes
     for ntype in bg.ntypes:
-        assert F.asnumpy(bnn[ntype]).tolist() == [
+        print(ntype)
+        assert F.asnumpy(bg.batch_num_nodes(ntype)).tolist() == [
             g1.number_of_nodes(ntype), g2.number_of_nodes(ntype)]
         assert bg.number_of_nodes(ntype) == (
                 g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype))
 
     # Test number of edges
-    bne = bg.batch_num_edges
     for etype in bg.canonical_etypes:
-        assert F.asnumpy(bg.batch_num_edges[etype]).tolist() == [
+        assert F.asnumpy(bg.batch_num_edges(etype)).tolist() == [
             g1.number_of_edges(etype), g2.number_of_edges(etype)]
         assert bg.number_of_edges(etype) == (
             g1.number_of_edges(etype) + g2.number_of_edges(etype))
@@ -97,114 +96,6 @@ def test_topology(idtype):
     g3, g4 = dgl.unbatch(bg)
     check_equivalence_between_heterographs(g1, g3)
     check_equivalence_between_heterographs(g2, g4)
-
-    '''
-    """Test batching two DGLHeteroGraphs with csr format"""
-    g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    }, idtype=idtype, restrict_format='csr')
-    g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    }, idtype=idtype, restrict_format='csr')
-    bg = dgl.batch_hetero([g1, g2])
-
-    # Test number of nodes
-    for ntype in bg.ntypes:
-        assert bg.batch_num_nodes(ntype) == [
-            g1.number_of_nodes(ntype), g2.number_of_nodes(ntype)]
-        assert bg.number_of_nodes(ntype) == (
-                g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype))
-
-    # Test number of edges
-    assert bg.batch_num_edges('plays') == [
-        g1.number_of_edges('plays'), g2.number_of_edges('plays')]
-    assert bg.number_of_edges('plays') == (
-        g1.number_of_edges('plays') + g2.number_of_edges('plays'))
-
-    for etype in bg.canonical_etypes:
-        assert bg.batch_num_edges(etype) == [
-            g1.number_of_edges(etype), g2.number_of_edges(etype)]
-        assert bg.number_of_edges(etype) == (
-            g1.number_of_edges(etype) + g2.number_of_edges(etype))
-
-    # Test relabeled nodes
-    for ntype in bg.ntypes:
-        assert list(F.asnumpy(bg.nodes(ntype))) == list(range(bg.number_of_nodes(ntype)))
-
-    # Test relabeled edges
-    src, dst = bg.edges(etype=('user', 'follows', 'user'))
-    assert list(F.asnumpy(src)) == [0, 1, 4, 5]
-    assert list(F.asnumpy(dst)) == [1, 2, 5, 6]
-    src, dst = bg.edges(etype=('user', 'follows', 'developer'))
-    assert list(F.asnumpy(src)) == [0, 1, 4, 5]
-    assert list(F.asnumpy(dst)) == [1, 2, 4, 5]
-    src, dst, eid = bg.edges(etype='plays', form='all')
-    assert list(F.asnumpy(src)) == [0, 1, 2, 3, 4, 5, 6]
-    assert list(F.asnumpy(dst)) == [0, 0, 1, 1, 2, 2, 3]
-    assert list(F.asnumpy(eid)) == [0, 1, 2, 3, 4, 5, 6]
-
-    # Test unbatching graphs
-    g3, g4 = dgl.unbatch_hetero(bg)
-    check_equivalence_between_heterographs(g1, g3)
-    check_equivalence_between_heterographs(g2, g4)
-
-    """Test batching two DGLHeteroGraphs with csc"""
-    g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    }, idtype=idtype, restrict_format='csc')
-    g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    }, idtype=idtype, restrict_format='csc')
-    bg = dgl.batch_hetero([g1, g2])
-
-    # Test number of nodes
-    for ntype in bg.ntypes:
-        assert bg.batch_num_nodes(ntype) == [
-            g1.number_of_nodes(ntype), g2.number_of_nodes(ntype)]
-        assert bg.number_of_nodes(ntype) == (
-                g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype))
-
-    # Test number of edges
-    assert bg.batch_num_edges('plays') == [
-        g1.number_of_edges('plays'), g2.number_of_edges('plays')]
-    assert bg.number_of_edges('plays') == (
-        g1.number_of_edges('plays') + g2.number_of_edges('plays'))
-
-    for etype in bg.canonical_etypes:
-        assert bg.batch_num_edges(etype) == [
-            g1.number_of_edges(etype), g2.number_of_edges(etype)]
-        assert bg.number_of_edges(etype) == (
-            g1.number_of_edges(etype) + g2.number_of_edges(etype))
-
-    # Test relabeled nodes
-    for ntype in bg.ntypes:
-        assert list(F.asnumpy(bg.nodes(ntype))) == list(range(bg.number_of_nodes(ntype)))
-
-    # Test relabeled edges
-    src, dst = bg.edges(etype=('user', 'follows', 'user'))
-    assert list(F.asnumpy(src)) == [0, 1, 4, 5]
-    assert list(F.asnumpy(dst)) == [1, 2, 5, 6]
-    src, dst = bg.edges(etype=('user', 'follows', 'developer'))
-    assert list(F.asnumpy(src)) == [0, 1, 4, 5]
-    assert list(F.asnumpy(dst)) == [1, 2, 4, 5]
-    src, dst, eid = bg.edges(etype='plays', form='all')
-    assert list(F.asnumpy(src)) == [0, 1, 2, 3, 4, 5, 6]
-    assert list(F.asnumpy(dst)) == [0, 0, 1, 1, 2, 2, 3]
-    assert list(F.asnumpy(eid)) == [0, 1, 2, 3, 4, 5, 6]
-
-    # Test unbatching graphs
-    g3, g4 = dgl.unbatch_hetero(bg)
-    check_equivalence_between_heterographs(g1, g3)
-    check_equivalence_between_heterographs(g2, g4)
-    '''
 
 @parametrize_dtype
 def test_batching_batched(idtype):
@@ -231,17 +122,15 @@ def test_batching_batched(idtype):
     assert bg2.batch_size == 3
 
     # Test number of nodes
-    bnn = bg2.batch_num_nodes
     for ntype in bg2.ntypes:
-        assert F.asnumpy(bnn[ntype]).tolist() == [
+        assert F.asnumpy(bg2.batch_num_nodes(ntype)).tolist() == [
             g1.number_of_nodes(ntype), g2.number_of_nodes(ntype), g3.number_of_nodes(ntype)]
         assert bg2.number_of_nodes(ntype) == (
                 g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype) + g3.number_of_nodes(ntype))
 
     # Test number of edges
-    bne = bg2.batch_num_edges
     for etype in bg2.canonical_etypes:
-        assert F.asnumpy(bne[etype]).tolist() == [
+        assert F.asnumpy(bg2.batch_num_edges(etype)).tolist() == [
             g1.number_of_edges(etype), g2.number_of_edges(etype), g3.number_of_edges(etype)]
         assert bg2.number_of_edges(etype) == (
                 g1.number_of_edges(etype) + g2.number_of_edges(etype) + g3.number_of_edges(etype))
@@ -365,15 +254,13 @@ def test_empty_relation(idtype):
     bg = dgl.batch([g1, g2])
 
     # Test number of nodes
-    bnn = bg.batch_num_nodes
     for ntype in bg.ntypes:
-        assert F.asnumpy(bnn[ntype]).tolist() == [
+        assert F.asnumpy(bg.batch_num_nodes(ntype)).tolist() == [
             g1.number_of_nodes(ntype), g2.number_of_nodes(ntype)]
 
     # Test number of edges
-    bne = bg.batch_num_edges
     for etype in bg.canonical_etypes:
-        assert F.asnumpy(bg.batch_num_edges[etype]).tolist() == [
+        assert F.asnumpy(bg.batch_num_edges(etype)).tolist() == [
             g1.number_of_edges(etype), g2.number_of_edges(etype)]
 
     # Test features
