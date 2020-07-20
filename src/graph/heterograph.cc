@@ -262,16 +262,11 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
 }
 
 std::string HeteroGraph::SharedMemName() const {
-#ifndef _WIN32
   return shared_mem_ ? shared_mem_->GetName() : "";
-#else
-  return "";
-#endif  // _WIN32
 }
 
 HeteroGraphPtr HeteroGraph::CopyToSharedMem(
       HeteroGraphPtr g, const std::string& name, const std::set<std::string>& fmts) {
-#ifndef _WIN32
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
   if (hg->SharedMemName() == name)
     return g;
@@ -322,12 +317,8 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
   hg_index->shared_mem_ = mem;
   return ret;
-#else
-  LOG(FATAL) << "Shared memory is not supported on Windows";
-#endif
 }
 
-#ifndef _WIN32
 aten::COOMatrix CreateCOOFromSharedMem(const std::string &name, uint8_t nbits,
     int64_t num_src, int64_t num_dst, int64_t num_edges, bool rsorted, bool csorted) {
   DLDataType dtype = {kDLInt, nbits, 1};
@@ -346,10 +337,8 @@ aten::CSRMatrix CreateCSRFromSharedMem(const std::string &name, uint8_t nbits,
   NDArray data = NDArray::EmptyShared(name + "_data", {num_edges}, dtype, ctx, false);
   return aten::CSRMatrix(num_src, num_dst, indptr, indices, data, sorted);
 }
-#endif
 
 HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
-#ifndef _WIN32
   auto mem = std::make_shared<SharedMemory>(name);
   auto mem_buf = mem->Open(SHARED_MEM_METAINFO_SIZE_MAX);
   dmlc::MemoryFixedSizeStream ifs(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
@@ -411,9 +400,6 @@ HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
   auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
   hg_index->shared_mem_ = mem;
   return ret;
-#else
-  LOG(FATAL) << "Shared memory is not supported on Windows";
-#endif
 }
 
 HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {

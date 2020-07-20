@@ -64,9 +64,9 @@ def test_single_process(index_dtype):
     _assert_is_identical_heteroindex(hg, hg_rebuild)
     _assert_is_identical_heteroindex(hg, hg_save_again)
 
-def sub_proc(hg_origin):
+def sub_proc(hg_origin, name):
     hg_rebuild = dgl.heterograph_index.create_heterograph_from_shared_memory('hg1')
-    hg_save_again = hg_rebuild.shared_memory("hg1")
+    hg_save_again = hg_rebuild.shared_memory(name)
     _assert_is_identical_heteroindex(hg_origin, hg_rebuild)
     _assert_is_identical_heteroindex(hg_origin, hg_save_again)
 
@@ -75,7 +75,17 @@ def sub_proc(hg_origin):
 def test_multi_process(index_dtype):
     hg = create_test_graph(index_dtype=index_dtype)._graph
     hg_share = hg.shared_memory("hg1")
-    p = mp.Process(target=sub_proc, args=(hg, ))
+    p = mp.Process(target=sub_proc, args=(hg, "hg1"))
+    p.start()
+    p.join()
+
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@parametrize_dtype
+def test_copy_from_gpu(index_dtype):
+    hg = create_test_graph(index_dtype=index_dtype)._graph
+    hg_gpu = hg.copy_to(F.cuda())
+    hg_share = hg.shared_memory("hg_gpu")
+    p = mp.Process(target=sub_proc, args=(hg_gpu, "hg_gpu"))
     p.start()
     p.join()
 
