@@ -1113,8 +1113,10 @@ def remove_edges(g, eids, etype=None):
             old_eids = g.edges(form='eid', order='eid', etype=c_etype)
             # trick here, eid_0 is 0 and should be handled
             old_eids = F.scatter_row(old_eids,
-                F.copy_to(F.tensor(0, dtype=F.int64), F.context(old_eids)),
-                F.copy_to(F.tensor(1, dtype=F.dtype(old_eids)),F.context(old_eids)))
+                                     F.copy_to(F.tensor(0, dtype=F.int64),
+                                               F.context(old_eids)),
+                                     F.copy_to(F.tensor(1, dtype=F.dtype(old_eids)),
+                                               F.context(old_eids)))
             old_eids = F.scatter_row(old_eids, eids, F.full_1d(
                 len(eids), 0, F.dtype(old_eids), F.context(old_eids)))
             edges[c_etype] = F.tensor(F.nonzero_1d(old_eids), dtype=F.dtype(old_eids))
@@ -1214,8 +1216,10 @@ def remove_nodes(g, nids, ntype=None):
             old_nids = g.nodes(c_ntype)
             # trick here, nid_0 is 0 and should be handled
             old_nids = F.scatter_row(old_nids,
-                    F.copy_to(F.tensor(0, dtype=F.int64), F.context(old_nids)),
-                    F.copy_to(F.tensor(1, dtype=F.dtype(old_nids)),F.context(old_nids)))
+                                     F.copy_to(F.tensor(0, dtype=F.int64),
+                                               F.context(old_nids)),
+                                     F.copy_to(F.tensor(1, dtype=F.dtype(old_nids)),
+                                               F.context(old_nids)))
             old_nids = F.scatter_row(old_nids, nids, F.full_1d(
                 len(nids), 0, F.dtype(old_nids), F.context(old_nids)))
             nodes[c_ntype] = F.tensor(F.nonzero_1d(old_nids), dtype=F.dtype(old_nids))
