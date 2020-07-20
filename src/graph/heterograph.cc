@@ -266,7 +266,7 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
   if (hg->shared_mem_name_ == name)
     return g;
-  
+
   std::string buf;
   dmlc::MemoryStringStream ofs(&buf);
   dmlc::SeekStream *strm = &ofs;
