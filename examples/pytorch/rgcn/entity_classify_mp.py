@@ -21,7 +21,7 @@ import dgl
 from dgl import DGLGraph
 from functools import partial
 
-from dgl.data.rdf import AIFB, MUTAG, BGS, AM
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
@@ -321,19 +321,19 @@ def run(proc_id, n_gpus, args, devices, dataset):
     print("{}/{} Mean forward time: {:4f}".format(proc_id, n_gpus,
                                                   np.mean(forward_time[len(forward_time) // 4:])))
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
-                                                   np.mean(backward_time[len(backward_time) // 4:]))) 
+                                                   np.mean(backward_time[len(backward_time) // 4:])))
 
 def main(args, devices):
     # load graph data
     ogb_dataset = False
     if args.dataset == 'aifb':
-        dataset = AIFB()
+        dataset = AIFBDataset()
     elif args.dataset == 'mutag':
-        dataset = MUTAG()
+        dataset = MUTAGDataset()
     elif args.dataset == 'bgs':
-        dataset = BGS()
+        dataset = BGSDataset()
     elif args.dataset == 'am':
-        dataset = AM()
+        dataset = AMDataset()
     else:
         raise ValueError()
 
@@ -344,9 +344,11 @@ def main(args, devices):
     num_of_ntype = len(hg.ntypes)
     category = dataset.predict_category
     num_classes = dataset.num_classes
-    train_idx = dataset.train_idx
-    test_idx = dataset.test_idx
-    labels = dataset.labels
+    train_mask = hg.nodes[category].data.pop('train_mask')
+    test_mask = hg.nodes[category].data.pop('test_mask')
+    labels = hg.nodes[category].data.pop('labels')
+    train_idx = th.nonzero(train_mask).squeeze()
+    test_idx = th.nonzero(test_mask).squeeze()
 
     # split dataset into train, validate, test
     if args.validation:
@@ -363,7 +365,7 @@ def main(args, devices):
         norm = th.ones(eid.shape[0]) / degrees
         norm = norm.unsqueeze(1)
         hg.edges[canonical_etypes].data['norm'] = norm
-    
+
     # get target category id
     category_id = len(hg.ntypes)
     for i, ntype in enumerate(hg.ntypes):
@@ -385,7 +387,7 @@ def main(args, devices):
     n_gpus = len(devices)
     # cpu
     if devices[0] == -1:
-        run(0, 0, args, ['cpu'], 
+        run(0, 0, args, ['cpu'],
             (g, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels))
     # gpu

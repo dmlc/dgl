@@ -14,6 +14,7 @@ import time
 import torch
 import torch.nn.functional as F
 from dgl import DGLGraph
+from dgl.data.rdf import
 from dgl.nn.pytorch import RelGraphConv
 from dgl.contrib.data import load_data
 from functools import partial
