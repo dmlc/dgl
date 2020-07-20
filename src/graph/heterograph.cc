@@ -271,8 +271,10 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   if (hg->SharedMemName() == name)
     return g;
 
-  std::string buf;
-  dmlc::MemoryStringStream ofs(&buf);
+  // Copy buffer to share memory
+  auto mem = std::make_shared<SharedMemory>(name);
+  auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
+  dmlc::MemoryFixedSizeStream ofs(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
   dmlc::SeekStream *strm = &ofs;
 
   bool has_coo = fmts.find("coo") != fmts.end();
@@ -308,11 +310,6 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
   }
 
-  // Copy buffer to share memory
-  CHECK_LE(strm->Tell(), SHARED_MEM_METAINFO_SIZE_MAX);
-  auto mem = std::make_shared<SharedMemory>(name);
-  auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
-  memcpy(mem_buf, buf.c_str(), strm->Tell());
   auto ret = HeteroGraphPtr(new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
   auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
   hg_index->shared_mem_ = mem;
