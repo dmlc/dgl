@@ -2078,6 +2078,21 @@ def test_add_edges(idtype):
     assert F.array_equal(g.edata['h'], F.tensor([1, 1, 2, 2], dtype=idtype))
     assert F.array_equal(g.edata['hh'], F.tensor([0, 0, 2, 2], dtype=idtype))
 
+    # zero data graph
+    g = dgl.graph([], num_nodes=0, idtype=idtype, device=F.ctx())
+    u = F.tensor([0, 1], dtype=idtype)
+    v = F.tensor([2, 2], dtype=idtype)
+    e_feat = {'h' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
+              'hh' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    g.add_edges(u, v, e_feat)
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 2
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['h'], F.tensor([2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['hh'], F.tensor([2, 2], dtype=idtype))
+
     # bipartite graph
     g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
     u = 0

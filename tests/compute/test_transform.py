@@ -346,25 +346,6 @@ def test_laplacian_lambda_max():
     for l_max in l_max_arr:
         assert l_max < 2 + eps
 
-
-def test_add_self_loop():
-    g = dgl.DGLGraph()
-    g.add_nodes(5)
-    g.add_edges([0, 1, 2], [1, 1, 2])
-    # Nodes 0, 3, 4 don't have self-loop
-    new_g = dgl.transform.add_self_loop(g)
-    assert F.allclose(new_g.edges()[0], F.tensor([0, 0, 1, 2, 3, 4]))
-    assert F.allclose(new_g.edges()[1], F.tensor([1, 0, 1, 2, 3, 4]))
-
-
-def test_remove_self_loop():
-    g = dgl.DGLGraph()
-    g.add_nodes(5)
-    g.add_edges([0, 1, 2], [1, 1, 2])
-    new_g = dgl.transform.remove_self_loop(g)
-    assert F.allclose(new_g.edges()[0], F.tensor([0]))
-    assert F.allclose(new_g.edges()[1], F.tensor([1]))
-
 def create_large_graph_index(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
@@ -981,6 +962,21 @@ def test_add_edges(idtype):
     assert F.array_equal(g.edata['h'], F.tensor([1, 1, 2, 2], dtype=idtype))
     assert F.array_equal(g.edata['hh'], F.tensor([0, 0, 2, 2], dtype=idtype))
 
+    # zero data graph
+    g = dgl.graph([], num_nodes=0, idtype=idtype, device=F.ctx())
+    u = F.tensor([0, 1], dtype=idtype)
+    v = F.tensor([2, 2], dtype=idtype)
+    e_feat = {'h' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
+              'hh' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    g = dgl.add_edges(g, u, v, e_feat)
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 2
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['h'], F.tensor([2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['hh'], F.tensor([2, 2], dtype=idtype))
+
     # bipartite graph
     g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
     u = 0
@@ -1391,8 +1387,6 @@ if __name__ == '__main__':
     # test_khop_adj()
     # test_khop_graph()
     # test_laplacian_lambda_max()
-    # test_remove_self_loop()
-    # test_add_self_loop()
     # test_partition_with_halo()
     # test_metis_partition()
     # test_hetero_linegraph('int32')
