@@ -9,12 +9,12 @@
 
 To use MWE-GCN:
 ```python
-python main_proteins_full_dgl.py --model MWE_GCN
+python main_proteins_full_dgl.py --model MWE-GCN
 ```
 
 To use MWE-DGCN:
 ```python
-python main_proteins_full_dgl.py --model MWE_DGCN
+python main_proteins_full_dgl.py --model MWE-DGCN
 ```
 
 Additional optional arguments include 'rand_seed' (the random seed), 'cuda' (the cuda device number, if available), 'postfix' (a string appended to the saved-model file)
