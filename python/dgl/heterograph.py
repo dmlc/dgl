@@ -803,7 +803,7 @@ class DGLHeteroGraph(object):
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
 
-    def add_selfloop(self, etype=None):
+    def add_self_loop(self, etype=None):
         r""" Add self loop for each node in the graph.
 
         Parameters
@@ -814,8 +814,8 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-        * It is recommanded to ``remove_selfloop`` before invoking
-        ``add_selfloop``.
+        * It is recommanded to ``remove_self_loop`` before invoking
+        ``add_self_loop``.
         * Inplace update is applied to the current graph.
         * Features for the new edges (self-loop edges) will be created
         by initializers defined with :func:`set_n_initializer`
@@ -852,22 +852,26 @@ class DGLHeteroGraph(object):
                                             torch.tensor([0, 1])),
                 ('user', 'plays', 'game'): (torch.tensor([0, 1]),
                                             torch.tensor([0, 1]))})
-        >>> g.add_selfloop(etype='follows')
+        >>> g.add_self_loop(etype='follows')
         >>> g
         Graph(num_nodes={'user': 3, 'game': 2},
             num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 5},
             metagraph=[('user', 'user'), ('user', 'game')])
+
+        See Also
+        --------
+        remove_self_loop
         """
         etype = self.to_canonical_etype(etype)
         if etype[0] != etype[2]:
             raise DGLError(
-                'add_selfloop does not support unidirectional bipartite graphs: {}.' \
+                'add_self_loop does not support unidirectional bipartite graphs: {}.' \
                 'Please make sure the types of head node and tail node are identical.' \
                 ''.format(etype))
         nodes = self.nodes(etype[0])
         self.add_edges(nodes, nodes, etype=etype)
 
-    def remove_selfloop(self, etype=None):
+    def remove_self_loop(self, etype=None):
         r""" Remove self loops for each node in the graph.
 
         If there are multiple self loops for a certain node,
@@ -884,7 +888,7 @@ class DGLHeteroGraph(object):
         >>> g = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([1, 0, 0, 2])),
                           idtype=idtype, device=F.ctx())
         >>> g.edata['he'] = torch.arange(4).float().reshape(-1, 1)
-        >>> g.remove_selfloop()
+        >>> g.remove_self_loop()
         >>> g
         Graph(num_nodes=3, num_edges=2,
             edata_schemes={'he': Scheme(shape=(2,), dtype=torch.float32)})
@@ -899,7 +903,7 @@ class DGLHeteroGraph(object):
         >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
         >>>                                         torch.tensor([0, 1]))
         >>>     })
-        >>> g.remove_selfloop(etype='follows')
+        >>> g.remove_self_loop(etype='follows')
         >>> g.num_nodes('user')
         3
         >>> g.num_nodes('game')
@@ -911,13 +915,13 @@ class DGLHeteroGraph(object):
 
         See Also
         --------
-        add_selfloop
+        add_self_loop
         """
         # TODO(xiangsx) need to handle block
         etype = self.to_canonical_etype(etype)
         if etype[0] != etype[2]:
             raise DGLError(
-                'remove_selfloop does not support unidirectional bipartite graphs: {}.' \
+                'remove_self_loop does not support unidirectional bipartite graphs: {}.' \
                 'Please make sure the types of head node and tail node are identical.' \
                 ''.format(etype))
         u, v = self.edges(form='uv', order='eid', etype=etype)

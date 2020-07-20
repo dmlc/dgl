@@ -2400,7 +2400,7 @@ def test_add_selfloop(idtype):
     g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
     g.edata['he'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g.ndata['hn'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
-    g.add_selfloop()
+    g.add_self_loop()
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 6
     u, v = g.edges(form='uv', order='eid')
@@ -2413,13 +2413,13 @@ def test_add_selfloop(idtype):
     # nothing will happend
     raise_error = False
     try:
-        g.add_selfloop()
+        g.add_self_loop()
     except:
         raise_error = True
     assert raise_error
 
     g = create_test_heterograph6(idtype)
-    g.add_selfloop(etype='follows')
+    g.add_self_loop(etype='follows')
     assert g.number_of_nodes('user') == 3
     assert g.number_of_nodes('game') == 2
     assert g.number_of_edges('follows') == 5
@@ -2432,7 +2432,7 @@ def test_add_selfloop(idtype):
 
     raise_error = False
     try:
-        g.add_selfloop(etype='plays')
+        g.add_self_loop(etype='plays')
     except:
         raise_error = True
     assert raise_error
@@ -2442,7 +2442,7 @@ def test_remove_selfloop(idtype):
     # homogeneous graph
     g = dgl.graph(([0, 0, 0, 1], [1, 0, 0, 2]), idtype=idtype, device=F.ctx())
     g.edata['he'] = F.copy_to(F.tensor([1, 2, 3, 4], dtype=idtype), ctx=F.ctx())
-    g.remove_selfloop()
+    g.remove_self_loop()
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 2
     assert F.array_equal(g.edata['he'], F.tensor([1, 4], dtype=idtype))
@@ -2452,13 +2452,13 @@ def test_remove_selfloop(idtype):
     # nothing will happend
     raise_error = False
     try:
-        g.remove_selfloop(etype='plays')
+        g.remove_self_loop(etype='plays')
     except:
         raise_error = True
     assert raise_error
 
     g = create_test_heterograph5(idtype)
-    g.remove_selfloop(etype='follows')
+    g.remove_self_loop(etype='follows')
     assert g.number_of_nodes('user') == 3
     assert g.number_of_nodes('game') == 2
     assert g.number_of_edges('follows') == 2
@@ -2471,7 +2471,7 @@ def test_remove_selfloop(idtype):
 
     raise_error = False
     try:
-        g.remove_selfloop(etype='plays')
+        g.remove_self_loop(etype='plays')
     except:
         raise_error = True
     assert raise_error
