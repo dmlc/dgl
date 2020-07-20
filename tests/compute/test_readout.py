@@ -1,4 +1,5 @@
 import dgl
+import numpy as np
 import backend as F
 import networkx as nx
 import unittest
@@ -114,78 +115,71 @@ def test_weighted_reduce_readout(g, idtype, reducer):
         subx.append(sx)
     assert F.allclose(x, F.cat(subx, dim=0))
 
-def _test_topk_nodes():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(14))
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+@pytest.mark.parametrize('descending', [True, False])
+def test_topk(g, idtype, descending):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['x'] = F.randn((g.number_of_nodes(), 3))
 
-    feat0 = F.randn((g0.number_of_nodes(), 10))
-    g0.ndata['x'] = feat0
-    # to test the case where k > number of nodes.
-    dgl.topk_nodes(g0, 'x', 20, idx=-1)
-    # test correctness
-    val, indices = dgl.topk_nodes(g0, 'x', 5, idx=-1)
-    ground_truth = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 9, 10), 0, True)[:5], (5,))
-    assert F.allclose(ground_truth, indices)
-    g0.ndata.pop('x')
+    # Test.1: to test the case where k > number of nodes.
+    dgl.topk_nodes(g, 'x', 100, sortby=-1)
 
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(12))
-    feat1 = F.randn((g1.number_of_nodes(), 10))
+    # Test.2: test correctness
+    min_nnodes = F.asnumpy(g.batch_num_nodes()).min()
+    if min_nnodes <= 1:
+        return
+    k = min_nnodes - 1
+    val, indices = dgl.topk_nodes(g, 'x', k, descending=descending, sortby=-1)
+    print(k)
+    print(g.ndata['x'])
+    print('val', val)
+    print('indices', indices)
+    subg = dgl.unbatch(g)
+    subval, subidx = [], []
+    for sg in subg:
+        subx = F.asnumpy(sg.ndata['x'])
+        ai = np.argsort(subx[:,-1:].flatten())
+        if descending:
+            ai = ai[::-1]
+        subx = np.expand_dims(subx[ai[:k]], 0)
+        subval.append(F.tensor(subx))
+        subidx.append(F.tensor(np.expand_dims(ai[:k], 0)))
+    print(F.cat(subval, dim=0))
+    assert F.allclose(val, F.cat(subval, dim=0))
+    assert F.allclose(indices, F.cat(subidx, dim=0))
 
-    bg = dgl.batch([g0, g1])
-    bg.ndata['x'] = F.cat([feat0, feat1], 0)
-    # to test the case where k > number of nodes.
-    dgl.topk_nodes(bg, 'x', 16, idx=1)
-    # test correctness
-    val, indices = dgl.topk_nodes(bg, 'x', 6, descending=False, idx=0)
-    ground_truth_0 = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 0, 1), 0, False)[:6], (6,))
-    ground_truth_1 = F.reshape(
-        F.argsort(F.slice_axis(feat1, -1, 0, 1), 0, False)[:6], (6,))
-    ground_truth = F.stack([ground_truth_0, ground_truth_1], 0)
-    assert F.allclose(ground_truth, indices)
+    # Test.3: sorby=None
+    dgl.topk_nodes(g, 'x', k, sortby=None)
 
-    # test idx=None
-    val, indices = dgl.topk_nodes(bg, 'x', 6, descending=True)
-    assert F.allclose(val, F.stack([F.topk(feat0, 6, 0), F.topk(feat1, 6, 0)], 0))
+    g.edata['x'] = F.randn((g.number_of_edges(), 3))
 
+    # Test.4: topk edges where k > number of edges.
+    dgl.topk_edges(g, 'x', 100, sortby=-1)
 
-def _test_topk_edges():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(14))
-
-    feat0 = F.randn((g0.number_of_edges(), 10))
-    g0.edata['x'] = feat0
-    # to test the case where k > number of edges.
-    dgl.topk_edges(g0, 'x', 30, idx=-1)
-    # test correctness
-    val, indices = dgl.topk_edges(g0, 'x', 7, idx=-1)
-    ground_truth = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 9, 10), 0, True)[:7], (7,))
-    assert F.allclose(ground_truth, indices)
-    g0.edata.pop('x')
-
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(12))
-    feat1 = F.randn((g1.number_of_edges(), 10))
-
-    bg = dgl.batch([g0, g1])
-    bg.edata['x'] = F.cat([feat0, feat1], 0)
-    # to test the case where k > number of edges.
-    dgl.topk_edges(bg, 'x', 33, idx=1)
-    # test correctness
-    val, indices = dgl.topk_edges(bg, 'x', 4, descending=False, idx=0)
-    ground_truth_0 = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 0, 1), 0, False)[:4], (4,))
-    ground_truth_1 = F.reshape(
-        F.argsort(F.slice_axis(feat1, -1, 0, 1), 0, False)[:4], (4,))
-    ground_truth = F.stack([ground_truth_0, ground_truth_1], 0)
-    assert F.allclose(ground_truth, indices)
-
-    # test idx=None
-    val, indices = dgl.topk_edges(bg, 'x', 6, descending=True)
-    assert F.allclose(val, F.stack([F.topk(feat0, 6, 0), F.topk(feat1, 6, 0)], 0))
+    # Test.5: topk edges test correctness
+    min_nedges = F.asnumpy(g.batch_num_edges()).min()
+    if min_nedges <= 1:
+        return
+    k = min_nedges - 1
+    val, indices = dgl.topk_edges(g, 'x', k, descending=descending, sortby=-1)
+    print(k)
+    print(g.edata['x'])
+    print('val', val)
+    print('indices', indices)
+    subg = dgl.unbatch(g)
+    subval, subidx = [], []
+    for sg in subg:
+        subx = F.asnumpy(sg.edata['x'])
+        ai = np.argsort(subx[:,-1:].flatten())
+        if descending:
+            ai = ai[::-1]
+        subx = np.expand_dims(subx[ai[:k]], 0)
+        subval.append(F.tensor(subx))
+        subidx.append(F.tensor(np.expand_dims(ai[:k], 0)))
+    print(F.cat(subval, dim=0))
+    assert F.allclose(val, F.cat(subval, dim=0))
+    assert F.allclose(indices, F.cat(subidx, dim=0))
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))

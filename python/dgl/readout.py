@@ -12,11 +12,6 @@ __all__ = ['readout_nodes', 'readout_edges',
            'max_nodes', 'max_edges', 'softmax_nodes', 'softmax_edges',
            'broadcast_nodes', 'broadcast_edges', 'topk_nodes', 'topk_edges']
 
-READOUT_ON_ATTRS = {
-    'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
-    'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
-}
-
 def readout_nodes(graph, feat, weight=None, *, op='sum', ntype=None):
     """Generate a graph-level representation by aggregating node features
     :attr:`feat`.
@@ -451,15 +446,16 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     """
     return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
-def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
+READOUT_ON_ATTRS = {
+    'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
+    'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
+}
+
+def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     """Internal function to take graph-wise top-k node/edge features of
     field :attr:`feat` in :attr:`graph` ranked by keys at given
-    index :attr:`idx`. If :attr:`descending` is set to False, return the
+    index :attr:`sortby`. If :attr:`descending` is set to False, return the
     k smallest elements instead.
-
-    If idx is set to None, the function would return top-k value of all
-    indices, which is equivalent to calling `th.topk(graph.ndata[feat], dim=0)`
-    for each single graph of the input batched-graph.
 
     Parameters
     ---------
@@ -474,22 +470,23 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     descending : bool
         Controls whether to return the largest or smallest elements,
          defaults to True.
-    idx : int or None, defaults to None
+    sortby : int
         The key index we sort :attr:`feat` on, if set to None, we sort
         the whole :attr:`feat`.
+    ntype_or_etype : str, tuple of str
+        Node/edge type.
 
     Returns
     -------
-    tuple of tensors:
-        The first tensor returns top-k features of each single graph of
-        the input graph:
-        a tensor with shape :math:`(B, K, D)` would be returned, where
+    sorted_feat : Tensor
+        A tensor with shape :math:`(B, K, D)`, where
         :math:`B` is the batch size of the input graph.
-        The second tensor returns the top-k indices of each single graph
-        of the input graph:
-        a tensor with shape :math:`(B, K)`(:math:`(B, K, D)` if` idx
-        is set to None) would be returned, where
-        :math:`B` is the batch size of the input graph.
+    sorted_idx : Tensor
+        A tensor with shape :math:`(B, K)`(:math:`(B, K, D)` if sortby
+        is set to None), where
+        :math:`B` is the batch size of the input graph, :math:`D`
+        is the feature size.
+
 
     Notes
     -----
@@ -499,22 +496,22 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     to :math:`k`th elements is not defined.
     """
     data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
-    data = getattr(graph, data_attr)
+    data = getattr(graph, typestr)[ntype_or_etype].data
     if F.ndim(data[feat]) > 2:
-        raise DGLError('The {} feature `{}` should have dimension less than or'
+        raise DGLError('Only support {} feature `{}` with dimension less than or'
                        ' equal to 2'.format(typestr, feat))
 
     feat = data[feat]
     hidden_size = F.shape(feat)[-1]
-    batch_num_objs = getattr(graph, batch_num_objs_attr)
+    batch_num_objs = getattr(graph, batch_num_objs_attr)(ntype_or_etype)
     batch_size = len(batch_num_objs)
 
     length = max(max(batch_num_objs), k)
     fill_val = -float('inf') if descending else float('inf')
     feat_ = F.pad_packed_tensor(feat, batch_num_objs, fill_val, l_min=k)
 
-    if idx is not None:
-        keys = F.squeeze(F.slice_axis(feat_, -1, idx, idx+1), -1)
+    if sortby is not None:
+        keys = F.squeeze(F.slice_axis(feat_, -1, sortby, sortby+1), -1)
         order = F.argsort(keys, -1, descending=descending)
     else:
         order = F.argsort(feat_, 1, descending=descending)
@@ -524,7 +521,7 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     # zero padding
     feat_ = F.pad_packed_tensor(feat, batch_num_objs, 0, l_min=k)
 
-    if idx is not None:
+    if sortby is not None:
         feat_ = F.reshape(feat_, (batch_size * length, -1))
         shift = F.repeat(F.arange(0, batch_size) * length, k, -1)
         shift = F.copy_to(shift, F.context(feat))
@@ -539,15 +536,14 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
            topk_indices
 
-def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
-    """Return graph-wise top-k node features of field :attr:`feat` in
-    :attr:`graph` ranked by keys at given index :attr:`idx`. If :attr:
+def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
+    """Perform a graph-wise top-k on node features :attr:`feat` in
+    :attr:`graph` by feature at index :attr:`sortby`. If :attr:
     `descending` is set to False, return the k smallest elements instead.
 
-    If idx is set to None, the function would return top-k value of all
-    indices, which is equivalent to calling
-    :code:`torch.topk(graph.ndata[feat], dim=0)`
-    for each example of the input graph.
+    If :attr:`sortby` is set to None, the function would perform top-k on
+    all dimensions independently, equivalent to calling
+    :code:`torch.topk(graph.ndata[feat], dim=0)`.
 
     Parameters
     ----------
@@ -559,22 +555,21 @@ def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
         The k in "top-k"
     descending : bool
         Controls whether to return the largest or smallest elements.
-    idx : int or None, defaults to None
-        The index of keys we rank :attr:`feat` on, if set to None, we sort
-        the whole :attr:`feat`.
+    sortby : int, optional
+        Sort according to which feature. If is None, all features are sorted independently.
+    ntype : str, optional
+        Node type. Can be omitted if there is only one node type in the graph.
 
     Returns
     -------
-    tuple of tensors
-        The first tensor returns top-k node features of each single graph of
-        the input graph:
-        a tensor with shape :math:`(B, K, D)` would be returned, where
+    sorted_feat : Tensor
+        A tensor with shape :math:`(B, K, D)`, where
         :math:`B` is the batch size of the input graph.
-        The second tensor returns the top-k node indices of each single graph
-        of the input graph:
-        a tensor with shape :math:`(B, K)`(:math:`(B, K, D)` if` idx
-        is set to None) would be returned, where
-        :math:`B` is the batch size of the input graph.
+    sorted_idx : Tensor
+        A tensor with shape :math:`(B, K)`(:math:`(B, K, D)` if sortby
+        is set to None), where
+        :math:`B` is the batch size of the input graph, :math:`D`
+        is the feature size.
 
     Examples
     --------
@@ -585,8 +580,7 @@ def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
     Create two :class:`~dgl.DGLGraph` objects and initialize their
     node features.
 
-    >>> g1 = dgl.DGLGraph()                           # Graph 1
-    >>> g1.add_nodes(4)
+    >>> g1 = dgl.graph(([0, 1], [2, 3]))              # Graph 1
     >>> g1.ndata['h'] = th.rand(4, 5)
     >>> g1.ndata['h']
     tensor([[0.0297, 0.8307, 0.9140, 0.6702, 0.3346],
@@ -594,8 +588,7 @@ def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
             [0.0880, 0.6515, 0.4451, 0.7507, 0.5297],
             [0.5171, 0.6379, 0.2695, 0.8954, 0.5197]])
 
-    >>> g2 = dgl.DGLGraph()                           # Graph 2
-    >>> g2.add_nodes(5)
+    >>> g2 = dgl.graph(([0, 1, 2], [2, 3, 4]))       # Graph 2
     >>> g2.ndata['h'] = th.rand(5, 5)
     >>> g2.ndata['h']
     tensor([[0.3168, 0.3174, 0.5303, 0.0804, 0.3808],
@@ -606,7 +599,7 @@ def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
 
     Top-k over node attribute :attr:`h` in a batched graph.
 
-    >>> bg = dgl.batch([g1, g2], node_attrs='h')
+    >>> bg = dgl.batch([g1, g2], ndata=['h'])
     >>> dgl.topk_nodes(bg, 'h', 3)
     (tensor([[[0.5901, 0.8307, 0.9280, 0.8954, 0.7997],
              [0.5171, 0.6515, 0.9140, 0.7507, 0.5297],
@@ -622,10 +615,10 @@ def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
              [0, 4, 4, 1, 0],
              [3, 3, 0, 3, 1]]]))
 
-    Top-k over node attribute :attr:`h` along index -1 in a batched graph.
+    Top-k over node attribute :attr:`h` along the last dimension in a batched graph.
     (used in SortPooling)
 
-    >>> dgl.topk_nodes(bg, 'h', 3, idx=-1)
+    >>> dgl.topk_nodes(bg, 'h', 3, sortby=-1)
     (tensor([[[0.5901, 0.3030, 0.9280, 0.6893, 0.7997],
              [0.0880, 0.6515, 0.4451, 0.7507, 0.5297],
              [0.5171, 0.6379, 0.2695, 0.8954, 0.5197]],
@@ -646,23 +639,21 @@ def topk_nodes(graph, feat, k, *, descending=True, idx=None, ntype=None):
 
     Notes
     -----
-    If an example has :math:`n` nodes and :math:`n<k`, in the first
-    returned tensor the :math:`n+1` to :math:`k`th rows would be padded
-    with all zero; in the second returned tensor, the behavior of :math:`n+1`
-    to :math:`k`th elements is not defined.
+    If an example has :math:`n` nodes and :math:`n<k`, the ``sorted_feat``
+    tensor will pad the :math:`n+1` to :math:`k`th rows with zero;
     """
-    return _topk_on(graph, 'nodes', feat, k, descending=descending, idx=idx)
+    return _topk_on(graph, 'nodes', feat, k,
+                    descending=descending, sortby=sortby,
+                    ntype_or_etype=ntype)
 
-def topk_edges(graph, feat, k, descending=True, idx=None):
-    """Return graph-wise top-k edge features of field :attr:`feat` in
-    :attr:`graph` ranked by keys at given index :attr:`idx`. If
-    :attr:`descending` is set to False, return the k smallest elements
-    instead.
+def topk_edges(graph, feat, k, *, descending=True, sortby=None, etype=None):
+    """Perform a graph-wise top-k on node features :attr:`feat` in
+    :attr:`graph` by feature at index :attr:`sortby`. If :attr:
+    `descending` is set to False, return the k smallest elements instead.
 
-    If idx is set to None, the function would return top-k value of all
-    indices, which is equivalent to calling
-    :code:`torch.topk(graph.edata[feat], dim=0)`
-    for each example of the input graph.
+    If :attr:`sortby` is set to None, the function would perform top-k on
+    all dimensions independently, equivalent to calling
+    :code:`torch.topk(graph.edata[feat], dim=0)`.
 
     Parameters
     ----------
@@ -671,25 +662,24 @@ def topk_edges(graph, feat, k, descending=True, idx=None):
     feat : str
         The feature field.
     k : int
-        The k in "top-k".
+        The k in "top-k"
     descending : bool
         Controls whether to return the largest or smallest elements.
-    idx : int or None, defaults to None
-        The key index we sort :attr:`feat` on, if set to None, we sort
-        the whole :attr:`feat`.
+    sortby : int, optional
+        Sort according to which feature. If is None, all features are sorted independently.
+    etype : str, typle of str, optional
+        Edge type. Can be omitted if there is only one edge type in the graph.
 
     Returns
     -------
-    tuple of tensors
-        The first tensor returns top-k edge features of each single graph of
-        the input graph:
-        a tensor with shape :math:`(B, K, D)` would be returned, where
+    sorted_feat : Tensor
+        A tensor with shape :math:`(B, K, D)`, where
         :math:`B` is the batch size of the input graph.
-        The second tensor returns the top-k edge indices of each single graph
-        of the input graph:
-        a tensor with shape :math:`(B, K)`(:math:`(B, K, D)` if` idx
-        is set to None) would be returned, where
-        :math:`B` is the batch size of the input graph.
+    sorted_idx : Tensor
+        A tensor with shape :math:`(B, K)`(:math:`(B, K, D)` if sortby
+        is set to None), where
+        :math:`B` is the batch size of the input graph, :math:`D`
+        is the feature size.
 
     Examples
     --------
@@ -700,9 +690,7 @@ def topk_edges(graph, feat, k, descending=True, idx=None):
     Create two :class:`~dgl.DGLGraph` objects and initialize their
     edge features.
 
-    >>> g1 = dgl.DGLGraph()                           # Graph 1
-    >>> g1.add_nodes(4)
-    >>> g1.add_edges([0, 1, 2, 3], [1, 2, 3, 0])
+    >>> g1 = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 0]))         # Graph 1
     >>> g1.edata['h'] = th.rand(4, 5)
     >>> g1.edata['h']
     tensor([[0.0297, 0.8307, 0.9140, 0.6702, 0.3346],
@@ -710,9 +698,7 @@ def topk_edges(graph, feat, k, descending=True, idx=None):
             [0.0880, 0.6515, 0.4451, 0.7507, 0.5297],
             [0.5171, 0.6379, 0.2695, 0.8954, 0.5197]])
 
-    >>> g2 = dgl.DGLGraph()                           # Graph 2
-    >>> g2.add_nodes(5)
-    >>> g2.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0])
+    >>> g2 = dgl.graph(([0, 1, 2, 3, 4], [1, 2, 3, 4, 0]))   # Graph 2
     >>> g2.edata['h'] = th.rand(5, 5)
     >>> g2.edata['h']
     tensor([[0.3168, 0.3174, 0.5303, 0.0804, 0.3808],
@@ -723,49 +709,46 @@ def topk_edges(graph, feat, k, descending=True, idx=None):
 
     Top-k over edge attribute :attr:`h` in a batched graph.
 
-    >>> bg = dgl.batch([g1, g2], edge_attrs='h')
+    >>> bg = dgl.batch([g1, g2], edata=['h'])
     >>> dgl.topk_edges(bg, 'h', 3)
     (tensor([[[0.5901, 0.8307, 0.9280, 0.8954, 0.7997],
-             [0.5171, 0.6515, 0.9140, 0.7507, 0.5297],
-             [0.0880, 0.6379, 0.4451, 0.6893, 0.5197]],
-
-            [[0.5065, 0.9105, 0.5692, 0.8489, 0.3872],
-             [0.3168, 0.5182, 0.5418, 0.6114, 0.3808],
-             [0.1931, 0.4954, 0.5303, 0.3934, 0.1458]]]), tensor([[[1, 0, 1, 3, 1],
-             [3, 2, 0, 2, 2],
-             [2, 3, 2, 1, 3]],
-
-            [[4, 2, 2, 2, 4],
-             [0, 4, 4, 1, 0],
-             [3, 3, 0, 3, 1]]]))
+              [0.5171, 0.6515, 0.9140, 0.7507, 0.5297],
+              [0.0880, 0.6379, 0.4451, 0.6893, 0.5197]],
+             [[0.5065, 0.9105, 0.5692, 0.8489, 0.3872],
+              [0.3168, 0.5182, 0.5418, 0.6114, 0.3808],
+              [0.1931, 0.4954, 0.5303, 0.3934, 0.1458]]]), tensor([[[1, 0, 1, 3, 1],
+              [3, 2, 0, 2, 2],
+              [2, 3, 2, 1, 3]],
+             [[4, 2, 2, 2, 4],
+              [0, 4, 4, 1, 0],
+              [3, 3, 0, 3, 1]]]))
 
     Top-k over edge attribute :attr:`h` along index -1 in a batched graph.
     (used in SortPooling)
 
-    >>> dgl.topk_edges(bg, 'h', 3, idx=-1)
+    >>> dgl.topk_edges(bg, 'h', 3, sortby=-1)
     (tensor([[[0.5901, 0.3030, 0.9280, 0.6893, 0.7997],
-             [0.0880, 0.6515, 0.4451, 0.7507, 0.5297],
-             [0.5171, 0.6379, 0.2695, 0.8954, 0.5197]],
-
-            [[0.5065, 0.5182, 0.5418, 0.1520, 0.3872],
-             [0.3168, 0.3174, 0.5303, 0.0804, 0.3808],
-             [0.1323, 0.2766, 0.4318, 0.6114, 0.1458]]]), tensor([[1, 2, 3],
-            [4, 0, 1]]))
+              [0.0880, 0.6515, 0.4451, 0.7507, 0.5297],
+              [0.5171, 0.6379, 0.2695, 0.8954, 0.5197]],
+             [[0.5065, 0.5182, 0.5418, 0.1520, 0.3872],
+              [0.3168, 0.3174, 0.5303, 0.0804, 0.3808],
+              [0.1323, 0.2766, 0.4318, 0.6114, 0.1458]]]), tensor([[1, 2, 3],
+             [4, 0, 1]]))
 
     Top-k over edge attribute :attr:`h` in a single graph.
 
     >>> dgl.topk_edges(g1, 'h', 3)
     (tensor([[[0.5901, 0.8307, 0.9280, 0.8954, 0.7997],
-             [0.5171, 0.6515, 0.9140, 0.7507, 0.5297],
-             [0.0880, 0.6379, 0.4451, 0.6893, 0.5197]]]), tensor([[[1, 0, 1, 3, 1],
-             [3, 2, 0, 2, 2],
-             [2, 3, 2, 1, 3]]]))
+              [0.5171, 0.6515, 0.9140, 0.7507, 0.5297],
+              [0.0880, 0.6379, 0.4451, 0.6893, 0.5197]]]), tensor([[[1, 0, 1, 3, 1],
+              [3, 2, 0, 2, 2],
+              [2, 3, 2, 1, 3]]]))
 
     Notes
     -----
-    If an example has :math:`n` edges and :math:`n<k`, in the first
-    returned tensor the :math:`n+1` to :math:`k`th rows would be padded
-    with all zero; in the second returned tensor, the behavior of :math:`n+1`
-    to :math:`k`th elements is not defined.
+    If an example has :math:`n` nodes and :math:`n<k`, the ``sorted_feat``
+    tensor will pad the :math:`n+1` to :math:`k`th rows with zero;
     """
-    return _topk_on(graph, 'edges', feat, k, descending=descending, idx=idx)
+    return _topk_on(graph, 'edges', feat, k,
+                    descending=descending, sortby=sortby,
+                    ntype_or_etype=etype)
