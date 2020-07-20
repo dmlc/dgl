@@ -127,17 +127,17 @@ struct CSRMatrix {
   CSRMatrix CopyToSharedMem(const std::string &name) const {
     DLContext ctx = {kDLCPU, 0};
     auto indptr_shared_mem = NDArray::EmptyShared(
-        name + "_csr_indptr", {indptr->shape[0]}, indptr->dtype, ctx, true);
+        name + "_indptr", {indptr->shape[0]}, indptr->dtype, ctx, true);
     indptr_shared_mem.CopyFrom(indptr);
     auto indices_shared_mem = NDArray::EmptyShared(
-        name + "_csr_indices", {indices->shape[0]}, indices->dtype, ctx, true);
+        name + "_indices", {indices->shape[0]}, indices->dtype, ctx, true);
     indices_shared_mem.CopyFrom(indices);
     NDArray data_shared_mem;
     if (aten::IsNullArray(data)) {
       data_shared_mem = aten::NullArray();
     } else {
       data_shared_mem = NDArray::EmptyShared(
-          name + "_csr_data", {data->shape[0]}, data->dtype, ctx, true);
+          name + "_data", {data->shape[0]}, data->dtype, ctx, true);
       data_shared_mem.CopyFrom(data);
     }
     return CSRMatrix(

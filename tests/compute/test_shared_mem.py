@@ -90,6 +90,6 @@ def test_copy_from_gpu():
     p.join()
 
 if __name__ == "__main__":
-    # test_single_process("int64")
-    # test_multi_process("int32")
+    test_single_process("int64")
+    test_multi_process("int32")
     test_copy_from_gpu()
