@@ -4,15 +4,8 @@
  * \brief Array operator CPU implementation
  */
 #include <dgl/array.h>
-
-#include <iostream>
-#include <algorithm>
-#include <vector>
-#include <iterator>
 #include <numeric>
-
 #include "../arith.h"
-#include "../array_op.h"
 
 namespace dgl {
 using runtime::NDArray;
@@ -262,44 +255,6 @@ IdArray NonZero(BoolArray bool_arr) {
 // TODO(Allen): Implement GPU version
 template IdArray NonZero<kDLCPU, int32_t>(BoolArray bool_arr);
 template IdArray NonZero<kDLCPU, int64_t>(BoolArray bool_arr);
-
-///////////////////////////// SetDiff1d /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-IdArray SetDiff1d(IdArray arr1, IdArray arr2) {
-  CHECK(arr1->ndim == 1) << "SetDiff1d only supports 1D array";
-  CHECK(arr2->ndim == 1) << "SetDiff1d only supports 1D array";
-  IdArray unique_arr1 = Unique<XPU, IdType>(arr1);
-  IdArray unique_arr2 = Unique<XPU, IdType>(arr2);
-  const IdType* unique_arr1_data = static_cast<IdType*>(unique_arr1->data);
-  const IdType* unique_arr2_data = static_cast<IdType*>(unique_arr2->data);
-  std::vector<IdType> diff;
-  std::set_difference(
-    unique_arr1_data, unique_arr1_data + unique_arr1->shape[0],
-    unique_arr2_data, unique_arr2_data + unique_arr2->shape[0],
-    std::inserter(diff, diff.begin()));
-
-  return VecToIdArray(diff, sizeof(IdType) * 8);
-}
-
-template IdArray SetDiff1d<kDLCPU, int32_t>(IdArray arr1, IdArray arr2);
-template IdArray SetDiff1d<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
-
-///////////////////////////// Unique /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-IdArray Unique(IdArray arr) {
-  CHECK(arr->ndim == 1) << "Unique only supports 1D array";
-  const IdType* arr_data = static_cast<IdType*>(arr->data);
-  std::vector<IdType> arr_vec(arr_data, arr_data+arr->shape[0]);
-  std::sort(arr_vec.begin(), arr_vec.end());
-  arr_vec.erase(std::unique(arr_vec.begin(), arr_vec.end()), arr_vec.end());
-  IdArray ret_ndarray = VecToIdArray(arr_vec, sizeof(IdType) * 8);
-  return ret_ndarray;
-}
-
-template IdArray Unique<kDLCPU, int32_t>(IdArray arr);
-template IdArray Unique<kDLCPU, int64_t>(IdArray arr);
 
 }  // namespace impl
 }  // namespace aten

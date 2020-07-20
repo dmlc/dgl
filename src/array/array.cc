@@ -94,28 +94,6 @@ IdArray NonZero(BoolArray bool_arr) {
   return ret;
 }
 
-IdArray SetDiff1d(IdArray lhs, IdArray rhs) {
-  IdArray ret;
-  CHECK_SAME_CONTEXT(lhs, rhs);
-  CHECK_SAME_DTYPE(lhs, rhs);
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "SetDiff1d", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::SetDiff1d<XPU, IdType>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray Unique(IdArray arr) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(arr->ctx.device_type, XPU, "Unique", {
-    ATEN_ID_TYPE_SWITCH(arr->dtype, IdType, {
-      ret = impl::Unique<XPU, IdType>(arr);
-    });
-  });
-  return ret;
-}
-
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
   CHECK_SAME_CONTEXT(array, index);
