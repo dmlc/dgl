@@ -1,9 +1,9 @@
 # DGL for OGB-proteins
 
 ## Dependencies
-- DGL
-- PyTorch
-- OGB
+- DGL 0.4.3
+- PyTorch 1.4.0
+- OGB 1.2.0
 
 ## Usage
 
@@ -17,5 +17,5 @@ To use MWE-DGCN:
 python main_proteins_full_dgl.py --model MWE_DGCN
 ```
 
-Additional optional arguments include 'rand_seed', 'cuda', 'postfix', whose roles can be found in main_proteins_full_dgl.py
+Additional optional arguments include 'rand_seed' (the random seed), 'cuda' (the cuda device number, if available), 'postfix' (a string appended to the saved-model file)
 
