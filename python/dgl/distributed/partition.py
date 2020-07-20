@@ -79,6 +79,7 @@ Two useful functions in this module:
 
 import json
 import os
+import time
 import numpy as np
 
 from .. import backend as F
@@ -253,47 +254,36 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         Indicate whether to balance the edges.
     '''
     if num_parts == 1:
-        client_parts = {0: g}
+        parts = {0: g}
         node_parts = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
         g.ndata[NID] = F.arange(0, g.number_of_nodes())
         g.edata[EID] = F.arange(0, g.number_of_edges())
-        g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int64, F.cpu())
-        g.edata['inner_edge'] = F.ones((g.number_of_edges(),), F.int64, F.cpu())
+        g.ndata['inner_node'] = F.ones((g.number_of_nodes(),), F.int8, F.cpu())
+        g.edata['inner_edge'] = F.ones((g.number_of_edges(),), F.int8, F.cpu())
         if reshuffle:
             g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
             g.edata['orig_id'] = F.arange(0, g.number_of_edges())
     elif part_method == 'metis':
         node_parts = metis_partition_assignment(g, num_parts, balance_ntypes=balance_ntypes,
                                                 balance_edges=balance_edges)
-        client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
+        parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     elif part_method == 'random':
         node_parts = random_choice(num_parts, g.number_of_nodes())
-        client_parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
+        parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
     # Let's calculate edge assignment.
-    # TODO(zhengda) we should replace int64 with int16. int16 should be sufficient.
     if not reshuffle:
+        start = time.time()
+        # We only optimize for reshuffled case. So it's fine to use int64 here.
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
-    num_edges = 0
-    num_nodes = 0
-    lnodes_list = []      # The node ids of each partition
-    ledges_list = []      # The edge Ids of each partition
-    for part_id in range(num_parts):
-        part = client_parts[part_id]
-        # To get the edges in the input graph, we should use original node Ids.
-        data_name = 'orig_id' if reshuffle else NID
-        local_nodes = F.boolean_mask(part.ndata[data_name], part.ndata['inner_node'])
-        local_edges = g.in_edges(local_nodes, form='eid')
-        if not reshuffle:
+        for part_id in parts:
+            part = parts[part_id]
+            # To get the edges in the input graph, we should use original node Ids.
+            local_edges = F.boolean_mask(part.edata[EID], part.edata['inner_edge'])
             edge_parts[F.asnumpy(local_edges)] = part_id
-        num_edges += len(local_edges)
-        num_nodes += len(local_nodes)
-        lnodes_list.append(local_nodes)
-        ledges_list.append(local_edges)
-    assert num_edges == g.number_of_edges()
-    assert num_nodes == g.number_of_nodes()
+        print('Calculate edge assignment: {:.3f} seconds'.format(time.time() - start))
 
     os.makedirs(out_path, mode=0o775, exist_ok=True)
     tot_num_inner_edges = 0
@@ -311,12 +301,19 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         # With reshuffling, we can ensure that all nodes and edges are reshuffled
         # and are in contiguous Id space.
         if num_parts > 1:
-            node_map_val = np.cumsum([len(lnodes) for lnodes in lnodes_list]).tolist()
-            edge_map_val = np.cumsum([len(ledges) for ledges in ledges_list]).tolist()
+            node_map_val = [F.as_scalar(F.sum(F.astype(parts[i].ndata['inner_node'], F.int64),
+                                              0)) for i in parts]
+            node_map_val = np.cumsum(node_map_val).tolist()
+            assert node_map_val[-1] == g.number_of_nodes()
+            edge_map_val = [F.as_scalar(F.sum(F.astype(parts[i].edata['inner_edge'], F.int64),
+                                              0)) for i in parts]
+            edge_map_val = np.cumsum(edge_map_val).tolist()
+            assert edge_map_val[-1] == g.number_of_edges()
         else:
             node_map_val = [g.number_of_nodes()]
             edge_map_val = [g.number_of_edges()]
 
+    start = time.time()
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
                      'num_edges': g.number_of_edges(),
@@ -326,14 +323,17 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                      'node_map': node_map_val,
                      'edge_map': edge_map_val}
     for part_id in range(num_parts):
-        part = client_parts[part_id]
+        part = parts[part_id]
 
         # Get the node/edge features of each partition.
         node_feats = {}
         edge_feats = {}
         if num_parts > 1:
-            local_nodes = lnodes_list[part_id]
-            local_edges = ledges_list[part_id]
+            # To get the edges in the input graph, we should use original node Ids.
+            ndata_name = 'orig_id' if reshuffle else NID
+            edata_name = 'orig_id' if reshuffle else EID
+            local_nodes = F.boolean_mask(part.ndata[ndata_name], part.ndata['inner_node'])
+            local_edges = F.boolean_mask(part.edata[edata_name], part.edata['inner_edge'])
             print('part {} has {} nodes and {} edges.'.format(
                 part_id, part.number_of_nodes(), part.number_of_edges()))
             print('{} nodes and {} edges are inside the partition'.format(
@@ -363,6 +363,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:
         json.dump(part_metadata, outfile, sort_keys=True, indent=4)
+    print('Save partitions: {:.3f} seconds'.format(time.time() - start))
 
     num_cuts = g.number_of_edges() - tot_num_inner_edges
     if num_parts == 1:
