@@ -763,74 +763,9 @@ def add_nodes(g, num, data=None, ntype=None):
     add_edges
     remove_edges
     """
-    # TODO(xiangsx): block do not support add_nodes
-    if ntype is None:
-        if len(g.ntypes) != 1:
-            raise DGLError('Node type name must be specified if there are more than one '
-                           'node types.')
-
-    assert num > 0, 'Number of new nodes should be larger than one.'
-
-    num_nodes_dict = {}
-    if ntype is None:
-        num_nodes_dict[g.ntypes[0]] = g.number_of_nodes(g.ntypes[0]) + num
-    else:
-        for c_ntype in g.ntypes:
-            num_nodes_dict[c_ntype] = \
-                g.number_of_nodes(c_ntype) + (num if c_ntype == ntype else 0)
-    graph_data = {}
-    for c_etype in g.canonical_etypes:
-        u, v = g.edges(form='uv', order='eid', etype=c_etype)
-        graph_data[c_etype] = (u, v)
-
-    new_g = heterograph(graph_data,
-                        num_nodes_dict,
-                        idtype=g.idtype,
-                        device=g.device)
-
-    for c_ntype in g.ntypes:
-        # ntype is None: only one ntype
-        # c_ntype == ntype: ntype to add nodes
-        if ntype is None or c_ntype == ntype:
-            ndata = g.nodes[c_ntype].data
-            # existing features
-            for key, val in ndata.items():
-                if data is not None and data.get(key, None) is not None:
-                    new_feats = utils.prepare_tensor(new_g, data[key], 'data')
-                    assert len(new_feats) == num, \
-                        'Data length of {} should be {}, but got {}'.format(key,
-                                                                            num,
-                                                                            len(new_feats))
-                    new_g.nodes[c_ntype].data[key] = F.cat([val, new_feats], dim=0)
-                else:
-                    shape = F.shape(val)
-                    shape = (num,) + shape[1:]
-                    new_feats = F.zeros(shape, F.dtype(val), F.context(val))
-                    new_g.nodes[c_ntype].data[key] = F.cat([val, new_feats], dim=0)
-
-            # non-existing features
-            if data is not None:
-                for key, val in data.items():
-                    if ndata.get(key, None) is None:
-                        shape = F.shape(data[key])
-                        shape = (g.number_of_nodes(c_ntype),) + shape[1:]
-                        new_feats = utils.prepare_tensor(new_g, data[key], 'data')
-                        assert len(new_feats) == num, \
-                            'Data length of {} should be {}, but got {}'.format(key,
-                                                                                num,
-                                                                                len(new_feats))
-                        new_g.nodes[c_ntype].data[key] = \
-                            F.cat([F.zeros(shape, F.dtype(data[key]), F.context(data[key])),
-                                   new_feats], dim=0)
-        else:
-            for key, val in g.nodes[c_ntype].data.items():
-                new_g.nodes[c_ntype].data[key] = val
-
-    for c_etype in g.canonical_etypes:
-        for key, val in g.edges[c_etype].data.items():
-            new_g.edges[c_etype].data[key] = val
-
-    return new_g
+    g = g.clone()
+    g.add_nodes(num, data=data, ntype=ntype)
+    return g
 
 def add_edges(g, u, v, data=None, etype=None):
     r"""Add multiple new edges for the specified edge type.
@@ -931,107 +866,9 @@ def add_edges(g, u, v, data=None, etype=None):
     remove_nodes
     remove_edges
     """
-    # TODO(xiangsx): block do not support add_edges
-    u = utils.prepare_tensor(g, u, 'u')
-    v = utils.prepare_tensor(g, v, 'v')
-
-    if etype is None:
-        if len(g.etypes) != 1:
-            raise DGLError('Edge type name must be specified if there are more than one '
-                           'edge types.')
-
-    assert len(u) > 0 and len(v) > 0, \
-        'The number of source nodes and the number of destination nodes should be larger than 0'
-
-    assert len(u) == len(v) or len(u) == 1 or len(v) == 1, \
-        'The number of source nodes and the number of destination nodes should be same, ' \
-        'or either the number of source nodes or the number of destination nodes is 1.'
-
-    # fill up u and v
-    if len(u) == 1 and len(v) > 1:
-        u = F.full_1d(len(v), F.as_scalar(u), dtype=F.dtype(u), ctx=F.context(u))
-    if len(v) == 1 and len(u) > 1:
-        v = F.full_1d(len(u), F.as_scalar(v), dtype=F.dtype(v), ctx=F.context(v))
-
-    u_type, e_type, v_type = g.to_canonical_etype(etype)
-    # if end nodes of adding edges does not exists
-    # use add_nodes to add new nodes first.
-    num_of_u = g.number_of_nodes(u_type)
-    num_of_v = g.number_of_nodes(v_type)
-    u_max = F.as_scalar(F.max(u, dim=0)) + 1
-    v_max = F.as_scalar(F.max(v, dim=0)) + 1
-
-    if u_type == v_type:
-        num_nodes = max(u_max, v_max)
-        if num_nodes > num_of_u:
-            g = add_nodes(g, num_nodes - num_of_u, ntype=u_type)
-    else:
-        if u_max > num_of_u:
-            g = add_nodes(g, u_max - num_of_u, ntype=u_type)
-        if v_max > num_of_v:
-            g = add_nodes(g, v_max - num_of_v, ntype=v_type)
-
-    num_nodes_dict = {}
-    for c_ntype in g.ntypes:
-        num_nodes_dict[c_ntype] = g.number_of_nodes(c_ntype)
-
-    graph_data = {}
-    for c_etype in g.canonical_etypes:
-        old_u, old_v = g.edges(form='uv', order='eid', etype=c_etype)
-        if c_etype == (u_type, e_type, v_type):
-            graph_data[c_etype] = (F.cat([old_u, u], dim=0),
-                                   F.cat([old_v, v], dim=0))
-        else:
-            graph_data[c_etype] = (old_u, old_v)
-
-    new_g = heterograph(graph_data,
-                        num_nodes_dict,
-                        idtype=g.idtype,
-                        device=g.device)
-
-    # copy node features
-    for c_ntype in g.ntypes:
-        for key, val in g.nodes[c_ntype].data.items():
-            new_g.nodes[c_ntype].data[key] = val
-
-    # copy edge features
-    for c_etype in g.canonical_etypes:
-        if c_etype == (u_type, e_type, v_type):
-            edata = g.edges[c_etype].data
-            # existing features
-            for key, val in edata.items():
-                if data is not None and data.get(key, None) is not None:
-                    new_feats = utils.prepare_tensor(new_g, data[key], 'data')
-                    assert len(new_feats) == len(u), \
-                        'Data length of {} should be {}, but got {}'.format(key,
-                                                                            len(u),
-                                                                            len(new_feats))
-                    new_g.edges[c_etype].data[key] = F.cat([val, new_feats], dim=0)
-                else:
-                    shape = F.shape(val)
-                    shape = (len(u),) + shape[1:]
-                    new_feats = F.zeros(shape, F.dtype(val), F.context(val))
-                    new_g.edges[c_etype].data[key] = F.cat([val, new_feats], dim=0)
-
-            # non-existing features
-            if data is not None:
-                for key, val in data.items():
-                    if edata.get(key, None) is None:
-                        shape = F.shape(data[key])
-                        shape = (g.number_of_edges(c_etype),) + shape[1:]
-                        new_feats = utils.prepare_tensor(new_g, data[key], 'data')
-                        assert len(new_feats) == len(u), \
-                            'Data length of {} should be {}, but got {}'.format(key,
-                                                                                len(u),
-                                                                                len(new_feats))
-                        new_g.edges[c_etype].data[key] = \
-                            F.cat([F.zeros(shape, F.dtype(val), F.context(val)),
-                                   new_feats], dim=0)
-        else:
-            for key, val in g.edges[c_etype].data.items():
-                new_g.edges[c_etype].data[key] = val
-
-    return new_g
+    g = g.clone()
+    g.add_edges(u, v, data=data, etype=etype)
+    return g
 
 def remove_edges(g, eids, etype=None):
     r"""Remove multiple edges with the specified edge type.
@@ -1094,37 +931,9 @@ def remove_edges(g, eids, etype=None):
     add_edges
     remove_nodes
     """
-    # TODO(xiangsx): block do not support remove_edges
-    if etype is None:
-        if len(g.etypes) != 1:
-            raise DGLError('Edge type name must be specified if there are more than one ' \
-                            'edge types.')
-    eids = utils.prepare_tensor(g, eids, 'u')
-    assert g.number_of_edges(etype) > F.as_scalar(F.max(eids, dim=0)), \
-        'The input eid {} is out of the range [0:{})'.format(
-            F.as_scalar(F.max(eids, dim=0)), g.number_of_edges(etype))
-
-    # edge_subgraph
-    edges = {}
-    etype = g.to_canonical_etype(etype)
-    for c_etype in g.canonical_etypes:
-        # the target edge type
-        if c_etype == etype:
-            old_eids = g.edges(form='eid', order='eid', etype=c_etype)
-            # trick here, eid_0 is 0 and should be handled
-            old_eids = F.scatter_row(old_eids,
-                                     F.copy_to(F.tensor(0, dtype=F.int64),
-                                               F.context(old_eids)),
-                                     F.copy_to(F.tensor(1, dtype=F.dtype(old_eids)),
-                                               F.context(old_eids)))
-            old_eids = F.scatter_row(old_eids, eids, F.full_1d(
-                len(eids), 0, F.dtype(old_eids), F.context(old_eids)))
-            edges[c_etype] = F.tensor(F.nonzero_1d(old_eids), dtype=F.dtype(old_eids))
-        else:
-            edges[c_etype] = g.edges(form='eid', order='eid', etype=c_etype)
-
-    sub_g = g.edge_subgraph(edges, preserve_nodes=True)
-    return sub_g
+    g = g.clone()
+    g.remove_edges(eids, etype=etype)
+    return g
 
 
 def remove_nodes(g, nids, ntype=None):
@@ -1197,38 +1006,9 @@ def remove_nodes(g, nids, ntype=None):
     add_edges
     remove_edges
     """
-    # TODO(xiangsx): block do not support remove_nodes
-    if ntype is None:
-        if len(g.ntypes) != 1:
-            raise DGLError('Node type name must be specified if there are more than one ' \
-                            'node types.')
-
-    nids = utils.prepare_tensor(g, nids, 'u')
-    assert g.number_of_nodes(ntype) > F.as_scalar(F.max(nids, dim=0)), \
-        'The input nids {} is out of the range [0:{})'.format(
-            F.as_scalar(F.max(nids, dim=0)), g.number_of_nodes(ntype))
-
-    nodes = {}
-    for c_ntype in g.ntypes:
-        # ntype is None: only one ntype
-        # c_ntype == ntype: ntype to add nodes
-        if ntype is None or c_ntype == ntype:
-            old_nids = g.nodes(c_ntype)
-            # trick here, nid_0 is 0 and should be handled
-            old_nids = F.scatter_row(old_nids,
-                                     F.copy_to(F.tensor(0, dtype=F.int64),
-                                               F.context(old_nids)),
-                                     F.copy_to(F.tensor(1, dtype=F.dtype(old_nids)),
-                                               F.context(old_nids)))
-            old_nids = F.scatter_row(old_nids, nids, F.full_1d(
-                len(nids), 0, F.dtype(old_nids), F.context(old_nids)))
-            nodes[c_ntype] = F.tensor(F.nonzero_1d(old_nids), dtype=F.dtype(old_nids))
-        else:
-            nodes[c_ntype] = g.nodes(c_ntype)
-
-    # node_subgraph
-    sub_g = g.subgraph(nodes)
-    return sub_g
+    g = g.clone()
+    g.remove_nodes(nids, ntype=ntype)
+    return g
 
 def add_self_loop(g, etype=None):
     r""" Add self loop for each node in the graph.
@@ -1297,6 +1077,7 @@ def add_self_loop(g, etype=None):
     new_g = add_edges(g, nodes, nodes, etype=etype)
     return new_g
 
+DGLHeteroGraph.add_self_loop = add_self_loop
 
 def remove_self_loop(g, etype=None):
     r""" Remove self loops for each node in the graph.
@@ -1362,6 +1143,7 @@ def remove_self_loop(g, etype=None):
     new_g = remove_edges(g, self_loop_eids, etype=etype)
     return new_g
 
+DGLHeteroGraph.remove_self_loop = remove_self_loop
 
 def reorder_nodes(g, new_node_ids):
     """ Generate a new graph with new node Ids.
