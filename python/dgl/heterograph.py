@@ -311,28 +311,618 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def add_nodes(self, num, data=None, ntype=None):
-        """Add multiple new nodes of the same node type
+        r"""Add new nodes of the same node type
 
-        Currently not supported.
+        Parameters
+        ----------
+        num : int
+            Number of nodes to add.
+        data : dict, optional
+            Feature data of the added nodes.
+        ntype : str, optional
+            The type of the new nodes. Can be omitted if there is
+            only one node type in the graph.
+
+        Notes
+        -----
+
+        * Inplace update is applied to the current graph.
+        * If the key of ``data`` does not contain some existing feature fields,
+        those features for the new nodes will be created by initializers
+        defined with :func:`set_n_initializer` (default initializer fills zeros).
+        * If the key of ``data`` contains new feature fields, those features for
+        the old nodes will be created by initializers defined with
+        :func:`set_n_initializer` (default initializer fills zeros).
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.num_nodes()
+        3
+        >>> g.add_nodes(2)
+        >>> g.num_nodes()
+        5
+
+        If the graph has some node features and new nodes are added without
+        features, their features will be created by initializers defined
+        with :func:`set_n_initializer`.
+
+        >>> g.ndata['h'] = torch.ones(5, 1)
+        >>> g.add_nodes(1)
+        >>> g.ndata['h']
+        tensor([[1.], [1.], [1.], [1.], [1.], [0.]])
+
+        We can also assign features for the new nodes in adding new nodes.
+
+        >>> g.add_nodes(1, {'h': torch.ones(1, 1), 'w': torch.ones(1, 1)})
+        >>> g.ndata['h']
+        tensor([[1.], [1.], [1.], [1.], [1.], [0.], [1.]])
+
+        Since ``data`` contains new feature fields, the features for old nodes
+        will be created by initializers defined with :func:`set_n_initializer`.
+
+        >>> g.ndata['w']
+        tensor([[0.], [0.], [0.], [0.], [0.], [0.], [1.]])
+
+
+        **Heterogeneous Graphs with Multiple Node Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.add_nodes(2)
+        DGLError: Node type name must be specified
+        if there are more than one node types.
+        >>> g.num_nodes('user')
+        3
+        >>> g.add_nodes(2, ntype='user')
+        >>> g.num_nodes('user')
+        5
+
+        See Also
+        --------
+        remove_nodes
+        add_edges
+        remove_edges
         """
-        raise DGLError('Mutation is not supported in heterograph.')
+        # TODO(xiangsx): block do not support add_nodes
+        if ntype is None:
+            if self._graph.number_of_ntypes() != 1:
+                raise DGLError('Node type name must be specified if there are more than one '
+                               'node types.')
 
-    def add_edge(self, u, v, data=None, etype=None):
-        """Add an edge of ``etype`` between u of the source node type, and v
-        of the destination node type..
+        # nothing happen
+        if num == 0:
+            return
 
-        Currently not supported.
-        """
-        raise DGLError('Mutation is not supported in heterograph.')
+        assert num > 0, 'Number of new nodes should be larger than one.'
+        ntid = self.get_ntype_id(ntype)
+        # update graph idx
+        metagraph = self._graph.metagraph
+        num_nodes_per_type = []
+        for c_ntype in self.ntypes:
+            if self.get_ntype_id(c_ntype) == ntid:
+                num_nodes_per_type.append(self.number_of_nodes(c_ntype) + num)
+            else:
+                num_nodes_per_type.append(self.number_of_nodes(c_ntype))
+
+        relation_graphs = []
+        for c_etype in self.canonical_etypes:
+            # src or dst == ntype, update the relation graph
+            if self.get_ntype_id(c_etype[0]) == ntid or self.get_ntype_id(c_etype[2]) == ntid:
+                u, v = self.edges(form='uv', order='eid', etype=c_etype)
+                hgidx = heterograph_index.create_unitgraph_from_coo(
+                    1 if c_etype[0] == c_etype[2] else 2,
+                    self.number_of_nodes(c_etype[0]) + \
+                        (num if self.get_ntype_id(c_etype[0]) == ntid else 0),
+                    self.number_of_nodes(c_etype[2]) + \
+                        (num if self.get_ntype_id(c_etype[2]) == ntid else 0),
+                    u,
+                    v,
+                    'any')
+                relation_graphs.append(hgidx)
+            else:
+                # do nothing
+                relation_graphs.append(self._graph.get_relation_graph(self.get_etype_id(c_etype)))
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        self._graph = hgidx
+
+        # update data frames
+        if data is None:
+            # Initialize feature with :func:`set_n_initializer`
+            self._node_frames[ntid].add_rows(num)
+        else:
+            self._node_frames[ntid].append(data)
 
     def add_edges(self, u, v, data=None, etype=None):
-        """Add multiple edges of ``etype`` between list of source nodes ``u``
-        and list of destination nodes ``v`` of type ``vtype``.  A single edge
-        is added between every pair of ``u[i]`` and ``v[i]``.
+        r"""Add multiple new edges for the specified edge type
 
-        Currently not supported.
+        The i-th new edge will be from ``u[i]`` to ``v[i]``.
+
+        Parameters
+        ----------
+        u : int, tensor, numpy.ndarray, list
+            Source node IDs, ``u[i]`` gives the source node for the i-th new edge.
+        v : int, tensor, numpy.ndarray, list
+            Destination node IDs, ``v[i]`` gives the destination node for the i-th new edge.
+        data : dict, optional
+            Feature data of the added edges. The i-th row of the feature data
+            corresponds to the i-th new edge.
+        etype : str or tuple of str, optional
+            The type of the new edges. Can be omitted if there is
+            only one edge type in the graph.
+
+        Notes
+        -----
+
+        * Inplace update is applied to the current graph.
+        * If end nodes of adding edges does not exists, add_nodes is invoked
+        to add new nodes. The node features of the new nodes will be created
+        by initializers defined with :func:`set_n_initializer` (default
+        initializer fills zeros). In certain cases, it is recommanded to
+        add_nodes first and then add_edges.
+        * If the key of ``data`` does not contain some existing feature fields,
+        those features for the new edges will be created by initializers
+        defined with :func:`set_n_initializer` (default initializer fills zeros).
+        * If the key of ``data`` contains new feature fields, those features for
+        the old edges will be created by initializers defined with
+        :func:`set_n_initializer` (default initializer fills zeros).
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.num_edges()
+        2
+        >>> g.add_edges(torch.tensor([1, 3]), torch.tensor([0, 1]))
+        >>> g.num_edges()
+        4
+
+        Since ``u`` or ``v`` contains a non-existing node ID, the nodes are
+        added implicitly.
+        >>> g.num_nodes()
+        4
+
+        If the graph has some edge features and new edges are added without
+        features, their features will be created by initializers defined
+        with :func:`set_n_initializer`.
+
+        >>> g.edata['h'] = torch.ones(4, 1)
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]))
+        >>> g.edata['h']
+        tensor([[1.], [1.], [1.], [1.], [0.]])
+
+        We can also assign features for the new edges in adding new edges.
+
+        >>> g.add_edges(torch.tensor([0, 0]), torch.tensor([2, 2]),
+        >>>             {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
+        >>> g.edata['h']
+        tensor([[1.], [1.], [1.], [1.], [0.], [1.], [2.]])
+
+        Since ``data`` contains new feature fields, the features for old edges
+        will be created by initializers defined with :func:`set_n_initializer`.
+
+        >>> g.edata['w']
+        tensor([[0.], [0.], [0.], [0.], [0.], [1.], [1.]])
+
+        **Heterogeneous Graphs with Multiple Edge Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.add_edges(torch.tensor([3]), torch.tensor([3]))
+        DGLError: Edge type name must be specified
+        if there are more than one edge types.
+        >>> g.number_of_edges('plays')
+        4
+        >>>  g.add_edges(torch.tensor([3]), torch.tensor([3]), etype='plays')
+        >>> g.number_of_edges('plays')
+        5
+
+        See Also
+        --------
+        add_nodes
+        remove_nodes
+        remove_edges
         """
-        raise DGLError('Mutation is not supported in heterograph.')
+        # TODO(xiangsx): block do not support add_edges
+        u = utils.prepare_tensor(self, u, 'u')
+        v = utils.prepare_tensor(self, v, 'v')
+
+        if etype is None:
+            if self._graph.number_of_etypes() != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+
+        # nothing changed
+        if len(u) == 0 or len(v) == 0:
+            return
+
+        assert len(u) == len(v) or len(u) == 1 or len(v) == 1, \
+            'need the number of source nodes and the number of destination nodes are same, ' \
+            'or either the number of source nodes or the number of destination nodes is 1.'
+
+        if len(u) == 1 and len(v) > 1:
+            u = F.full_1d(len(v), F.as_scalar(u), dtype=F.dtype(u), ctx=F.context(u))
+        if len(v) == 1 and len(u) > 1:
+            v = F.full_1d(len(u), F.as_scalar(v), dtype=F.dtype(v), ctx=F.context(v))
+
+        u_type, e_type, v_type = self.to_canonical_etype(etype)
+        # if end nodes of adding edges does not exists
+        # use add_nodes to add new nodes first.
+        num_of_u = self.number_of_nodes(u_type)
+        num_of_v = self.number_of_nodes(v_type)
+        u_max = F.as_scalar(F.max(u, dim=0)) + 1
+        v_max = F.as_scalar(F.max(v, dim=0)) + 1
+
+        if u_type == v_type:
+            num_nodes = max(u_max, v_max)
+            if num_nodes > num_of_u:
+                self.add_nodes(num_nodes - num_of_u, ntype=u_type)
+        else:
+            if u_max > num_of_u:
+                self.add_nodes(u_max - num_of_u, ntype=u_type)
+            if v_max > num_of_v:
+                self.add_nodes(v_max - num_of_v, ntype=v_type)
+
+        # metagraph is not changed
+        metagraph = self._graph.metagraph
+        num_nodes_per_type = []
+        for ntype in self.ntypes:
+            num_nodes_per_type.append(self.number_of_nodes(ntype))
+        # update graph idx
+        relation_graphs = []
+        for c_etype in self.canonical_etypes:
+            # the target edge type
+            if c_etype == (u_type, e_type, v_type):
+                old_u, old_v = self.edges(form='uv', order='eid', etype=c_etype)
+                hgidx = heterograph_index.create_unitgraph_from_coo(
+                    1 if u_type == v_type else 2,
+                    self.number_of_nodes(u_type),
+                    self.number_of_nodes(v_type),
+                    F.cat([old_u, u], dim=0),
+                    F.cat([old_v, v], dim=0),
+                    'any')
+                relation_graphs.append(hgidx)
+            else:
+                # do nothing
+                # Note: node range change has been handled in add_nodes()
+                relation_graphs.append(self._graph.get_relation_graph(self.get_etype_id(c_etype)))
+
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        self._graph = hgidx
+
+        # handle data
+        etid = self.get_etype_id(etype)
+        if data is None:
+            self._edge_frames[etid].add_rows(len(u))
+        else:
+            self._edge_frames[etid].append(data)
+
+    def remove_edges(self, eids, etype=None):
+        r"""Remove multiple edges with the specified edge type
+
+        Nodes will not be removed. After removing edges, the rest
+        edges will be re-indexed using consecutive integers from 0,
+        with their relative order preserved.
+
+        The features for the removed edges will be removed accordingly.
+
+        Parameters
+        ----------
+        eids : int, tensor, numpy.ndarray, list
+            IDs for the edges to remove.
+        etype : str or tuple of str, optional
+            The type of the edges to remove. Can be omitted if there is
+            only one edge type in the graph.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+        >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+        >>> g.remove_edges(torch.tensor([0, 1]))
+        >>> g
+        Graph(num_nodes=3, num_edges=1,
+            ndata_schemes={}
+            edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+        >>> g.edges('all')
+        (tensor([2]), tensor([2]), tensor([0]))
+        >>> g.edata['he']
+        tensor([[2.]])
+
+        **Heterogeneous Graphs with Multiple Edge Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.remove_edges(torch.tensor([0, 1]))
+        DGLError: Edge type name must be specified
+        if there are more than one edge types.
+        >>> g.remove_edges(torch.tensor([0, 1]), 'plays')
+        >>> g.edges('all', etype='plays')
+        (tensor([0, 1]), tensor([0, 0]), tensor([0, 1]))
+
+        See Also
+        --------
+        add_nodes
+        add_edges
+        remove_nodes
+        """
+        # TODO(xiangsx): block do not support remove_edges
+        if etype is None:
+            if self._graph.number_of_etypes() != 1:
+                raise DGLError('Edge type name must be specified if there are more than one ' \
+                               'edge types.')
+        eids = utils.prepare_tensor(self, eids, 'u')
+        assert self.number_of_edges(etype) > F.as_scalar(F.max(eids, dim=0)), \
+            'The input eid {} is out of the range [0:{})'.format(
+                F.as_scalar(F.max(eids, dim=0)), self.number_of_edges(etype))
+
+        # edge_subgraph
+        edges = {}
+        u_type, e_type, v_type = self.to_canonical_etype(etype)
+        for c_etype in self.canonical_etypes:
+            # the target edge type
+            if c_etype == (u_type, e_type, v_type):
+                old_eids = self.edges(form='eid', order='eid', etype=c_etype)
+                # trick here, eid_0 is 0 and should be handled
+                old_eids[0] += 1
+                old_eids = F.scatter_row(old_eids, eids, F.full_1d(
+                    len(eids), 0, F.dtype(old_eids), F.context(old_eids)))
+                edges[c_etype] = F.tensor(F.nonzero_1d(old_eids), dtype=F.dtype(old_eids))
+            else:
+                edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
+
+        sub_g = self.edge_subgraph(edges, preserve_nodes=True)
+        self._graph = sub_g._graph
+        self._node_frames = sub_g._node_frames
+        self._edge_frames = sub_g._edge_frames
+
+    def remove_nodes(self, nids, ntype=None):
+        r"""Remove multiple nodes with the specified node type
+
+        Edges that connect to the nodes will be removed as well. After removing
+        nodes and edges, the rest nodes and edges will be re-indexed using
+        consecutive integers from 0, with their relative order preserved.
+
+        The features for the removed nodes/edges will be removed accordingly.
+
+        Parameters
+        ----------
+        nids : int, tensor, numpy.ndarray, list
+            Nodes to remove.
+        ntype : str, optional
+            The type of the nodes to remove. Can be omitted if there is
+            only one node type in the graph.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+        >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
+        >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+        >>> g.remove_nodes(torch.tensor([0, 1]))
+        >>> g
+        Graph(num_nodes=1, num_edges=1,
+            ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
+            edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+        >>> g.ndata['hv']
+        tensor([[2.]])
+        >>> g.edata['he']
+        tensor([[2.]])
+
+        **Heterogeneous Graphs with Multiple Node Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.remove_nodes(torch.tensor([0, 1]))
+        DGLError: Node type name must be specified
+        if there are more than one node types.
+        >>> g.remove_nodes(torch.tensor([0, 1]), ntype='game')
+        >>> g.num_nodes('user')
+        3
+        >>> g.num_nodes('game')
+        0
+        >>> g.num_edges('plays')
+        0
+
+        See Also
+        --------
+        add_nodes
+        add_edges
+        remove_edges
+        """
+        # TODO(xiangsx): block do not support remove_nodes
+        if ntype is None:
+            if self._graph.number_of_ntypes() != 1:
+                raise DGLError('Node type name must be specified if there are more than one ' \
+                               'node types.')
+
+        nids = utils.prepare_tensor(self, nids, 'u')
+        assert self.number_of_nodes(ntype) > F.as_scalar(F.max(nids, dim=0)), \
+            'The input nids {} is out of the range [0:{})'.format(
+                F.as_scalar(F.max(nids, dim=0)), self.number_of_nodes(ntype))
+
+        ntid = self.get_ntype_id(ntype)
+        nodes = {}
+        for c_ntype in self.ntypes:
+            if self.get_ntype_id(c_ntype) == ntid:
+                old_nids = self.nodes(c_ntype)
+                # trick here, nid_0 is 0 and should be handled
+                old_nids[0] += 1
+                old_nids = F.scatter_row(old_nids, nids, F.full_1d(
+                    len(nids), 0, F.dtype(old_nids), F.context(old_nids)))
+                nodes[c_ntype] = F.tensor(F.nonzero_1d(old_nids), dtype=F.dtype(old_nids))
+            else:
+                nodes[c_ntype] = self.nodes(c_ntype)
+
+        # node_subgraph
+        sub_g = self.subgraph(nodes)
+        self._graph = sub_g._graph
+        self._node_frames = sub_g._node_frames
+        self._edge_frames = sub_g._edge_frames
+
+    def add_selfloop(self, etype=None):
+        r""" Add self loop for each node in the graph.
+
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The type of the edges to remove. Can be omitted if there is
+            only one edge type in the graph.
+
+        Notes
+        -----
+        * It is recommanded to ``remove_selfloop`` before invoking
+        ``add_selfloop``.
+        * Inplace update is applied to the current graph.
+        * Features for the new edges (self-loop edges) will be created
+        by initializers defined with :func:`set_n_initializer`
+        (default initializer fills zeros).
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([2, 1, 0])))
+        >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
+        >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+        >>> g
+        >>> g
+        Graph(num_nodes=3, num_edges=6,
+                ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
+                edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+        >>> g.edata['he']
+        tensor([[0.],
+                [1.],
+                [2.],
+                [0.],
+                [0.],
+                [0.]])
+
+        **Heterogeneous Graphs with Multiple Node Types**
+
+        >>> g = dgl.heterograph({
+                ('user', 'follows', 'user'): (torch.tensor([1, 2]),
+                                            torch.tensor([0, 1])),
+                ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+                                            torch.tensor([0, 1]))})
+        >>> g.add_selfloop(etype='follows')
+        >>> g
+        Graph(num_nodes={'user': 3, 'game': 2},
+            num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 5},
+            metagraph=[('user', 'user'), ('user', 'game')])
+        """
+        etype = self.to_canonical_etype(etype)
+        if etype[0] != etype[2]:
+            raise DGLError(
+                'add_selfloop does not support unidirectional bipartite graphs: {}.' \
+                'Please make sure the types of head node and tail node are identical.' \
+                ''.format(etype))
+        nodes = self.nodes(etype[0])
+        self.add_edges(nodes, nodes, etype=etype)
+
+    def remove_selfloop(self, etype=None):
+        r""" Remove self loops for each node in the graph.
+
+        If there are multiple self loops for a certain node,
+        all of them will be removed.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([1, 0, 0, 2])),
+                          idtype=idtype, device=F.ctx())
+        >>> g.edata['he'] = torch.arange(4).float().reshape(-1, 1)
+        >>> g.remove_selfloop()
+        >>> g
+        Graph(num_nodes=3, num_edges=2,
+            edata_schemes={'he': Scheme(shape=(2,), dtype=torch.float32)})
+        >>> g.edata['he']
+        tensor([[0.],[3.]])
+
+        **Heterogeneous Graphs with Multiple Node Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1, 1])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.remove_selfloop(etype='follows')
+        >>> g.num_nodes('user')
+        3
+        >>> g.num_nodes('game')
+        2
+        >>> g.num_edges('follows')
+        2
+        >>> g.num_edges('plays')
+        2
+
+        See Also
+        --------
+        add_selfloop
+        """
+        # TODO(xiangsx) need to handle block
+        etype = self.to_canonical_etype(etype)
+        if etype[0] != etype[2]:
+            raise DGLError(
+                'remove_selfloop does not support unidirectional bipartite graphs: {}.' \
+                'Please make sure the types of head node and tail node are identical.' \
+                ''.format(etype))
+        u, v = self.edges(form='uv', order='eid', etype=etype)
+        self_loop_eids = F.tensor(F.nonzero_1d(u == v), dtype=F.dtype(u))
+        self.remove_edges(self_loop_eids, etype=etype)
 
     #################################################################
     # Metagraph query
@@ -4006,207 +4596,120 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-    def format_in_use(self, etype=None):
-        """Return the sparse formats in use of the given edge/relation type.
+    def format(self, format=None):
+        r"""Get a cloned graph with the specified sparse format(s) or query 
+        for the usage status of sparse formats
+
+        The API copies both the graph structure and the features.
+
+        If the input graph has multiple edge types, they will have the same 
+        sparse format.
 
         Parameters
         ----------
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+        format : str or list of str or None
+
+            * If format is None, return the usage status of sparse formats
+            * If format is ``'any'`` 
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'``/``'any'`` or a sublist of 
+            them, specifying the sparse formats to use.
 
         Returns
         -------
-        list of str
-            Return all the formats currently in use (could be multiple).
+        dict or DGLGraph
+
+            * If format is ``'any'``, the result will be a dict recording the usage status of sparse formats.
+            * Otherwise, a DGLGraph will be returned, which is a clone of the 
+            original graph with the specified sparse format(s) ``format``
 
         Examples
         --------
-        For graph with only one edge type.
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows', restrict_format='csr')
-        >>> g.format_in_use()
-        ['csr']
+        The following example uses PyTorch backend.
 
-        For a graph with multiple types.
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.format_in_use('develops')
-        ['coo']
-        >>> spmat = g['develops'].adjacency_matrix(
-        ...     transpose=True, scipy_fmt='csr')    // Create CSR representation.
-        >>> g.format_in_use('develops')
-        ['coo', 'csr']
+        **Homographs or Heterographs with A Single Edge Type**
 
-        which is equivalent to:
+        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g.ndata['h'] = torch.ones(4, 1)
+        >>> # Check status of format usage
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> # Get a clone of the graph with 'csr' format
+        >>> csr_g = g.format('csr')
+        >>> # Only allowed formats will be displayed in the status query
+        >>> csr_g.format()
+        {'created': ['csr'], 'not created': []}
+        >>> # Features are copied as well
+        >>> csr_g.ndata['h']
+        tensor([[1.],
+                [1.],
+                [1.],
+                [1.]])
 
-        >>> g['develops'].restrict_format()
-        ['coo', 'csr']
-
-        See Also
-        --------
-        restrict_format
-        request_format
-        to_format
-        """
-        return self._graph.format_in_use(self.get_etype_id(etype))
-
-    def restrict_format(self, etype=None):
-        """Return the allowed sparse formats of the given edge/relation type.
-
-        Parameters
-        ----------
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-
-        Returns
-        -------
-        str : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
-            ``'any'`` indicates all sparse formats are allowed in .
-
-        Examples
-        --------
-        For graph with only one edge type.
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
-        >>> g.restrict_format()
-        'csr'
-
-        For a graph with multiple types.
+        **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.restrict_format('develops')
-        'any'
-
-        which is equivalent to:
-
-        >>> g['develops'].restrict_format()
-        'any'
-
-        See Also
-        --------
-        format_in_use
-        request_format
-        to_format
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]), 
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), 
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> # Get a clone of the graph with 'csr' format
+        >>> csr_g = g.format('csr')
+        >>> # Only allowed formats will be displayed in the status query
+        >>> csr_g.format()
+        {'created': ['csr'], 'not created': []}
         """
-        return self._graph.restrict_format(self.get_etype_id(etype))
-
-    def request_format(self, sparse_format, etype=None):
-        """Create a sparse matrix representation in given format immediately.
-
-        When the restrict format of the given edge type is ``any``, all formats of
-        sparse matrix representation are created in demand. In some cases user may
-        want a sparse matrix representation to be created immediately (e.g. in a
-        multi-process data loader), this API is designed for such purpose.
-
-        Parameters
-        ----------
-        sparse_format : str
-            ``'coo'``, ``'csr'``, or ``'csc'``
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-        Examples
-        --------
-        For graph with only one edge type.
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='any')
-        >>> g.format_in_use()
-        ['coo']
-        >>> g.request_format('csr')
-        >>> g.format_in_use()
-        ['coo', 'csr']
-
-        For a graph with multiple types.
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.format_in_use('develops')
-        ['coo']
-        >>> g.request_format('csc', etype='develops')
-        >>> g.format_in_use('develops')
-        ['coo', 'csc']
-
-        Another way to request format for a given etype is:
-        >>> g['plays'].request_format('csr')
-        >>> g['plays'].format_in_use()
-        ['coo', 'csr']
-
-        See Also
-        --------
-        format_in_use
-        restrict_format
-        to_format
-        """
-        if self.restrict_format(etype) != 'any':
-            raise KeyError("request_format is only available for "
-                           "graph whose restrict_format is 'any'")
-        if not sparse_format in ['coo', 'csr', 'csc']:
-            raise KeyError("can only request coo/csr/csr.")
-        return self._graph.request_format(sparse_format, self.get_etype_id(etype))
-
-
-    def to_format(self, restrict_format):
-        """Return a cloned graph but stored in the given restrict format.
-
-        If ``'any'`` is given, the restrict formats of the returned graph is relaxed.
-        The returned graph share the same node/edge data of the original graph.
-
-        Parameters
-        ----------
-        restrict_format : str
-            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
-
-        Returns
-        -------
-        A new graph.
-
-        Examples
-        --------
-        For a graph with single edge type:
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
-        >>> g.ndata['h'] = th.ones(3, 3)
-        >>> g.restrict_format()
-        'csr'
-        >>> g1 = g.to_format('coo')
-        >>> g1.ndata
-        {'h': tensor([[1., 1., 1.],
-                [1., 1., 1.],
-                [1., 1., 1.]])}
-        >>> g1.restrict_format()
-        'coo'
-
-        For a graph with multiple edge types:
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='coo')
-        >>> g.restrict_format('develops')
-        'coo'
-        >>> g1 = g.to_format('any')
-        >>> g1.restrict_format('plays')
-        'any'
-
-        See Also
-        --------
-        format_in_use
-        restrict_format
-        request_format
-        """
-        return DGLHeteroGraph(self._graph.to_format(restrict_format), self.ntypes, self.etypes,
+        if format is None:
+            return self._graph.format()
+        return DGLHeteroGraph(self._graph.to_format(format), self.ntypes, self.etypes,
                               self._node_frames,
                               self._edge_frames)
+
+    def create_format_(self):
+        r"""Create all sparse matrices allowed for the graph
+
+        By default, we create sparse matrices for a graph only when necessary. 
+        In some cases we may want to create them immediately (e.g. in a
+        multi-process data loader), which can be achieved via this API.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homographs or Heterographs with A Single Edge Type**
+
+        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> g.create_format_()
+        >>> g.format()
+        {'created': ['coo', 'csr', 'csc'], 'not created': []}
+
+        **Heterographs with Multiple Edge Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]), 
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), 
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> g.create_format_()
+        >>> g.format()
+        {'created': ['coo', 'csr', 'csc'], 'not created': []}
+        """
+        return self._graph.create_format_()
 
     def astype(self, idtype):
         """Cast this graph to use another ID type.

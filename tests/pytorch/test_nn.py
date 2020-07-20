@@ -222,7 +222,7 @@ def test_set_trans():
     assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
 
 def uniform_attention(g, shape):
-    a = th.ones(shape)
+    a = F.ones(shape)
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
     return a / g.in_degrees(g.edges(order='eid')[1]).view(target_shape).float()
 
@@ -246,6 +246,7 @@ def test_edge_softmax(idtype):
 
     # Test both forward and backward with PyTorch built-in softmax.
     g = dgl.rand_graph(30, 900)
+    g = g.astype(idtype).to(F.ctx())
 
     score = F.randn((900, 1))
     score.requires_grad_()

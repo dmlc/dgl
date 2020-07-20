@@ -264,7 +264,8 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {
+HeteroGraphPtr HeteroGraph::GetGraphInFormat(dgl_format_code_t restrict_formats) const {
+  /*
   std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
     auto relgraph = std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(etype));
@@ -272,6 +273,7 @@ HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const
   }
   return HeteroGraphPtr(new HeteroGraph(
     meta_graph_, format_rels, NumVerticesPerType()));
+  */
 }
 
 FlattenedHeteroGraphPtr HeteroGraph::Flatten(

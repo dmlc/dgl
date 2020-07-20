@@ -25,6 +25,10 @@ namespace dgl {
 class HeteroGraph;
 class UnitGraph;
 typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
+dgl_format_code_t all_code = 0x7;
+dgl_format_code_t coo_code = 0x1;
+dgl_format_code_t csr_code = 0x2;
+dgl_format_code_t csc_code = 0x4;
 
 /*!
  * \brief UnitGraph graph
@@ -174,31 +178,31 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::kAuto);
+      IdArray row, IdArray col, dgl_format_code_t restrict_formats = all_code);
 
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, const aten::COOMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::kAuto);
+      dgl_format_code_t restrict_formats = all_code);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      SparseFormat restrict_format = SparseFormat::kAuto);
+      dgl_format_code_t restrict_formats = all_code);
 
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::kAuto);
+      dgl_format_code_t restrict_formats = all_code);
 
   /*! \brief Create a graph from (in) CSC arrays */
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      SparseFormat restrict_format = SparseFormat::kAuto);
+      dgl_format_code_t restrict_formats = all_code);
 
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::kAuto);
+      dgl_format_code_t restrict_formats = all_code);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
@@ -241,14 +245,10 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! \brief some heuristic rules to determine the restrict format. */
   SparseFormat AutoDetectFormat(
-    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const;
+    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, dgl_format_code_t restrict_formats) const;
 
   SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
     return SelectFormat(preferred_format);
-  }
-
-  std::string GetRestrictFormat() const override {
-    return ToStringSparseFormat(this->restrict_format_);
   }
 
   /*!
@@ -261,7 +261,9 @@ class UnitGraph : public BaseHeteroGraph {
 
   dgl_format_code_t GetFormatInUse() const override;
 
-  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
+  dgl_format_code_t GetFormatAll() const override;
+
+  HeteroGraphPtr GetGraphInFormat() const override;
 
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
@@ -298,7 +300,7 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            SparseFormat restrict_format = SparseFormat::kAuto);
+            dgl_format_code_t restrict_formats=all_code);
 
   /*!
    * \brief constructor
@@ -317,7 +319,7 @@ class UnitGraph : public BaseHeteroGraph {
       bool has_in_csr,
       bool has_out_csr,
       bool has_coo,
-      SparseFormat restrict_format = SparseFormat::kAuto);
+      dgl_format_code_t restrict_formats=all_code);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
@@ -348,12 +350,8 @@ class UnitGraph : public BaseHeteroGraph {
   COOPtr coo_;
   /*!
    * \brief Storage format restriction.
-   * If it is not ANY, then conversion is not allowed for graph queries.
-   *
-   * Note that GetInCSR/GetOutCSR/GetCOO() can still be called and the conversion will
-   * still be done if requested explicitly (e.g. in message passing).
    */
-  SparseFormat restrict_format_;
+  dgl_format_code_t restrict_formats_;
 };
 
 };  // namespace dgl

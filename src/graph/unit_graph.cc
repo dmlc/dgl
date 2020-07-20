@@ -773,7 +773,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override {
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t restrict_formats) const override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return nullptr;
   }
@@ -1134,7 +1134,7 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
 HeteroGraphPtr UnitGraph::CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray row, IdArray col,
-    SparseFormat restrict_format) {
+    dgl_format_code_t restrict_formats) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
@@ -1142,12 +1142,12 @@ HeteroGraphPtr UnitGraph::CreateFromCOO(
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
 
   return HeteroGraphPtr(
-      new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
+      new UnitGraph(mg, nullptr, nullptr, coo, restrict_formats));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCOO(
     int64_t num_vtypes, const aten::COOMatrix& mat,
-    SparseFormat restrict_format) {
+    dgl_format_code_t restrict_formats) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(mat.num_rows, mat.num_cols);
@@ -1155,51 +1155,51 @@ HeteroGraphPtr UnitGraph::CreateFromCOO(
   COOPtr coo(new COO(mg, mat));
 
   return HeteroGraphPtr(
-      new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
+      new UnitGraph(mg, nullptr, nullptr, coo, restrict_formats));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids, SparseFormat restrict_format) {
+    IdArray indptr, IdArray indices, IdArray edge_ids, dgl_format_code_t restrict_formats) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_formats));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSR(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    SparseFormat restrict_format) {
+    dgl_format_code_t restrict_formats) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(mat.num_rows, mat.num_cols);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, mat));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_formats));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids, SparseFormat restrict_format) {
+    IdArray indptr, IdArray indices, IdArray edge_ids, dgl_format_code_t restrict_formats) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csc(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
-  return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, restrict_format));
+  return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, restrict_formats));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSC(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    SparseFormat restrict_format) {
+    dgl_format_code_t restrict_formats) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(mat.num_rows, mat.num_cols);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csc(new CSR(mg, mat));
-  return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, restrict_format));
+  return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, restrict_formats));
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
@@ -1215,7 +1215,7 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
     COOPtr new_coo =
       (bg->coo_->defined())? COOPtr(new COO(bg->coo_->AsNumBits(bits))) : nullptr;
     return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_formats_));
   }
 }
 
@@ -1232,12 +1232,12 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
     COOPtr new_coo =
       (bg->coo_->defined())? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
     return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_format_));
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->restrict_formats_));
   }
 }
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-                     SparseFormat restrict_format)
+                     dgl_format_code_t restrict_formats)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
   if (!in_csr_) {
     in_csr_ = CSRPtr(new CSR());
@@ -1248,31 +1248,7 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   if (!coo_) {
     coo_ = COOPtr(new COO());
   }
-
-  restrict_format_ = AutoDetectFormat(in_csr_, out_csr_, coo_, restrict_format);
-  switch (restrict_format) {
-  case SparseFormat::kCSC:
-    in_csr_ = GetInCSR();
-    // cleaning other format
-    out_csr_ = out_csr_->defined() ? CSRPtr(new CSR()) : out_csr_;
-    coo_ = coo_->defined() ? COOPtr(new COO()) : coo_;
-    break;
-  case SparseFormat::kCSR:
-    out_csr_ = GetOutCSR();
-    // cleaning other format
-    in_csr_ = in_csr_->defined() ? CSRPtr(new CSR()) : in_csr_;
-    coo_ = coo_->defined() ? COOPtr(new COO()) : coo_;
-    break;
-  case SparseFormat::kCOO:
-    coo_ = GetCOO();
-    // cleaning other format
-    in_csr_ = in_csr_->defined() ? CSRPtr(new CSR()) : in_csr_;
-    out_csr_ = out_csr_->defined() ? CSRPtr(new CSR()) : out_csr_;
-    break;
-  default:
-    break;
-  }
-
+  restrict_formats_ = restrict_formats;
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
@@ -1283,7 +1259,7 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
     bool has_in_csr,
     bool has_out_csr,
     bool has_coo,
-    SparseFormat restrict_format) {
+    dgl_format_code_t restrict_formats) {
   auto mg = CreateUnitGraphMetaGraph1();
 
   CSRPtr in_csr_ptr = nullptr;
@@ -1303,13 +1279,12 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
   else
     coo_ptr = COOPtr(new COO());
 
-  return HeteroGraphPtr(new UnitGraph(mg, in_csr_ptr, out_csr_ptr, coo_ptr, restrict_format));
+  return HeteroGraphPtr(new UnitGraph(mg, in_csr_ptr, out_csr_ptr, coo_ptr, restrict_formats));
 }
 
 UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   if (inplace)
-    if (restrict_format_ != SparseFormat::kAny &&
-        restrict_format_ != SparseFormat::kCSC)
+    if (restrict_formats_ & csc_code)
       LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
         ", cannot create CSC matrix.";
   CSRPtr ret = in_csr_;
@@ -1338,8 +1313,7 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   if (inplace)
-    if (restrict_format_ != SparseFormat::kAny &&
-        restrict_format_ != SparseFormat::kCSR)
+    if (restrict_formats_ & csr_code)
       LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
         ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
@@ -1367,8 +1341,7 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
 /* !\brief Return coo. If not exist, create from csr.*/
 UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
   if (inplace)
-    if (restrict_format_ != SparseFormat::kAny &&
-        restrict_format_ != SparseFormat::kCOO)
+    if (restrict_formats_ & coo_code)
       LOG(FATAL) << "The graph have restricted sparse format " << GetRestrictFormat() <<
         ", cannot create COO matrix.";
   COOPtr ret = coo_;
@@ -1415,13 +1388,25 @@ HeteroGraphPtr UnitGraph::GetAny() const {
   }
 }
 
-dgl_format_code_t UnitGraph::GetFormatInUse() const {
-  dgl_format_code_t ret = 0;
-  if (in_csr_->defined()) ret = ret | 1;
-  ret = ret << 1;
-  if (out_csr_->defined()) ret = ret | 1;
-  ret = ret << 1;
-  if (coo_->defined()) ret = ret | 1;
+std::vector<SparseFormat> UnitGraph::GetFormatInUse() const {
+  std::vector<std::string> ret;
+  if (in_csr_->defined())
+    ret.push_back("csc");
+  if (out_csr_->defined())
+    ret.push_back("csr");
+  if (coo_->defined())
+    ret.push_back("coo");
+  return ret;
+}
+
+std::vector<SparseFormat> UnitGraph::GetFormatAll() const {
+  std::vector<std::string> ret;
+  if (restrict_formats_ & csc_code)
+    ret.push_back("csc");
+  if (restrict_formats_ & csr_code)
+    ret.push_back("csr");
+  if (restrict_formats_ & coo_code)
+    ret.push_back("coo");
   return ret;
 }
 
@@ -1441,7 +1426,7 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
   }
 }
 
-HeteroGraphPtr UnitGraph::GetGraphInFormat(SparseFormat restrict_format) const {
+HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t restrict_formats) const {
     int64_t num_vtypes = NumVertexTypes();
     switch (restrict_format) {
     case SparseFormat::kCOO:
@@ -1460,7 +1445,7 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(SparseFormat restrict_format) const {
                       (in_csr_->defined()) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
                       (out_csr_->defined()) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
                       (coo_->defined()) ? COOPtr(new COO(*coo_)) : nullptr,
-                      restrict_format));
+                      restrict_formats));
     default:  // SparseFormat::kAuto
       LOG(FATAL) << "Must specify a restrict format.";
       return nullptr;
