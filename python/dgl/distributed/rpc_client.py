@@ -190,7 +190,8 @@ def shutdown_servers():
             rpc.send_request(server_id, req)
 
 def exit_client():
-    """Register exit callback
+    """Register exit callback.
     """
+    # Only client with rank_0 will send shutdown request to servers.
     shutdown_servers()
     finalize_client()
