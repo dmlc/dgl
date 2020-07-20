@@ -1112,7 +1112,9 @@ def remove_edges(g, eids, etype=None):
         if c_etype == etype:
             old_eids = g.edges(form='eid', order='eid', etype=c_etype)
             # trick here, eid_0 is 0 and should be handled
-            old_eids[0] += 1
+            old_eids = F.scatter_row(old_eids,
+                                     F.tensor(0, dtype=F.int64),
+                                     F.tensor(1, dtype=F.dtype(old_eids)))
             old_eids = F.scatter_row(old_eids, eids, F.full_1d(
                 len(eids), 0, F.dtype(old_eids), F.context(old_eids)))
             edges[c_etype] = F.tensor(F.nonzero_1d(old_eids), dtype=F.dtype(old_eids))

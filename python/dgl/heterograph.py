@@ -698,7 +698,9 @@ class DGLHeteroGraph(object):
             if c_etype == (u_type, e_type, v_type):
                 old_eids = self.edges(form='eid', order='eid', etype=c_etype)
                 # trick here, eid_0 is 0 and should be handled
-                old_eids[0] += 1
+                old_eids = F.scatter_row(old_eids,
+                                         F.tensor(0, dtype=F.int64),
+                                         F.tensor(1, dtype=F.dtype(old_eids)))
                 old_eids = F.scatter_row(old_eids, eids, F.full_1d(
                     len(eids), 0, F.dtype(old_eids), F.context(old_eids)))
                 edges[c_etype] = F.tensor(F.nonzero_1d(old_eids), dtype=F.dtype(old_eids))
@@ -809,7 +811,7 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         etype : str or tuple of str, optional
-            The type of the edges to remove. Can be omitted if there is
+            The type of the edges to add self loops. Can be omitted if there is
             only one edge type in the graph.
 
         Notes
@@ -876,6 +878,12 @@ class DGLHeteroGraph(object):
 
         If there are multiple self loops for a certain node,
         all of them will be removed.
+
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The type of the edges to remove self loops. Can be omitted if there is
+            only one edge type in the graph.
 
         Examples
         --------
