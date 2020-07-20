@@ -12,6 +12,7 @@ import io
 import unittest
 from utils import parametrize_dtype
 import multiprocessing as mp
+import os
 
 def create_test_graph(index_dtype):
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
