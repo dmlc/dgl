@@ -7,4 +7,4 @@ Currently it contains:
 * OGB-Products
   * GraphSAGE with Neighbor Sampling
 * OGB-Proteins
-  * MWE-GCN ([A GCN model for graphs with multi-dimensionally weighted edges](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf))
+  * MWE-GCN and MWE-DGCN ([GCN models for graphs with multi-dimensionally weighted edges](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf))
