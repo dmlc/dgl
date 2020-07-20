@@ -191,10 +191,10 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     retg.set_batch_num_nodes(bnn)
 
     # Compute batch num edges
-    batch_num_edges = {}
+    bne = {}
     for etype in graphs[0].canonical_etypes:
-        batch_num_edges[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
-    retg.set_batch_num_edges(batch_num_edges)
+        bne[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
+    retg.set_batch_num_edges(bne)
 
     # Batch node feature
     if ndata is not None:

@@ -29,6 +29,15 @@ def test_reduce_readout(g, idtype, reducer):
     g.edata['h'] = F.randn((g.number_of_edges(), 2))
 
     # Test.1: node readout
+    x = dgl.readout_nodes(g, 'h', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_nodes(sg, 'h', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
+
     x = getattr(dgl, '{}_nodes'.format(reducer))(g, 'h')
     # check correctness
     subg = dgl.unbatch(g)
@@ -39,6 +48,15 @@ def test_reduce_readout(g, idtype, reducer):
     assert F.allclose(x, F.cat(subx, dim=0))
 
     # Test.2: edge readout
+    x = dgl.readout_edges(g, 'h', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_edges(sg, 'h', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
+
     x = getattr(dgl, '{}_edges'.format(reducer))(g, 'h')
     # check correctness
     subg = dgl.unbatch(g)
@@ -59,6 +77,15 @@ def test_weighted_reduce_readout(g, idtype, reducer):
     g.edata['w'] = F.randn((g.number_of_edges(), 1))
 
     # Test.1: node readout
+    x = dgl.readout_nodes(g, 'h', 'w', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_nodes(sg, 'h', 'w', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
+
     x = getattr(dgl, '{}_nodes'.format(reducer))(g, 'h', 'w')
     # check correctness
     subg = dgl.unbatch(g)
@@ -69,6 +96,15 @@ def test_weighted_reduce_readout(g, idtype, reducer):
     assert F.allclose(x, F.cat(subx, dim=0))
 
     # Test.2: edge readout
+    x = dgl.readout_edges(g, 'h', 'w', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_edges(sg, 'h', 'w', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
+
     x = getattr(dgl, '{}_edges'.format(reducer))(g, 'h', 'w')
     # check correctness
     subg = dgl.unbatch(g)
