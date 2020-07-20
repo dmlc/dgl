@@ -10,7 +10,7 @@ import numbers
 import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
-from ...function.base import TargetCode 
+from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
 if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
@@ -356,7 +356,7 @@ def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = np.nonzero(tmp)[0]
-    return nd.array(tmp, ctx=input.context, dtype=input.dtype)
+    return nd.array(tmp, ctx=input.context, dtype=tmp.dtype)
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.

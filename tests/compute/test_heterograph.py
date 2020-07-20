@@ -8,6 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
+from dgl.heterograph_index import joint_union
 from utils import parametrize_dtype
 
 def create_test_heterograph(index_dtype):
@@ -717,7 +718,7 @@ def test_view1(index_dtype):
             for i in range(g.number_of_nodes(utype)):
                 assert out_degrees[i] == src_count[i]
             for i in range(g.number_of_nodes(vtype)):
-                assert in_degrees[i] == dst_count[i]   
+                assert in_degrees[i] == dst_count[i]
 
     edges = {
         'follows': ([0, 1], [1, 2]),
@@ -774,7 +775,7 @@ def test_view1(index_dtype):
     ndata = HG.ndata['h']
     assert isinstance(ndata, dict)
     assert F.array_equal(ndata['user'], f2)
-    
+
     edata = HG.edata['h']
     assert isinstance(edata, dict)
     assert F.array_equal(edata[('user', 'follows', 'user')], f4)
@@ -884,6 +885,15 @@ def test_to_device(index_dtype):
     if F.is_cuda_available():
         g1 = g.to(F.cuda())
         assert g1 is not None
+
+    # set feature after g.to
+    g = create_test_heterograph(index_dtype)
+    if F.is_cuda_available():
+        g1 = g.to(F.cuda())
+        assert g1 is not None
+        g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cuda())
+        g1.nodes['game'].data['i'] = F.copy_to(F.ones((2, 5)), F.cuda())
+        g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cuda())
 
 @parametrize_dtype
 def test_convert_bound(index_dtype):
@@ -1372,7 +1382,7 @@ def test_level2(index_dtype):
     g['plays'].send_and_recv([2, 3], mfunc, rfunc)
     y = g.nodes['game'].data['y']
     assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
-    
+
     # test fail case
     # fail due to multiple types
     fail = False
@@ -1977,6 +1987,13 @@ def test_reverse(index_dtype):
         }, index_dtype=index_dtype)
     gidx = g._graph
     r_gidx = gidx.reverse()
+
+    # metagraph
+    mg = gidx.metagraph
+    r_mg = r_gidx.metagraph
+    for etype in range(3):
+        assert mg.find_edge(etype) == r_mg.find_edge(etype)[::-1]
+
     # three node types and three edge types
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
@@ -2068,7 +2085,7 @@ if __name__ == '__main__':
     # test_flatten()
     # test_convert_bound()
     # test_convert()
-    # test_to_device()
+    # test_to_device("int32")
     # test_transform("int32")
     # test_subgraph("int32")
     # test_subgraph_mask("int32")
@@ -2084,6 +2101,6 @@ if __name__ == '__main__':
     # test_bipartite()
     # test_dtype_cast()
     # test_reverse("int32")
+    test_reverse("int32")
     test_format()
-
     pass

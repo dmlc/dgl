@@ -107,7 +107,7 @@ def create_large_heterograph(num_nodes):
 def test_node_subgraph_with_halo():
     gi = create_large_graph_index(1000)
     nodes = np.random.choice(gi.number_of_nodes(), 100, replace=False)
-    halo_subg, inner_node, inner_edge = gi.node_halo_subgraph(toindex(nodes), 2)
+    halo_subg, inner_node = gi.node_halo_subgraph(toindex(nodes), 2)
 
     # Check if edges in the subgraph are in the original graph.
     for s, d, e in zip(*halo_subg.graph.edges()):
@@ -120,35 +120,6 @@ def test_node_subgraph_with_halo():
     inner_node_ids = halo_subg.induced_nodes.tonumpy()[inner_node_ids]
     assert np.all(np.sort(inner_node_ids) == np.sort(nodes))
 
-    # Check if the inner edge labels are correct.
-    inner_edge = inner_edge.asnumpy()
-    inner_edge_ids = halo_subg.induced_edges.tonumpy()[inner_edge > 0]
-    subg = gi.node_subgraph(toindex(nodes))
-    assert np.all(np.sort(subg.induced_edges.tonumpy()) == np.sort(inner_edge_ids))
-
-def test_node_subgraph_with_halo_hetero():
-    hg = create_large_heterograph(1000)
-    gi = hg._graph
-    nodes = np.random.choice(hg.number_of_nodes(), 100, replace=False)
-    halo_subg, inner_node, inner_edge = gi.node_halo_subgraph(nodes, 2)
-
-    # Check if edges in the subgraph are in the original graph.
-    for s, d, e in zip(*halo_subg.graph.edges(0)):
-        assert halo_subg.induced_edges[0][e] in gi.edge_id(0, 
-                halo_subg.induced_nodes[0][s], halo_subg.induced_nodes[0][d])
-
-    # Check if the inner node labels are correct.
-    inner_node = inner_node.asnumpy()
-    inner_node_ids = np.nonzero(inner_node)[0]
-    inner_node_ids = halo_subg.induced_nodes[0].tonumpy()[inner_node_ids]
-    assert np.all(np.sort(inner_node_ids) == np.sort(nodes))
-
-    # Check if the inner edge labels are correct.
-    inner_edge = inner_edge.asnumpy()
-    inner_edge_ids = halo_subg.induced_edges[0].tonumpy()[inner_edge > 0]
-    subg = gi.node_subgraph([toindex(nodes)])
-    assert np.all(np.sort(subg.induced_edges[0].tonumpy()) == np.sort(inner_edge_ids))
-
 if __name__ == '__main__':
     test_node_subgraph()
     test_node_subgraph_with_halo()
@@ -156,4 +127,3 @@ if __name__ == '__main__':
     test_edge_subgraph_preserve_nodes()
     test_immutable_edge_subgraph()
     test_immutable_edge_subgraph_preserve_nodes()
-    test_node_subgraph_with_halo_hetero()
