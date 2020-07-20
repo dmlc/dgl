@@ -60,7 +60,7 @@ class GATConv(nn.Module):
                  activation=None):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(None, in_feats)
         self._out_feats = out_feats
         if isinstance(in_feats, tuple):
             self.fc_src = nn.Linear(
@@ -128,6 +128,8 @@ class GATConv(nn.Module):
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = self.fc(h_src).view(
                     -1, self._num_heads, self._out_feats)
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:

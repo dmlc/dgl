@@ -30,7 +30,7 @@ class DotGatConv(nn.Module):
                  out_feats
                  ):
         super(DotGatConv, self).__init__()
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(None, in_feats)
         self._out_feats = out_feats
 
         if isinstance(in_feats, tuple):
@@ -70,6 +70,8 @@ class DotGatConv(nn.Module):
         else:
             h_src = feat
             feat_src = feat_dst = self.fc(h_src)
+            if graph.is_block:
+                feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
         # Assign features to nodes
         graph.srcdata.update({'ft': feat_src})

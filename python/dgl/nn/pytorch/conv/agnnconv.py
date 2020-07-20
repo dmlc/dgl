@@ -59,7 +59,7 @@ class AGNNConv(nn.Module):
             should be the same as input shape.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(feat)
+            feat_src, feat_dst = expand_as_pair(graph, feat)
             graph.srcdata['h'] = feat_src
             graph.srcdata['norm_h'] = F.normalize(feat_src, p=2, dim=-1)
             if isinstance(feat, tuple):

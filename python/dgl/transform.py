@@ -1421,7 +1421,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     # The new graph duplicates the original node types to SRC and DST sets.
     new_ntypes = ([ntype for ntype in g.ntypes], [ntype for ntype in g.ntypes])
-    new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, g.etypes)
+    new_graph = DGLBlock(new_graph_index, new_ntypes, g.etypes)
     assert new_graph.is_unibipartite  # sanity check
 
     for i, ntype in enumerate(g.ntypes):

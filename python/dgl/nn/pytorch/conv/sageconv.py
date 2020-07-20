@@ -57,7 +57,7 @@ class SAGEConv(nn.Module):
                  activation=None):
         super(SAGEConv, self).__init__()
 
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(None, in_feats)
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         self.norm = norm
@@ -122,6 +122,8 @@ class SAGEConv(nn.Module):
                 feat_dst = self.feat_drop(feat[1])
             else:
                 feat_src = feat_dst = self.feat_drop(feat)
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
             h_self = feat_dst
 

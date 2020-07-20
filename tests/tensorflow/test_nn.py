@@ -6,7 +6,8 @@ import dgl
 import dgl.nn.tensorflow as nn
 import dgl.function as fn
 import backend as F
-from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
+from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph, \
+    random_block
 from copy import deepcopy
 
 import numpy as np
@@ -70,7 +71,7 @@ def test_graph_conv():
     # new_weight = conv.weight.data
     # assert not F.allclose(old_weight, new_weight)
 
-@pytest.mark.parametrize('g', get_cases(['path', 'bipartite', 'small'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['path', 'bipartite', 'small', 'block'], exclude=['zero-degree']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
@@ -355,6 +356,14 @@ def test_gat_conv():
     feat = (F.randn((100, 5)), F.randn((200, 10)))
     h = gat(g, feat)
 
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].numpy())
+    block = dgl.to_block(g, seed_nodes)
+    gat = nn.GATConv(5, 2, 4)
+    feat = F.randn((100, 5))
+    h = gat(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 4, 2)
+
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv(aggre_type):
     ctx = F.ctx()
@@ -377,6 +386,15 @@ def test_sage_conv(aggre_type):
     h = sage(g, feat)
     assert h.shape[-1] == 2
     assert h.shape[0] == 200
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].numpy())
+    block = dgl.to_block(g, seed_nodes)
+    sage = nn.SAGEConv(5, 10, aggre_type)
+    feat = F.randn((100, 5))
+    h = sage(block, feat)
+    assert h.shape[0] == block.number_of_dst_nodes()
+    assert h.shape[-1] == 10
 
     # Test the case for graphs without edges
     g = dgl.bipartite([], num_nodes=(5, 3))
@@ -437,6 +455,17 @@ def test_gin_conv(aggregator_type):
     feat = (F.randn((100, 5)), F.randn((200, 5)))
     h = gin(g, feat)
     assert h.shape == (200, 12)
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].numpy())
+    block = dgl.to_block(g, seed_nodes)
+    gin = nn.GINConv(
+        tf.keras.layers.Dense(12),
+        aggregator_type
+    )
+    feat = F.randn((100, 5))
+    h = gin(block, feat)
+    assert h.shape == (100, 12)
 
 def myagg(alist, dsttype):
     rst = alist[0]
