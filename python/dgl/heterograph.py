@@ -404,7 +404,7 @@ class DGLHeteroGraph(object):
 
         # nothing happen
         if num == 0:
-            return self
+            return
 
         assert num > 0, 'Number of new nodes should be larger than one.'
         ntid = self.get_ntype_id(ntype)
@@ -558,7 +558,7 @@ class DGLHeteroGraph(object):
 
         # nothing changed
         if len(u) == 0 or len(v) == 0:
-            return self
+            return
 
         assert len(u) == len(v) or len(u) == 1 or len(v) == 1, \
             'need the number of source nodes and the number of destination nodes are same, ' \
@@ -803,12 +803,14 @@ class DGLHeteroGraph(object):
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
 
-    def add_selfloop(self):
+    def add_selfloop(self, etype=None):
         r""" Add self loop for each node in the graph.
 
-        Since **selfloop is not well defined for unidirectional
-        bipartite graphs**, we simply skip the nodes corresponding
-        to unidirectional bipartite graphs.
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The type of the edges to remove. Can be omitted if there is
+            only one edge type in the graph.
 
         Notes
         -----
@@ -850,23 +852,22 @@ class DGLHeteroGraph(object):
                                             torch.tensor([0, 1])),
                 ('user', 'plays', 'game'): (torch.tensor([0, 1]),
                                             torch.tensor([0, 1]))})
-        >>> g.add_selfloop()
+        >>> g.add_selfloop(etype='follows')
         >>> g
         Graph(num_nodes={'user': 3, 'game': 2},
             num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 5},
             metagraph=[('user', 'user'), ('user', 'game')])
         """
-        self_loops = {}
-        for c_etype in self.canonical_etypes:
-            if c_etype[0] != c_etype[2]:
-                continue
-            nodes = self.nodes(c_etype[0])
-            self_loops[c_etype] = nodes
+        etype = self.to_canonical_etype(etype)
+        if etype[0] != etype[2]:
+            raise DGLError(
+                'add_selfloop does not support unidirectional bipartite graphs: {}.' \
+                'Please make sure the types of head node and tail node are identical.' \
+                ''.format(etype))
+        nodes = self.nodes(etype[0])
+        self.add_edges(nodes, nodes, etype=etype)
 
-        for c_type, nodes in self_loops.items():
-            self.add_edges(nodes, nodes, etype=c_type)
-
-    def remove_selfloop(self):
+    def remove_selfloop(self, etype=None):
         r""" Remove self loops for each node in the graph.
 
         If there are multiple self loops for a certain node,
@@ -898,7 +899,7 @@ class DGLHeteroGraph(object):
         >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
         >>>                                         torch.tensor([0, 1]))
         >>>     })
-        >>> g.remove_selfloop()
+        >>> g.remove_selfloop(etype='follows')
         >>> g.num_nodes('user')
         3
         >>> g.num_nodes('game')
@@ -913,16 +914,15 @@ class DGLHeteroGraph(object):
         add_selfloop
         """
         # TODO(xiangsx) need to handle block
-        self_loops = {}
-        for c_etype in self.canonical_etypes:
-            if c_etype[0] != c_etype[2]:
-                continue
-            u, v = self.edges(form='uv', order='eid', etype=c_etype)
-            self_loop_eids = F.tensor(F.nonzero_1d(u == v), dtype=F.dtype(u))
-            self_loops[c_etype] = self_loop_eids
-
-        for c_etype, eids in self_loops.items():
-            self.remove_edges(eids, etype=c_etype)
+        etype = self.to_canonical_etype(etype)
+        if etype[0] != etype[2]:
+            raise DGLError(
+                'remove_selfloop does not support unidirectional bipartite graphs: {}.' \
+                'Please make sure the types of head node and tail node are identical.' \
+                ''.format(etype))
+        u, v = self.edges(form='uv', order='eid', etype=etype)
+        self_loop_eids = F.tensor(F.nonzero_1d(u == v), dtype=F.dtype(u))
+        self.remove_edges(self_loop_eids, etype=etype)
 
     #################################################################
     # Metagraph query

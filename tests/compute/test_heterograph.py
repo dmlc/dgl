@@ -2411,11 +2411,15 @@ def test_add_selfloop(idtype):
     # bipartite graph
     g = dgl.bipartite(([0, 1, 2], [1, 2, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
     # nothing will happend
-    g.add_selfloop()
-    assert g.number_of_edges() == 3
+    raise_error = False
+    try:
+        g.add_selfloop()
+    except:
+        raise_error = True
+    assert raise_error
 
     g = create_test_heterograph6(idtype)
-    g.add_selfloop()
+    g.add_selfloop(etype='follows')
     assert g.number_of_nodes('user') == 3
     assert g.number_of_nodes('game') == 2
     assert g.number_of_edges('follows') == 5
@@ -2425,6 +2429,13 @@ def test_add_selfloop(idtype):
     assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
     assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 0, 0, 0], dtype=idtype))
     assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
+
+    raise_error = False
+    try:
+        g.add_selfloop(etype='plays')
+    except:
+        raise_error = True
+    assert raise_error
 
 @parametrize_dtype
 def test_remove_selfloop(idtype):
@@ -2439,11 +2450,15 @@ def test_remove_selfloop(idtype):
     # bipartite graph
     g = dgl.bipartite(([0, 1, 2], [1, 2, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
     # nothing will happend
-    g.remove_selfloop()
-    assert g.number_of_edges() == 3
+    raise_error = False
+    try:
+        g.remove_selfloop(etype='plays')
+    except:
+        raise_error = True
+    assert raise_error
 
     g = create_test_heterograph5(idtype)
-    g.remove_selfloop()
+    g.remove_selfloop(etype='follows')
     assert g.number_of_nodes('user') == 3
     assert g.number_of_nodes('game') == 2
     assert g.number_of_edges('follows') == 2
@@ -2453,6 +2468,13 @@ def test_remove_selfloop(idtype):
     assert F.array_equal(v, F.tensor([0, 1], dtype=idtype))
     assert F.array_equal(g.edges['follows'].data['h'], F.tensor([2, 4], dtype=idtype))
     assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
+
+    raise_error = False
+    try:
+        g.remove_selfloop(etype='plays')
+    except:
+        raise_error = True
+    assert raise_error
 
 if __name__ == '__main__':
     # test_create()
