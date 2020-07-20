@@ -79,6 +79,7 @@ def test_multi_process(index_dtype):
     p.start()
     p.join()
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @parametrize_dtype
 def test_copy_from_gpu(index_dtype):
