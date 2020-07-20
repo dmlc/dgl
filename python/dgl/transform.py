@@ -673,70 +673,488 @@ def metapath_reachable_graph(g, metapath):
 
     return new_g
 
-def add_self_loop(g):
-    """Return a new graph containing all the edges in the input graph plus self loops
-    of every nodes.
-    No duplicate self loop will be added for nodes already having self loops.
-    Self-loop edges id are not preserved. All self-loop edges would be added at the end.
+def add_nodes(g, num, data=None, ntype=None):
+    r"""Add new nodes of the same node type.
+    A new graph with newly added nodes is returned.
+
+    Parameters
+    ----------
+    num : int
+        Number of nodes to add.
+    data : dict, optional
+        Feature data of the added nodes.
+    ntype : str, optional
+        The type of the new nodes. Can be omitted if there is
+        only one node type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with newly added nodes.
+
+    Notes
+    -----
+
+    * If the key of ``data`` does not contain some existing feature fields,
+    those features for the new nodes will be filled with zeros).
+    * If the key of ``data`` contains new feature fields, those features for
+    the old nodes will be filled zeros).
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+    >>> g.num_nodes()
+    3
+    >>> g = dgl.add_nodes(g, 2)
+    >>> g.num_nodes()
+    5
+
+    If the graph has some node features and new nodes are added without
+    features, their features will be created by initializers defined
+    with :func:`set_n_initializer`.
+
+    >>> g.ndata['h'] = torch.ones(5, 1)
+    >>> g = dgl.add_nodes(g, 1)
+    >>> g.ndata['h']
+    tensor([[1.], [1.], [1.], [1.], [1.], [0.]])
+
+    We can also assign features for the new nodes in adding new nodes.
+
+    >>> g = dgl.add_nodes(g, 1, {'h': torch.ones(1, 1), 'w': torch.ones(1, 1)})
+    >>> g.ndata['h']
+    tensor([[1.], [1.], [1.], [1.], [1.], [0.], [1.]])
+
+    Since ``data`` contains new feature fields, the features for old nodes
+    will be created by initializers defined with :func:`set_n_initializer`.
+
+    >>> g.ndata['w']
+    tensor([[0.], [0.], [0.], [0.], [0.], [0.], [1.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.add_nodes(g, 2)
+    DGLError: Node type name must be specified
+    if there are more than one node types.
+    >>> g.num_nodes('user')
+    3
+    >>> g = dgl.add_nodes(g, 2, ntype='user')
+    >>> g.num_nodes('user')
+    5
+
+    See Also
+    --------
+    remove_nodes
+    add_edges
+    remove_edges
+    """
+    # TODO(xiangsx): block do not support add_nodes
+    if ntype is None:
+        if g.number_of_ntypes() != 1:
+            raise DGLError('Node type name must be specified if there are more than one '
+                            'node types.')
+
+    # nothing happen
+    if num == 0:
+        return g
+
+    assert num > 0, 'Number of new nodes should be larger than one.'
+
+    num_nodes_dict = {}
+    for c_ntype in self.ntypes:
+        num_nodes_dict[c_ntype] =
+            g.number_of_nodes(c_ntype) + num if c_ntype == ntype else 0
+
+    graph_data = {}
+    for c_etype in self.canonical_etypes:
+        u, v = g.edges(form='uv', order='eid', etype=c_etype)
+        graph_data[c_etype] = (u, v)
+
+    new_g = dgl.heterograph(graph_data,
+                            num_nodes_dict,
+                            idtype = g.dtype,
+                            device = g.device)
+
+    for c_ntype in self.ntypes:
+        if c_ntype == ntype:
+            ndata = g.nodes[c_ntype].data()
+            # existing features
+            for k, v in ndata.items():
+                if data.get(k, None) is not None:
+                    new_g.nodes[c_ntype].data[k] =
+                        F.cat([v, utils.prepare_tensor(new_g, data[k], 'data')], dim=0)
+                else:
+                    new_g.nodes[c_ntype].data[k] = v
+
+            # non-existing features
+            for k, v in data:
+                if ndata.get(k, None) is None:
+                    shape = F.shape(data[k])
+                    shape[0] = g.number_of_nodes(c_ntype)
+                    new_g.nodes[c_ntype].data[k] =
+                        F.cat([F.zeros(shape, F.dtype(data[k]), F.context(data[k])),
+                               utils.prepare_tensor(new_g, data[k], 'data')], dim=0)
+        else:
+            for k, v in g.nodes[c_ntype].data:
+                new_g.nodes[c_ntype].data[k] = v
+
+    for c_etype in self.canonical_etypes:
+        for k, v in g.edges[c_etype].data:
+            new_g.edges[c_etype].data[k] = v
+
+    return new_g
+
+def add_edges(g, u, v, data=None, etype=None):
+    r"""Add multiple new edges for the specified edge type.
+    A new graph with newly added edges is returned.
+
+    The i-th new edge will be from ``u[i]`` to ``v[i]``.
+
+    Parameters
+    ----------
+    u : int, tensor, numpy.ndarray, list
+        Source node IDs, ``u[i]`` gives the source node for the i-th new edge.
+    v : int, tensor, numpy.ndarray, list
+        Destination node IDs, ``v[i]`` gives the destination node for the i-th new edge.
+    data : dict, optional
+        Feature data of the added edges. The i-th row of the feature data
+        corresponds to the i-th new edge.
+    etype : str or tuple of str, optional
+        The type of the new edges. Can be omitted if there is
+        only one edge type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with newly added edges.
+
+    Notes
+    -----
+    * If end nodes of adding edges does not exists, add_nodes is invoked
+    to add new nodes. The node features of the new nodes will be created
+    by initializers defined with :func:`set_n_initializer` (default
+    initializer fills zeros). In certain cases, it is recommanded to
+    add_nodes first and then add_edges.
+    * If the key of ``data`` does not contain some existing feature fields,
+    those features for the new edges will be created by initializers
+    defined with :func:`set_n_initializer` (default initializer fills zeros).
+    * If the key of ``data`` contains new feature fields, those features for
+    the old edges will be created by initializers defined with
+    :func:`set_n_initializer` (default initializer fills zeros).
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+    >>> import dgl
+    >>> import torch
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
+    >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+    >>> g.num_edges()
+    2
+    >>> g = dgl.add_edges(g, torch.tensor([1, 3]), torch.tensor([0, 1]))
+    >>> g.num_edges()
+    4
+    Since ``u`` or ``v`` contains a non-existing node ID, the nodes are
+    added implicitly.
+    >>> g.num_nodes()
+    4
+
+    If the graph has some edge features and new edges are added without
+    features, their features will be created by initializers defined
+    with :func:`set_n_initializer`.
+
+    >>> g.edata['h'] = torch.ones(4, 1)
+    >>> g = dgl.add_edges(g, torch.tensor([1]), torch.tensor([1]))
+    >>> g.edata['h']
+    tensor([[1.], [1.], [1.], [1.], [0.]])
+
+    We can also assign features for the new edges in adding new edges.
+
+    >>> g = dgl.add_edges(g, torch.tensor([0, 0]), torch.tensor([2, 2]),
+    >>>                   {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
+    >>> g.edata['h']
+    tensor([[1.], [1.], [1.], [1.], [0.], [1.], [2.]])
+    Since ``data`` contains new feature fields, the features for old edges
+    will be created by initializers defined with :func:`set_n_initializer`.
+    >>> g.edata['w']
+    tensor([[0.], [0.], [0.], [0.], [0.], [1.], [1.]])
+
+    **Heterogeneous Graphs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.add_edges(g, torch.tensor([3]), torch.tensor([3]))
+    DGLError: Edge type name must be specified
+    if there are more than one edge types.
+    >>> g.number_of_edges('plays')
+    4
+    >>> g = dgl.add_edges(g, torch.tensor([3]), torch.tensor([3]), etype='plays')
+    >>> g.number_of_edges('plays')
+    5
+
+    See Also
+    --------
+    add_nodes
+    remove_nodes
+    remove_edges
+    """
+
+def remove_edges(g, eids, etype=None):
+    r"""Remove multiple edges with the specified edge type.
+    A new graph with certain edges deleted is returned.
+
+    Nodes will not be removed. After removing edges, the rest
+    edges will be re-indexed using consecutive integers from 0,
+    with their relative order preserved.
+    The features for the removed edges will be removed accordingly.
+
+    Parameters
+    ----------
+    eids : int, tensor, numpy.ndarray, list
+        IDs for the edges to remove.
+    etype : str or tuple of str, optional
+        The type of the edges to remove. Can be omitted if there is
+        only one edge type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with edges deleted.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+    >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g = dgl.remove_edges(g, torch.tensor([0, 1]))
+    >>> g
+    Graph(num_nodes=3, num_edges=1,
+        ndata_schemes={}
+        edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+    >>> g.edges('all')
+    (tensor([2]), tensor([2]), tensor([0]))
+    >>> g.edata['he']
+    tensor([[2.]])
+
+    **Heterogeneous Graphs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.remove_edges(g, torch.tensor([0, 1]))
+    DGLError: Edge type name must be specified
+    if there are more than one edge types.
+    >>> g = dgl.remove_edges(g, torch.tensor([0, 1]), 'plays')
+    >>> g.edges('all', etype='plays')
+    (tensor([0, 1]), tensor([0, 0]), tensor([0, 1]))
+    See Also
+    --------
+    add_nodes
+    add_edges
+    remove_nodes
+    """
+
+def remove_nodes(g, nids, ntype=None):
+    r"""Remove multiple nodes with the specified node type.
+    A new graph with certain nodes deleted is returned.
+
+    Edges that connect to the nodes will be removed as well. After removing
+    nodes and edges, the rest nodes and edges will be re-indexed using
+    consecutive integers from 0, with their relative order preserved.
+    The features for the removed nodes/edges will be removed accordingly.
+
+    The features for the removed nodes/edges will be removed accordingly.
+
+    Parameters
+    ----------
+    nids : int, tensor, numpy.ndarray, list
+        Nodes to remove.
+    ntype : str, optional
+        The type of the nodes to remove. Can be omitted if there is
+        only one node type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with nodes deleted.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+    >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g = dgl.remove_nodes(g, torch.tensor([0, 1]))
+    >>> g
+    Graph(num_nodes=1, num_edges=1,
+        ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
+        edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+    >>> g.ndata['hv']
+    tensor([[2.]])
+    >>> g.edata['he']
+    tensor([[2.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.remove_nodes(g, torch.tensor([0, 1]))
+    DGLError: Node type name must be specified
+    if there are more than one node types.
+    >>> g = dgl.remove_nodes(g, torch.tensor([0, 1]), ntype='game')
+    >>> g.num_nodes('user')
+    3
+    >>> g.num_nodes('game')
+    0
+    >>> g.num_edges('plays')
+    0
+
+    See Also
+    --------
+    add_nodes
+    add_edges
+    remove_edges
+    """
+
+def add_selfloop(g):
+    r""" Add self loop for each node in the graph.
+    A new graph with self-loop is returned.
+
+    Since **selfloop is not well defined for unidirectional
+    bipartite graphs**, we simply skip the nodes corresponding
+    to unidirectional bipartite graphs.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with self-loop.
+
+    Notes
+    -----
+    * It is recommanded to ``remove_selfloop`` before invoking
+    ``add_selfloop``.
+    * Features for the new edges (self-loop edges) will be created
+    by initializers defined with :func:`set_n_initializer`
+    (default initializer fills zeros).
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([2, 1, 0])))
+    >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g = dgl.add_selfloop(g)
+    >>> g
+    Graph(num_nodes=3, num_edges=6,
+            ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
+            edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+    >>> g.edata['he']
+    tensor([[0.],
+            [1.],
+            [2.],
+            [0.],
+            [0.],
+            [0.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+            ('user', 'follows', 'user'): (torch.tensor([1, 2]),
+                                        torch.tensor([0, 1])),
+            ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+                                        torch.tensor([0, 1]))})
+    >>> g = dgl.add_selfloop(g)
+    >>> g
+    Graph(num_nodes={'user': 3, 'game': 2},
+        num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 5},
+        metagraph=[('user', 'user'), ('user', 'game')])
+    """
+
+def remove_selfloop(g):
+    r""" Remove self loops for each node in the graph.
+    A new graph with self-loop removed is returned.
+
+    If there are multiple self loops for a certain node,
+    all of them will be removed.
 
     Examples
     ---------
 
-    >>> g = DGLGraph()
-    >>> g.add_nodes(5)
-    >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> new_g = dgl.transform.add_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
-    >>> new_g.edges()
-    (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
+    >>> import dgl
+    >>> import torch
 
-    Parameters
-    ------------
-    g: DGLGraph
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
 
-    Returns
+    >>> g = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([1, 0, 0, 2])),
+                        idtype=idtype, device=F.ctx())
+    >>> g.edata['he'] = torch.arange(4).float().reshape(-1, 1)
+    >>> g = dgl.remove_selfloop(g)
+    >>> g
+    Graph(num_nodes=3, num_edges=2,
+        edata_schemes={'he': Scheme(shape=(2,), dtype=torch.float32)})
+    >>> g.edata['he']
+    tensor([[0.],[3.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1, 1])),
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.remove_selfloop(g)
+    >>> g.num_nodes('user')
+    3
+    >>> g.num_nodes('game')
+    2
+    >>> g.num_edges('follows')
+    2
+    >>> g.num_edges('plays')
+    2
+
+    See Also
     --------
-    DGLGraph
+    add_selfloop
     """
-    new_g = DGLGraph()
-    new_g.add_nodes(g.number_of_nodes())
-    src, dst = g.all_edges(order="eid")
-    src = F.zerocopy_to_numpy(src)
-    dst = F.zerocopy_to_numpy(dst)
-    non_self_edges_idx = src != dst
-    nodes = np.arange(g.number_of_nodes())
-    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
-    new_g.add_edges(nodes, nodes)
-    return new_g
 
-def remove_self_loop(g):
-    """Return a new graph with all self-loop edges removed
-
-    Examples
-    ---------
-
-    >>> g = DGLGraph()
-    >>> g.add_nodes(5)
-    >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> new_g = dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
-    >>> new_g.edges()
-    (tensor([0]), tensor([1]))
-
-    Parameters
-    ------------
-    g: DGLGraph
-
-    Returns
-    --------
-    DGLGraph
-    """
-    new_g = DGLGraph()
-    new_g.add_nodes(g.number_of_nodes())
-    src, dst = g.all_edges(order="eid")
-    src = F.zerocopy_to_numpy(src)
-    dst = F.zerocopy_to_numpy(dst)
-    non_self_edges_idx = src != dst
-    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
-    return new_g
 
 def reorder_nodes(g, new_node_ids):
     """ Generate a new graph with new node Ids.
