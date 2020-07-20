@@ -965,6 +965,7 @@ class KVClient(object):
         num_partitions = part_policy.partition_book.num_partitions()
         num_clients_per_part = rpc.get_num_client() / num_partitions
         if self._client_id % num_clients_per_part == 0:
+            # send request to every server nodes
             request = DeleteDataRequest(name)
             for n in range(self._group_count):
                 server_id = part_policy.part_id * self._group_count + n
