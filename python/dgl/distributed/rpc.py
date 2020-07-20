@@ -16,13 +16,11 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
-'get_num_client', 'set_num_client', 'RPC_FINAL']
+'get_num_client', 'set_num_client']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
-
-RPC_FINAL = False
 
 def read_ip_config(filename):
     """Read network configuration information of server from file.
