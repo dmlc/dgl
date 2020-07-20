@@ -416,7 +416,6 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   auto orig_nodes = all_nodes;
 
   std::vector<dgl_id_t> edge_src, edge_dst, edge_eid;
-  std::vector<int> inner_edges;
 
   // When we deal with in-edges, we need to do two things:
   // * find the edges inside the partition and the edges between partitions.
@@ -436,7 +435,6 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
       edge_src.push_back(src_data[i]);
       edge_dst.push_back(dst_data[i]);
       edge_eid.push_back(eid_data[i]);
-      inner_edges.push_back(it1 != orig_nodes.end());
     }
     // We need to expand only if the node hasn't been seen before.
     auto it = all_nodes.find(src_data[i]);
@@ -463,7 +461,6 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
       edge_src.push_back(src_data[i]);
       edge_dst.push_back(dst_data[i]);
       edge_eid.push_back(eid_data[i]);
-      inner_edges.push_back(false);
       // If we haven't seen this node.
       auto it = all_nodes.find(src_data[i]);
       if (it == all_nodes.end()) {
@@ -502,8 +499,8 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   halo_subg.graph = subg;
   halo_subg.induced_vertices = aten::VecToIdArray(old_node_ids);
   halo_subg.induced_edges = aten::VecToIdArray(edge_eid);
+  // TODO(zhengda) we need to switch to 8 bytes afterwards.
   halo_subg.inner_nodes = aten::VecToIdArray<int>(inner_nodes, 32);
-  halo_subg.inner_edges = aten::VecToIdArray<int>(inner_edges, 32);
   return halo_subg;
 }
 
@@ -601,14 +598,6 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerNodes")
   auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
   CHECK(gptr) << "The input graph has to be immutable graph";
   *rv = gptr->inner_nodes;
-});
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerEdges")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  SubgraphRef g = args[0];
-  auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
-  CHECK(gptr) << "The input graph has to be immutable graph";
-  *rv = gptr->inner_edges;
 });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")

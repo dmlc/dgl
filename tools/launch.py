@@ -64,9 +64,8 @@ def submit_jobs(args, udf_command):
     torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
     torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
 
-    for i in range(args.num_client):
-        node_id = int(i / client_count_per_machine)
-        ip, _ = hosts[node_id]
+    for node_id, host in enumerate(hosts):
+        ip, _ = host
         new_torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
         new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
         cmd = client_cmd + ' ' + new_udf_command
