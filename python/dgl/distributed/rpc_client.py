@@ -193,5 +193,7 @@ def exit_client():
     """Register exit callback.
     """
     # Only client with rank_0 will send shutdown request to servers.
-    shutdown_servers()
-    finalize_client()
+    if rpc.RPC_FINAL == False:
+        shutdown_servers()
+        finalize_client()
+        rpc.RPC_FINAL = True
