@@ -767,7 +767,7 @@ def add_nodes(g, num, data=None, ntype=None):
     if ntype is None:
         if len(g.ntypes) != 1:
             raise DGLError('Node type name must be specified if there are more than one '
-                            'node types.')
+                           'node types.')
 
     assert num > 0, 'Number of new nodes should be larger than one.'
 
@@ -785,8 +785,8 @@ def add_nodes(g, num, data=None, ntype=None):
 
     new_g = heterograph(graph_data,
                         num_nodes_dict,
-                        idtype = g.idtype,
-                        device = g.device)
+                        idtype=g.idtype,
+                        device=g.device)
 
     for c_ntype in g.ntypes:
         # ntype is None: only one ntype
@@ -938,7 +938,7 @@ def add_edges(g, u, v, data=None, etype=None):
     if etype is None:
         if len(g.etypes) != 1:
             raise DGLError('Edge type name must be specified if there are more than one '
-                            'edge types.')
+                           'edge types.')
 
     assert len(u) > 0 and len(v) > 0, \
         'The number of source nodes and the number of destination nodes should be larger than 0'
@@ -949,7 +949,7 @@ def add_edges(g, u, v, data=None, etype=None):
 
     # fill up u and v
     if len(u) == 1 and len(v) > 1:
-            u = F.full_1d(len(v), F.as_scalar(u), dtype=F.dtype(u), ctx=F.context(u))
+        u = F.full_1d(len(v), F.as_scalar(u), dtype=F.dtype(u), ctx=F.context(u))
     if len(v) == 1 and len(u) > 1:
         v = F.full_1d(len(u), F.as_scalar(v), dtype=F.dtype(v), ctx=F.context(v))
 
@@ -986,8 +986,8 @@ def add_edges(g, u, v, data=None, etype=None):
 
     new_g = heterograph(graph_data,
                         num_nodes_dict,
-                        idtype = g.idtype,
-                        device = g.device)
+                        idtype=g.idtype,
+                        device=g.device)
 
     # copy node features
     for c_ntype in g.ntypes:
@@ -1345,10 +1345,10 @@ def remove_self_loop(g, etype=None):
     """
     etype = g.to_canonical_etype(etype)
     if etype[0] != etype[2]:
-            raise DGLError(
-                'remove_self_loop does not support unidirectional bipartite graphs: {}.' \
-                'Please make sure the types of head node and tail node are identical.' \
-                ''.format(etype))
+        raise DGLError(
+            'remove_self_loop does not support unidirectional bipartite graphs: {}.' \
+            'Please make sure the types of head node and tail node are identical.' \
+            ''.format(etype))
     u, v = g.edges(form='uv', order='eid', etype=etype)
     self_loop_eids = F.tensor(F.nonzero_1d(u == v), dtype=F.dtype(u))
     new_g = remove_edges(g, self_loop_eids, etype=etype)
