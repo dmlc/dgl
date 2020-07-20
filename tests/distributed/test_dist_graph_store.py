@@ -164,10 +164,6 @@ def check_dist_graph(g, num_nodes, num_edges):
     for n in nodes:
         assert n in local_nids
 
-    # clean up
-    if os.environ['DGL_DIST_MODE'] == 'distributed':
-        dgl.distributed.shutdown_servers()
-        dgl.distributed.finalize_client()
     print('end')
 
 def check_server_client(shared_mem):

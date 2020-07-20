@@ -8,6 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
+from dgl.heterograph_index import joint_union
 from utils import parametrize_dtype
 
 def create_test_heterograph(idtype):

@@ -3,7 +3,7 @@ dependencies:
   - python=3.6.9
   - pip
   - pip:
-    - mxnet
+    - mxnet==1.6.0
     - pytest
     - nose
     - numpy

@@ -18,7 +18,7 @@ TEST(Serialize, UnitGraph_COO) {
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
   auto mg = std::dynamic_pointer_cast<UnitGraph>(
-      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCOO));
+      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, coo_code));
 
   std::string blob;
   dmlc::MemoryStringStream ifs(&blob);
@@ -39,8 +39,9 @@ TEST(Serialize, UnitGraph_CSR) {
   aten::CSRMatrix csr_matrix;
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
+  // TODO(zihao): fix
   auto mg = std::dynamic_pointer_cast<UnitGraph>(
-      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSR));
+      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, csr_code));
 
   std::string blob;
   dmlc::MemoryStringStream ifs(&blob);

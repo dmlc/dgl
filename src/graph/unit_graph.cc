@@ -343,6 +343,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return SparseFormat::kAny;
   }
 
+  dgl_format_code_t GetFormatAll() const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return 0;
+  }
+
   dgl_format_code_t GetFormatInUse() const override {
     LOG(FATAL) << "Not enabled for COO graph";
     return 0;
@@ -735,6 +740,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
     LOG(FATAL) << "Not enabled for CSR graph";
     return SparseFormat::kAny;
+  }
+
+  dgl_format_code_t GetFormatAll() const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return 0;
   }
 
   dgl_format_code_t GetFormatInUse() const override {

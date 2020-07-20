@@ -49,7 +49,7 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
   return SparseFormat::kAny;
 }
 
-std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
+inline std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
   std::vector<SparseFormat> ret;
   if (code & coo_code)
     ret.push_back(SparseFormat::kCOO);
@@ -60,7 +60,7 @@ std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
   return ret;
 }
 
-dgl_format_code_t SparseFormatsToCode(
+inline dgl_format_code_t SparseFormatsToCode(
     const std::vector<SparseFormat>& formats) {
   dgl_format_code_t ret = 0;
   for (auto format : formats) {
