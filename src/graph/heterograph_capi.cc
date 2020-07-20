@@ -10,6 +10,7 @@
 
 #include "../c_api_common.h"
 #include "./heterograph.h"
+#include "unit_graph.h"
 
 using namespace dgl::runtime;
 
@@ -26,8 +27,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     int64_t num_dst = args[2];
     IdArray row = args[3];
     IdArray col = args[4];
-    SparseFormat restrict_format = ParseSparseFormat(args[5]);
-    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, restrict_format);
+    //SparseFormat restrict_format = ParseSparseFormat(args[5]);
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, all_code);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -39,9 +40,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indptr = args[3];
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
-    SparseFormat restrict_format = ParseSparseFormat(args[6]);
-    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids,
-                               restrict_format);
+    //SparseFormat restrict_format = ParseSparseFormat(args[6]);
+    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, all_code);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -527,8 +527,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> format_list;
-    for (std::string format : hg->GetRelationGraph(0)->GetFormatInUse()) {
-      format_list.push_back(Value(MakeValue(format)));
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetFormatInUse();
+    for (auto format : CodeToSparseFormats(code)) {
+      format_list.push_back(
+          Value(MakeValue(ToStringSparseFormat(format))));
     }
     *rv = format_list;
 });
@@ -537,8 +539,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatAll")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> format_list;
-    for (std::string format : hg->GetRelationGraph(0)->GetFormatAll()) {
-      format_list.push_back(Value(MakeValue(format)));
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetFormatAll();
+    for (auto format : CodeToSparseFormats(code)) {
+      format_list.push_back(
+          Value(MakeValue(ToStringSparseFormat(format))));
     }
     *rv = format_list;
 });
@@ -546,12 +550,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatAll")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    std::vector<std::string> format_all = hg->GetRelationGraph(0)->GetFormatAll();
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetFormatAll();
     for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
       auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
-      for (std::string format : format_all) {
-        bg->GetFormat(ParseSparseFormat(sparse_format));
-      }
+      for (auto format : CodeToSparseFormats(code))
+        bg->GetFormat(format);
     }
 });
 
@@ -564,7 +567,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
       std::string fmt = val->data;
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
-    auto hgptr = hg->GetGraphInFormat(formats_vec);
+    auto hgptr = hg->GetGraphInFormat(
+        SparseFormatsToCode(formats_vec));
     *rv = HeteroGraphRef(hgptr);
 });
 

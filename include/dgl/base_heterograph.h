@@ -14,6 +14,8 @@
 #include <memory>
 
 #include "./runtime/object.h"
+#include "aten/spmat.h"
+#include "aten/types.h"
 #include "graph_interface.h"
 #include "array.h"
 
@@ -367,7 +369,7 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Determine which format to use with a preference.
    *
-   * Return the preferred format if the underlying relation graph supports it.
+
    * Otherwise, it will return whatever DGL thinks is the most appropriate given
    * the arguments.
    *
@@ -378,18 +380,17 @@ class BaseHeteroGraph : public runtime::Object {
   virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
 
   /*!
-   * \brief Get restrict sparse format of the graph.
-   * 
-   * \return a string representing the sparse format: 'coo'/'csr'/'csc'/'any'
-   */
-  virtual std::string GetRestrictFormat() const = 0;
-
-  /*!
    * \brief Return the sparse format in use for the graph.
-   * 
-   * \return a number of type dgl_format_code_t. 
+   *
+   * \return a number of type dgl_format_code_t.
    */
   virtual dgl_format_code_t GetFormatInUse() const = 0;
+
+  /*!
+   * \brief Return all sparse formats for the graph.
+   * \return a number of type dgl_format_code_t.
+   */
+  virtual dgl_format_code_t GetFormatAll() const = 0;
 
   /*!
    * \brief Return the graph in specified restrict format.
@@ -606,7 +607,7 @@ HeteroGraphPtr CreateHeteroGraph(
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col, dgl_format_code_t restrict_formats);
+    IdArray row, IdArray col, dgl_format_code_t restrict_formats = all_code);
 
 /*!
  * \brief Create a heterograph from COO input.
@@ -617,7 +618,7 @@ HeteroGraphPtr CreateFromCOO(
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, const aten::COOMatrix& mat,
-    dgl_format_code_t restrict_formats);
+    dgl_format_code_t restrict_formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -633,7 +634,7 @@ HeteroGraphPtr CreateFromCOO(
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t restrict_formats);
+    dgl_format_code_t restrict_formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -644,7 +645,7 @@ HeteroGraphPtr CreateFromCSR(
  */
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t restrict_formats);
+    dgl_format_code_t restrict_formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -660,7 +661,7 @@ HeteroGraphPtr CreateFromCSR(
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t restrict_formats);
+    dgl_format_code_t restrict_formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -671,7 +672,7 @@ HeteroGraphPtr CreateFromCSC(
  */
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t restrict_formats);
+    dgl_format_code_t restrict_formats = all_code);
 
 /*!
  * \brief Extract the subgraph of the in edges of the given nodes.
@@ -813,13 +814,13 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
 HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
 
 #define FORMAT_HAS_CSC(format) \
-  (format & (1<<2))
+  ((format) & csc_code)
 
 #define FORMAT_HAS_CSR(format) \
-  (format & (1<<1))
+  ((format) & csr_code)
 
 #define FORMAT_HAS_COO(format) \
-  (format & 1)
+  ((format) & coo_code)
 
 }  // namespace dgl
 

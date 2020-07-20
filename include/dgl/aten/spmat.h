@@ -24,6 +24,14 @@ enum class SparseFormat {
   kAuto = 4   // kAuto is a placeholder that indicates it would be materialized later.
 };
 
+/*!
+ * \brief Sparse format codes
+ */
+const dgl_format_code_t all_code = 0x7;
+const dgl_format_code_t coo_code = 0x1;
+const dgl_format_code_t csr_code = 0x2;
+const dgl_format_code_t csc_code = 0x4;
+
 // Parse sparse format from string.
 inline SparseFormat ParseSparseFormat(const std::string& name) {
   if (name == "coo")
@@ -41,6 +49,38 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
   return SparseFormat::kAny;
 }
 
+std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
+  std::vector<SparseFormat> ret;
+  if (code & coo_code)
+    ret.push_back(SparseFormat::kCOO);
+  if (code & csr_code)
+    ret.push_back(SparseFormat::kCSR);
+  if (code & csc_code)
+    ret.push_back(SparseFormat::kCSC);
+  return ret;
+}
+
+dgl_format_code_t SparseFormatsToCode(
+    const std::vector<SparseFormat>& formats) {
+  dgl_format_code_t ret = 0;
+  for (auto format : formats) {
+    switch (format) {
+    case SparseFormat::kCOO:
+      ret |= coo_code;
+      break;
+    case SparseFormat::kCSR:
+      ret |= csr_code;
+      break;
+    case SparseFormat::kCSC:
+      ret |= csc_code;
+      break;
+    default:
+      LOG(FATAL) << "Only support COO/CSR/CSC formats.";
+    }
+  }
+  return ret;
+}
+
 // Create string from sparse format.
 inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
   if (sparse_format == SparseFormat::kCOO)
@@ -53,19 +93,6 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
     return std::string("any");
   else
     return std::string("auto");
-}
-
-inline dgl_format_code_t SparseFormat2Code(SparseFormat sparse_format) {
-  if (sparse_format == SparseFormat::kCOO)
-    return 1;
-  else if (sparse_format == SparseFormat::kCSR)
-    return 2;
-  else if (sparse_format == SparseFormat::kCSC)
-    return 3;
-  else if (sparse_format == SparseFormat::kAny)
-    return 0;
-  else
-    return 4;
 }
 
 // Sparse matrix object that is exposed to python API.

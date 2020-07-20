@@ -25,10 +25,6 @@ namespace dgl {
 class HeteroGraph;
 class UnitGraph;
 typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
-dgl_format_code_t all_code = 0x7;
-dgl_format_code_t coo_code = 0x1;
-dgl_format_code_t csr_code = 0x2;
-dgl_format_code_t csc_code = 0x4;
 
 /*!
  * \brief UnitGraph graph
@@ -263,7 +259,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   dgl_format_code_t GetFormatAll() const override;
 
-  HeteroGraphPtr GetGraphInFormat() const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t restrict_formats) const override;
 
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
