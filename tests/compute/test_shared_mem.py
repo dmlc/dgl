@@ -52,6 +52,7 @@ def _assert_is_identical_heteroindex(g, g2):
         assert F.array_equal(src, src2)
         assert F.array_equal(dst, dst2)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @parametrize_dtype
 def test_single_process(index_dtype):
     hg = create_test_graph(index_dtype=index_dtype)._graph
@@ -68,6 +69,7 @@ def sub_proc(hg_origin):
     _assert_is_identical_heteroindex(hg_origin, hg_rebuild)
     _assert_is_identical_heteroindex(hg_origin, hg_save_again)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @parametrize_dtype
 def test_multi_process(index_dtype):
     hg = create_test_graph(index_dtype=index_dtype)._graph
