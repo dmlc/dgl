@@ -27,6 +27,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    dgl.distributed.exit_client()
     return sampled_graph
 
 
@@ -56,8 +57,8 @@ def check_rpc_sampling(tmpdir, num_server):
     time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
-    #for p in pserver_list:
-    #    p.join()
+    for p in pserver_list:
+        p.join()
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
@@ -99,8 +100,8 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
-    #for p in pserver_list:
-    #    p.join()
+    for p in pserver_list:
+        p.join()
 
     orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
     orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
@@ -160,6 +161,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
+    dgl.distributed.exit_client()
     return sampled_graph
 
 

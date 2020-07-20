@@ -170,7 +170,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
-    atexit.register(exit_client)
+    #atexit.register(exit_client)
 
 def finalize_client():
     """Release resources of this client."""
@@ -193,7 +193,5 @@ def exit_client():
     """Register exit callback.
     """
     # Only client with rank_0 will send shutdown request to servers.
-    if rpc.RPC_FINAL == False:
-        shutdown_servers()
-        finalize_client()
-        rpc.RPC_FINAL = True
+    shutdown_servers()
+    finalize_client()
