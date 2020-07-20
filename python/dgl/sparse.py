@@ -172,20 +172,20 @@ def _gspmm(gidx, op, reduce_op, u, e):
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
-    if reduce_op in ['max', 'min']:
-        raise DGLError("SpMM kernel of max/min for tvm not implemented yet")
     nnz = gidx.number_of_edges(0)
     if nnz <= 0:
         return None
     indptr, indices, data = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_csc_dlpack(0))
+    edge_mapping = F.zerocopy_from_dgl_ndarray(data).long()
     f_input = [indptr, indices]
-    e = e[F.zerocopy_from_dgl_ndarray(data).long()]
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
     if use_u and F.ndim(u) == 1:
         u = F.unsqueeze(u, -1)
-    if use_e and F.ndim(e) == 1:
-        e = F.unsqueeze(e, -1)
+    if use_e:
+        e = e[edge_mapping]
+        if F.ndim(e) == 1:
+            e = F.unsqueeze(e, -1)
     ctx = F.context(u) if use_u else F.context(e)
     feat_type = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
@@ -231,23 +231,32 @@ def _gspmm(gidx, op, reduce_op, u, e):
     if len(compiled) > 5:
         lhs_offset, rhs_offset = compiled[5], compiled[6]
         f_input += [lhs_offset, rhs_offset]
+    ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
+    idtype = getattr(F, ugi.dtype)
+    arg_u, arg_e = None, None
+    use_cmp = reduce_op != 'sum'
+    if use_cmp:
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+            arg_u = arg_u.view((v_shp[0], out_len))
+            f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_u).to_dlpack()))
+        if use_e:
+            arg_e = F.zeros(v_shp, idtype, ctx)
+            arg_e = arg_e.view((v_shp[0], out_len))
+            f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_e).to_dlpack()))
     v = F.zeros(v_shp, feat_type, ctx)
     v = v.view((v_shp[0], out_len))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(v).to_dlpack()))
-    arg_u, arg_e = None, None
-    # ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
-    # idtype = getattr(F, ugi.dtype)
-    # if use_cmp:
-    #     if use_u:
-    #         arg_u = F.zeros(v_shp, idtype, ctx)
-    #     if use_e:
-    #         arg_e = F.zeros(v_shp, idtype, ctx)
-    # print(f_input)
     mod(*f_input)
     if use_u:
         u = u.view(u_shp)
+        if use_cmp:
+            arg_u = arg_u.view(v_shp)
     if use_e:
         e = e.view(e_shp)
+        if use_cmp:
+            arg_e = arg_e.view(v_shp)
+            arg_e = edge_mapping[arg_e.long()]
     v = v.view(v_shp)
     return v, (arg_u, arg_e)
 
