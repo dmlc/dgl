@@ -975,6 +975,7 @@ class KVClient(object):
                 assert response.msg == DELETE_MSG
         self.barrier()
         self._data_name_list.remove(name)
+        # TODO(chao) : remove the delete log print
         del self._data_store[name]
         del self._full_data_shape[name]
         del self._part_policy[name]
