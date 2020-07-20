@@ -91,16 +91,10 @@ class MovieLens(object):
 
         # # pair value is idx rather than id, and rating value starts from 1.0
         # # self.all_train_rating_pairs, self.all_train_rating_values = self._generate_pair_value(self.all_train_rating_data)
-        # self.train_rating_pairs, self.train_rating_values = self._generate_pair_value(train_rating_data)
-        # self.valid_rating_pairs, self.valid_rating_values = self._generate_pair_value(valid_rating_data)
-        # self.test_rating_pairs, self.test_rating_values = self._generate_pair_value(test_rating_data)
+        # train_u_indices, train_v_indices, train_labels = self._generate_pair_value(train_rating_data)
+        # val_u_indices, val_v_indices, val_labels = self._generate_pair_value(valid_rating_data)
+        # test_u_indices, test_v_indices, test_labels = self._generate_pair_value(test_rating_data)
 
-        # # 5. build traing graph 
-        # # Create adjacent matrix
-        # self.rating_mx_train = np.zeros((self._num_user, self._num_movie), dtype=np.float32)
-        # self.rating_mx_train[self.train_rating_pairs] = self.train_rating_values + 1.
-        # self.rating_mx_train = sp.csr_matrix(self.rating_mx_train)
-        
         if data_name == 'ml-100k':
             print("Using official MovieLens dataset split u1.base/u1.test with 20% validation set size...")
             (
@@ -285,7 +279,7 @@ class MovieLens(object):
                                  dtype=np.int32))
         # label ranges from 0. to 4.
         rating_values = rating_data["rating"].values.astype(np.float32) - 1.
-        return rating_pairs, rating_values
+        return rating_pairs[0], rating_pairs[1], rating_values
 
 import os
 import random

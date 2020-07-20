@@ -8,25 +8,34 @@ Credit: Tianjun Xiao ([@sneakerkg](https://github.com/sneakerkg))
 ## Dependencies
 
 * PyTorch 1.2+
-* pandas
-* torchtext 0.4+ (if using user and item contents as node features)
+* DGL 0.5 (nightly version)
 
 ## Data
 
-Supported datasets: ml-100k, ml-1m, ml-10m
+Supported datasets: ml-100k, ml-1m
 
 ## How to run
 
-### Train with full-graph
-
-ml-100k, no feature
+- ml-100k
 
 ```shell
-python3 train.py --data_name=ml-100k --use_one_hot_fea --train_max_epoch 80 --max_nodes_per_hop 200 --batch_size 50 --train_decay_epoch 50 --num_igmc_bases 4  --train_min_lr 1e-6 --data_valid_ratio 0.2
+python3 train.py --data_name ml-100k --testing \
+                 --batch_size 32 --edge_dropout 0.2 --max_nodes_per_hop 200 --train_epochs 80 \
+                 --device 0
 ```
 
-### How to run ensemble evaluation
+- ml-1m
 
 ```shell
-python3 train.py --data_name=ml-100k --use_one_hot_fea --train_max_epoch 80 --batch_size 50 --train_decay_epoch 50 --num_igmc_bases 4  --ckpt_idxs 39,49,59,69,79
+python3 train_multi_gpu.py --data_name ml-1m --testing \
+                --batch_size 32 --edge_dropout 0. --max_nodes_per_hop 100 --train_epochs 40 \
+                --train_log_interval 1000 --valid_log_interval 5 --train_lr_decay_step 20 \
+                --gpu 0,1,2,3
 ```
+
+## Results
+
+|Dataset|Our code <br> best of epochs|Author code <br> best of epochs / ensembled|
+|:-:|:-:|:-:|:-:|
+|ml-100k|0.9053|0.9053 / 0.9051|
+|ml-1m|0.8679|0.8685 / 0.8558|

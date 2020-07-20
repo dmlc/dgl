@@ -232,8 +232,8 @@ def config():
                         train/val/test and evaluate on val only')
     parser.add_argument('--gpu', default='0', type=str,
                         help="Comma separated list of GPU device IDs.")
-    parser.add_argument('--seed', type=int, default=42, metavar='S',
-                        help='random seed (default: 42)')
+    parser.add_argument('--seed', type=int, default=1234, metavar='S',
+                        help='random seed (default: 1234)')
     parser.add_argument('--data_name', default='ml-100k', type=str,
                         help='The dataset name: ml-100k, ml-1m')
     parser.add_argument('--data_test_ratio', type=float, default=0.1) # for ml-100k the test ration is 0.2
