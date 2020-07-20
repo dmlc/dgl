@@ -36,6 +36,6 @@ python3 train_multi_gpu.py --data_name ml-1m --testing \
 ## Results
 
 |Dataset|Our code <br> best of epochs|Author code <br> best of epochs / ensembled|
-|:-:|:-:|:-:|:-:|
+|:-:|:-:|:-:|
 |ml-100k|0.9053|0.9053 / 0.9051|
 |ml-1m|0.8679|0.8685 / 0.8558|
