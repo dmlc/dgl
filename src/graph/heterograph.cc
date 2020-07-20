@@ -261,10 +261,14 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
                                         hgindex->num_verts_per_type_));
 }
 
+std::string HeteroGraph::SharedMemName() const {
+  return shared_mem_ ? shared_mem_->GetName() : "";
+}
+
 HeteroGraphPtr HeteroGraph::CopyToSharedMem(
       HeteroGraphPtr g, const std::string& name, const std::set<std::string>& fmts) {
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
-  if (hg->shared_mem_name_ == name)
+  if (hg->SharedMemName() == name)
     return g;
 
   std::string buf;
@@ -311,7 +315,6 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   memcpy(mem_buf, buf.c_str(), strm->Tell());
   auto ret = HeteroGraphPtr(new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
   auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
-  hg_index->shared_mem_name_ = name;
   hg_index->shared_mem_ = mem;
   return ret;
 }
@@ -395,7 +398,6 @@ HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
 
   auto ret = HeteroGraphPtr(new HeteroGraph(metagraph, relgraphs, num_verts_per_type));
   auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
-  hg_index->shared_mem_name_ = name;
   hg_index->shared_mem_ = mem;
   return ret;
 }

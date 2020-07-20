@@ -57,12 +57,16 @@ def test_single_process(index_dtype):
     hg = create_test_graph(index_dtype=index_dtype)._graph
     hg_share = hg.shared_memory("hg")
     hg_rebuild = dgl.heterograph_index.create_heterograph_from_shared_memory('hg')
+    hg_save_again = hg_rebuild.shared_memory("hg")
     _assert_is_identical_heteroindex(hg, hg_share)
     _assert_is_identical_heteroindex(hg, hg_rebuild)
+    _assert_is_identical_heteroindex(hg, hg_save_again)
 
 def sub_proc(hg_origin):
     hg_rebuild = dgl.heterograph_index.create_heterograph_from_shared_memory('hg1')
+    hg_save_again = hg_rebuild.shared_memory("hg1")
     _assert_is_identical_heteroindex(hg_origin, hg_rebuild)
+    _assert_is_identical_heteroindex(hg_origin, hg_save_again)
 
 @parametrize_dtype
 def test_multi_process(index_dtype):
@@ -73,5 +77,5 @@ def test_multi_process(index_dtype):
     p.join()
 
 if __name__ == "__main__":
-    # test_single_process("int64")
+    test_single_process("int64")
     test_multi_process("int32")

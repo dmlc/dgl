@@ -247,9 +247,6 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
 
-  /*! \brief The name of the shared memory */
-  std::string shared_mem_name_;
-
   /*! \brief The shared memory object for meta info*/
   std::shared_ptr<runtime::SharedMemory> shared_mem_;
 
@@ -261,6 +258,9 @@ class HeteroGraph : public BaseHeteroGraph {
   */
   template <class IdType>
   FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
+
+  /*! \brief The name of the shared memory. Return empty string if it is not in shared memory. */
+  std::string SharedMemName() const;
 };
 
 const int64_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 16;  // at most 16k
