@@ -5050,6 +5050,8 @@ class DGLBlock(DGLHeteroGraph):
     """Subclass that signifies the graph is a block created from
     :func:`dgl.to_block`.
     """
+    # (BarclayII) I'm making a subclass because I don't want to make another version of
+    # serialization that contains the is_block flag.
     is_block = True
 
 _init_api("dgl.heterograph")
