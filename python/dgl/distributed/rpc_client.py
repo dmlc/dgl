@@ -2,6 +2,7 @@
 
 import os
 import socket
+import atexit
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -9,8 +10,6 @@ from .constants import MAX_QUEUE_SIZE
 if os.name != 'nt':
     import fcntl
     import struct
-
-import atexit
 
 def local_ip4_addr_list():
     """Return a set of IPv4 address
