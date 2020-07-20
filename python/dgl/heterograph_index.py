@@ -1149,6 +1149,17 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
             metagraph, rel_graphs, num_nodes_per_type.todgltensor())
 
 def create_heterograph_from_shared_memory(name):
+    """Create a heterograph from shared memory with the given name.
+
+    Paramaters
+    ----------
+    name : str
+        The name of the share memory
+
+    Returns
+    -------
+    HeteroGraphIndex (in shared memory)
+    """
     return _CAPI_DGLHeteroCreateFromSharedMem(name)
 
 def joint_union(metagraph, gidx_list):
