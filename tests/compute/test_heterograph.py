@@ -2076,8 +2076,8 @@ def test_clone(idtype):
     v = F.tensor([2, 6], dtype=idtype)
     g.add_edges(u, v, etype='plays')
     u, v = g.edges(form='uv', order='eid', etype='plays')
-    assert (F.array_equal(u, nu) == False)
-    assert (F.array_equal(v, nv) == False)
+    assert u.shape[0] != nu.shape[0]
+    assert v.shape[0] != nv.shape[0]
     assert g.nodes['user'].data['h'].shape[0] != new_g.nodes['user'].data['h'].shape[0]
     assert g.nodes['game'].data['h'].shape[0] != new_g.nodes['game'].data['h'].shape[0]
     assert g.edges['plays'].data['h'].shape[0] != new_g.edges['plays'].data['h'].shape[0]
