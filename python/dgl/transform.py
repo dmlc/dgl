@@ -1144,7 +1144,7 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
     '''
     if isinstance(g, DGLHeteroGraph):
         return hetero_metis_partition(g, k, extra_cached_hops, reshuffle,
-                    balance_ntypes, balance_edges)
+                                      balance_ntypes, balance_edges)
     node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges)
     if node_part is None:
         return None

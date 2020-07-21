@@ -1,18 +1,12 @@
 """Module for graph partition utilities."""
-
-from collections.abc import Iterable, Mapping
-from collections import defaultdict
 import time
 import numpy as np
-from scipy import sparse
 
 from ._ffi.function import _init_api
-from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import backend as F
 from . import utils
 from .base import EID, NID
-from . import ndarray as nd
 
 __all__ = ["metis_partition", "metis_partition_assignment",
            "partition_graph_with_halo"]
