@@ -3,25 +3,43 @@
 
 from __future__ import absolute_import
 
-import os, sys
+import os
 from .utils import download, extract_archive, get_download_dir, makedirs
 from ..utils import retry_method_with_fix
 
+
 class DGLDataset(object):
-    r"""The Basic DGL Dataset for creating graph datasets.
+    r"""The basic DGL dataset for creating graph datasets.
+
     This class defines a basic template class for DGL Dataset.
+    The following steps will be executed automatically:
+
+      1. Check whether there is a dataset cache on disk
+         (already processed and stored on the disk) by
+         invoking ``has_cache()``. If true, goto 5.
+      2. Call ``download()`` to download the data.
+      3. Call ``process()`` to process the data.
+      4. Call ``save()`` to save the processed dataset on disk and goto 6.
+      5. Call ``load()`` to load the processed dataset from disk.
+      6. Done
+
+    Users can overwrite these functions with their
+    own data processing logic.
 
     Parameters
+    ----------
     name : str
         Name of the dataset
     url : str
         Url to download the raw dataset
     raw_dir : str
-        Raw file directory to download/contains the input data directory.
+        Specifying the directory that will store the
+        downloaded data or the directory that
+        already stores the input data.
         Default: ~/.dgl/
     save_dir : str
         Directory to save the processed dataset.
-        Default: ~/.dgl/
+        Default: the value of `raw_dir`
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -45,33 +63,46 @@ class DGLDataset(object):
         self._load()
 
     def download(self):
-        r"""Downloads the dataset to the :obj:`self.raw_dir` folder.
-            Can be ignored if the dataset is already in self.raw_dir
+        r"""Overwrite to realize your own logic of downloading data.
+
+        It is recommended to download the to the :obj:`self.raw_dir`
+        folder. Can be ignored if the dataset is
+        already in `self.raw_dir`
         """
         pass
 
     def save(self):
-        r"""Save the processed dataset into files.
-            Use dgl.utils.data.save_graphs to save dgl graph into files.
-            Use dgl.utils.data.save_info to save extra dict information into files.
+        r"""Overwrite to realize your own logic of
+        saving the processed dataset into files.
+
+        It is recommended to use dgl.utils.data.save_graphs
+        to save dgl graph into files and use
+        dgl.utils.data.save_info to save extra
+        information into files.
         """
         pass
 
     def load(self):
-        r"""Load the saved dataset.
-            Use dgl.utils.data.load_graphs to load dgl graph from files.
-            Use dgl.utils.data.load_info to load extra information into python dict object.
+        r"""Overwrite to realize your own logic of
+        loading the saved dataset from files.
+
+        It is recommended to use dgl.utils.data.load_graphs
+        to load dgl graph from files and use
+        dgl.utils.data.load_info to load extra information
+        into python dict object.
         """
         pass
 
     def process(self):
-        r"""Processes the data.
+        r"""Overwrite to realize your own logic of processing the input data.
         """
         raise NotImplementedError
 
     def has_cache(self):
-        r"""Decide whether there exists a preprocessed dataset
-            By default False.
+        r"""Overwrite to realize your own logic of
+        deciding whether there exists a cached dataset.
+
+        By default False.
         """
         return False
 
@@ -120,19 +151,20 @@ class DGLDataset(object):
 
     @property
     def url(self):
-        r"""Get url to download the raw dataset
+        r"""Url to download the dataset.
         """
         return self._url
 
     @property
     def name(self):
-        r"""Name of the dataset
+        r"""Name of the dataset.
         """
         return self._name
 
     @property
     def raw_dir(self):
-        r"""Raw file directory contains the input data directory.
+        r"""Directory containing the raw data (e.g.,
+        the downloaded data).
         """
         return self._raw_dir
 
@@ -152,6 +184,7 @@ class DGLDataset(object):
     @property
     def save_path(self):
         r"""Path to save the processed dataset.
+            By default save_path = os.path.join(self.save_dir, self.name)
         """
         return os.path.join(self._save_dir, self.name)
 
@@ -170,16 +203,19 @@ class DGLDataset(object):
         r"""The number of examples in the dataset."""
         raise NotImplementedError
 
+
 class DGLBuiltinDataset(DGLDataset):
-    r"""The Basic DGL Builtin Dataset.
-        Builtin dataset will be automatically downloaded into ~/.dgl/
+    r"""The basic DGL builtin dataset.
+
     Parameters
     name : str
         Name of the dataset
     url : str
         Url to download the raw dataset
     raw_dir : str
-        Raw file directory to download/contains the input data directory.
+        Specifying the directory that will store the
+        downloaded data or the directory that
+        already stores the input data.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
