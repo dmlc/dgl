@@ -18,7 +18,9 @@ from .convert import graph, bipartite, heterograph
 from . import utils
 from .base import EID, NID
 from . import ndarray as nd
-
+from .partition import metis_partition_assignment as hetero_metis_partition_assignment
+from .partition import partition_graph_with_halo as hetero_partition_graph_with_halo
+from .partition import metis_partition as hetero_metis_partition
 
 __all__ = [
     'line_graph',
@@ -948,6 +950,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     a dict of DGLGraphs
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
+    if isinstance(g, DGLHeteroGraph):
+        return hetero_partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)
     assert len(node_part) == g.number_of_nodes()
     node_part = utils.toindex(node_part)
     if reshuffle:
@@ -1038,6 +1042,8 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     a 1-D tensor
         A vector with each element that indicates the partition Id of a vertex.
     '''
+    if isinstance(g, DGLHeteroGraph):
+        return hetero_metis_partition_assignment(g, k, balance_ntypes, balance_edges)
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     start = time.time()
@@ -1136,6 +1142,9 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
     a dict of DGLGraphs
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
+    if isinstance(g, DGLHeteroGraph):
+        return hetero_metis_partition(g, k, extra_cached_hops, reshuffle,
+                    balance_ntypes, balance_edges)
     node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges)
     if node_part is None:
         return None
