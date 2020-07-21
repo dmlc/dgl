@@ -154,8 +154,6 @@ def run(args, device, data):
     # clean up
     if not args.standalone:
         g._client.barrier()
-        dgl.distributed.shutdown_servers()
-        dgl.distributed.finalize_client()
 
 def main(args):
     if not args.standalone:
