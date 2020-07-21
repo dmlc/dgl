@@ -660,3 +660,106 @@ class FlattenedDict(object):
         k = self._group_keys[i]
         j = idx - self._group_offsets[i]
         return k, self._groups[k][j]
+
+
+def prepare_tensor(g, data, name):
+    """Convert the data to ID tensor and check its ID type and context.
+
+    If the data is already in tensor type, raise error if its ID type
+    and context does not match the graph's.
+    Otherwise, convert it to tensor type of the graph's ID type and
+    ctx and return.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Graph.
+    data : int, iterable of int, tensor
+        Data.
+    name : str
+        Name of the data.
+
+    Returns
+    -------
+    Tensor
+        Data in tensor object.
+    """
+    ret = None
+    if F.is_tensor(data):
+        if F.dtype(data) != g.idtype or F.context(data) != g.device:
+            raise DGLError('Expect argument "{}" to have data type {} and device '
+                           'context {}. But got {} and {}.'.format(
+                               name, g.idtype, g.device, F.dtype(data), F.context(data)))
+        ret = data
+    else:
+        ret = F.copy_to(F.tensor(data, g.idtype), g.device)
+
+    if F.ndim(ret) != 1:
+        raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
+            name, ret))
+    return ret
+
+def prepare_tensor_dict(g, data, name):
+    """Convert a dictionary of data to a dictionary of ID tensors.
+
+    If calls ``prepare_tensor`` on each key-value pair.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Graph.
+    data : dict[str, (int, iterable of int, tensor)]
+        Data dict.
+    name : str
+        Name of the data.
+
+    Returns
+    -------
+    dict[str, tensor]
+    """
+    return {key : prepare_tensor(g, val, '{}["{}"]'.format(name, key))
+            for key, val in data.items()}
+
+def check_all_same_idtype(glist, name):
+    """Check all the graphs have the same idtype."""
+    if len(glist) == 0:
+        return
+    idtype = glist[0].idtype
+    for i, g in enumerate(glist):
+        if g.idtype != idtype:
+            raise DGLError('Expect {}[{}] to have {} type ID, but got {}.'.format(
+                name, i, idtype, g.idtype))
+
+def check_all_same_device(glist, name):
+    """Check all the graphs have the same device."""
+    if len(glist) == 0:
+        return
+    device = glist[0].device
+    for i, g in enumerate(glist):
+        if g.device != device:
+            raise DGLError('Expect {}[{}] to be on device {}, but got {}.'.format(
+                name, i, device, g.device))
+
+def compensate(ids, origin_ids):
+    """computing the compensate set of ids from origin_ids
+
+    Note: ids should be a subset of origin_ids.
+    Any of ids and origin_ids can be non-consecutive,
+    and origin_ids should be sorted.
+
+    Example:
+    >>> ids = th.Tensor([0, 2, 4])
+    >>> origin_ids = th.Tensor([0, 1, 2, 4, 5])
+    >>> compensate(ids, origin_ids)
+    th.Tensor([1, 5])
+    """
+    # trick here, eid_0 or nid_0 can be 0.
+    mask = F.scatter_row(origin_ids,
+                         F.copy_to(F.tensor(0, dtype=F.int64),
+                                   F.context(origin_ids)),
+                         F.copy_to(F.tensor(1, dtype=F.dtype(origin_ids)),
+                                   F.context(origin_ids)))
+    mask = F.scatter_row(mask,
+                         ids,
+                         F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids)))
+    return F.tensor(F.nonzero_1d(mask), dtype=F.dtype(ids))

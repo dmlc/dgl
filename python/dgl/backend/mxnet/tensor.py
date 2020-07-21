@@ -29,26 +29,26 @@ def data_type_dict():
             'int16'   : np.int16,
             'int32'   : np.int32,
             'int64'   : np.int64,
-            'bool'    : np.bool}
+            'bool'    : np.bool}  # mxnet does not support bool
 
 def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
+    if dtype == np.bool:
+        # mxnet doesn't support bool
+        dtype =  np.int32
     if isinstance(data, nd.NDArray):
         if dtype is None or data.dtype == dtype:
             return data
         else:
             return nd.cast(data, dtype)
     else:
+        if isinstance(data, numbers.Number):
+            data = [data]
         if dtype is None:
-            if isinstance(data, numbers.Number):
-                dtype = np.int64 if isinstance(data, numbers.Integral) else np.float32
-            elif isinstance(data, np.ndarray):
-                dtype = data.dtype
-                # mxnet doesn't support bool
-                if dtype == np.bool:
-                    dtype = np.int32
+            if isinstance(data, np.ndarray):
+                dtype = np.int32 if data.dtype == np.bool else data.dtype
             else:
                 dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
         return nd.array(data, dtype=dtype)
@@ -128,6 +128,8 @@ def to_backend_ctx(dglctx):
         raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
+    if ty == np.bool:
+        ty = np.int32
     return nd.cast(input, ty)
 
 def asnumpy(input):
@@ -365,11 +367,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop, dtype="int64"):
+def arange(start, stop, dtype=np.int64):
     if start >= stop:
-        return nd.array([], dtype=data_type_dict()[dtype])
+        return nd.array([], dtype=dtype)
     else:
-        return nd.arange(start, stop, dtype=data_type_dict()[dtype])
+        return nd.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)

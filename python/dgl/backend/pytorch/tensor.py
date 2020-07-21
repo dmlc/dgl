@@ -5,6 +5,7 @@ from distutils.version import LooseVersion
 import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
 import builtins
+import numbers
 from torch.utils import dlpack
 
 from ... import ndarray as nd
@@ -31,7 +32,12 @@ def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.as_tensor(data, dtype=dtype)
+    if isinstance(data, numbers.Number):
+        data = [data]
+    if isinstance(data, th.Tensor):
+        return th.as_tensor(data, dtype=dtype, device=data.device)
+    else:
+        return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
@@ -286,8 +292,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop, dtype="int64"):
-    return th.arange(start, stop, dtype=data_type_dict()[dtype])
+def arange(start, stop, dtype=th.int64):
+    return th.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))
@@ -306,15 +312,21 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
-def zerocopy_to_dgl_ndarray(input):
-    return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+def zerocopy_to_dgl_ndarray(data):
+    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
 
-def zerocopy_from_dgl_ndarray(input):
-    return dlpack.from_dlpack(input.to_dlpack())
-
+def zerocopy_from_dgl_ndarray(data):
+    if data.shape == (0,):
+        # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
+        #  Related issue: https://github.com/pytorch/pytorch/issues/41182
+        #  The issue will be fixed in v1.6 and later.
+        return th.tensor([], dtype=getattr(th, data.dtype),
+                         device=to_backend_ctx(data.ctx))
+    else:
+        return dlpack.from_dlpack(data.to_dlpack())
 
 
 class BinaryReduce(th.autograd.Function):

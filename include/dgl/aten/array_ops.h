@@ -24,8 +24,9 @@ namespace aten {
 //////////////////////////////////////////////////////////////////////
 
 /*! \return A special array to represent null. */
-inline NDArray NullArray() {
-  return NDArray::Empty({0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+inline NDArray NullArray(const DLDataType& dtype = DLDataType{kDLInt, 64, 1},
+                         const DLContext& ctx = DLContext{kDLCPU, 0}) {
+  return NDArray::Empty({0}, dtype, ctx);
 }
 
 /*!
@@ -150,6 +151,8 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
 /*!
  * \brief Permute the elements of an array according to given indices.
  *
+ * Only support 1D arrays.
+ *
  * Equivalent to:
  *
  * <code>
@@ -158,6 +161,17 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
  * </code>
  */
 NDArray Scatter(NDArray array, IdArray indices);
+
+/*!
+ * \brief Scatter data into the output array.
+ *
+ * Equivalent to:
+ *
+ * <code>
+ *     out[index] = value
+ * </code>
+ */
+void Scatter_(IdArray index, NDArray value, NDArray out);
 
 /*!
  * \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
@@ -279,6 +293,16 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * \return Array after cumsum.
  */
 IdArray CumSum(IdArray array, bool prepend_zero = false);
+
+/*!
+ * \brief Return the nonzero index.
+ *
+ * Only support 1D array. The result index array is in int64.
+ *
+ * \param array The input array.
+ * \return A 1D index array storing the positions of the non zero values.
+ */
+IdArray NonZero(NDArray array);
 
 /*!
  * \brief Return a string that prints out some debug information.

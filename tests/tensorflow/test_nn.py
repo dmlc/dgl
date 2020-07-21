@@ -7,6 +7,7 @@ import dgl.nn.tensorflow as nn
 import dgl.function as fn
 import backend as F
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
+from test_utils import parametrize_dtype
 from copy import deepcopy
 
 import numpy as np
@@ -70,15 +71,17 @@ def test_graph_conv():
     # new_weight = conv.weight.data
     # assert not F.allclose(old_weight, new_weight)
 
-@pytest.mark.parametrize('g', get_cases(['path', 'bipartite', 'small'], exclude=['zero-degree']))
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
-def test_graph_conv2(g, norm, weight, bias):
+def test_graph_conv2(idtype, g, norm, weight, bias):
+    g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias)
     ext_w = F.randn((5, 2))
-    nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
-    ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
     h = F.randn((nsrc, 5))
     h_dst = F.randn((ndst, 2))
     if weight:
@@ -343,43 +346,52 @@ def test_rgcn():
     assert list(h_new_low.shape) == [100, O]
     assert F.allclose(h_new, h_new_low)
 
-def test_gat_conv():
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    gat = nn.GATConv(5, 2, 4)
-    feat = F.randn((100, 5))
-    h = gat(g, feat)
-    assert h.shape == (100, 4, 2)
-
-    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
-    gat = nn.GATConv((5, 10), 2, 4)
-    feat = (F.randn((100, 5)), F.randn((200, 10)))
-    h = gat(g, feat)
-
-@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
-def test_sage_conv(aggre_type):
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo']))
+def test_gat_conv(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    gat = nn.GATConv(5, 2, 4)
+    feat = F.randn((g.number_of_nodes(), 5))
+    h = gat(g, feat)
+    assert h.shape == (g.number_of_nodes(), 4, 2)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
+def test_gat_conv_bi(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    gat = nn.GATConv((5, 10), 2, 4)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 10)))
+    h = gat(g, feat)
+    assert h.shape == (g.number_of_dst_nodes(), 4, 2)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
+def test_sage_conv(idtype, g, aggre_type):
+    g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv(5, 10, aggre_type)
-    feat = F.randn((100, 5))
+    feat = F.randn((g.number_of_nodes(), 5))
     h = sage(g, feat)
     assert h.shape[-1] == 10
 
-    g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
+def test_sage_conv(idtype, g, aggre_type):
+    g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv(5, 10, aggre_type)
-    feat = F.randn((100, 5))
-    h = sage(g, feat)
-    assert h.shape[-1] == 10
-
-    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
     dst_dim = 5 if aggre_type != 'gcn' else 10
     sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
-    feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
+    feat = (F.randn((g.number_of_src_nodes(), 10)), F.randn((g.number_of_dst_nodes(), dst_dim)))
     h = sage(g, feat)
     assert h.shape[-1] == 2
-    assert h.shape[0] == 200
+    assert h.shape[0] == g.number_of_dst_nodes()
 
     # Test the case for graphs without edges
     g = dgl.bipartite([], num_nodes=(5, 3))
+    g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
     h = sage(g, feat)
@@ -417,26 +429,32 @@ def test_appnp_conv():
     h = appnp(g, feat)
     assert h.shape[-1] == 5
 
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
-def test_gin_conv(aggregator_type):
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+def test_gin_conv(g, idtype, aggregator_type):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
     gin = nn.GINConv(
         tf.keras.layers.Dense(12),
         aggregator_type
     )
-    feat = F.randn((100, 5))
-    gin = gin
+    feat = F.randn((g.number_of_nodes(), 5))
     h = gin(g, feat)
-    assert h.shape == (100, 12)
+    assert h.shape == (g.number_of_nodes(), 12)
 
-    g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
+def test_gin_conv_bi(g, idtype, aggregator_type):
+    g = g.astype(idtype).to(F.ctx())
     gin = nn.GINConv(
         tf.keras.layers.Dense(12),
         aggregator_type
     )
-    feat = (F.randn((100, 5)), F.randn((200, 5)))
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     h = gin(g, feat)
-    assert h.shape == (200, 12)
+    assert h.shape == (g.number_of_dst_nodes(), 12)
 
 def myagg(alist, dsttype):
     rst = alist[0]
@@ -444,12 +462,14 @@ def myagg(alist, dsttype):
         rst = rst + (i + 1) * alist[i]
     return rst
 
+@parametrize_dtype
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
-def test_hetero_conv(agg):
+def test_hetero_conv(agg, idtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (0, 2), (2, 1), (1, 3)],
         ('user', 'plays', 'game'): [(0, 0), (0, 2), (0, 3), (1, 0), (2, 2)],
-        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]})
+        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
+        idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
         'follows': nn.GraphConv(2, 3),
         'plays': nn.GraphConv(2, 4),

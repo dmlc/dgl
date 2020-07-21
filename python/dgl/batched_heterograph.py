@@ -246,7 +246,7 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
         """
         return self._batch_num_edges[self.get_etype_id(etype)]
 
-    def to(self, ctx, **kwargs):  # pylint: disable=invalid-name
+    def to(self, ctx, **kwargs):  # pylint: disable=invalid-name, arguments-differ
         """Move ndata, edata and graph structure to the targeted device context (cpu/gpu).
 
         Parameters
