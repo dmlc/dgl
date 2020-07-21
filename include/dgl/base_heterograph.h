@@ -374,10 +374,10 @@ class BaseHeteroGraph : public runtime::Object {
    * the arguments.
    *
    * \param etype Edge type.
-   * \param preferred_format Preferred sparse format.
+   * \param preferred_formats Preferred sparse formats.
    * \return Available sparse format.
    */
-  virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
+  virtual SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const = 0;
 
   /*!
    * \brief Return the sparse format in use for the graph.
@@ -394,11 +394,11 @@ class BaseHeteroGraph : public runtime::Object {
   virtual dgl_format_code_t GetFormatAll() const = 0;
 
   /*!
-   * \brief Return the graph in specified restrict format.
+   * \brief Return the graph in specified available formats.
    *
    * \return The new graph.
    */
-  virtual HeteroGraphPtr GetGraphInFormat(dgl_format_code_t restrict_formats) const = 0;
+  virtual HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const = 0;
 
   /*!
    * \brief Get adjacency matrix in COO format.
@@ -603,23 +603,23 @@ HeteroGraphPtr CreateHeteroGraph(
  * \param num_dst Number of nodes in the destination type.
  * \param row Src node ids of the edges.
  * \param col Dst node ids of the edges.
- * \param restrict_formats Sparse formats used for storing this graph.
+ * \param formats Sparse formats used for storing this graph.
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col, dgl_format_code_t restrict_formats = all_code);
+    IdArray row, IdArray col, dgl_format_code_t formats = all_code);
 
 /*!
  * \brief Create a heterograph from COO input.
  * \param num_vtypes Number of vertex types. Must be 1 or 2.
  * \param mat The COO matrix
- * \param restrict_formats Sparse formats used for storing this graph.
+ * \param formats Sparse formats used for storing this graph.
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, const aten::COOMatrix& mat,
-    dgl_format_code_t restrict_formats = all_code);
+    dgl_format_code_t formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -629,24 +629,24 @@ HeteroGraphPtr CreateFromCOO(
  * \param indptr Indptr array
  * \param indices Indices array
  * \param edge_ids Edge ids
- * \param restrict_formats Sparse formats for storing this graph.
+ * \param formats Sparse formats for storing this graph.
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t restrict_formats = all_code);
+    dgl_format_code_t formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSR input.
  * \param num_vtypes Number of vertex types. Must be 1 or 2.
  * \param mat The CSR matrix
- * \param restrict_formats Sparse formats for storing this graph.
+ * \param formats Sparse formats for storing this graph.
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t restrict_formats = all_code);
+    dgl_format_code_t formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -656,24 +656,24 @@ HeteroGraphPtr CreateFromCSR(
  * \param indptr Indptr array
  * \param indices Indices array
  * \param edge_ids Edge ids
- * \param restrict_formats Sparse formats used for storing this graph.
+ * \param formats Sparse formats used for storing this graph.
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t restrict_formats = all_code);
+    dgl_format_code_t formats = all_code);
 
 /*!
  * \brief Create a heterograph from CSC input.
  * \param num_vtypes Number of vertex types. Must be 1 or 2.
  * \param mat The CSC matrix
- * \param restrict_format Sparse format for storing this graph.
+ * \param formats Sparse formats available for storing this graph.
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t restrict_formats = all_code);
+    dgl_format_code_t formats = all_code);
 
 /*!
  * \brief Extract the subgraph of the in edges of the given nodes.

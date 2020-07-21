@@ -264,11 +264,11 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::GetGraphInFormat(dgl_format_code_t restrict_formats) const {
+HeteroGraphPtr HeteroGraph::GetGraphInFormat(dgl_format_code_t formats) const {
   std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
     auto relgraph = std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(etype));
-    format_rels[etype] = relgraph->GetGraphInFormat(restrict_formats);
+    format_rels[etype] = relgraph->GetGraphInFormat(formats);
   }
   return HeteroGraphPtr(new HeteroGraph(
     meta_graph_, format_rels, NumVerticesPerType()));

@@ -23,7 +23,7 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
   strm->Write(graph->NumVerticesPerType());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kAny);
+    SparseFormat fmt = graph->SelectFormat(etype, all_code);
     switch (fmt) {
       case SparseFormat::kCOO: {
         strm->Write(SparseFormat::kCOO);

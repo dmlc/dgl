@@ -187,8 +187,8 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->GetCSRMatrix(0);
   }
 
-  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
-    return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
+  SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
+    return GetRelationGraph(etype)->SelectFormat(0, preferred_formats);
   }
 
   dgl_format_code_t GetFormatAll() const override {
@@ -206,7 +206,7 @@ class HeteroGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t restrict_formats) const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 

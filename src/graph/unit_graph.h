@@ -174,31 +174,31 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, dgl_format_code_t restrict_formats = all_code);
+      IdArray row, IdArray col, dgl_format_code_t formats = all_code);
 
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, const aten::COOMatrix& mat,
-      dgl_format_code_t restrict_formats = all_code);
+      dgl_format_code_t formats = all_code);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      dgl_format_code_t restrict_formats = all_code);
+      dgl_format_code_t formats = all_code);
 
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      dgl_format_code_t restrict_formats = all_code);
+      dgl_format_code_t formats = all_code);
 
   /*! \brief Create a graph from (in) CSC arrays */
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      dgl_format_code_t restrict_formats = all_code);
+      dgl_format_code_t formats = all_code);
 
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      dgl_format_code_t restrict_formats = all_code);
+      dgl_format_code_t formats = all_code);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
@@ -241,10 +241,10 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! \brief some heuristic rules to determine the restrict format. */
   SparseFormat AutoDetectFormat(
-    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, dgl_format_code_t restrict_formats) const;
+    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, dgl_format_code_t formats) const;
 
-  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
-    return SelectFormat(preferred_format);
+  SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
+    return SelectFormat(preferred_formats);
   }
 
   /*!
@@ -259,7 +259,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   dgl_format_code_t GetFormatAll() const override;
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t restrict_formats) const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
@@ -296,7 +296,7 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            dgl_format_code_t restrict_formats=all_code);
+            dgl_format_code_t formats=all_code);
 
   /*!
    * \brief constructor
@@ -315,7 +315,7 @@ class UnitGraph : public BaseHeteroGraph {
       bool has_in_csr,
       bool has_out_csr,
       bool has_coo,
-      dgl_format_code_t restrict_formats=all_code);
+      dgl_format_code_t formats=all_code);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
@@ -329,7 +329,7 @@ class UnitGraph : public BaseHeteroGraph {
    * Otherwise, it will return whatever DGL thinks is the most appropriate given
    * the arguments.
    */
-  SparseFormat SelectFormat(SparseFormat preferred_format) const;
+  SparseFormat SelectFormat(dgl_format_code_t preferred_formats) const;
 
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
@@ -347,7 +347,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*!
    * \brief Storage format restriction.
    */
-  dgl_format_code_t restrict_formats_;
+  dgl_format_code_t formats_;
 };
 
 };  // namespace dgl
