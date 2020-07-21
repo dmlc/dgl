@@ -40,7 +40,7 @@ python3 entity_classify.py -d am --n-bases=40 --n-hidden=10 --l2norm=5e-4 --test
 ### Entity Classification with minibatch
 AIFB: accuracy avg(5 runs) 94.99%, best 97.22% (DGL)
 ```
-python3 entity_classify_mp.py -d aifb --testing --gpu 0 --fanout=20 --batch-size 128
+python3 entity_classify_mp.py -d aifb --testing --gpu 0 --fanout='20,20' --batch-size 128
 ```
 
 MUTAG: accuracy avg(5 runs) 67.06%, best 80.88% (DGL)
@@ -49,25 +49,31 @@ python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gp
 ```
 
 ```
-python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout 40 --n-epochs=40 --batch-size=128
+python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout '40,40' --n-epochs=40 --batch-size=128
 ```
 
 BGS: accuracy avg(5 runs) 84.14%, best 89.66% (DGL)
 
 ```
-python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout 40 --n-epochs=40 --batch-size=128
+python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout '40,40' --n-epochs=40 --batch-size=128
 ```
 
 AM: accuracy avg(5 runs) 88.28%, best 90.91% (DGL)
 ```
-python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout 35 --batch-size 256 --lr 1e-2 --n-hidden 16 --use-self-loop --n-epochs=40
+python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout '35,35' --batch-size 256 --lr 1e-2 --n-hidden 16 --use-self-loop --n-epochs=40
 ```
 
-Test-bd: P3-2xlarge
+### Entity Classification on OGBN-MAG
+Test-bd: P3-8xlarge
 
-OGBN-MAG accuracy 40.59
+OGBN-MAG accuracy 39.13 
 ```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout=20 --batch-size 1024 --n-hidden 64 --lr 0.001 --num-worker 8 --eval-batch-size 32 --low-mem --node-feats --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases -1
+python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='20,25' --batch-size 128 --n-hidden 64 --lr 0.01 --num-worker 0 --eval-batch-size 32 --low-mem --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases -1 --n-epochs 3 --mix-cpu-gpu --node-feats
+```
+
+OGBN-MAG without node-feats 41.90
+```
+python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='20,25' --batch-size 128 --n-hidden 64 --lr 0.01 --num-worker 0 --eval-batch-size 32 --low-mem --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases -1 --n-epochs 3 --mix-cpu-gpu 
 ```
 
 Test-bd: P2-8xlarge

@@ -26,6 +26,7 @@ from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
+import tqdm 
 
 from ogb.nodeproppred import DglNodePropPredDataset
 
@@ -170,8 +171,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         val_idx = val_idx[val_seed]
         test_idx = test_idx[test_seed]
 
+    fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     node_tids = g.ndata[dgl.NTYPE]
-    sampler = NeighborSampler(g, target_idx, [args.fanout] * args.n_layers)
+    sampler = NeighborSampler(g, target_idx, fanouts)
     loader = DataLoader(dataset=train_idx.numpy(),
                         batch_size=args.batch_size,
                         collate_fn=sampler.sample_blocks,
@@ -304,8 +306,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             forward_time.append(t1 - t0)
             backward_time.append(t2 - t1)
             train_acc = th.sum(logits.argmax(dim=1) == labels[seeds]).item() / len(seeds)
-            print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
-                  format(train_acc, loss.item()))
+            if i % 100 and proc_id == 0:
+                print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
+                    format(train_acc, loss.item()))
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, i, forward_time[-1], backward_time[-1]))
 
@@ -313,10 +316,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         # only process 0 will do the evaluation
         if (queue is not None) or (proc_id == 0):
             model.eval()
-            eval_logtis = []
+            eval_logits = []
             eval_seeds = []
             with th.no_grad():
-                for i, sample_data in enumerate(val_loader):
+                for sample_data in tqdm.tqdm(val_loader):
                     seeds, blocks = sample_data
                     if args.mix_cpu_gpu is False:
                         feats = embed_layer(blocks[0].srcdata[dgl.NID],
@@ -329,29 +332,26 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                                             blocks[0].srcdata['type_id'],
                                             node_feats)
                     logits = model(blocks, feats)
-                    eval_logtis.append(logits.cpu().detach())
+                    eval_logits.append(logits.cpu().detach())
                     eval_seeds.append(seeds.cpu().detach())
-                    if i % 1000 and proc_id == 0:
-                        print("handle {} valid samples".format(i * seeds.shape[0]))
-                eval_logtis = th.cat(eval_logtis)
+                eval_logits = th.cat(eval_logits)
                 eval_seeds = th.cat(eval_seeds)
-                val_loss = F.cross_entropy(eval_logtis, labels[eval_seeds].cpu()).item()
-                val_acc = th.sum(eval_logtis.argmax(dim=1) == labels[eval_seeds].cpu()).item() / len(eval_seeds)
-
                 if queue is not None:
-                    queue.put((val_loss, val_acc))
+                    queue.put((eval_logits, eval_seeds))
 
             if proc_id == 0:
                 if queue is not None:
-                    val_loss = []
-                    val_acc = []
+                    eval_logits = []
+                    eval_seeds = []
                     for i in range(n_gpus):
                         log = queue.get()
-                        val_l, val_a = log
-                        val_loss.append(val_l)
-                        val_acc.append(val_a)
-                    val_loss = sum(val_loss) / len(val_loss)
-                    val_acc = sum(val_acc) / len(val_acc)
+                        val_l, val_s = log
+                        eval_logits.append(val_l)
+                        eval_seeds.append(val_s)
+                    eval_logits = th.cat(eval_logits)
+                    eval_seeds = th.cat(eval_seeds)
+                val_loss = F.cross_entropy(eval_logits, labels[eval_seeds].cpu()).item()
+                val_acc = th.sum(eval_logits.argmax(dim=1) == labels[eval_seeds].cpu()).item() / len(eval_seeds)
 
                 print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
                         format(val_acc, val_loss))
@@ -362,10 +362,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
     # only process 0 will do the evaluation
     if (queue is not None) or (proc_id == 0):
         model.eval()
-        test_logtis = []
+        test_logits = []
         test_seeds = []
         with th.no_grad():
-            for i, sample_data in enumerate(test_loader):
+            for sample_data in tqdm.tqdm(test_loader):
                 seeds, blocks = sample_data
                 if args.mix_cpu_gpu is False:
                     feats = embed_layer(blocks[0].srcdata[dgl.NID],
@@ -378,31 +378,33 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                                         blocks[0].srcdata['type_id'],
                                         node_feats)
                 logits = model(blocks, feats)
-                test_logtis.append(logits.detach())
-                test_seeds.append(seeds.detach())
-                if i % 10:
-                    print("handle {} test samples".format(i * seeds.shape[0]))
-            test_logtis = th.cat(test_logtis)
+                test_logits.append(logits.cpu().detach())
+                test_seeds.append(seeds.cpu().detach())
+            test_logits = th.cat(test_logits)
             test_seeds = th.cat(test_seeds)
-            test_loss = F.cross_entropy(test_logtis, labels[test_seeds]).item()
-            test_acc = th.sum(test_logtis.argmax(dim=1) == labels[test_seeds]).item() / len(test_seeds)
 
             if queue is not None:
-                queue.put((test_loss, test_acc))
+                queue.put((test_logits, test_seeds))
 
         if proc_id == 0:
             if queue is not None:
-                test_loss = []
-                test_acc = []
+                test_logits = []
+                test_seeds = []
                 for i in range(n_gpus):
                     log = queue.get()
-                    val_l, val_a = log
-                    test_loss.append(val_l)
-                    test_acc.append(val_a)
-                test_loss = sum(test_loss) / len(test_loss)
-                test_acc = sum(test_acc) / len(test_acc)
+                    test_l, test_s = log
+                    test_logits.append(test_l)
+                    test_seeds.append(test_s)
+                test_logits = th.cat(test_logits)
+                test_seeds = th.cat(test_seeds)
+            test_loss = F.cross_entropy(test_logits, labels[test_seeds].cpu()).item()
+            test_acc = th.sum(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item() / len(test_seeds)
             print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
             print()
+
+    # sync for test
+    if n_gpus > 1:
+        th.distributed.barrier()
 
     print("{}/{} Mean forward time: {:4f}".format(proc_id, n_gpus,
                                                   np.mean(forward_time[len(forward_time) // 4:])))
@@ -584,7 +586,7 @@ def config():
             help="l2 norm coef")
     parser.add_argument("--relabel", default=False, action='store_true',
             help="remove untouched nodes and relabel")
-    parser.add_argument("--fanout", type=int, default=4,
+    parser.add_argument("--fanout", type=str, default="4, 4",
             help="Fan-out of neighbor sampling.")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
