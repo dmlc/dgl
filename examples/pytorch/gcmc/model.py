@@ -302,9 +302,7 @@ class BiDecoder(nn.Module):
         super(BiDecoder, self).__init__()
         self._num_basis = num_basis
         self.dropout = nn.Dropout(dropout_rate)
-        self.Ps = nn.ParameterList()
-        for i in range(num_basis):
-            self.Ps.append(nn.Parameter(th.randn(in_units, in_units)))
+        self.P = nn.Parameter(th.randn(num_basis, in_units, in_units))
         self.combine_basis = nn.Linear(self._num_basis, num_classes, bias=False)
         self.reset_parameters()
 
@@ -312,6 +310,10 @@ class BiDecoder(nn.Module):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
+
+    def apply_edges(self, edges):
+        sr = th.einsum('ai,bij,aj->ab', edges.src['h'], self.P, edges.dst['h'])
+        return {'sr': sr}
 
     def forward(self, graph, ufeat, ifeat):
         """Forward function.
@@ -334,12 +336,9 @@ class BiDecoder(nn.Module):
             ufeat = self.dropout(ufeat)
             ifeat = self.dropout(ifeat)
             graph.nodes['movie'].data['h'] = ifeat
-            basis_out = []
-            for i in range(self._num_basis):
-                graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
-                graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
-                basis_out.append(graph.edata['sr'].unsqueeze(1))
-            out = th.cat(basis_out, dim=1)
+            graph.nodes['user'].data['h'] = ufeat
+            graph.apply_edges(self.apply_edges)
+            out = graph.edata['sr']
             out = self.combine_basis(out)
         return out
 
@@ -390,12 +389,7 @@ class DenseBiDecoder(BiDecoder):
         """
         ufeat = self.dropout(ufeat)
         ifeat = self.dropout(ifeat)
-        basis_out = []
-        for i in range(self._num_basis):
-            ufeat_i = ufeat @ self.Ps[i]
-            out = th.einsum('ab,ab->a', ufeat_i, ifeat)
-            basis_out.append(out.unsqueeze(1))
-        out = th.cat(basis_out, dim=1)
+        out = th.einsum('ai,bij,aj->ab', ufeat, self.P, ifeat)
         out = self.combine_basis(out)
         return out
 
