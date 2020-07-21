@@ -340,7 +340,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
     LOG(FATAL) << "Not enabled for COO graph";
-    return SparseFormat::kAny;
+    return SparseFormat::kCOO;
   }
 
   dgl_format_code_t GetFormatAll() const override {
@@ -739,7 +739,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
     LOG(FATAL) << "Not enabled for CSR graph";
-    return SparseFormat::kAny;
+    return SparseFormat::kCSR;
   }
 
   dgl_format_code_t GetFormatAll() const override {
@@ -1409,13 +1409,8 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
     return GetOutCSR();
   case SparseFormat::kCSC:
     return GetInCSR();
-  case SparseFormat::kCOO:
+  default:
     return GetCOO();
-  case SparseFormat::kAny:
-    return GetAny();
-  default:  // SparseFormat::kAuto
-    LOG(FATAL) << "Must specify a restrict format.";
-    return nullptr;
   }
 }
 
@@ -1430,13 +1425,13 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
 }
 
 /*
-SparseFormat UnitGraph::AutoDetectFormat(
+dgl_format_code_t UnitGraph::AutoDetectFormat(
     CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
   if (restrict_format != SparseFormat::kAuto)
     return restrict_format;
   if (coo && coo->defined() && coo->IsHypersparse())
     return SparseFormat::kCOO;
-  return SparseFormat::kAny;
+  return all_code;
 }
 */
 

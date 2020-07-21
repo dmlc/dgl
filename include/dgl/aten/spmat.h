@@ -17,11 +17,9 @@ namespace dgl {
  * \brief Sparse format.
  */
 enum class SparseFormat {
-  kAny = 0,
-  kCOO = 1,
-  kCSR = 2,
-  kCSC = 3,
-  kAuto = 4   // kAuto is a placeholder that indicates it would be materialized later.
+  kCOO = 0,
+  kCSR = 1,
+  kCSC = 2,
 };
 
 /*!
@@ -40,13 +38,9 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
     return SparseFormat::kCSR;
   else if (name == "csc")
     return SparseFormat::kCSC;
-  else if (name == "any")
-    return SparseFormat::kAny;
-  else if (name == "auto")
-    return SparseFormat::kAuto;
   else
     LOG(FATAL) << "Sparse format not recognized";
-  return SparseFormat::kAny;
+  return SparseFormat::kCOO;
 }
 
 // Create string from sparse format.
@@ -55,12 +49,8 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
     return std::string("coo");
   else if (sparse_format == SparseFormat::kCSR)
     return std::string("csr");
-  else if (sparse_format == SparseFormat::kCSC)
-    return std::string("csc");
-  else if (sparse_format == SparseFormat::kAny)
-    return std::string("any");
   else
-    return std::string("auto");
+    return std::string("csc");
 }
 
 inline std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
