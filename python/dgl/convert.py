@@ -509,8 +509,11 @@ def heterograph(data_dict,
         num_nodes_dict = defaultdict(int)
         for (srctype, etype, dsttype), data in data_dict.items():
             if isinstance(data, tuple):
-                src = utils.toindex(data[0]).tonumpy()
-                dst = utils.toindex(data[1]).tonumpy()
+                # TODO(minjie): converting to index is unnecessary just for getting the max ID.
+                src = utils.toindex(data[0],
+                                    dtype='int32' if idtype == F.int32 else 'int64').tonumpy()
+                dst = utils.toindex(data[1],
+                                    dtype='int32' if idtype == F.int32 else 'int64').tonumpy()
                 nsrc = (src.max() + 1) if len(src) > 0 else 0
                 ndst = (dst.max() + 1) if len(dst) > 0 else 0
             elif isinstance(data, list):

@@ -781,6 +781,30 @@ def check_all_same_schema(feat_dict_list, keys, name):
             t1 = feat_dict_list[0][k]
             t2 = fdict[k]
             if F.dtype(t1) != F.dtype(t2) or F.shape(t1)[1:] != F.shape(t2)[1:]:
-                raise DGLError('Expect all feature "{}" to have the data type'
+                raise DGLError('Expect all feature "{}" to have the same data type'
                                ' and feature size, but got\n\t{} {}\nand\n\t{} {}.'.format(
                                    k, F.dtype(t1), F.shape(t1)[1:], F.dtype(t2), F.shape(t2)[1:]))
+
+def compensate(ids, origin_ids):
+    """computing the compensate set of ids from origin_ids
+
+    Note: ids should be a subset of origin_ids.
+    Any of ids and origin_ids can be non-consecutive,
+    and origin_ids should be sorted.
+
+    Example:
+    >>> ids = th.Tensor([0, 2, 4])
+    >>> origin_ids = th.Tensor([0, 1, 2, 4, 5])
+    >>> compensate(ids, origin_ids)
+    th.Tensor([1, 5])
+    """
+    # trick here, eid_0 or nid_0 can be 0.
+    mask = F.scatter_row(origin_ids,
+                         F.copy_to(F.tensor(0, dtype=F.int64),
+                                   F.context(origin_ids)),
+                         F.copy_to(F.tensor(1, dtype=F.dtype(origin_ids)),
+                                   F.context(origin_ids)))
+    mask = F.scatter_row(mask,
+                         ids,
+                         F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids)))
+    return F.tensor(F.nonzero_1d(mask), dtype=F.dtype(ids))
