@@ -215,7 +215,7 @@ Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-so
 
 ## New to Deep Learning and Graph Deep Learning?
 
-Check out the open source book [*Dive into Deep Learning*](http://gluon.ai/).
+Check out the open source book [*Dive into Deep Learning*](https://d2l.ai/).
 
 For those who are new to graph neural network, please see the [basic of DGL](https://docs.dgl.ai/tutorials/basics/index.html).
 
