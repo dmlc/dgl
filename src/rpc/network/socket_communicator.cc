@@ -68,7 +68,8 @@ bool SocketSender::Connect() {
       if (client_socket->Connect(ip, port)) {
         bo = true;
       } else {
-        if (try_count % 10 == 0 && try_count != 0) {
+        if (try_count % 200 == 0 && try_count != 0) {
+          // every 1000 seconds show this message
           LOG(INFO) << "Try to connect to: " << ip << ":" << port;
         }
         try_count++;
