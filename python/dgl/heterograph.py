@@ -3237,6 +3237,19 @@ class DGLHeteroGraph(object):
         self._edge_frames[etid].pop(key)
 
     #################################################################
+    # DEPRECATED: from the old DGLGraph
+    #################################################################
+
+    def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
+        """DEPRECATED: please use
+            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``.
+        which will return a new graph created from the networkx graph.
+        """
+        raise DGLError('DGLGraph.from_networkx is deprecated. Please call the following\n\n'
+                       '\t dgl.from_networkx(nx_graph, node_attrs, edge_attrs)\n\n'
+                       ', which creates a new DGLGraph from the networkx graph.')
+
+    #################################################################
     # Message passing
     #################################################################
 
@@ -4204,65 +4217,6 @@ class DGLHeteroGraph(object):
     #################################################################
     # Misc
     #################################################################
-
-    def to_networkx(self, node_attrs=None, edge_attrs=None):
-        """Convert this graph to networkx graph.
-
-        The edge id will be saved as the 'id' edge attribute.
-
-        Parameters
-        ----------
-        node_attrs : iterable of str, optional
-            The node attributes to be copied.
-        edge_attrs : iterable of str, optional
-            The edge attributes to be copied.
-
-        Returns
-        -------
-        networkx.DiGraph
-            The nx graph
-
-        Examples
-        --------
-
-        .. note:: Here we use pytorch syntax for demo. The general idea applies
-            to other frameworks with minor syntax change (e.g. replace
-            ``torch.tensor`` with ``mxnet.ndarray``).
-
-        >>> import torch as th
-        >>> g = DGLGraph()
-        >>> g.add_nodes(5, {'n1': th.randn(5, 10)})
-        >>> g.add_edges([0,1,3,4], [2,4,0,3], {'e1': th.randn(4, 6)})
-        >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
-
-        See Also
-        --------
-        dgl.to_networkx
-        """
-        if self.device != F.cpu():
-            raise DGLError('Cannot convert a CUDA graph to networkx. Call g.cpu() first.')
-        # TODO(minjie): multi-type support
-        assert len(self.ntypes) == 1
-        assert len(self.etypes) == 1
-        src, dst = self.edges()
-        src = F.asnumpy(src)
-        dst = F.asnumpy(dst)
-        # xiangsx: Always treat graph as multigraph
-        nx_graph = nx.MultiDiGraph()
-        nx_graph.add_nodes_from(range(self.number_of_nodes()))
-        for eid, (u, v) in enumerate(zip(src, dst)):
-            nx_graph.add_edge(u, v, id=eid)
-
-        if node_attrs is not None:
-            for nid, attr in nx_graph.nodes(data=True):
-                feat_dict = self._get_n_repr(0, nid)
-                attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
-        if edge_attrs is not None:
-            for _, _, attr in nx_graph.edges(data=True):
-                eid = attr['id']
-                feat_dict = self._get_e_repr(0, eid)
-                attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
-        return nx_graph
 
     def filter_nodes(self, predicate, nodes=ALL, ntype=None):
         """Return a tensor of node IDs with the given node type that satisfy

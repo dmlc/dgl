@@ -13,6 +13,7 @@ from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
 
 __all__ = [
     'graph',
+    'graph_from_networkx',
     'bipartite',
     'hetero_from_relations',
     'heterograph',
@@ -762,93 +763,32 @@ def to_homo(G):
 
     return retg
 
-############################################################
-# Internal APIs
-############################################################
-
-def create_from_edges(u, v,
-                      utype, etype, vtype,
-                      urange, vrange,
-                      validate=True,
-                      restrict_format="auto"):
-    """Internal function to create a graph from incident nodes with types.
-
-    utype could be equal to vtype
+def from_networkx(nx_graph, *,
+                  ntype='_N', etype='_E',
+                  node_attrs=None,
+                  edge_attrs=None,
+                  edge_id_attr_name='id',
+                  restrict_format='auto',
+                  idtype=None):
+    """Create a DGLGraph from networkx.
 
     Parameters
     ----------
-    u : Tensor
-        Source node IDs.
-    v : Tensor
-        Dest node IDs.
-    utype : str
-        Source node type name.
-    etype : str
-        Edge type name.
-    vtype : str
-        Destination node type name.
-    urange : int, optional
-        The source node ID range. If None, the value is the maximum
-        of the source node IDs in the edge list plus 1. (Default: None)
-    vrange : int, optional
-        The destination node ID range. If None, the value is the
-        maximum of the destination node IDs in the edge list plus 1. (Default: None)
-    validate : bool, optional
-        If True, checks if node IDs are within range.
-    restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
-        Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-
-    Returns
-    -------
-    DGLHeteroGraph
-    """
-    if validate:
-        if urange is not None and len(u) > 0 and \
-            urange <= F.as_scalar(F.max(u, dim=0)):
-            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                urange, F.as_scalar(F.max(u, dim=0))))
-        if vrange is not None and len(v) > 0 and \
-            vrange <= F.as_scalar(F.max(v, dim=0)):
-            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                vrange, F.as_scalar(F.max(v, dim=0))))
-
-    if utype == vtype:
-        num_ntypes = 1
-    else:
-        num_ntypes = 2
-
-    hgidx = heterograph_index.create_unitgraph_from_coo(
-        num_ntypes, urange, vrange, u, v, restrict_format)
-    if utype == vtype:
-        return DGLHeteroGraph(hgidx, [utype], [etype])
-    else:
-        return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
-
-def create_from_networkx(nx_graph,
-                         ntype, etype,
-                         edge_id_attr_name='id',
-                         node_attrs=None,
-                         edge_attrs=None,
-                         restrict_format='auto',
-                         idtype=F.int64):
-    """Create a heterograph that has only one set of nodes and edges.
-
-    Parameters
-    ----------
-    nx_graph : NetworkX graph
+    nx_graph : networkx.Graph
+        NetworkX graph.
     ntype : str
         Type name for both source and destination nodes
     etype : str
         Type name for edges
-    edge_id_attr_name : str, optional
-        Key name for edge ids in the NetworkX graph. If not found, we
-        will consider the graph not to have pre-specified edge ids. (Default: 'id')
     node_attrs : list of str
         Names for node features to retrieve from the NetworkX graph (Default: None)
     edge_attrs : list of str
         Names for edge features to retrieve from the NetworkX graph (Default: None)
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
+    edge_id_attr_name : str, optional
+        Key name for edge ids in the NetworkX graph. If not found, we
+        will consider the graph not to have pre-specified edge ids. (Default: 'id')
     idtype : int32, int64, optional
         Integer ID type. Must be int32 or int64. Default: int64.
 
@@ -856,38 +796,9 @@ def create_from_networkx(nx_graph,
     -------
     g : DGLHeteroGraph
     """
-    assert False
-    if not nx_graph.is_directed():
-        nx_graph = nx_graph.to_directed()
-
-    # Relabel nodes using consecutive integers
-    nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
-
-    # nx_graph.edges(data=True) returns src, dst, attr_dict
-    if nx_graph.number_of_edges() > 0:
-        has_edge_id = edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]
-    else:
-        has_edge_id = False
-
-    if has_edge_id:
-        num_edges = nx_graph.number_of_edges()
-        src = [0] * num_edges
-        dst = [0] * num_edges
-        for u, v, attr in nx_graph.edges(data=True):
-            eid = attr[edge_id_attr_name]
-            src[eid] = u
-            dst[eid] = v
-    else:
-        src = []
-        dst = []
-        for e in nx_graph.edges:
-            src.append(e[0])
-            dst.append(e[1])
-    src = F.tensor(src, idtype)
-    dst = F.tensor(dst, idtype)
-    num_nodes = nx_graph.number_of_nodes()
-    g = create_from_edges(src, dst, ntype, etype, ntype, num_nodes, num_nodes,
-                          validate=False, restrict_format=restrict_format)
+    g = graph(nx_graph, ntype, etype,
+              restrict_format=restrict_format,
+              idtype=idtype)
 
     # handle features
     # copy attributes
@@ -954,4 +865,91 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
     networkx.DiGraph
         The nx graph
     """
-    return g.to_networkx(node_attrs, edge_attrs)
+    if g.device != F.cpu():
+        raise DGLError('Cannot convert a CUDA graph to networkx. Call g.cpu() first.')
+    # TODO(minjie): multi-type support
+    assert len(g.ntypes) == 1
+    assert len(g.etypes) == 1
+    src, dst = g.edges()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    # xiangsx: Always treat graph as multigraph
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_nodes_from(range(g.number_of_nodes()))
+    for eid, (u, v) in enumerate(zip(src, dst)):
+        nx_graph.add_edge(u, v, id=eid)
+
+    if node_attrs is not None:
+        for nid, attr in nx_graph.nodes(data=True):
+            feat_dict = g._get_n_repr(0, nid)
+            attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
+    if edge_attrs is not None:
+        for _, _, attr in nx_graph.edges(data=True):
+            eid = attr['id']
+            feat_dict = g._get_e_repr(0, eid)
+            attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
+    return nx_graph
+
+DGLHeteroGraph.to_networkx = to_networkx
+
+############################################################
+# Internal APIs
+############################################################
+
+def create_from_edges(u, v,
+                      utype, etype, vtype,
+                      urange, vrange,
+                      validate=True,
+                      restrict_format="auto"):
+    """Internal function to create a graph from incident nodes with types.
+
+    utype could be equal to vtype
+
+    Parameters
+    ----------
+    u : Tensor
+        Source node IDs.
+    v : Tensor
+        Dest node IDs.
+    utype : str
+        Source node type name.
+    etype : str
+        Edge type name.
+    vtype : str
+        Destination node type name.
+    urange : int, optional
+        The source node ID range. If None, the value is the maximum
+        of the source node IDs in the edge list plus 1. (Default: None)
+    vrange : int, optional
+        The destination node ID range. If None, the value is the
+        maximum of the destination node IDs in the edge list plus 1. (Default: None)
+    validate : bool, optional
+        If True, checks if node IDs are within range.
+    restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
+        Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
+
+    Returns
+    -------
+    DGLHeteroGraph
+    """
+    if validate:
+        if urange is not None and len(u) > 0 and \
+            urange <= F.as_scalar(F.max(u, dim=0)):
+            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
+                urange, F.as_scalar(F.max(u, dim=0))))
+        if vrange is not None and len(v) > 0 and \
+            vrange <= F.as_scalar(F.max(v, dim=0)):
+            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
+                vrange, F.as_scalar(F.max(v, dim=0))))
+
+    if utype == vtype:
+        num_ntypes = 1
+    else:
+        num_ntypes = 2
+
+    hgidx = heterograph_index.create_unitgraph_from_coo(
+        num_ntypes, urange, vrange, u, v, restrict_format)
+    if utype == vtype:
+        return DGLHeteroGraph(hgidx, [utype], [etype])
+    else:
+        return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
