@@ -202,6 +202,8 @@ class DGLHeteroGraph(object):
         """Init internal states."""
         self._graph = gidx
         self._canonical_etypes = None
+        self._batch_num_nodes = None
+        self._batch_num_edges = None
 
         # Handle node types
         if isinstance(ntypes, tuple):
@@ -1092,6 +1094,52 @@ class DGLHeteroGraph(object):
         if etid is None:
             raise DGLError('Edge type "{}" does not exist.'.format(etype))
         return etid
+    #################################################################
+    # Batching
+    #################################################################
+    @property
+    def batch_size(self):
+        return len(self.batch_num_nodes(self.ntypes[0]))
+
+    def batch_num_nodes(self, ntype=None):
+        if self._batch_num_nodes is None:
+            self._batch_num_nodes = {}
+            for ty in self.ntypes:
+                bnn = F.copy_to(F.tensor([self.number_of_nodes(ty)], F.int64), self.device)
+                self._batch_num_nodes[ty] = bnn
+        if ntype is None:
+            if len(self.ntypes) != 1:
+                raise DGLError('Node type name must be specified if there are more than one '
+                               'node types.')
+            ntype = self.ntypes[0]
+        return self._batch_num_nodes[ntype]
+
+    def set_batch_num_nodes(self, val):
+        if not isinstance(val, Mapping):
+            if len(self.ntypes) != 1:
+                raise DGLError('Must provide a dictionary when there are multiple node types.')
+            val = {self.ntypes[0] : val}
+        self._batch_num_nodes = val
+
+    def batch_num_edges(self, etype=None):
+        if self._batch_num_edges is None:
+            self._batch_num_edges = {}
+            for ty in self.canonical_etypes:
+                bne = F.copy_to(F.tensor([self.number_of_edges(ty)], F.int64), self.device)
+                self._batch_num_edges[ty] = bne
+        if etype is None:
+            if len(self.etypes) != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+            etype = self.canonical_etypes[0]
+        return self._batch_num_edges[etype]
+
+    def set_batch_num_edges(self, val):
+        if not isinstance(val, Mapping):
+            if len(self.etypes) != 1:
+                raise DGLError('Must provide a dictionary when there are multiple edge types.')
+            val = {self.canonical_etypes[0] : val}
+        self._batch_num_edges = val
 
     #################################################################
     # View
@@ -4330,8 +4378,17 @@ class DGLHeteroGraph(object):
             new_feats = {k : F.copy_to(feat, device) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
         new_gidx = self._graph.copy_to(utils.to_dgl_context(device))
-        return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
-                              new_nframes, new_eframes)
+        ret = DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
+                             new_nframes, new_eframes)
+
+        if self._batch_num_nodes is not None:
+            new_bnn = {k : F.copy_to(num, device) for k, num in self._batch_num_nodes.items()}
+            ret._batch_num_nodes = new_bnn
+        if self._batch_num_edges is not None:
+            new_bne = {k : F.copy_to(num, device) for k, num in self._batch_num_edges.items()}
+            ret._batch_num_edges = new_bne
+
+        return ret
 
     def cpu(self):
         """Return a new copy of this graph on CPU.
