@@ -207,7 +207,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
             calc_bcast(op, u_shp, e_shp)
         mod = gspmm.spmm(
             op, reduce_op, nnz, num_rows, num_cols,
-            lhs_len, rhs_len, out_len, str(indice_type), str(feat_type),
+            lhs_len, rhs_len, out_len, indice_type, str(feat_type),
             use_bcast=if_bcast, target=target
         )
         compiled = (mod, v_shp, lhs_len, rhs_len, out_len)
@@ -230,8 +230,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
     if len(compiled) > 5:
         lhs_offset, rhs_offset = compiled[5], compiled[6]
         f_input += [lhs_offset, rhs_offset]
-    ugi = gidx.get_unitgraph(0, to_dgl_context(ctx))
-    idtype = getattr(F, ugi.dtype)
+    idtype = getattr(F, gidx.dtype)
     arg_u, arg_e = None, None
     use_cmp = reduce_op != 'sum'
     if use_cmp:
