@@ -763,4 +763,3 @@ def compensate(ids, origin_ids):
                          ids,
                          F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids)))
     return F.tensor(F.nonzero_1d(mask), dtype=F.dtype(ids))
-

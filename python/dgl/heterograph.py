@@ -4356,7 +4356,7 @@ class DGLHeteroGraph(object):
             The graph object that is a clone of current graph.
         """
         meta_edges = []
-        for s_ntype, e_type, d_ntype in self.canonical_etypes:
+        for s_ntype, _, d_ntype in self.canonical_etypes:
             meta_edges.append((self.get_ntype_id(s_ntype), self.get_ntype_id(d_ntype)))
 
         metagraph = graph_index.from_edge_list(meta_edges, True)

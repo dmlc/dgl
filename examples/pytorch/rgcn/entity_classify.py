@@ -22,7 +22,7 @@ from model import BaseRGCN
 
 class EntityClassify(BaseRGCN):
     def create_features(self):
-        features = torch.ones(self.num_nodes)
+        features = torch.arange(self.num_nodes)
         if self.use_cuda:
             features = features.cuda()
         return features
