@@ -864,6 +864,10 @@ class HeteroGraphIndex(ObjectBase):
         -------
         A new graph index.
         """
+        if formats == 'any':
+            formats = ['coo', 'csr', 'csc']
+        if isinstance(formats, str):
+            formats = [formats]
         return _CAPI_DGLHeteroGetFormatGraph(self, formats)
 
     def create_format_(self):
@@ -950,6 +954,10 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
     -------
     HeteroGraphIndex
     """
+    if formats == 'any':
+        formats = ['coo', 'csr', 'csc']
+    if isinstance(formats, str):
+        formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(row), F.to_dgl_nd(col),
@@ -980,6 +988,10 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     -------
     HeteroGraphIndex
     """
+    if formats == 'any':
+        formats = ['coo', 'csr', 'csc']
+    if isinstance(formats, str):
+        formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(indptr), F.to_dgl_nd(indices), F.to_dgl_nd(edge_ids),

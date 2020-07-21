@@ -901,10 +901,6 @@ def create_from_edges(u, v,
     else:
         num_ntypes = 2
 
-    if formats == 'any':
-        formats = ['coo', 'csr', 'csc']
-    if isinstance(formats, str):
-        formats = [formats]
     hgidx = heterograph_index.create_unitgraph_from_coo(
         num_ntypes, urange, vrange, u, v, formats)
     if utype == vtype:
@@ -971,10 +967,6 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
     """
     num_src, num_dst = spmat.shape
     num_ntypes = 1 if utype == vtype else 2
-    if formats == 'any':
-        formats = ['coo', 'csr', 'csc']
-    if isinstance(formats, str):
-        formats = [formats]
     if spmat.getformat() == 'coo':
         row = F.tensor(spmat.row, idtype)
         col = F.tensor(spmat.col, idtype)

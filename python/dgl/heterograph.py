@@ -4596,7 +4596,7 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-    def format(self, format=None):
+    def format(self, formats=None):
         r"""Get a cloned graph with the specified sparse format(s) or query 
         for the usage status of sparse formats
 
@@ -4607,7 +4607,7 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        format : str or list of str or None
+        formats : str or list of str or None
 
             * If format is None, return the usage status of sparse formats
             * If format is ``'any'``, indicating all formats are available.
@@ -4665,13 +4665,9 @@ class DGLHeteroGraph(object):
         >>> csr_g.format()
         {'created': ['csr'], 'not created': []}
         """
-        if format is None:
+        if formats is None:
             return self._graph.format()
-        if format == 'any':
-            format = ['coo', 'csr', 'csc']
-        if isinstance(format, str):
-            format = [format]
-        return DGLHeteroGraph(self._graph.to_format(format), self.ntypes, self.etypes,
+        return DGLHeteroGraph(self._graph.to_format(formats), self.ntypes, self.etypes,
                               self._node_frames,
                               self._edge_frames)
 
