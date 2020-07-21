@@ -558,7 +558,7 @@ def heterograph(data_dict, num_nodes_dict=None, formats='any',
                 data, srctype, etype,
                 num_nodes=num_nodes_dict[srctype],
                 validate=False,
-                formats=format,
+                formats=formats,
                 idtype=idtype, device=device))
         else:
             rel_graphs.append(bipartite(

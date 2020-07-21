@@ -4667,6 +4667,10 @@ class DGLHeteroGraph(object):
         """
         if format is None:
             return self._graph.format()
+        if format == 'any':
+            format = ['coo', 'csr', 'csc']
+        if isinstance(format, str):
+            format = [format]
         return DGLHeteroGraph(self._graph.to_format(format), self.ntypes, self.etypes,
                               self._node_frames,
                               self._edge_frames)
