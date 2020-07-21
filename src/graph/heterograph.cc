@@ -266,7 +266,8 @@ std::string HeteroGraph::SharedMemName() const {
 }
 
 HeteroGraphPtr HeteroGraph::CopyToSharedMem(
-      HeteroGraphPtr g, const std::string& name, const std::set<std::string>& fmts) {
+      HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
+      const std::vector<std::string>& etypes, const std::set<std::string>& fmts) {
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hg);
   if (hg->SharedMemName() == name)
@@ -314,6 +315,9 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   auto ret = std::shared_ptr<HeteroGraph>(
       new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
   ret->shared_mem_ = mem;
+
+  strm->Write(ntypes);
+  strm->Write(etypes);
   return ret;
 }
 
@@ -336,7 +340,8 @@ aten::CSRMatrix CreateCSRFromSharedMem(const std::string &name, uint8_t nbits,
   return aten::CSRMatrix(num_src, num_dst, indptr, indices, data, sorted);
 }
 
-HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
+std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
+    HeteroGraph::CreateFromSharedMem(const std::string &name) {
   auto mem = std::make_shared<SharedMemory>(name);
   auto mem_buf = mem->Open(SHARED_MEM_METAINFO_SIZE_MAX);
   dmlc::MemoryFixedSizeStream ifs(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
@@ -397,7 +402,13 @@ HeteroGraphPtr HeteroGraph::CreateFromSharedMem(const std::string &name) {
   auto ret = HeteroGraphPtr(new HeteroGraph(metagraph, relgraphs, num_verts_per_type));
   auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
   hg_index->shared_mem_ = mem;
-  return ret;
+
+  std::vector<std::string> ntypes;
+  std::vector<std::string> etypes;
+  CHECK(strm->Read(&ntypes)) << "invalid ntypes";
+  CHECK(strm->Read(&etypes)) << "invalid etypes";
+  
+  return std::make_tuple(hg_index, ntypes, etypes);
 }
 
 HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {

@@ -227,13 +227,17 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
 
-    def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
+    def shared_memory(self, name, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory
 
         Parameters
         ----------
         name : str
             The name of the shared memory.
+        ntypes : list of str
+            Name of node types
+        etypes : list of str
+            Name of edge types
         format : list of str
             Desired formats to be materialized.
 
@@ -246,7 +250,9 @@ class HeteroGraphIndex(ObjectBase):
         assert len(formats) > 0
         for fmt in formats:
             assert fmt in ("coo", "csr", "csc")
-        return _CAPI_DGLHeteroCopyToSharedMem(self, name, formats)
+        ntypes = [] if ntypes is None else ntypes
+        etypes = [] if etypes is None else etypes
+        return _CAPI_DGLHeteroCopyToSharedMem(self, name, ntypes, etypes, formats)
 
     def is_multigraph(self):
         """Return whether the graph is a multigraph
@@ -1159,6 +1165,10 @@ def create_heterograph_from_shared_memory(name):
     Returns
     -------
     HeteroGraphIndex (in shared memory)
+    ntypes : list of str
+        Names of node types
+    etypes : list of str
+        Names of edge types
     """
     return _CAPI_DGLHeteroCreateFromSharedMem(name)
 

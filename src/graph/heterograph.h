@@ -222,10 +222,19 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
+  /*! \brief Copy the data to shared memory.
+  *
+  * Also save names of node types and edge types of the HeteroGraph object to shared memory
+  */
   static HeteroGraphPtr CopyToSharedMem(
-      HeteroGraphPtr g, const std::string& name, const std::set<std::string>& fmts);
+      HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
+      const std::vector<std::string>& etypes, const std::set<std::string>& fmts);
 
-  static HeteroGraphPtr CreateFromSharedMem(const std::string &name);
+  /*! \brief Create a heterograph from 
+  *   \return the HeteroGraphPtr, names of node types, names of edge types
+  */
+  static std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
+      CreateFromSharedMem(const std::string &name);
 
   /*! \brief Creat a LineGraph of self */
   HeteroGraphPtr LineGraph(bool backtracking) const;

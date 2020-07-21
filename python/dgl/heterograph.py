@@ -4651,6 +4651,46 @@ class DGLHeteroGraph(object):
                               self._node_frames,
                               self._edge_frames)
 
+    def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
+        """Return a copy of this graph in shared memory
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory.
+        format : list of str
+            Desired formats to be materialized.
+
+        Returns
+        -------
+        HeteroGraph
+            The graph index in shared memory
+        """
+        assert len(name) > 0, "The name of shared memory cannot be empty"
+        assert len(formats) > 0
+        for fmt in formats:
+            assert fmt in ("coo", "csr", "csc")
+        print(len(self.ntypes), len(self.etypes))
+        gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
+        return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
+
+    @staticmethod
+    def create_heterograph_from_shared_memory(name):
+        """Create a heterograph from shared memory with the given name.
+
+        Paramaters
+        ----------
+        name : str
+            The name of the share memory
+
+        Returns
+        -------
+        HeteroGraph (in shared memory)
+        """
+        g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(name)
+        print(len(ntypes), len(etypes))
+        return DGLHeteroGraph(g, ntypes, etypes)
+
     def long(self):
         """Return a heterograph object use int64 as index dtype,
         with the ndata and edata as the original object
