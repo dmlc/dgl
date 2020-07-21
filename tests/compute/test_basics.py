@@ -34,6 +34,7 @@ def generate_graph(grad=False):
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
+    g.to(F.ctx())
     ncol = F.randn((10, D))
     ecol = F.randn((17, D))
     if grad:
@@ -55,7 +56,7 @@ def test_batch_setter_getter():
     assert F.allclose(g.ndata['h'], F.zeros((10, D)))
     # pop nodes
     old_len = len(g.ndata)
-    assert _pfc(g.pop_n_repr('h')) == [0.] * 10
+    g.ndata.pop('h')
     assert len(g.ndata) == old_len - 1
     g.ndata['h'] = F.zeros((10, D))
     # set partial nodes
@@ -91,7 +92,7 @@ def test_batch_setter_getter():
     assert _pfc(g.edata['l']) == [0.] * 17
     # pop edges
     old_len = len(g.edata)
-    assert _pfc(g.pop_e_repr('l')) == [0.] * 17
+    g.edata.pop('l')
     assert len(g.edata) == old_len - 1
     g.edata['l'] = F.zeros((17, D))
     # set partial edges (many-many)
