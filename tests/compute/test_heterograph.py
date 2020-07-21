@@ -2078,9 +2078,9 @@ def test_clone(idtype):
     u, v = g.edges(form='uv', order='eid', etype='plays')
     assert (F.array_equal(u, nu) == False)
     assert (F.array_equal(v, nv) == False)
-    assert (F.array_equal(g.nodes['user'].data['h'], new_g.nodes['user'].data['h']) == False)
-    assert (F.array_equal(g.nodes['game'].data['h'], new_g.nodes['game'].data['h']) == False)
-    assert (F.array_equal(g.edges['plays'].data['h'], new_g.edges['plays'].data['h']) == False)
+    assert g.nodes['user'].data['h'].shape[0] != new_g.nodes['user'].data['h'].shape[0]
+    assert g.nodes['game'].data['h'].shape[0] != new_g.nodes['game'].data['h'].shape[0]
+    assert g.edges['plays'].data['h'].shape[0] != new_g.edges['plays'].data['h'].shape[0]
 
 
 @parametrize_dtype
