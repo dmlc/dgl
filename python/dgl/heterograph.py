@@ -4610,8 +4610,8 @@ class DGLHeteroGraph(object):
         format : str or list of str or None
 
             * If format is None, return the usage status of sparse formats
-            * If format is ``'any'`` 
-            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'``/``'any'`` or a sublist of 
+            * If format is ``'any'``, indicating all formats are available.
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
             them, specifying the sparse formats to use.
 
         Returns

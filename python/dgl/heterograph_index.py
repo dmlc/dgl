@@ -831,16 +831,11 @@ class HeteroGraphIndex(ObjectBase):
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
     def format(self):
-        """Return the sparse formats in use of the given edge/relation type.
-
-        Parameters
-        ----------
-        etype : int
-            The edge/relation type.
+        """Return the sparse formats created/not created for the graph.
 
         Returns
         -------
-        list of string : return all the formats currently in use (could be multiple).
+        dict : TODO(zihao)
         """
         format_all = _CAPI_DGLHeteroGetFormatAll(self)
         format_in_use = _CAPI_DGLHeteroGetFormatInUse(self)
@@ -857,22 +852,19 @@ class HeteroGraphIndex(ObjectBase):
             'not created': not_created
         }
 
-    def to_format(self, format_list):
-        """Return a clone graph index but stored in the given sparse format.
-
-        If 'any' is given, the restrict formats of the returned graph index
-        is relaxed.
+    def to_format(self, formats):
+        """Return a clone graph index but stored in the given sparse formats.
 
         Parameters
         ----------
-        restrict_format : str
-            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
+        formats : list of str
+            Desired restrict formats.
 
         Returns
         -------
         A new graph index.
         """
-        return _CAPI_DGLHeteroGetFormatGraph(self, format_list)
+        return _CAPI_DGLHeteroGetFormatGraph(self, formats)
 
     def create_format_(self):
         """"""
@@ -936,7 +928,7 @@ class HeteroSubgraphIndex(ObjectBase):
 #################################################################
 
 def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
-                              restrict_format):
+                              formats):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -951,22 +943,20 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
         Row index.
     col : utils.Index
         Col index.
-    restrict_format : "any", "coo", "csr" or "csc"
-        Restrict the storage format of the unit graph.
+    formats : list of str.
+        Restrict the storage formats available for the unit graph.
 
     Returns
     -------
     HeteroGraphIndex
     """
-    if restrict_format == 'auto':
-        restrict_format = ['csr', 'csc', 'coo']
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(row), F.to_dgl_nd(col),
-        restrict_format)
+        formats)
 
 def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
-                              restrict_format):
+                              formats):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -983,8 +973,8 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         CSR indices.
     edge_ids : utils.Index
         Edge shuffle id.
-    restrict_format : "any", "coo", "csr" or "csc"
-        Restrict the storage format of the unit graph.
+    formats : str
+        Restrict the storage formats available for the unit graph.
 
     Returns
     -------
@@ -993,7 +983,7 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(indptr), F.to_dgl_nd(indices), F.to_dgl_nd(edge_ids),
-        restrict_format)
+        formats)
 
 def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
     """Create a heterograph from metagraph and graphs of every relation.

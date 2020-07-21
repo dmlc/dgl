@@ -27,8 +27,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     int64_t num_dst = args[2];
     IdArray row = args[3];
     IdArray col = args[4];
-    //SparseFormat restrict_format = ParseSparseFormat(args[5]);
-    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, all_code);
+    List<Value> formats = args[5];
+    std::vector<SparseFormat> formats_vec;
+    for (Value val : formats) {
+      std::string fmt = val->data;
+      formats_vec.push_back(ParseSparseFormat(fmt));
+    }
+    auto code = SparseFormatsToCode(formats_vec);
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, code);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -40,8 +46,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indptr = args[3];
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
-    //SparseFormat restrict_format = ParseSparseFormat(args[6]);
-    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, all_code);
+    List<Value> formats = args[6];
+    std::vector<SparseFormat> formats_vec;
+    for (Value val : formats) {
+      std::string fmt = val->data;
+      formats_vec.push_back(ParseSparseFormat(fmt));
+    }
+    auto code = SparseFormatsToCode(formats_vec);
+    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
     *rv = HeteroGraphRef(hgptr);
   });
 
