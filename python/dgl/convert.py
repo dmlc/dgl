@@ -15,6 +15,7 @@ __all__ = [
     'graph',
     'bipartite',
     'hetero_from_relations',
+    'hetero_from_shared_memory',
     'heterograph',
     'to_hetero',
     'to_homo',
@@ -413,6 +414,21 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
             retg.nodes[ntype].data.update(rgrh.nodes[ntype].data)
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
+
+def hetero_from_shared_memory(name):
+    """Create a heterograph from shared memory with the given name.
+
+    Paramaters
+    ----------
+    name : str
+        The name of the share memory
+
+    Returns
+    -------
+    HeteroGraph (in shared memory)
+    """
+    g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(name)
+    return DGLHeteroGraph(g, ntypes, etypes)
 
 def heterograph(data_dict, num_nodes_dict=None, restrict_format='auto', index_dtype='int64'):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.

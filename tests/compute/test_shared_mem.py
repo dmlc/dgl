@@ -54,14 +54,14 @@ def _assert_is_identical_hetero(g, g2):
 def test_single_process(index_dtype):
     hg = create_test_graph(index_dtype=index_dtype)
     hg_share = hg.shared_memory("hg")
-    hg_rebuild = dgl.DGLHeteroGraph.create_heterograph_from_shared_memory('hg')
+    hg_rebuild = dgl.hetero_from_shared_memory('hg')
     hg_save_again = hg_rebuild.shared_memory("hg")
     _assert_is_identical_hetero(hg, hg_share)
     _assert_is_identical_hetero(hg, hg_rebuild)
     _assert_is_identical_hetero(hg, hg_save_again)
 
 def sub_proc(hg_origin, name):
-    hg_rebuild = dgl.DGLHeteroGraph.create_heterograph_from_shared_memory(name)
+    hg_rebuild = dgl.hetero_from_shared_memory(name)
     hg_save_again = hg_rebuild.shared_memory(name)
     _assert_is_identical_hetero(hg_origin, hg_rebuild)
     _assert_is_identical_hetero(hg_origin, hg_save_again)
@@ -79,7 +79,7 @@ def test_multi_process(index_dtype):
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_copy_from_gpu():
     hg = create_test_graph(index_dtype="int32")
-    hg_gpu = hg.copy_to(dgl.utils.to_dgl_context(F.cuda()))
+    hg_gpu = hg.to(F.cuda())
     hg_share = hg_gpu.shared_memory("hg_gpu")
     p = mp.Process(target=sub_proc, args=(hg, "hg_gpu"))
     p.start()
@@ -87,5 +87,5 @@ def test_copy_from_gpu():
 
 if __name__ == "__main__":
     test_single_process("int64")
-    # test_multi_process("int32")
-    # test_copy_from_gpu()
+    test_multi_process("int32")
+    test_copy_from_gpu()

@@ -4673,21 +4673,6 @@ class DGLHeteroGraph(object):
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
 
-    @staticmethod
-    def create_heterograph_from_shared_memory(name):
-        """Create a heterograph from shared memory with the given name.
-
-        Paramaters
-        ----------
-        name : str
-            The name of the share memory
-
-        Returns
-        -------
-        HeteroGraph (in shared memory)
-        """
-        g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(name)
-        return DGLHeteroGraph(g, ntypes, etypes)
 
     def long(self):
         """Return a heterograph object use int64 as index dtype,
