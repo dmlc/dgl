@@ -3240,6 +3240,34 @@ class DGLHeteroGraph(object):
     # Message passing
     #################################################################
 
+    def register_apply_node_func(self, func):
+        """Deprecated: please directly call :func:`apply_nodes` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_apply_node_func is deprecated.'
+                       ' Please directly call apply_nodes with func as the argument.')
+
+    def register_apply_edge_func(self, func):
+        """Deprecated: please directly call :func:`apply_edges` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_apply_edge_func is deprecated.'
+                       ' Please directly call apply_edges with func as the argument.')
+
+    def register_message_func(self, func):
+        """Deprecated: please directly call :func:`update_all` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_message_func is deprecated.'
+                       ' Please directly call update_all with func as the argument.')
+
+    def register_reduce_func(self, func):
+        """Deprecated: please directly call :func:`update_all` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_reduce_func is deprecated.'
+                       ' Please directly call update_all with func as the argument.')
+
     def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
         """Apply the function on the nodes with the same type to update their
         features.
