@@ -192,14 +192,18 @@ class DGLHeteroGraph(object):
     """
     # pylint: disable=unused-argument
     def __init__(self,
-                 gidx,
-                 ntypes='_U',
-                 etypes='_V',
+                 gidx=[],
+                 ntypes=['_U'],
+                 etypes=['_V'],
                  node_frames=None,
                  edge_frames=None,
                  **deprecate_kwargs):
-        #if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
-            #u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
+        if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
+            dgl_warning('From 0.5, we recommend creating graphs by `dgl.graph(data)`'
+                        ' instead of dgl.DGLGraph(data).')
+            u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
+            gidx = heterograph_index.create_unitgraph_from_coo(
+                1, num_src, num_dst, u, v, "any")
         self._init(gidx, ntypes, etypes, node_frames, edge_frames)
 
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
