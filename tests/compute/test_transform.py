@@ -8,6 +8,8 @@ from dgl.graph_index import from_scipy_sparse_matrix
 import unittest
 from utils import parametrize_dtype
 
+from test_heterograph import create_test_heterograph4, create_test_heterograph5, create_test_heterograph6
+
 D = 5
 
 # line graph related
@@ -56,7 +58,7 @@ def test_hetero_linegraph(idtype):
                           np.array([0, 1, 2, 4]))
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csr', idtype=idtype)
     lg = dgl.line_heterograph(g)
     assert lg.number_of_nodes() == 5
@@ -67,7 +69,7 @@ def test_hetero_linegraph(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csc', idtype=idtype)
     lg = dgl.line_heterograph(g)
     assert lg.number_of_nodes() == 5
@@ -343,25 +345,6 @@ def test_laplacian_lambda_max():
     assert len(l_max_arr) == len(N_arr)
     for l_max in l_max_arr:
         assert l_max < 2 + eps
-
-
-def test_add_self_loop():
-    g = dgl.DGLGraph()
-    g.add_nodes(5)
-    g.add_edges([0, 1, 2], [1, 1, 2])
-    # Nodes 0, 3, 4 don't have self-loop
-    new_g = dgl.transform.add_self_loop(g)
-    assert F.allclose(new_g.edges()[0], F.tensor([0, 0, 1, 2, 3, 4]))
-    assert F.allclose(new_g.edges()[1], F.tensor([1, 0, 1, 2, 3, 4]))
-
-
-def test_remove_self_loop():
-    g = dgl.DGLGraph()
-    g.add_nodes(5)
-    g.add_edges([0, 1, 2], [1, 1, 2])
-    new_g = dgl.transform.remove_self_loop(g)
-    assert F.allclose(new_g.edges()[0], F.tensor([0]))
-    assert F.allclose(new_g.edges()[1], F.tensor([1]))
 
 def create_large_graph_index(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
@@ -643,7 +626,7 @@ def test_compact(idtype):
         g3, always_preserve=F.tensor([1, 7], idtype))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3.idtype == idtype
     assert set(induced_nodes['user']) == set([0, 1, 2, 7])
     _check(g3, new_g3, induced_nodes)
@@ -663,7 +646,7 @@ def test_compact(idtype):
     new_g1, new_g2 = dgl.compact_graphs(
         [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=idtype)})
     induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}    
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert new_g1.idtype == idtype
     assert new_g2.idtype == idtype
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
@@ -676,7 +659,7 @@ def test_compact(idtype):
         [g3, g4], always_preserve=F.tensor([1, 7], dtype=idtype))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    
+
     assert new_g3.idtype == idtype
     assert new_g4.idtype == idtype
 
@@ -924,25 +907,498 @@ def _test_cast():  # disabled; prepare for DGLGraph/HeteroGraph merge
     assert F.array_equal(g2src, gsrc)
     assert F.array_equal(g2dst, gdst)
 
+@parametrize_dtype
+def test_add_edges(idtype):
+    # homogeneous graph
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    u = 0
+    v = 1
+    g = dgl.add_edges(g, u, v)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 3
+    u = [0]
+    v = [1]
+    g = dgl.add_edges(g, u, v)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 4
+    u = F.tensor(u, dtype=idtype)
+    v = F.tensor(v, dtype=idtype)
+    g = dgl.add_edges(g, u, v)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 5
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1, 2, 1, 1, 1], dtype=idtype))
+
+    # node id larger than current max node id
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    u = F.tensor([0, 1], dtype=idtype)
+    v = F.tensor([2, 3], dtype=idtype)
+    g = dgl.add_edges(g, u, v)
+    assert g.number_of_nodes() == 4
+    assert g.number_of_edges() == 4
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
+
+    # has data
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.edata['h'] = F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx())
+    u = F.tensor([0, 1], dtype=idtype)
+    v = F.tensor([2, 3], dtype=idtype)
+    e_feat = {'h' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
+              'hh' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    g = dgl.add_edges(g, u, v, e_feat)
+    assert g.number_of_nodes() == 4
+    assert g.number_of_edges() == 4
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
+    assert F.array_equal(g.ndata['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
+    assert F.array_equal(g.edata['h'], F.tensor([1, 1, 2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['hh'], F.tensor([0, 0, 2, 2], dtype=idtype))
+
+    # zero data graph
+    g = dgl.graph([], num_nodes=0, idtype=idtype, device=F.ctx())
+    u = F.tensor([0, 1], dtype=idtype)
+    v = F.tensor([2, 2], dtype=idtype)
+    e_feat = {'h' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
+              'hh' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    g = dgl.add_edges(g, u, v, e_feat)
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 2
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['h'], F.tensor([2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['hh'], F.tensor([2, 2], dtype=idtype))
+
+    # bipartite graph
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    u = 0
+    v = 1
+    g = dgl.add_edges(g, u, v)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes('user') == 2
+    assert g.number_of_nodes('game') == 3
+    assert g.number_of_edges() == 3
+    u = [0]
+    v = [1]
+    g = dgl.add_edges(g, u, v)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes('user') == 2
+    assert g.number_of_nodes('game') == 3
+    assert g.number_of_edges() == 4
+    u = F.tensor(u, dtype=idtype)
+    v = F.tensor(v, dtype=idtype)
+    g = dgl.add_edges(g, u, v)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes('user') == 2
+    assert g.number_of_nodes('game') == 3
+    assert g.number_of_edges() == 5
+    u, v = g.edges(form='uv')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1, 2, 1, 1, 1], dtype=idtype))
+
+    # node id larger than current max node id
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    u = F.tensor([0, 2], dtype=idtype)
+    v = F.tensor([2, 3], dtype=idtype)
+    g = dgl.add_edges(g, u, v)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 4
+    assert g.number_of_edges() == 4
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
+
+    # has data
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx()),
+                    'game' : F.copy_to(F.tensor([2, 2, 2], dtype=idtype), ctx=F.ctx())}
+    g.edata['h'] = F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx())
+    u = F.tensor([0, 2], dtype=idtype)
+    v = F.tensor([2, 3], dtype=idtype)
+    e_feat = {'h' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
+              'hh' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    g = dgl.add_edges(g, u, v, e_feat)
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 4
+    assert g.number_of_edges() == 4
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 0], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 0], dtype=idtype))
+    assert F.array_equal(g.edata['h'], F.tensor([1, 1, 2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['hh'], F.tensor([0, 0, 2, 2], dtype=idtype))
+
+    # heterogeneous graph
+    g = create_test_heterograph4(idtype)
+    u = F.tensor([0, 2], dtype=idtype)
+    v = F.tensor([2, 3], dtype=idtype)
+    g = dgl.add_edges(g, u, v, etype='plays')
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 4
+    assert g.number_of_nodes('developer') == 2
+    assert g.number_of_edges('plays') == 6
+    assert g.number_of_edges('develops') == 2
+    u, v = g.edges(form='uv', order='eid', etype='plays')
+    assert F.array_equal(u, F.tensor([0, 1, 1, 2, 0, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 0, 1, 1, 2, 3], dtype=idtype))
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 0, 0], dtype=idtype))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 1, 1, 1, 0, 0], dtype=idtype))
+
+    # add with feature
+    e_feat = {'h': F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    u = F.tensor([0, 2], dtype=idtype)
+    v = F.tensor([2, 3], dtype=idtype)
+    g.nodes['game'].data['h'] =  F.copy_to(F.tensor([2, 2, 1, 1], dtype=idtype), ctx=F.ctx())
+    g = dgl.add_edges(g, u, v, data=e_feat, etype='develops')
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 4
+    assert g.number_of_nodes('developer') == 3
+    assert g.number_of_edges('plays') == 6
+    assert g.number_of_edges('develops') == 4
+    u, v = g.edges(form='uv', order='eid', etype='develops')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 1, 2, 3], dtype=idtype))
+    assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3, 0], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 1, 1], dtype=idtype))
+    assert F.array_equal(g.edges['develops'].data['h'], F.tensor([0, 0, 2, 2], dtype=idtype))
+
+@parametrize_dtype
+def test_add_nodes(idtype):
+    # homogeneous Graphs
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([1,1,1], dtype=idtype), ctx=F.ctx())
+    new_g = dgl.add_nodes(g, 1)
+    assert g.number_of_nodes() == 3
+    assert new_g.number_of_nodes() == 4
+    assert F.array_equal(new_g.ndata['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
+
+    # zero node graph
+    g = dgl.graph([], num_nodes=3, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([1,1,1], dtype=idtype), ctx=F.ctx())
+    g = dgl.add_nodes(g, 1, data={'h' : F.copy_to(F.tensor([2],  dtype=idtype), ctx=F.ctx())})
+    assert g.number_of_nodes() == 4
+    assert F.array_equal(g.ndata['h'], F.tensor([1, 1, 1, 2], dtype=idtype))
+
+    # bipartite graph
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    g = dgl.add_nodes(g, 2, data={'h' : F.copy_to(F.tensor([2, 2],  dtype=idtype), ctx=F.ctx())}, ntype='user')
+    assert g.number_of_nodes('user') == 4
+    assert g.number_of_nodes('game') == 3
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([0, 0, 2, 2], dtype=idtype))
+    g = dgl.add_nodes(g, 2, ntype='game')
+    assert g.number_of_nodes('user') == 4
+    assert g.number_of_nodes('game') == 5
+
+    # heterogeneous graph
+    g = create_test_heterograph4(idtype)
+    g = dgl.add_nodes(g, 1, ntype='user')
+    g = dgl.add_nodes(g, 2, data={'h' : F.copy_to(F.tensor([2, 2],  dtype=idtype), ctx=F.ctx())}, ntype='game')
+    assert g.number_of_nodes('user') == 4
+    assert g.number_of_nodes('game') == 4
+    assert g.number_of_nodes('developer') == 2
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
+
+@parametrize_dtype
+def test_remove_edges(idtype):
+    # homogeneous Graphs
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    e = 0
+    g = dgl.remove_edges(g, e)
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2], dtype=idtype))
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    e = [0]
+    g = dgl.remove_edges(g, e)
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2], dtype=idtype))
+    e = F.tensor([0], dtype=idtype)
+    g = dgl.remove_edges(g, e)
+    assert g.number_of_edges() == 0
+
+    # has node data
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g = dgl.remove_edges(g, 1)
+    assert g.number_of_edges() == 1
+    assert F.array_equal(g.ndata['h'], F.tensor([1, 2, 3], dtype=idtype))
+
+    # has edge data
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.edata['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
+    g = dgl.remove_edges(g, 0)
+    assert g.number_of_edges() == 1
+    assert F.array_equal(g.edata['h'], F.tensor([2], dtype=idtype))
+
+    # invalid eid
+    assert_fail = False
+    try:
+        g = dgl.remove_edges(g, 1)
+    except:
+        assert_fail = True
+    assert assert_fail
+
+    # bipartite graph
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    e = 0
+    g = dgl.remove_edges(g, e)
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2], dtype=idtype))
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    e = [0]
+    g = dgl.remove_edges(g, e)
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2], dtype=idtype))
+    e = F.tensor([0], dtype=idtype)
+    g = dgl.remove_edges(g, e)
+    assert g.number_of_edges() == 0
+
+    # has data
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx()),
+                    'game' : F.copy_to(F.tensor([2, 2, 2], dtype=idtype), ctx=F.ctx())}
+    g.edata['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
+    g = dgl.remove_edges(g, 1)
+    assert g.number_of_edges() == 1
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2], dtype=idtype))
+    assert F.array_equal(g.edata['h'], F.tensor([1], dtype=idtype))
+
+    # heterogeneous graph
+    g = create_test_heterograph4(idtype)
+    g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 2, 3, 4], dtype=idtype), ctx=F.ctx())
+    g = dgl.remove_edges(g, 1, etype='plays')
+    assert g.number_of_edges('plays') == 3
+    u, v = g.edges(form='uv', order='eid', etype='plays')
+    assert F.array_equal(u, F.tensor([0, 1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 1, 1], dtype=idtype))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 3, 4], dtype=idtype))
+    # remove all edges of 'develops'
+    g = dgl.remove_edges(g, [0, 1], etype='develops')
+    assert g.number_of_edges('develops') == 0
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2], dtype=idtype))
+    assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3], dtype=idtype))
+
+@parametrize_dtype
+def test_remove_nodes(idtype):
+    # homogeneous Graphs
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    n = 0
+    g = dgl.remove_nodes(g, n)
+    assert g.number_of_nodes() == 2
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1], dtype=idtype))
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    n = [1]
+    g = dgl.remove_nodes(g, n)
+    assert g.number_of_nodes() == 2
+    assert g.number_of_edges() == 0
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    n = F.tensor([2], dtype=idtype)
+    g = dgl.remove_nodes(g, n)
+    assert g.number_of_nodes() == 2
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1], dtype=idtype))
+
+    # invalid nid
+    assert_fail = False
+    try:
+        g.remove_nodes(3)
+    except:
+        assert_fail = True
+    assert assert_fail
+
+    # has node and edge data
+    g = dgl.graph(([0, 0, 2], [0, 1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['hv'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g.edata['he'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g = dgl.remove_nodes(g, F.tensor([0], dtype=idtype))
+    assert g.number_of_nodes() == 2
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1], dtype=idtype))
+    assert F.array_equal(g.ndata['hv'], F.tensor([2, 3], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([3], dtype=idtype))
+
+    # node id larger than current max node id
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    n = 0
+    g = dgl.remove_nodes(g, n, ntype='user')
+    assert g.number_of_nodes('user') == 1
+    assert g.number_of_nodes('game') == 3
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2], dtype=idtype))
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    n = [1]
+    g = dgl.remove_nodes(g, n, ntype='user')
+    assert g.number_of_nodes('user') == 1
+    assert g.number_of_nodes('game') == 3
+    assert g.number_of_edges() == 1
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1], dtype=idtype))
+    g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    n = F.tensor([0], dtype=idtype)
+    g = dgl.remove_nodes(g, n, ntype='game')
+    assert g.number_of_nodes('user') == 2
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges() == 2
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0 ,1], dtype=idtype))
+
+    # heterogeneous graph
+    g = create_test_heterograph4(idtype)
+    g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 2, 3, 4], dtype=idtype), ctx=F.ctx())
+    g = dgl.remove_nodes(g, 0, ntype='game')
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 1
+    assert g.number_of_nodes('developer') == 2
+    assert g.number_of_edges('plays') == 2
+    assert g.number_of_edges('develops') == 1
+    assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1], dtype=idtype))
+    assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2], dtype=idtype))
+    assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3], dtype=idtype))
+    u, v = g.edges(form='uv', order='eid', etype='plays')
+    assert F.array_equal(u, F.tensor([1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 0], dtype=idtype))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([3, 4], dtype=idtype))
+    u, v = g.edges(form='uv', order='eid', etype='develops')
+    assert F.array_equal(u, F.tensor([1], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0], dtype=idtype))
+
+@parametrize_dtype
+def test_add_selfloop(idtype):
+    # homogeneous graph
+    g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
+    g.edata['he'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g.ndata['hn'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g = dgl.add_self_loop(g)
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 6
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 0, 0, 0], dtype=idtype))
+
+    # bipartite graph
+    g = dgl.bipartite(([0, 1, 2], [1, 2, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    # nothing will happend
+    raise_error = False
+    try:
+        g = dgl.add_self_loop(g)
+    except:
+        raise_error = True
+    assert raise_error
+
+    g = create_test_heterograph6(idtype)
+    g = dgl.add_self_loop(g, etype='follows')
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges('follows') == 5
+    assert g.number_of_edges('plays') == 2
+    u, v = g.edges(form='uv', order='eid', etype='follows')
+    assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
+
+    raise_error = False
+    try:
+        g = dgl.add_self_loop(g, etype='plays')
+    except:
+        raise_error = True
+    assert raise_error
+
+@parametrize_dtype
+def test_remove_selfloop(idtype):
+    # homogeneous graph
+    g = dgl.graph(([0, 0, 0, 1], [1, 0, 0, 2]), idtype=idtype, device=F.ctx())
+    g.edata['he'] = F.copy_to(F.tensor([1, 2, 3, 4], dtype=idtype), ctx=F.ctx())
+    g = dgl.remove_self_loop(g)
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 2
+    assert F.array_equal(g.edata['he'], F.tensor([1, 4], dtype=idtype))
+
+    # bipartite graph
+    g = dgl.bipartite(([0, 1, 2], [1, 2, 2]), 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
+    # nothing will happend
+    raise_error = False
+    try:
+        g = dgl.remove_self_loop(g, etype='plays')
+    except:
+        raise_error = True
+    assert raise_error
+
+    g = create_test_heterograph5(idtype)
+    g = dgl.remove_self_loop(g, etype='follows')
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges('follows') == 2
+    assert g.number_of_edges('plays') == 2
+    u, v = g.edges(form='uv', order='eid', etype='follows')
+    assert F.array_equal(u, F.tensor([1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 1], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([2, 4], dtype=idtype))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
+
+    raise_error = False
+    try:
+        g = dgl.remove_self_loop(g, etype='plays')
+    except:
+        raise_error = True
+    assert raise_error
+
 if __name__ == '__main__':
-    test_reorder_nodes()
+    #test_reorder_nodes()
     # test_line_graph()
     # test_no_backtracking()
-    test_reverse()
+    #test_reverse()
     # test_reverse_shared_frames()
     # test_simple_graph()
     # test_bidirected_graph()
     # test_khop_adj()
     # test_khop_graph()
     # test_laplacian_lambda_max()
-    # test_remove_self_loop()
-    # test_add_self_loop()
     # test_partition_with_halo()
     # test_metis_partition()
     # test_hetero_linegraph('int32')
     # test_compact()
-    test_to_simple("int32")
+    #test_to_simple("int32")
     # test_in_subgraph("int32")
     # test_out_subgraph()
     # test_to_block("int32")
     # test_remove_edges()
+    test_add_nodes(F.int32)
+    test_add_edges(F.int32)
+    test_remove_edges(F.int32)
+    test_remove_nodes(F.int32)
+    test_add_selfloop(F.int32)
+    test_remove_selfloop(F.int32)
