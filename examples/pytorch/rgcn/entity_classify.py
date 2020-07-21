@@ -81,7 +81,7 @@ def main(args):
         u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
         _, inverse_index, count = torch.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        norm = torch.ones(eid.shape[0]) / degrees
+        norm = torch.ones(eid.shape[0]).float() / degrees.float()
         norm = norm.unsqueeze(1)
         hg.edges[canonical_etypes].data['norm'] = norm
 
