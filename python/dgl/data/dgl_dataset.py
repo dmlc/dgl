@@ -37,7 +37,7 @@ class DGLDataset(object):
         Default: ~/.dgl/
     save_dir : str
         Directory to save the processed dataset.
-        Default: ~/.dgl/
+        Default: same as raw_dir
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
