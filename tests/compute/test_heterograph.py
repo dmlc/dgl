@@ -2038,9 +2038,9 @@ def test_clone(idtype):
     assert F.array_equal(g.edata['h'], new_g.edata['h'])
     # data change
     new_g.ndata['h'] = F.copy_to(F.tensor([2, 2, 2], dtype=idtype), ctx=F.ctx())
-    assert F.array_equal(g.ndata['h'], new_g.ndata['h']) is False
+    assert (F.array_equal(g.ndata['h'], new_g.ndata['h']) == False)
     g.edata['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
-    assert F.array_equal(g.edata['h'], new_g.edata['h']) is False
+    assert (F.array_equal(g.edata['h'], new_g.edata['h']) == False)
     # graph structure change
     g.add_nodes(1)
     assert g.number_of_nodes() != new_g.number_of_nodes()
@@ -2076,11 +2076,11 @@ def test_clone(idtype):
     v = F.tensor([2, 6], dtype=idtype)
     g.add_edges(u, v, etype='plays')
     u, v = g.edges(form='uv', order='eid', etype='plays')
-    assert F.array_equal(u, nu) is False
-    assert F.array_equal(v, nv) is False
-    assert F.array_equal(g.nodes['user'].data['h'], new_g.nodes['user'].data['h']) is False
-    assert F.array_equal(g.nodes['game'].data['h'], new_g.nodes['game'].data['h']) is False
-    assert F.array_equal(g.edges['plays'].data['h'], new_g.edges['plays'].data['h']) is False
+    assert (F.array_equal(u, nu) == False)
+    assert (F.array_equal(v, nv) == False)
+    assert (F.array_equal(g.nodes['user'].data['h'], new_g.nodes['user'].data['h']) == False)
+    assert (F.array_equal(g.nodes['game'].data['h'], new_g.nodes['game'].data['h']) == False)
+    assert (F.array_equal(g.edges['plays'].data['h'], new_g.edges['plays'].data['h']) == False)
 
 
 @parametrize_dtype
