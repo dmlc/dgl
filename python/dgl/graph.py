@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import Iterable
 from functools import wraps
 import networkx as nx
+import numpy as np
 
 import dgl
 from .base import ALL, NID, EID, is_all, DGLError, dgl_warning
@@ -1917,6 +1918,112 @@ class DGLGraph(DGLBaseGraph):
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
+
+    def from_mesh(self, mesh_dict):
+        """Convert from a mesh dict.
+        NOTE: May need implement batching.
+
+        Parameters
+        ---------
+        mesh : 
+            Dict which contains verts and faces.
+            Verts is float numpy array with shape [N, 3] indicating the coordinates of the vertexes.
+            Faces is int numpy array with shape [M, 3] indicating the vertex index of a triangle face.
+        
+        Examples
+        --------
+        >>> import numpy as np
+        >>> verts = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+        >>>                   [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=np.float)
+        >>> faces = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7],
+        >>>                   [0, 1, 5], [0, 4, 5], [1, 2, 5], [2, 5, 6],
+        >>>                   [2, 6, 7], [2, 3, 7], [0, 3, 4], [3, 4, 7]], dtype=np.int64)
+        >>> mesh_dict = {'verts': verts, 'faces': faces}
+        >>> g = dgl.DGLGraph()
+        >>> g.from_mesh_dict(mesh_dict)
+        """
+        self.clear()
+        verts = mesh_dict['verts']
+        faces = mesh_dict['faces']
+        if verts.shape[-1] != 3:
+            raise DGLError('Invalid verts coordinates. Only support 3D coords now.')
+        if faces.shape[-1] != 3:
+            raise DGLError('Invalid faces format. Only support triangle mesh now.')
+
+        edge_pairs = np.concatenate([faces[:, [0,1]], faces[:, [1,2]], faces[:, [2,0]]], axis=0)
+        triangle_heads = np.concatenate([faces[:, 2], faces[:, 0], faces[:, 1]], axis=0)
+        # make it undirected
+        edge_pairs = np.concatenate([edge_pairs, edge_pairs[:,[1,0]]], axis=0)
+        triangle_heads = np.concatenate([triangle_heads, triangle_heads], axis=0)
+        edge_pairs, indices = np.unique(edge_pairs, axis=0, return_inverse=True)
+        sort_idx = np.argsort(indices)
+        triangle_heads = triangle_heads[sort_idx].reshape(-1, 2)
+
+        self._graph = graph_index.from_edge_list(edge_pairs, self.is_readonly)
+        self._node_frame.add_rows(self.number_of_nodes())
+        self._edge_frame.add_rows(self.number_of_edges())
+        self._msg_frame.add_rows(self.number_of_edges())
+
+        # Put coordinates into node attribute
+        # Coordinates will be the node feature
+        self._node_frame['coords'] = verts
+        # In mesh, each edge will be shared by two faces.
+        # We save face reconstruction info on edge features.
+        self._edge_frame['triangle_heads'] = triangle_heads
+
+    def to_mesh(self):
+        """Convert DGLGraph to a mesh.
+        """
+        if ('coords' not in self.node_attr_schemes().keys()) or ('triangle_heads' not in self.edge_attr_schemes().keys()):
+            raise DGLError('To convert DGLGraph into mesh, node should have coordinate feature and edge should have face feature.')
+        verts = self.ndata['coords']
+        src, dst = self.all_edges()
+        faces_part1 = np.stack([src, dst, self.edata['triangle_heads'][:, 0]]).transpose()
+        faces_part2 = np.stack([src, dst, self.edata['triangle_heads'][:, 1]]).transpose()
+        faces = np.concatenate([faces_part1, faces_part2], axis=0)
+        faces = np.unique(np.sort(faces, axis=1), axis=0)
+        return {'verts': verts, 'faces': faces}
+    
+    def sample_point_cloud_from_mesh(self, num_samples):
+        """Convert point cloud from mesh stored as a DGLGraph
+        
+        Parameters
+        ---------
+        num_samples : number of points to sample from a mesh
+        """
+        # Converting to mesh.
+        mesh = self.to_mesh()
+        verts = mesh['verts']
+        faces = mesh['faces']
+
+        # Computing area for each face
+        # Nomalize the edges to 0 - 1
+        # NOTE: when go to batched dgl graph, the normalize could be per mesh
+        # or on the whole DGLGraph
+        verts = verts / verts.max()
+        ab = verts[faces[:, 1]] - verts[faces[:, 0]]
+        ac = verts[faces[:, 2]] - verts[faces[:, 0]]
+        area = 0.5 * np.linalg.norm(np.cross(ab, ac), ord=2, axis=1)
+
+        # Number of points to sample from each face
+        face_prob = area / area.sum()
+        sample_hist = np.random.multinomial(num_samples, face_prob)
+        sample_idx = np.repeat(range(faces.shape[0]), sample_hist)
+        faces = faces[sample_idx, :]
+
+        # Sample points from each face
+        # https://math.stackexchange.com/questions/18686/uniform-random-point-in-triangle
+        r1r2 = np.random.rand(2, num_samples)
+        r1, r2 = r1r2[0], r1r2[1]
+        r1_sqrt = np.sqrt(r1)
+        w0 = np.expand_dims(1.0 - r1_sqrt, axis=-1)
+        w1 = np.expand_dims(r1_sqrt * (1.0 - r2), axis=-1)
+        w2 = np.expand_dims(r1_sqrt * r2, axis=-1)
+        a = verts[faces[:,0]]
+        b = verts[faces[:,1]]
+        c = verts[faces[:,2]]
+        point_samples = w0 * a + w1 * b + w2 * c
+        return point_samples
 
     def node_attr_schemes(self):
         """Return the node feature schemes.

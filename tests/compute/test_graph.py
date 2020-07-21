@@ -44,6 +44,14 @@ def scipy_csr_input():
     # dst = [4 6 9 3 5 3 7 5 8 1 3 4 9 1 9 6 2 8 9 2]
     return csr
 
+def mesh_dict_input():
+    verts = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                      [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=np.float)
+    faces = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7],
+                      [0, 1, 5], [0, 4, 5], [1, 2, 5], [2, 5, 6],
+                      [2, 6, 7], [2, 3, 7], [0, 3, 4], [3, 4, 7]], dtype=np.int)
+    return {'verts': 2.0 * (verts - 0.5), 'faces': faces}
+
 def gen_by_mutation():
     g = dgl.DGLGraph()
     src, dst = edge_pair_input()
@@ -315,6 +323,25 @@ def test_incmat():
                       [0., 1., 0., -1., 0.],
                       [0., 0., 1., 1., 0.]]))
 
+def test_mesh():
+    mesh = mesh_dict_input()
+    g = dgl.DGLGraph()
+    # Init from mesh
+    g.from_mesh(mesh)
+    assert g.number_of_nodes() == 8
+    assert g.number_of_edges() == 36
+    assert g.ndata['coords'].shape == (8, 3)
+    # DGLGraph to mesh
+    mesh = g.to_mesh()
+    assert mesh['verts'].shape[0] == 8
+    assert mesh['faces'].shape[0] == 12
+    # Sample point cloud from mesh
+    points = g.sample_point_cloud_from_mesh(60)
+    # The mesh is a cube, centered at (0, 0, 0), each edge has len 2
+    # The points must have 1 dimension with 1 or -1
+    assert np.all(np.abs(np.max(np.abs(points), axis=-1) - 1.0) < 1e-6)
+
+
 def test_readonly():
     g = dgl.DGLGraph()
     g.add_nodes(5)
@@ -419,3 +446,4 @@ if __name__ == '__main__':
     test_incmat()
     test_readonly()
     test_find_edges()
+    test_mesh()
