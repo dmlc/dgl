@@ -11,6 +11,7 @@ from . import graph_index
 from . import heterograph_index
 from . import utils
 from . import backend as F
+from . import utils
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
@@ -192,10 +193,13 @@ class DGLHeteroGraph(object):
     # pylint: disable=unused-argument
     def __init__(self,
                  gidx,
-                 ntypes,
-                 etypes,
+                 ntypes='_U',
+                 etypes='_V',
                  node_frames=None,
-                 edge_frames=None):
+                 edge_frames=None,
+                 **deprecate_kwargs):
+        #if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
+            #u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
         self._init(gidx, ntypes, etypes, node_frames, edge_frames)
 
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):

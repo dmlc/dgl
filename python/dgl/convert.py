@@ -26,7 +26,7 @@ def graph(data,
           num_nodes=None,
           validate=True,
           restrict_format='auto',
-          idtype=F.int64,
+          idtype=None,
           device=None,
           card=None, **kwargs):
     """Create a graph with one type of nodes and edges.
@@ -59,23 +59,13 @@ def graph(data,
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
     idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
+        Integer ID type. Valid options are int32 or int64. If None, try infer from
+        the given data.
     device : Device context, optional
         Device on which the graph is created. Default: infer from data.
     card : int, optional
         Deprecated (see :attr:`num_nodes`). Cardinality (number of nodes in the graph).
         If None, infer from input data, i.e. the largest node ID plus 1. (Default: None)
-    kwargs : key-word arguments, optional
-        Other key word arguments. Only comes into effect when we are using a NetworkX
-        graph. It can consist of:
-
-        * edge_id_attr_name
-            ``Str``, key name for edge ids in the NetworkX graph. If not found, we
-            will consider the graph not to have pre-specified edge ids.
-        * node_attrs
-            ``List of str``, names for node features to retrieve from the NetworkX graph
-        * edge_attrs
-            ``List of str``, names for edge features to retrieve from the NetworkX graph
 
     Returns
     -------
@@ -137,30 +127,12 @@ def graph(data,
                     "Please use num_nodes={} instead.".format(card))
         num_nodes = card
 
-    if num_nodes is not None:
+    u, v, urange, vrange = utils.graphdata2tensors(data, idtype)
+    if num_nodes is not None:  # override the number of nodes
         urange, vrange = num_nodes, num_nodes
-    else:
-        urange, vrange = None, None
 
-    g = None
-    if isinstance(data, tuple):
-        u, v = F.tensor(data[0], idtype), F.tensor(data[1], idtype)
-        g = create_from_edges(
-            u, v, ntype, etype, ntype, urange, vrange, validate,
-            restrict_format=restrict_format)
-    elif isinstance(data, list):
-        u, v = elist2tensor(data, idtype)
-        g = create_from_edges(
-            u, v, ntype, etype, ntype, urange, vrange, validate,
-            restrict_format=restrict_format)
-    elif isinstance(data, sp.sparse.spmatrix):
-        g = create_from_scipy(
-            data, ntype, etype, ntype, restrict_format=restrict_format, idtype=idtype)
-    elif isinstance(data, nx.Graph):
-        g = create_from_networkx(
-            data, ntype, etype, restrict_format=restrict_format, idtype=idtype, **kwargs)
-    else:
-        raise DGLError('Unsupported graph data type:', type(data))
+    g = create_from_edges(u, v, ntype, etype, ntype, urange, vrange,
+                          validate, restrict_format=restrict_format)
 
     if (device is not None and utils.to_dgl_context(device).device_type == 2
             and idtype == F.int64):
@@ -178,7 +150,7 @@ def bipartite(data,
               num_nodes=None,
               validate=True,
               restrict_format='auto',
-              idtype=F.int64,
+              idtype=None,
               device=None,
               card=None, **kwargs):
     """Create a bipartite graph.
@@ -216,20 +188,14 @@ def bipartite(data,
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
     idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
+        Integer ID type. Valid options are int32 or int64. If None, try infer from
+        the given data.
     device : Device context, optional
         Device on which the graph is created. Default: infer from data.
     card : 2-tuple of int, optional
         Deprecated (see :attr:`num_nodes`). Cardinality (number of nodes in the source and
         destination group). If None, infer from input data, i.e. the largest node ID plus 1
         for each type. (Default: None)
-    kwargs : key-word arguments, optional
-        Other key word arguments. Only comes into effect when we are using a NetworkX
-        graph. It can consist of:
-
-        * edge_id_attr_name
-            ``Str``, key name for edge ids in the NetworkX graph. If not found, we
-            will consider the graph not to have pre-specified edge ids.
 
     Returns
     -------
@@ -309,32 +275,15 @@ def bipartite(data,
         dgl_warning("Argument 'card' will be deprecated. "
                     "Please use num_nodes={} instead.".format(card))
         num_nodes = card
-    if num_nodes is not None:
+
+    u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=True)
+    if num_nodes is not None:  # override the number of nodes
         urange, vrange = num_nodes
-    else:
-        urange, vrange = None, None
 
-    g = None
-    if isinstance(data, tuple):
-        u, v = F.tensor(data[0], idtype), F.tensor(data[1], idtype)
-        g = create_from_edges(
-            u, v, utype, etype, vtype, urange, vrange, validate,
-            restrict_format=restrict_format)
-    elif isinstance(data, list):
-        u, v = elist2tensor(data, idtype)
-        g = create_from_edges(
-            u, v, utype, etype, vtype, urange, vrange, validate,
-            restrict_format=restrict_format)
-    elif isinstance(data, sp.sparse.spmatrix):
-        g = create_from_scipy(
-            data, utype, etype, vtype, restrict_format=restrict_format, idtype=idtype)
-    elif isinstance(data, nx.Graph):
-        g = create_from_networkx_bipartite(data, utype, etype, vtype,
-                                           restrict_format=restrict_format,
-                                           idtype=idtype, **kwargs)
-    else:
-        raise DGLError('Unsupported graph data type:', type(data))
-
+    g = create_from_edges(
+        u, v, utype, etype, vtype, urange, vrange, validate,
+        restrict_format=restrict_format)
+    
     if (device is not None and utils.to_dgl_context(device).device_type == 2
             and idtype == F.int64):
         # device_type 2 is an internal code for GPU
@@ -460,7 +409,7 @@ def heterograph(data_dict,
                 num_nodes_dict=None,
                 validate=True,
                 restrict_format='auto',
-                idtype=F.int64,
+                idtype=None,
                 device=None):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.
 
@@ -486,7 +435,8 @@ def heterograph(data_dict,
     restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
         Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
     idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
+        Integer ID type. Valid options are int32 or int64. If None, try infer from
+        the given data.
     device : Device context, optional
         Device on which the graph is created. Default: infer from data.
 
@@ -502,69 +452,38 @@ def heterograph(data_dict,
     ...     ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
     ...     })
     """
-    rel_graphs = []
+    # Try infer idtype
+    if idtype is None:
+        for k, data in data_dict.items():
+            if isinstance(data, tuple) and len(data) == 2 and F.is_tensor(data[0]):
+                idtype = F.dtype(data[0])
+                break
+
+    # Convert all data to edge tensors first.
+    data_dict = {(sty, ety, dty) : utils.graphdata2tensors(data, idtype, bipartite=(sty != dty))
+                 for (sty, ety, dty), data in data_dict.items()}
 
     # infer number of nodes for each node type
     if num_nodes_dict is None:
         num_nodes_dict = defaultdict(int)
         for (srctype, etype, dsttype), data in data_dict.items():
-            if isinstance(data, tuple):
-                # TODO(minjie): converting to index is unnecessary just for getting the max ID.
-                src = utils.toindex(data[0],
-                                    dtype='int32' if idtype == F.int32 else 'int64').tonumpy()
-                dst = utils.toindex(data[1],
-                                    dtype='int32' if idtype == F.int32 else 'int64').tonumpy()
-                nsrc = (src.max() + 1) if len(src) > 0 else 0
-                ndst = (dst.max() + 1) if len(dst) > 0 else 0
-            elif isinstance(data, list):
-                if len(data) == 0:
-                    nsrc = ndst = 0
-                else:
-                    src, dst = zip(*data)
-                    src = utils.toindex(src).tonumpy()
-                    dst = utils.toindex(dst).tonumpy()
-                    nsrc = src.max() + 1
-                    ndst = dst.max() + 1
-            elif isinstance(data, sp.sparse.spmatrix):
-                nsrc = data.shape[0]
-                ndst = data.shape[1]
-            elif isinstance(data, nx.Graph):
-                if data.number_of_nodes() == 0:
-                    nsrc = ndst = 0
-                elif srctype == dsttype:
-                    nsrc = ndst = data.number_of_nodes()
-                else:
-                    nsrc = len({n for n, d in data.nodes(data=True) if d['bipartite'] == 0})
-                    ndst = data.number_of_nodes() - nsrc
-            elif isinstance(data, DGLHeteroGraph):
-                # original node type and edge type of ``data`` is ignored.
-                assert len(data.canonical_etypes) == 1, \
-                    "Relational graphs must have only one edge type."
-                srctype, _, dsttype = data.canonical_etypes[0]
-                nsrc = data.number_of_nodes(srctype)
-                ndst = data.number_of_nodes(dsttype)
-            else:
-                raise DGLError('Unsupported graph data type %s for %s' % (
-                    type(data), (srctype, etype, dsttype)))
-            if srctype == dsttype:
-                ndst = nsrc = max(nsrc, ndst)
-
+            _, _, nsrc, ndst = data
             num_nodes_dict[srctype] = max(num_nodes_dict[srctype], nsrc)
             num_nodes_dict[dsttype] = max(num_nodes_dict[dsttype], ndst)
 
+    rel_graphs = []
     for (srctype, etype, dsttype), data in data_dict.items():
-        if isinstance(data, DGLHeteroGraph):
-            rel_graphs.append(data.to(device).astype(idtype))
-        elif srctype == dsttype:
+        u, v, _, _ = data
+        if srctype == dsttype:
             rel_graphs.append(graph(
-                data, srctype, etype,
+                (u, v), srctype, etype,
                 num_nodes=num_nodes_dict[srctype],
                 validate=validate,
                 restrict_format=restrict_format,
                 idtype=idtype, device=device))
         else:
             rel_graphs.append(bipartite(
-                data, srctype, etype, dsttype,
+                (u, v), srctype, etype, dsttype,
                 num_nodes=(num_nodes_dict[srctype], num_nodes_dict[dsttype]),
                 validate=validate,
                 restrict_format=restrict_format,
@@ -849,7 +768,7 @@ def to_homo(G):
 
 def create_from_edges(u, v,
                       utype, etype, vtype,
-                      urange=None, vrange=None,
+                      urange, vrange,
                       validate=True,
                       restrict_format="auto"):
     """Internal function to create a graph from incident nodes with types.
@@ -892,11 +811,8 @@ def create_from_edges(u, v,
             vrange <= F.as_scalar(F.max(v, dim=0)):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
                 vrange, F.as_scalar(F.max(v, dim=0))))
-    urange = urange or (0 if len(u) == 0 else F.as_scalar(F.max(u, dim=0)) + 1)
-    vrange = vrange or (0 if len(v) == 0 else F.as_scalar(F.max(v, dim=0)) + 1)
 
     if utype == vtype:
-        urange = vrange = max(urange, vrange)
         num_ntypes = 1
     else:
         num_ntypes = 2
@@ -904,84 +820,6 @@ def create_from_edges(u, v,
     hgidx = heterograph_index.create_unitgraph_from_coo(
         num_ntypes, urange, vrange, u, v, restrict_format)
     if utype == vtype:
-        return DGLHeteroGraph(hgidx, [utype], [etype])
-    else:
-        return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
-
-def elist2tensor(elist, idtype):
-    """Internal function to convert an edge list to edge tensors.
-
-    Parameters
-    ----------
-    elist : iterable of int pairs
-        List of (src, dst) node ID pairs.
-    idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
-
-    Returns
-    -------
-    (Tensor, Tensor)
-        Edge tensors.
-    """
-    if len(elist) == 0:
-        u, v = [], []
-    else:
-        u, v = zip(*elist)
-        u = list(u)
-        v = list(v)
-    return F.tensor(u, idtype), F.tensor(v, idtype)
-
-def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
-                      restrict_format='auto', idtype=F.int64):
-    """Internal function to create a heterograph from a scipy sparse matrix with types.
-
-    Parameters
-    ----------
-    spmat : scipy.sparse.spmatrix
-        The adjacency matrix whose rows represent sources and columns
-        represent destinations.
-    utype : str
-        Source node type name.
-    etype : str
-        Edge type name.
-    vtype : str
-        Destination node type name.
-    with_edge_id : bool
-        If True, the entries in the sparse matrix are treated as edge IDs.
-        Otherwise, the entries are ignored and edges will be added in
-        (source, destination) order.
-        Note that this option only affects CSR matrices; COO matrices' rows and cols
-        are always assumed to be ordered by edge ID already.
-    validate : bool, optional
-        If True, checks if node IDs are within range.
-    restrict_format : 'any', 'coo', 'csr', 'csc', 'auto', optional
-        Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
-
-    Returns
-    -------
-    DGLHeteroGraph
-    """
-    num_src, num_dst = spmat.shape
-    num_ntypes = 1 if utype == vtype else 2
-    if spmat.getformat() == 'coo':
-        row = F.tensor(spmat.row, idtype)
-        col = F.tensor(spmat.col, idtype)
-        hgidx = heterograph_index.create_unitgraph_from_coo(
-            num_ntypes, num_src, num_dst, row, col, restrict_format)
-    else:
-        spmat = spmat.tocsr()
-        indptr = F.tensor(spmat.indptr, idtype)
-        indices = F.tensor(spmat.indices, idtype)
-        if with_edge_id:
-            data = F.tensor(spmat.data, idtype)
-        else:
-            # TODO(minjie): range[0, nnz) ids could be actually be omitted
-            data = F.arange(0, len(indices), idtype)
-        hgidx = heterograph_index.create_unitgraph_from_csr(
-            num_ntypes, num_src, num_dst, indptr, indices, data, restrict_format)
-    if num_ntypes == 1:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
         return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
@@ -1018,6 +856,7 @@ def create_from_networkx(nx_graph,
     -------
     g : DGLHeteroGraph
     """
+    assert False
     if not nx_graph.is_directed():
         nx_graph = nx_graph.to_directed()
 
@@ -1093,86 +932,6 @@ def create_from_networkx(nx_graph,
                     raise DGLError('Not all edges have attribute {}.'.format(attr))
             g.edata[attr] = F.copy_to(_batcher(attr_dict[attr]), g.device)
 
-    return g
-
-def create_from_networkx_bipartite(nx_graph,
-                                   utype, etype, vtype,
-                                   edge_id_attr_name='id',
-                                   node_attrs=None,
-                                   edge_attrs=None,
-                                   restrict_format='auto',
-                                   idtype=F.int64):
-    """Create a heterograph that has one set of source nodes, one set of
-    destination nodes and one set of edges.
-
-    Parameters
-    ----------
-    nx_graph : NetworkX graph
-        The input graph must follow the bipartite graph convention of networkx.
-        Each node has an attribute ``bipartite`` with values 0 and 1 indicating
-        which set it belongs to. Only edges from node set 0 to node set 1 are
-        added to the returned graph.
-    utype : str
-        Source node type name.
-    etype : str
-        Edge type name.
-    vtype : str
-        Destination node type name.
-    edge_id_attr_name : str, optional
-        Key name for edge ids in the NetworkX graph. If not found, we
-        will consider the graph not to have pre-specified edge ids. (Default: 'id')
-    node_attrs : list of str
-        Names for node features to retrieve from the NetworkX graph (Default: None)
-    edge_attrs : list of str
-        Names for edge features to retrieve from the NetworkX graph (Default: None)
-    restrict_format : 'any', 'coo', 'csr', 'csc', 'auto' optional
-        Force the storage format.  Default: 'auto' (i.e. let DGL decide what to use).
-    idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
-
-    Returns
-    -------
-    g : DGLHeteroGraph
-    """
-    if not nx_graph.is_directed():
-        nx_graph = nx_graph.to_directed()
-
-    top_nodes = {n for n, d in nx_graph.nodes(data=True) if d['bipartite'] == 0}
-    bottom_nodes = set(nx_graph) - top_nodes
-    top_nodes = sorted(top_nodes)
-    bottom_nodes = sorted(bottom_nodes)
-    top_map = {n : i for i, n in enumerate(top_nodes)}
-    bottom_map = {n : i for i, n in enumerate(bottom_nodes)}
-
-    if nx_graph.number_of_edges() > 0:
-        has_edge_id = edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]
-    else:
-        has_edge_id = False
-
-    if has_edge_id:
-        num_edges = nx_graph.number_of_edges()
-        src = [0] * num_edges
-        dst = [0] * num_edges
-        for u, v, attr in nx_graph.edges(data=True):
-            eid = attr[edge_id_attr_name]
-            src[eid] = top_map[u]
-            dst[eid] = bottom_map[v]
-    else:
-        src = []
-        dst = []
-        for e in nx_graph.edges:
-            if e[0] in top_map:
-                src.append(top_map[e[0]])
-                dst.append(bottom_map[e[1]])
-    src = F.tensor(src, dtype=idtype)
-    dst = F.tensor(dst, dtype=idtype)
-    g = create_from_edges(src, dst, utype, etype, vtype,
-                          len(top_nodes), len(bottom_nodes), validate=False,
-                          restrict_format=restrict_format)
-
-    # TODO attributes
-    assert node_attrs is None, 'Retrieval of node attributes are not supported yet.'
-    assert edge_attrs is None, 'Retrieval of edge attributes are not supported yet.'
     return g
 
 def to_networkx(g, node_attrs=None, edge_attrs=None):
