@@ -418,6 +418,9 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
 def hetero_from_shared_memory(name):
     """Create a heterograph from shared memory with the given name.
 
+    The newly created graph will have the same node types and edge types as the original graph.
+    But it does not have node features or edges features.
+
     Paramaters
     ----------
     name : str

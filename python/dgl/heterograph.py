@@ -4652,7 +4652,7 @@ class DGLHeteroGraph(object):
                               self._edge_frames)
 
     def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
-        """Return a copy of this graph in shared memory
+        """Return a copy of this graph in shared memory (without node feature or edge feature)
 
         Parameters
         ----------

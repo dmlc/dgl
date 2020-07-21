@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <tuple>
 #include "./unit_graph.h"
 
 namespace dgl {
