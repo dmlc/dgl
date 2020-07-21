@@ -20,6 +20,7 @@ from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
 from .gdelt import GDELT, GDELTDataset
 from .icews18 import ICEWS18, ICEWS18Dataset
 from .qm7b import QM7b, QM7bDataset
+from .dgl_dataset import DGLDataset, DGLBuiltinDataset
 
 
 def register_data_args(parser):
