@@ -54,7 +54,7 @@ def find_lib_path(name=None, search_path=None, optional=False):
         elif isinstance(search_path, str):
             dll_path.append(search_path)
         else:
-            raise ValueError(f"type(search_path)={type(search_path)} is invalid")
+            raise ValueError("type(search_path)={} is invalid".format(type(search_path)))
     dll_path = [str(x.absolute()) if isinstance(x, pathlib.Path) else os.path.abspath(x) for x in dll_path]
 
     if name is None:
