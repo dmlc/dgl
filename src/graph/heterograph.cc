@@ -407,7 +407,6 @@ std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
   std::vector<std::string> etypes;
   CHECK(strm->Read(&ntypes)) << "invalid ntypes";
   CHECK(strm->Read(&etypes)) << "invalid etypes";
-  
   return std::make_tuple(hg_index, ntypes, etypes);
 }
 

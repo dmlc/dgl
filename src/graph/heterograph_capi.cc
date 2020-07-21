@@ -472,7 +472,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFromSharedMem")
     for (const auto &ntype : ntypes)
       ntypes_list.push_back(Value(MakeValue(ntype)));
     for (const auto &etype : etypes)
-      ntypes_list.push_back(Value(MakeValue(etype)));
+      etypes_list.push_back(Value(MakeValue(etype)));
     List<Value> ret;
     ret.push_back(Value(MakeValue(HeteroGraphRef(hg))));
     ret.push_back(Value(MakeValue(ntypes_list)));

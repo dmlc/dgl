@@ -1170,7 +1170,8 @@ def create_heterograph_from_shared_memory(name):
     etypes : list of str
         Names of edge types
     """
-    return _CAPI_DGLHeteroCreateFromSharedMem(name)
+    g, ntypes, etypes = _CAPI_DGLHeteroCreateFromSharedMem(name)
+    return g, list(ntypes), list(etypes)
 
 def joint_union(metagraph, gidx_list):
     """Return a joint union of the input heterographs.

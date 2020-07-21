@@ -55,7 +55,6 @@ def test_single_process(index_dtype):
     hg = create_test_graph(index_dtype=index_dtype)
     hg_share = hg.shared_memory("hg")
     hg_rebuild = dgl.DGLHeteroGraph.create_heterograph_from_shared_memory('hg')
-    print(hg_rebuild)
     hg_save_again = hg_rebuild.shared_memory("hg")
     _assert_is_identical_hetero(hg, hg_share)
     _assert_is_identical_hetero(hg, hg_rebuild)

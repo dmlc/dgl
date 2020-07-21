@@ -4670,7 +4670,6 @@ class DGLHeteroGraph(object):
         assert len(formats) > 0
         for fmt in formats:
             assert fmt in ("coo", "csr", "csc")
-        print(len(self.ntypes), len(self.etypes))
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
 
@@ -4688,7 +4687,6 @@ class DGLHeteroGraph(object):
         HeteroGraph (in shared memory)
         """
         g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(name)
-        print(len(ntypes), len(etypes))
         return DGLHeteroGraph(g, ntypes, etypes)
 
     def long(self):
