@@ -340,6 +340,8 @@ def unbatch(g, node_split=None, edge_split=None):
     --------
     batch
     """
+    num_split = None
+    # Parse node_split
     if node_split is None:
         node_split = {ntype : g.batch_num_nodes(ntype) for ntype in g.ntypes}
     elif not isinstance(node_split, Mapping):
@@ -349,7 +351,13 @@ def unbatch(g, node_split=None, edge_split=None):
         node_split = {g.ntypes[0] : node_split}
     if node_split.keys() != set(g.ntypes):
         raise DGLError('Must specify node_split for each node type.')
+    for k, split in node_split.items():
+        if num_split is not None and num_split != len(split):
+            raise DGLError('All node_split and edge_split must specify the same number'
+                           ' of split sizes.')
+        num_split = len(split)
 
+    # Parse edge_split 
     if edge_split is None:
         edge_split = {etype : g.batch_num_edges(etype) for etype in g.canonical_etypes}
     elif not isinstance(edge_split, Mapping):
@@ -359,12 +367,17 @@ def unbatch(g, node_split=None, edge_split=None):
         edge_split = {g.canonical_etypes[0] : edge_split}
     if edge_split.keys() != set(g.canonical_etypes):
         raise DGLError('Must specify edge_split for each canonical edge type.')
+    for k, split in edge_split.items():
+        if num_split is not None and num_split != len(split):
+            raise DGLError('All edge_split and edge_split must specify the same number'
+                           ' of split sizes.')
+        num_split = len(split)
 
     node_split = {k : F.asnumpy(split).tolist() for k, split in node_split.items()}
     edge_split = {k : F.asnumpy(split).tolist() for k, split in edge_split.items()}
 
     # Split edges for each relation
-    edge_dict_per = [{} for i in range(g.batch_size)]
+    edge_dict_per = [{} for i in range(num_split)]
     for rel in g.canonical_etypes:
         srctype, etype, dsttype = rel
         srcnid_off = dstnid_off = 0
@@ -376,10 +389,10 @@ def unbatch(g, node_split=None, edge_split=None):
             srcnid_off += node_split[srctype][i]
             dstnid_off += node_split[dsttype][i]
     num_nodes_dict_per = [{k : split[i] for k, split in node_split.items()}
-                          for i in range(g.batch_size)]
+                          for i in range(num_split)]
 
     # Create graphs
-    gs = [convert.heterograph(edge_dict, num_nodes_dict, validate=True)
+    gs = [convert.heterograph(edge_dict, num_nodes_dict, validate=True, idtype=g.idtype)
           for edge_dict, num_nodes_dict in zip(edge_dict_per, num_nodes_dict_per)]
 
     # Unbatch node features

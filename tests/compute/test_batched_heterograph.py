@@ -4,6 +4,7 @@ import unittest
 
 from dgl.base import ALL
 from utils import parametrize_dtype
+from test_utils import check_graph_equal
 
 def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=None):
     assert g1.ntypes == g2.ntypes
@@ -289,6 +290,30 @@ def test_empty_relation(idtype):
     g1 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(0, 4))
     g2 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(1, 5))
     dgl.batch([g1, g2])
+
+@parametrize_dtype
+def test_unbatch2(idtype):
+    # batch 3 graphs but unbatch to 2
+    g1 = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
+    g2 = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
+    g3 = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
+    bg = dgl.batch([g1, g2, g3])
+    bnn = F.tensor([8, 4])
+    bne = F.tensor([6, 3])
+    f1, f2 = dgl.unbatch(bg, node_split=bnn, edge_split=bne)
+    u, v = f1.edges(order='eid')
+    assert F.allclose(u, F.tensor([0, 1, 2, 4, 5, 6]))
+    assert F.allclose(v, F.tensor([1, 2, 3, 5, 6, 7]))
+    u, v = f2.edges(order='eid')
+    assert F.allclose(u, F.tensor([0, 1, 2]))
+    assert F.allclose(v, F.tensor([1, 2, 3]))
+
+    # batch 2 but unbatch to 3
+    bg = dgl.batch([f1, f2])
+    gg1, gg2, gg3 = dgl.unbatch(bg, F.tensor([4, 4, 4]), F.tensor([3, 3, 3]))
+    check_graph_equal(g1, gg1)
+    check_graph_equal(g2, gg2)
+    check_graph_equal(g3, gg3)
 
 if __name__ == '__main__':
     #test_topology('int32')
