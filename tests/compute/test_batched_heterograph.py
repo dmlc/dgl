@@ -105,12 +105,12 @@ def test_batching_hetero_topology(idtype):
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    }, idtype=idtype, restrict_format='csr')
+    }, idtype=idtype).format('csr')
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    }, idtype=idtype, restrict_format='csr')
+    }, idtype=idtype).format('csr')
     bg = dgl.batch_hetero([g1, g2])
 
     # Test number of nodes
@@ -158,12 +158,12 @@ def test_batching_hetero_topology(idtype):
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
-    }, idtype=idtype, restrict_format='csc')
+    }, idtype=idtype).format('csc')
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
-    }, idtype=idtype, restrict_format='csc')
+    }, idtype=idtype).format('csc')
     bg = dgl.batch_hetero([g1, g2])
 
     # Test number of nodes
