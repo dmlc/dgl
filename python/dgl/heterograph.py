@@ -199,8 +199,8 @@ class DGLHeteroGraph(object):
                  edge_frames=None,
                  **deprecate_kwargs):
         if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
-            dgl_warning('From 0.5, we recommend creating graphs by `dgl.graph(data)`'
-                        ' instead of dgl.DGLGraph(data).')
+            dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
+                        ' instead of `dgl.DGLGraph(data)`.')
             u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
             gidx = heterograph_index.create_unitgraph_from_coo(
                 1, num_src, num_dst, u, v, "any")
@@ -1783,11 +1783,9 @@ class DGLHeteroGraph(object):
         bool
             True if the graph is readonly, False otherwise.
         """
-        dgl_warning('DGLGraph.is_readonly is deprecated'
-                    'DGLGraph is now always mutable and '
-                    'we recommend you to use outplace mutation operations like '
-                    'dgl.add_edges, dgl.add_nodes, dgl.remove_edges, dgl.remove_nodes,'
-                    'dgl.add_self_loop and dgl.remove_self_loop.')
+        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
+                    'DGLGraph now always supports mutable operations like add_nodes'
+                    ' and add_edges.')
         return False
 
     @property
@@ -4340,13 +4338,10 @@ class DGLHeteroGraph(object):
                 return F.boolean_mask(e, mask[e])
 
     def readonly(self, readonly_state=True):
-        """Deprecated: DGLGraph will always be mutable.
-        """
-        dgl_warning('DGLGraph.readonly is deprecated'
-                    'DGLGraph is now always mutable and '
-                    'we recommend you to use outplace mutation operations like '
-                    'dgl.add_edges, dgl.add_nodes, dgl.remove_edges, dgl.remove_nodes,'
-                    'dgl.add_self_loop and dgl.remove_self_loop.')
+        """Deprecated: DGLGraph will always be mutable."""
+        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
+                    'DGLGraph now always supports mutable operations like add_nodes'
+                    ' and add_edges.')
         return
 
     @property

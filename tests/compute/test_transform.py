@@ -88,6 +88,7 @@ def test_no_backtracking():
 @parametrize_dtype
 def test_reverse(idtype):
     g = dgl.DGLGraph()
+    g = g.astype(idtype).to(F.ctx())
     g.add_nodes(5)
     # The graph need not to be completely connected.
     g.add_edges([0, 1, 2], [1, 2, 1])
@@ -218,8 +219,10 @@ def test_reverse(idtype):
     assert ('hhh' in g_r.edges['follows'].data) is True
 
 
-def test_reverse_shared_frames():
+@parametrize_dtype
+def test_reverse_shared_frames(idtype):
     g = dgl.DGLGraph()
+    g = g.astype(idtype).to(F.ctx())
     g.add_nodes(3)
     g.add_edges([0, 1, 2], [1, 2, 1])
     g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
