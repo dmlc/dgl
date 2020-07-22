@@ -30,6 +30,19 @@ class SubgraphResponse(Response):
     def __getstate__(self):
         return self.global_src, self.global_dst, self.global_eids
 
+class FindEdgeResponse(Response):
+    """The response for sampling and in_subgraph"""
+
+    def __init__(self, global_src, global_dst, order_id):
+        self.global_src = global_src
+        self.global_dst = global_dst
+        self.order_id = order_id
+
+    def __setstate__(self, state):
+        self.global_src, self.global_dst, self.order_id = state
+
+    def __getstate__(self):
+        return self.global_src, self.global_dst, self.order_id
 
 def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, prob, replace):
     """ Sample from local partition.
@@ -109,21 +122,22 @@ class SamplingRequest(Request):
 class EdgesRequest(Request):
     """Edges Request"""
 
-    def __init__(self, edge_ids):
+    def __init__(self, edge_ids, order_id):
         self.edge_ids = edge_ids
+        self.order_id = order_id
 
     def __setstate__(self, state):
-        self.edge_ids = state
+        self.edge_ids, self.order_id = state
 
     def __getstate__(self):
-        return self.edge_ids
+        return self.edge_ids, self.order_id
 
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
         global_src, global_dst = _find_edges(local_g, partition_book, self.edge_ids)
 
-        return SubgraphResponse(global_src, global_dst, None)
+        return FindEdgeResponse(global_src, global_dst, self.order_id)
 
 class InSubgraphRequest(Request):
     """InSubgraph Request"""
@@ -307,14 +321,17 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     edges = toindex(edges).tousertensor()
     partition_id = partition_book.eid2partid(edges)
     local_eids = None
+    reorder_idx = []
     for pid in range(partition_book.num_partitions()):
-        edge_id = F.boolean_mask(edges, partition_id == pid)
+        mask = (partition_id == pid)
+        edge_id = F.boolean_mask(edges, mask)
+        reorder_idx.append(F.nonzero_1d(mask))
 
         if pid == partition_book.partid and g.local_partition is not None:
             assert local_eids is None
             local_eids = edge_id
         elif len(edge_id) != 0:
-            req = issue_remote_req(edge_id)
+            req = issue_remote_req(edge_id, pid)
             req_list.append((pid, req))
 
     # send requests to the remote machine.
@@ -323,21 +340,23 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
         msgseq2pos = send_requests_to_machine(req_list)
 
     # handle edges in local partition.
-    src_ids = []
-    dst_ids = []
+    src_ids = F.zeros_like(edges)
+    dst_ids = F.zeros_like(edges)
     if local_eids is not None:
         src, dst = local_access(g.local_partition, partition_book, local_eids)
-        src_ids.append(src)
-        dst_ids.append(dst)
+        src_ids = F.scatter_row(src_ids, reorder_idx[partition_book.partid], src)
+        dst_ids = F.scatter_row(dst_ids, reorder_idx[partition_book.partid], dst)
 
+    order_id = []
     # receive responses from remote machines.
     if msgseq2pos is not None:
         results = recv_responses(msgseq2pos)
-        src_ids.append(results.global_src)
-        dst_ids.append(results.global_dst)
+        for result in results:
+            src = result.global_src
+            dst = result.global_dst
 
-    src_ids = F.cat(src_ids, dim=0)
-    dst_ids = F.cat(dst_ids, dim=0)
+            src_ids = F.scatter_row(src_ids, reorder_idx[result.order_id], src)
+            dst_ids = F.scatter_row(dst_ids, reorder_idx[result.order_id], dst)
     return src_ids, dst_ids
 
 def find_edges(g, edge_ids):
@@ -360,8 +379,8 @@ def find_edges(g, edge_ids):
     tensor
         The destination node ID array.
     """
-    def issue_remove_req(edge_ids):
-        return EdgesRequest(edge_ids)
+    def issue_remove_req(edge_ids, order_id):
+        return EdgesRequest(edge_ids, order_id)
     def local_access(local_g, partition_book, edge_ids):
         return _find_edges(local_g, partition_book, edge_ids)
     return _distributed_edge_access(g, edge_ids, issue_remove_req, local_access)
