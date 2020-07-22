@@ -96,7 +96,7 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
-_initialized = False
+INITIALIZED = False
 
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
@@ -173,15 +173,15 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
     atexit.register(exit_client)
-    global _initialized
-    _initialized = False
+    global INITIALIZED
+    INITIALIZED = False
 
 def finalize_client():
     """Release resources of this client."""
     rpc.finalize_sender()
     rpc.finalize_receiver()
-    global _initialized
-    _initialized = False
+    global INITIALIZED
+    INITIALIZED = False
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -206,4 +206,4 @@ def exit_client():
 def is_initialized():
     """Is RPC initialized?
     """
-    return _initialized
+    return INITIALIZED
