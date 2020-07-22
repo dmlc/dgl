@@ -4658,7 +4658,6 @@ class DGLHeteroGraph(object):
         ----------
         name : str
             The name of the shared memory.
-        
         formats : list of str (optional)
             Desired formats to be materialized.
 
