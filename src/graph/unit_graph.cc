@@ -1391,11 +1391,11 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 dgl_format_code_t UnitGraph::GetFormatInUse() const {
   dgl_format_code_t ret = 0;
   if (in_csr_->defined())
-    ret += csc_code;
+    ret |= csc_code;
   if (out_csr_->defined())
-    ret += csr_code;
+    ret |= csr_code;
   if (coo_->defined())
-    ret += coo_code;
+    ret |= coo_code;
   return ret;
 }
 
@@ -1450,7 +1450,6 @@ dgl_format_code_t UnitGraph::AutoDetectFormat(
 
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
   dgl_format_code_t common = preferred_formats & formats_;
-  LOG(INFO) << "common formats " << int(common);
   if (FORMAT_HAS_CSC(common))
     return SparseFormat::kCSC;
   if (FORMAT_HAS_CSR(common))

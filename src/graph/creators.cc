@@ -44,7 +44,14 @@ HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
     dgl_format_code_t formats) {
   auto unit_g = UnitGraph::CreateFromCSR(num_vtypes, mat, formats);
-  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
+  LOG(INFO) << "all: " << int(unit_g->GetFormatAll());
+  LOG(INFO) << "in_use: " << int(unit_g->GetFormatInUse());
+  auto ret = HeteroGraphPtr(new HeteroGraph(
+      unit_g->meta_graph(),
+      {unit_g}));
+  LOG(INFO) << "ret: " << int(ret->GetFormatInUse());
+  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(),
+                                                       {unit_g}));
 }
 
 HeteroGraphPtr CreateFromCSC(

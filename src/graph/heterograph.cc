@@ -181,12 +181,14 @@ HeteroGraph::HeteroGraph(
     GraphPtr meta_graph,
     const std::vector<HeteroGraphPtr>& rel_graphs,
     const std::vector<int64_t>& num_nodes_per_type) : BaseHeteroGraph(meta_graph) {
+  LOG(INFO) << "before " << int(rel_graphs[0]->GetFormatInUse());
   if (num_nodes_per_type.size() == 0)
     num_verts_per_type_ = InferNumVerticesPerType(meta_graph, rel_graphs);
   else
     num_verts_per_type_ = num_nodes_per_type;
-
+  LOG(INFO) << "middle " << int(rel_graphs[0]->GetFormatInUse());
   HeteroGraphSanityCheck(meta_graph, rel_graphs);
+  LOG(INFO) << "after " << int(rel_graphs[0]->GetFormatInUse());
   relation_graphs_ = CastToUnitGraphs(rel_graphs);
 }
 
