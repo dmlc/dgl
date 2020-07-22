@@ -24,32 +24,34 @@ python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train -
 When copying data to the cluster, we recommend users to copy the partitioned data to NFS so that all worker machines
 will be able to access the partitioned data.
 
-### Step 3: run servers
+### Step 3: Launch distributed jobs
 
-We need to run a server on each machine. Before running the servers, we need to update `ip_config.txt` with the right IP addresses.
-
-```bash
-# run server on machine 0
-python3 train_dist.py --server --graph-name ogb-product --id 0 --num-client 4 --conf_path data/ogb-product.json --ip_config ip_config.txt
-# run server on machine 1
-python3 train_dist.py --server --graph-name ogb-product --id 1 --num-client 4 --conf_path data/ogb-product.json --ip_config ip_config.txt
-# run server on machine 2
-python3 train_dist.py --server --graph-name ogb-product --id 2 --num-client 4 --conf_path data/ogb-product.json --ip_config ip_config.txt
-# run server on machine 3
-python3 train_dist.py --server --graph-name ogb-product --id 3 --num-client 4 --conf_path data/ogb-product.json --ip_config ip_config.txt
-```
-
-### Step 4: run trainers
-We run a trainer process on each machine. Here we use Pytorch distributed. We need to use pytorch distributed launch to run each trainer process.
-Pytorch distributed requires one of the trainer process to be the master. Here we use the first machine to run the master process.
+First make sure that the master node has the right permission to ssh to all the other nodes. Then run script:
 
 ```bash
-# run client on machine 0
-python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=0 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
-# run client on machine 1
-python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=1 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
-# run client on machine 2
-python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=2 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
-# run client on machine 3
-python3 -m torch.distributed.launch --nproc_per_node=1 --nnodes=4 --node_rank=3 --master_addr="172.31.16.250" --master_port=1234 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --num-client 4 --batch-size 1000 --lr 0.1
+python3 ~/dgl/tools/launch.py \
+--workspace ~/dgl/examples/pytorch/graphsage/experimental \
+--num_client 4 \
+--conf_path data/ogb-product.json \
+--ip_config ip_config.txt \
+"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000 --lr 0.1 --num-client 4"
 ```
+
+## Distributed code runs in the standalone mode
+
+The standalone mode is mainly used for development and testing. The procedure to run the code is much simpler.
+
+### Step 1: graph construction.
+
+When testing the standalone mode of the training script, we should construct a graph with one partition.
+```bash
+python3 partition_graph.py --dataset ogb-product --num_parts 1
+```
+
+### Step 2: run the training script
+
+```bash
+python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --conf_path data/ogb-product.json --standalone
+```
+
+Note: please ensure that all environment variables shown above are unset if they were set for testing distributed training.

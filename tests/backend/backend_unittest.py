@@ -97,6 +97,10 @@ def dot(a, b):
     """Compute Dot between a and b"""
     pass
 
+def abs(a):
+    """Compute the absolute value of a"""
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
