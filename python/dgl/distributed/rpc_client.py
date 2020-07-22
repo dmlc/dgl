@@ -174,7 +174,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.set_num_client(res.num_client)
     atexit.register(exit_client)
     global INITIALIZED
-    INITIALIZED = False
+    INITIALIZED = True
 
 def finalize_client():
     """Release resources of this client."""

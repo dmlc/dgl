@@ -1,5 +1,6 @@
 """Define distributed tensor."""
 
+import os
 import uuid
 
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
@@ -86,7 +87,9 @@ class DistTensor:
             assert shape == shape1, 'The shape does not match with the existing tensor'
 
     def __del__(self):
-        if not self._persistent and self._owner and is_initialized():
+        initialized = os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone' \
+                or is_initialized()
+        if not self._persistent and self._owner and initialized:
             self.kvstore.delete_data(self._name)
 
     def __getitem__(self, idx):

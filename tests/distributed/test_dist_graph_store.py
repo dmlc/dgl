@@ -97,11 +97,26 @@ def check_dist_graph(g, num_nodes, num_edges):
     feats = g.ndata['test1'][nids]
     assert np.all(F.asnumpy(feats) == 0)
 
-    # Test reuse_if_exist
-    g.ndata['test2'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2',
-                                                  init_func=rand_init)
-    g.ndata['test3'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2')
-    assert np.all(F.asnumpy(g.ndata['test2'][nids]) == F.asnumpy(g.ndata['test3'][nids]))
+    # reference to a one that exists
+    test2 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2', init_func=rand_init)
+    test3 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2')
+    assert np.all(F.asnumpy(test2[nids]) == F.asnumpy(test3[nids]))
+
+    # create a tensor and destroy a tensor and create it again.
+    test3 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test3', init_func=rand_init)
+    del test3
+    test3 = dgl.distributed.DistTensor(g, (g.number_of_nodes(), 3), F.float32, 'test3')
+    del test3
+
+    # test a persistent tesnor
+    test4 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test4', init_func=rand_init,
+                                       persistent=True)
+    del test4
+    try:
+        test4 = dgl.distributed.DistTensor(g, (g.number_of_nodes(), 3), F.float32, 'test4')
+        raise Exception('')
+    except:
+        pass
 
     # Test sparse emb
     try:
