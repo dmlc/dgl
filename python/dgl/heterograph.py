@@ -283,7 +283,7 @@ class DGLHeteroGraph(object):
 
     def __getstate__(self):
         if self.is_block:
-            ntypes = (list(self._srctypes_invmap.keys()), list(self._dsttypes_invmap.keys()))
+            ntypes = (self.srctypes, self.dsttypes)
         else:
             ntypes = self._ntypes
         return self._graph, ntypes, self._etypes, self._node_frames, self._edge_frames
