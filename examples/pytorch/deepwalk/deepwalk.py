@@ -69,7 +69,7 @@ class DeepwalkTrainer:
         elif self.args.mix:
             print("Mix CPU with %d GPU" % len(self.args.gpus))
             if len(self.args.gpus) == 1:
-                assert self.args.gpus[0] >= 0, 'mix CPU with GPU should have avaliable GPU'
+                assert self.args.gpus[0] >= 0, 'mix CPU with GPU should have available GPU'
                 self.emb_model.set_device(self.args.gpus[0])
         else:
             print("Run in CPU process")
