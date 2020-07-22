@@ -623,6 +623,9 @@ class RangePartitionBook:
         """
         return self._partid
 
+NODE_PART_POLICY = 'node'
+EDGE_PART_POLICY = 'edge'
+
 class PartitionPolicy(object):
     """Wrapper for GraphPartitionBook and RangePartitionBook.
 
@@ -637,7 +640,8 @@ class PartitionPolicy(object):
     """
     def __init__(self, policy_str, partition_book):
         # TODO(chao): support more policies for HeteroGraph
-        assert policy_str in ('edge', 'node'), 'policy_str must be \'edge\' or \'node\'.'
+        assert policy_str in (EDGE_PART_POLICY, NODE_PART_POLICY), \
+                'policy_str must be \'edge\' or \'node\'.'
         self._policy_str = policy_str
         self._part_id = partition_book.partid
         self._partition_book = partition_book
@@ -670,9 +674,9 @@ class PartitionPolicy(object):
         tensor
             local ID tensor
         """
-        if self._policy_str == 'edge':
+        if self._policy_str == EDGE_PART_POLICY:
             return self._partition_book.eid2localeid(id_tensor, self._part_id)
-        elif self._policy_str == 'node':
+        elif self._policy_str == NODE_PART_POLICY:
             return self._partition_book.nid2localnid(id_tensor, self._part_id)
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
@@ -690,9 +694,9 @@ class PartitionPolicy(object):
         tensor
             partition ID
         """
-        if self._policy_str == 'edge':
+        if self._policy_str == EDGE_PART_POLICY:
             return self._partition_book.eid2partid(id_tensor)
-        elif self._policy_str == 'node':
+        elif self._policy_str == NODE_PART_POLICY:
             return self._partition_book.nid2partid(id_tensor)
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
@@ -705,9 +709,9 @@ class PartitionPolicy(object):
         int
             data size
         """
-        if self._policy_str == 'edge':
+        if self._policy_str == EDGE_PART_POLICY:
             return len(self._partition_book.partid2eids(self._part_id))
-        elif self._policy_str == 'node':
+        elif self._policy_str == NODE_PART_POLICY:
             return len(self._partition_book.partid2nids(self._part_id))
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
