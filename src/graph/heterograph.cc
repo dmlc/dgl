@@ -268,7 +268,7 @@ std::string HeteroGraph::SharedMemName() const {
 HeteroGraphPtr HeteroGraph::CopyToSharedMem(
       HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
       const std::vector<std::string>& etypes, const std::set<std::string>& fmts) {
-  // TODO: Raise error when calling shared_memory if graph index is on gpu
+  // TODO(JJ): Raise error when calling shared_memory if graph index is on gpu
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hg);
   if (hg->SharedMemName() == name)
@@ -276,9 +276,8 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
 
   // Copy buffer to share memory
   auto mem = std::make_shared<SharedMemory>(name);
-  auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
-  dmlc::MemoryFixedSizeStream ofs(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
-  dmlc::SeekStream *strm = &ofs;
+  SharedMemManager shm(name, mem);
+  dmlc::Stream *strm = &shm;
 
   bool has_coo = fmts.find("coo") != fmts.end();
   bool has_csr = fmts.find("csr") != fmts.end();
@@ -298,17 +297,13 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
     aten::CSRMatrix csr, csc;
     std::string prefix = name + "_" + std::to_string(etype);
     if (has_coo) {
-      coo = hg->GetCOOMatrix(etype).CopyToSharedMem(prefix + "_coo");
-      strm->Write(coo.row_sorted);
-      strm->Write(coo.col_sorted);
+      coo = shm.CopyToSharedMem(hg->GetCOOMatrix(etype), prefix + "_coo");
     }
     if (has_csr) {
-      csr = hg->GetCSRMatrix(etype).CopyToSharedMem(prefix + "_csr");
-      strm->Write(csr.sorted);
+      csr = shm.CopyToSharedMem(hg->GetCSRMatrix(etype), prefix + "_csr");
     }
     if (has_csc) {
-      csc = hg->GetCSCMatrix(etype).CopyToSharedMem(prefix + "_csc");
-      strm->Write(csc.sorted);
+      csc = shm.CopyToSharedMem(hg->GetCSCMatrix(etype), prefix + "_csc");
     }
     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
   }
