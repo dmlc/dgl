@@ -176,11 +176,13 @@ def test_edge_ids():
     #csr = csr.transpose()
     g = dgl.DGLGraph(csr, readonly=True)
     num_nodes = g.number_of_nodes()
-    in_edges = g._graph.in_edges(v=dgl.utils.toindex([2]))
-    src, dst, eids = g._graph.edge_ids(dgl.utils.toindex(in_edges[0]),
-                                       dgl.utils.toindex(in_edges[1]))
-    assert np.all(in_edges[0].tonumpy() == src.tonumpy())
-    assert np.all(in_edges[1].tonumpy() == dst.tonumpy())
+    # homograph, etid == 0
+    in_edges = g._graph.in_edges(0, v=F.tensor([2]))
+    src, dst, eids = g._graph.edge_ids_all(0,
+                                           F.tensor(in_edges[0]),
+                                           F.tensor(in_edges[1]))
+    assert np.all(F.asnumpy(in_edges[0]) == F.asnumpy(src))
+    assert np.all(F.asnumpy(in_edges[1]) == F.asnumpy(dst))
 
 if __name__ == '__main__':
     test_basics()

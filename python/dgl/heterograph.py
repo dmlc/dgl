@@ -1756,6 +1756,13 @@ class DGLHeteroGraph(object):
         """
         return self._graph.number_of_edges(self.get_etype_id(etype))
 
+    def __len__(self):
+        """Deprecated: please directly call :func:`number_of_nodes`
+        """
+        dgl_warning('DGLGraph.__len__ is deprecated.'
+                    'Please directly call DGLGraph.number_of_nodes.')
+        return self.number_of_nodes()
+
     @property
     def is_multigraph(self):
         """Whether the graph is a multigraph
@@ -1769,14 +1776,19 @@ class DGLHeteroGraph(object):
 
     @property
     def is_readonly(self):
-        """Whether the graph is readonly
+        """Deprecated: DGLGraph will always be mutable.
 
         Returns
         -------
         bool
             True if the graph is readonly, False otherwise.
         """
-        return self._graph.is_readonly()
+        dgl_warning('DGLGraph.is_readonly is deprecated'
+                    'DGLGraph is now always mutable and '
+                    'we recommend you to use outplace mutation operations like '
+                    'dgl.add_edges, dgl.add_nodes, dgl.remove_edges, dgl.remove_nodes,'
+                    'dgl.add_self_loop and dgl.remove_self_loop.')
+        return False
 
     @property
     def idtype(self):
@@ -1804,6 +1816,13 @@ class DGLHeteroGraph(object):
             th.int32/th.int64 or tf.int32/tf.int64 etc.
         """
         return self._graph.dtype
+
+    def __contains__(self, vid):
+        """Deprecated: please directly call :func:`has_nodes`.
+        """
+        dgl_warning('DGLGraph.__contains__ is deprecated.'
+                       ' Please directly call has_nodes.')
+        return self.has_nodes(vid)
 
     def has_nodes(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
@@ -2831,6 +2850,15 @@ class DGLHeteroGraph(object):
 
     # Alias of ``adjacency_matrix``
     adj = adjacency_matrix
+
+    def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
+        """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt)``.
+        """
+        dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated.'
+                    'Please directly call DGLGraph.adjacency_matrix(transpose, scipy_fmt).'
+                    'Note: return_edge_ids is not supported now')
+
+        return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
 
     def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
@@ -4310,6 +4338,16 @@ class DGLHeteroGraph(object):
                 else:
                     e = utils.prepare_tensor(self, edges, 'edges')
                 return F.boolean_mask(e, mask[e])
+
+    def readonly(self, readonly_state=True):
+        """Deprecated: DGLGraph will always be mutable.
+        """
+        dgl_warning('DGLGraph.readonly is deprecated'
+                    'DGLGraph is now always mutable and '
+                    'we recommend you to use outplace mutation operations like '
+                    'dgl.add_edges, dgl.add_nodes, dgl.remove_edges, dgl.remove_nodes,'
+                    'dgl.add_self_loop and dgl.remove_self_loop.')
+        return
 
     @property
     def device(self):
