@@ -64,21 +64,21 @@ ogbl-collab
 
 <br>obgl-ddi
 <br>#params: 1444840(model) + 99073(mlp) = 1543913
-<br>&emsp;Hits@10
-<br>&emsp;Highest Train: 36.09 ± 2.47
-<br>&emsp;Highest Valid: 32.83 ± 2.30
-<br>&emsp;&emsp;Final Train: 36.06 ± 2.45
-<br>&emsp;&emsp;Final Test: 11.76 ± 3.91
-<br>&emsp;Hits@20
-<br>&emsp;Highest Train: 45.59 ± 2.45
-<br>&emsp;Highest Valid: 42.00 ± 2.36
-<br>&emsp;&emsp;Final Train: 45.56 ± 2.50
-<br>&emsp;&emsp;Final Test: 22.46 ± 2.90
-<br>&emsp;Hits@30
-<br>&emsp;Highest Train: 51.58 ± 2.41
-<br>&emsp;Highest Valid: 47.82 ± 2.19
-<br>&emsp;&emsp;Final Train: 51.58 ± 2.42
-<br>&emsp;&emsp;Final Test: 30.17 ± 3.39
+<br>Hits@10
+<br>&emsp;Highest Train: 33.91 ± 2.01
+<br>&emsp;Highest Valid: 30.96 ± 1.89
+<br>&emsp;&emsp;Final Train: 33.90 ± 2.00
+<br>&emsp;&emsp;Final Test: 15.16 ± 4.28
+<br>Hits@20
+<br>&emsp;Highest Train: 44.64 ± 1.71
+<br>&emsp;Highest Valid: 41.32 ± 1.69
+<br>&emsp;&emsp;Final Train: 44.62 ± 1.69
+<br>&emsp;&emsp;Final Test: 26.42 ± 6.10
+<br>Hits@30
+<br>&emsp;Highest Train: 51.01 ± 1.72
+<br>&emsp;Highest Valid: 47.64 ± 1.71
+<br>&emsp;&emsp;Final Train: 50.99 ± 1.72
+<br>&emsp;&emsp;Final Test: 33.56 ± 3.95
 
 
 <br>ogbl-ppa
@@ -102,7 +102,7 @@ ogbl-collab
 <br>ogbl-citation
 <br>#params: 757811178(model) + 131841(mlp) = 757943019
 <br>MRR
-<br>&emsp;Highest Train: 0.8797 ± 0.0007
-<br>&emsp;Highest Valid: 0.8139 ± 0.0005
-<br>&emsp;&emsp;Final Train: 0.8792 ± 0.0008
-<br>&emsp;&emsp;Final Test: 0.8148 ± 0.0004
+<br>&emsp;Highest Train: 0.8994 ± 0.0004
+<br>&emsp;Highest Valid: 0.8271 ± 0.0003
+<br>&emsp;&emsp;Final Train: 0.8991 ± 0.0007
+<br>&emsp;&emsp;Final Test: 0.8284 ± 0.0005
