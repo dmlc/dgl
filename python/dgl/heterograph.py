@@ -3271,12 +3271,26 @@ class DGLHeteroGraph(object):
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
         """DEPRECATED: please use
-            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``.
+
+            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``
+
         which will return a new graph created from the networkx graph.
         """
         raise DGLError('DGLGraph.from_networkx is deprecated. Please call the following\n\n'
                        '\t dgl.from_networkx(nx_graph, node_attrs, edge_attrs)\n\n'
                        ', which creates a new DGLGraph from the networkx graph.')
+
+    def from_scipy_sparse_matrix(self, spmat, multigraph=None):
+        """DEPRECATED: please use
+
+            ``dgl.from_scipy(spmat)``
+
+        which will return a new graph created from the scipy matrix.
+        """
+        raise DGLError('DGLGraph.from_scipy_sparse_matrix is deprecated. '
+                       'Please call the following\n\n'
+                       '\t dgl.from_scipy(spmat)\n\n'
+                       ', which creates a new DGLGraph from the scipy matrix.')
 
     #################################################################
     # Message passing
