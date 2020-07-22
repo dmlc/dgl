@@ -166,7 +166,7 @@ def run(args, device, data):
     # Training loop
     iter_tput = []
     profiler = Profiler()
-    profiler.start()
+    #profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
         tic = time.time()
@@ -226,21 +226,19 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s'.format(
                     epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:])))
             start = time.time()
+        th.distributed.barrier()
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
         epoch += 1
 
-
-        toc = time.time()
-        print('Epoch Time(s): {:.4f}'.format(toc - tic))
         #if epoch % args.eval_every == 0 and epoch != 0:
         #    eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
         #    print('Eval Acc {:.4f}'.format(eval_acc))
 
-    profiler.stop()
-    print(profiler.output_text(unicode=True, color=True))
+    #profiler.stop()
+    #print(profiler.output_text(unicode=True, color=True))
     # clean up
     if not args.standalone:
         g._client.barrier()
@@ -251,6 +249,9 @@ def run(args, device, data):
 
         dgl.distributed.shutdown_servers()
         dgl.distributed.finalize_client()
+    else:
+        feat = g.ndata['features']
+        th.save(feat, 'feat.pt')
 
 def main(args):
     if not args.standalone:
