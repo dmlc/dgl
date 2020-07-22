@@ -85,6 +85,7 @@ def test_copy_from_gpu():
     p.start()
     p.join()
 
+# TODO: Test calling shared_memory with Blocks (a subclass of HeteroGraph)
 if __name__ == "__main__":
     test_single_process("int64")
     test_multi_process("int32")

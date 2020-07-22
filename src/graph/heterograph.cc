@@ -268,6 +268,7 @@ std::string HeteroGraph::SharedMemName() const {
 HeteroGraphPtr HeteroGraph::CopyToSharedMem(
       HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
       const std::vector<std::string>& etypes, const std::set<std::string>& fmts) {
+  // TODO: Raise error when calling shared_memory if graph index is on gpu
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hg);
   if (hg->SharedMemName() == name)

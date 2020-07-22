@@ -4651,6 +4651,7 @@ class DGLHeteroGraph(object):
                               self._node_frames,
                               self._edge_frames)
 
+    # TODO: Formats should not be specified, just saving all the materialized formats
     def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory (without node feature or edge feature)
 
