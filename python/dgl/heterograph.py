@@ -4411,11 +4411,6 @@ class DGLHeteroGraph(object):
         if device is None or self.device == device:
             return self
 
-        if utils.to_dgl_context(device).device_type == 2 and self.idtype == F.int64:
-            # device_type 2 is an internal code for GPU
-            dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
-                        ' int() to convert to int32 first.')
-
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
@@ -4435,6 +4430,8 @@ class DGLHeteroGraph(object):
         if self._batch_num_edges is not None:
             new_bne = {k : F.copy_to(num, device) for k, num in self._batch_num_edges.items()}
             ret._batch_num_edges = new_bne
+
+        ret = utils.to_int32_graph_if_on_gpu(ret)
 
         return ret
 

@@ -240,7 +240,6 @@ def test_query(idtype):
                 F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
 
         assert not g.is_multigraph
-        assert g.is_readonly
 
         for etype in etypes:
             srcs, dsts = edges[etype]

@@ -135,14 +135,8 @@ def graph(data,
     g = create_from_edges(u, v, ntype, etype, ntype, urange, vrange,
                           validate, restrict_format=restrict_format)
 
-    if (device is not None and utils.to_dgl_context(device).device_type == 2
-            and idtype == F.int64):
-        # device_type 2 is an internal code for GPU
-        dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
-                    ' int() to convert to int32 first.')
-
     if device is None:
-        return g
+        return utils.to_int32_graph_if_on_gpu(g)
     else:
         return g.to(device)
 
@@ -285,14 +279,8 @@ def bipartite(data,
         u, v, utype, etype, vtype, urange, vrange, validate,
         restrict_format=restrict_format)
     
-    if (device is not None and utils.to_dgl_context(device).device_type == 2
-            and idtype == F.int64):
-        # device_type 2 is an internal code for GPU
-        dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
-                    ' int() to convert to int32 first.')
-
     if device is None:
-        return g
+        return utils.to_int32_graph_if_on_gpu(g)
     else:
         return g.to(device)
 
