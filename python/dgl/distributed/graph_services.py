@@ -333,8 +333,8 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     # receive responses from remote machines.
     if msgseq2pos is not None:
         results = recv_responses(msgseq2pos)
-        src_ids.append(results[0])
-        dst_ids.append(results[1])
+        src_ids.append(results.global_src)
+        dst_ids.append(results.global_dst)
 
     src_ids = F.cat(src_ids, dim=0)
     dst_ids = F.cat(dst_ids, dim=0)
