@@ -112,8 +112,7 @@ class NodeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy,
-                                          create_new=False)
+            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -125,8 +124,7 @@ class NodeDataView(MutableMapping):
         self._data[key] = val
 
     def __delitem__(self, key):
-        #TODO(zhengda) how to delete data in the kvstore.
-        raise NotImplementedError("delete node data isn't supported yet")
+        del self._data[key]
 
     def __len__(self):
         # The number of node data may change. Let's count it every time we need them.
@@ -160,8 +158,7 @@ class EdgeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy,
-                                          create_new=False)
+            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -173,8 +170,7 @@ class EdgeDataView(MutableMapping):
         self._data[key] = val
 
     def __delitem__(self, key):
-        #TODO(zhengda) how to delete data in the kvstore.
-        raise NotImplementedError("delete edge data isn't supported yet")
+        del self._data[key]
 
     def __len__(self):
         # The number of edge data may change. Let's count it every time we need them.

@@ -93,22 +93,15 @@ def check_dist_graph(g, num_nodes, num_edges):
 
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
-    g.ndata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32, 'test1')
+    g.ndata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32)
     feats = g.ndata['test1'][nids]
     assert np.all(F.asnumpy(feats) == 0)
 
     # Test reuse_if_exist
     g.ndata['test2'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2',
                                                   init_func=rand_init)
-    g.ndata['test3'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2',
-                                                  reuse_if_exist=True)
+    g.ndata['test3'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2')
     assert np.all(F.asnumpy(g.ndata['test2'][nids]) == F.asnumpy(g.ndata['test3'][nids]))
-
-    # Test init edge data
-    new_shape = (g.number_of_edges(), 2)
-    g.edata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32, 'test1')
-    feats = g.edata['test1'][eids]
-    assert np.all(F.asnumpy(feats) == 0)
 
     # Test sparse emb
     try:
@@ -130,7 +123,7 @@ def check_dist_graph(g, num_nodes, num_edges):
 
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
         grad_sum = dgl.distributed.DistTensor(g, (g.number_of_nodes(),), F.float32,
-                                              'emb1_sum', policy, create_new=False)
+                                              'emb1_sum', policy)
         assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
