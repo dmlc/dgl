@@ -1415,13 +1415,26 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 }
 
 HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
-  return HeteroGraphPtr(
-    // TODO(xiangsx) Make it as graph storage.Clone()
-    new UnitGraph(meta_graph_,
-                  (in_csr_->defined() && (formats & csc_code)) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
-                  (out_csr_->defined() && (formats & csr_code)) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
-                  (coo_->defined() && (formats & coo_code)) ? COOPtr(new COO(*coo_)) : nullptr,
-                  formats));
+  if (formats == all_code)
+    return HeteroGraphPtr(
+        // TODO(xiangsx) Make it as graph storage.Clone()
+        new UnitGraph(meta_graph_,
+                      (in_csr_->defined())
+                          ? CSRPtr(new CSR(*in_csr_))
+                          : nullptr,
+                      (out_csr_->defined())
+                          ? CSRPtr(new CSR(*out_csr_))
+                          : nullptr,
+                      (coo_->defined())
+                          ? COOPtr(new COO(*coo_))
+                          : nullptr,
+                      formats));
+  int64_t num_vtypes = NumVertexTypes();
+  if (formats & coo_code)
+    return CreateFromCOO(num_vtypes, GetCOO(false)->adj(), formats);
+  if (formats & csr_code)
+    return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
+  return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
 }
 
 /*
@@ -1436,12 +1449,19 @@ dgl_format_code_t UnitGraph::AutoDetectFormat(
 */
 
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
-  if (in_csr_->defined() && FORMAT_HAS_CSC(preferred_formats))
+  dgl_format_code_t common = preferred_formats & formats_;
+  LOG(INFO) << "common formats " << int(common);
+  if (FORMAT_HAS_CSC(common))
     return SparseFormat::kCSC;
-  else if (out_csr_->defined() && FORMAT_HAS_CSR(preferred_formats))
+  if (FORMAT_HAS_CSR(common))
     return SparseFormat::kCSR;
-  else  // coo_->defined() && FORMAT_HAS_COO(preferred_formats)
+  if (FORMAT_HAS_COO(common))
     return SparseFormat::kCOO;
+  if (coo_->defined())
+    return SparseFormat::kCOO;
+  if (in_csr_->defined())
+    return SparseFormat::kCSC;
+  return SparseFormat::kCSR;
 }
 
 GraphPtr UnitGraph::AsImmutableGraph() const {

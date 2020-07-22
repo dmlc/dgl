@@ -841,12 +841,12 @@ class HeteroGraphIndex(ObjectBase):
         format_in_use = _CAPI_DGLHeteroGetFormatInUse(self)
         created = []
         not_created = []
-        for format in ['coo', 'csr', 'csc']:
-            if format in format_all:
-                if format in format_in_use:
-                    created.append(format)
+        for fmt in ['coo', 'csr', 'csc']:
+            if fmt in format_all:
+                if fmt in format_in_use:
+                    created.append(fmt)
                 else:
-                    not_created.append(format)
+                    not_created.append(fmt)
         return {
             'created': created,
             'not created': not_created
