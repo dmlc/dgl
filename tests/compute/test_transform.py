@@ -14,34 +14,22 @@ D = 5
 
 # line graph related
 
-def test_line_graph():
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_line_graph1():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
     G.edata['h'] = F.randn((2 * N, D))
     n_edges = G.number_of_edges()
     L = G.line_graph(shared=True)
     assert L.number_of_nodes() == 2 * N
-    L.ndata['h'] = F.randn((2 * N, D))
-    # update node features on line graph should reflect to edge features on
-    # original graph.
-    u = [0, 0, 2, 3]
-    v = [1, 2, 0, 0]
-    eid = G.edge_ids(u, v)
-    L.nodes[eid].data['h'] = F.zeros((4, D))
-    assert F.allclose(G.edges[u, v].data['h'], F.zeros((4, D)))
-
-    # adding a new node feature on line graph should also reflect to a new
-    # edge feature on original graph
-    data = F.randn((n_edges, D))
-    L.ndata['w'] = data
-    assert F.allclose(G.edata['w'], data)
+    assert F.allclose(L.ndata['h'], G.edata['h'])
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-def test_hetero_linegraph(idtype):
+def test_line_graph2(idtype):
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', idtype=idtype)
-    lg = dgl.line_heterograph(g)
+    lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
     row, col = lg.edges()
@@ -50,7 +38,7 @@ def test_hetero_linegraph(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    lg = dgl.line_heterograph(g, backtracking=False)
+    lg = dgl.line_graph(g, backtracking=False)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 4
     row, col = lg.edges()
@@ -60,7 +48,7 @@ def test_hetero_linegraph(idtype):
                           np.array([4, 0, 3, 1]))
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csr', idtype=idtype)
-    lg = dgl.line_heterograph(g)
+    lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
     row, col = lg.edges()
@@ -71,7 +59,7 @@ def test_hetero_linegraph(idtype):
 
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', restrict_format='csc', idtype=idtype)
-    lg = dgl.line_heterograph(g)
+    lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
     row, col, eid = lg.edges('all')
@@ -84,6 +72,7 @@ def test_hetero_linegraph(idtype):
     assert np.array_equal(col[order],
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_no_backtracking():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
@@ -116,12 +105,12 @@ def test_reverse(idtype):
     assert g.edge_id(1, 2) == rg.edge_id(2, 1)
     assert g.edge_id(2, 1) == rg.edge_id(1, 2)
 
-    # test dgl.reverse_heterograph
+    # test dgl.reverse
     # test homogeneous graph
     g = dgl.graph((F.tensor([0, 1, 2]), F.tensor([1, 2, 0])))
     g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
     g.edata['h'] = F.tensor([[3.], [4.], [5.]])
-    g_r = dgl.reverse_heterograph(g)
+    g_r = dgl.reverse(g)
     assert g.number_of_nodes() == g_r.number_of_nodes()
     assert g.number_of_edges() == g_r.number_of_edges()
     u_g, v_g, eids_g = g.all_edges(form='all')
@@ -133,14 +122,14 @@ def test_reverse(idtype):
     assert len(g_r.edata) == 0
 
     # without share ndata
-    g_r = dgl.reverse_heterograph(g, copy_ndata=False)
+    g_r = dgl.reverse(g, copy_ndata=False)
     assert g.number_of_nodes() == g_r.number_of_nodes()
     assert g.number_of_edges() == g_r.number_of_edges()
     assert len(g_r.ndata) == 0
     assert len(g_r.edata) == 0
 
     # with share ndata and edata
-    g_r = dgl.reverse_heterograph(g, copy_ndata=True, copy_edata=True)
+    g_r = dgl.reverse(g, copy_ndata=True, copy_edata=True)
     assert g.number_of_nodes() == g_r.number_of_nodes()
     assert g.number_of_edges() == g_r.number_of_edges()
     assert F.array_equal(g.ndata['h'], g_r.ndata['h'])
@@ -167,7 +156,7 @@ def test_reverse(idtype):
     g.nodes['game'].data['h'] = F.tensor([0, 1])
     g.edges['follows'].data['h'] = F.tensor([0, 1, 2, 4, 3 ,1, 3])
     g.edges['follows'].data['hh'] = F.tensor([1, 2, 3, 2, 0, 0, 1])
-    g_r = dgl.reverse_heterograph(g)
+    g_r = dgl.reverse(g)
 
     for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
         assert etype_g[0] == etype_gr[2]
@@ -197,7 +186,7 @@ def test_reverse(idtype):
     assert F.array_equal(eids_g, eids_rg)
 
     # withour share ndata
-    g_r = dgl.reverse_heterograph(g, copy_ndata=False)
+    g_r = dgl.reverse(g, copy_ndata=False)
     for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
         assert etype_g[0] == etype_gr[2]
         assert etype_g[1] == etype_gr[1]
@@ -208,7 +197,7 @@ def test_reverse(idtype):
     assert len(g_r.nodes['user'].data) == 0
     assert len(g_r.nodes['game'].data) == 0
 
-    g_r = dgl.reverse_heterograph(g, copy_ndata=True, copy_edata=True)
+    g_r = dgl.reverse(g, copy_ndata=True, copy_edata=True)
     print(g_r)
     for etype_g, etype_gr in zip(g.canonical_etypes, g_r.canonical_etypes):
         assert etype_g[0] == etype_gr[2]
@@ -242,19 +231,7 @@ def test_reverse_shared_frames():
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
                       rg.edges[[1, 1], [0, 2]].data['h'])
 
-    rg.ndata['h'] = rg.ndata['h'] + 1
-    assert F.allclose(rg.ndata['h'], g.ndata['h'])
-
-    g.edata['h'] = g.edata['h'] - 1
-    assert F.allclose(rg.edata['h'], g.edata['h'])
-
-    src_msg = fn.copy_src(src='h', out='m')
-    sum_reduce = fn.sum(msg='m', out='h')
-
-    rg.update_all(src_msg, sum_reduce)
-    assert F.allclose(g.ndata['h'], rg.ndata['h'])
-
-
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
     g = dgl.DGLGraph(elist, readonly=True)
@@ -266,8 +243,8 @@ def test_simple_graph():
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == set(elist)
 
-
-def test_bidirected_graph():
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def _test_bidirected_graph():
     def _test(in_readonly, out_readonly):
         elist = [(0, 0), (0, 1), (1, 0),
                 (1, 1), (2, 1), (2, 2)]
@@ -287,6 +264,7 @@ def test_bidirected_graph():
     _test(False, False)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_khop_graph():
     N = 20
     feat = F.randn((N, 5))
@@ -1384,23 +1362,17 @@ if __name__ == '__main__':
     # test_no_backtracking()
     #test_reverse()
     # test_reverse_shared_frames()
-    # test_simple_graph()
+    test_simple_graph()
     # test_bidirected_graph()
     # test_khop_adj()
     # test_khop_graph()
     # test_laplacian_lambda_max()
     # test_partition_with_halo()
     # test_metis_partition()
-    # test_hetero_linegraph('int32')
+    # test_line_graph2('int32')
     # test_compact()
     #test_to_simple("int32")
     # test_in_subgraph("int32")
     # test_out_subgraph()
     # test_to_block("int32")
     # test_remove_edges()
-    test_add_nodes(F.int32)
-    test_add_edges(F.int32)
-    test_remove_edges(F.int32)
-    test_remove_nodes(F.int32)
-    test_add_selfloop(F.int32)
-    test_remove_selfloop(F.int32)

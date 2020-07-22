@@ -1626,24 +1626,24 @@ UnitGraph::ToSimple() const {
   auto avail_fmt = SelectFormat(SparseFormat::kAny);
   switch (avail_fmt) {
     case SparseFormat::kCOO: {
-      auto ret = aten::COOToSimple(coo_->adj());
+      auto ret = aten::COOToSimple(GetCOO()->adj());
       count = std::get<1>(ret);
       edge_map = std::get<2>(ret);
-      new_coo = COOPtr(new COO(coo_->meta_graph(), std::get<0>(ret)));
+      new_coo = COOPtr(new COO(meta_graph(), std::get<0>(ret)));
       break;
     }
     case SparseFormat::kCSR: {
-      auto ret = aten::CSRToSimple(in_csr_->adj());
+      auto ret = aten::CSRToSimple(GetOutCSR()->adj());
       count = std::get<1>(ret);
       edge_map = std::get<2>(ret);
-      new_incsr = CSRPtr(new CSR(in_csr_->meta_graph(), std::get<0>(ret)));
+      new_outcsr = CSRPtr(new CSR(meta_graph(), std::get<0>(ret)));
       break;
     }
     case SparseFormat::kCSC: {
-      auto ret = aten::CSRToSimple(out_csr_->adj());
+      auto ret = aten::CSRToSimple(GetInCSR()->adj());
       count = std::get<1>(ret);
       edge_map = std::get<2>(ret);
-      new_outcsr = CSRPtr(new CSR(out_csr_->meta_graph(), std::get<0>(ret)));
+      new_incsr = CSRPtr(new CSR(meta_graph(), std::get<0>(ret)));
       break;
     }
     default:

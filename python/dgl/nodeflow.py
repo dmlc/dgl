@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
-from .base import ALL, is_all, DGLError
+from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLBaseGraph
@@ -89,13 +89,15 @@ class NodeFlow(DGLBaseGraph):
 
     Parameters
     ----------
-    parent : DGLGraph
+    parent : DGLGraphStale
         The parent graph.
     nfobj : NodeFlowObject
         The nodeflow object
     """
     def __init__(self, parent, nfobj):
         super(NodeFlow, self).__init__(nfobj.graph)
+        dgl_warning('NodeFlow APIs are deprecated starting from v0.5. Please read our'
+                    ' guide<link> for how to use the new sampling APIs.')
         self._parent = parent
         self._node_mapping = utils.toindex(nfobj.node_mapping)
         self._edge_mapping = utils.toindex(nfobj.edge_mapping)
@@ -891,7 +893,7 @@ class NodeFlow(DGLBaseGraph):
     def block_compute(self, block_id, message_func="default", reduce_func="default",
                       apply_node_func="default", v=ALL, inplace=False):
         """Perform the computation on the specified block. It's similar to `pull`
-        in DGLGraph.
+        in DGLGraphStale.
         On the given block i, it runs `pull` on nodes in layer i+1, which generates
         messages on edges in block i, runs the reduce function and node update
         function on nodes in layer i+1.

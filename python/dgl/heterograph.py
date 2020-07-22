@@ -204,6 +204,9 @@ class DGLHeteroGraph(object):
             u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
             gidx = heterograph_index.create_unitgraph_from_coo(
                 1, num_src, num_dst, u, v, "any")
+        if len(deprecate_kwargs) != 0:
+            dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
+                        ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
         self._init(gidx, ntypes, etypes, node_frames, edge_frames)
 
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):

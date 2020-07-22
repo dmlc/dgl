@@ -4,7 +4,9 @@ from collections.abc import Iterable, Mapping
 from collections import defaultdict
 import numpy as np
 from scipy import sparse
+
 from ._ffi.function import _init_api
+from .base import EID, NID, dgl_warning, DGLError
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
@@ -14,18 +16,12 @@ from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
 from .convert import graph, bipartite
 from . import utils
-from .base import EID, NID
-from . import ndarray as nd
-
 
 __all__ = [
     'line_graph',
-    'line_heterograph',
     'khop_adj',
     'khop_graph',
     'reverse',
-    'reverse_heterograph',
-    'to_simple_graph',
     'to_bidirected',
     'laplacian_lambda_max',
     'knn_graph',
@@ -40,6 +36,7 @@ __all__ = [
     'compact_graphs',
     'to_block',
     'to_simple',
+    'to_simple_graph',
     'in_subgraph',
     'out_subgraph',
     'as_immutable_graph',
@@ -149,27 +146,6 @@ def segmented_knn_graph(x, k, segs):
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
-    Parameters
-    ----------
-    g : dgl.DGLGraph
-        The input graph.
-    backtracking : bool, optional
-        Whether the returned line graph is backtracking.
-    shared : bool, optional
-        Whether the returned line graph shares representations with `self`.
-
-    Returns
-    -------
-    DGLGraph
-        The line graph of this graph.
-    """
-    graph_data = g._graph.line_graph(backtracking)
-    node_frame = g._edge_frame if shared else None
-    return DGLGraph(graph_data, node_frame)
-
-def line_heterograph(g, backtracking=True):
-    """Return the line graph of this graph.
-
     The graph should be an directed homogeneous graph. Aother type of graphs
     are not supported right now.
 
@@ -177,8 +153,13 @@ def line_heterograph(g, backtracking=True):
 
     Parameters
     ----------
-    backtracking : bool
+    g : DGLGraph
+        Input graph.
+    backtracking : bool, optional
         Whether the pair of (v, u) (u, v) edges are treated as linked. Default True.
+    shared : bool, optional
+        Whether to copy the edge features of the original graph as the node features
+        of the result line graph.
 
     Returns
     -------
@@ -209,10 +190,13 @@ def line_heterograph(g, backtracking=True):
     """
     assert g.is_homograph(), \
         'line_heterograph only support directed homogeneous graph right now'
+    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
+    if shared:
+        # copy edge features
+        lg.ndata.update(g.edata)
+    return lg
 
-    hgidx = _CAPI_DGLHeteroLineGraph(g._graph, backtracking)
-    hg = DGLHeteroGraph(hgidx, g._etypes, g._ntypes)
-    return hg
+DGLHeteroGraph.line_graph = line_graph
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
@@ -308,80 +292,7 @@ def khop_graph(g, k):
     # in the future.
     return DGLGraph(from_coo(n, row, col, True))
 
-def reverse(g, copy_ndata=False, copy_edata=False):
-    """Return the reverse of a graph
-    The reverse (also called converse, transpose) of a directed graph is another directed
-    graph on the same nodes with edges reversed in terms of direction.
-    Given a :class:`dgl.DGLGraph` object, we return another :class:`dgl.DGLGraph` object
-    representing its reverse.
-
-    Parameters
-    ----------
-    g : dgl.DGLGraph
-        The input graph.
-    copy_ndata: bool, optional
-        If True, node attributes are copied from the original graph to the reversed graph.
-        Otherwise the reversed graph will not be initialized with node attributes.
-    copy_edata: bool, optional
-        If True, edge attributes are copied from the original graph to the reversed graph.
-        Otherwise the reversed graph will not have edge attributes.
-
-    Return
-    ------
-    dgl.DGLGraph
-        The reversed graph.
-
-    Notes
-    -----
-    * We do not dynamically update the topology of a graph once that of its reverse changes.
-      This can be particularly problematic when the node/edge attrs are shared. For example,
-      if the topology of both the original graph and its reverse get changed independently,
-      you can get a mismatched node/edge feature.
-
-    Examples
-    --------
-    Create a graph to reverse.
-    >>> import dgl
-    >>> import torch as th
-    >>> g = dgl.DGLGraph()
-    >>> g.add_nodes(3)
-    >>> g.add_edges([0, 1, 2], [1, 2, 0])
-    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
-    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
-    Reverse the graph and examine its structure.
-    >>> rg = g.reverse(copy_ndata=True, copy_edata=True)
-    >>> print(rg)
-    DGLGraph with 3 nodes and 3 edges.
-    Node data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-    Edge data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-    The edges are reversed now.
-    >>> rg.has_edges_between([1, 2, 0], [0, 1, 2])
-    tensor([1, 1, 1])
-    Reversed edges have the same feature as the original ones.
-    >>> g.edges[[0, 2], [1, 0]].data['h'] == rg.edges[[1, 0], [0, 2]].data['h']
-    tensor([[1],
-            [1]], dtype=torch.uint8)
-    The node/edge features of the reversed graph share memory with the original
-    graph, which is helpful for both forward computation and back propagation.
-    >>> g.ndata['h'] = g.ndata['h'] + 1
-    >>> rg.ndata['h']
-    tensor([[1.],
-            [2.],
-            [3.]])
-    """
-    g_reversed = DGLGraph()
-    g_reversed.add_nodes(g.number_of_nodes())
-    g_edges = g.all_edges(order='eid')
-    g_reversed.add_edges(g_edges[1], g_edges[0])
-    g_reversed._batch_num_nodes = g._batch_num_nodes
-    g_reversed._batch_num_edges = g._batch_num_edges
-    if copy_ndata:
-        g_reversed._node_frame = g._node_frame
-    if copy_edata:
-        g_reversed._edge_frame = g._edge_frame
-    return g_reversed
-
-def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
+def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_edata=None):
     r"""Return the reverse of a graph.
 
     The reverse (also called converse, transpose) of a graph with edges
@@ -499,6 +410,12 @@ def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
     >>> rg.edges['plays'].data
     {}
     """
+    if share_ndata is not None:
+        dgl_warning('share_ndata argument has been renamed to copy_ndata.')
+        copy_ndata = share_ndata
+    if share_edata is not None:
+        dgl_warning('share_edata argument has been renamed to copy_edata.')
+        copy_edata = share_edata
     # TODO(0.5 release, xiangsx) need to handle BLOCK
     # currently reversing a block results in undefined behavior
     gidx = g._graph.reverse()
@@ -522,12 +439,12 @@ def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
 
     return new_g
 
-DGLHeteroGraph.reverse = reverse_heterograph
+DGLHeteroGraph.reverse = reverse
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
 
-    The function generates a new *readonly* graph with no node/edge feature.
+    DEPRECATED: renamed to dgl.to_simple
 
     Parameters
     ----------
@@ -539,8 +456,8 @@ def to_simple_graph(g):
     DGLGraph
         A simple graph.
     """
-    gidx = _CAPI_DGLToSimpleGraph(g._graph)
-    return DGLGraph(gidx, readonly=True)
+    dgl_warning('dgl.to_simple_graph is renamed to dgl.to_simple in v0.5.')
+    return to_simple(g)
 
 def to_bidirected(g, readonly=True):
     """Convert the graph to a bidirected graph.

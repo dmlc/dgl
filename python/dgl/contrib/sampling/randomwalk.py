@@ -21,7 +21,7 @@ def random_walk(g, seeds, num_traces, num_hops):
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         The graph.
     seeds : Tensor
         The node ID tensor from which the random walk traces starts.
@@ -81,7 +81,7 @@ def random_walk_with_restart(
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         The graph.
     seeds : Tensor
         The node ID tensor from which the random walk traces starts.
@@ -130,7 +130,7 @@ def bipartite_single_sided_random_walk_with_restart(
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         The graph.
     seeds : Tensor
         The node ID tensor from which the random walk traces starts.
