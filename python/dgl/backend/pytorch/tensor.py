@@ -104,6 +104,7 @@ def asnumpy(input):
         return input.cpu().detach().numpy()
 
 def copy_to(input, ctx, **kwargs):
+    ctx = th.device(ctx)
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':

@@ -3097,8 +3097,9 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
             if F.context(val) != self.device:
-                raise DGLError('Expect node feature to be on device {}.'
-                               ' But got {}.'.format(self.device, F.context(val)))
+                raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
+                               ' device {}. Call DGLGraph.to() to copy the graph to the'
+                               ' same device.'.format(key, F.context(val), self.device))
 
         if is_all(u):
             for key, val in data.items():
@@ -4414,21 +4415,23 @@ class DGLHeteroGraph(object):
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
-            new_feats = {k : F.copy_to(feat, device) for k, feat in nframe.items()}
+            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in nframe.items()}
             new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
         new_eframes = []
         for eframe in self._edge_frames:
-            new_feats = {k : F.copy_to(feat, device) for k, feat in eframe.items()}
+            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
         new_gidx = self._graph.copy_to(utils.to_dgl_context(device))
         ret = DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
                              new_nframes, new_eframes)
 
         if self._batch_num_nodes is not None:
-            new_bnn = {k : F.copy_to(num, device) for k, num in self._batch_num_nodes.items()}
+            new_bnn = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_nodes.items()}
             ret._batch_num_nodes = new_bnn
         if self._batch_num_edges is not None:
-            new_bne = {k : F.copy_to(num, device) for k, num in self._batch_num_edges.items()}
+            new_bne = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_edges.items()}
             ret._batch_num_edges = new_bne
 
         ret = utils.to_int32_graph_if_on_gpu(ret)

@@ -137,7 +137,7 @@ class GraphConv(nn.Module):
             feat_src, feat_dst = expand_as_pair(feat)
 
             if self._norm == 'both':
-                degs = graph.out_degrees().to(feat_src.device).float().clamp(min=1)
+                degs = graph.out_degrees().float().clamp(min=1)
                 norm = th.pow(degs, -0.5)
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = th.reshape(norm, shp)
@@ -169,7 +169,7 @@ class GraphConv(nn.Module):
                     rst = th.matmul(rst, weight)
 
             if self._norm != 'none':
-                degs = graph.in_degrees().to(feat_dst.device).float().clamp(min=1)
+                degs = graph.in_degrees().float().clamp(min=1)
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
                 else:

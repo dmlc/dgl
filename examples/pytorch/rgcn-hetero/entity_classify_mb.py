@@ -71,9 +71,11 @@ def main(args):
         val_idx = train_idx
 
     # check cuda
+    device = 'cpu'
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
+        device = 'cuda:%d' % args.gpu
 
     train_label = labels[train_idx]
     val_label = labels[val_idx]
@@ -127,6 +129,7 @@ def main(args):
             t0 = time.time()
 
         for i, (input_nodes, seeds, blocks) in enumerate(loader):
+            blocks = [blk.to(device) for blk in blocks]
             seeds = seeds[category]     # we only predict the nodes with type "category"
             batch_tic = time.time()
             emb = extract_embed(node_embed, input_nodes)

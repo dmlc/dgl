@@ -109,6 +109,9 @@ for ntype in G.ntypes:
 for etype in G.etypes:
     edge_dict[etype] = len(edge_dict)
     G.edges[etype].data['id'] = torch.ones(G.number_of_edges(etype), dtype=torch.long) * edge_dict[etype] 
+
+print('!!!!', node_dict)
+print('!!!!', edge_dict)
     
 #     Random initialize input feature
 for ntype in G.ntypes:
