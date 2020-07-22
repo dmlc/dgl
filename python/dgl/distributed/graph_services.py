@@ -413,5 +413,5 @@ def in_subgraph(g, nodes):
     return _distributed_access(g, nodes, issue_remote_req, local_access)
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SubgraphResponse)
-register_service(EDGES_SERVICE_ID, EdgesRequest, SubgraphResponse)
+register_service(EDGES_SERVICE_ID, EdgesRequest, FindEdgeResponse)
 register_service(INSUBGRAPH_SERVICE_ID, InSubgraphRequest, SubgraphResponse)
