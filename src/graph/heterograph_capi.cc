@@ -442,14 +442,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
     List<Value> ntypes = args[2];
     List<Value> etypes = args[3];
     List<Value> fmts = args[4];
-    std::vector<std::string> ntypes_vec;
-    std::vector<std::string> etypes_vec;
-    ntypes_vec.reserve(hg->NumVertexTypes());
-    etypes_vec.reserve(hg->NumEdgeTypes());
-    for (const auto &ntype : ntypes)
-      ntypes_vec.push_back(ntype->data);
-    for (const auto &etype : etypes)
-      etypes_vec.push_back(etype->data);
+    auto ntypes_vec = ListValueToVector<std::string>(ntypes);
+    auto etypes_vec = ListValueToVector<std::string>(etypes);
     std::set<std::string> fmts_set;
     for (const auto &fmt : fmts) {
       std::string fmt_data = fmt->data;
@@ -473,10 +467,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFromSharedMem")
       ntypes_list.push_back(Value(MakeValue(ntype)));
     for (const auto &etype : etypes)
       etypes_list.push_back(Value(MakeValue(etype)));
-    List<Value> ret;
-    ret.push_back(Value(MakeValue(HeteroGraphRef(hg))));
-    ret.push_back(Value(MakeValue(ntypes_list)));
-    ret.push_back(Value(MakeValue(etypes_list)));
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(hg));
+    ret.push_back(ntypes_list);
+    ret.push_back(etypes_list);
     *rv = ret;
   });
 
