@@ -200,9 +200,9 @@ class DeepwalkDataset:
             self.neg_table = np.array(self.neg_table, dtype=np.long)
             del node_degree
 
-    def create_sampler(self, gpu_id):
+    def create_sampler(self, i):
         """ create random walk sampler """
-        return DeepwalkSampler(self.G, self.seeds[gpu_id], self.walk_length)
+        return DeepwalkSampler(self.G, self.seeds[i], self.walk_length)
 
     def save_mapping(self, map_file):
         """ save the mapping dict that maps node IDs to embedding indices """

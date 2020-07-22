@@ -95,7 +95,7 @@ class DeepwalkTrainer:
         ps = []
 
         for i in range(len(self.args.gpus)):
-            p = mp.Process(target=self.fast_train_sp, args=(self.args.gpus[i],))
+            p = mp.Process(target=self.fast_train_sp, args=(i, self.args.gpus[i]))
             ps.append(p)
             p.start()
 
@@ -111,7 +111,7 @@ class DeepwalkTrainer:
             self.emb_model.save_embedding(self.dataset, self.args.output_emb_file)
 
     @thread_wrapped_func
-    def fast_train_sp(self, gpu_id):
+    def fast_train_sp(self, rank, gpu_id):
         """ a subprocess for fast_train_mp """
         if self.args.mix:
             self.emb_model.set_device(gpu_id)
@@ -120,7 +120,7 @@ class DeepwalkTrainer:
         if self.args.async_update:
             self.emb_model.create_async_update()
 
-        sampler = self.dataset.create_sampler(gpu_id)
+        sampler = self.dataset.create_sampler(rank)
 
         dataloader = DataLoader(
             dataset=sampler.seeds,
@@ -131,14 +131,13 @@ class DeepwalkTrainer:
             num_workers=self.args.num_sampler_threads,
             )
         num_batches = len(dataloader)
-        print("num batchs: %d in subprocess [%d]" % (num_batches, gpu_id))
+        print("num batchs: %d in process [%d] GPU [%d]" % (num_batches, rank, gpu_id))
         # number of positive node pairs in a sequence
         num_pos = int(2 * self.args.walk_length * self.args.window_size\
             - self.args.window_size * (self.args.window_size + 1))
         
         start = time.time()
         with torch.no_grad():
-            max_i = num_batches
             for i, walks in enumerate(dataloader):
                 if self.args.fast_neg:
                     self.emb_model.fast_learn(walks)
@@ -153,11 +152,11 @@ class DeepwalkTrainer:
 
                 if i > 0 and i % self.args.print_interval == 0:
                     if self.args.print_loss:
-                        print("Solver [%d] batch %d tt: %.2fs loss: %.4f" \
+                        print("GPU-[%d] batch %d time: %.2fs loss: %.4f" \
                             % (gpu_id, i, time.time()-start, -sum(self.emb_model.loss)/self.args.print_interval))
                         self.emb_model.loss = []
                     else:
-                        print("Solver [%d] batch %d tt: %.2fs" % (gpu_id, i, time.time()-start))
+                        print("GPU-[%d] batch %d time: %.2fs" % (gpu_id, i, time.time()-start))
                     start = time.time()
 
             if self.args.async_update:
