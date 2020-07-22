@@ -4,7 +4,7 @@ from .. import backend as F
 from .dist_tensor import DistTensor
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY
 
-class SparseNodeEmbedding:
+class Embedding:
     ''' Sparse embeddings in the distributed KVStore.
 
     The sparse embeddings are only used as node embeddings.
@@ -13,18 +13,20 @@ class SparseNodeEmbedding:
     ----------
     g : DistGraph
         The distributed graph object.
-    name : str
-        The name of the embeddings
     shape : tuple of int
         The shape of the embedding. The first dimension should be the number of nodes.
-    initializer : callable
+    name : str
+        The name of the embeddings
+    init_func : callable
         The function to create the initial data.
+    part_policy : PartitionPolicy
+        The partition policy.
 
     Examples
     --------
     >>> emb_init = lambda shape, dtype: F.zeros(shape, dtype, F.cpu())
     >>> shape = (g.number_of_nodes(), 1)
-    >>> emb = dgl.distributed.SparseNodeEmbedding(g, 'emb1', shape, emb_init)
+    >>> emb = dgl.distributed.Embedding(g, 'emb1', shape, emb_init)
     >>> optimizer = dgl.distributed.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     >>>     feats = emb(nids)
@@ -32,12 +34,11 @@ class SparseNodeEmbedding:
     >>>     loss.backward()
     >>>     optimizer.step()
     '''
-    def __init__(self, g, name, shape, initializer):
-        assert shape[0] == g.number_of_nodes()
-        part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
-        g.ndata[name] = DistTensor(g, shape, F.float32, name, part_policy, initializer)
+    def __init__(self, g, shape, name, init_func, part_policy=None):
+        if part_policy is None:
+            part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
 
-        self._tensor = g.ndata[name]
+        self._tensor = DistTensor(g, shape, F.float32, name, init_func, part_policy)
         self._trace = []
 
     def __call__(self, idx):
@@ -95,7 +96,7 @@ class SparseAdagrad:
 
     Parameters
     ----------
-    params : list of SparseNodeEmbeddings
+    params : list of Embeddings
         The list of sparse embeddings.
     lr : float
         The learning rate.
