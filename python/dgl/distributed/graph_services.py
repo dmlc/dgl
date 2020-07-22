@@ -326,7 +326,6 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
         mask = (partition_id == pid)
         edge_id = F.boolean_mask(edges, mask)
         reorder_idx.append(F.nonzero_1d(mask))
-        print(F.nonzero_1d(mask))
         if pid == partition_book.partid and g.local_partition is not None:
             assert local_eids is None
             local_eids = edge_id
@@ -354,7 +353,6 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
         for result in results:
             src = result.global_src
             dst = result.global_dst
-            print(result.order_id)
             src_ids = F.scatter_row(src_ids, reorder_idx[result.order_id], src)
             dst_ids = F.scatter_row(dst_ids, reorder_idx[result.order_id], dst)
     return src_ids, dst_ids

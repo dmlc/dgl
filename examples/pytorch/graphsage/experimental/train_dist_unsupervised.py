@@ -69,8 +69,6 @@ class NeighborSampler(object):
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
 
-            # Pre-generate CSR format that it can be used in training directly
-            block.in_degree(0)
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
@@ -226,7 +224,6 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s'.format(
                     epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:])))
             start = time.time()
-        th.distributed.barrier()
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
@@ -258,6 +255,7 @@ def main(args):
         th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, conf_file=args.conf_path)
     print('rank:', g.rank())
+    print('number of edges', g.number_of_edges())
 
     train_eids = dgl.distributed.edge_split(th.arange(g.number_of_edges()), g.get_partition_book(), force_even=True)
     train_nids = dgl.distributed.node_split(th.arange(g.number_of_nodes()), g.get_partition_book())
