@@ -1448,15 +1448,17 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
         for ntype in g.ntypes:
             src = src_node_id[ntype]
             dst = dst_node_id[ntype]
-            for key in g.nodes[ntype].data:
-                new_graph.srcnodes[ntype].data[key] = F.gather_row(g.nodes[ntype].data[key], src)
-                new_graph.dstnodes[ntype].data[key] = F.gather_row(g.nodes[ntype].data[key], dst)
+            for key, value in g.nodes[ntype].data.items():
+                ctx = F.context(value)
+                new_graph.srcnodes[ntype].data[key] = F.gather_row(value, F.copy_to(src, ctx))
+                new_graph.dstnodes[ntype].data[key] = F.gather_row(value, F.copy_to(dst, ctx))
     if copy_edata:
         for canonical_etype in g.canonical_etypes:
             eid = edge_id[canonical_etype]
-            for key in g.edges[canonical_etype].data:
+            for key, value in g.edges[canonical_etype].data.items():
+                ctx = F.context(value)
                 new_graph.edges[canonical_etype].data[key] = F.gather_row(
-                    g.edges[canonical_etype].data[key], eid)
+                    value, F.copy_to(eid, ctx))
 
     for i, ntype in enumerate(g.ntypes):
         new_graph.srcnodes[ntype].data[NID] = F.zerocopy_from_dgl_ndarray(src_nodes_nd[i])
