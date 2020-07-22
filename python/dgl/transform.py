@@ -7,14 +7,13 @@ from scipy import sparse
 
 from ._ffi.function import _init_api
 from .base import EID, NID, dgl_warning, DGLError
-from .graph import DGLGraph
+from .graph import DGLGraph as DGLGraphStale
+from . import convert
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
 from . import backend as F
-from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
-from .graph import unbatch
-from .convert import graph, bipartite
+from . import batch
 from . import utils
 
 __all__ = [
@@ -97,8 +96,7 @@ def knn_graph(x, k):
         (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
         shape=(n_samples * n_points, n_samples * n_points))
 
-    g = DGLGraph(adj, readonly=True)
-    return g
+    return convert.graph(adj)
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs):
@@ -290,7 +288,7 @@ def khop_graph(g, k):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    return DGLGraph(from_coo(n, row, col, True))
+    return convert.graph((row, col), num_nodes=n)
 
 def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_edata=None):
     r"""Return the reverse of a graph.
@@ -500,7 +498,7 @@ def to_bidirected(g, readonly=True):
         newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
     else:
         newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
-    return DGLGraph(newgidx)
+    return DGLGraphStale(newgidx)
 
 def laplacian_lambda_max(g):
     """Return the largest eigenvalue of the normalized symmetric laplacian of g.
@@ -529,7 +527,7 @@ def laplacian_lambda_max(g):
     >>> dgl.laplacian_lambda_max(g)
     [1.809016994374948]
     """
-    g_arr = unbatch(g)
+    g_arr = batch.unbatch(g)
     rst = []
     for g_i in g_arr:
         n = g_i.number_of_nodes()
@@ -578,10 +576,10 @@ def metapath_reachable_graph(g, metapath):
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     if srctype == dsttype:
         assert adj.shape[0] == adj.shape[1]
-        new_g = graph(adj, ntype=srctype, idtype=g.idtype, device=g.device)
+        new_g = convert.graph(adj, ntype=srctype, idtype=g.idtype, device=g.device)
     else:
-        new_g = bipartite(adj, utype=srctype, vtype=dsttype,
-                          idtype=g.idtype, device=g.device)
+        new_g = convert.bipartite(adj, utype=srctype, vtype=dsttype,
+                                  idtype=g.idtype, device=g.device)
 
     # copy srcnode features
     for key, value in g.nodes[srctype].data.items():
@@ -1087,7 +1085,7 @@ def reorder_nodes(g, new_node_ids):
             and F.asnumpy(sorted_ids[-1]) == g.number_of_nodes() - 1, \
             "The new node Ids are incorrect."
     new_gidx = _CAPI_DGLReorderGraph(g._graph, new_node_ids.todgltensor())
-    new_g = DGLGraph(new_gidx)
+    new_g = DGLGraphStale(new_gidx)
     new_g.ndata['orig_id'] = idx
     return new_g
 
@@ -1867,47 +1865,21 @@ DGLHeteroGraph.to_simple = to_simple
 def as_heterograph(g, ntype='_U', etype='_E'):
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
 
-    Node and edge features are preserved. Returns 64 bits graph
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The graph
-    ntype : str, optional
-        The node type name
-    etype : str, optional
-        The edge type name
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The heterograph.
+    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
+                do nothing and can be removed safely in all cases.
     """
-    hgi = _CAPI_DGLAsHeteroGraph(g._graph)
-    hg = DGLHeteroGraph(hgi, [ntype], [etype])
-    hg.ndata.update(g.ndata)
-    hg.edata.update(g.edata)
-    return hg
+    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
+                '\tdgl.as_heterograph will do nothing and can be removed safely in all cases.')
+    return g
 
 def as_immutable_graph(hg):
     """Convert a DGLHeteroGraph with one node and edge type into a DGLGraph.
 
-    Node and edge features are preserved.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        The heterograph
-
-    Returns
-    -------
-    DGLGraph
-        The graph.
+    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
+                do nothing and can be removed safely in all cases.
     """
-    gidx = _CAPI_DGLAsImmutableGraph(hg._graph)
-    g = DGLGraph(gidx)
-    g.ndata.update(hg.ndata)
-    g.edata.update(hg.edata)
-    return g
+    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
+                '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
+    return hg
 
 _init_api("dgl.transform")

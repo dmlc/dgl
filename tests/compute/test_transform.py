@@ -290,6 +290,7 @@ def test_khop_graph():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3, directed=True))
     _test(g)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_khop_adj():
     N = 20
     feat = F.randn((N, 5))
@@ -306,6 +307,7 @@ def test_khop_adj():
         assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_laplacian_lambda_max():
     N = 20
     eps = 1e-6
@@ -343,7 +345,7 @@ def get_nodeflow(g, node_ids, num_layers):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_partition_with_halo():
-    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
     node_part = np.random.choice(4, g.number_of_nodes())
     subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2)
     for part_id, subg in subgs.items():
@@ -372,7 +374,7 @@ def test_partition_with_halo():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
-    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
     check_metis_partition(g, 0)
     check_metis_partition(g, 1)
     check_metis_partition(g, 2)
@@ -460,7 +462,7 @@ def check_metis_partition(g, extra_hops):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="It doesn't support GPU")
 def test_reorder_nodes():
-    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
     new_nids = np.random.permutation(g.number_of_nodes())
     # TODO(zhengda) we need to test both CSR and COO.
     new_g = dgl.transform.reorder_nodes(g, new_nids)
@@ -860,32 +862,6 @@ def test_remove_edges(idtype):
     check(g4, 'AA', g, [])
     check(g4, 'AB', g, [3, 1, 2, 0])
     check(g4, 'BA', g, [])
-
-def _test_cast():  # disabled; prepare for DGLGraph/HeteroGraph merge
-    m = spsp.coo_matrix(([1, 1], ([0, 1], [1, 2])), (4, 4))
-    g = dgl.DGLGraph(m, readonly=True)
-    gsrc, gdst = g.edges(order='eid')
-    ndata = F.randn((4, 5))
-    edata = F.randn((2, 4))
-    g.ndata['x'] = ndata
-    g.edata['y'] = edata
-
-    hg = dgl.as_heterograph(g, 'A', 'AA')
-    assert hg.ntypes == ['A']
-    assert hg.etypes == ['AA']
-    assert hg.canonical_etypes == [('A', 'AA', 'A')]
-    assert hg.number_of_nodes() == 4
-    assert hg.number_of_edges() == 2
-    hgsrc, hgdst = hg.edges(order='eid')
-    assert F.array_equal(gsrc, hgsrc)
-    assert F.array_equal(gdst, hgdst)
-
-    g2 = dgl.as_immutable_graph(hg)
-    assert g2.number_of_nodes() == 4
-    assert g2.number_of_edges() == 2
-    g2src, g2dst = hg.edges(order='eid')
-    assert F.array_equal(g2src, gsrc)
-    assert F.array_equal(g2dst, gdst)
 
 @parametrize_dtype
 def test_add_edges(idtype):
@@ -1362,9 +1338,9 @@ if __name__ == '__main__':
     # test_no_backtracking()
     #test_reverse()
     # test_reverse_shared_frames()
-    test_simple_graph()
+    #test_simple_graph()
     # test_bidirected_graph()
-    # test_khop_adj()
+    test_khop_adj()
     # test_khop_graph()
     # test_laplacian_lambda_max()
     # test_partition_with_halo()

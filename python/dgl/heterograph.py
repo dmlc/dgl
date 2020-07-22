@@ -2838,7 +2838,7 @@ class DGLHeteroGraph(object):
         if transpose is None:
             dgl_warning(
                 "Currently adjacency_matrix() returns a matrix with destination as rows"
-                " by default.  In 0.5 the result will have source as rows"
+                " by default.\n\tIn 0.5 the result will have source as rows"
                 " (i.e. transpose=True)")
             transpose = False
 
@@ -2852,11 +2852,11 @@ class DGLHeteroGraph(object):
     adj = adjacency_matrix
 
     def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
-        """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt)``.
+        """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
         """
-        dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated.'
-                    'Please directly call DGLGraph.adjacency_matrix(transpose, scipy_fmt).'
-                    'Note: return_edge_ids is not supported now')
+        dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
+                    'Please replace it with:\n\n\t'
+                    'DGLGraph.adjacency_matrix(transpose, scipy_fmt="{}").\n'.format(fmt))
 
         return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
 
