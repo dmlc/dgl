@@ -13,12 +13,12 @@ from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
 
 __all__ = [
     'graph',
-    'graph_from_networkx',
     'bipartite',
     'hetero_from_relations',
     'heterograph',
     'to_hetero',
     'to_homo',
+    'from_networkx',
     'to_networkx',
 ]
 
@@ -796,9 +796,20 @@ def from_networkx(nx_graph, *,
     -------
     g : DGLHeteroGraph
     """
+    # Relabel nodes using consecutive integers
+    nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
+    if not nx_graph.is_directed():
+        nx_graph = nx_graph.to_directed()
+
     g = graph(nx_graph, ntype, etype,
               restrict_format=restrict_format,
               idtype=idtype)
+
+    # nx_graph.edges(data=True) returns src, dst, attr_dict
+    if nx_graph.number_of_edges() > 0:
+        has_edge_id = edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]
+    else:
+        has_edge_id = False
 
     # handle features
     # copy attributes
@@ -830,7 +841,7 @@ def from_networkx(nx_graph, *,
                                    ' smaller than the number of edges --'
                                    ' {}, got {}.'.format(num_edges, attrs['id']))
                 for key in edge_attrs:
-                    attr_dict[key][attrs['id']] = attrs[key]
+                    attr_dict[key][attrs[edge_id_attr_name]] = attrs[key]
         else:
             # XXX: assuming networkx iteration order is deterministic
             #      so the order is the same as graph_index.from_networkx
