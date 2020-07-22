@@ -2,6 +2,7 @@
 
 import os
 import socket
+import atexit
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -169,6 +170,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
+    atexit.register(exit_client)
 
 def finalize_client():
     """Release resources of this client."""
@@ -186,3 +188,11 @@ def shutdown_servers():
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
+
+def exit_client():
+    """Register exit callback.
+    """
+    # Only client with rank_0 will send shutdown request to servers.
+    shutdown_servers()
+    finalize_client()
+    atexit.unregister(exit_client)
