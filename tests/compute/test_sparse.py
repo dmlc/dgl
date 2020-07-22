@@ -94,67 +94,67 @@ sddmm_shapes = [
     ((1,), (1,))
 ]
 
-# @pytest.mark.parametrize('g', graphs)
-# @pytest.mark.parametrize('shp', spmm_shapes)
-# @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
-# @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
-# @parametrize_dtype
-# def test_spmm(idtype, g, shp, msg, reducer):
-#     g = g.astype(idtype).to(F.ctx())
-#     if dgl.backend.backend_name == 'tensorflow' and (reducer in ['min', 'max']):
-#         pytest.skip()  # tensorflow dlpack has problem writing into int32 arrays on GPU.
-#     print(g)
-#     print(g.idtype)
+@pytest.mark.parametrize('g', graphs)
+@pytest.mark.parametrize('shp', spmm_shapes)
+@pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
+@pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
+@parametrize_dtype
+def test_spmm(idtype, g, shp, msg, reducer):
+    g = g.astype(idtype).to(F.ctx())
+    if dgl.backend.backend_name == 'tensorflow' and (reducer in ['min', 'max']):
+        pytest.skip()  # tensorflow dlpack has problem writing into int32 arrays on GPU.
+    print(g)
+    print(g.idtype)
 
-#     hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
-#     he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
-#     print('u shape: {}, e shape: {}'.format(F.shape(hu), F.shape(he)))
+    hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
+    he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
+    print('u shape: {}, e shape: {}'.format(F.shape(hu), F.shape(he)))
 
-#     g.srcdata['x'] = F.attach_grad(F.clone(hu))
-#     g.edata['w'] = F.attach_grad(F.clone(he))
-#     print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
+    g.srcdata['x'] = F.attach_grad(F.clone(hu))
+    g.edata['w'] = F.attach_grad(F.clone(he))
+    print('SpMM(message func: {}, reduce func: {})'.format(msg, reducer))
 
-#     u = F.attach_grad(F.clone(hu))
-#     e = F.attach_grad(F.clone(he))
-#     with F.record_grad():
-#         v = gspmm(g, msg, reducer, u, e)
-#         non_degree_indices = F.tensor(
-#             np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
-#         v = F.gather_row(v, non_degree_indices)
-#         if g.number_of_edges() > 0:
-#             F.backward(F.reduce_sum(v))
-#             if msg != 'copy_rhs':
-#                 grad_u = F.grad(u)
-#             if msg != 'copy_lhs':
-#                 grad_e = F.grad(e)
+    u = F.attach_grad(F.clone(hu))
+    e = F.attach_grad(F.clone(he))
+    with F.record_grad():
+        v = gspmm(g, msg, reducer, u, e)
+        non_degree_indices = F.tensor(
+            np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
+        v = F.gather_row(v, non_degree_indices)
+        if g.number_of_edges() > 0:
+            F.backward(F.reduce_sum(v))
+            if msg != 'copy_rhs':
+                grad_u = F.grad(u)
+            if msg != 'copy_lhs':
+                grad_e = F.grad(e)
 
-#     with F.record_grad():
-#         g.update_all(udf_msg[msg], udf_reduce[reducer])
-#         if g.number_of_edges() > 0:
-#             v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
-#             assert F.allclose(v, v1)
-#             print('forward passed')
+    with F.record_grad():
+        g.update_all(udf_msg[msg], udf_reduce[reducer])
+        if g.number_of_edges() > 0:
+            v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
+            assert F.allclose(v, v1)
+            print('forward passed')
 
-#             F.backward(F.reduce_sum(v1))
-#             if msg != 'copy_rhs':
-#                 if reducer in ['min', 'max']: # there might be some numerical errors
-#                     rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) /\
-#                            F.reduce_sum(F.abs(grad_u))
-#                     assert F.as_scalar(rate) < 1e-2, rate
-#                 else:
-#                     assert F.allclose(F.grad(g.srcdata['x']), grad_u)
-#             if msg != 'copy_lhs':
-#                 if reducer in ['min', 'max']:
-#                     rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) /\
-#                            F.reduce_sum(F.abs(grad_e))
-#                     assert F.as_scalar(rate) < 1e-2, rate
-#                 else:
-#                     assert F.allclose(F.grad(g.edata['w']), grad_e)
-#             print('backward passed')
+            F.backward(F.reduce_sum(v1))
+            if msg != 'copy_rhs':
+                if reducer in ['min', 'max']: # there might be some numerical errors
+                    rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) /\
+                           F.reduce_sum(F.abs(grad_u))
+                    assert F.as_scalar(rate) < 1e-2, rate
+                else:
+                    assert F.allclose(F.grad(g.srcdata['x']), grad_u)
+            if msg != 'copy_lhs':
+                if reducer in ['min', 'max']:
+                    rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) /\
+                           F.reduce_sum(F.abs(grad_e))
+                    assert F.as_scalar(rate) < 1e-2, rate
+                else:
+                    assert F.allclose(F.grad(g.edata['w']), grad_e)
+            print('backward passed')
 
-#     g.srcdata.pop('x')
-#     g.edata.pop('w')
-#     if 'v' in g.dstdata: g.dstdata.pop('v')
+    g.srcdata.pop('x')
+    g.edata.pop('w')
+    if 'v' in g.dstdata: g.dstdata.pop('v')
 
 @pytest.mark.parametrize('g', graphs)
 @pytest.mark.parametrize('shp', sddmm_shapes)
