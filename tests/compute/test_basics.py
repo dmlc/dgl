@@ -34,7 +34,7 @@ def generate_graph(grad=False):
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    g.to(F.ctx())
+    g = g.to(F.ctx())
     ncol = F.randn((10, D))
     ecol = F.randn((17, D))
     if grad:
@@ -141,7 +141,7 @@ def test_batch_setter_autograd():
     assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 
-def test_nx_conversion():
+def _test_nx_conversion():
     # check conversion between networkx and DGLGraph
 
     def _check_nx_feature(nxg, nf, ef):
@@ -325,6 +325,7 @@ def test_update_routines():
 def test_update_all_0deg():
     # test#1
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(5)
     g.add_edge(1, 0)
     g.add_edge(2, 0)
@@ -351,6 +352,7 @@ def test_update_all_0deg():
 
     # test#2: graph with no edge
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(5)
     g.set_n_initializer(_init2, 'h')
     g.ndata['h'] = old_repr
@@ -361,6 +363,7 @@ def test_update_all_0deg():
 
 def test_pull_0deg():
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(2)
     g.add_edge(0, 1)
     def _message(edges):
@@ -397,6 +400,7 @@ def test_dynamic_addition():
     D = 1
 
     g = DGLGraph()
+    g = g.to(F.ctx())
 
     # Test node addition
     g.add_nodes(N)
@@ -426,15 +430,16 @@ def test_dynamic_addition():
 
 
 def test_repr():
-    G = dgl.DGLGraph()
-    G.add_nodes(10)
-    G.add_edge(0, 1)
-    repr_string = G.__repr__()
+    g = dgl.DGLGraph()
+    g = g.to(F.ctx())
+    g.add_nodes(10)
+    g.add_edge(0, 1)
+    repr_string = g.__repr__()
     print(repr_string)
-    G.ndata['x'] = F.zeros((10, 5))
-    G.add_edges([0, 1], 2)
-    G.edata['y'] = F.zeros((3, 4))
-    repr_string = G.__repr__()
+    g.ndata['x'] = F.zeros((10, 5))
+    g.add_edges([0, 1], 2)
+    g.edata['y'] = F.zeros((3, 4))
+    repr_string = g.__repr__()
     print(repr_string)
 
 
@@ -445,6 +450,7 @@ def test_group_apply_edges():
         return {"norm_feat": normalized_feat}
 
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(10)
     g.add_edges(0, [1, 2, 3, 4, 5, 6, 7, 8])
     g.add_edges(1, [2, 3, 4, 6, 7, 8])
@@ -475,6 +481,7 @@ def test_group_apply_edges():
 def test_group_apply_edges2():
     m = ssp.random(10, 10, 0.2)
     g = DGLGraph(m, readonly=True)
+    g = g.to(F.ctx())
     g.ndata['deg'] = g.in_degrees()
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     g.edata['id'] = F.arange(0, g.number_of_edges())
@@ -494,6 +501,7 @@ def test_group_apply_edges2():
 
 def test_local_var():
     g = DGLGraph(nx.path_graph(5))
+    g = g.to(F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -531,6 +539,7 @@ def test_local_var():
 
     # test initializer1
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(2)
     g.add_edges([0, 1], [1, 1])
     g.set_n_initializer(dgl.init.zero_initializer)
@@ -553,6 +562,7 @@ def test_local_var():
 
 def test_local_scope():
     g = DGLGraph(nx.path_graph(5))
+    g = g.to(F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -604,6 +614,7 @@ def test_local_scope():
 
     # test initializer1
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(2)
     g.add_edges([0, 1], [1, 1])
     g.set_n_initializer(dgl.init.zero_initializer)
@@ -625,7 +636,7 @@ def test_local_scope():
     foo(g)
 
 if __name__ == '__main__':
-    test_nx_conversion()
+    #test_nx_conversion()
     test_batch_setter_getter()
     test_batch_setter_autograd()
     test_batch_send()

@@ -123,8 +123,10 @@ def graphdata2tensors(data, idtype=None, bipartite=False):
     num_dst : int
         Number of destination nodes.
     """
-    if idtype is None:
-        idtype = F.int64  # preferred default idtype is int64
+    if idtype is None and not (isinstance(data, tuple) and F.is_tensor(data[0])):
+        # preferred default idtype is int64
+        # if data is tensor and idtype is None, infer the idtype from tensor
+        idtype = F.int64
     if isinstance(data, tuple):
         src, dst = F.tensor(data[0], idtype), F.tensor(data[1], idtype)
     elif isinstance(data, list):
@@ -222,7 +224,7 @@ def infer_num_nodes(data, bipartite=False):
         Number of destination nodes.
 
     or
-    
+
     None
         If the inference failed.
     """
