@@ -192,7 +192,7 @@ def _test_nx_conversion():
 
     # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
-    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
+    g = dgl.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -207,7 +207,7 @@ def _test_nx_conversion():
     assert F.array_equal(F.astype(g.edata['id'], F.int64), F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
-    g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
+    g.edata.pop('id') # pop id so we don't need to provide id when adding edges
     new_n = F.randn((2, 3))
     new_e = F.randn((3, 5))
     g.add_nodes(2, data={'n1': new_n})
@@ -226,8 +226,7 @@ def _test_nx_conversion():
     for _, _, attr in nxg.edges(data=True):
         attr.pop('id')
     # test with a new graph
-    g = DGLGraph()
-    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
+    g = dgl.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
     # check graph size
     assert g.number_of_nodes() == 7
     assert g.number_of_edges() == 7
@@ -252,8 +251,7 @@ def _test_nx_conversion():
     for u, v, d in nxg.edges(data=True):
         d['h'] = F.tensor([u, v])
 
-    g = dgl.DGLGraph()
-    g.from_networkx(nxg, node_attrs=['h'], edge_attrs=['h'])
+    g = dgl.from_networkx(nxg, node_attrs=['h'], edge_attrs=['h'])
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 4
     assert g.has_edge_between(0, 1)
