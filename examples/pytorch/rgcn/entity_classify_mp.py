@@ -262,9 +262,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                 dense_params += list(embed_layer.embeds.parameters())
         optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
         if  n_gpus > 1:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr)
+            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr, weight_decay=args.l2norm)
         else:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
+            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr, weight_decay=args.l2norm)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
@@ -486,13 +486,14 @@ def main(args, devices):
             val_idx = train_idx
 
     # calculate norm for each edge type and store in edge
-    for canonical_etypes in hg.canonical_etypes:
-        u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
-        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = th.ones(eid.shape[0]) / degrees
-        norm = norm.unsqueeze(1)
-        hg.edges[canonical_etypes].data['norm'] = norm
+    if args.global_norm is False:
+        for canonical_etypes in hg.canonical_etypes:
+            u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
+            _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+            degrees = count[inverse_index]
+            norm = th.ones(eid.shape[0]) / degrees
+            norm = norm.unsqueeze(1)
+            hg.edges[canonical_etypes].data['norm'] = norm
 
     # get target category id
     category_id = len(hg.ntypes)
@@ -501,6 +502,14 @@ def main(args, devices):
             category_id = i
 
     g = dgl.to_homo(hg)
+    if args.global_norm:
+        u, v, eid = g.all_edges(form='all')
+        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        norm = th.ones(eid.shape[0]) / degrees
+        norm = norm.unsqueeze(1)
+        g.edata['norm'] = norm
+
     g.ndata[dgl.NTYPE].share_memory_()
     g.edata[dgl.ETYPE].share_memory_()
     g.edata['norm'].share_memory_()
@@ -532,9 +541,9 @@ def main(args, devices):
         num_train_seeds = train_idx.shape[0]
         num_valid_seeds = val_idx.shape[0]
         num_test_seeds = test_idx.shape[0]
-        train_seeds = th.arange(num_train_seeds)
-        valid_seeds = th.arange(num_valid_seeds)
-        test_seeds = th.arange(num_test_seeds)
+        train_seeds = th.randperm(num_train_seeds)
+        valid_seeds = th.randperm(num_valid_seeds)
+        test_seeds = th.randperm(num_test_seeds)
         tseeds_per_proc = num_train_seeds // n_gpus
         vseeds_per_proc = num_valid_seeds // n_gpus
         tstseeds_per_proc = num_test_seeds // n_gpus
@@ -607,6 +616,8 @@ def config():
             help='Use sparse embedding for node embeddings.')
     parser.add_argument('--node-feats', default=False, action='store_true',
             help='Whether use node features')
+    parser.add_argument('--global-norm', default=False, action='store_true',
+            help='User global norm instead of per node type norm')
     parser.set_defaults(validation=True)
     args = parser.parse_args()
     return args
