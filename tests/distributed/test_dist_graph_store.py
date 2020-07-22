@@ -93,22 +93,30 @@ def check_dist_graph(g, num_nodes, num_edges):
 
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
-    g.ndata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32, 'test1')
+    g.ndata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32)
     feats = g.ndata['test1'][nids]
     assert np.all(F.asnumpy(feats) == 0)
 
-    # Test reuse_if_exist
-    g.ndata['test2'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2',
-                                                  init_func=rand_init)
-    g.ndata['test3'] = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2',
-                                                  reuse_if_exist=True)
-    assert np.all(F.asnumpy(g.ndata['test2'][nids]) == F.asnumpy(g.ndata['test3'][nids]))
+    # reference to a one that exists
+    test2 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2', init_func=rand_init)
+    test3 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2')
+    assert np.all(F.asnumpy(test2[nids]) == F.asnumpy(test3[nids]))
 
-    # Test init edge data
-    new_shape = (g.number_of_edges(), 2)
-    g.edata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32, 'test1')
-    feats = g.edata['test1'][eids]
-    assert np.all(F.asnumpy(feats) == 0)
+    # create a tensor and destroy a tensor and create it again.
+    test3 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test3', init_func=rand_init)
+    del test3
+    test3 = dgl.distributed.DistTensor(g, (g.number_of_nodes(), 3), F.float32, 'test3')
+    del test3
+
+    # test a persistent tesnor
+    test4 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test4', init_func=rand_init,
+                                       persistent=True)
+    del test4
+    try:
+        test4 = dgl.distributed.DistTensor(g, (g.number_of_nodes(), 3), F.float32, 'test4')
+        raise Exception('')
+    except:
+        pass
 
     # Test sparse emb
     try:
@@ -130,7 +138,7 @@ def check_dist_graph(g, num_nodes, num_edges):
 
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
         grad_sum = dgl.distributed.DistTensor(g, (g.number_of_nodes(),), F.float32,
-                                              'emb1_sum', policy, create_new=False)
+                                              'emb1_sum', policy)
         assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
@@ -175,10 +183,6 @@ def check_dist_graph(g, num_nodes, num_edges):
     for n in nodes:
         assert n in local_nids
 
-    # clean up
-    if os.environ['DGL_DIST_MODE'] == 'distributed':
-        dgl.distributed.shutdown_servers()
-        dgl.distributed.finalize_client()
     print('end')
 
 def check_server_client(shared_mem):

@@ -1,6 +1,10 @@
 """Define distributed tensor."""
 
+import os
+import uuid
+
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
+from .rpc_client import is_initialized
 from ..base import DGLError
 from .. import utils
 from .. import backend as F
@@ -18,12 +22,17 @@ def _default_init_data(shape, dtype):
 class DistTensor:
     ''' Distributed tensor.
 
-    This is a wrapper to access a tensor stored in the distributed KVStore.
-    This wrapper provides an interface similar to the local tensor.
+    DistTensor references to a tensor stored in the distributed KVStore.
+    When a DistTensor is created, it may reference to a tensor in the KVStore, or
+    create a new one. The tensor is identified by the name passed to the constructor
+    of DistTensor. If the name exists, DistTensor will reference the existing one.
+    In this case, the shape and the data type should match the existing tensor.
+    If the name doesn't exist, a new tensor will be created in the kvstore.
 
-    If a user tries to create a new tensor with a name that exists in the KVStore,
-    the creation will fail by default. However, if reuse_if_exist=True, it tries
-    to reuse the existing tensor in the KVStore if the shape and dtype match.
+    If persistent=True when creating DistTesnor, the tensor in the KVStore will
+    be persistent. Even if DistTensor is destroyed in the local trainer process,
+    the tensor will still exist in KVStore. However, we do not allow an anonymous
+    tensor to be persistent.
 
     Parameters
     ----------
@@ -39,13 +48,11 @@ class DistTensor:
         The partition policy of the tensor
     init_func : callable
         The function to initialize data in the tensor.
-    create_new : bool
-        Whether or not to create a new tensor in the KVStore.
-    reuse_if_exist : bool
-        Reuse the existing tensor if create_new=True.
+    persistent : bool
+        Whether the created tensor is persistent.
     '''
-    def __init__(self, g, shape, dtype, name, part_policy=None, init_func=None,
-                 create_new=True, reuse_if_exist=False):
+    def __init__(self, g, shape, dtype, name=None, part_policy=None, init_func=None,
+                 persistent=False):
         self.kvstore = g._client
         self._shape = shape
         self._dtype = dtype
@@ -64,18 +71,26 @@ class DistTensor:
 
         if init_func is None:
             init_func = _default_init_data
+        # If a user doesn't provide a name, we generate a name ourselves.
+        if name is None:
+            assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
+            name = uuid.uuid4().hex[:10]
         self._name = _get_data_name(name, part_policy.policy_str)
-        if create_new:
-            if reuse_if_exist and self._name in g._client.data_name_list():
-                dtype1, shape1, _ = g._client.get_data_meta(self._name)
-                assert dtype == dtype1, 'The dtype does not match with the existing tensor'
-                assert shape == shape1, 'The shape does not match with the existing tensor'
-            else:
-                g._client.init_data(self._name, shape, dtype, part_policy, init_func)
+        self._persistent = persistent
+        if self._name not in g._client.data_name_list():
+            g._client.init_data(self._name, shape, dtype, part_policy, init_func)
+            self._owner = True
         else:
+            self._owner = False
             dtype1, shape1, _ = g._client.get_data_meta(self._name)
             assert dtype == dtype1, 'The dtype does not match with the existing tensor'
             assert shape == shape1, 'The shape does not match with the existing tensor'
+
+    def __del__(self):
+        initialized = os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone' \
+                or is_initialized()
+        if not self._persistent and self._owner and initialized:
+            self.kvstore.delete_data(self._name)
 
     def __getitem__(self, idx):
         idx = utils.toindex(idx)

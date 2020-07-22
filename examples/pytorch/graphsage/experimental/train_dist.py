@@ -66,11 +66,11 @@ class DistSAGE(SAGE):
         nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
                                            g.get_partition_book(), force_even=True)
         y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_hidden), th.float32, 'h',
-                                       reuse_if_exist=True)
+                                       persistent=True)
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_classes),
-                                               th.float32, 'h_last', reuse_if_exist=True)
+                                               th.float32, 'h_last', persistent=True)
 
             sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
@@ -213,8 +213,6 @@ def run(args, device, data):
     # clean up
     if not args.standalone:
         g._client.barrier()
-        dgl.distributed.shutdown_servers()
-        dgl.distributed.finalize_client()
 
 def main(args):
     if not args.standalone:
