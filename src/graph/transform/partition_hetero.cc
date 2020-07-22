@@ -226,7 +226,8 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLReassignEdges_Hetero")
     CHECK_EQ(hgptr->relation_graphs().size(), 1)
       << "Reorder only supports HomoGraph";
     auto ugptr = hgptr->relation_graphs()[0];
-    auto csrmat = ugptr->GetCSRMatrix(0);
+    bool is_incsr = args[1];
+    auto csrmat = is_incsr ? ugptr->GetCSCMatrix(0) : ugptr->GetCSRMatrix(0);
     int64_t num_edges = csrmat.data->shape[0];
     IdArray new_data =
       IdArray::Empty({num_edges}, csrmat.data->dtype, csrmat.data->ctx);
