@@ -128,7 +128,7 @@ class DeepwalkTrainer:
             collate_fn=sampler.sample,
             shuffle=False,
             drop_last=False,
-            num_workers=2,
+            num_workers=self.args.num_sampler_threads,
             )
         num_batches = len(dataloader)
         print("num batchs: %d in subprocess [%d]" % (num_batches, gpu_id))
@@ -187,7 +187,7 @@ class DeepwalkTrainer:
             collate_fn=sampler.sample,
             shuffle=False,
             drop_last=False,
-            num_workers=2,
+            num_workers=self.args.num_sampler_threads,
             )
         
         num_batches = len(dataloader)
@@ -297,6 +297,8 @@ if __name__ == '__main__':
             help="do negative sampling inside a batch")
     parser.add_argument('--num_threads', default=8, type=int, 
             help="number of threads used for each CPU-core/GPU")
+    parser.add_argument('--num_sampler_threads', default=2, type=int, 
+            help="number of threads used for sampling")
     
     parser.add_argument('--count_params', default=False, action="store_true", 
             help="count the params, exit once counting over")
