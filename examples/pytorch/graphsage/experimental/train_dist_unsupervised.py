@@ -255,7 +255,7 @@ def main(args):
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, conf_file=args.conf_path)
     print('rank:', g.rank())
 
-    train_eids = dgl.distributed.edge_split(th.arange(g.number_of_edges()), g.get_partition_book())
+    train_eids = dgl.distributed.edge_split(th.arange(g.number_of_edges()), g.get_partition_book(), force_even=True)
     train_nids = dgl.distributed.node_split(th.arange(g.number_of_nodes()), g.get_partition_book())
     device = th.device('cpu')
 
