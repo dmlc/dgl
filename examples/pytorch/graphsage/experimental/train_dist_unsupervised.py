@@ -163,8 +163,6 @@ def run(args, device, data):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    train_size = th.sum(g.ndata['train_mask'][0:g.number_of_nodes()])
-
     # Training loop
     iter_tput = []
     profiler = Profiler()
@@ -246,6 +244,11 @@ def run(args, device, data):
     # clean up
     if not args.standalone:
         g._client.barrier()
+
+        if g.rank() == 0:
+            feat = g.ndata['features']
+            th.save(feat, 'feat.pt')
+
         dgl.distributed.shutdown_servers()
         dgl.distributed.finalize_client()
 
