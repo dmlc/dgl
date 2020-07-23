@@ -277,7 +277,8 @@ class HeteroNodeView(object):
 
     def __call__(self, ntype=None):
         """Return the nodes."""
-        return F.copy_to(F.arange(0, self._graph.number_of_nodes(ntype),
+        ntid = self._typeid_getter(ntype)
+        return F.copy_to(F.arange(0, self._graph._graph.number_of_nodes(ntid),
                                   dtype=self._graph.idtype),
                          self._graph.device)
 

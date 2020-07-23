@@ -8,7 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
-from utils import parametrize_dtype
+from test_utils import parametrize_dtype, get_cases
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -971,6 +971,20 @@ def test_to_device(idtype):
             g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
         with pytest.raises(DGLError):
             g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
+
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['block']))
+def test_to_device2(g, idtype):
+    g = g.astype(idtype)
+    g = g.to(F.cpu())
+    assert g.device == F.cpu()
+    if F.is_cuda_available():
+        g1 = g.to(F.cuda())
+        assert g1.device == F.cuda()
+        assert g1.ntypes == g.ntypes
+        assert g1.etypes == g.etypes
+        assert g1.canonical_etypes == g.canonical_etypes
 
 @parametrize_dtype
 def test_convert_bound(idtype):

@@ -244,7 +244,7 @@ class EntityClassify(nn.Module):
                 num_workers=num_workers)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                block = blocks[0].to(device)
 
                 h = {k: x[k][input_nodes[k]].to(device) for k in input_nodes.keys()}
                 h_dst = {k: v[:block.number_of_dst_nodes(k)] for k, v in h.items()}
