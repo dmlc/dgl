@@ -121,6 +121,8 @@ def start_client(ip_config):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(ip_config=ip_config)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
+    print("wait...")
+    time.sleep(60*20)
     # test send and recv
     dgl.distributed.send_request(0, req)
     res = dgl.distributed.recv_response()
