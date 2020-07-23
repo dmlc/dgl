@@ -12,7 +12,7 @@ from utils import shuffle_walks
 #np.random.seed(3141592653)
 
 def ReadTxtNet(file_path="", undirected=True):
-    """ Read the txt network file. 
+    """ Read the txt network file.
     Notations: The network is unweighted.
 
     Parameters
@@ -23,7 +23,7 @@ def ReadTxtNet(file_path="", undirected=True):
     Return
     ------
     net dict : a dict recording the connections in the graph
-    node2id dict : a dict mapping the nodes to their embedding indices 
+    node2id dict : a dict mapping the nodes to their embedding indices
     id2node dict : a dict mapping nodes embedding indices to the nodes
     """
     if file_path == 'youtube' or file_path == 'blog':
@@ -64,7 +64,7 @@ def ReadTxtNet(file_path="", undirected=True):
                 net[n1][n2] = 1
                 src.append(n1)
                 dst.append(n2)
-            
+
             if undirected:
                 if n2 not in net:
                     net[n2] = {n1: 1}
@@ -88,7 +88,7 @@ def ReadTxtNet(file_path="", undirected=True):
 def net2graph(net_sm):
     """ Transform the network to DGL graph
 
-    Return 
+    Return
     ------
     G DGLGraph : graph by DGL
     """
@@ -100,7 +100,7 @@ def net2graph(net_sm):
     return G
 
 class DeepwalkDataset:
-    def __init__(self, 
+    def __init__(self,
             net_file,
             map_file,
             walk_length=80,
@@ -182,8 +182,8 @@ class DeepwalkSampler(object):
         self.G = G
         self.seeds = seeds
         self.walk_length = walk_length
-    
+
     def sample(self, seeds):
-        walks = dgl.contrib.sampling.random_walk(self.G, seeds, 
-            1, self.walk_length-1)
+        walks, _ = dgl.sampling.random_walk(self.G, seeds,
+            length=self.walk_length-1)
         return walks
