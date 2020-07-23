@@ -123,6 +123,7 @@ def start_client(ip_config):
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     print("wait...")
     time.sleep(60*20)
+    print("finish wait...")
     # test send and recv
     dgl.distributed.send_request(0, req)
     res = dgl.distributed.recv_response()
