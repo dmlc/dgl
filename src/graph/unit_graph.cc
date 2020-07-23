@@ -1249,6 +1249,10 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
     coo_ = COOPtr(new COO());
   }
   formats_ = formats;
+  dgl_format_code_t created = GetFormatInUse();
+  if ((formats | created) != formats)
+    LOG(FATAL) << "Graph created from formats: " << CodeToStr(created) <<
+      ", which is not compatible with available formats: " << CodeToStr(formats);
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
@@ -1450,17 +1454,12 @@ dgl_format_code_t UnitGraph::AutoDetectFormat(
 
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
   dgl_format_code_t common = preferred_formats & formats_;
-  if (FORMAT_HAS_CSC(common))
-    return SparseFormat::kCSC;
-  if (FORMAT_HAS_CSR(common))
-    return SparseFormat::kCSR;
-  if (FORMAT_HAS_COO(common))
-    return SparseFormat::kCOO;
-  if (coo_->defined())
-    return SparseFormat::kCOO;
-  if (in_csr_->defined())
-    return SparseFormat::kCSC;
-  return SparseFormat::kCSR;
+  dgl_format_code_t created = GetFormatInUse();
+  if (common & created)
+    return DecodeFormat(common & created);
+  if (common)
+    return DecodeFormat(common);
+  return DecodeFormat(created);
 }
 
 GraphPtr UnitGraph::AsImmutableGraph() const {

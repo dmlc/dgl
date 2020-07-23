@@ -133,7 +133,6 @@ InferNumVerticesPerType(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& 
   dgl_type_t *srctypes = static_cast<dgl_type_t *>(etype_array.src->data);
   dgl_type_t *dsttypes = static_cast<dgl_type_t *>(etype_array.dst->data);
   dgl_type_t *etypes = static_cast<dgl_type_t *>(etype_array.id->data);
-
   for (size_t i = 0; i < meta_graph->NumEdges(); ++i) {
     dgl_type_t srctype = srctypes[i];
     dgl_type_t dsttype = dsttypes[i];
@@ -181,14 +180,11 @@ HeteroGraph::HeteroGraph(
     GraphPtr meta_graph,
     const std::vector<HeteroGraphPtr>& rel_graphs,
     const std::vector<int64_t>& num_nodes_per_type) : BaseHeteroGraph(meta_graph) {
-  LOG(INFO) << "before " << int(rel_graphs[0]->GetFormatInUse());
   if (num_nodes_per_type.size() == 0)
     num_verts_per_type_ = InferNumVerticesPerType(meta_graph, rel_graphs);
   else
     num_verts_per_type_ = num_nodes_per_type;
-  LOG(INFO) << "middle " << int(rel_graphs[0]->GetFormatInUse());
   HeteroGraphSanityCheck(meta_graph, rel_graphs);
-  LOG(INFO) << "after " << int(rel_graphs[0]->GetFormatInUse());
   relation_graphs_ = CastToUnitGraphs(rel_graphs);
 }
 

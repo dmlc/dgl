@@ -64,17 +64,6 @@ inline std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
   return ret;
 }
 
-inline std::string CodeToStr(dgl_format_code_t code) {
-  std::string ret = "";
-  if (code & coo_code)
-    ret += "coo ";
-  if (code & csr_code)
-    ret += "csr ";
-  if (code & csc_code)
-    ret += "csc ";
-  return ret;
-}
-
 inline dgl_format_code_t
 SparseFormatsToCode(const std::vector<SparseFormat> &formats) {
   dgl_format_code_t ret = 0;
@@ -94,6 +83,25 @@ SparseFormatsToCode(const std::vector<SparseFormat> &formats) {
     }
   }
   return ret;
+}
+
+inline std::string CodeToStr(dgl_format_code_t code) {
+  std::string ret = "";
+  if (code & coo_code)
+    ret += "coo ";
+  if (code & csr_code)
+    ret += "csr ";
+  if (code & csc_code)
+    ret += "csc ";
+  return ret;
+}
+
+inline SparseFormat DecodeFormat(dgl_format_code_t code) {
+  if (code & coo_code)
+    return SparseFormat::kCOO;
+  if (code & csc_code)
+    return SparseFormat::kCSC;
+  return SparseFormat::kCSR;
 }
 
 // Sparse matrix object that is exposed to python API.
