@@ -43,12 +43,6 @@ class RedditDataset(object):
         self.val_mask = (node_types == 2)
         self.test_mask = (node_types == 3)
 
-        self.graph.ndata['train_mask'] = F.tensor(self.train_mask, dtype=F.bool)
-        self.graph.ndata['val_mask'] = F.tensor(self.val_mask, dtype=F.bool)
-        self.graph.ndata['test_mask'] = F.tensor(self.test_mask, dtype=F.bool)
-        self.graph.ndata['feat'] = F.tensor(self.features, dtype=F.float32)
-        self.graph.ndata['label'] = F.tensor(self.labels, dtype=F.int64)
-
         print('Finished data loading.')
         print('  NumNodes: {}'.format(self.graph.number_of_nodes()))
         print('  NumEdges: {}'.format(self.graph.number_of_edges()))
@@ -60,6 +54,11 @@ class RedditDataset(object):
 
     def __getitem__(self, idx):
         assert idx == 0, "Reddit Dataset only has one graph"
+        self.graph.ndata['train_mask'] = F.tensor(self.train_mask, dtype=F.bool)
+        self.graph.ndata['val_mask'] = F.tensor(self.val_mask, dtype=F.bool)
+        self.graph.ndata['test_mask'] = F.tensor(self.test_mask, dtype=F.bool)
+        self.graph.ndata['feat'] = F.tensor(self.features, dtype=F.float32)
+        self.graph.ndata['label'] = F.tensor(self.labels, dtype=F.int64)
         return self.graph
     
     def __len__(self):
