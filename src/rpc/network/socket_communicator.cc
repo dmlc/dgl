@@ -192,7 +192,6 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   }
   // Initialize socket and socket-thread
   server_socket_ = new TCPSocket();
-  server_socket_->SetTimeout(kTimeOut);  // seconds
   // Bind socket
   if (server_socket_->Bind(ip.c_str(), port) == false) {
     LOG(FATAL) << "Cannot bind to " << ip << ":" << port;

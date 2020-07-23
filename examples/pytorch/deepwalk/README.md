@@ -30,7 +30,7 @@ For other datasets please pass the full path to the trainer through --data\_file
 ## How to run the code
 To run the code:
 ```
-python3 deepwalk.py --data_file youtube --output_emb_file emb.txt --adam --mix --lr 0.2 --gpus 0 1 2 3 --batch_size 100 --negative 5
+python3 deepwalk.py --data_file youtube --output_emb_file emb.txt --mix --lr 0.2 --gpus 0 1 2 3 --batch_size 100 --negative 5
 ```
 
 ## How to save the embedding
