@@ -24,7 +24,6 @@ def test_line_graph1():
     assert L.number_of_nodes() == 2 * N
     assert F.allclose(L.ndata['h'], G.edata['h'])
 
-"""
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_line_graph2(idtype):
@@ -72,7 +71,6 @@ def test_line_graph2(idtype):
                           np.array([0, 0, 1, 2, 2, 3, 4, 4]))
     assert np.array_equal(col[order],
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
-"""
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_no_backtracking():
@@ -235,18 +233,6 @@ def test_reverse_shared_frames(idtype):
     assert F.allclose(g.edata['h'], rg.edata['h'])
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
                       rg.edges[[1, 1], [0, 2]].data['h'])
-
-    rg.ndata['h'] = rg.ndata['h'] + 1
-    assert F.allclose(rg.ndata['h'], g.ndata['h'])
-
-    g.edata['h'] = g.edata['h'] - 1
-    assert F.allclose(rg.edata['h'], g.edata['h'])
-
-    src_msg = fn.copy_src(src='h', out='m')
-    sum_reduce = fn.sum(msg='m', out='h')
-
-    rg.update_all(src_msg, sum_reduce)
-    assert F.allclose(g.ndata['h'], rg.ndata['h'])
 
 def test_to_bidirected():
     # homogeneous graph
@@ -479,7 +465,7 @@ def test_metis_partition():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_hetero_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
-    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
     g = dgl.as_heterograph(g)
     check_metis_partition(g, 0)
     check_metis_partition(g, 1)

@@ -145,7 +145,7 @@ def segmented_knn_graph(x, k, segs):
     src = F.reshape(src, (-1,))
     adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
 
-    g = DGLGraph(adj, readonly=True)
+    g = DGLGraphStale(adj, readonly=True)
     return g
 
 def to_bidirected(g, readonly=None, copy_ndata=True,
@@ -1307,7 +1307,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
 
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
-        subg1 = DGLGraph(graph_data=subg.graph, readonly=True)
+        subg1 = DGLGraphStale(graph_data=subg.graph, readonly=True)
         subg1.ndata[NID] = induced_nodes.tousertensor()
         subg1.edata[EID] = induced_edges.tousertensor()
         return subg1
