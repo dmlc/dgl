@@ -221,13 +221,13 @@ def run(args, device, data):
             step_time.append(step_t)
             iter_tput.append(pos_edges / (step_t))
             if step % args.log_every == 0:
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s'.format(
-                    epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:])))
+                print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s'.format(
+                    g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:])))
             start = time.time()
 
         toc = time.time()
-        print('Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
-            toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
+        print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
+            g.rank(), toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
         epoch += 1
 
         #if epoch % args.eval_every == 0 and epoch != 0:
