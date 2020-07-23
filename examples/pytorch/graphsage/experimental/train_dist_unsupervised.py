@@ -183,7 +183,7 @@ def run(args, device, data):
         step_time = []
         for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
             tic_step = time.time()
-            sample_time += tic_step - start
+            sample_time = tic_step - start
 
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
@@ -220,7 +220,7 @@ def run(args, device, data):
 
             step_t = time.time() - tic_step
             step_time.append(step_t)
-            iter_tput.append(pos_edges / (step_t))
+            iter_tput.append(pos_edges / (step_t + sample_time))
             sample_tput.append(sample_time)
             if step % args.log_every == 0:
                 print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f}/{: .3f} s'.format(
