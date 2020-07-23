@@ -4651,8 +4651,8 @@ class DGLHeteroGraph(object):
         ----------
         formats : str or list of str or None
 
-            * If format is None, return the usage status of sparse formats
-            * If format is ``'any'``, indicating all formats are available.
+            * If formats is None, return the usage status of sparse formats
+            * If formats is ``'any'``, indicating all formats are available.
             * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
             them, specifying the sparse formats to use.
 
@@ -4660,9 +4660,9 @@ class DGLHeteroGraph(object):
         -------
         dict or DGLGraph
 
-            * If format is ``'any'``, the result will be a dict recording the usage status of sparse formats.
+            * If format is None, the result will be a dict recording the usage status of sparse formats.
             * Otherwise, a DGLGraph will be returned, which is a clone of the 
-            original graph with the specified sparse format(s) ``format``
+            original graph with the specified sparse format(s) ``formats``.
 
         Examples
         --------
@@ -4714,7 +4714,7 @@ class DGLHeteroGraph(object):
                               self._edge_frames)
 
     def create_format_(self):
-        r"""Create all sparse matrices allowed for the graph
+        r"""Create all sparse matrices allowed for the graph.
 
         By default, we create sparse matrices for a graph only when necessary. 
         In some cases we may want to create them immediately (e.g. in a

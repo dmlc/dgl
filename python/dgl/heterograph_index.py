@@ -835,7 +835,8 @@ class HeteroGraphIndex(ObjectBase):
 
         Returns
         -------
-        dict : TODO(zihao)
+        dict
+            a dict recording the usage status of sparse formats.
         """
         format_all = _CAPI_DGLHeteroGetFormatAll(self)
         format_in_use = _CAPI_DGLHeteroGetFormatInUse(self)
@@ -857,8 +858,12 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
-        formats : list of str
-            Desired restrict formats.
+        formats : str or list of str or None
+
+            * If format is None, return the usage status of sparse formats
+            * If format is ``'any'``, indicating all formats are available.
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
+            them, specifying the sparse formats to use.
 
         Returns
         -------
@@ -871,7 +876,7 @@ class HeteroGraphIndex(ObjectBase):
         return _CAPI_DGLHeteroGetFormatGraph(self, formats)
 
     def create_format_(self):
-        """"""
+        """Create all sparse matrices allowed for the graph."""
         return _CAPI_DGLHeteroCreateFormat(self)
 
     @utils.cached_member(cache='_cache', prefix='reverse')
