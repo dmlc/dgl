@@ -99,7 +99,7 @@ bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
     *nd = NDArray::Empty(shape, dtype, ctx);
   } else {
     *nd =
-      NDArray::EmptyShared(graph_name_ + "." + name, shape, dtype, ctx, false);
+      NDArray::EmptyShared(graph_name_ + name, shape, dtype, ctx, false);
   }
   return true;
 }
