@@ -129,28 +129,6 @@ struct COOMatrix {
                      row_sorted, col_sorted);
   }
 
-  /*! \brief Save arrays of the coo matrix into the shared memory with the given name 
-   *  Note: It does not save the metainfo 
-   */
-  COOMatrix CopyToSharedMem(const std::string &name) const {
-    DLContext ctx = {kDLCPU, 0};
-    auto row_shared_mem = NDArray::EmptyShared(
-        name + "_row", {row->shape[0]}, row->dtype, ctx, true);
-    row_shared_mem.CopyFrom(row);
-    auto col_shared_mem = NDArray::EmptyShared(
-        name + "_col", {col->shape[0]}, col->dtype, ctx, true);
-    col_shared_mem.CopyFrom(col);
-    NDArray data_shared_mem;
-    if (aten::IsNullArray(data)) {
-      data_shared_mem = aten::NullArray();
-    } else {
-      NDArray::EmptyShared(
-          name + "_data", {data->shape[0]}, data->dtype, ctx, true);
-      data_shared_mem.CopyFrom(data);
-    }
-    return COOMatrix(num_rows, num_cols, row_shared_mem, col_shared_mem, data_shared_mem,
-                     row_sorted, col_sorted);
-  }
 };
 
 ///////////////////////// COO routines //////////////////////////

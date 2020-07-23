@@ -16,6 +16,7 @@
 #include <set>
 #include <tuple>
 #include "./unit_graph.h"
+#include "shared_mem_manager.h"
 
 namespace dgl {
 
@@ -272,8 +273,6 @@ class HeteroGraph : public BaseHeteroGraph {
   template <class IdType>
   FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
 };
-
-const int64_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 16;  // at most 16k
 
 }  // namespace dgl
 
