@@ -105,8 +105,8 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         assign_tensor = self.pool_gc(g, h)
         device = feat.device
         assign_tensor_masks = []
-        batch_size = len(g.batch_num_nodes)
-        for g_n_nodes in g.batch_num_nodes:
+        batch_size = len(g.batch_num_nodes())
+        for g_n_nodes in g.batch_num_nodes():
             mask = torch.ones((g_n_nodes,
                                int(assign_tensor.size()[1] / batch_size)))
             assign_tensor_masks.append(mask)

@@ -5,7 +5,8 @@ import random
 
 from .utils import download, extract_archive, get_download_dir, loadtxt
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from ..convert import graph
+from .. import backend as F
 
 class LegacyTUDataset(object):
     """
@@ -30,7 +31,7 @@ class LegacyTUDataset(object):
         self.name = name
         self.hidden_size = hidden_size
         self.extract_dir = self._get_extract_dir()
-        self._load()
+        self._load(use_pandas, max_allow_node)
 
     def _get_extract_dir(self):
         download_dir = get_download_dir()
@@ -42,11 +43,18 @@ class LegacyTUDataset(object):
         return extract_dir
 
     def _download(self):
+        download_dir = get_download_dir()
+        zip_file_path = os.path.join(
+            download_dir,
+            "tu_{}.zip".format(
+                self.name))
+
         download(self._url.format(self.name), path=zip_file_path)
+        extract_dir = os.path.join(download_dir, "tu_{}".format(self.name))
         extract_archive(zip_file_path, extract_dir)
 
     @retry_method_with_fix(_download)
-    def _load(self):
+    def _load(self, use_pandas, max_allow_node):
         self.data_mode = None
         self.max_allow_node = max_allow_node
 
@@ -63,7 +71,7 @@ class LegacyTUDataset(object):
         DS_graph_labels = self._idx_from_zero(
             np.genfromtxt(self._file_path("graph_labels"), dtype=int))
 
-        g = DGLGraph()
+        g = graph([])
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
@@ -75,17 +83,17 @@ class LegacyTUDataset(object):
             if len(node_idx[0]) > self.max_num_node:
                 self.max_num_node = len(node_idx[0])
 
-        self.graph_lists = g.subgraphs(node_idx_list)
+        self.graph_lists = [g.subgraph(node_idx) for node_idx in node_idx_list]
         self.num_labels = max(DS_graph_labels) + 1
         self.graph_labels = DS_graph_labels
 
         try:
             DS_node_labels = self._idx_from_zero(
                 np.loadtxt(self._file_path("node_labels"), dtype=int))
-            g.ndata['node_label'] = DS_node_labels
+            g.ndata['node_label'] = F.tensor(DS_node_labels)
             one_hot_node_labels = self._to_onehot(DS_node_labels)
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = one_hot_node_labels[idxs, :]
+                g.ndata['feat'] = F.tensor(one_hot_node_labels[idxs, :])
             self.data_mode = "node_label"
         except IOError:
             print("No Node Label Data")
@@ -96,7 +104,7 @@ class LegacyTUDataset(object):
             if DS_node_attr.ndim == 1:
                 DS_node_attr = np.expand_dims(DS_node_attr, -1)
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = DS_node_attr[idxs, :]
+                g.ndata['feat'] = F.tensor(DS_node_attr[idxs, :])
             self.data_mode = "node_attr"
         except IOError:
             print("No Node Attribute Data")
@@ -170,7 +178,7 @@ class TUDataset(object):
     Graphs may have node labels, node attributes, edge labels, and edge attributes,
     varing from different dataset.
 
-    :param name: Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
+    :param name: Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the
     datasets name on https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets.
     """
 
