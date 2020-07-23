@@ -66,6 +66,9 @@ def main(args):
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
 
+    if args.gpu >= 0:
+        g = g.to(args.gpu)
+
     # create APPNP model
     model = APPNP(g,
                   in_feats,
