@@ -458,6 +458,7 @@ class DGLHeteroGraph(object):
             self._node_frames[ntid].add_rows(num)
         else:
             self._node_frames[ntid].append(data)
+        self._reset_cached_info()
 
     def add_edge(self, u, v, data=None, etype=None):
         """Add one edge to the graph.
@@ -642,6 +643,7 @@ class DGLHeteroGraph(object):
             self._edge_frames[etid].add_rows(len(u))
         else:
             self._edge_frames[etid].append(data)
+        self._reset_cached_info()
 
     def remove_edges(self, eids, etype=None):
         r"""Remove multiple edges with the specified edge type
@@ -815,6 +817,14 @@ class DGLHeteroGraph(object):
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
+
+    def _reset_cached_info(self):
+        """Some info like batch_num_nodes may be stale after mutation
+        Clean these cached info
+        """
+        self._batch_num_nodes = None
+        self._batch_num_edges = None
+
 
     #################################################################
     # Metagraph query
