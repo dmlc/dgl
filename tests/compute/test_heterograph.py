@@ -1861,53 +1861,40 @@ def test_dtype_cast(idtype):
 @parametrize_dtype
 def test_format(idtype):
     # single relation
-    """
     g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx()).format('coo')
-    assert g.restrict_format() == 'coo'
-    assert g.format_in_use() == ['coo']
+    assert g.format()['created'] == ['coo']
+    assert len(g.format()['not created']) == 0
     try:
         spmat = g.adjacency_matrix(scipy_fmt="csr")
     except:
         print('test passed, graph with restrict_format coo should not create csr matrix.')
     else:
         assert False, 'cannot create csr when restrict_format is coo'
-    g1 = g.to_format('any')
-    assert g1.restrict_format() == 'any'
-    g1.request_format('coo')
-    g1.request_format('csr')
-    g1.request_format('csc')
-    assert len(g1.format_in_use()) == 3
-    assert g.restrict_format() == 'coo'
-    assert g.format_in_use() == ['coo']
+    g1 = g.format('any')
+    assert len(g1.format()['created']) + len(g1.format()['not created']) == 3
+    g1.create_format_()
+    assert len(g1.format()['created']) == 3
+    assert g.format()['created'] == ['coo']
 
     # multiple relation
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
         ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-        }, restrict_format='csr', idtype=idtype, device=F.ctx())
+        }, idtype=idtype, device=F.ctx()).format('csr')
     user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
     g['follows'].srcdata['h'] = user_feat
-    for rel_type in ['follows', 'plays', 'develops']:
-        assert g.restrict_format(rel_type) == 'csr'
-        assert g.format_in_use(rel_type) == ['csr']
-        try:
-            g[rel_type].request_format('coo')
-        except:
-            print('test passed, graph with restrict_format csr should not create coo matrix')
-        else:
-            assert False, 'cannot create coo when restrict_format is csr'
+    assert g.format()['created'] == ['csr']
+    assert len(g.format()['not created']) == 0
 
-    g1 = g.to_format('csc')
+    g1 = g.format('csc')
     # test frame
     assert F.array_equal(g1['follows'].srcdata['h'], user_feat)
     # test each relation graph
-    for rel_type in ['follows', 'plays', 'develops']:
-        assert g1.restrict_format(rel_type) == 'csc'
-        assert g1.format_in_use(rel_type) == ['csc']
-        assert g.restrict_format(rel_type) == 'csr'
-        assert g.format_in_use(rel_type) == ['csr']
-    """
+    assert g1.format()['created'] == ['csc']
+    assert len(g1.format()['not created']) == 0
+    assert g.format()['created'] == ['csr']
+    assert len(g.format()['not created']) == 0
 
 @parametrize_dtype
 def test_edges_order(idtype):
