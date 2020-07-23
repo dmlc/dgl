@@ -346,7 +346,6 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
         src_ids = F.scatter_row(src_ids, reorder_idx[partition_book.partid], src)
         dst_ids = F.scatter_row(dst_ids, reorder_idx[partition_book.partid], dst)
 
-    order_id = []
     # receive responses from remote machines.
     if msgseq2pos is not None:
         results = recv_responses(msgseq2pos)
