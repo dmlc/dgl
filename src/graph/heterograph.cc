@@ -293,7 +293,6 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   std::vector<HeteroGraphPtr> relgraphs(g->NumEdgeTypes());
 
   for (dgl_type_t etype = 0 ; etype < g->NumEdgeTypes() ; ++etype) {
-    // strm->Write(hg->NumEdges(etype));
     aten::COOMatrix coo;
     aten::CSRMatrix csr, csc;
     std::string prefix = name + "_" + std::to_string(etype);

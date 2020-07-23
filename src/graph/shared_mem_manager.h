@@ -23,7 +23,7 @@ namespace dgl {
 
 using dgl::runtime::SharedMemory;
 
-const size_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 16;
+const size_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 32;
 
 // Utility class to copy objects to shared memory and record metadatas
 class SharedMemManager : public dmlc::Stream {
