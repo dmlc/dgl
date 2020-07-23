@@ -51,6 +51,20 @@ def batched_graph0():
     g3 = dgl.graph(([0], [1]))
     return dgl.batch([g1, g2, g3])
 
+@register_case(['block'])
+def block_graph0():
+    g = dgl.graph(([2, 3, 4], [5, 6, 7]), num_nodes=100)
+    return dgl.to_block(g)
+
+@register_case(['block'])
+def block_graph1():
+    g = dgl.heterograph({
+            ('user', 'plays', 'game') : ([0, 1, 2], [1, 1, 0]),
+            ('user', 'likes', 'game') : ([1, 2, 3], [0, 0, 2]),
+            ('store', 'sells', 'game') : ([0, 1, 1], [0, 1, 2]),
+        })
+    return dgl.to_block(g)
+
 def random_dglgraph(size):
     return dgl.DGLGraph(nx.erdos_renyi_graph(size, 0.3))
 

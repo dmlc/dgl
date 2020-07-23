@@ -8,3 +8,4 @@ else:
     parametrize_dtype = pytest.mark.parametrize("idtype", [F.int32])
 
 from .checks import *
+from .graph_cases import get_cases

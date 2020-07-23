@@ -3,6 +3,7 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from contextlib import contextmanager
+import copy
 import numbers
 import networkx as nx
 import numpy as np
@@ -318,6 +319,26 @@ class DGLHeteroGraph(object):
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph.edges())
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
+
+    def __copy__(self):
+        """Shallow copy implementation."""
+        #TODO(minjie): too many states in python; should clean up and lower to C
+        obj = DGLHeteroGraph.__new__(DGLHeteroGraph)
+        obj._graph = self._graph
+        obj._canonical_etypes = self._canonical_etypes
+        obj._batch_num_nodes = self._batch_num_nodes
+        obj._batch_num_edges = self._batch_num_edges
+        obj._ntypes = self._ntypes
+        obj._etypes = self._etypes
+        obj._srctypes_invmap = self._srctypes_invmap
+        obj._dsttypes_invmap = self._dsttypes_invmap
+        obj._is_unibipartite = self._is_unibipartite
+        obj._etype2canonical = self._etype2canonical
+        obj._etypes_invmap = self._etypes_invmap
+        obj._nx_metagraph = self._nx_metagraph
+        obj._node_frames = self._node_frames
+        obj._edge_frames = self._edge_frames
+        return obj
 
     #################################################################
     # Mutation operations
@@ -1123,6 +1144,7 @@ class DGLHeteroGraph(object):
         if etid is None:
             raise DGLError('Edge type "{}" does not exist.'.format(etype))
         return etid
+
     #################################################################
     # Batching
     #################################################################
@@ -2338,7 +2360,7 @@ class DGLHeteroGraph(object):
         dsttype = self.to_canonical_etype(etype)[2]
         etid = self.get_etype_id(etype)
         if is_all(v):
-            v = self.nodes(dsttype)
+            v = self.dstnodes(dsttype)
         deg = self._graph.in_degrees(etid, utils.prepare_tensor(self, v, 'v'))
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
@@ -2395,7 +2417,7 @@ class DGLHeteroGraph(object):
         srctype = self.to_canonical_etype(etype)[0]
         etid = self.get_etype_id(etype)
         if is_all(u):
-            u = self.nodes(srctype)
+            u = self.srcnodes(srctype)
         deg = self._graph.out_degrees(etid, utils.prepare_tensor(self, u, 'u'))
         if isinstance(u, numbers.Integral):
             return F.as_scalar(deg)
@@ -3107,8 +3129,9 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
             if F.context(val) != self.device:
-                raise DGLError('Expect node feature to be on device {}.'
-                               ' But got {}.'.format(self.device, F.context(val)))
+                raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
+                               ' device {}. Call DGLGraph.to() to copy the graph to the'
+                               ' same device.'.format(key, F.context(val), self.device))
 
         if is_all(u):
             for key, val in data.items():
@@ -3212,8 +3235,9 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect number of features to match number of edges.'
                                ' Got %d and %d instead.' % (nfeats, num_edges))
             if F.context(val) != self.device:
-                raise DGLError('Expect edge feature to be on device {}.'
-                               ' But got {}.'.format(self.device, F.context(val)))
+                raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
+                               ' device {}. Call DGLGraph.to() to copy the graph to the'
+                               ' same device.'.format(key, F.context(val), self.device))
 
         # set
         if is_all(eid):
@@ -4421,24 +4445,33 @@ class DGLHeteroGraph(object):
         if device is None or self.device == device:
             return self
 
+        ret = copy.copy(self)
+
+        # 1. Copy graph structure
+        ret._graph = self._graph.copy_to(utils.to_dgl_context(device))
+
+        # 2. Copy features
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
-            new_feats = {k : F.copy_to(feat, device) for k, feat in nframe.items()}
+            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in nframe.items()}
             new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
+        ret._node_frames = new_nframes
+
         new_eframes = []
         for eframe in self._edge_frames:
-            new_feats = {k : F.copy_to(feat, device) for k, feat in eframe.items()}
+            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
-        new_gidx = self._graph.copy_to(utils.to_dgl_context(device))
-        ret = DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
-                             new_nframes, new_eframes)
+        ret._edge_frames = new_eframes
 
+        # 2. Copy misc info
         if self._batch_num_nodes is not None:
-            new_bnn = {k : F.copy_to(num, device) for k, num in self._batch_num_nodes.items()}
+            new_bnn = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_nodes.items()}
             ret._batch_num_nodes = new_bnn
         if self._batch_num_edges is not None:
-            new_bne = {k : F.copy_to(num, device) for k, num in self._batch_num_edges.items()}
+            new_bne = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_edges.items()}
             ret._batch_num_edges = new_bne
 
         ret = utils.to_int32_graph_if_on_gpu(ret)

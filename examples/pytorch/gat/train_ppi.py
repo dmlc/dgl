@@ -63,6 +63,7 @@ def main(args):
     n_classes = train_dataset.labels.shape[1]
     num_feats = train_dataset.features.shape[1]
     g = train_dataset.graph
+    g = g.to(device)
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     # define the model
     model = GAT(g,
@@ -84,6 +85,7 @@ def main(args):
         loss_list = []
         for batch, data in enumerate(train_dataloader):
             subgraph, feats, labels = data
+            subgraph = subgraph.to(device)
             feats = feats.to(device)
             labels = labels.to(device)
             model.g = subgraph
@@ -102,6 +104,7 @@ def main(args):
             val_loss_list = []
             for batch, valid_data in enumerate(valid_dataloader):
                 subgraph, feats, labels = valid_data
+                subgraph = subgraph.to(device)
                 feats = feats.to(device)
                 labels = labels.to(device)
                 score, val_loss = evaluate(feats.float(), model, subgraph, labels.float(), loss_fcn)
@@ -125,6 +128,7 @@ def main(args):
     test_score_list = []
     for batch, test_data in enumerate(test_dataloader):
         subgraph, feats, labels = test_data
+        subgraph = subgraph.to(device)
         feats = feats.to(device)
         labels = labels.to(device)
         test_score_list.append(evaluate(feats, model, subgraph, labels.float(), loss_fcn)[0])
