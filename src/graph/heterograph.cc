@@ -276,7 +276,8 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
 
   // Copy buffer to share memory
   auto mem = std::make_shared<SharedMemory>(name);
-  SharedMemManager shm(name, mem);
+  auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
+  SharedMemManager shm(name, mem_buf);
   dmlc::Stream *strm = &shm;
 
   bool has_coo = fmts.find("coo") != fmts.end();
@@ -292,7 +293,7 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   std::vector<HeteroGraphPtr> relgraphs(g->NumEdgeTypes());
 
   for (dgl_type_t etype = 0 ; etype < g->NumEdgeTypes() ; ++etype) {
-    strm->Write(hg->NumEdges(etype));
+    // strm->Write(hg->NumEdges(etype));
     aten::COOMatrix coo;
     aten::CSRMatrix csr, csc;
     std::string prefix = name + "_" + std::to_string(etype);
@@ -317,31 +318,12 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   return ret;
 }
 
-aten::COOMatrix CreateCOOFromSharedMem(const std::string &name, uint8_t nbits,
-    int64_t num_src, int64_t num_dst, int64_t num_edges, bool rsorted, bool csorted) {
-  DLDataType dtype = {kDLInt, nbits, 1};
-  DLContext ctx = {kDLCPU, 0};
-  NDArray row = NDArray::EmptyShared(name+"_row", {num_edges}, dtype, ctx, false);
-  NDArray col = NDArray::EmptyShared(name+"_col", {num_edges}, dtype, ctx, false);
-  return aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
-}
-
-aten::CSRMatrix CreateCSRFromSharedMem(const std::string &name, uint8_t nbits,
-    int64_t num_src, int64_t num_dst, int64_t num_edges, bool sorted) {
-  DLDataType dtype = {kDLInt, nbits, 1};
-  DLContext ctx = {kDLCPU, 0};
-  NDArray indptr = NDArray::EmptyShared(name + "_indptr", {num_src + 1}, dtype, ctx, false);
-  NDArray indices = NDArray::EmptyShared(name + "_indices", {num_edges}, dtype, ctx, false);
-  NDArray data = NDArray::EmptyShared(name + "_data", {num_edges}, dtype, ctx, false);
-  return aten::CSRMatrix(num_src, num_dst, indptr, indices, data, sorted);
-}
-
 std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
     HeteroGraph::CreateFromSharedMem(const std::string &name) {
   auto mem = std::make_shared<SharedMemory>(name);
   auto mem_buf = mem->Open(SHARED_MEM_METAINFO_SIZE_MAX);
-  dmlc::MemoryFixedSizeStream ifs(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
-  dmlc::SeekStream *strm = &ifs;
+  SharedMemManager shm(name, mem_buf);
+  dmlc::Stream *strm = &shm;
 
   uint8_t nbits;
   CHECK(strm->Read(&nbits)) << "invalid nbits (unit8_t)";
@@ -360,36 +342,17 @@ std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
 
   std::vector<HeteroGraphPtr> relgraphs(metagraph->NumEdges());
   for (dgl_type_t etype = 0 ; etype < metagraph->NumEdges() ; ++etype) {
-    int64_t num_edges;
-    CHECK(strm->Read(&num_edges)) << "Invalid number of edges";
-
-    auto srcdst = metagraph->FindEdge(etype);
-    auto srctype = srcdst.first;
-    auto dsttype = srcdst.second;
-    auto num_src = num_verts_per_type[srctype];
-    auto num_dst = num_verts_per_type[dsttype];
-
     aten::COOMatrix coo;
     aten::CSRMatrix csr, csc;
     std::string prefix = name + "_" + std::to_string(etype);
     if (has_coo) {
-      bool rsorted, csorted;
-      CHECK(strm->Read(&rsorted)) << "invalid rsorted";
-      CHECK(strm->Read(&csorted)) << "invalid csorted";
-      coo = CreateCOOFromSharedMem(prefix + "_coo", nbits, num_src, num_dst,
-          num_edges, rsorted, csorted);
+      shm.CreateFromSharedMem(&coo, prefix + "_coo");
     }
     if (has_csr) {
-      bool sorted;
-      CHECK(strm->Read(&sorted)) << "invalid sorted";
-      csr = CreateCSRFromSharedMem(prefix + "_csr", nbits, num_src, num_dst,
-          num_edges, sorted);
+      shm.CreateFromSharedMem(&csr, prefix + "_csr");
     }
     if (has_csc) {
-      bool sorted;
-      CHECK(strm->Read(&sorted)) << "invalid sorted";
-      csc = CreateCSRFromSharedMem(prefix + "_csc", nbits, num_dst, num_src,
-          num_edges, sorted);
+      shm.CreateFromSharedMem(&csc, prefix + "_csc");
     }
 
     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);

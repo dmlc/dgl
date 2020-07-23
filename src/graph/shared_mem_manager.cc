@@ -47,8 +47,10 @@ NDArray SharedMemManager::CopyToSharedMem<NDArray>(const NDArray &data,
   if (is_null) {
     return data;
   } else {
-    return NDArray::EmptyShared(graph_name_ + name, shape, data->dtype, ctx,
-                                true);
+    auto nd =
+      NDArray::EmptyShared(graph_name_ + name, shape, data->dtype, ctx, true);
+    nd.CopyFrom(data);
+    return nd;
   }
 }
 
@@ -70,7 +72,7 @@ COOMatrix SharedMemManager::CopyToSharedMem<COOMatrix>(const COOMatrix &coo,
                                                        std::string name) {
   auto row_shared_mem = CopyToSharedMem(coo.row, name + "_row");
   auto col_shared_mem = CopyToSharedMem(coo.col, name + "_col");
-  auto data_shared_mem = CopyToSharedMem(coo.col, name + "_data");
+  auto data_shared_mem = CopyToSharedMem(coo.data, name + "_data");
   strm_->Write(coo.num_rows);
   strm_->Write(coo.num_cols);
   strm_->Write(coo.row_sorted);
@@ -93,7 +95,15 @@ bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
   if (ndim != 0) {
     CHECK(this->ReadArray(&shape[0], ndim)) << "Invalid DLTensor file format";
   }
-  *nd = NDArray::EmptyShared(graph_name_ + name, shape, dtype, ctx, false);
+  bool is_null;
+  this->Read(&is_null);
+  if (is_null) {
+    *nd = NDArray::Empty(shape, dtype, ctx);
+  } else {
+    *nd =
+      NDArray::EmptyShared(graph_name_ + "." + name, shape, dtype, ctx, false);
+  }
+  return true;
 }
 
 template <>
@@ -120,64 +130,5 @@ bool SharedMemManager::CreateFromSharedMem<CSRMatrix>(CSRMatrix *csr,
   strm_->Read(&csr->sorted);
   return true;
 }
-
-// template <>
-// HeteroGraphPtr SharedMemManager::CopyToSharedMem<HeteroGraphPtr>(
-//   const HeteroGraphPtr &g, std::string name) {
-//   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
-//   CHECK_NOTNULL(hg);
-//   hg->SharedMemName();
-//   if (hg->SharedMemName() == name) {
-//     return g;
-//   }
-
-//   // Copy buffer to share memory
-// //   auto mem = std::make_shared<SharedMemory>(name);
-// //   auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
-// //   dmlc::MemoryFixedSizeStream ofs(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
-// //   dmlc::SeekStream *strm_ = &ofs;
-
-//   bool has_coo = fmts.find("coo") != fmts.end();
-//   bool has_csr = fmts.find("csr") != fmts.end();
-//   bool has_csc = fmts.find("csc") != fmts.end();
-//   strm_->Write(g->NumBits());
-//   strm_->Write(has_coo);
-//   strm_->Write(has_csr);
-//   strm_->Write(has_csc);
-//   strm_->Write(ImmutableGraph::ToImmutable(hg->meta_graph_));
-//   strm_->Write(hg->num_verts_per_type_);
-
-//   std::vector<HeteroGraphPtr> relgraphs(g->NumEdgeTypes());
-
-//   for (dgl_type_t etype = 0 ; etype < g->NumEdgeTypes() ; ++etype) {
-//     strm_->Write(hg->NumEdges(etype));
-//     aten::COOMatrix coo;
-//     aten::CSRMatrix csr, csc;
-//     std::string prefix = name + "_" + std::to_string(etype);
-//     if (has_coo) {
-//       coo = hg->GetCOOMatrix(etype).CopyToSharedMem(prefix + "_coo");
-//       strm_->Write(coo.row_sorted);
-//       strm_->Write(coo.col_sorted);
-//     }
-//     if (has_csr) {
-//       csr = hg->GetCSRMatrix(etype).CopyToSharedMem(prefix + "_csr");
-//       strm_->Write(csr.sorted);
-//     }
-//     if (has_csc) {
-//       csc = hg->GetCSCMatrix(etype).CopyToSharedMem(prefix + "_csc");
-//       strm_->Write(csc.sorted);
-//     }
-//     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc,
-//     has_csr, has_coo);
-//   }
-
-//   auto ret = std::shared_ptr<HeteroGraph>(
-//       new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
-//   ret->shared_mem_ = mem;
-
-//   strm_->Write(ntypes);
-//   strm_->Write(etypes);
-//   return ret;
-// }
 
 }  // namespace dgl

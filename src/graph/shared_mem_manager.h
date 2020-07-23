@@ -25,17 +25,16 @@ using dgl::runtime::SharedMemory;
 
 const size_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 16;
 
+// Utility class to copy objects to shared memory and record metadatas
 class SharedMemManager : public dmlc::Stream {
  public:
-  explicit SharedMemManager(std::string graph_name, std::shared_ptr<SharedMemory> shm)
+  explicit SharedMemManager(std::string graph_name, void* mem_buf)
       : graph_name_(graph_name),
-        meta_shm_(shm),
-        mem_buf(meta_shm_->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX)),
         fs_strm(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX),
         strm_(&fs_strm) {}
 
   template <typename T>
-  T CopyToSharedMem(const T &data, std::string name);
+  T CopyToSharedMem(const T& data, std::string name);
 
   template <typename T>
   bool CreateFromSharedMem(T* out_data, std::string name);
@@ -49,15 +48,10 @@ class SharedMemManager : public dmlc::Stream {
 
  private:
   std::string graph_name_;
-  std::shared_ptr<SharedMemory> meta_shm_;
-  void* mem_buf;
-  //   std::array<void, SHARED_MEM_METAINFO_SIZE_MAX> metadata_;
   dmlc::MemoryFixedSizeStream fs_strm;
-  dmlc::Stream *strm_;
-
- public:
+  dmlc::Stream* strm_;
 };
 
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_SERIALIZER_H_
+#endif  // DGL_GRAPH_SHARED_MEM_MANAGER_H_
