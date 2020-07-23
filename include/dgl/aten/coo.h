@@ -128,7 +128,6 @@ struct COOMatrix {
                      aten::IsNullArray(data)? data : data.CopyTo(ctx),
                      row_sorted, col_sorted);
   }
-
 };
 
 ///////////////////////// COO routines //////////////////////////

@@ -120,7 +120,6 @@ struct CSRMatrix {
                      aten::IsNullArray(data)? data : data.CopyTo(ctx),
                      sorted);
   }
-
 };
 
 ///////////////////////// CSR routines //////////////////////////
