@@ -246,7 +246,7 @@ def split(input, sizes_or_sections, dim):
 
 
 def repeat(input, repeats, dim):
-    return tf.keras.backend.repeat_elements(input, repeats, dim)
+    return tf.repeat(input, repeats, dim)
 
 
 def gather_row(data, row_index):
@@ -324,7 +324,7 @@ def uniform(shape, dtype, ctx, low, high):
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, tf.Tensor):
-        max_len = as_scalar(lengths.max())
+        max_len = as_scalar(tf.reduce_max(lengths))
     else:
         max_len = builtins.max(lengths)
 

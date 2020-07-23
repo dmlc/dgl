@@ -28,12 +28,12 @@ def generate_rand_graph(n, connect_more=False, complete=False, add_self_loop=Fal
             arr[0] = 1
             arr[:, 0] = 1
     if add_self_loop:
-        g = dgl.DGLGraph(arr, readonly=False)
+        g = dgl.DGLGraphStale(arr, readonly=False)
         nodes = np.arange(g.number_of_nodes())
         g.add_edges(nodes, nodes)
         g.readonly()
     else:
-        g = dgl.DGLGraph(arr, readonly=True)
+        g = dgl.DGLGraphStale(arr, readonly=True)
     g.ndata['h1'] = F.randn((g.number_of_nodes(), 10))
     g.edata['h2'] = F.randn((g.number_of_edges(), 3))
     return g

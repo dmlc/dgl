@@ -235,9 +235,10 @@ def test_nx_conversion(idtype):
 
     # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
-    g = dgl.graph(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'], idtype=idtype, device=F.ctx())
+    g = dgl.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'], idtype=idtype)
     assert g.idtype == idtype
-    assert g.device == F.ctx()
+    assert g.device == F.cpu()
+    g = g.to(F.ctx())
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -272,7 +273,7 @@ def test_nx_conversion(idtype):
     for _, _, attr in nxg.edges(data=True):
         attr.pop('id')
     # test with a new graph
-    g = dgl.graph(nxg, node_attrs=['n1'], edge_attrs=['e1'], device=F.ctx())
+    g = dgl.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'], idtype=idtype)
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -287,25 +288,6 @@ def test_nx_conversion(idtype):
         edge_feat.append(F.unsqueeze(attr['e1'], 0))
     edge_feat = F.cat(edge_feat, 0)
     assert F.allclose(g.edata['e1'], edge_feat)
-
-    # Test converting from a networkx graph whose nodes are
-    # not labeled with consecutive-integers.
-    nxg = nx.cycle_graph(5)
-    nxg.remove_nodes_from([0, 4])
-    for u in nxg.nodes():
-        nxg.nodes[u]['h'] = F.tensor([u])
-    for u, v, d in nxg.edges(data=True):
-        d['h'] = F.tensor([u, v])
-
-    g = dgl.DGLGraph()
-    g.from_networkx(nxg, node_attrs=['h'], edge_attrs=['h'])
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 4
-    assert g.has_edge_between(0, 1)
-    assert g.has_edge_between(1, 2)
-    assert F.allclose(g.ndata['h'], F.tensor([[1.], [2.], [3.]]))
-    assert F.allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
-                                              [2., 3.], [2., 3.]]))
 
 @parametrize_dtype
 def test_apply_nodes(idtype):

@@ -44,6 +44,13 @@ def graph0():
     return dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
                       [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]))
 
+@register_case(['batched', 'homo', 'small'])
+def batched_graph0():
+    g1 = dgl.graph(([0, 1, 2], [1, 2, 3]))
+    g2 = dgl.graph(([1, 1], [2, 0]))
+    g3 = dgl.graph(([0], [1]))
+    return dgl.batch([g1, g2, g3])
+
 def random_dglgraph(size):
     return dgl.DGLGraph(nx.erdos_renyi_graph(size, 0.3))
 

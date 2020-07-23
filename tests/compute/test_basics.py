@@ -34,6 +34,7 @@ def generate_graph(grad=False):
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
+    g = g.to(F.ctx())
     ncol = F.randn((10, D))
     ecol = F.randn((17, D))
     if grad:
@@ -55,7 +56,7 @@ def test_batch_setter_getter():
     assert F.allclose(g.ndata['h'], F.zeros((10, D)))
     # pop nodes
     old_len = len(g.ndata)
-    assert _pfc(g.pop_n_repr('h')) == [0.] * 10
+    g.ndata.pop('h')
     assert len(g.ndata) == old_len - 1
     g.ndata['h'] = F.zeros((10, D))
     # set partial nodes
@@ -91,7 +92,7 @@ def test_batch_setter_getter():
     assert _pfc(g.edata['l']) == [0.] * 17
     # pop edges
     old_len = len(g.edata)
-    assert _pfc(g.pop_e_repr('l')) == [0.] * 17
+    g.edata.pop('l')
     assert len(g.edata) == old_len - 1
     g.edata['l'] = F.zeros((17, D))
     # set partial edges (many-many)
@@ -140,7 +141,7 @@ def test_batch_setter_autograd():
     assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 
-def test_nx_conversion():
+def _test_nx_conversion():
     # check conversion between networkx and DGLGraph
 
     def _check_nx_feature(nxg, nf, ef):
@@ -191,7 +192,7 @@ def test_nx_conversion():
 
     # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
-    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
+    g = dgl.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -206,7 +207,7 @@ def test_nx_conversion():
     assert F.array_equal(F.astype(g.edata['id'], F.int64), F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
-    g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
+    g.edata.pop('id') # pop id so we don't need to provide id when adding edges
     new_n = F.randn((2, 3))
     new_e = F.randn((3, 5))
     g.add_nodes(2, data={'n1': new_n})
@@ -225,8 +226,7 @@ def test_nx_conversion():
     for _, _, attr in nxg.edges(data=True):
         attr.pop('id')
     # test with a new graph
-    g = DGLGraph()
-    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
+    g = dgl.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
     # check graph size
     assert g.number_of_nodes() == 7
     assert g.number_of_edges() == 7
@@ -251,8 +251,7 @@ def test_nx_conversion():
     for u, v, d in nxg.edges(data=True):
         d['h'] = F.tensor([u, v])
 
-    g = dgl.DGLGraph()
-    g.from_networkx(nxg, node_attrs=['h'], edge_attrs=['h'])
+    g = dgl.from_networkx(nxg, node_attrs=['h'], edge_attrs=['h'])
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 4
     assert g.has_edge_between(0, 1)
@@ -261,46 +260,12 @@ def test_nx_conversion():
     assert F.allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
                                               [2., 3.], [2., 3.]]))
 
-def test_batch_send():
-    g = generate_graph()
-    def _fmsg(edges):
-        assert tuple(F.shape(edges.src['h'])) == (5, D)
-        return {'m' : edges.src['h']}
-    g.register_message_func(_fmsg)
-    # many-many send
-    u = F.tensor([0, 0, 0, 0, 0])
-    v = F.tensor([1, 2, 3, 4, 5])
-    g.send((u, v))
-    # one-many send
-    u = F.tensor([0])
-    v = F.tensor([1, 2, 3, 4, 5])
-    g.send((u, v))
-    # many-one send
-    u = F.tensor([1, 2, 3, 4, 5])
-    v = F.tensor([9])
-    g.send((u, v))
-
-def test_batch_recv():
-    # basic recv test
-    g = generate_graph()
-    g.register_message_func(message_func)
-    g.register_reduce_func(reduce_func)
-    g.register_apply_node_func(apply_node_func)
-    u = F.tensor([0, 0, 0, 4, 5, 6])
-    v = F.tensor([1, 2, 3, 9, 9, 9])
-    reduce_msg_shapes.clear()
-    g.send((u, v))
-    g.recv(F.unique(v))
-    assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
-    reduce_msg_shapes.clear()
-
 def test_apply_nodes():
     def _upd(nodes):
         return {'h' : nodes.data['h'] * 2}
     g = generate_graph()
-    g.register_apply_node_func(_upd)
     old = g.ndata['h']
-    g.apply_nodes()
+    g.apply_nodes(_upd)
     assert F.allclose(old * 2, g.ndata['h'])
     u = F.tensor([0, 3, 4, 6])
     g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
@@ -310,9 +275,8 @@ def test_apply_edges():
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
     g = generate_graph()
-    g.register_apply_edge_func(_upd)
     old = g.edata['w']
-    g.apply_edges()
+    g.apply_edges(_upd)
     assert F.allclose(old * 2, g.edata['w'])
     u = F.tensor([0, 0, 0, 4, 5, 6])
     v = F.tensor([1, 2, 3, 9, 9, 9])
@@ -322,15 +286,12 @@ def test_apply_edges():
 
 def test_update_routines():
     g = generate_graph()
-    g.register_message_func(message_func)
-    g.register_reduce_func(reduce_func)
-    g.register_apply_node_func(apply_node_func)
 
     # send_and_recv
     reduce_msg_shapes.clear()
     u = [0, 0, 0, 4, 5, 6]
     v = [1, 2, 3, 9, 9, 9]
-    g.send_and_recv((u, v))
+    g.send_and_recv((u, v), message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
     try:
@@ -342,105 +303,27 @@ def test_update_routines():
     # pull
     v = F.tensor([1, 2, 3, 9])
     reduce_msg_shapes.clear()
-    g.pull(v)
+    g.pull(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 8, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
     # push
     v = F.tensor([0, 1, 2, 3])
     reduce_msg_shapes.clear()
-    g.push(v)
+    g.push(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
     reduce_msg_shapes.clear()
 
     # update_all
     reduce_msg_shapes.clear()
-    g.update_all()
+    g.update_all(message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
-
-def test_recv_0deg():
-    # test recv with 0deg nodes;
-    g = DGLGraph()
-    g.add_nodes(2)
-    g.add_edge(0, 1)
-    def _message(edges):
-        return {'m' : edges.src['h']}
-    def _reduce(nodes):
-        return {'h' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
-    def _apply(nodes):
-        return {'h' : nodes.data['h'] * 2}
-    def _init2(shape, dtype, ctx, ids):
-        return 2 + F.zeros(shape, dtype, ctx)
-    g.register_message_func(_message)
-    g.register_reduce_func(_reduce)
-    g.register_apply_node_func(_apply)
-    g.set_n_initializer(_init2, 'h')
-    # test#1: recv both 0deg and non-0deg nodes
-    old = F.randn((2, 5))
-    g.ndata['h'] = old
-    g.send((0, 1))
-    g.recv([0, 1])
-    new = g.ndata.pop('h')
-    # 0deg check: initialized with the func and got applied
-    assert F.allclose(new[0], F.full_1d(5, 4, F.float32))
-    # non-0deg check
-    assert F.allclose(new[1], F.sum(old, 0) * 2)
-
-    # test#2: recv only 0deg node is equal to apply
-    old = F.randn((2, 5))
-    g.ndata['h'] = old
-    g.send((0, 1))
-    g.recv(0)
-    new = g.ndata.pop('h')
-    # 0deg check: equal to apply_nodes
-    assert F.allclose(new[0], 2 * old[0])
-    # non-0deg check: untouched
-    assert F.allclose(new[1], old[1])
-
-def test_recv_0deg_newfld():
-    # test recv with 0deg nodes; the reducer also creates a new field
-    g = DGLGraph()
-    g.add_nodes(2)
-    g.add_edge(0, 1)
-    def _message(edges):
-        return {'m' : edges.src['h']}
-    def _reduce(nodes):
-        return {'h1' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
-    def _apply(nodes):
-        return {'h1' : nodes.data['h1'] * 2}
-    def _init2(shape, dtype, ctx, ids):
-        return 2 + F.zeros(shape, dtype=dtype, ctx=ctx)
-    g.register_message_func(_message)
-    g.register_reduce_func(_reduce)
-    g.register_apply_node_func(_apply)
-    # test#1: recv both 0deg and non-0deg nodes
-    old = F.randn((2, 5))
-    g.set_n_initializer(_init2, 'h1')
-    g.ndata['h'] = old
-    g.send((0, 1))
-    g.recv([0, 1])
-    new = g.ndata.pop('h1')
-    # 0deg check: initialized with the func and got applied
-    assert F.allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
-    # non-0deg check
-    assert F.allclose(new[1], F.sum(old, 0) * 2)
-
-    # test#2: recv only 0deg node
-    old = F.randn((2, 5))
-    g.ndata['h'] = old
-    g.ndata['h1'] = F.full((2, 5), -1, F.int64)  # this is necessary
-    g.send((0, 1))
-    g.recv(0)
-    new = g.ndata.pop('h1')
-    # 0deg check: fallback to apply
-    assert F.allclose(new[0], F.full_1d(5, -2, F.int64))
-    # non-0deg check: not changed
-    assert F.allclose(new[1], F.full_1d(5, -1, F.int64))
 
 def test_update_all_0deg():
     # test#1
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(5)
     g.add_edge(1, 0)
     g.add_edge(2, 0)
@@ -467,6 +350,7 @@ def test_update_all_0deg():
 
     # test#2: graph with no edge
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(5)
     g.set_n_initializer(_init2, 'h')
     g.ndata['h'] = old_repr
@@ -477,6 +361,7 @@ def test_update_all_0deg():
 
 def test_pull_0deg():
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(2)
     g.add_edge(0, 1)
     def _message(edges):
@@ -487,14 +372,11 @@ def test_pull_0deg():
         return {'h' : nodes.data['h'] * 2}
     def _init2(shape, dtype, ctx, ids):
         return 2 + F.zeros(shape, dtype, ctx)
-    g.register_message_func(_message)
-    g.register_reduce_func(_reduce)
-    g.register_apply_node_func(_apply)
     g.set_n_initializer(_init2, 'h')
     # test#1: pull both 0deg and non-0deg nodes
     old = F.randn((2, 5))
     g.ndata['h'] = old
-    g.pull([0, 1])
+    g.pull([0, 1], _message, _reduce, _apply)
     new = g.ndata.pop('h')
     # 0deg check: initialized with the func and got applied
     assert F.allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
@@ -504,86 +386,19 @@ def test_pull_0deg():
     # test#2: pull only 0deg node
     old = F.randn((2, 5))
     g.ndata['h'] = old
-    g.pull(0)
+    g.pull(0, _message, _reduce, _apply)
     new = g.ndata.pop('h')
     # 0deg check: fallback to apply
     assert F.allclose(new[0], 2*old[0])
     # non-0deg check: not touched
     assert F.allclose(new[1], old[1])
 
-def test_send_multigraph():
-    g = DGLGraph()
-    g.add_nodes(3)
-    g.add_edge(0, 1)
-    g.add_edge(0, 1)
-    g.add_edge(0, 1)
-    g.add_edge(2, 1)
-
-    def _message_a(edges):
-        return {'a': edges.data['a']}
-    def _message_b(edges):
-        return {'a': edges.data['a'] * 3}
-    def _reduce(nodes):
-        return {'a': F.max(nodes.mailbox['a'], 1)}
-
-    def answer(*args):
-        return F.max(F.stack(args, 0), 0)
-
-    # send by eid
-    old_repr = F.randn((4, 5))
-    g.ndata['a'] = F.zeros((3, 5))
-    g.edata['a'] = old_repr
-    g.send([0, 2], message_func=_message_a)
-    g.recv(1, _reduce)
-    new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2]))
-
-    g.ndata['a'] = F.zeros((3, 5))
-    g.edata['a'] = old_repr
-    g.send([0, 2, 3], message_func=_message_a)
-    g.recv(1, _reduce)
-    new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
-
-    # send on multigraph
-    g.ndata['a'] = F.zeros((3, 5))
-    g.edata['a'] = old_repr
-    g.send(([0, 2], [1, 1]), _message_a)
-    g.recv(1, _reduce)
-    new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], F.max(old_repr, 0))
-
-    # consecutive send and send_on
-    g.ndata['a'] = F.zeros((3, 5))
-    g.edata['a'] = old_repr
-    g.send((2, 1), _message_a)
-    g.send([0, 1], message_func=_message_b)
-    g.recv(1, _reduce)
-    new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0] * 3, old_repr[1] * 3, old_repr[3]))
-
-    # consecutive send_on
-    g.ndata['a'] = F.zeros((3, 5))
-    g.edata['a'] = old_repr
-    g.send(0, message_func=_message_a)
-    g.send(1, message_func=_message_b)
-    g.recv(1, _reduce)
-    new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[1] * 3))
-
-    # send_and_recv_on
-    g.ndata['a'] = F.zeros((3, 5))
-    g.edata['a'] = old_repr
-    g.send_and_recv([0, 2, 3], message_func=_message_a, reduce_func=_reduce)
-    new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
-    assert F.allclose(new_repr[[0, 2]], F.zeros((2, 5)))
-
 def test_dynamic_addition():
     N = 3
     D = 1
 
     g = DGLGraph()
+    g = g.to(F.ctx())
 
     # Test node addition
     g.add_nodes(N)
@@ -613,15 +428,16 @@ def test_dynamic_addition():
 
 
 def test_repr():
-    G = dgl.DGLGraph()
-    G.add_nodes(10)
-    G.add_edge(0, 1)
-    repr_string = G.__repr__()
+    g = dgl.DGLGraph()
+    g = g.to(F.ctx())
+    g.add_nodes(10)
+    g.add_edge(0, 1)
+    repr_string = g.__repr__()
     print(repr_string)
-    G.ndata['x'] = F.zeros((10, 5))
-    G.add_edges([0, 1], 2)
-    G.edata['y'] = F.zeros((3, 4))
-    repr_string = G.__repr__()
+    g.ndata['x'] = F.zeros((10, 5))
+    g.add_edges([0, 1], 2)
+    g.edata['y'] = F.zeros((3, 4))
+    repr_string = g.__repr__()
     print(repr_string)
 
 
@@ -632,6 +448,7 @@ def test_group_apply_edges():
         return {"norm_feat": normalized_feat}
 
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(10)
     g.add_edges(0, [1, 2, 3, 4, 5, 6, 7, 8])
     g.add_edges(1, [2, 3, 4, 6, 7, 8])
@@ -662,6 +479,7 @@ def test_group_apply_edges():
 def test_group_apply_edges2():
     m = ssp.random(10, 10, 0.2)
     g = DGLGraph(m, readonly=True)
+    g = g.to(F.ctx())
     g.ndata['deg'] = g.in_degrees()
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     g.edata['id'] = F.arange(0, g.number_of_edges())
@@ -681,6 +499,7 @@ def test_group_apply_edges2():
 
 def test_local_var():
     g = DGLGraph(nx.path_graph(5))
+    g = g.to(F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -718,6 +537,7 @@ def test_local_var():
 
     # test initializer1
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(2)
     g.add_edges([0, 1], [1, 1])
     g.set_n_initializer(dgl.init.zero_initializer)
@@ -740,6 +560,7 @@ def test_local_var():
 
 def test_local_scope():
     g = DGLGraph(nx.path_graph(5))
+    g = g.to(F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -791,6 +612,7 @@ def test_local_scope():
 
     # test initializer1
     g = DGLGraph()
+    g = g.to(F.ctx())
     g.add_nodes(2)
     g.add_edges([0, 1], [1, 1])
     g.set_n_initializer(dgl.init.zero_initializer)
@@ -812,7 +634,7 @@ def test_local_scope():
     foo(g)
 
 if __name__ == '__main__':
-    test_nx_conversion()
+    #test_nx_conversion()
     test_batch_setter_getter()
     test_batch_setter_autograd()
     test_batch_send()
