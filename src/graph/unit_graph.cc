@@ -1441,22 +1441,13 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
   return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
 }
 
-/*
-dgl_format_code_t UnitGraph::AutoDetectFormat(
-    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, SparseFormat restrict_format) const {
-  if (restrict_format != SparseFormat::kAuto)
-    return restrict_format;
-  if (coo && coo->defined() && coo->IsHypersparse())
-    return SparseFormat::kCOO;
-  return all_code;
-}
-*/
-
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
   dgl_format_code_t common = preferred_formats & formats_;
   dgl_format_code_t created = GetFormatInUse();
   if (common & created)
     return DecodeFormat(common & created);
+  if (coo_->defined() && coo_->IsHypersparse())
+    return SparseFormat::kCOO;
   if (common)
     return DecodeFormat(common);
   return DecodeFormat(created);
