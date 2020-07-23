@@ -8,6 +8,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/graph_serializer.h>
 #include <dmlc/memory_io.h>
+#include <memory>
 #include <vector>
 #include <tuple>
 #include <utility>
@@ -277,18 +278,18 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   // Copy buffer to share memory
   auto mem = std::make_shared<SharedMemory>(name);
   auto mem_buf = mem->CreateNew(SHARED_MEM_METAINFO_SIZE_MAX);
-  SharedMemManager shm(name, mem_buf);
-  dmlc::Stream *strm = &shm;
+  dmlc::MemoryFixedSizeStream strm(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
+  SharedMemManager shm(name, &strm);
 
   bool has_coo = fmts.find("coo") != fmts.end();
   bool has_csr = fmts.find("csr") != fmts.end();
   bool has_csc = fmts.find("csc") != fmts.end();
-  strm->Write(g->NumBits());
-  strm->Write(has_coo);
-  strm->Write(has_csr);
-  strm->Write(has_csc);
-  strm->Write(ImmutableGraph::ToImmutable(hg->meta_graph_));
-  strm->Write(hg->num_verts_per_type_);
+  shm.Write(g->NumBits());
+  shm.Write(has_coo);
+  shm.Write(has_csr);
+  shm.Write(has_csc);
+  shm.Write(ImmutableGraph::ToImmutable(hg->meta_graph_));
+  shm.Write(hg->num_verts_per_type_);
 
   std::vector<HeteroGraphPtr> relgraphs(g->NumEdgeTypes());
 
@@ -312,8 +313,8 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
       new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
   ret->shared_mem_ = mem;
 
-  strm->Write(ntypes);
-  strm->Write(etypes);
+  shm.Write(ntypes);
+  shm.Write(etypes);
   return ret;
 }
 
@@ -321,23 +322,23 @@ std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
     HeteroGraph::CreateFromSharedMem(const std::string &name) {
   auto mem = std::make_shared<SharedMemory>(name);
   auto mem_buf = mem->Open(SHARED_MEM_METAINFO_SIZE_MAX);
-  SharedMemManager shm(name, mem_buf);
-  dmlc::Stream *strm = &shm;
+  dmlc::MemoryFixedSizeStream strm(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);
+  SharedMemManager shm(name, &strm);
 
   uint8_t nbits;
-  CHECK(strm->Read(&nbits)) << "invalid nbits (unit8_t)";
+  CHECK(shm.Read(&nbits)) << "invalid nbits (unit8_t)";
 
   bool has_coo, has_csr, has_csc;
-  CHECK(strm->Read(&has_coo)) << "invalid nbits (unit8_t)";
-  CHECK(strm->Read(&has_csr)) << "invalid csr (unit8_t)";
-  CHECK(strm->Read(&has_csc)) << "invalid csc (unit8_t)";
+  CHECK(shm.Read(&has_coo)) << "invalid nbits (unit8_t)";
+  CHECK(shm.Read(&has_csr)) << "invalid csr (unit8_t)";
+  CHECK(shm.Read(&has_csc)) << "invalid csc (unit8_t)";
 
   auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
-  CHECK(strm->Read(&meta_imgraph)) << "Invalid meta graph";
+  CHECK(shm.Read(&meta_imgraph)) << "Invalid meta graph";
   GraphPtr metagraph = meta_imgraph;
 
   std::vector<int64_t> num_verts_per_type;
-  CHECK(strm->Read(&num_verts_per_type)) << "Invalid number of vertices per type";
+  CHECK(shm.Read(&num_verts_per_type)) << "Invalid number of vertices per type";
 
   std::vector<HeteroGraphPtr> relgraphs(metagraph->NumEdges());
   for (dgl_type_t etype = 0 ; etype < metagraph->NumEdges() ; ++etype) {
@@ -357,15 +358,14 @@ std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
   }
 
-  auto ret = HeteroGraphPtr(new HeteroGraph(metagraph, relgraphs, num_verts_per_type));
-  auto hg_index = std::dynamic_pointer_cast<HeteroGraph>(ret);
-  hg_index->shared_mem_ = mem;
+  auto ret = std::make_shared<HeteroGraph>(metagraph, relgraphs, num_verts_per_type);
+  ret->shared_mem_ = mem;
 
   std::vector<std::string> ntypes;
   std::vector<std::string> etypes;
-  CHECK(strm->Read(&ntypes)) << "invalid ntypes";
-  CHECK(strm->Read(&etypes)) << "invalid etypes";
-  return std::make_tuple(hg_index, ntypes, etypes);
+  CHECK(shm.Read(&ntypes)) << "invalid ntypes";
+  CHECK(shm.Read(&etypes)) << "invalid etypes";
+  return std::make_tuple(ret, ntypes, etypes);
 }
 
 HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {

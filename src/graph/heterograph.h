@@ -248,7 +248,6 @@ class HeteroGraph : public BaseHeteroGraph {
  private:
   // To create empty class
   friend class Serializer;
-  friend class SharedMemManager;
 
   // Empty Constructor, only for serializer
   HeteroGraph() : BaseHeteroGraph() {}
@@ -274,8 +273,6 @@ class HeteroGraph : public BaseHeteroGraph {
   template <class IdType>
   FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;
 };
-
-// const int64_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 16;  // at most 16k
 
 }  // namespace dgl
 

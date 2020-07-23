@@ -30,8 +30,6 @@ using namespace dgl::aten;
 
 namespace dgl {
 
-// const size_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 16;
-
 template <>
 NDArray SharedMemManager::CopyToSharedMem<NDArray>(const NDArray &data,
                                                    std::string name) {

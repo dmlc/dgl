@@ -28,10 +28,9 @@ const size_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 32;
 // Utility class to copy objects to shared memory and record metadatas
 class SharedMemManager : public dmlc::Stream {
  public:
-  explicit SharedMemManager(std::string graph_name, void* mem_buf)
+  explicit SharedMemManager(std::string graph_name, dmlc::Stream* strm)
       : graph_name_(graph_name),
-        fs_strm(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX),
-        strm_(&fs_strm) {}
+        strm_(strm) {}
 
   template <typename T>
   T CopyToSharedMem(const T& data, std::string name);
@@ -48,7 +47,6 @@ class SharedMemManager : public dmlc::Stream {
 
  private:
   std::string graph_name_;
-  dmlc::MemoryFixedSizeStream fs_strm;
   dmlc::Stream* strm_;
 };
 
