@@ -2,6 +2,7 @@
 
 import os
 import socket
+import atexit
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -95,6 +96,8 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
+INITIALIZED = False
+
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
 
@@ -169,11 +172,16 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
+    atexit.register(exit_client)
+    global INITIALIZED
+    INITIALIZED = True
 
 def finalize_client():
     """Release resources of this client."""
     rpc.finalize_sender()
     rpc.finalize_receiver()
+    global INITIALIZED
+    INITIALIZED = False
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -186,3 +194,16 @@ def shutdown_servers():
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
+
+def exit_client():
+    """Register exit callback.
+    """
+    # Only client with rank_0 will send shutdown request to servers.
+    shutdown_servers()
+    finalize_client()
+    atexit.unregister(exit_client)
+
+def is_initialized():
+    """Is RPC initialized?
+    """
+    return INITIALIZED

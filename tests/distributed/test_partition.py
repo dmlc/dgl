@@ -17,8 +17,7 @@ def create_random_graph(n):
     ig = create_graph_index(arr, readonly=True)
     return dgl.DGLGraph(ig)
 
-def check_partition(part_method, reshuffle):
-    g = create_random_graph(10000)
+def check_partition(g, part_method, reshuffle):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
     g.edata['feats'] = F.tensor(np.random.randn(g.number_of_edges(), 10))
@@ -105,12 +104,22 @@ def check_partition(part_method, reshuffle):
         assert np.all(F.asnumpy(eid2pid) == edge_map)
 
 def test_partition():
-    check_partition('metis', True)
-    check_partition('metis', False)
-    check_partition('random', True)
-    check_partition('random', False)
+    g = create_random_graph(10000)
+    check_partition(g, 'metis', True)
+    check_partition(g, 'metis', False)
+    check_partition(g, 'random', True)
+    check_partition(g, 'random', False)
+
+def test_hetero_partition():
+    g = create_random_graph(10000)
+    g = dgl.as_heterograph(g)
+    check_partition(g, 'metis', True)
+    check_partition(g, 'metis', False)
+    check_partition(g, 'random', True)
+    check_partition(g, 'random', False)
 
 
 if __name__ == '__main__':
     os.makedirs('/tmp/partition', exist_ok=True)
     test_partition()
+    test_hetero_partition()
