@@ -122,7 +122,7 @@ def start_client(ip_config):
     dgl.distributed.connect_to_server(ip_config=ip_config)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     print("wait...")
-    time.sleep(60*20)
+    time.sleep(60*2)
     print("finish wait...")
     # test send and recv
     dgl.distributed.send_request(0, req)
