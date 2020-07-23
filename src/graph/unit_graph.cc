@@ -1522,8 +1522,29 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   int64_t save_format_code, formats_code;
   CHECK(fs->Read(&save_format_code)) << "Invalid format";
   CHECK(fs->Read(&formats_code)) << "Invalid format";
-  formats_ = static_cast<dgl_format_code_t>(formats_code);
   auto save_format = static_cast<SparseFormat>(save_format_code);
+  if (formats_code >> 32) {
+    formats_ = static_cast<dgl_format_code_t>(0xffffffff & formats_code);
+  } else {
+    // NOTE(zihao): to be compatible with old formats.
+    switch (formats_code & 0xffffffff) {
+    case 0:
+      formats_ = all_code;
+      break;
+    case 1:
+      formats_ = coo_code;
+      break;
+    case 2:
+      formats_ = csr_code;
+      break;
+    case 3:
+      formats_ = csc_code;
+      break;
+    default:
+      LOG(FATAL) << "Load graph failed, formats code " << formats_code <<
+        "not recognized.";
+    }
+  }
 
   switch (save_format) {
     case SparseFormat::kCOO:
@@ -1562,8 +1583,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   // sparse matrix
   auto avail_fmt = SelectFormat(all_code);
   fs->Write(static_cast<int64_t>(avail_fmt));
-  // TODO(zihao) fix
-  fs->Write(static_cast<int64_t>(formats_));
+  fs->Write(static_cast<int64_t>(formats_ | 0x100000000));
   switch (avail_fmt) {
     case SparseFormat::kCOO:
       fs->Write(GetCOO());

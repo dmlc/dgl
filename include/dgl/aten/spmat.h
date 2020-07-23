@@ -17,9 +17,9 @@ namespace dgl {
  * \brief Sparse format.
  */
 enum class SparseFormat {
-  kCOO = 0,
-  kCSR = 1,
-  kCSC = 2,
+  kCOO = 1,
+  kCSR = 2,
+  kCSC = 3,
 };
 
 /*!
