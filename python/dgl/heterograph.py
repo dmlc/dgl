@@ -199,7 +199,9 @@ class DGLHeteroGraph(object):
                  node_frames=None,
                  edge_frames=None,
                  **deprecate_kwargs):
-        if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
+        if isinstance(gidx, DGLHeteroGraph):
+            raise DGLError('The input is already a DGLGraph. No need to create it again.')
+        elif not isinstance(gidx, heterograph_index.HeteroGraphIndex):
             dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
                         ' instead of `dgl.DGLGraph(data)`.')
             u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
@@ -4855,6 +4857,8 @@ class DGLHeteroGraph(object):
         DGLHeteroGraph
             Graph in the new ID type.
         """
+        if idtype is None:
+            return self
         if not idtype in (F.int32, F.int64):
             raise DGLError("ID type must be int32 or int64, but got {}.".format(idtype))
         if self.idtype == idtype:
