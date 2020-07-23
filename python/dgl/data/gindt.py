@@ -179,17 +179,17 @@ class GINDataset(object):
                     m_edges += nrow[1]
                     g.add_edges(j, nrow[2:])
 
-                    # add self loop
-                    if self.self_loop:
-                        m_edges += 1
-                        g.add_edge(j, j)
-
                     if (j + 1) % 10 == 0 and self.verbosity is True:
                         print(
                             'processing node {} of graph {}...'.format(
                                 j + 1, i + 1))
                         print('this node has {} edgs.'.format(
                             nrow[1]))
+                
+                # Add self loops
+                if self.self_loop:
+                    m_edges += n_nodes
+                    g.add_edges(F.arange(0, n_nodes), F.arange(0, n_nodes))
 
                 if nattrs != []:
                     nattrs = np.stack(nattrs)
@@ -202,7 +202,7 @@ class GINDataset(object):
                 if len(self.nlabel_dict) > 1:
                     self.nlabels_flag = True
 
-                assert len(g) == n_nodes
+                assert g.number_of_nodes() == n_nodes
 
                 # update statistics of graphs
                 self.n += n_nodes

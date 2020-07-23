@@ -12,7 +12,6 @@ from . import graph_index
 from . import heterograph_index
 from . import utils
 from . import backend as F
-from . import utils
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
@@ -4580,8 +4579,19 @@ class DGLHeteroGraph(object):
         """
         local_node_frames = [fr.clone() for fr in self._node_frames]
         local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        return DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
-                              local_node_frames, local_edge_frames)
+        ret = DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
+                             local_node_frames, local_edge_frames)
+        
+        # Copy misc info
+        if self._batch_num_nodes is not None:
+            new_bnn = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_nodes.items()}
+            ret._batch_num_nodes = new_bnn
+        if self._batch_num_edges is not None:
+            new_bne = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_edges.items()}
+            ret._batch_num_edges = new_bne
+        return ret
 
     @contextmanager
     def local_scope(self):
@@ -4864,9 +4874,9 @@ class DGLHeteroGraph(object):
         if self.idtype == idtype:
             return self
         bits = 32 if idtype == F.int32 else 64
-        return DGLHeteroGraph(self._graph.asbits(bits), self.ntypes, self.etypes,
-                              self._node_frames,
-                              self._edge_frames)
+        ret = copy.copy(self)
+        ret._graph = self._graph.asbits(bits)
+        return ret
 
     def long(self):
         """Cast this graph to use int64 IDs.
