@@ -224,7 +224,7 @@ def run(args, device, data):
             sample_tput.append(sample_time)
             if step % args.log_every == 0:
                 print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f}/{: .3f} s'.format(
-                    g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]), np.sum(sample_tput[-args.log_every:]))
+                    g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]), np.sum(sample_tput[-args.log_every:])))
             start = time.time()
 
         toc = time.time()
