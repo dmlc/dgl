@@ -377,7 +377,8 @@ class BaseHeteroGraph : public runtime::Object {
    * \param preferred_formats Preferred sparse formats.
    * \return Available sparse format.
    */
-  virtual SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const = 0;
+  virtual SparseFormat SelectFormat(
+      dgl_type_t etype, dgl_format_code_t preferred_formats) const = 0;
 
   /*!
    * \brief Return the sparse format in use for the graph.

@@ -296,7 +296,7 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            dgl_format_code_t formats=all_code);
+            dgl_format_code_t formats = all_code);
 
   /*!
    * \brief constructor
@@ -315,7 +315,7 @@ class UnitGraph : public BaseHeteroGraph {
       bool has_in_csr,
       bool has_out_csr,
       bool has_coo,
-      dgl_format_code_t formats=all_code);
+      dgl_format_code_t formats = all_code);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
