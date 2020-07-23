@@ -35,7 +35,8 @@ def _reduce_grad(grad, shape):
     return grad.view(-1, *shape[1:])
 
 def _reduce_last_dim(ufeat, efeat):
-    """Indicates whether to reduce the last dimension in gsddmm,
+    """Indicates whether to reduce the last dimension on edges
+    in the backward pass of spmm,
     if so, use dot instead of mul."""
     ushp = ufeat.shape
     eshp = efeat.shape
