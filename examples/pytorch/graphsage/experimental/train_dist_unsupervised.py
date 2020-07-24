@@ -19,7 +19,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
-from pyinstrument import Profiler
+#from pyinstrument import Profiler
 
 class NegativeSampler(object):
     def __init__(self, g, neg_nseeds):
@@ -162,14 +162,10 @@ def run(args, device, data):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Training loop
-    iter_tput = []
-    sample_tput = []
-    profiler = Profiler()
+    #profiler = Profiler()
     #profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
-        tic = time.time()
-
         sample_time = 0
         copy_time = 0
         forward_time = 0
@@ -177,22 +173,31 @@ def run(args, device, data):
         update_time = 0
         num_seeds = 0
         num_inputs = 0
+
+        step_time = []
+        iter_t = []
+        sample_t = []
+        feat_copy_t = []
+        forward_t = []
+        backward_t = []
+        update_t = []
+        iter_tput = []
+
         start = time.time()
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        step_time = []
         for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
             tic_step = time.time()
-            sample_time = tic_step - start
+            sample_t.append(tic_step - start)
 
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             input_nodes = blocks[0].srcdata[dgl.NID]
 
             # Load the input features as well as output labels
-            start = time.time()
             batch_inputs = load_subtensor(g, input_nodes, device)
-            copy_time += time.time() - start
+            copy_time = time.time()
+            feat_copy_t.append(copy_time - tic_step)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -201,8 +206,8 @@ def run(args, device, data):
             optimizer.zero_grad()
             loss.backward()
             compute_end = time.time()
-            forward_time += forward_end - start
-            backward_time += compute_end - forward_end
+            forward_t.append(forward_end - copy_time)
+            backward_t.append(compute_end - forward_end)
 
             # Aggregate gradients in multiple nodes.
             if not args.standalone:
@@ -213,35 +218,31 @@ def run(args, device, data):
                         param.grad.data /= args.num_client
 
             optimizer.step()
-            update_time += time.time() - compute_end
+            update_t.append(time.time() - compute_end)
 
             pos_edges = pos_graph.number_of_edges()
             neg_edges = neg_graph.number_of_edges()
 
-            step_t = time.time() - tic_step
+            step_t = time.time() - start
             step_time.append(step_t)
-            iter_tput.append(pos_edges / (step_t + sample_time))
-            sample_tput.append(sample_time)
+            iter_tput.append(pos_edges / step_t)
+            num_seeds += pos_edges
             if step % args.log_every == 0:
-                print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f}/{: .3f} s'.format(
-                    g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]), np.sum(sample_tput[-args.log_every:])))
+                print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s' \
+                        '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
+                    g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]),
+                    np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
+                    np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
-        toc = time.time()
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
-            g.rank(), toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
+            g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
         epoch += 1
 
-        #if epoch % args.eval_every == 0 and epoch != 0:
-        #    eval_acc = evaluate(model, g, g.ndata['features'], g.ndata['labels'], val_nid, args.batch_size, device)
-        #    print('Eval Acc {:.4f}'.format(eval_acc))
-
-    #profiler.stop()
-    #print(profiler.output_text(unicode=True, color=True))
-    # clean up
     if not args.standalone:
         g._client.barrier()
 
+        # save features into file
         if g.rank() == 0:
             feat = g.ndata['features']
             th.save(feat, 'feat.pt')
