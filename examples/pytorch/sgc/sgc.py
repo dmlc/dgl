@@ -76,7 +76,9 @@ def main(args):
                    cached=True,
                    bias=args.bias)
 
-    if cuda: model.cuda()
+    if cuda:
+        model.cuda()
+        g = g.to(args.gpu)
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer

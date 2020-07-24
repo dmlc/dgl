@@ -61,14 +61,14 @@ class Model(nn.Module):
         return out
 
 
-def calc_weight(g, device):
+def calc_weight(g):
     """
     Compute row_normalized(D^(-1/2)AD^(-1/2))
     """
     with g.local_scope():
         # compute D^(-0.5)*D(-1/2), assuming A is Identity
-        g.ndata["in_deg"] = g.in_degrees().float().to(device).pow(-0.5)
-        g.ndata["out_deg"] = g.out_degrees().float().to(device).pow(-0.5)
+        g.ndata["in_deg"] = g.in_degrees().float().pow(-0.5)
+        g.ndata["out_deg"] = g.out_degrees().float().pow(-0.5)
         g.apply_edges(fn.u_mul_v("out_deg", "in_deg", "weight"))
         # row-normalize weight
         g.update_all(fn.copy_e("weight", "msg"), fn.sum("msg", "norm"))
@@ -76,13 +76,13 @@ def calc_weight(g, device):
         return g.edata["weight"]
 
 
-def preprocess(g, features, args, device):
+def preprocess(g, features, args):
     """
     Pre-compute the average of n-th hop neighbors
     """
     with torch.no_grad():
-        g.edata["weight"] = calc_weight(g, device)
-        g.ndata["feat_0"] = features.to(device)
+        g.edata["weight"] = calc_weight(g)
+        g.ndata["feat_0"] = features
         for hop in range(1, args.R + 1):
             g.update_all(fn.u_mul_e(f"feat_{hop-1}", "weight", "msg"),
                          fn.sum("msg", f"feat_{hop}"))
@@ -94,11 +94,12 @@ def preprocess(g, features, args, device):
 
 def prepare_data(device, args):
     data = load_dataset(args.dataset)
-    g, features, labels, n_classes, train_nid, val_nid, test_nid = data
-    in_feats = features.shape[1]
-    feats = preprocess(g, features, args, device)
+    g, n_classes, train_nid, val_nid, test_nid = data
+    g = g.to(device)
+    in_feats = g.ndata['feat'].shape[1]
+    feats = preprocess(g, g.ndata['feat'], args)
+    labels = g.ndata['label']
     # move to device
-    labels = labels.to(device)
     train_nid = train_nid.to(device)
     val_nid = val_nid.to(device)
     test_nid = test_nid.to(device)

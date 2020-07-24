@@ -125,6 +125,9 @@ def graph(data,
           ndata_schemes={}
           edata_schemes={})
     """
+    if isinstance(data, DGLHeteroGraph):
+        return data.astype(idtype).to(device)
+
     if card is not None:
         dgl_warning("Argument 'card' will be deprecated. "
                     "Please use num_nodes={} instead.".format(card))
