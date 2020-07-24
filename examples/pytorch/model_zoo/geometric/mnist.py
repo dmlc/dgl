@@ -33,6 +33,7 @@ A = grid_graph(28, 8, metric)
 
 coarsening_levels = 4
 L, perm = coarsen(A, coarsening_levels)
+print(perm)
 g_arr = [DGLGraph(csr) for csr in L]
 
 coordinate_arr = get_coordinates(g_arr, grid_side, coarsening_levels, perm)
