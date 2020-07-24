@@ -218,7 +218,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     ----------
     g : DistGraph
         The distributed graph.
-    nodes : tensor
+    nodes : tensor or dict
         Node ids to sample neighbors from.
     fanout : int
         The number of sampled neighbors for each node.
@@ -238,6 +238,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         ``nodes``. The sampled subgraph has the same metagraph as the original
         one.
     """
+    if isinstance(nodes, dict):
+        assert len(nodes) == 1, 'The distributed sampler only supports one node type for now.'
+        nodes = list(nodes.values())[0]
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
@@ -267,6 +270,9 @@ def in_subgraph(g, nodes):
     DGLHeteroGraph
         The subgraph.
     """
+    if isinstance(nodes, dict):
+        assert len(nodes) == 1, 'The distributed in_subgraph only supports one node type for now.'
+        nodes = list(nodes.values())[0]
     def issue_remote_req(node_ids):
         return InSubgraphRequest(node_ids)
     def local_access(local_g, partition_book, local_nids):

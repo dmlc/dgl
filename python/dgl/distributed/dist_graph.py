@@ -372,6 +372,44 @@ class DistGraph:
         """
         return self._edata
 
+    @property
+    def ntypes(self):
+        """Return the list of node types of this graph.
+
+        Returns
+        -------
+        list of str
+
+        Examples
+        --------
+
+        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
+        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g.ntypes
+        ['user', 'game']
+        """
+        return self._g._ntypes
+
+    @property
+    def etypes(self):
+        """Return the list of edge types of this graph.
+
+        Returns
+        -------
+        list of str
+
+        Examples
+        --------
+
+        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
+        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g.etypes
+        ['follows', 'plays']
+        """
+        return self._g._etypes
+
     def number_of_nodes(self):
         """Return the number of nodes"""
         return self._num_nodes
