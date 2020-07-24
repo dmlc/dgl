@@ -191,10 +191,9 @@ def _gspmm(gidx, op, reduce_op, u, e):
     srctype, dsttype = gidx.metagraph.find_edge(0)
     num_rows = gidx.number_of_nodes(dsttype)
     num_cols = gidx.number_of_nodes(srctype)
-    key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, indice_type, feat_type)
-    print(key)
+    target = F.device_type(ctx)
+    key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, indice_type, feat_type, target)
     if key not in compiled_gspmm_kernels:
-        target = F.device_type(ctx)
         if target == 'cuda':
             tvm_ctx = tvm.gpu(0)
         elif target == 'cpu':
@@ -216,7 +215,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
             lhs_offset.copyfrom(lhs_off)
             rhs_offset.copyfrom(rhs_off)
             compiled += (lhs_offset, rhs_offset)
-        compiled_gsddmm_kernels[key] = compiled
+        compiled_gspmm_kernels[key] = compiled
     else:
         compiled = compiled_gspmm_kernels[key]
     mod, v_shp, lhs_len, rhs_len, out_len = compiled[:5]
@@ -329,10 +328,10 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     srctype, dsttype = gidx.metagraph.find_edge(0)
     num_cols = gidx.number_of_nodes(dsttype)
     num_rows = gidx.number_of_nodes(srctype)
+    target = F.device_type(ctx)
     key = (num_rows, num_cols, nnz, op, lhs_target, rhs_target, \
-         lhs_shp, rhs_shp, indice_type, feat_type)
+         lhs_shp, rhs_shp, indice_type, feat_type, target)
     if key not in compiled_gsddmm_kernels:
-        target = F.device_type(ctx)
         if target == 'cuda':
             tvm_ctx = tvm.gpu(0)
         elif target == 'cpu':
