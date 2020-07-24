@@ -8,15 +8,16 @@ def check_graph_equal(g1, g2, check_feature=True):
     assert g1.idtype == g2.idtype
     assert g1.ntypes == g2.ntypes
     assert g1.etypes == g2.etypes
+    assert g1.srctypes == g2.srctypes
+    assert g1.dsttypes == g2.dsttypes
     assert g1.canonical_etypes == g2.canonical_etypes
+    assert g1.batch_size == g2.batch_size
     for nty in g1.ntypes:
         assert g1.number_of_nodes(nty) == g2.number_of_nodes(nty)
-    for ety in g1.etypes:
-        if len(g1._etype2canonical[ety]) > 0:
-            assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
-
+        assert F.allclose(g1.batch_num_nodes(nty), g2.batch_num_nodes(nty))
     for ety in g1.canonical_etypes:
         assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
+        assert F.allclose(g1.batch_num_edges(ety), g2.batch_num_edges(ety))
         src1, dst1, eid1 = g1.edges(etype=ety, form='all')
         src2, dst2, eid2 = g2.edges(etype=ety, form='all')
         assert F.allclose(src1, src2)

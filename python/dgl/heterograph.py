@@ -285,17 +285,33 @@ class DGLHeteroGraph(object):
         self._edge_frames = edge_frames
 
     def __getstate__(self):
-        return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
+        metainfo = (self._ntypes, self._etypes, self._canonical_etypes,
+                    self._srctypes_invmap, self._dsttypes_invmap,
+                    self._is_unibipartite, self._etype2canonical, self._etypes_invmap)
+        return (self._graph, metainfo,
+                self._node_frames, self._edge_frames,
+                self._batch_num_nodes, self._batch_num_edges)
 
     def __setstate__(self, state):
         # Compatibility check
         # TODO: version the storage
-        if isinstance(state, tuple) and len(state) == 5:
-            # DGL 0.4.3+
+        if isinstance(state, tuple) and len(state) == 6:
+            # DGL >= 0.5
+            #TODO(minjie): too many states in python; should clean up and lower to C
+            (self._graph, metainfo, self._node_frames, self._edge_frames,
+                    self._batch_num_nodes, self._batch_num_edges) = state
+            (self._ntypes, self._etypes, self._canonical_etypes,
+                    self._srctypes_invmap, self._dsttypes_invmap,
+                    self._is_unibipartite, self._etype2canonical,
+                    self._etypes_invmap) = metainfo
+        elif isinstance(state, tuple) and len(state) == 5:
+            # DGL == 0.4.3
+            dgl_warning("The object is pickled with DGL == 0.4.3.  "
+                        "Some of the original attributes are ignored.")
             self._init(*state)
         elif isinstance(state, dict):
-            # DGL 0.4.2-
-            dgl_warning("The object is pickled with DGL version 0.4.2-.  "
+            # DGL <= 0.4.2
+            dgl_warning("The object is pickled with DGL <= 0.4.2.  "
                         "Some of the original attributes are ignored.")
             self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
                        state['_edge_frames'])
@@ -326,11 +342,11 @@ class DGLHeteroGraph(object):
         #TODO(minjie): too many states in python; should clean up and lower to C
         obj = DGLHeteroGraph.__new__(DGLHeteroGraph)
         obj._graph = self._graph
-        obj._canonical_etypes = self._canonical_etypes
         obj._batch_num_nodes = self._batch_num_nodes
         obj._batch_num_edges = self._batch_num_edges
         obj._ntypes = self._ntypes
         obj._etypes = self._etypes
+        obj._canonical_etypes = self._canonical_etypes
         obj._srctypes_invmap = self._srctypes_invmap
         obj._dsttypes_invmap = self._dsttypes_invmap
         obj._is_unibipartite = self._is_unibipartite
