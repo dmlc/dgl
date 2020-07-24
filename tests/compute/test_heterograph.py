@@ -80,13 +80,13 @@ def create_test_heterograph3(idtype):
     wishes_nx.add_edge('u2', 'g0', id=1)
 
     follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows',
-            idtype=idtype, device=device).format('coo')
+            idtype=idtype, device=device).formats('coo')
     plays_g = dgl.bipartite([(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game',
-            idtype=idtype, device=device).format('coo')
+            idtype=idtype, device=device).formats('coo')
     wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game',
-            idtype=idtype, device=device).format('coo')
+            idtype=idtype, device=device).formats('coo')
     develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game',
-            idtype=idtype, device=device).format('coo')
+            idtype=idtype, device=device).formats('coo')
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     assert g.idtype == idtype
     assert g.device == device
@@ -1320,7 +1320,7 @@ def test_subgraph(idtype):
     if F._default_context_str != 'gpu':
         # TODO(minjie): enable this later
         for fmt in ['csr', 'csc', 'coo']:
-            g = dgl.graph([(0, 1), (1, 2)]).format(fmt)
+            g = dgl.graph([(0, 1), (1, 2)]).formats(fmt)
             sg = g.subgraph({g.ntypes[0]: [1, 0]})
             nids = F.asnumpy(sg.ndata[dgl.NID])
             assert np.array_equal(nids, np.array([1, 0]))
@@ -1857,40 +1857,40 @@ def test_dtype_cast(idtype):
 @parametrize_dtype
 def test_format(idtype):
     # single relation
-    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx()).format('coo')
-    assert g.format()['created'] == ['coo']
-    assert len(g.format()['not created']) == 0
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx()).formats('coo')
+    assert g.formats()['created'] == ['coo']
+    assert len(g.formats()['not created']) == 0
     try:
         spmat = g.adjacency_matrix(scipy_fmt="csr")
     except:
-        print('test passed, graph with restrict_format coo should not create csr matrix.')
+        print('test passed, graph with allowed format coo should not create csr matrix.')
     else:
-        assert False, 'cannot create csr when restrict_format is coo'
-    g1 = g.format('any')
-    assert len(g1.format()['created']) + len(g1.format()['not created']) == 3
+        assert False, 'cannot create csr when allowed format is coo'
+    g1 = g.formats(['coo', 'csr', 'csc'])
+    assert len(g1.formats()['created']) + len(g1.formats()['not created']) == 3
     g1.create_format_()
-    assert len(g1.format()['created']) == 3
-    assert g.format()['created'] == ['coo']
+    assert len(g1.formats()['created']) == 3
+    assert g.formats()['created'] == ['coo']
 
     # multiple relation
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
         ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-        }, idtype=idtype, device=F.ctx()).format('csr')
+        }, idtype=idtype, device=F.ctx()).formats('csr')
     user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
     g['follows'].srcdata['h'] = user_feat
-    assert g.format()['created'] == ['csr']
-    assert len(g.format()['not created']) == 0
+    assert g.formats()['created'] == ['csr']
+    assert len(g.formats()['not created']) == 0
 
-    g1 = g.format('csc')
+    g1 = g.formats('csc')
     # test frame
     assert F.array_equal(g1['follows'].srcdata['h'], user_feat)
     # test each relation graph
-    assert g1.format()['created'] == ['csc']
-    assert len(g1.format()['not created']) == 0
-    assert g.format()['created'] == ['csr']
-    assert len(g.format()['not created']) == 0
+    assert g1.formats()['created'] == ['csc']
+    assert len(g1.formats()['not created']) == 0
+    assert g.formats()['created'] == ['csr']
+    assert len(g.formats()['not created']) == 0
 
 @parametrize_dtype
 def test_edges_order(idtype):
@@ -1900,7 +1900,7 @@ def test_edges_order(idtype):
         np.array([2, 2, 1, 1, 1])
     ), idtype=idtype, device=F.ctx())
 
-    print(g.format())
+    print(g.formats())
     src, dst = g.all_edges(order='srcdst')
     assert F.array_equal(src, F.tensor([0, 0, 0, 1, 2], dtype=idtype))
     assert F.array_equal(dst, F.tensor([1, 1, 2, 2, 1], dtype=idtype))
@@ -1921,11 +1921,11 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csr'
-    gidx = gidx.to_format('csr')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csr')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
-    assert 'csr' in gidx.format()['created']
-    assert 'csc' in r_gidx.format()['created']
+    assert 'csr' in gidx.formats()['created']
+    assert 'csc' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
     g_s, g_d, _ = gidx.edges(0)
@@ -1934,11 +1934,11 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csc'
-    gidx = gidx.to_format('csc')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csc')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
-    assert 'csc' in gidx.format()['created']
-    assert 'csr' in r_gidx.format()['created']
+    assert 'csc' in gidx.formats()['created']
+    assert 'csr' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
     g_s, g_d, _ = gidx.edges(0)
@@ -1981,12 +1981,12 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csr'
-    gidx = gidx.to_format('csr')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csr')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
     # three node types and three edge types
-    assert 'csr' in gidx.format()['created']
-    assert 'csc' in r_gidx.format()['created']
+    assert 'csr' in gidx.formats()['created']
+    assert 'csc' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
     assert gidx.number_of_nodes(2) == r_gidx.number_of_nodes(2)
@@ -2007,12 +2007,12 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csc'
-    gidx = gidx.to_format('csc')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csc')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
     # three node types and three edge types
-    assert 'csc' in gidx.format()['created']
-    assert 'csr' in r_gidx.format()['created']
+    assert 'csc' in gidx.formats()['created']
+    assert 'csr' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
     assert gidx.number_of_nodes(2) == r_gidx.number_of_nodes(2)

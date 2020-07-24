@@ -48,7 +48,8 @@ class HeteroGraphIndex(ObjectBase):
                 num_dst = number_of_nodes[dst_ntype]
                 src_id, dst_id, _ = edges_per_type
                 rel_graphs.append(create_unitgraph_from_coo(
-                    1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, "any"))
+                    1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id,
+                    ['coo', 'csr', ' csc']))
             self.__init_handle_by_constructor__(
                 _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 
@@ -830,50 +831,49 @@ class HeteroGraphIndex(ObjectBase):
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
-    def format(self):
-        """Return the sparse formats created/not created for the graph.
+    def formats(self, formats=None):
+        """Get a graph index with the specified sparse format(s) or query
+        for the usage status of sparse formats
 
-        Returns
-        -------
-        dict
-            a dict recording the usage status of sparse formats.
-        """
-        format_all = _CAPI_DGLHeteroGetFormatAll(self)
-        format_in_use = _CAPI_DGLHeteroGetFormatInUse(self)
-        created = []
-        not_created = []
-        for fmt in ['coo', 'csr', 'csc']:
-            if fmt in format_all:
-                if fmt in format_in_use:
-                    created.append(fmt)
-                else:
-                    not_created.append(fmt)
-        return {
-            'created': created,
-            'not created': not_created
-        }
-
-    def to_format(self, formats):
-        """Return a clone graph index but stored in the given sparse formats.
+        If the graph has multiple edge types, they will have the same 
+        sparse format.
 
         Parameters
         ----------
         formats : str or list of str or None
 
-            * If format is None, return the usage status of sparse formats
-            * If format is ``'any'``, indicating all formats are available.
+            * If formats is None, return the usage status of sparse formats
             * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
             them, specifying the sparse formats to use.
 
         Returns
         -------
-        A new graph index.
+        dict or GraphIndex
+
+            * If formats is None, the result will be a dict recording the usage status of sparse formats.
+            * Otherwise, a GraphIndex will be returned, which is a clone of the 
+            original graph with the specified sparse format(s) ``formats``.
+
         """
-        if formats == 'any':
-            formats = ['coo', 'csr', 'csc']
-        if isinstance(formats, str):
-            formats = [formats]
-        return _CAPI_DGLHeteroGetFormatGraph(self, formats)
+        formats_allowed = _CAPI_DGLHeteroGetFormatAll(self)
+        formats_created = _CAPI_DGLHeteroGetFormatInUse(self)
+        created = []
+        not_created = []
+        if formats is None:
+            for fmt in ['coo', 'csr', 'csc']:
+                if fmt in formats_allowed:
+                    if fmt in formats_created:
+                        created.append(fmt)
+                    else:
+                        not_created.append(fmt)
+            return {
+                'created': created,
+                'not created': not_created
+            }
+        else:
+            if isinstance(formats, str):
+                formats = [formats]
+            return _CAPI_DGLHeteroGetFormatGraph(self, formats)
 
     def create_format_(self):
         """Create all sparse matrices allowed for the graph."""
@@ -953,14 +953,12 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
     col : utils.Index
         Col index.
     formats : list of str.
-        Restrict the storage formats available for the unit graph.
+        Restrict the storage formats allowed for the unit graph.
 
     Returns
     -------
     HeteroGraphIndex
     """
-    if formats == 'any':
-        formats = ['coo', 'csr', 'csc']
     if isinstance(formats, str):
         formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
@@ -987,14 +985,12 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     edge_ids : utils.Index
         Edge shuffle id.
     formats : str
-        Restrict the storage formats available for the unit graph.
+        Restrict the storage formats allowed for the unit graph.
 
     Returns
     -------
     HeteroGraphIndex
     """
-    if formats == 'any':
-        formats = ['coo', 'csr', 'csc']
     if isinstance(formats, str):
         formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(

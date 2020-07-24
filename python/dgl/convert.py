@@ -26,7 +26,7 @@ def graph(data,
           ntype='_N', etype='_E',
           num_nodes=None,
           validate=True,
-          formats='any',
+          formats=['coo', 'csr', 'csc'],
           idtype=None,
           device=None,
           card=None, **kwargs):
@@ -59,8 +59,7 @@ def graph(data,
         If False and card is not None, user would receive a warning.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Valid options are int32 or int64. If None, try infer from
         the given data.
@@ -149,7 +148,7 @@ def bipartite(data,
               utype='_U', etype='_E', vtype='_V',
               num_nodes=None,
               validate=True,
-              formats='any',
+              formats=['coo', 'csr', 'csc'],
               idtype=None,
               device=None,
               card=None, **kwargs):
@@ -187,8 +186,7 @@ def bipartite(data,
         If False and card is not None, user would receive a warning.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Valid options are int32 or int64. If None, try infer from
         the given data.
@@ -404,7 +402,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
 def heterograph(data_dict,
                 num_nodes_dict=None,
                 validate=True,
-                formats='any',
+                formats=['coo', 'csr', 'csc'],
                 idtype=None,
                 device=None):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.
@@ -430,8 +428,7 @@ def heterograph(data_dict,
         If False and num_nodes_dict is not None, user would receive a warning.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Valid options are int32 or int64. If None, try infer from
         the given data.
@@ -765,7 +762,7 @@ def from_networkx(nx_graph, *,
                   node_attrs=None,
                   edge_attrs=None,
                   edge_id_attr_name='id',
-                  formats='any',
+                  formats=['coo', 'csr', 'csc'],
                   idtype=None):
     """Create a DGLGraph from networkx.
     Parameters
@@ -782,8 +779,7 @@ def from_networkx(nx_graph, *,
         Names for edge features to retrieve from the NetworkX graph (Default: None)
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     edge_id_attr_name : str, optional
         Key name for edge ids in the NetworkX graph. If not found, we
         will consider the graph not to have pre-specified edge ids. (Default: 'id')
@@ -908,7 +904,7 @@ def create_from_edges(u, v,
                       utype, etype, vtype,
                       urange, vrange,
                       validate=True,
-                      formats='any'):
+                      formats=['coo', 'csr', 'csc']):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -935,8 +931,7 @@ def create_from_edges(u, v,
         If True, checks if node IDs are within range.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
 
     Returns
     -------

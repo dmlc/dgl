@@ -205,7 +205,7 @@ class DGLHeteroGraph(object):
                         ' instead of `dgl.DGLGraph(data)`.')
             u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
             gidx = heterograph_index.create_unitgraph_from_coo(
-                1, num_src, num_dst, u, v, "any")
+                1, num_src, num_dst, u, v, ['coo', 'csr', 'csc'])
         if len(deprecate_kwargs) != 0:
             dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
@@ -465,7 +465,7 @@ class DGLHeteroGraph(object):
                         (num if self.get_ntype_id(c_etype[2]) == ntid else 0),
                     u,
                     v,
-                    'any')
+                    ['coo', 'csr', 'csc'])
                 relation_graphs.append(hgidx)
             else:
                 # do nothing
@@ -648,7 +648,7 @@ class DGLHeteroGraph(object):
                     self.number_of_nodes(v_type),
                     F.cat([old_u, u], dim=0),
                     F.cat([old_v, v], dim=0),
-                    'any')
+                    ['coo', 'csr', 'csc'])
                 relation_graphs.append(hgidx)
             else:
                 # do nothing
@@ -4590,11 +4590,11 @@ class DGLHeteroGraph(object):
         
         # Copy misc info
         if self._batch_num_nodes is not None:
-            new_bnn = {k : F.copy_to(num, device, **kwargs)
+            new_bnn = {k : F.copy_to(num, self.device)
                        for k, num in self._batch_num_nodes.items()}
             ret._batch_num_nodes = new_bnn
         if self._batch_num_edges is not None:
-            new_bne = {k : F.copy_to(num, device, **kwargs)
+            new_bne = {k : F.copy_to(num, self.device)
                        for k, num in self._batch_num_edges.items()}
             ret._batch_num_edges = new_bne
         return ret
@@ -4656,7 +4656,7 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-    def format(self, formats=None):
+    def formats(self, formats=None):
         r"""Get a cloned graph with the specified sparse format(s) or query 
         for the usage status of sparse formats
 
@@ -4670,7 +4670,6 @@ class DGLHeteroGraph(object):
         formats : str or list of str or None
 
             * If formats is None, return the usage status of sparse formats
-            * If formats is ``'any'``, indicating all formats are available.
             * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
             them, specifying the sparse formats to use.
 
@@ -4678,7 +4677,7 @@ class DGLHeteroGraph(object):
         -------
         dict or DGLGraph
 
-            * If format is None, the result will be a dict recording the usage status of sparse formats.
+            * If formats is None, the result will be a dict recording the usage status of sparse formats.
             * Otherwise, a DGLGraph will be returned, which is a clone of the 
             original graph with the specified sparse format(s) ``formats``.
 
@@ -4695,12 +4694,12 @@ class DGLHeteroGraph(object):
         >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
         >>> g.ndata['h'] = torch.ones(4, 1)
         >>> # Check status of format usage
-        >>> g.format()
+        >>> g.formats()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
         >>> # Get a clone of the graph with 'csr' format
-        >>> csr_g = g.format('csr')
+        >>> csr_g = g.formats('csr')
         >>> # Only allowed formats will be displayed in the status query
-        >>> csr_g.format()
+        >>> csr_g.formats()
         {'created': ['csr'], 'not created': []}
         >>> # Features are copied as well
         >>> csr_g.ndata['h']
@@ -4717,17 +4716,17 @@ class DGLHeteroGraph(object):
         >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), 
         >>>                                         torch.tensor([0, 1]))
         >>>     })
-        >>> g.format()
+        >>> g.formats()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
         >>> # Get a clone of the graph with 'csr' format
-        >>> csr_g = g.format('csr')
+        >>> csr_g = g.formats('csr')
         >>> # Only allowed formats will be displayed in the status query
-        >>> csr_g.format()
+        >>> csr_g.formats()
         {'created': ['csr'], 'not created': []}
         """
         if formats is None:
-            return self._graph.format()
-        return DGLHeteroGraph(self._graph.to_format(formats), self.ntypes, self.etypes,
+            return self._graph.formats()
+        return DGLHeteroGraph(self._graph.formats(formats), self.ntypes, self.etypes,
                               self._node_frames,
                               self._edge_frames)
 
