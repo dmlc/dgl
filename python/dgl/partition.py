@@ -202,7 +202,14 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
 
     # When balancing edges in partitions, we use in-degree as one of the weights.
     if balance_edges:
-        vwgt.append(F.astype(g.in_degrees(), F.int64))
+        if balance_ntypes is None:
+            vwgt.append(F.astype(g.in_degrees(), F.int64))
+        else:
+            for ntype in uniq_ntypes:
+                nids = F.nonzero_1d(balance_ntypes == ntype)
+                degs = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
+                degs[nids] = g.in_degrees(nids)
+                vwgt.append(degs)
 
     # The vertex weights have to be stored in a vector.
     if len(vwgt) > 0:
