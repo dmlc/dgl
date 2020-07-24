@@ -83,7 +83,6 @@ class GSpMM(th.autograd.Function):
             if reduce_op == 'sum':
                 if op == 'mul' and _need_reduce_last_dim(X, Y):
                     dY = _gsddmm(gidx, 'dot', X, dZ)
-                    return None, None, None, dX, dY
                 elif op in ['mul', 'div']:
                     dY = _gsddmm(gidx, 'mul', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)
