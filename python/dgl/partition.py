@@ -206,10 +206,10 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
             vwgt.append(F.astype(g.in_degrees(), F.int64))
         else:
             for ntype in uniq_ntypes:
-                nids = F.nonzero_1d(balance_ntypes == ntype)
-                degs = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
-                degs[nids] = g.in_degrees(nids)
-                vwgt.append(degs)
+                nids = F.asnumpy(F.nonzero_1d(balance_ntypes == ntype))
+                degs = np.zeros((g.number_of_nodes(),), np.int64)
+                degs[nids] = F.asnumpy(g.in_degrees(nids))
+                vwgt.append(F.tensor(degs))
 
     # The vertex weights have to be stored in a vector.
     if len(vwgt) > 0:
