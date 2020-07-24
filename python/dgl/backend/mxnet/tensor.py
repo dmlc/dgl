@@ -356,7 +356,7 @@ def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = np.nonzero(tmp)[0]
-    return nd.array(tmp, ctx=input.context, dtype=input.dtype)
+    return nd.array(tmp, ctx=input.context, dtype=tmp.dtype)
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.
