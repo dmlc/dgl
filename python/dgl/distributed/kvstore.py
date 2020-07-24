@@ -612,6 +612,9 @@ class KVServer(object):
         # Basic information
         self._server_id = server_id
         self._server_namebook = rpc.read_ip_config(ip_config)
+        assert server_id in self._server_namebook, \
+                'Trying to start server {}, but there are {} servers in the config file'.format(
+                    server_id, len(self._server_namebook))
         self._machine_id = self._server_namebook[server_id][0]
         self._group_count = self._server_namebook[server_id][3]
         # We assume partition_id is equal to machine_id
@@ -700,13 +703,19 @@ class KVServer(object):
         assert len(name) > 0, 'name cannot be empty.'
         if name in self._data_store:
             raise RuntimeError("Data %s has already exists!" % name)
+        self._part_policy[name] = self.find_policy(policy_str)
         if data_tensor is not None: # Create shared-tensor
             data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
             shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-        self._part_policy[name] = self.find_policy(policy_str)
+            assert self._part_policy[name].get_data_size() == data_tensor.shape[0], \
+                    'kvserver expect partition {} for {} has {} rows, but gets {} rows'.format(
+                        self._part_policy[name].part_id,
+                        policy_str,
+                        self._part_policy[name].get_data_size(),
+                        data_tensor.shape[0])
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
 
