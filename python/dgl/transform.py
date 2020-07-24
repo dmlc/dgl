@@ -1072,7 +1072,6 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
                 nids = F.nonzero_1d(balance_ntypes == ntype)
                 degs = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
                 degs[nids] = g.in_degrees(nids)
-                print(degs)
                 vwgt.append(degs)
 
     # The vertex weights have to be stored in a vector.
