@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl import DGLGraph
+import dgl
 from dgl.data import register_data_args, load_data
 from models import *
 from conf import *
@@ -85,13 +85,14 @@ def main(args):
     if args.self_loop:
         g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
-    g = DGLGraph(g)
+    g = dgl.graph(g)
     n_edges = g.number_of_edges()
     # normalization
     degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5)
     norm[torch.isinf(norm)] = 0
     if cuda:
+        g = g.to(torch.device(0))
         norm = norm.cuda()
     g.ndata['norm'] = norm.unsqueeze(1)
 
@@ -103,7 +104,7 @@ def main(args):
                 *config['extra_args'])
 
     if cuda:
-        model.cuda()
+        model = model.cuda()
 
     print(model)
 

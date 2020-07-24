@@ -44,13 +44,15 @@ class EdgeSoftmax(th.autograd.Function):
         # a local variable
         if not is_all(eids):
             g = g.edge_subgraph(eids.type(g.idtype), preserve_nodes=True)
+        # NOTE(zihao): to deal to scalar node scores.
+        input_shape = score.shape
 
         score_max = F.copy_e_max(g, score)
         score = th.exp(F.e_sub_v(g, score, score_max))
         score_sum = F.copy_e_sum(g, score)
         out = F.e_div_v(g, score, score_sum)
 
-        ctx.backward_cache = g
+        ctx.backward_cache = g, input_shape
         ctx.save_for_backward(out)
         return out
 
@@ -70,12 +72,12 @@ class EdgeSoftmax(th.autograd.Function):
             grad_score = sds - out * sds_sum  # multiple expressions
             return grad_score.data
         """
-        g = ctx.backward_cache
+        g, input_shape = ctx.backward_cache
         out, = ctx.saved_tensors
         sds = out * grad_out
         accum = F.copy_e_sum(g, sds)
         grad_score = sds - F.e_mul_v(g, out, accum)
-        return None, grad_score, None
+        return None, grad_score.view(input_shape), None
 
 
 def edge_softmax(graph, logits, eids=ALL):
