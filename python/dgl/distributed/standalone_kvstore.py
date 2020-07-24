@@ -35,6 +35,10 @@ class KVClient(object):
         '''add new data to the client'''
         self._data[name] = init_func(shape, dtype)
 
+    def delete_data(self, name):
+        '''delete the data'''
+        del self._data[name]
+
     def data_name_list(self):
         '''get the names of all data'''
         return list(self._data.keys())
