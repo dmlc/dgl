@@ -133,8 +133,6 @@ class GSpMM(mx.autograd.Function):
             if reduce_op == 'sum':
                 if op == 'mul' and _need_reduce_last_dim(X, Y):
                     dY = _gsddmm(gidx, 'dot', X, dZ)
-                    self.saved_tensors = None
-                    return dX, dY
                 elif op in ['mul', 'div']:
                     dY = _gsddmm(gidx, 'mul', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)

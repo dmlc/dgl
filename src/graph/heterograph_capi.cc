@@ -559,11 +559,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     *rv = ret_list;
 });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCreatedFormats")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> format_list;
-    dgl_format_code_t code = hg->GetRelationGraph(0)->GetFormatInUse();
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetCreatedFormats();
     for (auto format : CodeToSparseFormats(code)) {
       format_list.push_back(
           Value(MakeValue(ToStringSparseFormat(format))));
@@ -571,11 +571,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatInUse")
     *rv = format_list;
 });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatAll")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetAllowedFormats")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> format_list;
-    dgl_format_code_t code = hg->GetRelationGraph(0)->GetFormatAll();
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetAllowedFormats();
     for (auto format : CodeToSparseFormats(code)) {
       format_list.push_back(
           Value(MakeValue(ToStringSparseFormat(format))));
@@ -586,7 +586,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatAll")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    dgl_format_code_t code = hg->GetRelationGraph(0)->GetFormatAll();
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetAllowedFormats();
     for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
       auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
       for (auto format : CodeToSparseFormats(code))

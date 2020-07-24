@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl import DGLGraph
+import dgl
 from dgl.data import register_data_args, load_data
 from models import *
 from conf import *
@@ -89,7 +89,7 @@ def main(args):
                 *config['extra_args'])
 
     if cuda:
-        model.cuda()
+        model = model.cuda()
 
     print(model)
 

@@ -343,12 +343,12 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return SparseFormat::kCOO;
   }
 
-  dgl_format_code_t GetFormatAll() const override {
+  dgl_format_code_t GetAllowedFormats() const override {
     LOG(FATAL) << "Not enabled for COO graph";
     return 0;
   }
 
-  dgl_format_code_t GetFormatInUse() const override {
+  dgl_format_code_t GetCreatedFormats() const override {
     LOG(FATAL) << "Not enabled for COO graph";
     return 0;
   }
@@ -742,12 +742,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return SparseFormat::kCSR;
   }
 
-  dgl_format_code_t GetFormatAll() const override {
+  dgl_format_code_t GetAllowedFormats() const override {
     LOG(FATAL) << "Not enabled for COO graph";
     return 0;
   }
 
-  dgl_format_code_t GetFormatInUse() const override {
+  dgl_format_code_t GetCreatedFormats() const override {
     LOG(FATAL) << "Not enabled for CSR graph";
     return 0;
   }
@@ -1249,7 +1249,7 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
     coo_ = COOPtr(new COO());
   }
   formats_ = formats;
-  dgl_format_code_t created = GetFormatInUse();
+  dgl_format_code_t created = GetCreatedFormats();
   if ((formats | created) != formats)
     LOG(FATAL) << "Graph created from formats: " << CodeToStr(created) <<
       ", which is not compatible with available formats: " << CodeToStr(formats);
@@ -1392,7 +1392,7 @@ HeteroGraphPtr UnitGraph::GetAny() const {
   }
 }
 
-dgl_format_code_t UnitGraph::GetFormatInUse() const {
+dgl_format_code_t UnitGraph::GetCreatedFormats() const {
   dgl_format_code_t ret = 0;
   if (in_csr_->defined())
     ret |= csc_code;
@@ -1403,7 +1403,7 @@ dgl_format_code_t UnitGraph::GetFormatInUse() const {
   return ret;
 }
 
-dgl_format_code_t UnitGraph::GetFormatAll() const {
+dgl_format_code_t UnitGraph::GetAllowedFormats() const {
   return formats_;
 }
 
@@ -1443,10 +1443,10 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
 
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
   dgl_format_code_t common = preferred_formats & formats_;
-  dgl_format_code_t created = GetFormatInUse();
+  dgl_format_code_t created = GetCreatedFormats();
   if (common & created)
     return DecodeFormat(common & created);
-  if (coo_->defined() && coo_->IsHypersparse())
+  if (coo_->defined() && coo_->IsHypersparse())  // only allow coo for hypersparse graph.
     return SparseFormat::kCOO;
   if (common)
     return DecodeFormat(common);

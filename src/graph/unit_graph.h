@@ -251,9 +251,9 @@ class UnitGraph : public BaseHeteroGraph {
    */
   HeteroGraphPtr GetFormat(SparseFormat format) const;
 
-  dgl_format_code_t GetFormatInUse() const override;
+  dgl_format_code_t GetCreatedFormats() const override;
 
-  dgl_format_code_t GetFormatAll() const override;
+  dgl_format_code_t GetAllowedFormats() const override;
 
   HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
