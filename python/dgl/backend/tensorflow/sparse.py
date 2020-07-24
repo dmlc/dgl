@@ -71,7 +71,7 @@ def _reduce_grad(grad, shape):
     grad = tf.reduce_sum(grad, axis=reduce_idx_tensor, keepdims=True)
     return tf.reshape(grad, shape)
 
-def _reduce_last_dim(ufeat, efeat):
+def _need_reduce_last_dim(ufeat, efeat):
     """Indicates whether to reduce the last dimension on edges
     in the backward pass of spmm,
     if so, use dot instead of mul."""
@@ -112,10 +112,10 @@ def gspmm_real(g, op, reduce_op, X, Y):
             dX = _reduce_grad(dX, X.shape)
         if op != 'copy_lhs':
             if reduce_op == 'sum':
-                if op == 'mul' and _reduce_last_dim(X, Y):
+                if op == 'mul' and _need_reduce_last_dim(X, Y):
                     dY = _gsddmm(gidx, 'dot', X, dZ)
                     return dX, dY
-                if op in ['mul', 'div']:
+                elif op in ['mul', 'div']:
                     dY = _gsddmm(gidx, 'mul', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:

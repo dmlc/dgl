@@ -239,10 +239,6 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Return the out-edge CSR in the matrix form */
   aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override;
 
-  /*! \brief some heuristic rules to determine the restrict format. */
-  SparseFormat AutoDetectFormat(
-    CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, dgl_format_code_t formats) const;
-
   SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
     return SelectFormat(preferred_formats);
   }
