@@ -51,7 +51,7 @@ def main(args):
         if args.self_loop:
             g.remove_edges_from(nx.selfloop_edges(g))
             g.add_edges_from(zip(g.nodes(), g.nodes()))
-        g = DGLGraph(g)
+        g = DGLGraph(g).to(device)
         n_edges = g.number_of_edges()
         # normalization
         degs = tf.cast(tf.identity(g.in_degrees()), dtype=tf.float32)

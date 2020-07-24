@@ -61,7 +61,6 @@ class GSpMM(th.autograd.Function):
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
         X, Y, argX, argY = ctx.saved_tensors
-        dX, dY = None, None
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
@@ -79,6 +78,8 @@ class GSpMM(th.autograd.Function):
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX.scatter_add_(0, argX.long(), dZ)
             dX = _reduce_grad(dX, X.shape)
+        else:
+            dX = None
         if op != 'copy_lhs' and ctx.needs_input_grad[4]:
             if reduce_op == 'sum':
                 if op == 'mul' and _need_reduce_last_dim(X, Y):
@@ -97,6 +98,8 @@ class GSpMM(th.autograd.Function):
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY.scatter_add_(0, argY.long(), _addsub(op, dZ))
             dY = _reduce_grad(dY, Y.shape)
+        else:
+            dY = None
         return None, None, None, dX, dY
 
 class GSDDMM(th.autograd.Function):
@@ -112,7 +115,6 @@ class GSDDMM(th.autograd.Function):
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target = ctx.backward_cache
         X, Y = ctx.saved_tensors
-        dX, dY = None, None
         if op != 'copy_rhs' and ctx.needs_input_grad[2]:
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if lhs_target == 'v' else gidx.reverse()
@@ -131,6 +133,8 @@ class GSDDMM(th.autograd.Function):
                 else:  # mul, div, dot
                     dX = _gsddmm(gidx, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
             dX = _reduce_grad(dX, X.shape)
+        else:
+            dX = None
         if op != 'copy_lhs' and ctx.needs_input_grad[3]:
             if rhs_target in ['u', 'v']:
                 _gidx = gidx if rhs_target == 'v' else gidx.reverse()
@@ -151,6 +155,8 @@ class GSDDMM(th.autograd.Function):
                     dY = _gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
                     if op == 'div': dY = -dY / (Y ** 2)
             dY = _reduce_grad(dY, Y.shape)
+        else:
+            dY = None
         return None, None, dX, dY, None, None
 
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
