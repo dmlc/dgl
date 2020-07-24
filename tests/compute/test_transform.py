@@ -490,6 +490,17 @@ def test_metis_partition():
     check_metis_partition(g, 2)
     check_metis_partition_with_constraint(g)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
+def test_hetero_metis_partition():
+    # TODO(zhengda) Metis fails to partition a small graph.
+    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    g = dgl.as_heterograph(g)
+    check_metis_partition(g, 0)
+    check_metis_partition(g, 1)
+    check_metis_partition(g, 2)
+    check_metis_partition_with_constraint(g)
+
+
 def check_metis_partition_with_constraint(g):
     ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
     ntypes[0:int(g.number_of_nodes()/4)] = 1
@@ -1027,12 +1038,12 @@ def test_cast():
     assert F.array_equal(g2dst, gdst)
 
 if __name__ == '__main__':
-    test_reorder_nodes()
+    # test_reorder_nodes()
     # test_line_graph()
     # test_no_backtracking()
-    test_reverse()
+    # test_reverse()
     # test_reverse_shared_frames()
-    test_to_bidirected()
+    # test_to_bidirected()
     # test_simple_graph()
     # test_bidirected_graph()
     # test_khop_adj()
@@ -1041,10 +1052,11 @@ if __name__ == '__main__':
     # test_remove_self_loop()
     # test_add_self_loop()
     # test_partition_with_halo()
-    # test_metis_partition()
+    test_metis_partition()
+    test_hetero_metis_partition()
     # test_hetero_linegraph('int32')
     # test_compact()
-    test_to_simple("int32")
+    # test_to_simple("int32")
     # test_in_subgraph("int32")
     # test_out_subgraph()
     # test_to_block("int32")

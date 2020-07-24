@@ -1,6 +1,8 @@
 """Define sparse embedding and optimizer."""
 
 from .. import backend as F
+from .dist_tensor import DistTensor
+from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY
 
 class SparseNodeEmbedding:
     ''' Sparse embeddings in the distributed KVStore.
@@ -32,7 +34,8 @@ class SparseNodeEmbedding:
     '''
     def __init__(self, g, name, shape, initializer):
         assert shape[0] == g.number_of_nodes()
-        g.init_ndata(name, shape, F.float32, initializer)
+        part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
+        g.ndata[name] = DistTensor(g, shape, F.float32, name, part_policy, initializer)
 
         self._tensor = g.ndata[name]
         self._trace = []

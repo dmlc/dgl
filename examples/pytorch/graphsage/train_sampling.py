@@ -61,7 +61,6 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
@@ -105,6 +104,7 @@ def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
     """
+    labels = labels.long()
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
 def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
