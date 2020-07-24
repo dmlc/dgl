@@ -5,7 +5,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
-import dgl.nn.pytorch as dglnn
+import dgl.nn as dglnn
 import tqdm
 
 class RelGraphConvLayer(nn.Module):
