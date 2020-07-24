@@ -93,7 +93,7 @@ class RelGraphEmbedLayer(nn.Module):
             if input_size[ntype] is not None:
                 input_emb_size = input_size[ntype].shape[1]
                 embed = nn.Parameter(th.Tensor(input_emb_size, self.embed_size))
-                nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
+                nn.init.xavier_uniform_(embed)
                 self.embeds[str(ntype)] = embed
 
         self.node_embeds = th.nn.Embedding(node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)

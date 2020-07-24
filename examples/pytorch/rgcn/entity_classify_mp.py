@@ -262,9 +262,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                 dense_params += list(embed_layer.embeds.parameters())
         optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
         if  n_gpus > 1:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr, weight_decay=args.l2norm)
+            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr)
         else:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr, weight_decay=args.l2norm)
+            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
@@ -278,10 +278,6 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         model.train()
 
         for i, sample_data in enumerate(loader):
-            optimizer.zero_grad()
-            if args.sparse_embedding:
-                emb_optimizer.zero_grad()
-
             seeds, blocks = sample_data
             t0 = time.time()
             if args.mix_cpu_gpu is False:
@@ -297,6 +293,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             logits = model(blocks, feats)
             loss = F.cross_entropy(logits, labels[seeds])
             t1 = time.time()
+            optimizer.zero_grad()
+            if args.sparse_embedding:
+                emb_optimizer.zero_grad()
+
             loss.backward()
             optimizer.step()
             if args.sparse_embedding:
@@ -312,7 +312,6 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, i, forward_time[-1], backward_time[-1]))
 
-        gc.collect()
         # only process 0 will do the evaluation
         if (queue is not None) or (proc_id == 0):
             model.eval()
@@ -520,6 +519,7 @@ def main(args, devices):
     loc = (node_tids == category_id)
     target_idx = node_ids[loc]
     target_idx.share_memory_()
+    train_idx.share_memory_()
     val_idx.share_memory_()
     test_idx.share_memory_()
 
