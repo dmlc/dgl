@@ -98,6 +98,17 @@ def test_topology(idtype):
     check_equivalence_between_heterographs(g1, g3)
     check_equivalence_between_heterographs(g2, g4)
 
+    # Test dtype cast
+    if idtype == "int32":
+        bg_cast = bg.long()
+    else:
+        bg_cast = bg.int()
+    assert bg.batch_size == bg_cast.batch_size
+
+    # Test local var
+    bg_local = bg.local_var()
+    assert bg.batch_size == bg_local.batch_size
+
 @parametrize_dtype
 def test_batching_batched(idtype):
     """Test batching a DGLHeteroGraph and a BatchedDGLHeteroGraph."""
