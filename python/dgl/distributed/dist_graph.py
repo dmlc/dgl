@@ -544,7 +544,7 @@ def _split_even(partition_book, rank, elements):
         return eles[offsets[rank-1]:offsets[rank]]
 
 
-def node_split(nodes, partition_book, rank=None, force_even=False):
+def node_split(nodes, partition_book=None, rank=None, force_even=True):
     ''' Split nodes and return a subset for the local rank.
 
     This function splits the input nodes based on the partition book and
@@ -580,6 +580,10 @@ def node_split(nodes, partition_book, rank=None, force_even=False):
         The vector of node Ids that belong to the rank.
     '''
     num_nodes = 0
+    if not isinstance(nodes, DistTensor):
+        assert partition_book is not None, 'Regular tensor requires a partition book.'
+    elif partition_book is None:
+        partition_book = nodes.part_policy.partition_book
     for part in partition_book.metadata():
         num_nodes += part['num_nodes']
     assert len(nodes) == num_nodes, \
@@ -591,7 +595,7 @@ def node_split(nodes, partition_book, rank=None, force_even=False):
         local_nids = partition_book.partid2nids(partition_book.partid)
         return _split_local(partition_book, rank, nodes, local_nids)
 
-def edge_split(edges, partition_book, rank=None, force_even=False):
+def edge_split(edges, partition_book=None, rank=None, force_even=True):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
@@ -627,6 +631,10 @@ def edge_split(edges, partition_book, rank=None, force_even=False):
         The vector of edge Ids that belong to the rank.
     '''
     num_edges = 0
+    if not isinstance(edges, DistTensor):
+        assert partition_book is not None, 'Regular tensor requires a partition book.'
+    elif partition_book is None:
+        partition_book = edges.part_policy.partition_book
     for part in partition_book.metadata():
         num_edges += part['num_edges']
     assert len(edges) == num_edges, \
