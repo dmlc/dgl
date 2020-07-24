@@ -210,13 +210,6 @@ def run(args, device, data):
             backward_t.append(compute_end - forward_end)
 
             # Aggregate gradients in multiple nodes.
-            if not args.standalone:
-                for param in model.parameters():
-                    if param.requires_grad and param.grad is not None:
-                        th.distributed.all_reduce(param.grad.data,
-                                                  op=th.distributed.ReduceOp.SUM)
-                        param.grad.data /= args.num_client
-
             optimizer.step()
             update_t.append(time.time() - compute_end)
 
