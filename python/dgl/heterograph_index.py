@@ -25,7 +25,12 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        return _CAPI_DGLHeteroPickle(self)
+        """Issue: https://github.com/pytorch/pytorch/issues/32351
+           Need to set the tensor created in the __getstate__ function
+            as object attribute to avoid potential bugs
+        """
+        self._pk_state = _CAPI_DGLHeteroPickle(self)
+        return self._pk_state
 
     def __setstate__(self, state):
         self._cache = {}
@@ -1230,8 +1235,12 @@ class HeteroPickleStates(ObjectBase):
         return [arr_func(i) for i in range(num_arr)]
 
     def __getstate__(self):
-        arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
-        return self.version, self.meta, arrays
+        """Issue: https://github.com/pytorch/pytorch/issues/32351
+           Need to set the tensor created in the __getstate__ function
+            as object attribute to avoid potential bugs
+        """
+        self._pk_arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
+        return self.version, self.meta, self._pk_arrays
 
     def __setstate__(self, state):
         if isinstance(state[0], int):
@@ -1244,4 +1253,5 @@ class HeteroPickleStates(ObjectBase):
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
             self.__init_handle_by_constructor__(
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
+
 _init_api("dgl.heterograph_index")
