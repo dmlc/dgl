@@ -205,7 +205,7 @@ class DGLHeteroGraph(object):
                         ' instead of `dgl.DGLGraph(data)`.')
             u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
             gidx = heterograph_index.create_unitgraph_from_coo(
-                1, num_src, num_dst, u, v, "any")
+                1, num_src, num_dst, u, v, ['coo', 'csr', 'csc'])
         if len(deprecate_kwargs) != 0:
             dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
@@ -465,7 +465,7 @@ class DGLHeteroGraph(object):
                         (num if self.get_ntype_id(c_etype[2]) == ntid else 0),
                     u,
                     v,
-                    'any')
+                    ['coo', 'csr', 'csc'])
                 relation_graphs.append(hgidx)
             else:
                 # do nothing
@@ -648,7 +648,7 @@ class DGLHeteroGraph(object):
                     self.number_of_nodes(v_type),
                     F.cat([old_u, u], dim=0),
                     F.cat([old_v, v], dim=0),
-                    'any')
+                    ['coo', 'csr', 'csc'])
                 relation_graphs.append(hgidx)
             else:
                 # do nothing
@@ -4590,11 +4590,11 @@ class DGLHeteroGraph(object):
         
         # Copy misc info
         if self._batch_num_nodes is not None:
-            new_bnn = {k : F.copy_to(num, device, **kwargs)
+            new_bnn = {k : F.copy_to(num, self.device)
                        for k, num in self._batch_num_nodes.items()}
             ret._batch_num_nodes = new_bnn
         if self._batch_num_edges is not None:
-            new_bne = {k : F.copy_to(num, device, **kwargs)
+            new_bne = {k : F.copy_to(num, self.device)
                        for k, num in self._batch_num_edges.items()}
             ret._batch_num_edges = new_bne
         return ret
@@ -4656,207 +4656,119 @@ class DGLHeteroGraph(object):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-    def format_in_use(self, etype=None):
-        """Return the sparse formats in use of the given edge/relation type.
+    def formats(self, formats=None):
+        r"""Get a cloned graph with the specified sparse format(s) or query 
+        for the usage status of sparse formats
+
+        The API copies both the graph structure and the features.
+
+        If the input graph has multiple edge types, they will have the same 
+        sparse format.
 
         Parameters
         ----------
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+        formats : str or list of str or None
+
+            * If formats is None, return the usage status of sparse formats
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
+            them, specifying the sparse formats to use.
 
         Returns
         -------
-        list of str
-            Return all the formats currently in use (could be multiple).
+        dict or DGLGraph
+
+            * If formats is None, the result will be a dict recording the usage status of sparse formats.
+            * Otherwise, a DGLGraph will be returned, which is a clone of the 
+            original graph with the specified sparse format(s) ``formats``.
 
         Examples
         --------
-        For graph with only one edge type.
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows', restrict_format='csr')
-        >>> g.format_in_use()
-        ['csr']
+        The following example uses PyTorch backend.
 
-        For a graph with multiple types.
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.format_in_use('develops')
-        ['coo']
-        >>> spmat = g['develops'].adjacency_matrix(
-        ...     transpose=True, scipy_fmt='csr')    // Create CSR representation.
-        >>> g.format_in_use('develops')
-        ['coo', 'csr']
+        **Homographs or Heterographs with A Single Edge Type**
 
-        which is equivalent to:
+        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g.ndata['h'] = torch.ones(4, 1)
+        >>> # Check status of format usage
+        >>> g.formats()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> # Get a clone of the graph with 'csr' format
+        >>> csr_g = g.formats('csr')
+        >>> # Only allowed formats will be displayed in the status query
+        >>> csr_g.formats()
+        {'created': ['csr'], 'not created': []}
+        >>> # Features are copied as well
+        >>> csr_g.ndata['h']
+        tensor([[1.],
+                [1.],
+                [1.],
+                [1.]])
 
-        >>> g['develops'].restrict_format()
-        ['coo', 'csr']
-
-        See Also
-        --------
-        restrict_format
-        request_format
-        to_format
-        """
-        return self._graph.format_in_use(self.get_etype_id(etype))
-
-    def restrict_format(self, etype=None):
-        """Return the allowed sparse formats of the given edge/relation type.
-
-        Parameters
-        ----------
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-
-        Returns
-        -------
-        str : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
-            ``'any'`` indicates all sparse formats are allowed in .
-
-        Examples
-        --------
-        For graph with only one edge type.
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
-        >>> g.restrict_format()
-        'csr'
-
-        For a graph with multiple types.
+        **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.restrict_format('develops')
-        'any'
-
-        which is equivalent to:
-
-        >>> g['develops'].restrict_format()
-        'any'
-
-        See Also
-        --------
-        format_in_use
-        request_format
-        to_format
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]), 
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), 
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.formats()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> # Get a clone of the graph with 'csr' format
+        >>> csr_g = g.formats('csr')
+        >>> # Only allowed formats will be displayed in the status query
+        >>> csr_g.formats()
+        {'created': ['csr'], 'not created': []}
         """
-        return self._graph.restrict_format(self.get_etype_id(etype))
-
-    def request_format(self, sparse_format, etype=None):
-        """Create a sparse matrix representation in given format immediately.
-
-        When the restrict format of the given edge type is ``any``, all formats of
-        sparse matrix representation are created in demand. In some cases user may
-        want a sparse matrix representation to be created immediately (e.g. in a
-        multi-process data loader), this API is designed for such purpose.
-
-        Parameters
-        ----------
-        sparse_format : str
-            ``'coo'``, ``'csr'``, or ``'csc'``
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-        Examples
-        --------
-        For graph with only one edge type.
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='any')
-        >>> g.format_in_use()
-        ['coo']
-        >>> g.request_format('csr')
-        >>> g.format_in_use()
-        ['coo', 'csr']
-
-        For a graph with multiple types.
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.format_in_use('develops')
-        ['coo']
-        >>> g.request_format('csc', etype='develops')
-        >>> g.format_in_use('develops')
-        ['coo', 'csc']
-
-        Another way to request format for a given etype is:
-        >>> g['plays'].request_format('csr')
-        >>> g['plays'].format_in_use()
-        ['coo', 'csr']
-
-        See Also
-        --------
-        format_in_use
-        restrict_format
-        to_format
-        """
-        if self.restrict_format(etype) != 'any':
-            raise KeyError("request_format is only available for "
-                           "graph whose restrict_format is 'any'")
-        if not sparse_format in ['coo', 'csr', 'csc']:
-            raise KeyError("can only request coo/csr/csr.")
-        return self._graph.request_format(sparse_format, self.get_etype_id(etype))
-
-
-    def to_format(self, restrict_format):
-        """Return a cloned graph but stored in the given restrict format.
-
-        If ``'any'`` is given, the restrict formats of the returned graph is relaxed.
-        The returned graph share the same node/edge data of the original graph.
-
-        Parameters
-        ----------
-        restrict_format : str
-            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
-
-        Returns
-        -------
-        A new graph.
-
-        Examples
-        --------
-        For a graph with single edge type:
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
-        >>> g.ndata['h'] = th.ones(3, 3)
-        >>> g.restrict_format()
-        'csr'
-        >>> g1 = g.to_format('coo')
-        >>> g1.ndata
-        {'h': tensor([[1., 1., 1.],
-                [1., 1., 1.],
-                [1., 1., 1.]])}
-        >>> g1.restrict_format()
-        'coo'
-
-        For a graph with multiple edge types:
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='coo')
-        >>> g.restrict_format('develops')
-        'coo'
-        >>> g1 = g.to_format('any')
-        >>> g1.restrict_format('plays')
-        'any'
-
-        See Also
-        --------
-        format_in_use
-        restrict_format
-        request_format
-        """
-        return DGLHeteroGraph(self._graph.to_format(restrict_format), self.ntypes, self.etypes,
+        if formats is None:
+            return self._graph.formats()
+        return DGLHeteroGraph(self._graph.formats(formats), self.ntypes, self.etypes,
                               self._node_frames,
                               self._edge_frames)
+
+    def create_format_(self):
+        r"""Create all sparse matrices allowed for the graph.
+
+        By default, we create sparse matrices for a graph only when necessary. 
+        In some cases we may want to create them immediately (e.g. in a
+        multi-process data loader), which can be achieved via this API.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homographs or Heterographs with A Single Edge Type**
+
+        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> g.create_format_()
+        >>> g.format()
+        {'created': ['coo', 'csr', 'csc'], 'not created': []}
+
+        **Heterographs with Multiple Edge Types**
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]), 
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), 
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> g.create_format_()
+        >>> g.format()
+        {'created': ['coo', 'csr', 'csc'], 'not created': []}
+        """
+        return self._graph.create_format_()
 
     def astype(self, idtype):
         """Cast this graph to use another ID type.

@@ -8,6 +8,83 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
+HeteroGraphPtr JointUnionHeteroGraph(
+  GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
+  CHECK_GT(component_graphs.size(), 0) << "Input graph list has at least two graphs";
+  std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
+  std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices(), 0);
+
+  // Loop over all canonical etypes
+  for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
+    auto pair = meta_graph->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    uint64_t num_src_v = component_graphs[0]->NumVertices(src_vtype);
+    uint64_t num_dst_v = component_graphs[0]->NumVertices(dst_vtype);
+    HeteroGraphPtr rgptr = nullptr;
+
+    // ALL = CSC | CSR | COO
+    const dgl_format_code_t code =\
+      component_graphs[0]->GetRelationGraph(etype)->GetFormatAll();
+
+    // get common format
+    for (size_t i = 0; i < component_graphs.size(); ++i) {
+      const auto& cg = component_graphs[i];
+      CHECK_EQ(num_src_v, component_graphs[i]->NumVertices(src_vtype)) << "Input graph[" << i <<
+        "] should have same number of src vertices as input graph[0]";
+      CHECK_EQ(num_dst_v, component_graphs[i]->NumVertices(dst_vtype)) << "Input graph[" << i <<
+        "] should have same number of dst vertices as input graph[0]";
+
+      const dgl_format_code_t curr_code = cg->GetRelationGraph(etype)->GetFormatAll();
+      if (curr_code != code)
+        LOG(FATAL) << "All components should have the same formats";
+    }
+
+    // prefer COO
+    if (FORMAT_HAS_COO(code)) {
+      std::vector<aten::COOMatrix> coos;
+      for (size_t i = 0; i < component_graphs.size(); ++i) {
+        const auto& cg = component_graphs[i];
+        aten::COOMatrix coo = cg->GetCOOMatrix(etype);
+        coos.push_back(coo);
+      }
+
+      aten::COOMatrix res = aten::UnionCoo(coos);
+      rgptr = UnitGraph::CreateFromCOO(
+          (src_vtype == dst_vtype) ? 1 : 2, res, code);
+    } else if (FORMAT_HAS_CSR(code)) {
+      std::vector<aten::CSRMatrix> csrs;
+      for (size_t i = 0; i < component_graphs.size(); ++i) {
+        const auto& cg = component_graphs[i];
+        aten::CSRMatrix csr = cg->GetCSRMatrix(etype);
+        csrs.push_back(csr);
+      }
+
+      aten::CSRMatrix res = aten::UnionCsr(csrs);
+      rgptr = UnitGraph::CreateFromCSR(
+        (src_vtype == dst_vtype) ? 1 : 2, res, code);
+    } else if (FORMAT_HAS_CSC(code)) {
+      // CSR and CSC have the same storage format, i.e. CSRMatrix
+      std::vector<aten::CSRMatrix> cscs;
+      for (size_t i = 0; i < component_graphs.size(); ++i) {
+        const auto& cg = component_graphs[i];
+        aten::CSRMatrix csc = cg->GetCSCMatrix(etype);
+        cscs.push_back(csc);
+      }
+
+      aten::CSRMatrix res = aten::UnionCsr(cscs);
+      rgptr = UnitGraph::CreateFromCSC(
+        (src_vtype == dst_vtype) ? 1 : 2, res, code);
+    }
+
+    rel_graphs[etype] = rgptr;
+    num_nodes_per_type[src_vtype] = num_src_v;
+    num_nodes_per_type[dst_vtype] = num_dst_v;
+  }
+
+  return CreateHeteroGraph(meta_graph, rel_graphs, std::move(num_nodes_per_type));
+}
+
 HeteroGraphPtr DisjointUnionHeteroGraph2(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
   CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";
@@ -22,30 +99,22 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     uint64_t src_offset = 0, dst_offset = 0;
     HeteroGraphPtr rgptr = nullptr;
 
-    // ALL = CSC | CSR | COO
-    dgl_format_code_t format = (1 << (SparseFormat2Code(SparseFormat::kCOO)-1)) |
-                              (1 << (SparseFormat2Code(SparseFormat::kCSR)-1)) |
-                              (1 << (SparseFormat2Code(SparseFormat::kCSC)-1));
+    const dgl_format_code_t code =\
+      component_graphs[0]->GetRelationGraph(etype)->GetFormatAll();
     // do some preprocess
     for (size_t i = 0; i < component_graphs.size(); ++i) {
       const auto& cg = component_graphs[i];
-      const std::string restrict_format = cg->GetRelationGraph(etype)->GetRestrictFormat();
-      const SparseFormat curr_format = ParseSparseFormat(restrict_format);
-
-      if (curr_format == SparseFormat::kCOO ||
-          curr_format == SparseFormat::kCSR ||
-          curr_format == SparseFormat::kCSC)
-        format &=(1 << (SparseFormat2Code(curr_format)-1));
+      const dgl_format_code_t cur_code = cg->GetRelationGraph(etype)->GetFormatAll();
+      if (cur_code != code)
+        LOG(FATAL) << "All components should have the same formats";
 
       // Update offsets
       src_offset += cg->NumVertices(src_vtype);
       dst_offset += cg->NumVertices(dst_vtype);
     }
-    CHECK_GT(format, 0) << "The conjunction of restrict_format of the relation graphs under " <<
-      etype << "should not be None.";
 
     // prefer COO
-    if (FORMAT_HAS_COO(format)) {
+    if (FORMAT_HAS_COO(code)) {
       std::vector<aten::COOMatrix> coos;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
         const auto& cg = component_graphs[i];
@@ -56,9 +125,8 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
       aten::COOMatrix res = aten::DisjointUnionCoo(coos);
 
       rgptr = UnitGraph::CreateFromCOO(
-        (src_vtype == dst_vtype) ? 1 : 2, res,
-        SparseFormat::kAny);
-    } else if (FORMAT_HAS_CSR(format)) {
+          (src_vtype == dst_vtype) ? 1 : 2, res, code);
+    } else if (FORMAT_HAS_CSR(code)) {
       std::vector<aten::CSRMatrix> csrs;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
         const auto& cg = component_graphs[i];
@@ -69,9 +137,9 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
       aten::CSRMatrix res = aten::DisjointUnionCsr(csrs);
 
       rgptr = UnitGraph::CreateFromCSR(
-        (src_vtype == dst_vtype) ? 1 : 2, res,
-        SparseFormat::kAny);
-    } else if (FORMAT_HAS_CSC(format)) {
+        (src_vtype == dst_vtype) ? 1 : 2, res, code);
+    } else if (FORMAT_HAS_CSC(code)) {
+      // CSR and CSC have the same storage format, i.e. CSRMatrix
       std::vector<aten::CSRMatrix> cscs;
       for (size_t i = 0; i < component_graphs.size(); ++i) {
         const auto& cg = component_graphs[i];
@@ -81,8 +149,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
 
       aten::CSRMatrix res = aten::DisjointUnionCsr(cscs);
       rgptr = UnitGraph::CreateFromCSC(
-        (src_vtype == dst_vtype) ? 1 : 2, res,
-        SparseFormat::kAny);
+        (src_vtype == dst_vtype) ? 1 : 2, res, code);
     }
     rel_graphs[etype] = rgptr;
     num_nodes_per_type[src_vtype] = src_offset;
@@ -139,10 +206,9 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
   std::vector<std::vector<HeteroGraphPtr>> rel_graphs;
   rel_graphs.resize(batch_size);
   // Loop over all edge types
-  auto format = batched_graph->GetRelationGraph(0)->GetFormatInUse();
-  auto restrict_format = batched_graph->GetRelationGraph(0)->GetRestrictFormat();
+  auto code = batched_graph->GetRelationGraph(0)->GetFormatAll();
 
-  if (FORMAT_HAS_COO(format)) {
+  if (FORMAT_HAS_COO(code)) {
     for (uint64_t etype = 0; etype < num_edge_types; ++etype) {
       auto pair = meta_graph->FindEdge(etype);
       const dgl_type_t src_vtype = pair.first;
@@ -155,13 +221,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
                                                    vertex_cumsum[dst_vtype]);
       for (uint64_t g = 0; g < batch_size; ++g) {
         HeteroGraphPtr rgptr = UnitGraph::CreateFromCOO(
-          (src_vtype == dst_vtype) ? 1 : 2, res[g],
-          ParseSparseFormat(restrict_format));
-
+          (src_vtype == dst_vtype) ? 1 : 2, res[g], code);
         rel_graphs[g].push_back(rgptr);
       }
     }
-  } else if (FORMAT_HAS_CSR(format)) {
+  } else if (FORMAT_HAS_CSR(code)) {
     for (uint64_t etype = 0; etype < num_edge_types; ++etype) {
       auto pair = meta_graph->FindEdge(etype);
       const dgl_type_t src_vtype = pair.first;
@@ -174,17 +238,16 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
                                                    vertex_cumsum[dst_vtype]);
       for (uint64_t g = 0; g < batch_size; ++g) {
         HeteroGraphPtr rgptr = UnitGraph::CreateFromCSR(
-          (src_vtype == dst_vtype) ? 1 : 2, res[g],
-          ParseSparseFormat(restrict_format));
-
+          (src_vtype == dst_vtype) ? 1 : 2, res[g], code);
         rel_graphs[g].push_back(rgptr);
       }
     }
-  } else if (FORMAT_HAS_CSC(format)) {
+  } else if (FORMAT_HAS_CSC(code)) {
     for (uint64_t etype = 0; etype < num_edge_types; ++etype) {
       auto pair = meta_graph->FindEdge(etype);
       const dgl_type_t src_vtype = pair.first;
       const dgl_type_t dst_vtype = pair.second;
+      // CSR and CSC have the same storage format, i.e. CSRMatrix
       aten::CSRMatrix csc = batched_graph->GetCSCMatrix(etype);
       auto res = aten::DisjointPartitionCsrBySizes(csc,
                                                    batch_size,
@@ -193,9 +256,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
                                                    vertex_cumsum[src_vtype]);
       for (uint64_t g = 0; g < batch_size; ++g) {
         HeteroGraphPtr rgptr = UnitGraph::CreateFromCSC(
-          (src_vtype == dst_vtype) ? 1 : 2, res[g],
-          SparseFormat::kAny);
-
+          (src_vtype == dst_vtype) ? 1 : 2, res[g], code);
         rel_graphs[g].push_back(rgptr);
       }
     }

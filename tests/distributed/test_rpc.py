@@ -154,10 +154,6 @@ def start_client(ip_config):
 
     # clean up
     time.sleep(2)
-    if dgl.distributed.get_rank() == 0:
-        dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
-    print("Get rank: %d" % dgl.distributed.get_rank())
 
 def test_serialize():
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload

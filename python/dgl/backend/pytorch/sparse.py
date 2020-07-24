@@ -8,13 +8,14 @@ def _reduce_grad(grad, shape):
     If there is broadcast in forward pass, gradients need to be reduced on
     broadcast dimension. This function checks the input tensor shape and
     gradient shape and perform the reduction.
+
     Parameters
     ----------
     grad: Tensor
         Gradient tensor
     shape: tuple
-        Shape of input tens
-    or
+        Shape of input tensor
+
     Returns
     -------
     Tensor
@@ -32,6 +33,14 @@ def _reduce_grad(grad, shape):
     if len(reduce_idx) > 0:
         grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(-1, *shape[1:])
+
+def _need_reduce_last_dim(ufeat, efeat):
+    """Indicates whether to reduce the last dimension on edges
+    in the backward pass of spmm,
+    if so, use dot instead of mul."""
+    ushp = ufeat.shape
+    eshp = efeat.shape
+    return ushp[1:-1] == eshp[1:-1] and eshp[-1] == 1 and ushp[-1] > 1
 
 def _muldiv(op, x):
     return 1. / x if op == 'div' else x
@@ -72,7 +81,10 @@ class GSpMM(th.autograd.Function):
             dX = _reduce_grad(dX, X.shape)
         if op != 'copy_lhs' and ctx.needs_input_grad[4]:
             if reduce_op == 'sum':
-                if op in ['mul', 'div']:
+                if op == 'mul' and _need_reduce_last_dim(X, Y):
+                    dY = _gsddmm(gidx, 'dot', X, dZ)
+                    return None, None, None, dX, dY
+                elif op in ['mul', 'div']:
                     dY = _gsddmm(gidx, 'mul', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:

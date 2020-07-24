@@ -133,7 +133,6 @@ InferNumVerticesPerType(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& 
   dgl_type_t *srctypes = static_cast<dgl_type_t *>(etype_array.src->data);
   dgl_type_t *dsttypes = static_cast<dgl_type_t *>(etype_array.dst->data);
   dgl_type_t *etypes = static_cast<dgl_type_t *>(etype_array.id->data);
-
   for (size_t i = 0; i < meta_graph->NumEdges(); ++i) {
     dgl_type_t srctype = srctypes[i];
     dgl_type_t dsttype = dsttypes[i];
@@ -185,7 +184,6 @@ HeteroGraph::HeteroGraph(
     num_verts_per_type_ = InferNumVerticesPerType(meta_graph, rel_graphs);
   else
     num_verts_per_type_ = num_nodes_per_type;
-
   HeteroGraphSanityCheck(meta_graph, rel_graphs);
   relation_graphs_ = CastToUnitGraphs(rel_graphs);
 }
@@ -264,11 +262,11 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::GetGraphInFormat(SparseFormat restrict_format) const {
+HeteroGraphPtr HeteroGraph::GetGraphInFormat(dgl_format_code_t formats) const {
   std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
     auto relgraph = std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(etype));
-    format_rels[etype] = relgraph->GetGraphInFormat(restrict_format);
+    format_rels[etype] = relgraph->GetGraphInFormat(formats);
   }
   return HeteroGraphPtr(new HeteroGraph(
     meta_graph_, format_rels, NumVerticesPerType()));
