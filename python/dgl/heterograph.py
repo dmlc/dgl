@@ -732,6 +732,9 @@ class DGLHeteroGraph(object):
                 raise DGLError('Edge type name must be specified if there are more than one ' \
                                'edge types.')
         eids = utils.prepare_tensor(self, eids, 'u')
+        if len(eids) == 0:
+            # no edge to delete
+            return
         assert self.number_of_edges(etype) > F.as_scalar(F.max(eids, dim=0)), \
             'The input eid {} is out of the range [0:{})'.format(
                 F.as_scalar(F.max(eids, dim=0)), self.number_of_edges(etype))
@@ -822,6 +825,9 @@ class DGLHeteroGraph(object):
                                'node types.')
 
         nids = utils.prepare_tensor(self, nids, 'u')
+        if len(nids) == 0:
+            # no node to delete
+            return
         assert self.number_of_nodes(ntype) > F.as_scalar(F.max(nids, dim=0)), \
             'The input nids {} is out of the range [0:{})'.format(
                 F.as_scalar(F.max(nids, dim=0)), self.number_of_nodes(ntype))
