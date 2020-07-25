@@ -9,6 +9,7 @@ import networkx as nx
 import unittest, pytest
 from dgl import DGLError
 from test_utils import parametrize_dtype, get_cases
+from scipy.sparse import rand
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -193,6 +194,14 @@ def test_create(idtype):
 
     _test_validate_bipartite((3, 3))
     _test_validate_bipartite((2, 4))
+
+    # test from_scipy
+    num_nodes = 10
+    density = 0.25
+    for fmt in ['csr', 'coo', 'csc']:
+        adj = rand(num_nodes, num_nodes, density=density, format=fmt)
+        g = dgl.from_scipy(adj, eweight_name='w')
+        assert F.array_equal(g.edata['w'], F.copy_to(F.tensor(adj.data), g.device))
 
 @parametrize_dtype
 def test_query(idtype):

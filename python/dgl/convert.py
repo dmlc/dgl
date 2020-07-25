@@ -18,6 +18,7 @@ __all__ = [
     'heterograph',
     'to_hetero',
     'to_homo',
+    'from_scipy',
     'from_networkx',
     'to_networkx',
 ]
@@ -757,6 +758,41 @@ def to_homo(G):
 
     return retg
 
+def from_scipy(sp_mat, 
+               ntype='_N', etype='_E',
+               eweight_name=None,
+               formats=['coo', 'csr', 'csc'],
+               idtype=None):
+    """Create a DGLGraph from a SciPy sparse matrix.
+
+    Parameters
+    ----------
+    sp_mat : SciPy sparse matrix
+        SciPy sparse matrix.
+    ntype : str
+        Type name for both source and destination nodes
+    etype : str
+        Type name for edges
+    eweight_name : str, optional
+        If given, the edge weights in the matrix will be 
+        stored in ``edata[eweight_name]``.
+    formats : str or list of str
+        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
+
+    Returns
+    -------
+    g : DGLGraph
+    """
+    u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype)
+    g = create_from_edges(u, v, ntype, etype, ntype, urange, vrange,
+                          validate=False, formats=formats)
+    if eweight_name is not None:
+        g.edata[eweight_name] = F.tensor(sp_mat.data)
+    return g
+
 def from_networkx(nx_graph, *,
                   ntype='_N', etype='_E',
                   node_attrs=None,
@@ -765,6 +801,7 @@ def from_networkx(nx_graph, *,
                   formats=['coo', 'csr', 'csc'],
                   idtype=None):
     """Create a DGLGraph from networkx.
+
     Parameters
     ----------
     nx_graph : networkx.Graph
@@ -777,17 +814,18 @@ def from_networkx(nx_graph, *,
         Names for node features to retrieve from the NetworkX graph (Default: None)
     edge_attrs : list of str
         Names for edge features to retrieve from the NetworkX graph (Default: None)
-    formats : str or list of str
-        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     edge_id_attr_name : str, optional
         Key name for edge ids in the NetworkX graph. If not found, we
         will consider the graph not to have pre-specified edge ids. (Default: 'id')
+    formats : str or list of str
+        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Must be int32 or int64. Default: int64.
+
     Returns
     -------
-    g : DGLHeteroGraph
+    g : DGLGraph
     """
     # Relabel nodes using consecutive integers
     nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
