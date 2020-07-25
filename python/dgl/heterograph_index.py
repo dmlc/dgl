@@ -25,7 +25,12 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        return _CAPI_DGLHeteroPickle(self)
+        """Issue: https://github.com/pytorch/pytorch/issues/32351
+           Need to set the tensor created in the __getstate__ function
+            as object attribute to avoid potential bugs
+        """
+        self._pk_state = _CAPI_DGLHeteroPickle(self)
+        return self._pk_state
 
     def __setstate__(self, state):
         self._cache = {}
@@ -48,7 +53,8 @@ class HeteroGraphIndex(ObjectBase):
                 num_dst = number_of_nodes[dst_ntype]
                 src_id, dst_id, _ = edges_per_type
                 rel_graphs.append(create_unitgraph_from_coo(
-                    1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, "any"))
+                    1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id,
+                    ['coo', 'csr', ' csc']))
             self.__init_handle_by_constructor__(
                 _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 
@@ -830,73 +836,53 @@ class HeteroGraphIndex(ObjectBase):
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
-    def format_in_use(self, etype):
-        """Return the sparse formats in use of the given edge/relation type.
+    def formats(self, formats=None):
+        """Get a graph index with the specified sparse format(s) or query
+        for the usage status of sparse formats
+
+        If the graph has multiple edge types, they will have the same 
+        sparse format.
 
         Parameters
         ----------
-        etype : int
-            The edge/relation type.
+        formats : str or list of str or None
+
+            * If formats is None, return the usage status of sparse formats
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
+            them, specifying the sparse formats to use.
 
         Returns
         -------
-        list of string : return all the formats currently in use (could be multiple).
+        dict or GraphIndex
+
+            * If formats is None, the result will be a dict recording the usage status of sparse formats.
+            * Otherwise, a GraphIndex will be returned, which is a clone of the 
+            original graph with the specified sparse format(s) ``formats``.
+
         """
-        format_code = _CAPI_DGLHeteroGetFormatInUse(self, etype)
-        ret = []
-        if format_code & 1:
-            ret.append('coo')
-        format_code >>= 1
-        if format_code & 1:
-            ret.append('csr')
-        format_code >>= 1
-        if format_code & 1:
-            ret.append('csc')
-        return ret
+        formats_allowed = _CAPI_DGLHeteroGetAllowedFormats(self)
+        formats_created = _CAPI_DGLHeteroGetCreatedFormats(self)
+        created = []
+        not_created = []
+        if formats is None:
+            for fmt in ['coo', 'csr', 'csc']:
+                if fmt in formats_allowed:
+                    if fmt in formats_created:
+                        created.append(fmt)
+                    else:
+                        not_created.append(fmt)
+            return {
+                'created': created,
+                'not created': not_created
+            }
+        else:
+            if isinstance(formats, str):
+                formats = [formats]
+            return _CAPI_DGLHeteroGetFormatGraph(self, formats)
 
-    def restrict_format(self, etype):
-        """Return restrict sparse format of the given edge/relation type.
-
-        Parameters
-        ----------
-        etype : int
-            The edge/relation type.
-
-        Returns
-        -------
-        string : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
-        """
-        ret = _CAPI_DGLHeteroGetRestrictFormat(self, etype)
-        return ret
-
-    def request_format(self, sparse_format, etype):
-        """Create a sparse matrix representation in given format immediately.
-
-        Parameters
-        ----------
-        etype : int
-            The edge/relation type.
-        sparse_format : str
-            ``'coo'``, ``'csr'``, or ``'csc'``
-        """
-        _CAPI_DGLHeteroRequestFormat(self, sparse_format, etype)
-
-    def to_format(self, restrict_format):
-        """Return a clone graph index but stored in the given sparse format.
-
-        If 'any' is given, the restrict formats of the returned graph index
-        is relaxed.
-
-        Parameters
-        ----------
-        restrict_format : str
-            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
-
-        Returns
-        -------
-        A new graph index.
-        """
-        return _CAPI_DGLHeteroGetFormatGraph(self, restrict_format)
+    def create_format_(self):
+        """Create all sparse matrices allowed for the graph."""
+        return _CAPI_DGLHeteroCreateFormat(self)
 
     @utils.cached_member(cache='_cache', prefix='reverse')
     def reverse(self):
@@ -956,7 +942,7 @@ class HeteroSubgraphIndex(ObjectBase):
 #################################################################
 
 def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
-                              restrict_format):
+                              formats):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -971,20 +957,22 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
         Row index.
     col : utils.Index
         Col index.
-    restrict_format : "any", "coo", "csr" or "csc"
-        Restrict the storage format of the unit graph.
+    formats : list of str.
+        Restrict the storage formats allowed for the unit graph.
 
     Returns
     -------
     HeteroGraphIndex
     """
+    if isinstance(formats, str):
+        formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(row), F.to_dgl_nd(col),
-        restrict_format)
+        formats)
 
 def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
-                              restrict_format):
+                              formats):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -1001,17 +989,19 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         CSR indices.
     edge_ids : utils.Index
         Edge shuffle id.
-    restrict_format : "any", "coo", "csr" or "csc"
-        Restrict the storage format of the unit graph.
+    formats : str
+        Restrict the storage formats allowed for the unit graph.
 
     Returns
     -------
     HeteroGraphIndex
     """
+    if isinstance(formats, str):
+        formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(indptr), F.to_dgl_nd(indices), F.to_dgl_nd(edge_ids),
-        restrict_format)
+        formats)
 
 def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
     """Create a heterograph from metagraph and graphs of every relation.
@@ -1034,6 +1024,23 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
     else:
         return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
             metagraph, rel_graphs, num_nodes_per_type.todgltensor())
+
+def joint_union(metagraph, gidx_list):
+    """Return a joint union of the input heterographs.
+
+    Parameters
+    ----------
+    metagraph : GraphIndex
+        Meta-graph.
+    gidx_list : list of HeteroGraphIndex
+        Heterographs to be joint_unioned.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        joint_unioned Heterograph.
+    """
+    return _CAPI_DGLHeteroJointUnion(metagraph, gidx_list)
 
 def disjoint_union(metagraph, graphs):
     """Return a disjoint union of the input heterographs.
@@ -1121,8 +1128,12 @@ class HeteroPickleStates(ObjectBase):
         return [arr_func(i) for i in range(num_arr)]
 
     def __getstate__(self):
-        arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
-        return self.version, self.meta, arrays
+        """Issue: https://github.com/pytorch/pytorch/issues/32351
+           Need to set the tensor created in the __getstate__ function
+            as object attribute to avoid potential bugs
+        """
+        self._pk_arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
+        return self.version, self.meta, self._pk_arrays
 
     def __setstate__(self, state):
         if isinstance(state[0], int):
@@ -1135,4 +1146,5 @@ class HeteroPickleStates(ObjectBase):
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
             self.__init_handle_by_constructor__(
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
+
 _init_api("dgl.heterograph_index")

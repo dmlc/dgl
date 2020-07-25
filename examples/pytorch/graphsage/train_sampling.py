@@ -68,7 +68,6 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
@@ -85,6 +84,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
 
+                block = block.to(device)
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
@@ -113,6 +113,7 @@ def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
     """
+    labels = labels.long()
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
 def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
@@ -179,6 +180,7 @@ def run(args, device, data):
 
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
+            blocks = [block.to(device) for block in blocks]
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)

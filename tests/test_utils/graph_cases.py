@@ -44,6 +44,27 @@ def graph0():
     return dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
                       [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]))
 
+@register_case(['homo', 'small', 'has_feature'])
+def graph1():
+    g = dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
+                   [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]))
+    g.ndata['h'] = F.randn((g.number_of_nodes(), 2))
+    g.edata['w'] = F.randn((g.number_of_edges(), 3))
+    return g
+
+@register_case(['hetero', 'small', 'has_feature'])
+def heterograph0():
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): (F.tensor([0, 1, 1, 2]), F.tensor([0, 0, 1, 1])),
+        ('developer', 'develops', 'game'): (F.tensor([0, 1]), F.tensor([0, 1]))})
+    g.nodes['user'].data['h'] = F.randn((g.number_of_nodes('user'), 3))
+    g.nodes['game'].data['h'] = F.randn((g.number_of_nodes('game'), 2))
+    g.nodes['developer'].data['h'] = F.randn((g.number_of_nodes('developer'), 3))
+    g.edges['plays'].data['h'] = F.randn((g.number_of_edges('plays'), 1))
+    g.edges['develops'].data['h'] = F.randn((g.number_of_edges('develops'), 5))
+    return g
+
+
 @register_case(['batched', 'homo', 'small'])
 def batched_graph0():
     g1 = dgl.graph(([0, 1, 2], [1, 2, 3]))

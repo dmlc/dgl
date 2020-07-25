@@ -60,6 +60,7 @@ def main(args):
     g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
+    g = g.to(ctx)
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     model = GAT(g,

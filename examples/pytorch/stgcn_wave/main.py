@@ -22,7 +22,7 @@ parser.add_argument('--window', type=int, default=144, help='window length')
 parser.add_argument('--sensorsfilepath', type=str, default='./data/sensor_graph/graph_sensor_ids.txt', help='sensors file path')
 parser.add_argument('--disfilepath', type=str, default='./data/sensor_graph/distances_la_2012.csv', help='distance file path')
 parser.add_argument('--tsfilepath', type=str, default='./data/metr-la.h5', help='ts file path')
-parser.add_argument('--savemodelpath', type=str, default='./save/stgcnwavemodel.pt', help='save model path')
+parser.add_argument('--savemodelpath', type=str, default='stgcnwavemodel.pt', help='save model path')
 parser.add_argument('--pred_len', type=int, default=5, help='how many steps away we want to predict')
 parser.add_argument('--control_str', type=str, default='TNTSTNTST', help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
 parser.add_argument('--channels', type=int, nargs='+', default=[1, 16, 32, 64, 32, 128], help='model strcture controller, T: Temporal Layer, S: Spatio Layer, N: Norm Layer')
@@ -37,8 +37,7 @@ distance_df = pd.read_csv(args.disfilepath, dtype={'from': 'str', 'to': 'str'})
 
 adj_mx = get_adjacency_matrix(distance_df, sensor_ids)
 sp_mx = sp.coo_matrix(adj_mx)
-G = dgl.DGLGraph()
-G.from_scipy_sparse_matrix(sp_mx)
+G = dgl.from_scipy(sp_mx)
 
 
 df = pd.read_hdf(args.tsfilepath)
@@ -91,6 +90,7 @@ test_iter = torch.utils.data.DataLoader(test_data, batch_size)
 
 
 loss = nn.MSELoss()
+G = G.to(device)
 model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers, args.control_str).to(device)
 optimizer = torch.optim.RMSprop(model.parameters(), lr=lr)
 

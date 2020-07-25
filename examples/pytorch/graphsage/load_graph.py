@@ -23,7 +23,9 @@ def load_reddit():
 def load_ogb(name):
     from ogb.nodeproppred import DglNodePropPredDataset
 
+    print('load', name)
     data = DglNodePropPredDataset(name=name)
+    print('finish loading', name)
     splitted_idx = data.get_idx_split()
     graph, labels = data[0]
     labels = labels[:, 0]
@@ -31,7 +33,7 @@ def load_ogb(name):
     graph.ndata['features'] = graph.ndata['feat']
     graph.ndata['labels'] = labels
     in_feats = graph.ndata['features'].shape[1]
-    num_labels = len(th.unique(labels))
+    num_labels = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
 
     # Find the node IDs in the training, validation, and test set.
     train_nid, val_nid, test_nid = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
@@ -44,7 +46,8 @@ def load_ogb(name):
     graph.ndata['train_mask'] = train_mask
     graph.ndata['val_mask'] = val_mask
     graph.ndata['test_mask'] = test_mask
-    return graph, len(th.unique(graph.ndata['labels']))
+    print('finish constructing', name)
+    return graph, num_labels
 
 def inductive_split(g):
     """Split the graph into training graph, validation graph, and test graph by training

@@ -237,6 +237,36 @@ def get_download_dir():
         os.makedirs(dirname)
     return dirname
 
+def save_info(path, info):
+    """ Save dataset related information into disk.
+
+    Parameters
+    ----------
+    path : str
+        File to save information.
+    info : dict
+        A python dict storing information to save on disk.
+    """
+    with open(path, "wb" ) as pf:
+        pickle.dump(info, pf)
+
+
+def load_info(path):
+    """ Load dataset related information from disk.
+
+    Parameters
+    ----------
+    path : str
+        File to load information from.
+
+    Returns
+    -------
+    info : dict
+        A python dict storing information loaded from disk.
+    """
+    with open(path, "rb") as pf:
+        info = pickle.load(pf)
+    return info
 
 class Subset(object):
     """Subset of a dataset at specified indices
