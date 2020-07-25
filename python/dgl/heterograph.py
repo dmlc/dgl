@@ -4599,20 +4599,9 @@ class DGLHeteroGraph(object):
         --------
         local_var
         """
-        local_node_frames = [fr.clone() for fr in self._node_frames]
-        local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        ret = DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
-                             local_node_frames, local_edge_frames)
-        
-        # Copy misc info
-        if self._batch_num_nodes is not None:
-            new_bnn = {k : F.copy_to(num, self.device)
-                       for k, num in self._batch_num_nodes.items()}
-            ret._batch_num_nodes = new_bnn
-        if self._batch_num_edges is not None:
-            new_bne = {k : F.copy_to(num, self.device)
-                       for k, num in self._batch_num_edges.items()}
-            ret._batch_num_edges = new_bne
+        ret = copy.copy(self)
+        ret._node_frames = [fr.clone() for fr in self._node_frames]
+        ret._edge_frames = [fr.clone() for fr in self._edge_frames]
         return ret
 
     @contextmanager

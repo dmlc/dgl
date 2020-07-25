@@ -6,8 +6,8 @@ import numpy as np
 import numpy.random as npr
 import scipy as sp
 
-from ..graph import DGLGraph, batch
-from ..utils import Index
+from .. import convert
+from .. import batch
 
 def sbm(n_blocks, block_size, p, q, rng=None):
     """ (Symmetric) Stochastic Block Model
@@ -77,7 +77,6 @@ class SBMMixture:
         block_size = n_nodes // n_communities
         self._k = k
         self._avg_deg = avg_deg
-        self._gs = [DGLGraph() for i in range(n_graphs)]
         if type(pq) is list:
             assert len(pq) == n_graphs
         elif type(pq) is str:
@@ -85,14 +84,10 @@ class SBMMixture:
             pq = [generator() for i in range(n_graphs)]
         else:
             raise RuntimeError()
-        adjs = [sbm(n_communities, block_size, *x) for x in pq]
-        for g, adj in zip(self._gs, adjs):
-            g.from_scipy_sparse_matrix(adj)
+        self._gs = [convert.graph(sbm(n_communities, block_size, *x)) for x in pq]
         self._lgs = [g.line_graph(backtracking=False) for g in self._gs]
-        in_degrees = lambda g: g.in_degrees(
-                Index(np.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
-        self._g_degs = [in_degrees(g) for g in self._gs]
-        self._lg_degs = [in_degrees(lg) for lg in self._lgs]
+        self._g_degs = [g.in_degrees().float() for g in self._gs]
+        self._lg_degs = [lg.in_degrees().float() for lg in self._lgs]
         self._pm_pds = list(zip(*[g.edges() for g in self._gs]))[0]
 
     def __len__(self):
@@ -112,8 +107,8 @@ class SBMMixture:
 
     def collate_fn(self, x):
         g, lg, deg_g, deg_lg, pm_pd = zip(*x)
-        g_batch = batch(g)
-        lg_batch = batch(lg)
+        g_batch = batch.batch(g)
+        lg_batch = batch.batch(lg)
         degg_batch = np.concatenate(deg_g, axis=0)
         deglg_batch = np.concatenate(deg_lg, axis=0)
         pm_pd_batch = np.concatenate([x + i * self._n_nodes for i, x in enumerate(pm_pd)], axis=0)

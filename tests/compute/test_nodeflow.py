@@ -39,29 +39,6 @@ def generate_rand_graph(n, connect_more=False, complete=False, add_self_loop=Fal
     return g
 
 
-def test_self_loop():
-    n = 100
-    num_hops = 2
-    g = generate_rand_graph(n, complete=True)
-    nf = create_mini_batch(g, num_hops, add_self_loop=True)
-    for i in range(1, nf.num_layers):
-        in_deg = nf.layer_in_degree(i)
-        deg = F.copy_to(F.ones(in_deg.shape, dtype=F.int64), F.cpu()) * n
-        assert_array_equal(F.asnumpy(in_deg), F.asnumpy(deg))
-
-    g = generate_rand_graph(n, complete=True, add_self_loop=True)
-    g = dgl.to_simple_graph(g)
-    nf = create_mini_batch(g, num_hops, add_self_loop=True)
-    for i in range(nf.num_blocks):
-        parent_eid = F.asnumpy(nf.block_parent_eid(i))
-        parent_nid = F.asnumpy(nf.layer_parent_nid(i + 1))
-        # The loop eid in the parent graph must exist in the block parent eid.
-        parent_loop_eid = F.asnumpy(g.edge_ids(parent_nid, parent_nid))
-        assert len(parent_loop_eid) == len(parent_nid)
-        for eid in parent_loop_eid:
-            assert eid in parent_eid
-
-
 def create_mini_batch(g, num_hops, add_self_loop=False):
     seed_ids = np.array([1, 2, 0, 3])
     sampler = NeighborSampler(g, batch_size=4, expand_factor=g.number_of_nodes(),
