@@ -16,7 +16,7 @@ from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
 from .convert import graph, bipartite, heterograph
 from . import utils
-from .base import EID, NID
+from .base import EID, NID, DGLError, is_internal_column
 from . import ndarray as nd
 from .partition import metis_partition_assignment as hetero_metis_partition_assignment
 from .partition import partition_graph_with_halo as hetero_partition_graph_with_halo
@@ -1465,6 +1465,8 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
             src = src_node_id[ntype]
             dst = dst_node_id[ntype]
             for key, value in g.nodes[ntype].data.items():
+                if is_internal_column(key):
+                    continue
                 ctx = F.context(value)
                 new_graph.srcnodes[ntype].data[key] = F.gather_row(value, F.copy_to(src, ctx))
                 new_graph.dstnodes[ntype].data[key] = F.gather_row(value, F.copy_to(dst, ctx))
@@ -1472,6 +1474,8 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
         for canonical_etype in g.canonical_etypes:
             eid = edge_id[canonical_etype]
             for key, value in g.edges[canonical_etype].data.items():
+                if is_internal_column(key):
+                    continue
                 ctx = F.context(value)
                 new_graph.edges[canonical_etype].data[key] = F.gather_row(
                     value, F.copy_to(eid, ctx))

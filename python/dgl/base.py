@@ -16,6 +16,11 @@ NID = '_ID'
 ETYPE = '_TYPE'
 EID = '_ID'
 
+_INTERNAL_COLUMNS = {NTYPE, NID, ETYPE, EID}
+
+def is_internal_column(name):
+    return name in _INTERNAL_COLUMNS
+
 def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""
     return isinstance(arg, str) and arg == ALL
