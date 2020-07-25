@@ -17,8 +17,61 @@ def _AXWb(A, X, W, b):
     Y = th.matmul(A, X.view(X.shape[0], -1)).view_as(X)
     return Y + b
 
+def test_graph_conv():
+    g = dgl.DGLGraph(nx.path_graph(3))
+    ctx = F.ctx()
+    adj = g.adjacency_matrix(ctx=ctx)
+
+    conv = nn.GraphConv(5, 2, norm='none', bias=True)
+    conv = conv.to(ctx)
+    print(conv)
+    # test#1: basic
+    h0 = F.ones((3, 5))
+    h1 = conv(g, h0)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    assert F.allclose(h1, _AXWb(adj, h0, conv.weight, conv.bias))
+    # test#2: more-dim
+    h0 = F.ones((3, 5, 5))
+    h1 = conv(g, h0)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    assert F.allclose(h1, _AXWb(adj, h0, conv.weight, conv.bias))
+
+    conv = nn.GraphConv(5, 2)
+    conv = conv.to(ctx)
+    # test#3: basic
+    h0 = F.ones((3, 5))
+    h1 = conv(g, h0)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    # test#4: basic
+    h0 = F.ones((3, 5, 5))
+    h1 = conv(g, h0)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+
+    conv = nn.GraphConv(5, 2)
+    conv = conv.to(ctx)
+    # test#3: basic
+    h0 = F.ones((3, 5))
+    h1 = conv(g, h0)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    # test#4: basic
+    h0 = F.ones((3, 5, 5))
+    h1 = conv(g, h0)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+
+    # test rest_parameters
+    old_weight = deepcopy(conv.weight.data)
+    conv.reset_parameters()
+    new_weight = conv.weight.data
+    assert not F.allclose(old_weight, new_weight)
+
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo', 'block'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
@@ -451,7 +504,7 @@ def test_sage_conv(idtype, g, aggre_type):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv_bi(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
@@ -465,6 +518,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
 
 @parametrize_dtype
 def test_sage_conv2(idtype):
+    # TODO: add test for blocks
     # Test the case for graphs without edges
     g = dgl.bipartite([], num_nodes=(5, 3))
     g = g.astype(idtype).to(F.ctx())
@@ -556,7 +610,7 @@ def test_agnn_conv(g, idtype):
     assert h.shape == (g.number_of_nodes(), 5)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
 def test_agnn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -624,7 +678,7 @@ def test_gmm_conv(g, idtype):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
 def test_gmm_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -691,7 +745,7 @@ def test_edge_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
 def test_edge_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -699,7 +753,12 @@ def test_edge_conv_bi(g, idtype):
     print(edge_conv)
     h0 = F.randn((g.number_of_src_nodes(), 5))
     x0 = F.randn((g.number_of_dst_nodes(), 5))
-    h1 = edge_conv(g, (h0, x0))
+    if not g.is_homograph() and not g.is_block:
+        # bipartite
+        assert False
+        h1 = edge_conv(g, (h0, h0[:10]))
+    else:
+        h1 = edge_conv(g, (h0, x0))
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_dense_cheb_conv():

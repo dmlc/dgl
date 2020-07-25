@@ -1,5 +1,7 @@
 from collections import defaultdict
+import backend as F
 import dgl
+import numpy as np
 import networkx as nx
 import numpy as np
 import scipy.sparse as ssp
@@ -94,3 +96,7 @@ def random_graph(size):
 
 def random_bipartite(size_src, size_dst):
     return dgl.bipartite(ssp.random(size_src, size_dst, 0.1))
+
+def random_block(size):
+    g = dgl.graph(nx.erdos_renyi_graph(size, 0.1))
+    return dgl.to_block(g, np.unique(F.zerocopy_to_numpy(g.edges()[1])))

@@ -190,6 +190,8 @@ class DGLHeteroGraph(object):
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
     """
+    is_block = False
+
     # pylint: disable=unused-argument, dangerous-default-value
     def __init__(self,
                  gidx=[],
@@ -334,7 +336,7 @@ class DGLHeteroGraph(object):
                           for i in range(len(self.ntypes))}
             nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
-            meta = str(self.metagraph.edges())
+            meta = str(self.metagraph.edges(keys=True))
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
 
     def __copy__(self):
@@ -1668,7 +1670,7 @@ class DGLHeteroGraph(object):
             new_etypes = [etype]
             new_eframes = [self._edge_frames[etid]]
 
-            return DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            return self.__class__(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
         else:
             flat = self._graph.flatten_relations(etypes)
             new_g = flat.graph
@@ -1690,7 +1692,7 @@ class DGLHeteroGraph(object):
             new_eframes = [combine_frames(self._edge_frames, etids)]
 
             # create new heterograph
-            new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            new_hg = self.__class__(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
 
             src = new_ntypes[0]
             dst = new_ntypes[1] if new_g.number_of_ntypes() == 2 else src
@@ -2454,8 +2456,18 @@ class DGLHeteroGraph(object):
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph."""
-        # TODO(minjie): should create a utility function for feature inheritence here.
-        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes)
+        node_frames = [
+            FrameRef(Frame(
+                self._node_frames[i][induced_nodes_of_ntype],
+                num_rows=len(induced_nodes_of_ntype)))
+            for i, induced_nodes_of_ntype in enumerate(induced_nodes)]
+        edge_frames = [
+            FrameRef(Frame(
+                self._edge_frames[i][induced_edges_of_etype],
+                num_rows=len(induced_edges_of_etype)))
+            for i, induced_edges_of_etype in enumerate(induced_edges)]
+
+        hsg = self.__class__(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
         hsg.is_subgraph = True
         for ntype, induced_nid in zip(self.ntypes, induced_nodes):
             ndata = hsg.nodes[ntype].data
@@ -2763,7 +2775,7 @@ class DGLHeteroGraph(object):
         # num_nodes_per_type doesn't need to be int32
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64"))
-        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes,
+        hg = self.__class__(hgidx, ntypes, induced_etypes,
                             node_frames, edge_frames)
         return hg
 
@@ -2840,7 +2852,7 @@ class DGLHeteroGraph(object):
         # num_nodes_per_type should be int64
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type, "int64"))
-        hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
+        hg = self.__class__(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
         return hg
 
     def adjacency_matrix(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
@@ -4544,7 +4556,6 @@ class DGLHeteroGraph(object):
         return DGLHeteroGraph(hgidx, self.ntypes, self.etypes,
                               local_node_frames, local_edge_frames)
 
-
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.
 
@@ -5204,5 +5215,35 @@ def check_idtype_dict(graph_dtype, tensor_dict):
     """check whether the dtypes of tensors in dict are consistent with graph's dtype"""
     for _, v in tensor_dict.items():
         check_same_dtype(graph_dtype, v)
+
+class DGLBlock(DGLHeteroGraph):
+    """Subclass that signifies the graph is a block created from
+    :func:`dgl.to_block`.
+    """
+    # (BarclayII) I'm making a subclass because I don't want to make another version of
+    # serialization that contains the is_block flag.
+    is_block = True
+
+    def __repr__(self):
+        if len(self.srctypes) == 1 and len(self.dsttypes) == 1 and len(self.etypes) == 1:
+            ret = 'Block(num_src_nodes={srcnode}, num_dst_nodes={dstnode}, num_edges={edge})'
+            return ret.format(
+                srcnode=self.number_of_src_nodes(),
+                dstnode=self.number_of_dst_nodes(),
+                edge=self.number_of_edges())
+        else:
+            ret = ('Block(num_src_nodes={srcnode},\n'
+                   '      num_dst_nodes={dstnode},\n'
+                   '      num_edges={edge},\n'
+                   '      metagraph={meta})')
+            nsrcnode_dict = {ntype : self.number_of_src_nodes(ntype)
+                             for ntype in self.srctypes}
+            ndstnode_dict = {ntype : self.number_of_dst_nodes(ntype)
+                             for ntype in self.dsttypes}
+            nedge_dict = {etype : self.number_of_edges(etype)
+                          for etype in self.canonical_etypes}
+            meta = str(self.metagraph.edges(keys=True))
+            return ret.format(
+                srcnode=nsrcnode_dict, dstnode=ndstnode_dict, edge=nedge_dict, meta=meta)
 
 _init_api("dgl.heterograph")

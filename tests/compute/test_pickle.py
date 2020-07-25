@@ -157,6 +157,34 @@ def test_pickling_graph(g, idtype):
     new_g = _reconstruct_pickle(g)
     test_utils.check_graph_equal(g, new_g, check_feature=True)
 
+def test_pickling_batched_heterograph():
+    # copied from test_heterograph.create_test_heterograph()
+    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
+    wishes_nx = nx.DiGraph()
+    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
+    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
+    wishes_nx.add_edge('u0', 'g1', id=0)
+    wishes_nx.add_edge('u2', 'g0', id=1)
+
+    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
+    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game')
+    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+    g2 = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+
+    g.nodes['user'].data['u_h'] = F.randn((3, 4))
+    g.nodes['game'].data['g_h'] = F.randn((2, 5))
+    g.edges['plays'].data['p_h'] = F.randn((4, 6))
+    g2.nodes['user'].data['u_h'] = F.randn((3, 4))
+    g2.nodes['game'].data['g_h'] = F.randn((2, 5))
+    g2.edges['plays'].data['p_h'] = F.randn((4, 6))
+
+    bg = dgl.batch_hetero([g, g2])
+    new_bg = _reconstruct_pickle(bg)
+    _assert_is_identical_batchedhetero(bg, new_bg)
+>>>>>>> ec2e24be6dcc3bcc3d4ad5dff78212735f9db00f
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")
 def test_pickling_heterograph_index_compatibility():
