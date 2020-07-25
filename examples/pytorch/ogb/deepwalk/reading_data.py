@@ -161,7 +161,7 @@ class DeepwalkDataset:
         self.fast_neg = fast_neg
 
         if load_from_ogbl:
-            assert len(gpus) == 1, "ogb.linkproppred is not compatible with multi-gpu training."
+            assert len(gpus) == 1, "ogb.linkproppred is not compatible with multi-gpu training (CUDA error)."
             from load_dataset import load_from_ogbl_with_name
             self.G = load_from_ogbl_with_name(ogbl_name)
             self.G = make_undirected(self.G)
@@ -200,26 +200,25 @@ class DeepwalkDataset:
             self.neg_table = np.array(self.neg_table, dtype=np.long)
             del node_degree
 
-    def create_sampler(self, gpu_id):
-        """ Still in construction...
-
-        Several mode:
-        1. do true negative sampling.
-          1.1 from random walk sequence
-          1.2 from node degree distribution
-          return the sampled node ids
-        2. do false negative sampling from random walk sequence
-          save GPU, faster
-          return the node indices in the sequences
-        """
-        return DeepwalkSampler(self.G, self.seeds[gpu_id], self.walk_length)
+    def create_sampler(self, i):
+        """ create random walk sampler """
+        return DeepwalkSampler(self.G, self.seeds[i], self.walk_length)
 
     def save_mapping(self, map_file):
+        """ save the mapping dict that maps node IDs to embedding indices """
         with open(map_file, "wb") as f:
             pickle.dump(self.node2id, f)
 
 class DeepwalkSampler(object):
     def __init__(self, G, seeds, walk_length):
+        """ random walk sampler 
+        
+        Parameter
+        ---------
+        G dgl.Graph : the input graph
+        seeds torch.LongTensor : starting nodes
+        walk_length int : walk length
+        """
         self.G = G
         self.seeds = seeds
         self.walk_length = walk_length
