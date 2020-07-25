@@ -855,8 +855,8 @@ class HeteroGraphIndex(ObjectBase):
             original graph with the specified sparse format(s) ``formats``.
 
         """
-        formats_allowed = _CAPI_DGLHeteroGetFormatAll(self)
-        formats_created = _CAPI_DGLHeteroGetFormatInUse(self)
+        formats_allowed = _CAPI_DGLHeteroGetAllowedFormats(self)
+        formats_created = _CAPI_DGLHeteroGetCreatedFormats(self)
         created = []
         not_created = []
         if formats is None:
