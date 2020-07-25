@@ -60,11 +60,11 @@ def test_batch_setter_getter():
     assert len(g.ndata) == old_len - 1
     g.ndata['h'] = F.zeros((10, D))
     # set partial nodes
-    u = F.tensor([1, 3, 5])
+    u = F.tensor([1, 3, 5], g.idtype)
     g.nodes[u].data['h'] = F.ones((3, D))
     assert _pfc(g.ndata['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
     # get partial nodes
-    u = F.tensor([1, 2, 3])
+    u = F.tensor([1, 2, 3], g.idtype)
     assert _pfc(g.nodes[u].data['h']) == [1., 0., 1.]
 
     '''
@@ -96,35 +96,35 @@ def test_batch_setter_getter():
     assert len(g.edata) == old_len - 1
     g.edata['l'] = F.zeros((17, D))
     # set partial edges (many-many)
-    u = F.tensor([0, 0, 2, 5, 9])
-    v = F.tensor([1, 3, 9, 9, 0])
+    u = F.tensor([0, 0, 2, 5, 9], g.idtype)
+    v = F.tensor([1, 3, 9, 9, 0], g.idtype)
     g.edges[u, v].data['l'] = F.ones((5, D))
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
     assert _pfc(g.edata['l']) == truth
     # set partial edges (many-one)
-    u = F.tensor([3, 4, 6])
-    v = F.tensor([9])
+    u = F.tensor([3, 4, 6], g.idtype)
+    v = F.tensor([9], g.idtype)
     g.edges[u, v].data['l'] = F.ones((3, D))
     truth[5] = truth[7] = truth[11] = 1.
     assert _pfc(g.edata['l']) == truth
     # set partial edges (one-many)
-    u = F.tensor([0])
-    v = F.tensor([4, 5, 6])
+    u = F.tensor([0], g.idtype)
+    v = F.tensor([4, 5, 6], g.idtype)
     g.edges[u, v].data['l'] = F.ones((3, D))
     truth[6] = truth[8] = truth[10] = 1.
     assert _pfc(g.edata['l']) == truth
     # get partial edges (many-many)
-    u = F.tensor([0, 6, 0])
-    v = F.tensor([6, 9, 7])
+    u = F.tensor([0, 6, 0], g.idtype)
+    v = F.tensor([6, 9, 7], g.idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (many-one)
-    u = F.tensor([5, 6, 7])
-    v = F.tensor([9])
+    u = F.tensor([5, 6, 7], g.idtype)
+    v = F.tensor([9], g.idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (one-many)
-    u = F.tensor([0])
-    v = F.tensor([3, 4, 5])
+    u = F.tensor([0], g.idtype)
+    v = F.tensor([3, 4, 5], g.idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
 
@@ -132,7 +132,7 @@ def test_batch_setter_autograd():
     g = generate_graph(grad=True)
     h1 = g.ndata['h']
     # partial set
-    v = F.tensor([1, 2, 8])
+    v = F.tensor([1, 2, 8], g.idtype)
     hh = F.attach_grad(F.zeros((len(v), D)))
     with F.record_grad():
         g.nodes[v].data['h'] = hh
@@ -267,7 +267,7 @@ def test_apply_nodes():
     old = g.ndata['h']
     g.apply_nodes(_upd)
     assert F.allclose(old * 2, g.ndata['h'])
-    u = F.tensor([0, 3, 4, 6])
+    u = F.tensor([0, 3, 4, 6], g.idtype)
     g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
     assert F.allclose(F.gather_row(g.ndata['h'], u), F.zeros((4, D)))
 
@@ -278,8 +278,8 @@ def test_apply_edges():
     old = g.edata['w']
     g.apply_edges(_upd)
     assert F.allclose(old * 2, g.edata['w'])
-    u = F.tensor([0, 0, 0, 4, 5, 6])
-    v = F.tensor([1, 2, 3, 9, 9, 9])
+    u = F.tensor([0, 0, 0, 4, 5, 6], g.idtype)
+    v = F.tensor([1, 2, 3, 9, 9, 9], g.idtype)
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
     eid = F.tensor(g.edge_ids(u, v))
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
@@ -301,14 +301,14 @@ def test_update_routines():
         pass
 
     # pull
-    v = F.tensor([1, 2, 3, 9])
+    v = F.tensor([1, 2, 3, 9], g.idtype)
     reduce_msg_shapes.clear()
     g.pull(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 8, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
     # push
-    v = F.tensor([0, 1, 2, 3])
+    v = F.tensor([0, 1, 2, 3], g.idtype)
     reduce_msg_shapes.clear()
     g.push(v, message_func, reduce_func, apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
@@ -481,14 +481,15 @@ def test_group_apply_edges2():
     g = DGLGraph(m, readonly=True)
     g = g.to(F.ctx())
     g.ndata['deg'] = g.in_degrees()
-    g.ndata['id'] = F.arange(0, g.number_of_nodes())
-    g.edata['id'] = F.arange(0, g.number_of_edges())
+    g.ndata['id'] = F.arange(0, g.number_of_nodes(), g.idtype)
+    g.edata['id'] = F.arange(0, g.number_of_edges(), g.idtype)
 
     def apply(edges):
         w = edges.data['id']
         n_nodes, deg = w.shape
 
         dst = edges.dst['id'][:, 0]
+        # TODO: tmp hack
         eid1 = F.asnumpy(g.in_edges(dst, 'eid')).reshape(n_nodes, deg).sort(1)
         eid2 = F.asnumpy(edges.data['id']).sort(1)
         assert np.array_equal(eid1, eid2)

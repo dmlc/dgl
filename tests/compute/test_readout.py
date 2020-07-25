@@ -141,7 +141,7 @@ def test_topk(g, idtype, descending):
         subx = F.asnumpy(sg.ndata['x'])
         ai = np.argsort(subx[:,-1:].flatten())
         if descending:
-            ai = ai[::-1]
+            ai = np.ascontiguousarray(ai[::-1])
         subx = np.expand_dims(subx[ai[:k]], 0)
         subval.append(F.tensor(subx))
         subidx.append(F.tensor(np.expand_dims(ai[:k], 0)))
@@ -173,7 +173,7 @@ def test_topk(g, idtype, descending):
         subx = F.asnumpy(sg.edata['x'])
         ai = np.argsort(subx[:,-1:].flatten())
         if descending:
-            ai = ai[::-1]
+            ai = np.ascontiguousarray(ai[::-1])
         subx = np.expand_dims(subx[ai[:k]], 0)
         subval.append(F.tensor(subx))
         subidx.append(F.tensor(np.expand_dims(ai[:k], 0)))

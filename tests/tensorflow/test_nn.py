@@ -72,7 +72,7 @@ def test_graph_conv():
     # assert not F.allclose(old_weight, new_weight)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])

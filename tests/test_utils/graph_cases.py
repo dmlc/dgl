@@ -27,45 +27,45 @@ def get_cases(labels=None, exclude=[]):
                 cases.add(case)
     return [fn() for fn in cases]
 
-@register_case(['dglgraph', 'path', 'small'])
+@register_case(['dglgraph', 'path'])
 def dglgraph_path():
     return dgl.DGLGraph(nx.path_graph(5))
 
-@register_case(['bipartite', 'small', 'hetero', 'zero-degree'])
+@register_case(['bipartite'])
 def bipartite1():
     return dgl.bipartite([(0, 0), (0, 1), (0, 4), (2, 1), (2, 4), (3, 3)])
 
-@register_case(['bipartite', 'small', 'hetero'])
+@register_case(['bipartite'])
 def bipartite_full():
     return dgl.bipartite([(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2), (1, 3)])
 
-@register_case(['homo', 'small'])
+@register_case(['homo'])
 def graph0():
     return dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
                       [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]))
 
-@register_case(['homo', 'small', 'has_feature'])
+@register_case(['homo', 'has_feature'])
 def graph1():
     g = dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
                    [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]))
-    g.ndata['h'] = F.randn((g.number_of_nodes(), 2))
-    g.edata['w'] = F.randn((g.number_of_edges(), 3))
+    g.ndata['h'] = F.copy_to(F.randn((g.number_of_nodes(), 2)), F.cpu())
+    g.edata['w'] = F.copy_to(F.randn((g.number_of_edges(), 3)), F.cpu())
     return g
 
-@register_case(['hetero', 'small', 'has_feature'])
+@register_case(['hetero', 'has_feature'])
 def heterograph0():
     g = dgl.heterograph({
-        ('user', 'plays', 'game'): (F.tensor([0, 1, 1, 2]), F.tensor([0, 0, 1, 1])),
-        ('developer', 'develops', 'game'): (F.tensor([0, 1]), F.tensor([0, 1]))})
-    g.nodes['user'].data['h'] = F.randn((g.number_of_nodes('user'), 3))
-    g.nodes['game'].data['h'] = F.randn((g.number_of_nodes('game'), 2))
-    g.nodes['developer'].data['h'] = F.randn((g.number_of_nodes('developer'), 3))
-    g.edges['plays'].data['h'] = F.randn((g.number_of_edges('plays'), 1))
-    g.edges['develops'].data['h'] = F.randn((g.number_of_edges('develops'), 5))
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])})
+    g.nodes['user'].data['h'] = F.copy_to(F.randn((g.number_of_nodes('user'), 3)), F.cpu())
+    g.nodes['game'].data['h'] = F.copy_to(F.randn((g.number_of_nodes('game'), 2)), F.cpu())
+    g.nodes['developer'].data['h'] = F.copy_to(F.randn((g.number_of_nodes('developer'), 3)), F.cpu())
+    g.edges['plays'].data['h'] = F.copy_to(F.randn((g.number_of_edges('plays'), 1)), F.cpu())
+    g.edges['develops'].data['h'] = F.copy_to(F.randn((g.number_of_edges('develops'), 5)), F.cpu())
     return g
 
 
-@register_case(['batched', 'homo', 'small'])
+@register_case(['batched', 'homo'])
 def batched_graph0():
     g1 = dgl.graph(([0, 1, 2], [1, 2, 3]))
     g2 = dgl.graph(([1, 1], [2, 0]))

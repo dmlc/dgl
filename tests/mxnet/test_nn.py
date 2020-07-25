@@ -79,7 +79,7 @@ def test_graph_conv(idtype):
     check_close(g.ndata['h'], 2 * F.ones((3, 1)))
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [False])

@@ -155,7 +155,7 @@ def _global_message_func(nodes):
 def test_pickling_graph(g, idtype):
     g = g.astype(idtype)
     new_g = _reconstruct_pickle(g)
-    test_utils.check_graph_equal(g, new_g, True)
+    test_utils.check_graph_equal(g, new_g, check_feature=True)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")

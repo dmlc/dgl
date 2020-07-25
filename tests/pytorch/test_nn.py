@@ -18,7 +18,7 @@ def _AXWb(A, X, W, b):
     return Y + b
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
@@ -59,6 +59,7 @@ def _S2AXWb(A, N, X, W, b):
 
 def test_tagconv():
     g = dgl.DGLGraph(nx.path_graph(3))
+    g = g.to(F.ctx())
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
@@ -94,6 +95,7 @@ def test_tagconv():
 def test_set2set():
     ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(10))
+    g = g.to(F.ctx())
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
     s2s = s2s.to(ctx)
@@ -105,8 +107,8 @@ def test_set2set():
     assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
 
     # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(11))
-    g2 = dgl.DGLGraph(nx.path_graph(5))
+    g1 = dgl.DGLGraph(nx.path_graph(11)).to(F.ctx())
+    g2 = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
     bg = dgl.batch([g, g1, g2])
     h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = s2s(bg, h0)
@@ -115,6 +117,7 @@ def test_set2set():
 def test_glob_att_pool():
     ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(10))
+    g = g.to(F.ctx())
 
     gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
     gap = gap.to(ctx)
@@ -134,6 +137,7 @@ def test_glob_att_pool():
 def test_simple_pool():
     ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(15))
+    g = g.to(F.ctx())
 
     sum_pool = nn.SumPooling()
     avg_pool = nn.AvgPooling()
@@ -157,7 +161,7 @@ def test_simple_pool():
     assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
     # test#2: batched graph
-    g_ = dgl.DGLGraph(nx.path_graph(5))
+    g_ = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = sum_pool(bg, h0)
@@ -266,10 +270,13 @@ def test_edge_softmax(idtype):
     print(score.grad[:10], grad_score[:10])
     
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo'], exclude=['zero-degree', 'dglgraph']))
 def test_edge_softmax2(idtype, g):
     g = g.astype(idtype).to(F.ctx())
     g = g.local_var()
+    g.srcdata.clear()
+    g.dstdata.clear()
+    g.edata.clear()
     a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
     a2 = a1.clone().detach().requires_grad_()
     g.edata['s'] = a1
@@ -278,7 +285,7 @@ def test_edge_softmax2(idtype, g):
     
     builtin_sm = nn.edge_softmax(g, a2)
     builtin_sm.sum().backward()
-    print(a1.grad - a2.grad)
+    #print(a1.grad - a2.grad)
     assert len(g.srcdata) == 0
     assert len(g.dstdata) == 0
     assert len(g.edata) == 2
@@ -339,6 +346,7 @@ def test_rgcn():
     ctx = F.ctx()
     etype = []
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = g.to(F.ctx())
     # 5 etypes
     R = 5
     for i in range(g.number_of_edges()):
@@ -478,6 +486,7 @@ def test_sage_conv2(idtype):
 def test_sgc_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = g.to(F.ctx())
     # not cached
     sgc = nn.SGConv(5, 10, 3)
     feat = F.randn((100, 5))
@@ -497,6 +506,7 @@ def test_sgc_conv():
 def test_appnp_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = g.to(F.ctx())
     appnp = nn.APPNPConv(10, 0.1)
     feat = F.randn((100, 5))
     appnp = appnp.to(ctx)
@@ -559,6 +569,7 @@ def test_agnn_conv_bi(g, idtype):
 def test_gated_graph_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = g.to(F.ctx())
     ggconv = nn.GatedGraphConv(5, 10, 5, 3)
     etypes = th.arange(g.number_of_edges()) % 3
     feat = F.randn((100, 5))
@@ -695,6 +706,7 @@ def test_dense_cheb_conv():
     for k in range(1, 4):
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        g = g.to(F.ctx())
         adj = g.adjacency_matrix(ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, 2, k, None)
         dense_cheb = nn.DenseChebConv(5, 2, k)
@@ -730,6 +742,7 @@ def test_sequential():
     g = dgl.DGLGraph()
     g.add_nodes(3)
     g.add_edges([0, 1, 2, 0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1, 2, 2, 2])
+    g = g.to(F.ctx())
     net = nn.Sequential(ExampleLayer(), ExampleLayer(), ExampleLayer())
     n_feat = F.randn((3, 4))
     e_feat = F.randn((9, 4))
@@ -750,9 +763,9 @@ def test_sequential():
             n_feat += graph.ndata['h']
             return n_feat.view(graph.number_of_nodes() // 2, 2, -1).sum(1)
 
-    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05))
-    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2))
-    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8))
+    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05)).to(F.ctx())
+    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2)).to(F.ctx())
+    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8)).to(F.ctx())
     net = nn.Sequential(ExampleLayer(), ExampleLayer(), ExampleLayer())
     net = net.to(ctx)
     n_feat = F.randn((32, 4))
@@ -760,7 +773,7 @@ def test_sequential():
     assert n_feat.shape == (4, 4)
 
 def test_atomic_conv():
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
     aconv = nn.AtomicConv(interaction_cutoffs=F.tensor([12.0, 12.0]),
                           rbf_kernel_means=F.tensor([0.0, 2.0]),
                           rbf_kernel_scaling=F.tensor([4.0, 4.0]),
@@ -778,7 +791,7 @@ def test_atomic_conv():
     assert h.shape[-1] == 4
 
 def test_cf_conv():
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
     cfconv = nn.CFConv(node_in_feats=2,
                        edge_in_feats=3,
                        hidden_feats=2,

@@ -8,7 +8,7 @@ from .base import ALL, is_all, DGLError, dgl_warning
 from . import convert
 from . import utils
 
-__all__ = ['batch', 'unbatch']
+__all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
 def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     r"""Batch a collection of ``DGLGraph``s into one graph for more efficient
@@ -161,8 +161,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
 
-    utils.check_all_same_idtype(graphs, 'graphs')
     utils.check_all_same_device(graphs, 'graphs')
+    utils.check_all_same_idtype(graphs, 'graphs')
     relations = graphs[0].canonical_etypes
     idtype = graphs[0].idtype
     device = graphs[0].device
@@ -410,3 +410,15 @@ def unbatch(g, node_split=None, edge_split=None):
                 subg.edges[etype].data[key] = subf
 
     return gs
+
+
+#### DEPRECATED APIS ####
+def batch_hetero(*args, **kwargs):
+    dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
+                ' replace dgl.batch_hetero with dgl.batch')
+    return batch(*args, **kwargs)
+
+def unbatch_hetero(*args, **kwargs):
+    dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
+                ' replace dgl.unbatch_hetero with dgl.unbatch')
+    return batch(*args, **kwargs)
