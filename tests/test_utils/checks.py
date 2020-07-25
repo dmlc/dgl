@@ -3,9 +3,12 @@ import backend as F
 
 __all__ = ['check_graph_equal']
 
-def check_graph_equal(g1, g2, check_feature=True):
+def check_graph_equal(g1, g2, *,
+                      check_idtype=True,
+                      check_feature=True):
     assert g1.device == g1.device
-    assert g1.idtype == g2.idtype
+    if check_idtype:
+        assert g1.idtype == g2.idtype
     assert g1.ntypes == g2.ntypes
     assert g1.etypes == g2.etypes
     assert g1.srctypes == g2.srctypes
@@ -20,9 +23,14 @@ def check_graph_equal(g1, g2, check_feature=True):
         assert F.allclose(g1.batch_num_edges(ety), g2.batch_num_edges(ety))
         src1, dst1, eid1 = g1.edges(etype=ety, form='all')
         src2, dst2, eid2 = g2.edges(etype=ety, form='all')
-        assert F.allclose(src1, src2)
-        assert F.allclose(dst1, dst2)
-        assert F.allclose(eid1, eid2)
+        if check_idtype:
+            assert F.allclose(src1, src2)
+            assert F.allclose(dst1, dst2)
+            assert F.allclose(eid1, eid2)
+        else:
+            assert F.allclose(src1, F.astype(src2, g1.idtype))
+            assert F.allclose(dst1, F.astype(dst2, g1.idtype))
+            assert F.allclose(eid1, F.astype(eid2, g1.idtype))
 
     if check_feature:
         for nty in g1.ntypes:

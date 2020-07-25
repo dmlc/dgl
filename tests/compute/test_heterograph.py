@@ -8,6 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
+import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
 
@@ -200,8 +201,10 @@ def test_create(idtype):
     density = 0.25
     for fmt in ['csr', 'coo', 'csc']:
         adj = rand(num_nodes, num_nodes, density=density, format=fmt)
-        g = dgl.from_scipy(adj, eweight_name='w')
-        assert F.array_equal(g.edata['w'], F.copy_to(F.tensor(adj.data), g.device))
+        g = dgl.from_scipy(adj, eweight_name='w', idtype=idtype)
+        assert g.idtype == idtype
+        assert g.device == F.cpu()
+        assert F.array_equal(g.edata['w'], F.copy_to(F.tensor(adj.data), F.cpu()))
 
 @parametrize_dtype
 def test_query(idtype):
@@ -578,7 +581,7 @@ def test_view(idtype):
     g.nodes['user'].data['h'] = f1       # ok
     f2 = g.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.nodes('user')), F.arange(0, 3))
+    assert F.array_equal(g.nodes('user'), F.arange(0, 3, idtype))
     g.nodes['user'].data.pop('h')
 
     # multi type ndata
@@ -611,7 +614,7 @@ def test_view(idtype):
     f5 = g.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
     assert F.array_equal(f3, f5)
-    assert F.array_equal(F.tensor(g.edges(etype='follows', form='eid')), F.arange(0, 2))
+    assert F.array_equal(g.edges(etype='follows', form='eid'), F.arange(0, 2, idtype))
     g.edges['follows'].data.pop('h')
 
     f3 = F.randn((2, 4))
@@ -639,7 +642,7 @@ def test_view(idtype):
     g.srcnodes['user'].data['h'] = f1       # ok
     f2 = g.srcnodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.srcnodes('user')), F.arange(0, 3))
+    assert F.array_equal(g.srcnodes('user'), F.arange(0, 3, idtype))
     g.srcnodes['user'].data.pop('h')
 
     # multi type ndata
@@ -669,7 +672,7 @@ def test_view(idtype):
     g.dstnodes['user'].data['h'] = f1       # ok
     f2 = g.dstnodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.dstnodes('user')), F.arange(0, 3))
+    assert F.array_equal(g.dstnodes('user'), F.arange(0, 3, idtype))
     g.dstnodes['user'].data.pop('h')
 
     # multi type ndata
@@ -815,13 +818,13 @@ def test_view1(idtype):
     g.ndata['h'] = f1       # ok
     f2 = HG.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.nodes()), F.arange(0, 3))
+    assert F.array_equal(g.nodes(), F.arange(0, 3, g.idtype))
 
     f3 = F.randn((2, 4))
     g.edata['h'] = f3
     f4 = HG.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
-    assert F.array_equal(F.tensor(g.edges(form='eid')), F.arange(0, 2))
+    assert F.array_equal(g.edges(form='eid'), F.arange(0, 2, g.idtype))
 
     # multiple types
     ndata = HG.ndata['h']
@@ -1152,15 +1155,15 @@ def test_subgraph_mask(idtype):
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
         assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([1, 2], F.int64))
+                             F.tensor([1, 2], idtype))
         assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                             F.tensor([0], F.int64))
+                             F.tensor([0], idtype))
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], idtype))
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], idtype))
         assert F.array_equal(F.tensor(sg.edges['wishes'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], idtype))
         assert sg.number_of_nodes('developer') == 0
         assert sg.number_of_edges('develops') == 0
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
@@ -1194,15 +1197,15 @@ def test_subgraph(idtype):
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
         assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([1, 2], F.int64))
+                             F.tensor([1, 2], g.idtype))
         assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                             F.tensor([0], F.int64))
+                             F.tensor([0], g.idtype))
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
         assert F.array_equal(F.tensor(sg.edges['wishes'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
         assert sg.number_of_nodes('developer') == 0
         assert sg.number_of_edges('develops') == 0
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
@@ -1246,13 +1249,13 @@ def test_subgraph(idtype):
 
         if not preserve_nodes:
             assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                                 F.tensor([1, 2], F.int64))
+                                 F.tensor([1, 2], g.idtype))
         else:
             for ntype in sg.ntypes:
                 assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
 
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
 
         if not preserve_nodes:
             assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
@@ -1265,15 +1268,15 @@ def test_subgraph(idtype):
 
         if not preserve_nodes:
             assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                                 F.tensor([0, 1], F.int64))
+                                 F.tensor([0, 1], g.idtype))
             assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                                 F.tensor([0], F.int64))
+                                 F.tensor([0], g.idtype))
         else:
             for ntype in sg.ntypes:
                 assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
 
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
-                             F.tensor([0, 1], F.int64))
+                             F.tensor([0, 1], g.idtype))
 
     sg1_graph = g_graph.subgraph([1, 2])
     _check_subgraph_single_ntype(g_graph, sg1_graph)
@@ -1858,10 +1861,7 @@ def test_dtype_cast(idtype):
     else:
         g_cast = g.int()
         assert g_cast.idtype == F.int32
-    assert "feat" in g_cast.ndata
-    assert "h" in g_cast.edata
-    assert F.array_equal(g.ndata["feat"], g_cast.ndata["feat"])
-    assert F.array_equal(g.edata["h"], g_cast.edata["h"])
+    test_utils.check_graph_equal(g, g_cast, check_idtype=False)
 
 @parametrize_dtype
 def test_format(idtype):
@@ -2302,6 +2302,7 @@ def test_add_nodes(idtype):
     assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
 
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet has error with (0,) shape tensor.")
 @parametrize_dtype
 def test_remove_edges(idtype):
     # homogeneous Graphs
