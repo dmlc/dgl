@@ -66,9 +66,9 @@ python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ### Entity Classification on OGBN-MAG
 Test-bd: P3-8xlarge
 
-OGBN-MAG accuracy 44.12
+OGBN-MAG accuracy 45.92
 ```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='25,25' --batch-size 256 --n-hidden 64 --lr 0.01 --num-worker 0 --eval-batch-size 8 --low-mem --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --mix-cpu-gpu --node-feats
+python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='25,25' --batch-size 256 --n-hidden 64 --lr 0.01 --num-worker 0 --eval-batch-size 8 --low-mem --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --mix-cpu-gpu --node-feats --layer-norm
 ```
 
 OGBN-MAG without node-feats 41.90

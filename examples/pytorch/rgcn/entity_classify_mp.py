@@ -66,7 +66,8 @@ class EntityClassify(nn.Module):
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False,
-                 low_mem=False):
+                 low_mem=False,
+                 layer_norm=False):
         super(EntityClassify, self).__init__()
         self.device = th.device(device if device >= 0 else 'cpu')
         self.num_nodes = num_nodes
@@ -78,6 +79,7 @@ class EntityClassify(nn.Module):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
         self.low_mem = low_mem
+        self.layer_norm = layer_norm
 
         self.layers = nn.ModuleList()
         # i2h
@@ -232,7 +234,8 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
                            use_self_loop=args.use_self_loop,
-                           low_mem=args.low_mem)
+                           low_mem=args.low_mem,
+                           layer_norm=args.layer_norm)
 
     if dev_id >= 0 and n_gpus == 1:
         th.cuda.set_device(dev_id)
@@ -319,6 +322,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             eval_seeds = []
             with th.no_grad():
                 for sample_data in tqdm.tqdm(val_loader):
+                    th.cuda.empty_cache()
                     seeds, blocks = sample_data
                     if args.mix_cpu_gpu is False:
                         feats = embed_layer(blocks[0].srcdata[dgl.NID],
@@ -365,6 +369,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         test_seeds = []
         with th.no_grad():
             for sample_data in tqdm.tqdm(test_loader):
+                th.cuda.empty_cache()
                 seeds, blocks = sample_data
                 if args.mix_cpu_gpu is False:
                     feats = embed_layer(blocks[0].srcdata[dgl.NID],
@@ -618,6 +623,8 @@ def config():
             help='Whether use node features')
     parser.add_argument('--global-norm', default=False, action='store_true',
             help='User global norm instead of per node type norm')
+    parser.add_argument('--layer-norm', default=False, action='store_true',
+            help='Use layer norm')
     parser.set_defaults(validation=True)
     args = parser.parse_args()
     return args
