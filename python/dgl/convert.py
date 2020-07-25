@@ -30,7 +30,8 @@ def graph(data,
           formats=['coo', 'csr', 'csc'],
           idtype=None,
           device=None,
-          card=None, **kwargs):
+          card=None,
+          **deprecated_kwargs):
     """Create a graph with one type of nodes and edges.
 
     In the sparse matrix perspective, :func:`dgl.graph` creates a graph
@@ -125,11 +126,11 @@ def graph(data,
           ndata_schemes={}
           edata_schemes={})
     """
-    if len(kwargs) != 0:
+    if len(deprecated_kwargs) != 0:
         raise DGLError("Key word arguments {} have been removed from dgl.graph()."
                        " They are moved to dgl.from_scipy() and dgl.from_networkx()."
                        " Please refer to their API documents for more details.".format(
-                           kwargs.keys()))
+                           deprecated_kwargs.keys()))
 
     if isinstance(data, DGLHeteroGraph):
         return data.astype(idtype).to(device)
@@ -158,7 +159,8 @@ def bipartite(data,
               formats=['coo', 'csr', 'csc'],
               idtype=None,
               device=None,
-              card=None, **kwargs):
+              card=None,
+              **deprecated_kwargs):
     """Create a bipartite graph.
 
     The result graph is directed and edges must be from ``utype`` nodes
@@ -276,11 +278,11 @@ def bipartite(data,
           num_edges={('_U', '_E', '_V'): 3},
           metagraph=[('_U', '_V')])
     """
-    if len(kwargs) != 0:
+    if len(deprecated_kwargs) != 0:
         raise DGLError("Key word arguments {} have been removed from dgl.graph()."
                        " They are moved to dgl.from_scipy() and dgl.from_networkx()."
                        " Please refer to their API documents for more details.".format(
-                           kwargs.keys()))
+                           deprecated_kwargs.keys()))
 
     if utype == vtype:
         raise DGLError('utype should not be equal to vtype. Use ``dgl.graph`` instead.')

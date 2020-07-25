@@ -7,7 +7,7 @@ from . import random
 __all__ = ['rand_graph', 'rand_bipartite']
 
 def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu(),
-               restrict_format='any'):
+               formats=['coo', 'csr', 'csc']):
     """Generate a random graph of the given number of nodes/edges.
 
     It uniformly chooses ``num_edges`` from all pairs and form a graph.
@@ -24,8 +24,9 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu(),
         Integer ID type. Must be int32 or int64. Default: int64.
     device : Device context, optional
         Device on which the graph is created. Default: CPU.
-    restrict_format : 'any', 'coo', 'csr', 'csc', optional
-        Force the storage format. Default: 'any' (i.e. let DGL decide what to use).
+    formats : str or list of str
+        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
 
     Returns
     -------
@@ -37,12 +38,13 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu(),
     cols = F.copy_to(F.astype(eids % num_nodes, idtype), device)
     g = convert.graph((rows, cols),
                       num_nodes=num_nodes, validate=False,
-                      restrict_format=restrict_format,
+                      formats=formats,
                       idtype=idtype, device=device)
     return g
 
 def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
-                   idtype=F.int64, device=F.cpu(), restrict_format='any'):
+                   idtype=F.int64, device=F.cpu(),
+                   formats=['csr', 'coo', 'csc']):
     """Generate a random bipartite graph of the given number of src/dst nodes and
     number of edges.
 
@@ -60,8 +62,9 @@ def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
         Integer ID type. Must be int32 or int64. Default: int64.
     device : Device context, optional
         Device on which the graph is created. Default: CPU.
-    restrict_format : 'any', 'coo', 'csr', 'csc', optional
-        Force the storage format. Default: 'any' (i.e. let DGL decide what to use).
+    formats : str or list of str
+        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
 
     Returns
     -------
@@ -74,5 +77,5 @@ def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
     g = convert.bipartite((rows, cols),
                           num_nodes=(num_src_nodes, num_dst_nodes), validate=False,
                           idtype=idtype, device=device,
-                          restrict_format=restrict_format)
+                          formats=formats)
     return g
