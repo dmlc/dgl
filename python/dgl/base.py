@@ -19,6 +19,7 @@ EID = '_ID'
 _INTERNAL_COLUMNS = {NTYPE, NID, ETYPE, EID}
 
 def is_internal_column(name):
+    """Return true if the column name is reversed by DGL."""
     return name in _INTERNAL_COLUMNS
 
 def is_all(arg):
