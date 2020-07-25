@@ -513,7 +513,7 @@ class MovieLens(object):
         else:
             raise NotImplementedError
 
-        TEXT = torchtext.data.Field(tokenize='spacy')
+        TEXT = torchtext.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
         embedding = torchtext.vocab.GloVe(name='840B', dim=300)
 
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)

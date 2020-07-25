@@ -47,7 +47,7 @@ def test_line_graph2(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
-        'user', 'follows', restrict_format='csr', idtype=idtype)
+        'user', 'follows', idtype=idtype).formats('csr')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -57,8 +57,8 @@ def test_line_graph2(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
-        'user', 'follows', restrict_format='csc', idtype=idtype)
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+        'user', 'follows', idtype=idtype).formats('csc')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -234,6 +234,85 @@ def test_reverse_shared_frames(idtype):
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
                       rg.edges[[1, 1], [0, 2]].data['h'])
 
+def test_to_bidirected():
+    # homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.], [1.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
+    u, v = g.edges()
+    ub, vb = bg.edges()
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    assert F.array_equal(g.ndata['h'], bg.ndata['h'])
+    assert F.array_equal(F.cat([g.edata['h'], g.edata['h']], dim=0), bg.edata['h'])
+    bg.ndata['hh'] = F.tensor([[0.], [1.], [2.], [1.]])
+    assert ('hh' in g.ndata) is False
+    bg.edata['hh'] = F.tensor([[0.], [1.], [2.], [1.], [0.], [1.], [2.], [1.]])
+    assert ('hh' in g.edata) is False
+
+    # donot share ndata and edata
+    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False)
+    ub, vb = bg.edges()
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    assert ('h' in bg.ndata) is False
+    assert ('h' in bg.edata) is False
+
+    # zero edge graph
+    g = dgl.graph([])
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
+
+    # heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'wins', 'user'): (F.tensor([0, 2, 0, 2, 2]), F.tensor([1, 1, 2, 1, 0])),
+        ('user', 'plays', 'game'): (F.tensor([1, 2, 1]), F.tensor([2, 1, 1])),
+        ('user', 'follows', 'user'): (F.tensor([1, 2, 1]), F.tensor([0, 0, 0]))
+    })
+    g.nodes['game'].data['hv'] = F.ones((3, 1))
+    g.nodes['user'].data['hv'] = F.ones((3, 1))
+    g.edges['wins'].data['h'] = F.tensor([0, 1, 2, 3, 4])
+    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True, ignore_bipartite=True)
+    assert F.array_equal(g.nodes['game'].data['hv'], bg.nodes['game'].data['hv'])
+    assert F.array_equal(g.nodes['user'].data['hv'], bg.nodes['user'].data['hv'])
+    u, v = g.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    assert F.array_equal(F.cat([g.edges['wins'].data['h'], g.edges['wins'].data['h']], dim=0),
+                         bg.edges['wins'].data['h'])
+    u, v = g.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    u, v = g.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    assert F.array_equal(u, ub)
+    assert F.array_equal(v, vb)
+    assert len(bg.edges['plays'].data) == 0
+    assert len(bg.edges['follows'].data) == 0
+
+    # donot share ndata and edata
+    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False, ignore_bipartite=True)
+    assert len(bg.edges['wins'].data) == 0
+    assert len(bg.edges['plays'].data) == 0
+    assert len(bg.edges['follows'].data) == 0
+    assert len(bg.nodes['game'].data) == 0
+    assert len(bg.nodes['user'].data) == 0
+    u, v = g.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'wins', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    u, v = g.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'follows', 'user'))
+    assert F.array_equal(F.cat([u, v], dim=0), ub)
+    assert F.array_equal(F.cat([v, u], dim=0), vb)
+    u, v = g.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    ub, vb = bg.all_edges(order='eid', etype=('user', 'plays', 'game'))
+    assert F.array_equal(u, ub)
+    assert F.array_equal(v, vb)
+
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
@@ -255,7 +334,7 @@ def _test_bidirected_graph():
         g = dgl.DGLGraph(elist, readonly=in_readonly)
         elist.append((1, 2))
         elist = set(elist)
-        big = dgl.to_bidirected(g, out_readonly)
+        big = dgl.to_bidirected_stale(g, out_readonly)
         assert big.number_of_edges() == num_edges
         src, dst = big.edges()
         eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
@@ -359,13 +438,13 @@ def test_partition_with_halo():
         for i in range(nf.num_layers):
             layer_nids1 = F.asnumpy(nf.layer_parent_nid(i))
             layer_nids2 = lnf.layer_parent_nid(i)
-            layer_nids2 = F.asnumpy(F.gather_row(subg.parent_nid, layer_nids2))
+            layer_nids2 = F.asnumpy(F.gather_row(subg.ndata[dgl.NID], layer_nids2))
             assert np.all(np.sort(layer_nids1) == np.sort(layer_nids2))
 
         for i in range(nf.num_blocks):
             block_eids1 = F.asnumpy(nf.block_parent_eid(i))
             block_eids2 = lnf.block_parent_eid(i)
-            block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
+            block_eids2 = F.asnumpy(F.gather_row(subg.edata[dgl.EID], block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
     subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
@@ -382,6 +461,17 @@ def test_metis_partition():
     check_metis_partition(g, 1)
     check_metis_partition(g, 2)
     check_metis_partition_with_constraint(g)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
+def test_hetero_metis_partition():
+    # TODO(zhengda) Metis fails to partition a small graph.
+    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
+    g = dgl.as_heterograph(g)
+    check_metis_partition(g, 0)
+    check_metis_partition(g, 1)
+    check_metis_partition(g, 2)
+    check_metis_partition_with_constraint(g)
+
 
 def check_metis_partition_with_constraint(g):
     ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
@@ -837,13 +927,13 @@ def test_remove_edges(idtype):
 
     for fmt in ['coo', 'csr', 'csc']:
         for edges_to_remove in [[2], [2, 2], [3, 2], [1, 3, 1, 2]]:
-            g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], restrict_format=fmt, idtype=idtype)
+            g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], idtype=idtype).formats(fmt)
             g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
             check(g1, None, g, edges_to_remove)
 
             g = dgl.graph(
                 spsp.csr_matrix(([1, 1, 1, 1], ([0, 2, 1, 3], [1, 3, 2, 4])), shape=(5, 5)),
-                restrict_format=fmt, idtype=idtype)
+                idtype=idtype).formats(fmt)
             g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
             check(g1, None, g, edges_to_remove)
 
@@ -1336,22 +1426,4 @@ def test_remove_selfloop(idtype):
     assert raise_error
 
 if __name__ == '__main__':
-    #test_reorder_nodes()
-    # test_line_graph()
-    # test_no_backtracking()
-    #test_reverse()
-    # test_reverse_shared_frames()
-    #test_simple_graph()
-    # test_bidirected_graph()
-    test_khop_adj()
-    # test_khop_graph()
-    # test_laplacian_lambda_max()
-    # test_partition_with_halo()
-    # test_metis_partition()
-    # test_line_graph2('int32')
-    # test_compact()
-    #test_to_simple("int32")
-    # test_in_subgraph("int32")
-    # test_out_subgraph()
-    # test_to_block("int32")
-    # test_remove_edges()
+    pass

@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 import dgl.function as fn
-from dgl import DGLGraph
+from dgl import DGLGraphStale
 from dgl.data import register_data_args, load_data
 
 
@@ -177,7 +177,7 @@ def main(args):
               n_test_samples))
 
     # create GCN model
-    g = DGLGraph(data.graph, readonly=True)
+    g = DGLGraphStale(data.graph, readonly=True)
     norm = 1. / g.in_degrees().float().unsqueeze(1)
 
     if args.gpu < 0:
