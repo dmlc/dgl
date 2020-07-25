@@ -3,7 +3,7 @@
 import scipy as sp
 import networkx as nx
 
-from ..base import DGLError, dgl_warning
+from ..base import DGLError
 from .. import backend as F
 
 def elist2tensor(elist, idtype):

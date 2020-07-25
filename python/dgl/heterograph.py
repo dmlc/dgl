@@ -190,7 +190,7 @@ class DGLHeteroGraph(object):
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
     """
-    # pylint: disable=unused-argument
+    # pylint: disable=unused-argument, dangerous-default-value
     def __init__(self,
                  gidx=[],
                  ntypes=['_U'],
@@ -200,7 +200,7 @@ class DGLHeteroGraph(object):
                  **deprecate_kwargs):
         if isinstance(gidx, DGLHeteroGraph):
             raise DGLError('The input is already a DGLGraph. No need to create it again.')
-        elif not isinstance(gidx, heterograph_index.HeteroGraphIndex):
+        if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
             dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
                         ' instead of `dgl.DGLGraph(data)`.')
             u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
@@ -299,11 +299,11 @@ class DGLHeteroGraph(object):
             # DGL >= 0.5
             #TODO(minjie): too many states in python; should clean up and lower to C
             (self._graph, metainfo, self._node_frames, self._edge_frames,
-                    self._batch_num_nodes, self._batch_num_edges) = state
+             self._batch_num_nodes, self._batch_num_edges) = state
             (self._ntypes, self._etypes, self._canonical_etypes,
-                    self._srctypes_invmap, self._dsttypes_invmap,
-                    self._is_unibipartite, self._etype2canonical,
-                    self._etypes_invmap) = metainfo
+             self._srctypes_invmap, self._dsttypes_invmap,
+             self._is_unibipartite, self._etype2canonical,
+             self._etypes_invmap) = metainfo
         elif isinstance(state, tuple) and len(state) == 5:
             # DGL == 0.4.3
             dgl_warning("The object is pickled with DGL == 0.4.3.  "
@@ -1173,9 +1173,11 @@ class DGLHeteroGraph(object):
     #################################################################
     @property
     def batch_size(self):
+        """TBD"""
         return len(self.batch_num_nodes(self.ntypes[0]))
 
     def batch_num_nodes(self, ntype=None):
+        """TBD"""
         if self._batch_num_nodes is None:
             self._batch_num_nodes = {}
             for ty in self.ntypes:
@@ -1189,6 +1191,7 @@ class DGLHeteroGraph(object):
         return self._batch_num_nodes[ntype]
 
     def set_batch_num_nodes(self, val):
+        """TBD"""
         if not isinstance(val, Mapping):
             if len(self.ntypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple node types.')
@@ -1196,6 +1199,7 @@ class DGLHeteroGraph(object):
         self._batch_num_nodes = val
 
     def batch_num_edges(self, etype=None):
+        """TBD"""
         if self._batch_num_edges is None:
             self._batch_num_edges = {}
             for ty in self.canonical_etypes:
@@ -1209,6 +1213,7 @@ class DGLHeteroGraph(object):
         return self._batch_num_edges[etype]
 
     def set_batch_num_edges(self, val):
+        """TBD"""
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple edge types.')
@@ -1874,7 +1879,7 @@ class DGLHeteroGraph(object):
         """Deprecated: please directly call :func:`has_nodes`.
         """
         dgl_warning('DGLGraph.__contains__ is deprecated.'
-                       ' Please directly call has_nodes.')
+                    ' Please directly call has_nodes.')
         return self.has_nodes(vid)
 
     def has_nodes(self, vid, ntype=None):
@@ -4413,7 +4418,6 @@ class DGLHeteroGraph(object):
         dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
                     'DGLGraph now always supports mutable operations like add_nodes'
                     ' and add_edges.')
-        return
 
     @property
     def device(self):
@@ -4662,12 +4666,12 @@ class DGLHeteroGraph(object):
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     def formats(self, formats=None):
-        r"""Get a cloned graph with the specified sparse format(s) or query 
+        r"""Get a cloned graph with the specified sparse format(s) or query
         for the usage status of sparse formats
 
         The API copies both the graph structure and the features.
 
-        If the input graph has multiple edge types, they will have the same 
+        If the input graph has multiple edge types, they will have the same
         sparse format.
 
         Parameters
@@ -4675,16 +4679,17 @@ class DGLHeteroGraph(object):
         formats : str or list of str or None
 
             * If formats is None, return the usage status of sparse formats
-            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of
             them, specifying the sparse formats to use.
 
         Returns
         -------
         dict or DGLGraph
 
-            * If formats is None, the result will be a dict recording the usage status of sparse formats.
-            * Otherwise, a DGLGraph will be returned, which is a clone of the 
-            original graph with the specified sparse format(s) ``formats``.
+            * If formats is None, the result will be a dict recording the usage
+              status of sparse formats.
+            * Otherwise, a DGLGraph will be returned, which is a clone of the
+              original graph with the specified sparse format(s) ``formats``.
 
         Examples
         --------
@@ -4716,9 +4721,9 @@ class DGLHeteroGraph(object):
         **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]), 
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
         >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), 
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
         >>>                                         torch.tensor([0, 1]))
         >>>     })
         >>> g.formats()
@@ -4738,7 +4743,7 @@ class DGLHeteroGraph(object):
     def create_format_(self):
         r"""Create all sparse matrices allowed for the graph.
 
-        By default, we create sparse matrices for a graph only when necessary. 
+        By default, we create sparse matrices for a graph only when necessary.
         In some cases we may want to create them immediately (e.g. in a
         multi-process data loader), which can be achieved via this API.
 
@@ -4762,9 +4767,9 @@ class DGLHeteroGraph(object):
         **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]), 
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
         >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), 
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
         >>>                                         torch.tensor([0, 1]))
         >>>     })
         >>> g.format()

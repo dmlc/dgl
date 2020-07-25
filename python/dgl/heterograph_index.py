@@ -840,7 +840,7 @@ class HeteroGraphIndex(ObjectBase):
         """Get a graph index with the specified sparse format(s) or query
         for the usage status of sparse formats
 
-        If the graph has multiple edge types, they will have the same 
+        If the graph has multiple edge types, they will have the same
         sparse format.
 
         Parameters
@@ -848,16 +848,17 @@ class HeteroGraphIndex(ObjectBase):
         formats : str or list of str or None
 
             * If formats is None, return the usage status of sparse formats
-            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of 
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of
             them, specifying the sparse formats to use.
 
         Returns
         -------
         dict or GraphIndex
 
-            * If formats is None, the result will be a dict recording the usage status of sparse formats.
-            * Otherwise, a GraphIndex will be returned, which is a clone of the 
-            original graph with the specified sparse format(s) ``formats``.
+            * If formats is None, the result will be a dict recording the usage
+              status of sparse formats.
+            * Otherwise, a GraphIndex will be returned, which is a clone of the
+              original graph with the specified sparse format(s) ``formats``.
 
         """
         formats_allowed = _CAPI_DGLHeteroGetAllowedFormats(self)

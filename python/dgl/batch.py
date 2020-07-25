@@ -1,6 +1,4 @@
 """Utilities for batching/unbatching graphs."""
-
-from collections import defaultdict
 from collections.abc import Mapping
 
 from . import backend as F
@@ -13,7 +11,7 @@ __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     r"""Batch a collection of ``DGLGraph``s into one graph for more efficient
     graph computation.
-    
+
     Each input graph becomes one disjoint component of the batched graph. The nodes
     and edges are relabeled to be disjoint segments:
 
@@ -21,9 +19,10 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
                        graphs[0]  graphs[1]          ...  graphs[k]
     =================  =========  =================  ===  =========
     Original node ID   0 ~ N_0    0 ~ N_1            ...  0 ~ N_k
-    New node ID        0 ~ N_0    N_0+1 ~ N_0+N_1+1  ...  1+\sum_{i=0}^{k-1} N_i ~ 1+\sum_{i=0}^k N_i 
+    New node ID        0 ~ N_0    N_0+1 ~ N_0+N_1+1  ...  1+\sum_{i=0}^{k-1} N_i ~
+                                                          1+\sum_{i=0}^k N_i
     =================  =========  =================  ===  =========
-    
+
     Because of this, many of the computations on a batched graph are the same as if
     performed on each graph individually, but become much more efficient
     since they can be parallelized easily. This makes ``dgl.batch`` very useful
@@ -32,25 +31,25 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     For heterograph inputs, they must share the same set of relations (i.e., node types
     and edge types) and the function will perform batching on each relation one by one.
     Thus, the result is also a heterograph and has the same set of relations as the inputs.
-    
+
     The numbers of nodes and edges of the input graphs are accessible via the
     :func:`DGLGraph.batch_num_nodes` and :func:`DGLGraph.batch_num_edges` attributes
     of the result graph. For homographs, they are 1D integer tensors, with each element
     being the number of nodes/edges of the corresponding input graph. For
     heterographs, they are dictionaries of 1D integer tensors, with node
     type or edge type as the keys.
-    
+
     The function supports batching batched graphs. The batch size of the result
     graph is the sum of the batch sizes of all the input graphs.
-    
+
     By default, node/edge features are batched by concatenating the feature tensors
     of all input graphs. This thus requires features of the same name to have
     the same data type and feature size. One can pass ``None`` to the ``ndata``
     or ``edata`` argument to prevent feature batching, or pass a list of string
     to specify which features to batch.
-    
+
     To unbatch the graph back to a list, use the :func:`dgl.unbatch` function.
-    
+
     Parameters
     ----------
     graphs : list[DGLGraph]
@@ -59,17 +58,17 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         Node features to batch.
     edata : list[str], None, optional
         Edge features to batch.
-    
+
     Returns
     -------
     DGLGraph
         Batched graph.
-        
+
     Examples
     --------
-    
+
     Batch homographs
-    
+
     >>> import dgl
     >>> import torch as th
     >>> # 4 nodes, 3 edges
@@ -89,9 +88,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     tensor([3, 4])
     >>> bg.edges()
     (tensor([0, 1, 2, 4, 4, 4, 5], tensor([1, 2, 3, 4, 5, 6, 4]))
-            
+
     Batch batched graphs
-    
+
     >>> bbg = dgl.batch([bg, bg])
     >>> bbg.batch_size
     4
@@ -99,9 +98,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     tensor([4, 3, 4, 3])
     >>> bbg.batch_num_edges()
     tensor([3, 4, 3, 4])
-    
+
     Batch graphs with feature data
-    
+
     >>> g1.ndata['x'] = th.zeros(g1.num_nodes(), 3)
     >>> g1.edata['w'] = th.ones(g1.num_edges(), 2)
     >>> g2.ndata['x'] = th.ones(g2.num_nodes(), 3)
@@ -123,11 +122,13 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
             [0, 0],
             [0, 0],
             [0, 0]])
-            
+
     Batch heterographs
-    
-    >>> hg1 = dgl.heterograph({('user', 'plays', 'game') : (th.tensor([0, 1]), th.tensor([0, 0]))})
-    >>> hg2 = dgl.heterograph({('user', 'plays', 'game') : (th.tensor([0, 0, 0]), th.tensor([1, 0, 2]))})
+
+    >>> hg1 = dgl.heterograph({
+    ...     ('user', 'plays', 'game') : (th.tensor([0, 1]), th.tensor([0, 0]))})
+    >>> hg2 = dgl.heterograph({
+    ...     ('user', 'plays', 'game') : (th.tensor([0, 0, 0]), th.tensor([1, 0, 2]))})
     >>> bhg = dgl.batch([hg1, hg2])
     >>> bhg
     Graph(num_nodes={'user': 3, 'game': 4},
@@ -139,18 +140,18 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     {'user' : tensor([2, 1]), 'game' : tensor([1, 3])}
     >>> bhg.batch_num_edges()
     {('user', 'plays', 'game') : tensor([2, 3])}
-    
+
     See Also
     --------
     unbatch
     """
     if len(graphs) == 0:
         raise DGLError('The input list of graphs cannot be empty.')
-    if node_attrs != None:
+    if node_attrs is not None:
         dgl_warning('Arguments node_attrs has been deprecated. Please use'
                     ' ndata instead.')
         ndata = node_attrs
-    if edge_attrs != None:
+    if edge_attrs is not None:
         dgl_warning('Arguments edge_attrs has been deprecated. Please use'
                     ' edata instead.')
         edata = edge_attrs
@@ -183,7 +184,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         edge_dict[rel] = (F.cat(src, 0), F.cat(dst, 0))
         num_nodes_dict.update({srctype : srcnid_off, dsttype : dstnid_off})
     retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
-    
+
     # Compute batch num nodes
     bnn = {}
     for ntype in graphs[0].ntypes:
@@ -323,8 +324,10 @@ def unbatch(g, node_split=None, edge_split=None):
 
     Heterograph input
 
-    >>> hg1 = dgl.heterograph({('user', 'plays', 'game') : (th.tensor([0, 1]), th.tensor([0, 0]))})
-    >>> hg2 = dgl.heterograph({('user', 'plays', 'game') : (th.tensor([0, 0, 0]), th.tensor([1, 0, 2]))})
+    >>> hg1 = dgl.heterograph({
+    ...     ('user', 'plays', 'game') : (th.tensor([0, 1]), th.tensor([0, 0]))})
+    >>> hg2 = dgl.heterograph({
+    ...     ('user', 'plays', 'game') : (th.tensor([0, 0, 0]), th.tensor([1, 0, 2]))})
     >>> bhg = dgl.batch([hg1, hg2])
     >>> f1, f2 = dgl.unbatch(bhg)
     >>> f1
@@ -351,13 +354,13 @@ def unbatch(g, node_split=None, edge_split=None):
         node_split = {g.ntypes[0] : node_split}
     if node_split.keys() != set(g.ntypes):
         raise DGLError('Must specify node_split for each node type.')
-    for k, split in node_split.items():
+    for split in node_split.values():
         if num_split is not None and num_split != len(split):
             raise DGLError('All node_split and edge_split must specify the same number'
                            ' of split sizes.')
         num_split = len(split)
 
-    # Parse edge_split 
+    # Parse edge_split
     if edge_split is None:
         edge_split = {etype : g.batch_num_edges(etype) for etype in g.canonical_etypes}
     elif not isinstance(edge_split, Mapping):
@@ -367,7 +370,7 @@ def unbatch(g, node_split=None, edge_split=None):
         edge_split = {g.canonical_etypes[0] : edge_split}
     if edge_split.keys() != set(g.canonical_etypes):
         raise DGLError('Must specify edge_split for each canonical edge type.')
-    for k, split in edge_split.items():
+    for split in edge_split.values():
         if num_split is not None and num_split != len(split):
             raise DGLError('All edge_split and edge_split must specify the same number'
                            ' of split sizes.')
@@ -414,11 +417,13 @@ def unbatch(g, node_split=None, edge_split=None):
 
 #### DEPRECATED APIS ####
 def batch_hetero(*args, **kwargs):
+    """DEPREACTED: please use dgl.batch """
     dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
                 ' replace dgl.batch_hetero with dgl.batch')
     return batch(*args, **kwargs)
 
 def unbatch_hetero(*args, **kwargs):
+    """DEPREACTED: please use dgl.unbatch """
     dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
                 ' replace dgl.unbatch_hetero with dgl.unbatch')
     return batch(*args, **kwargs)

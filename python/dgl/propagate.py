@@ -117,8 +117,8 @@ def prop_nodes_topo(graph,
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'prop_nodes_topo only support homogeneous graph'
-    # Todo: since operator TopologicalNodesFrontiers currently only 
-    # supports cpu graphs, we move graph to cpu as a workaround, 
+    # Todo: since operator TopologicalNodesFrontiers currently only
+    # supports cpu graphs, we move graph to cpu as a workaround,
     # which should be fixed in the future
     nodes_gen = trv.topological_nodes_generator(graph.cpu(), reverse)
     nodes_gen = [frontier.to(graph.device) for frontier in nodes_gen]

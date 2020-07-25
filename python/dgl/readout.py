@@ -1,8 +1,6 @@
 """Classes and functions for batching multiple graphs together."""
 from __future__ import absolute_import
 
-import numpy as np
-
 from .base import DGLError
 from . import backend as F
 from . import segment
@@ -57,7 +55,7 @@ def readout_nodes(graph, feat, weight=None, *, op='sum', ntype=None):
     >>> g1.ndata['h'] = th.tensor([1., 2.])
     >>> g2 = dgl.graph(([0, 1], [1, 2]))              # Graph 2
     >>> g2.ndata['h'] = th.tensor([1., 2., 3.])
-    
+
     Sum over one graph:
 
     >>> dgl.readout_nodes(g1, 'h')
@@ -74,16 +72,16 @@ def readout_nodes(graph, feat, weight=None, *, op='sum', ntype=None):
     >>> bg.ndata['w'] = th.tensor([.1, .2, .1, .5, .2])
     >>> dgl.readout_nodes(bg, 'h', 'w')
     tensor([.5, 1.7])
-    
+
     Readout by max:
-    
+
     >>> dgl.readout_nodes(bg, 'h', op='max')
     tensor([2., 3.])
 
     See Also
     --------
     readout_edges
-    """ 
+    """
     x = graph.nodes[ntype].data[feat]
     if weight is not None:
         x = x * graph.nodes[ntype].data[weight]
@@ -495,7 +493,7 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     with all zero; in the second returned tensor, the behavior of :math:`n+1`
     to :math:`k`th elements is not defined.
     """
-    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
+    _, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, typestr)[ntype_or_etype].data
     if F.ndim(data[feat]) > 2:
         raise DGLError('Only support {} feature `{}` with dimension less than or'

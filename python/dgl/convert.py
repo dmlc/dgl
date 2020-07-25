@@ -1,7 +1,7 @@
 """Module for converting graph from/to other object."""
+# pylint: disable=dangerous-default-value
 from collections import defaultdict
 import numpy as np
-import scipy as sp
 import networkx as nx
 
 from . import backend as F
@@ -125,6 +125,12 @@ def graph(data,
           ndata_schemes={}
           edata_schemes={})
     """
+    if len(kwargs) != 0:
+        raise DGLError("Key word arguments {} have been removed from dgl.graph()."
+                       " They are moved to dgl.from_scipy() and dgl.from_networkx()."
+                       " Please refer to their API documents for more details.".format(
+                           kwargs.keys()))
+
     if isinstance(data, DGLHeteroGraph):
         return data.astype(idtype).to(device)
 
@@ -270,6 +276,12 @@ def bipartite(data,
           num_edges={('_U', '_E', '_V'): 3},
           metagraph=[('_U', '_V')])
     """
+    if len(kwargs) != 0:
+        raise DGLError("Key word arguments {} have been removed from dgl.graph()."
+                       " They are moved to dgl.from_scipy() and dgl.from_networkx()."
+                       " Please refer to their API documents for more details.".format(
+                           kwargs.keys()))
+
     if utype == vtype:
         raise DGLError('utype should not be equal to vtype. Use ``dgl.graph`` instead.')
     if card is not None:
@@ -450,7 +462,7 @@ def heterograph(data_dict,
     """
     # Try infer idtype
     if idtype is None:
-        for k, data in data_dict.items():
+        for data in data_dict.values():
             if isinstance(data, tuple) and len(data) == 2 and F.is_tensor(data[0]):
                 idtype = F.dtype(data[0])
                 break
@@ -758,7 +770,7 @@ def to_homo(G):
 
     return retg
 
-def from_scipy(sp_mat, 
+def from_scipy(sp_mat,
                ntype='_N', etype='_E',
                eweight_name=None,
                formats=['coo', 'csr', 'csc'],
@@ -774,7 +786,7 @@ def from_scipy(sp_mat,
     etype : str
         Type name for edges
     eweight_name : str, optional
-        If given, the edge weights in the matrix will be 
+        If given, the edge weights in the matrix will be
         stored in ``edata[eweight_name]``.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,

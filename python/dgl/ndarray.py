@@ -182,7 +182,6 @@ class SparseMatrix(ObjectBase):
         """
         ret = [_CAPI_DGLSparseMatrixGetIndices(self, i) for i in range(3)]
         return [F.zerocopy_from_dgl_ndarray(arr) for arr in ret]
-        #return [F.zerocopy_from_dgl_ndarray(v.data) for v in ret]
 
     @property
     def flags(self):
@@ -192,7 +191,7 @@ class SparseMatrix(ObjectBase):
         -------
         list of boolean
         """
-        return [v for v in _CAPI_DGLSparseMatrixGetFlags(self)]
+        return _CAPI_DGLSparseMatrixGetFlags(self)
 
     def __getstate__(self):
         return self.format, self.num_rows, self.num_cols, self.indices, self.flags

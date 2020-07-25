@@ -8,19 +8,18 @@ from scipy import sparse
 
 from ._ffi.function import _init_api
 from .base import EID, NID, dgl_warning, DGLError
-from .graph import DGLGraph as DGLGraphStale
 from . import convert
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
 from . import backend as F
-from .graph_index import _get_halo_subgraph_inner_node
-from .convert import graph, bipartite, heterograph
 from . import utils, batch
-from .base import EID, NID
-from . import ndarray as nd
 from .partition import metis_partition_assignment as hetero_metis_partition_assignment
 from .partition import partition_graph_with_halo as hetero_partition_graph_with_halo
 from .partition import metis_partition as hetero_metis_partition
+
+# TO BE DEPRECATED
+from .graph import DGLGraph as DGLGraphStale
+from .graph_index import _get_halo_subgraph_inner_node
 
 __all__ = [
     'line_graph',
@@ -262,7 +261,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
             u, v = g.edges(form='uv', order='eid', etype=c_etype)
             subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = heterograph(subgs)
+        new_g = convert.heterograph(subgs)
     else:
         subgs = {}
         for c_etype in canonical_etypes:
@@ -273,7 +272,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
                 u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = heterograph(subgs)
+        new_g = convert.heterograph(subgs)
 
     # handle features
     if copy_ndata:
@@ -2054,7 +2053,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
 
 DGLHeteroGraph.to_simple = to_simple
 
-def as_heterograph(g, ntype='_U', etype='_E'):
+def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
 
     DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
