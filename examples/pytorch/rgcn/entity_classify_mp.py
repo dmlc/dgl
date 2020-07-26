@@ -338,7 +338,7 @@ def main(args, devices):
         raise ValueError()
 
     # Load from hetero-graph
-    hg = dataset.graph
+    hg = dataset[0]
 
     num_rels = len(hg.canonical_etypes)
     num_of_ntype = len(hg.ntypes)

@@ -22,14 +22,14 @@ AIFB: accuracy 97.22% (DGL), 95.83% (paper)
 python3 entity_classify.py -d aifb --testing --gpu 0
 ```
 
-MUTAG: accuracy 75% (DGL), 73.23% (paper)
+MUTAG: accuracy 73.04% (DGL), 73.23% (paper)
 ```
 python3 entity_classify.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0
 ```
 
-BGS: accuracy 82.76% (DGL), 83.10% (paper)
+BGS: accuracy 93.1% (DGL), 83.10% (paper)
 ```
-python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --relabel
+python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
 
 AM: accuracy 87.37% (DGL), 89.29% (paper)

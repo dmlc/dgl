@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from functools import partial
 
 import dgl
-from dgl.data.rdf import AIFB, MUTAG, BGS, AM
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import EntityClassify, RelGraphEmbed
 
 def extract_embed(node_embed, input_nodes):
@@ -46,22 +46,24 @@ def evaluate(model, loader, node_embed, labels, category, use_cuda):
 def main(args):
     # load graph data
     if args.dataset == 'aifb':
-        dataset = AIFB()
+        dataset = AIFBDataset()
     elif args.dataset == 'mutag':
-        dataset = MUTAG()
+        dataset = MUTAGDataset()
     elif args.dataset == 'bgs':
-        dataset = BGS()
+        dataset = BGSDataset()
     elif args.dataset == 'am':
-        dataset = AM()
+        dataset = AMDataset()
     else:
         raise ValueError()
 
-    g = dataset.graph
+    g = dataset[0]
     category = dataset.predict_category
     num_classes = dataset.num_classes
-    train_idx = dataset.train_idx
-    test_idx = dataset.test_idx
-    labels = dataset.labels
+    train_mask = g.nodes[category].data.pop('train_mask')
+    test_mask = g.nodes[category].data.pop('test_mask')
+    train_idx = th.nonzero(train_mask).squeeze()
+    test_idx = th.nonzero(test_mask).squeeze()
+    labels = g.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
     if args.validation:

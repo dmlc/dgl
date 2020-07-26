@@ -221,14 +221,14 @@ class RDFGraphDataset(DGLBuiltinDataset):
         test_mask = idx2mask(test_idx, self._hg.number_of_nodes(self.predict_category))
         labels = F.tensor(labels).long()
 
-        self._hg.nodes[self.predict_category].data['train_mask'] = generate_mask_tensor(train_mask)
-        self._hg.nodes[self.predict_category].data['test_mask'] = generate_mask_tensor(test_mask)
-        self._hg.nodes[self.predict_category].data['labels'] = labels
+        self._train_mask = generate_mask_tensor(train_mask)
+        self._test_mask = generate_mask_tensor(test_mask)
+        self._labels = labels
+        self._num_classes = num_classes
+
         # save for compatability
         self._train_idx = F.tensor(train_idx)
         self._test_idx = F.tensor(test_idx)
-        self._labels = labels
-        self._num_classes = num_classes
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
         # create homo graph
@@ -264,7 +264,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
 
     def load_data_split(self, ent2id, root_path):
         label_dict = {}
-        labels = np.zeros((self.graph.number_of_nodes(self.predict_category),)) - 1
+        labels = np.zeros((self._hg.number_of_nodes(self.predict_category),)) - 1
         train_idx = self.parse_idx_file(
             os.path.join(root_path, 'trainingSet.tsv'),
             ent2id, label_dict, labels)
@@ -312,7 +312,10 @@ class RDFGraphDataset(DGLBuiltinDataset):
                                   self.save_name + '.bin')
         info_path = os.path.join(self.save_path,
                                  self.save_name + '.pkl')
-        save_graphs(str(graph_path), self.graph)
+        self._hg.nodes[self.predict_category].data['train_mask'] = self._train_mask
+        self._hg.nodes[self.predict_category].data['test_mask'] = self._test_mask
+        self._hg.nodes[self.predict_category].data['labels'] = self._labels
+        save_graphs(str(graph_path), self._hg)
         save_info(str(info_path), {'num_classes': self.num_classes,
                                    'predict_category': self.predict_category})
 
@@ -327,14 +330,29 @@ class RDFGraphDataset(DGLBuiltinDataset):
         self._num_classes = info['num_classes']
         self._predict_category = info['predict_category']
         self._hg = graphs[0]
-        train_mask = self._hg.nodes[self.predict_category].data['train_mask']
-        test_mask = self._hg.nodes[self.predict_category].data['test_mask']
+        train_mask = self._hg.nodes[self.predict_category].data.pop('train_mask')
+        test_mask = self._hg.nodes[self.predict_category].data.pop('test_mask')
 
         train_idx = F.nonzero_1d(train_mask)
         test_idx = F.nonzero_1d(test_mask)
+        self._train_mask = train_mask
+        self._test_mask = test_mask
         self._train_idx = train_idx
         self._test_idx = test_idx
-        self._labels = self._hg.nodes[self.predict_category].data['labels']
+        self._labels = self._hg.nodes[self.predict_category].data.pop('labels')
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+        """
+        g = self._hg
+        g.nodes[self.predict_category].data['train_mask'] = self._train_mask
+        g.nodes[self.predict_category].data['test_mask'] = self._test_mask
+        g.nodes[self.predict_category].data['labels'] = self._labels
+        return g
+
+    def __len__(self):
+        r"""The number of examples in the dataset."""
+        return 1
 
     @property
     def save_name(self):
@@ -342,6 +360,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
 
     @property
     def graph(self):
+        deprecate_property('dataset.graph', 'hg = dataset[0]')
         return self._hg
 
     @property
