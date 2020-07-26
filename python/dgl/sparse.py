@@ -109,9 +109,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
 
     Notes
     -----
-    This function does not handle gradients, and for scalar input features,
-    we expand its dimension with an additional dimension of length one. (e.g.
-    (90,) to (90, 1) for a graph with 90 nodes/edges).
+    This function does not handle gradients.
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gspmm on graph with one edge type")
@@ -154,7 +152,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
         v = F.squeeze(v, -1)
     return v, (arg_u, arg_e)
 
-def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
+def _gsddmm(gidx, op, lhs, rhs, lhs_target, rhs_target):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
@@ -192,9 +190,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 
     Notes
     -----
-    This function does not handle gradients, and for scalar input features,
-    we expand its dimension with an additional dimension of length one. (e.g.
-    (90,) to (90, 1) for a graph with 90 nodes/edges).
+    This function does not handle gradients.
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
