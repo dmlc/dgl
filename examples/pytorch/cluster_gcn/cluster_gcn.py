@@ -75,7 +75,7 @@ def main(args):
             n_test_samples))
     # create GCN model
     g = data.graph
-    g = dgl.from_networkx(g)
+    g = dgl.graph(g)
     if args.self_loop and not args.dataset.startswith('reddit'):
         g = dgl.remove_self_loop(g)
         g = dgl.add_self_loop(g)
