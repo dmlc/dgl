@@ -25,7 +25,7 @@ from .convert import *
 from .graph import DGLGraph as DGLGraphStale
 from .generators import *
 from .heterograph import DGLHeteroGraph
-from .heterograph import DGLHeteroGraph as DGLGraph
+from .heterograph import DGLHeteroGraph as DGLGraph  # pylint: disable=reimported
 from .nodeflow import *
 from .traversal import *
 from .transform import *

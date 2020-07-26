@@ -8,7 +8,7 @@ Dependencies
 - PyTorch 1.1.0+
 - sklearn
 - dgl
-
+- tables
 
 
 How to run

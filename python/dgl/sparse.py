@@ -114,23 +114,23 @@ def _gspmm(gidx, op, reduce_op, u, e):
     (90,) to (90, 1) for a graph with 90 nodes/edges).
     """
     if gidx.number_of_etypes() != 1:
-        raise DGLError("We only support gsddmm on graph with one edge type")
+        raise DGLError("We only support gspmm on graph with one edge type")
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
+    # deal with scalar features.
+    expand_u, expand_e = False, False
     if use_u:
         if F.ndim(u) == 1:
             u = F.unsqueeze(u, -1)
+            expand_u = True
     if use_e:
         if F.ndim(e) == 1:
             e = F.unsqueeze(e, -1)
-    if gidx.number_of_etypes() != 1:
-        raise DGLError("We only support gspmm on graph with one edge type")
-
+            expand_e = True
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
     e_shp = F.shape(e) if use_e else (0,)
-
     _, dsttype = gidx.metagraph.find_edge(0)
     v_shp = (gidx.number_of_nodes(dsttype), ) +\
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
@@ -150,6 +150,8 @@ def _gspmm(gidx, op, reduce_op, u, e):
                             to_dgl_nd_for_write(v),
                             to_dgl_nd_for_write(arg_u),
                             to_dgl_nd_for_write(arg_e))
+    if (expand_u or not use_u) and (expand_e or not use_e):
+        v = F.squeeze(v, -1)
     return v, (arg_u, arg_e)
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
@@ -198,13 +200,16 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         raise DGLError("We only support gsddmm on graph with one edge type")
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
+    # deal with scalar features.
+    expand_lhs, expand_rhs = False, False
     if use_lhs:
         if F.ndim(lhs) == 1:
             lhs = F.unsqueeze(lhs, -1)
+            expand_lhs = True
     if use_rhs:
         if F.ndim(rhs) == 1:
             rhs = F.unsqueeze(rhs, -1)
-
+            expand_rhs = True
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
     ctx = F.context(lhs) if use_lhs else F.context(rhs)
@@ -220,6 +225,8 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
                              to_dgl_nd(rhs if use_rhs else None),
                              to_dgl_nd_for_write(out),
                              lhs_target, rhs_target)
+    if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
+        out = F.squeeze(out, -1)
     return out
 
 _init_api("dgl.sparse")

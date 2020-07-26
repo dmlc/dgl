@@ -385,14 +385,14 @@ class BaseHeteroGraph : public runtime::Object {
    *
    * \return a number of type dgl_format_code_t.
    */
-  virtual dgl_format_code_t GetFormatInUse() const = 0;
+  virtual dgl_format_code_t GetCreatedFormats() const = 0;
 
   /*!
    * \brief Return allowed sparse formats for the graph.
    *
    * \return a number of type dgl_format_code_t.
    */
-  virtual dgl_format_code_t GetFormatAll() const = 0;
+  virtual dgl_format_code_t GetAllowedFormats() const = 0;
 
   /*!
    * \brief Return the graph in specified available formats.

@@ -6,7 +6,14 @@ import torch.nn.functional as F
 import dgl.function as fn
 
 class HGTLayer(nn.Module):
-    def __init__(self, in_dim, out_dim, node_dict, edge_dict, n_heads, dropout = 0.2, use_norm = False):
+    def __init__(self,
+                 in_dim,
+                 out_dim,
+                 node_dict,
+                 edge_dict,
+                 n_heads,
+                 dropout = 0.2,
+                 use_norm = False):
         super(HGTLayer, self).__init__()
 
         self.in_dim        = in_dim
@@ -76,31 +83,36 @@ class HGTLayer(nn.Module):
         h   = torch.sum(att.unsqueeze(dim = -1) * nodes.mailbox['v'], dim=1)
         return {'t': h.view(-1, self.out_dim)}
         
-    def forward(self, G, inp_key, out_key):
-        node_dict, edge_dict = self.node_dict, self.edge_dict
-        for srctype, etype, dsttype in G.canonical_etypes:
-            k_linear = self.k_linears[node_dict[srctype]]
-            v_linear = self.v_linears[node_dict[srctype]] 
-            q_linear = self.q_linears[node_dict[dsttype]]
-            
-            G.nodes[srctype].data['k'] = k_linear(G.nodes[srctype].data[inp_key]).view(-1, self.n_heads, self.d_k)
-            G.nodes[srctype].data['v'] = v_linear(G.nodes[srctype].data[inp_key]).view(-1, self.n_heads, self.d_k)
-            G.nodes[dsttype].data['q'] = q_linear(G.nodes[dsttype].data[inp_key]).view(-1, self.n_heads, self.d_k)
-            
-            G.apply_edges(func=self.edge_attention, etype=etype)
-        G.multi_update_all({etype : (self.message_func, self.reduce_func) \
-                            for etype in edge_dict}, cross_reducer = 'mean')
-        for ntype in G.ntypes:
-            '''
-                Step 3: Target-specific Aggregation
-                x = norm( W[node_type] * gelu( Agg(x) ) + x )
-            '''
-            n_id = node_dict[ntype]
-            alpha = torch.sigmoid(self.skip[n_id])
-            trans_out = self.drop(self.a_linears[n_id](G.nodes[ntype].data['t']))
-            trans_out = trans_out * alpha + G.nodes[ntype].data[inp_key] * (1-alpha)
-            if self.use_norm:
-                G.nodes[ntype].data[out_key] = self.norms[n_id](trans_out)
+    def forward(self, G, h):
+        with G.local_scope():
+            node_dict, edge_dict = self.node_dict, self.edge_dict
+            for srctype, etype, dsttype in G.canonical_etypes:
+                k_linear = self.k_linears[node_dict[srctype]]
+                v_linear = self.v_linears[node_dict[srctype]] 
+                q_linear = self.q_linears[node_dict[dsttype]]
+                
+                G.nodes[srctype].data['k'] = k_linear(h[srctype]).view(-1, self.n_heads, self.d_k)
+                G.nodes[srctype].data['v'] = v_linear(h[srctype]).view(-1, self.n_heads, self.d_k)
+                G.nodes[dsttype].data['q'] = q_linear(h[dsttype]).view(-1, self.n_heads, self.d_k)
+                
+                G.apply_edges(func=self.edge_attention, etype=etype)
+            G.multi_update_all({etype : (self.message_func, self.reduce_func) \
+                                for etype in edge_dict}, cross_reducer = 'mean')
+            new_h = {}
+            for ntype in G.ntypes:
+                '''
+                    Step 3: Target-specific Aggregation
+                    x = norm( W[node_type] * gelu( Agg(x) ) + x )
+                '''
+                n_id = node_dict[ntype]
+                alpha = torch.sigmoid(self.skip[n_id])
+                trans_out = self.drop(self.a_linears[n_id](G.nodes[ntype].data['t']))
+                trans_out = trans_out * alpha + h[ntype] * (1-alpha)
+                if self.use_norm:
+                    new_h[ntype] = self.norms[n_id](trans_out)
+                else:
+                    new_h[ntype] = trans_out
+            return new_h
                 
 class HGT(nn.Module):
     def __init__(self, G, node_dict, edge_dict, n_inp, n_hid, n_out, n_layers, n_heads, use_norm = True):
@@ -120,12 +132,13 @@ class HGT(nn.Module):
         self.out = nn.Linear(n_hid, n_out)
 
     def forward(self, G, out_key):
+        h = {}
         for ntype in G.ntypes:
             n_id = self.node_dict[ntype]
-            G.nodes[ntype].data['h'] = F.gelu(self.adapt_ws[n_id](G.nodes[ntype].data['inp']))
+            h[ntype] = F.gelu(self.adapt_ws[n_id](G.nodes[ntype].data['inp']))
         for i in range(self.n_layers):
-            self.gcs[i](G, 'h', 'h')
-        return self.out(G.nodes[out_key].data['h'])
+            h = self.gcs[i](G, h)
+        return self.out(h[out_key])
 
 class HeteroRGCNLayer(nn.Module):
     def __init__(self, in_size, out_size, etypes):

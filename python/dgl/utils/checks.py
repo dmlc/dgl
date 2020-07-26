@@ -1,4 +1,5 @@
 """Checking and logging utilities."""
+# pylint: disable=invalid-name
 from __future__ import absolute_import, division
 
 from ..base import DGLError, dgl_warning
@@ -124,9 +125,10 @@ def check_all_same_schema(feat_dict_list, keys, name):
             t1 = feat_dict_list[0][k]
             t2 = fdict[k]
             if F.dtype(t1) != F.dtype(t2) or F.shape(t1)[1:] != F.shape(t2)[1:]:
-                raise DGLError('Expect all feature "{}" to have the same data type'
+                raise DGLError('Expect all features {}["{}"] to have the same data type'
                                ' and feature size, but got\n\t{} {}\nand\n\t{} {}.'.format(
-                                   k, F.dtype(t1), F.shape(t1)[1:], F.dtype(t2), F.shape(t2)[1:]))
+                                   name, k, F.dtype(t1), F.shape(t1)[1:],
+                                   F.dtype(t2), F.shape(t2)[1:]))
 
 def to_int32_graph_if_on_gpu(g):
     """Convert to int32 graph if the input graph is on GPU."""

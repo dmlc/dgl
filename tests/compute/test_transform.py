@@ -47,7 +47,7 @@ def test_line_graph2(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
-        'user', 'follows', idtype=idtype).format('csr')
+        'user', 'follows', idtype=idtype).formats('csr')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -58,7 +58,7 @@ def test_line_graph2(idtype):
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
-        'user', 'follows', idtype=idtype).format('csc')
+        'user', 'follows', idtype=idtype).formats('csc')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -902,7 +902,6 @@ def test_to_block(idtype):
     bg = dgl.to_block(g, dst_nodes=dst_nodes)
     checkall(g, bg, dst_nodes)
 
-"""
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_remove_edges(idtype):
@@ -928,13 +927,13 @@ def test_remove_edges(idtype):
 
     for fmt in ['coo', 'csr', 'csc']:
         for edges_to_remove in [[2], [2, 2], [3, 2], [1, 3, 1, 2]]:
-            g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], idtype=idtype).format(fmt)
+            g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], idtype=idtype).formats(fmt)
             g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
             check(g1, None, g, edges_to_remove)
 
             g = dgl.graph(
                 spsp.csr_matrix(([1, 1, 1, 1], ([0, 2, 1, 3], [1, 3, 2, 4])), shape=(5, 5)),
-                idtype=idtype).format(fmt)
+                idtype=idtype).formats(fmt)
             g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
             check(g1, None, g, edges_to_remove)
 
@@ -956,7 +955,6 @@ def test_remove_edges(idtype):
     check(g4, 'AA', g, [])
     check(g4, 'AB', g, [3, 1, 2, 0])
     check(g4, 'BA', g, [])
-"""
 
 @parametrize_dtype
 def test_add_edges(idtype):

@@ -191,12 +191,12 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->SelectFormat(0, preferred_formats);
   }
 
-  dgl_format_code_t GetFormatAll() const override {
-    return GetRelationGraph(0)->GetFormatAll();
+  dgl_format_code_t GetAllowedFormats() const override {
+    return GetRelationGraph(0)->GetAllowedFormats();
   }
 
-  dgl_format_code_t GetFormatInUse() const override {
-    return GetRelationGraph(0)->GetFormatInUse();
+  dgl_format_code_t GetCreatedFormats() const override {
+    return GetRelationGraph(0)->GetCreatedFormats();
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;

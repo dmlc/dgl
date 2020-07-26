@@ -1,7 +1,7 @@
 """Module for converting graph from/to other object."""
+# pylint: disable=dangerous-default-value
 from collections import defaultdict
 import numpy as np
-import scipy as sp
 import networkx as nx
 
 from . import backend as F
@@ -18,6 +18,7 @@ __all__ = [
     'heterograph',
     'to_hetero',
     'to_homo',
+    'from_scipy',
     'from_networkx',
     'to_networkx',
 ]
@@ -26,10 +27,11 @@ def graph(data,
           ntype='_N', etype='_E',
           num_nodes=None,
           validate=True,
-          formats='any',
+          formats=['coo', 'csr', 'csc'],
           idtype=None,
           device=None,
-          card=None, **kwargs):
+          card=None,
+          **deprecated_kwargs):
     """Create a graph with one type of nodes and edges.
 
     In the sparse matrix perspective, :func:`dgl.graph` creates a graph
@@ -59,8 +61,7 @@ def graph(data,
         If False and card is not None, user would receive a warning.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Valid options are int32 or int64. If None, try infer from
         the given data.
@@ -125,6 +126,12 @@ def graph(data,
           ndata_schemes={}
           edata_schemes={})
     """
+    if len(deprecated_kwargs) != 0:
+        raise DGLError("Key word arguments {} have been removed from dgl.graph()."
+                       " They are moved to dgl.from_scipy() and dgl.from_networkx()."
+                       " Please refer to their API documents for more details.".format(
+                           deprecated_kwargs.keys()))
+
     if isinstance(data, DGLHeteroGraph):
         return data.astype(idtype).to(device)
 
@@ -149,10 +156,11 @@ def bipartite(data,
               utype='_U', etype='_E', vtype='_V',
               num_nodes=None,
               validate=True,
-              formats='any',
+              formats=['coo', 'csr', 'csc'],
               idtype=None,
               device=None,
-              card=None, **kwargs):
+              card=None,
+              **deprecated_kwargs):
     """Create a bipartite graph.
 
     The result graph is directed and edges must be from ``utype`` nodes
@@ -187,8 +195,7 @@ def bipartite(data,
         If False and card is not None, user would receive a warning.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Valid options are int32 or int64. If None, try infer from
         the given data.
@@ -271,6 +278,12 @@ def bipartite(data,
           num_edges={('_U', '_E', '_V'): 3},
           metagraph=[('_U', '_V')])
     """
+    if len(deprecated_kwargs) != 0:
+        raise DGLError("Key word arguments {} have been removed from dgl.graph()."
+                       " They are moved to dgl.from_scipy() and dgl.from_networkx()."
+                       " Please refer to their API documents for more details.".format(
+                           deprecated_kwargs.keys()))
+
     if utype == vtype:
         raise DGLError('utype should not be equal to vtype. Use ``dgl.graph`` instead.')
     if card is not None:
@@ -404,7 +417,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
 def heterograph(data_dict,
                 num_nodes_dict=None,
                 validate=True,
-                formats='any',
+                formats=['coo', 'csr', 'csc'],
                 idtype=None,
                 device=None):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.
@@ -430,8 +443,7 @@ def heterograph(data_dict,
         If False and num_nodes_dict is not None, user would receive a warning.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Valid options are int32 or int64. If None, try infer from
         the given data.
@@ -452,7 +464,7 @@ def heterograph(data_dict,
     """
     # Try infer idtype
     if idtype is None:
-        for k, data in data_dict.items():
+        for data in data_dict.values():
             if isinstance(data, tuple) and len(data) == 2 and F.is_tensor(data[0]):
                 idtype = F.dtype(data[0])
                 break
@@ -760,14 +772,50 @@ def to_homo(G):
 
     return retg
 
+def from_scipy(sp_mat,
+               ntype='_N', etype='_E',
+               eweight_name=None,
+               formats=['coo', 'csr', 'csc'],
+               idtype=None):
+    """Create a DGLGraph from a SciPy sparse matrix.
+
+    Parameters
+    ----------
+    sp_mat : SciPy sparse matrix
+        SciPy sparse matrix.
+    ntype : str
+        Type name for both source and destination nodes
+    etype : str
+        Type name for edges
+    eweight_name : str, optional
+        If given, the edge weights in the matrix will be
+        stored in ``edata[eweight_name]``.
+    formats : str or list of str
+        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
+    idtype : int32, int64, optional
+        Integer ID type. Must be int32 or int64. Default: int64.
+
+    Returns
+    -------
+    g : DGLGraph
+    """
+    u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype)
+    g = create_from_edges(u, v, ntype, etype, ntype, urange, vrange,
+                          validate=False, formats=formats)
+    if eweight_name is not None:
+        g.edata[eweight_name] = F.tensor(sp_mat.data)
+    return g
+
 def from_networkx(nx_graph, *,
                   ntype='_N', etype='_E',
                   node_attrs=None,
                   edge_attrs=None,
                   edge_id_attr_name='id',
-                  formats='any',
+                  formats=['coo', 'csr', 'csc'],
                   idtype=None):
     """Create a DGLGraph from networkx.
+
     Parameters
     ----------
     nx_graph : networkx.Graph
@@ -780,18 +828,18 @@ def from_networkx(nx_graph, *,
         Names for node features to retrieve from the NetworkX graph (Default: None)
     edge_attrs : list of str
         Names for edge features to retrieve from the NetworkX graph (Default: None)
-    formats : str or list of str
-        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
     edge_id_attr_name : str, optional
         Key name for edge ids in the NetworkX graph. If not found, we
         will consider the graph not to have pre-specified edge ids. (Default: 'id')
+    formats : str or list of str
+        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
     idtype : int32, int64, optional
         Integer ID type. Must be int32 or int64. Default: int64.
+
     Returns
     -------
-    g : DGLHeteroGraph
+    g : DGLGraph
     """
     # Relabel nodes using consecutive integers
     nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
@@ -908,7 +956,7 @@ def create_from_edges(u, v,
                       utype, etype, vtype,
                       urange, vrange,
                       validate=True,
-                      formats='any'):
+                      formats=['coo', 'csr', 'csc']):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -935,8 +983,7 @@ def create_from_edges(u, v,
         If True, checks if node IDs are within range.
     formats : str or list of str
         It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        or ``'any'`` which is short for ``['coo', 'csr', 'csc']``.
-        Force the storage formats.  Default: ``'any'``.
+        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
 
     Returns
     -------

@@ -25,7 +25,7 @@ HeteroGraphPtr JointUnionHeteroGraph(
 
     // ALL = CSC | CSR | COO
     const dgl_format_code_t code =\
-      component_graphs[0]->GetRelationGraph(etype)->GetFormatAll();
+      component_graphs[0]->GetRelationGraph(etype)->GetAllowedFormats();
 
     // get common format
     for (size_t i = 0; i < component_graphs.size(); ++i) {
@@ -35,7 +35,7 @@ HeteroGraphPtr JointUnionHeteroGraph(
       CHECK_EQ(num_dst_v, component_graphs[i]->NumVertices(dst_vtype)) << "Input graph[" << i <<
         "] should have same number of dst vertices as input graph[0]";
 
-      const dgl_format_code_t curr_code = cg->GetRelationGraph(etype)->GetFormatAll();
+      const dgl_format_code_t curr_code = cg->GetRelationGraph(etype)->GetAllowedFormats();
       if (curr_code != code)
         LOG(FATAL) << "All components should have the same formats";
     }
@@ -100,11 +100,11 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     HeteroGraphPtr rgptr = nullptr;
 
     const dgl_format_code_t code =\
-      component_graphs[0]->GetRelationGraph(etype)->GetFormatAll();
+      component_graphs[0]->GetRelationGraph(etype)->GetAllowedFormats();
     // do some preprocess
     for (size_t i = 0; i < component_graphs.size(); ++i) {
       const auto& cg = component_graphs[i];
-      const dgl_format_code_t cur_code = cg->GetRelationGraph(etype)->GetFormatAll();
+      const dgl_format_code_t cur_code = cg->GetRelationGraph(etype)->GetAllowedFormats();
       if (cur_code != code)
         LOG(FATAL) << "All components should have the same formats";
 
@@ -206,7 +206,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
   std::vector<std::vector<HeteroGraphPtr>> rel_graphs;
   rel_graphs.resize(batch_size);
   // Loop over all edge types
-  auto code = batched_graph->GetRelationGraph(0)->GetFormatAll();
+  auto code = batched_graph->GetRelationGraph(0)->GetAllowedFormats();
 
   if (FORMAT_HAS_COO(code)) {
     for (uint64_t etype = 0; etype < num_edge_types; ++etype) {
