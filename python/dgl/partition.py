@@ -112,8 +112,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
         subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=['_N'], etypes=['_E'])
-        subg1.ndata[NID] = induced_nodes[0].tousertensor()
-        subg1.edata[EID] = induced_edges[0].tousertensor()
+        subg1.ndata[NID] = induced_nodes[0]
+        subg1.edata[EID] = induced_edges[0]
         return subg1
 
     for i, subg in enumerate(subgs):
