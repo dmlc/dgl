@@ -13,10 +13,10 @@ import numpy as np
 import time
 import tensorflow as tf
 from tensorflow.keras import layers
-from dgl import DGLGraph
+import dgl
 from dgl.nn.tensorflow import RelGraphConv
-from dgl.contrib.data import load_data
 from functools import partial
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 
 from model import BaseRGCN
 
@@ -49,13 +49,30 @@ def acc(logits, labels, mask):
 
 def main(args):
     # load graph data
-    data = load_data(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
-    num_nodes = data.num_nodes
-    num_rels = data.num_rels
-    num_classes = data.num_classes
-    labels = data.labels
-    train_idx = data.train_idx
-    test_idx = data.test_idx
+    # load graph data
+    if args.dataset == 'aifb':
+        dataset = AIFBDataset()
+    elif args.dataset == 'mutag':
+        dataset = MUTAGDataset()
+    elif args.dataset == 'bgs':
+        dataset = BGSDataset()
+    elif args.dataset == 'am':
+        dataset = AMDataset()
+    else:
+        raise ValueError()
+
+    # Load from hetero-graph
+    hg = dataset[0]
+
+    num_rels = len(hg.canonical_etypes)
+    num_of_ntype = len(hg.ntypes)
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    train_mask = hg.nodes[category].data.pop('train_mask')
+    test_mask = hg.nodes[category].data.pop('test_mask')
+    train_idx = tf.squeeze(tf.where(train_mask))
+    test_idx = tf.squeeze(tf.where(test_mask))
+    labels = hg.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
     if args.validation:
@@ -64,13 +81,35 @@ def main(args):
     else:
         val_idx = train_idx
 
-    # since the nodes are featureless, the input feature is then the node id.
-    feats = tf.range(num_nodes, dtype=tf.int64)
+    # calculate norm for each edge type and store in edge
+    for canonical_etypes in hg.canonical_etypes:
+        u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
+        _, inverse_index, count = tf.unique_with_counts(v)
+        degrees = tf.gather(count, inverse_index)
+        norm = tf.ones(eid.shape[0]) / tf.cast(degrees, tf.float32)
+        norm = tf.expand_dims(norm, 1)
+        hg.edges[canonical_etypes].data['norm'] = norm
+
+    # get target category id
+    category_id = len(hg.ntypes)
+    for i, ntype in enumerate(hg.ntypes):
+        if ntype == category:
+            category_id = i
 
     # edge type and normalization factor
-    edge_type = tf.convert_to_tensor(data.edge_type)
-    edge_norm = tf.expand_dims(tf.convert_to_tensor(data.edge_norm), 1)
-    labels = tf.reshape(tf.convert_to_tensor(labels), (-1, ))
+    g = dgl.to_homo(hg)
+    num_nodes = g.number_of_nodes()
+    node_ids = tf.range(num_nodes, dtype=tf.int64)
+    edge_norm = g.edata['norm']
+    edge_type = tf.cast(g.edata[dgl.ETYPE], tf.int64)
+
+    # find out the target node ids in g
+    node_tids = g.ndata[dgl.NTYPE]
+    loc = (node_tids == category_id)
+    target_idx = tf.squeeze(tf.where(loc))
+
+    # since the nodes are featureless, the input feature is then the node id.
+    feats = tf.range(num_nodes, dtype=tf.int64)
 
     # check cuda
     if args.gpu < 0:
@@ -78,25 +117,20 @@ def main(args):
         use_cuda = False
     else:
         device = "/gpu:{}".format(args.gpu)
+        g = g.to(device)
         use_cuda = True
-    
+
     with tf.device(device):
-
-        # create graph
-        g = DGLGraph()
-        g.add_nodes(num_nodes)
-        g.add_edges(data.edge_src, data.edge_dst)
-
         # create model
-        model = EntityClassify(len(g),
-                            args.n_hidden,
-                            num_classes,
-                            num_rels,
-                            num_bases=args.n_bases,
-                            num_hidden_layers=args.n_layers - 2,
-                            dropout=args.dropout,
-                            use_self_loop=args.use_self_loop,
-                            use_cuda=use_cuda)
+        model = EntityClassify(num_nodes,
+                               args.n_hidden,
+                               num_classes,
+                               num_rels,
+                               num_bases=args.n_bases,
+                               num_hidden_layers=args.n_layers - 2,
+                               dropout=args.dropout,
+                               use_self_loop=args.use_self_loop,
+                               use_cuda=use_cuda)
 
         # optimizer
         optimizer = tf.keras.optimizers.Adam(
@@ -111,9 +145,10 @@ def main(args):
             t0 = time.time()
             with tf.GradientTape() as tape:
                 logits = model(g, feats, edge_type, edge_norm)
+                logits = tf.gather(logits, target_idx)
                 loss = loss_fcn(tf.gather(labels, train_idx), tf.gather(logits, train_idx))
                 # Manually Weight Decay
-                # We found Tensorflow has a different implementation on weight decay 
+                # We found Tensorflow has a different implementation on weight decay
                 # of Adam(W) optimizer with PyTorch. And this results in worse results.
                 # Manually adding weights to the loss to do weight decay solves this problem.
                 for weight in model.trainable_weights:
@@ -136,6 +171,7 @@ def main(args):
         print()
 
         logits = model(g, feats, edge_type, edge_norm)
+        logits = tf.gather(logits, target_idx)
         test_loss = loss_fcn(tf.gather(labels, test_idx), tf.gather(logits, test_idx))
         test_acc = acc(logits, labels, test_idx)
         print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.numpy().item()))

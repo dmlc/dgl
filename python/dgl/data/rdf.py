@@ -219,7 +219,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
 
         train_mask = idx2mask(train_idx, self._hg.number_of_nodes(self.predict_category))
         test_mask = idx2mask(test_idx, self._hg.number_of_nodes(self.predict_category))
-        labels = F.tensor(labels).long()
+        labels = F.tensor(labels, F.data_type_dict['int64'])
 
         self._train_mask = generate_mask_tensor(train_mask)
         self._test_mask = generate_mask_tensor(test_mask)
