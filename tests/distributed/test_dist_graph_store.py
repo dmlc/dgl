@@ -13,7 +13,7 @@ from dgl.graph_index import create_graph_index
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
-from dgl.distributed import SparseAdagrad, Embedding
+from dgl.distributed import SparseAdagrad, DistEmbedding
 from numpy.testing import assert_almost_equal
 import backend as F
 import math
@@ -120,8 +120,7 @@ def check_dist_graph(g, num_nodes, num_edges):
 
     # Test sparse emb
     try:
-        new_shape = (g.number_of_nodes(), 1)
-        emb = Embedding(g, new_shape, 'emb1', emb_init)
+        emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb1', emb_init)
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
@@ -142,7 +141,7 @@ def check_dist_graph(g, num_nodes, num_edges):
         assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = Embedding(g, new_shape, 'emb2', emb_init)
+        emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb2', emb_init)
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
             feats1 = emb(nids)

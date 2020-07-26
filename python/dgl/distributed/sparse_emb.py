@@ -1,20 +1,21 @@
 """Define sparse embedding and optimizer."""
 
 from .. import backend as F
+from .. import utils
 from .dist_tensor import DistTensor
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY
 
-class Embedding:
-    ''' Sparse embeddings in the distributed KVStore.
-
-    The sparse embeddings are only used as node embeddings.
+class DistEmbedding:
+    '''Embeddings in the distributed KVStore.
 
     Parameters
     ----------
     g : DistGraph
         The distributed graph object.
-    shape : tuple of int
-        The shape of the embedding. The first dimension should be the number of nodes.
+    num_embeddings : int
+        The number of embeddings
+    embedding_dim : int
+        The dimension size of embeddings.
     name : str
         The name of the embeddings
     init_func : callable
@@ -25,8 +26,7 @@ class Embedding:
     Examples
     --------
     >>> emb_init = lambda shape, dtype: F.zeros(shape, dtype, F.cpu())
-    >>> shape = (g.number_of_nodes(), 1)
-    >>> emb = dgl.distributed.Embedding(g, 'emb1', shape, emb_init)
+    >>> emb = dgl.distributed.DistEmbedding(g, g.number_of_nodes(), 10)
     >>> optimizer = dgl.distributed.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     >>>     feats = emb(nids)
@@ -34,14 +34,16 @@ class Embedding:
     >>>     loss.backward()
     >>>     optimizer.step()
     '''
-    def __init__(self, g, shape, name, init_func, part_policy=None):
+    def __init__(self, g, num_embeddings, embedding_dim, name=None, init_func=None, part_policy=None):
         if part_policy is None:
             part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
 
-        self._tensor = DistTensor(g, shape, F.float32, name, init_func, part_policy)
+        self._tensor = DistTensor(g, (num_embeddings, embedding_dim), F.float32, name,
+                                  init_func, part_policy)
         self._trace = []
 
     def __call__(self, idx):
+        idx = utils.toindex(idx).tousertensor()
         emb = F.attach_grad(self._tensor[idx])
         self._trace.append((idx, emb))
         return emb
@@ -96,7 +98,7 @@ class SparseAdagrad:
 
     Parameters
     ----------
-    params : list of Embeddings
+    params : list of DistEmbeddings
         The list of sparse embeddings.
     lr : float
         The learning rate.
