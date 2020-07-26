@@ -78,7 +78,7 @@ class GatedGraphConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            assert graph.is_homograph(), \
+            assert graph.is_homogeneous(), \
                 "not a homograph; convert it with to_homo and pass in the edge type as argument"
             zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
             feat = th.cat([feat, zero_pad], -1)

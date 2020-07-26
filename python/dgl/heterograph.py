@@ -342,7 +342,8 @@ class DGLHeteroGraph(object):
     def __copy__(self):
         """Shallow copy implementation."""
         #TODO(minjie): too many states in python; should clean up and lower to C
-        obj = DGLHeteroGraph.__new__(DGLHeteroGraph)
+        cls = type(self)
+        obj = cls.__new__(cls)
         obj._graph = self._graph
         obj._batch_num_nodes = self._batch_num_nodes
         obj._batch_num_edges = self._batch_num_edges
@@ -2456,19 +2457,16 @@ class DGLHeteroGraph(object):
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph."""
-        node_frames = [
-            FrameRef(Frame(
-                self._node_frames[i][induced_nodes_of_ntype],
-                num_rows=len(induced_nodes_of_ntype)))
-            for i, induced_nodes_of_ntype in enumerate(induced_nodes)]
-        edge_frames = [
-            FrameRef(Frame(
-                self._edge_frames[i][induced_edges_of_etype],
-                num_rows=len(induced_edges_of_etype)))
-            for i, induced_edges_of_etype in enumerate(induced_edges)]
+        node_frames = []
+        for i, ind_nodes in enumerate(induced_nodes):
+            subframe = self._node_frames[i][utils.toindex(ind_nodes, self._idtype_str)]
+            node_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_nodes))))
+        edge_frames = []
+        for i, ind_edges in enumerate(induced_edges):
+            subframe = self._edge_frames[i][utils.toindex(ind_edges, self._idtype_str)]
+            edge_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_edges))))
 
-        hsg = self.__class__(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
-        hsg.is_subgraph = True
+        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
         for ntype, induced_nid in zip(self.ntypes, induced_nodes):
             ndata = hsg.nodes[ntype].data
             orig_ndata = self.nodes[ntype].data
@@ -2569,6 +2567,8 @@ class DGLHeteroGraph(object):
         --------
         edge_subgraph
         """
+        if self.is_block:
+            raise DGLError('Extracting subgraph from a block graph is not allowed.')
         if not isinstance(nodes, Mapping):
             assert len(self.ntypes) == 1, \
                 'need a dict of node type and IDs for graph with multiple node types'
@@ -2678,6 +2678,8 @@ class DGLHeteroGraph(object):
         --------
         subgraph
         """
+        if self.is_block:
+            raise DGLError('Extracting subgraph from a block graph is not allowed.')
         if not isinstance(edges, Mapping):
             assert len(self.canonical_etypes) == 1, \
                 'need a dict of edge type and IDs for graph with multiple edge types'
@@ -2775,7 +2777,7 @@ class DGLHeteroGraph(object):
         # num_nodes_per_type doesn't need to be int32
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64"))
-        hg = self.__class__(hgidx, ntypes, induced_etypes,
+        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes,
                             node_frames, edge_frames)
         return hg
 
@@ -2852,7 +2854,7 @@ class DGLHeteroGraph(object):
         # num_nodes_per_type should be int64
         hgidx = heterograph_index.create_heterograph_from_relations(
             metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type, "int64"))
-        hg = self.__class__(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
+        hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
         return hg
 
     def adjacency_matrix(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
@@ -4539,6 +4541,11 @@ class DGLHeteroGraph(object):
         DGLHeteroGraph
             The graph object that is a clone of current graph.
         """
+        # XXX(minjie): Do a shallow copy first to clone some internal metagraph information.
+        #   Not a beautiful solution though.
+        ret = copy.copy(self)
+
+        # Clone the graph structure
         meta_edges = []
         for s_ntype, _, d_ntype in self.canonical_etypes:
             meta_edges.append((self.get_ntype_id(s_ntype), self.get_ntype_id(d_ntype)))
@@ -4548,13 +4555,14 @@ class DGLHeteroGraph(object):
         num_nodes_per_type = [self.number_of_nodes(c_ntype) for c_ntype in self.ntypes]
         relation_graphs = [self._graph.get_relation_graph(self.get_etype_id(c_etype))
                            for c_etype in self.canonical_etypes]
-        hgidx = heterograph_index.create_heterograph_from_relations(
+        ret._graph = heterograph_index.create_heterograph_from_relations(
             metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
 
-        local_node_frames = [fr.clone() for fr in self._node_frames]
-        local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        return DGLHeteroGraph(hgidx, self.ntypes, self.etypes,
-                              local_node_frames, local_edge_frames)
+        # Clone the frames
+        ret._node_frames = [fr.clone() for fr in self._node_frames]
+        ret._edge_frames = [fr.clone() for fr in self._edge_frames]
+
+        return ret
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.
@@ -4672,7 +4680,7 @@ class DGLHeteroGraph(object):
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
 
-    def is_homograph(self):
+    def is_homogeneous(self):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
@@ -4746,10 +4754,13 @@ class DGLHeteroGraph(object):
         {'created': ['csr'], 'not created': []}
         """
         if formats is None:
+            # Return the format information
             return self._graph.formats()
-        return DGLHeteroGraph(self._graph.formats(formats), self.ntypes, self.etypes,
-                              self._node_frames,
-                              self._edge_frames)
+        else:
+            # Convert the graph to use another format
+            ret = copy.copy(self)
+            ret._graph = self._graph.formats(formats)
+            return ret
 
     def create_format_(self):
         r"""Create all sparse matrices allowed for the graph.

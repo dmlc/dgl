@@ -9,7 +9,7 @@ from scipy import sparse
 from ._ffi.function import _init_api
 from .base import EID, NID, dgl_warning, DGLError, is_internal_column
 from . import convert
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLHeteroGraph, DGLBlock
 from . import ndarray as nd
 from . import backend as F
 from . import utils, batch
@@ -340,7 +340,7 @@ def line_graph(g, backtracking=True, shared=False):
     ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
 
     """
-    assert g.is_homograph(), \
+    assert g.is_homogeneous(), \
         'line_heterograph only support directed homogeneous graph right now'
     lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
     if shared:
@@ -568,6 +568,8 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     if share_edata is not None:
         dgl_warning('share_edata argument has been renamed to copy_edata.')
         copy_edata = share_edata
+    if g.is_block:
+        raise DGLError('Reversing a block graph is not allowed.')
     # TODO(0.5 release, xiangsx) need to handle BLOCK
     # currently reversing a block results in undefined behavior
     gidx = g._graph.reverse()
@@ -1571,6 +1573,8 @@ def compact_graphs(graphs, always_preserve=None):
         return_single = True
     if len(graphs) == 0:
         return []
+    if graphs[0].is_block:
+        raise DGLError('Compacting a block graph is not allowed.')
 
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
@@ -1839,6 +1843,8 @@ def in_subgraph(g, nodes):
     DGLHeteroGraph
         The subgraph.
     """
+    if g.is_block:
+        raise DGLError('Extracting subgraph of a block graph is not allowed.')
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
@@ -1879,6 +1885,8 @@ def out_subgraph(g, nodes):
     DGLHeteroGraph
         The subgraph.
     """
+    if g.is_block:
+        raise DGLError('Extracting subgraph of a block graph is not allowed.')
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
@@ -2052,6 +2060,8 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     {('user', 'wins', 'user'): tensor([1, 2, 1, 1])
      ('user', 'plays', 'game'): tensor([1, 1, 1])}
     """
+    if g.is_block:
+        raise DGLError('Cannot convert a block graph to a simple graph.')
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
     simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
     counts = [F.zerocopy_from_dgl_ndarray(count) for count in counts]

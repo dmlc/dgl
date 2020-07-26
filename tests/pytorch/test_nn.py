@@ -18,7 +18,7 @@ def _AXWb(A, X, W, b):
     return Y + b
 
 def test_graph_conv():
-    g = dgl.DGLGraph(nx.path_graph(3))
+    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
 
@@ -71,11 +71,31 @@ def test_graph_conv():
     assert not F.allclose(old_weight, new_weight)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo', 'block'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartitie', 'block-bipartite'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
 def test_graph_conv(idtype, g, norm, weight, bias):
+    # Test one tensor input
+    g = g.astype(idtype).to(F.ctx())
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
+    ext_w = F.randn((5, 2)).to(F.ctx())
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).to(F.ctx())
+    if weight:
+        h_out = conv(g, h)
+    else:
+        h_out = conv(g, h, weight=ext_w)
+    assert h_out.shape == (ndst, 2)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite', 'block-bipartite'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [True, False])
+def test_graph_conv_bi(idtype, g, norm, weight, bias):
+    # Test a pair of tensor inputs
     g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
     ext_w = F.randn((5, 2)).to(F.ctx())
@@ -84,19 +104,10 @@ def test_graph_conv(idtype, g, norm, weight, bias):
     h = F.randn((nsrc, 5)).to(F.ctx())
     h_dst = F.randn((ndst, 2)).to(F.ctx())
     if weight:
-        h_out = conv(g, h)
+        h_out = conv(g, (h, h_dst))
     else:
-        h_out = conv(g, h, weight=ext_w)
+        h_out = conv(g, (h, h_dst), weight=ext_w)
     assert h_out.shape == (ndst, 2)
-
-    if not isinstance(g, dgl.DGLGraph) and len(g.ntypes) == 2:
-        # bipartite, should also accept pair of tensors
-        if weight:
-            h_out2 = conv(g, (h, h_dst))
-        else:
-            h_out2 = conv(g, (h, h_dst), weight=ext_w)
-        assert h_out2.shape == (ndst, 2)
-        assert F.array_equal(h_out, h_out2)
 
 def _S2AXWb(A, N, X, W, b):
     X1 = X * N
@@ -471,7 +482,7 @@ def test_rgcn():
     assert F.allclose(h_new, h_new_low)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_gat_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -493,7 +504,7 @@ def test_gat_conv_bi(g, idtype):
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
