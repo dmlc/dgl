@@ -26,10 +26,6 @@ def get_graph(network_data, vocab):
         keys describing the edge types, values representing edges
     vocab: a dict
         mapping node IDs to node indices
-<<<<<<< HEAD
-=======
-
->>>>>>> c334b40e1f8a30bd5619814f34a469b18774fba7
     Output
     ------
     DGLHeteroGraph
