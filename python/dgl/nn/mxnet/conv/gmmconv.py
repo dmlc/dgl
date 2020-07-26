@@ -115,7 +115,7 @@ class GMMConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         """
-        feat_src, feat_dst = expand_as_pair(feat)
+        feat_src, feat_dst = expand_as_pair(feat, graph)
         with graph.local_scope():
             graph.srcdata['h'] = self.fc(feat_src).reshape(
                 -1, self._n_kernels, self._out_feats)

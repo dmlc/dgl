@@ -39,6 +39,9 @@ class DGLBaseGraph(object):
     graph : graph index, optional
         Data to initialize graph.
     """
+
+    is_block = False        # for compatibility with DGLHeteroGraph
+
     def __init__(self, graph):
         self._graph = graph
 

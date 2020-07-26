@@ -100,7 +100,7 @@ class NNConv(nn.Block):
             is the output feature size.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(feat)
+            feat_src, feat_dst = expand_as_pair(feat, graph)
 
             # (n, d_in, 1)
             graph.srcdata['h'] = feat_src.expand_dims(-1)

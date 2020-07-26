@@ -69,6 +69,8 @@ class GCMCGraphConv(nn.Module):
             The output feature
         """
         with graph.local_scope():
+            if isinstance(feat, tuple):
+                feat, _ = feat      # dst feature not used
             cj = graph.srcdata['cj']
             ci = graph.dstdata['ci']
             if self.device is not None:
