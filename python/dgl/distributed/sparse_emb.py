@@ -6,7 +6,9 @@ from .dist_tensor import DistTensor
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY
 
 class DistEmbedding:
-    '''Embeddings in the distributed KVStore.
+    '''Embeddings in the distributed training.
+
+    By default, the embeddings are created for nodes in the graph.
 
     Parameters
     ----------
