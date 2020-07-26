@@ -71,7 +71,7 @@ class EdgeConv(nn.Block):
             New node features.
         """
         with g.local_scope():
-            h_src, h_dst = expand_as_pair(h)
+            h_src, h_dst = expand_as_pair(h, g)
             g.srcdata['x'] = h_src
             g.dstdata['x'] = h_dst
             if not self.batch_norm:
