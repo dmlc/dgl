@@ -36,7 +36,8 @@ class DistEmbedding:
     >>>     loss.backward()
     >>>     optimizer.step()
     '''
-    def __init__(self, g, num_embeddings, embedding_dim, name=None, init_func=None, part_policy=None):
+    def __init__(self, g, num_embeddings, embedding_dim, name=None,
+                 init_func=None, part_policy=None):
         if part_policy is None:
             part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
 
