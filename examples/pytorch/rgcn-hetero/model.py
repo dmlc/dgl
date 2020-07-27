@@ -5,7 +5,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
-import dgl.nn.pytorch as dglnn
+import dgl.nn as dglnn
 import tqdm
 
 class RelGraphConvLayer(nn.Module):
@@ -101,14 +101,8 @@ class RelGraphConvLayer(nn.Module):
                      for i, w in enumerate(th.split(weight, 1, dim=0))}
         else:
             wdict = {}
+        inputs_src, inputs_dst = dglnn.expand_as_pair(inputs, g)
         hs = self.conv(g, inputs, mod_kwargs=wdict)
-
-        if isinstance(inputs, tuple):
-            # minibatch training
-            inputs_dst = inputs[1]
-        else:
-            # full graph training
-            inputs_dst = inputs
 
         def _apply(ntype, h):
             if self.self_loop:
@@ -211,8 +205,7 @@ class EntityClassify(nn.Module):
         else:
             # minibatch training
             for layer, block in zip(self.layers, blocks):
-                h_dst = {k: v[:block.number_of_dst_nodes(k)] for k, v in h.items()}
-                h = layer(block, (h, h_dst))
+                h = layer(block, h)
         return h
 
     def inference(self, g, batch_size, device, num_workers, x=None):
@@ -247,8 +240,7 @@ class EntityClassify(nn.Module):
                 block = blocks[0]
 
                 h = {k: x[k][input_nodes[k]].to(device) for k in input_nodes.keys()}
-                h_dst = {k: v[:block.number_of_dst_nodes(k)] for k, v in h.items()}
-                h = layer(block, (h, h_dst))
+                h = layer(block, h)
 
                 for k in h.keys():
                     y[k][output_nodes[k]] = h[k].cpu()
