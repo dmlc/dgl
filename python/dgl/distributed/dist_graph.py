@@ -383,13 +383,12 @@ class DistGraph:
         Examples
         --------
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g = DistGraph("ip_config.txt", "test")
         >>> g.ntypes
-        ['user', 'game']
+        ['_U']
         """
-        return self._g._ntypes
+        # Currently, we only support a graph with one node type.
+        return ['_U']
 
     @property
     def etypes(self):
@@ -402,13 +401,12 @@ class DistGraph:
         Examples
         --------
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g = DistGraph("ip_config.txt", "test")
         >>> g.etypes
-        ['follows', 'plays']
+        ['_E']
         """
-        return self._g._etypes
+        # Currently, we only support a graph with one edge type.
+        return ['_E']
 
     def number_of_nodes(self):
         """Return the number of nodes"""
