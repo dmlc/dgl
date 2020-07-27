@@ -16,6 +16,8 @@ if __name__ == '__main__':
                            help='balance the training size in each partition.')
     argparser.add_argument('--balance_edges', action='store_true',
                            help='balance the number of edges in each partition.')
+    argparser.add_argument('--num_hops', type=int, default=1,
+                           help='number of hops')
     args = argparser.parse_args()
 
     start = time.time()
@@ -35,5 +37,6 @@ if __name__ == '__main__':
     else:
         balance_ntypes = None
     dgl.distributed.partition_graph(g, args.dataset, args.num_parts, 'data',
+                                    num_hops=args.num_hops,
                                     balance_ntypes=balance_ntypes,
                                     balance_edges=args.balance_edges)
