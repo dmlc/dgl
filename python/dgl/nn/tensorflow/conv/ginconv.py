@@ -71,7 +71,7 @@ class GINConv(layers.Layer):
             as input dimensionality.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(feat)
+            feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = feat_src
             graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
             rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']

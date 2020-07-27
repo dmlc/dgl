@@ -265,6 +265,12 @@ def test_pickling_heterograph():
     new_g = _reconstruct_pickle(g)
     _assert_is_identical_hetero(g, new_g)
 
+    block = dgl.to_block(g, {'user': [1, 2], 'game': [0, 1], 'developer': []})
+    new_block = _reconstruct_pickle(block)
+    _assert_is_identical_hetero(block, new_block)
+    assert block.is_block
+    assert new_block.is_block
+
 def test_pickling_batched_heterograph():
     # copied from test_heterograph.create_test_heterograph()
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
