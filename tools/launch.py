@@ -12,7 +12,6 @@ from threading import Thread
 def execute_remote(cmd, ip, thread_list):
     """execute command line on remote machine via ssh"""
     cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
-    print(cmd)
     # thread func to run the job
     def run(cmd):
         subprocess.check_call(cmd, shell = True)
