@@ -21,8 +21,6 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from pyinstrument import Profiler
 
-from train_sampling import run, SAGE, compute_acc, load_subtensor
-
 class NeighborSampler(object):
     def __init__(self, g, fanouts, sample_neighbors):
         self.g = g
@@ -43,11 +41,36 @@ class NeighborSampler(object):
             blocks.insert(0, block)
         return blocks
 
-class DistSAGE(SAGE):
+class DistSAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes, n_layers,
                  activation, dropout):
-        super(DistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers,
-                                       activation, dropout)
+        super().__init__()
+        self.n_layers = n_layers
+        self.n_hidden = n_hidden
+        self.n_classes = n_classes
+        self.layers = nn.ModuleList()
+        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
+        for i in range(1, n_layers - 1):
+            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
+        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
+        self.dropout = nn.Dropout(dropout)
+        self.activation = activation
+
+    def forward(self, blocks, x):
+        h = x
+        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+            # We need to first copy the representation of nodes on the RHS from the
+            # appropriate nodes on the LHS.
+            # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
+            # would be (num_nodes_RHS, D)
+            h_dst = h[:block.number_of_dst_nodes()]
+            # Then we compute the updated representation on the RHS.
+            # The shape of h now becomes (num_nodes_RHS, D)
+            h = layer(block, (h, h_dst))
+            if l != len(self.layers) - 1:
+                h = self.activation(h)
+                h = self.dropout(h)
+        return h
 
     def inference(self, g, x, batch_size, device):
         """
@@ -100,6 +123,13 @@ class DistSAGE(SAGE):
             g.barrier()
         return y
 
+def compute_acc(pred, labels):
+    """
+    Compute the accuracy of prediction given the labels.
+    """
+    labels = labels.long()
+    return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
+
 def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
@@ -115,6 +145,14 @@ def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid])
+
+def load_subtensor(g, seeds, input_nodes, device):
+    """
+    Copys features and labels of a set of nodes onto GPU.
+    """
+    batch_inputs = g.ndata['features'][input_nodes].to(device)
+    batch_labels = g.ndata['labels'][seeds].to(device)
+    return batch_inputs, batch_labels
 
 def run(args, device, data):
     # Unpack data
