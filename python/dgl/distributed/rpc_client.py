@@ -1,5 +1,5 @@
 """Functions used by client."""
-
+#pylint: disable=invalid-name
 import os
 import socket
 import atexit
@@ -177,6 +177,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     global INITIALIZED
     INITIALIZED = True
 
+
 def finalize_client():
     """Release resources of this client."""
     rpc.finalize_sender()
@@ -187,6 +188,7 @@ def finalize_client():
         sampler_pool.close()
         sampler_pool.join()
 
+
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
 
@@ -194,10 +196,11 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    if rpc.get_rank() == 0: # Only client_0 issue this command
+    if rpc.get_rank() == 0:  # Only client_0 issue this command
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
+
 
 def exit_client():
     """Register exit callback.
@@ -206,6 +209,7 @@ def exit_client():
     shutdown_servers()
     finalize_client()
     atexit.unregister(exit_client)
+
 
 def is_initialized():
     """Is RPC initialized?
@@ -216,18 +220,21 @@ def is_initialized():
 sampler_pool = None
 num_sampler_workers = 0
 
+
 def _close():
     """Finalize client and close servers when finished"""
     rpc.finalize_sender()
     rpc.finalize_receiver()
 
+
 def _init_rpc(ip_config, max_queue_size, net_type):
     connect_to_server(ip_config, max_queue_size, net_type)
-    import atexit
     atexit.register(_close)
+
 
 def get_sampler_pool():
     return sampler_pool, num_sampler_workers
+
 
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     ctx = mp.get_context("spawn")
