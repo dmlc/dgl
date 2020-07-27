@@ -9,9 +9,10 @@ from .sparse_emb import SparseAdagrad, SparseNodeEmbedding
 
 from .rpc import *
 from .rpc_server import start_server
-from .rpc_client import connect_to_server, exit_client
+from .rpc_client import connect_to_server, finalize_client, shutdown_servers, init_rpc
 from .kvstore import KVServer, KVClient
 from .server_state import ServerState
+from .dist_dataloader import DistDataLoader
 from .graph_services import sample_neighbors, in_subgraph
 
 if os.environ.get('DGL_ROLE', 'client') == 'server':

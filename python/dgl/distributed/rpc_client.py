@@ -3,6 +3,7 @@
 import os
 import socket
 import atexit
+import multiprocessing as mp
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -182,6 +183,9 @@ def finalize_client():
     rpc.finalize_receiver()
     global INITIALIZED
     INITIALIZED = False
+    if sampler_pool is not None:
+        sampler_pool.close()
+        sampler_pool.join()
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -207,3 +211,29 @@ def is_initialized():
     """Is RPC initialized?
     """
     return INITIALIZED
+
+
+sampler_pool = None
+num_sampler_workers = 0
+
+def _close():
+    """Finalize client and close servers when finished"""
+    rpc.finalize_sender()
+    rpc.finalize_receiver()
+
+def _init_rpc(ip_config, max_queue_size, net_type):
+    connect_to_server(ip_config, max_queue_size, net_type)
+    import atexit
+    atexit.register(_close)
+
+def get_sampler_pool():
+    return sampler_pool, num_sampler_workers
+
+def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+    ctx = mp.get_context("spawn")
+    global sampler_pool
+    global num_sampler_workers
+    sampler_pool = ctx.Pool(
+        num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+    num_sampler_workers = num_workers
+    connect_to_server(ip_config, max_queue_size, net_type)
