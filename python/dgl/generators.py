@@ -1,5 +1,5 @@
 """Module for various graph generator functions."""
-# pylint: dangerous-default-value
+# pylint: disable= dangerous-default-value
 
 from . import backend as F
 from . import convert
