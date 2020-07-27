@@ -231,10 +231,11 @@ pipeline {
           }
           stages {
             stage("Unit test") {
-              //steps {
+              steps {
                 // TODO(minjie): tmp disabled
                 //unit_test_linux("tensorflow", "gpu")
-              //}
+                sh "echo skipped"
+              }
             }
           }
           post {
