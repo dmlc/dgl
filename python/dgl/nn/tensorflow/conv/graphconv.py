@@ -130,7 +130,7 @@ class GraphConv(layers.Layer):
             The output feature
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(feat)
+            feat_src, feat_dst = expand_as_pair(feat, graph)
 
             if self._norm == 'both':
                 degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32),

@@ -41,6 +41,10 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
     vwgt = static_cast<idx_t*>(vwgt_arr->data);
   }
 
+  idx_t options[METIS_NOPTIONS];
+  METIS_SetDefaultOptions(options);
+  options[METIS_OPTION_ONDISK] = 1;
+
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
                                 xadj,        // indptr
@@ -52,7 +56,7 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
                                 &nparts,     // The number of partitions.
                                 NULL,        // the desired weight for each partition and constraint
                                 NULL,        // the allowed load imbalance tolerance
-                                NULL,        // the array of options
+                                options,     // the array of options
                                 &objval,      // the edge-cut or the total communication volume of
                                 // the partitioning solution
                                 part);

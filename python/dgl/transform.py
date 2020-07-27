@@ -8,7 +8,7 @@ from scipy import sparse
 
 from ._ffi.function import _init_api
 from .graph import DGLGraph
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLHeteroGraph, DGLBlock
 from . import ndarray as nd
 from . import backend as F
 from .graph_index import from_coo
@@ -16,7 +16,7 @@ from .graph_index import _get_halo_subgraph_inner_node
 from .graph import unbatch
 from .convert import graph, bipartite, heterograph
 from . import utils
-from .base import EID, NID
+from .base import EID, NID, DGLError, is_internal_column
 from . import ndarray as nd
 from .partition import metis_partition_assignment as hetero_metis_partition_assignment
 from .partition import partition_graph_with_halo as hetero_partition_graph_with_halo
@@ -1071,7 +1071,14 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
 
     # When balancing edges in partitions, we use in-degree as one of the weights.
     if balance_edges:
-        vwgt.append(F.astype(g.in_degrees(), F.int64))
+        if balance_ntypes is None:
+            vwgt.append(F.astype(g.in_degrees(), F.int64))
+        else:
+            for ntype in uniq_ntypes:
+                nids = F.asnumpy(F.nonzero_1d(balance_ntypes == ntype))
+                degs = np.zeros((g.number_of_nodes(),), np.int64)
+                degs[nids] = F.asnumpy(g.in_degrees(nids))
+                vwgt.append(F.zerocopy_from_numpy(degs))
 
     # The vertex weights have to be stored in a vector.
     if len(vwgt) > 0:
@@ -1287,7 +1294,7 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def to_block(g, dst_nodes=None, include_dst_in_src=True):
+def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_edata=True):
     """Convert a graph into a bipartite-structured "block" for message passing.
 
     A block graph is uni-directional bipartite graph consisting of two sets of nodes
@@ -1327,8 +1334,18 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         The graph.
     dst_nodes : Tensor or dict[str, Tensor], optional
         Optional DST nodes. If a tensor is given, the graph must have only one node type.
-    include_dst_in_src : bool, default True
+    include_dst_in_src : bool
         If False, do not include DST nodes in SRC nodes.
+        (Default: True)
+    copy_ndata : bool, optional
+        If True, the source and destination node features of the block are copied from the
+        original graph.
+        If False, the block will not have any node features.
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the block are copied from the origianl graph.
+        If False, the simple graph will not have any edge features.
+        (Default: True)
 
     Returns
     -------
@@ -1430,8 +1447,38 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     # The new graph duplicates the original node types to SRC and DST sets.
     new_ntypes = ([ntype for ntype in g.ntypes], [ntype for ntype in g.ntypes])
-    new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, g.etypes)
+    new_graph = DGLBlock(new_graph_index, new_ntypes, g.etypes)
     assert new_graph.is_unibipartite  # sanity check
+
+    src_node_id = {
+        ntype: F.zerocopy_from_dgl_ndarray(src)
+        for ntype, src in zip(g.ntypes, src_nodes_nd)}
+    dst_node_id = {
+        ntype: dst_nodes.get(ntype, F.tensor([], dtype=g.idtype))
+        for ntype in g.ntypes}
+    edge_id = {
+        canonical_etype: F.zerocopy_from_dgl_ndarray(edges)
+        for canonical_etype, edges in zip(g.canonical_etypes, induced_edges_nd)}
+
+    if copy_ndata:
+        for ntype in g.ntypes:
+            src = src_node_id[ntype]
+            dst = dst_node_id[ntype]
+            for key, value in g.nodes[ntype].data.items():
+                if is_internal_column(key):
+                    continue
+                ctx = F.context(value)
+                new_graph.srcnodes[ntype].data[key] = F.gather_row(value, F.copy_to(src, ctx))
+                new_graph.dstnodes[ntype].data[key] = F.gather_row(value, F.copy_to(dst, ctx))
+    if copy_edata:
+        for canonical_etype in g.canonical_etypes:
+            eid = edge_id[canonical_etype]
+            for key, value in g.edges[canonical_etype].data.items():
+                if is_internal_column(key):
+                    continue
+                ctx = F.context(value)
+                new_graph.edges[canonical_etype].data[key] = F.gather_row(
+                    value, F.copy_to(eid, ctx))
 
     for i, ntype in enumerate(g.ntypes):
         new_graph.srcnodes[ntype].data[NID] = F.zerocopy_from_dgl_ndarray(src_nodes_nd[i])
@@ -1443,9 +1490,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i])
-        utype, etype, vtype = canonical_etype
-        new_canonical_etype = (utype, etype, vtype)
-        new_graph.edges[new_canonical_etype].data[EID] = induced_edges
+        new_graph.edges[canonical_etype].data[EID] = induced_edges
 
     return new_graph
 

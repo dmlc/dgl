@@ -1,5 +1,7 @@
 from collections import defaultdict
+import backend as F
 import dgl
+import numpy as np
 import networkx as nx
 import scipy.sparse as ssp
 
@@ -35,6 +37,11 @@ def bipartite1():
 def bipartite_full():
     return dgl.bipartite([(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2), (1, 3)])
 
+@register_case(['block'])
+def block():
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+    return dgl.to_block(g, [1, 2, 3, 4])
+
 def random_dglgraph(size):
     return dgl.DGLGraph(nx.erdos_renyi_graph(size, 0.3))
 
@@ -43,3 +50,7 @@ def random_graph(size):
 
 def random_bipartite(size_src, size_dst):
     return dgl.bipartite(ssp.random(size_src, size_dst, 0.1))
+
+def random_block(size):
+    g = dgl.graph(nx.erdos_renyi_graph(size, 0.1))
+    return dgl.to_block(g, np.unique(F.zerocopy_to_numpy(g.edges()[1])))
