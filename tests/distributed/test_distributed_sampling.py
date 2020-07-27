@@ -27,8 +27,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
+    dgl.distributed.exit_client()
     return sampled_graph
 
 
@@ -162,8 +161,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
+    dgl.distributed.exit_client()
     return sampled_graph
 
 

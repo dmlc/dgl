@@ -517,6 +517,9 @@ def grad(x):
 def is_no_grad(x):
     return x.grad is None or (x.grad == 0).all()
 
+def is_recording():
+    return th.is_grad_enabled()
+
 class record_grad(object):
     def __init__(self):
         pass

@@ -239,6 +239,12 @@ def start_client(num_clients):
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     res = kvclient.pull(name='data_2', id_tensor=id_tensor)
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
+
+    # Test delete data
+    kvclient.delete_data('data_0')
+    kvclient.delete_data('data_1')
+    kvclient.delete_data('data_2')
+
     # Register new push handler
     kvclient.init_data(name='data_3', 
                        shape=F.shape(data_2),
@@ -259,8 +265,6 @@ def start_client(num_clients):
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
     # clean up
     kvclient.barrier()
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():

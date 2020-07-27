@@ -463,6 +463,49 @@ class SendMetaToBackupRequest(rpc.Request):
         res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
         return res
 
+DELETE_DATA = 901240
+DELETE_MSG = "Delete_Data"
+
+class DeleteDataResponse(rpc.Response):
+    """Send a confirmation signal (just a short string message)
+    of DeleteDataRequest to client.
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __getstate__(self):
+        return self.msg
+
+    def __setstate__(self, state):
+        self.msg = state
+
+class DeleteDataRequest(rpc.Request):
+    """Send message to server to delete data tensor
+
+    Parameters
+    ----------
+    name : str
+        data name
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def __getstate__(self):
+        return self.name
+
+    def __setstate__(self, state):
+        self.name = state
+
+    def process_request(self, server_state):
+        kv_store = server_state.kv_store
+        assert self.name in kv_store.data_store, 'data name %s not exists.' % self.name
+        del kv_store.data_store[self.name]
+        del kv_store.part_policy[self.name]
+        del kv_store.push_handlers[self.name]
+        del kv_store.pull_handlers[self.name]
+        res = DeleteDataResponse(DELETE_MSG)
+        return res
+
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
@@ -558,6 +601,9 @@ class KVServer(object):
         rpc.register_service(SEND_META_TO_BACKUP,
                              SendMetaToBackupRequest,
                              SendMetaToBackupResponse)
+        rpc.register_service(DELETE_DATA,
+                             DeleteDataRequest,
+                             DeleteDataResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -566,6 +612,9 @@ class KVServer(object):
         # Basic information
         self._server_id = server_id
         self._server_namebook = rpc.read_ip_config(ip_config)
+        assert server_id in self._server_namebook, \
+                'Trying to start server {}, but there are {} servers in the config file'.format(
+                    server_id, len(self._server_namebook))
         self._machine_id = self._server_namebook[server_id][0]
         self._group_count = self._server_namebook[server_id][3]
         # We assume partition_id is equal to machine_id
@@ -654,13 +703,19 @@ class KVServer(object):
         assert len(name) > 0, 'name cannot be empty.'
         if name in self._data_store:
             raise RuntimeError("Data %s has already exists!" % name)
+        self._part_policy[name] = self.find_policy(policy_str)
         if data_tensor is not None: # Create shared-tensor
             data_type = F.reverse_data_type_dict[F.dtype(data_tensor)]
             shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-        self._part_policy[name] = self.find_policy(policy_str)
+            assert self._part_policy[name].get_data_size() == data_tensor.shape[0], \
+                    'kvserver expect partition {} for {} has {} rows, but gets {} rows'.format(
+                        self._part_policy[name].part_id,
+                        policy_str,
+                        self._part_policy[name].get_data_size(),
+                        data_tensor.shape[0])
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
 
@@ -726,6 +781,9 @@ class KVClient(object):
         rpc.register_service(SEND_META_TO_BACKUP,
                              SendMetaToBackupRequest,
                              SendMetaToBackupResponse)
+        rpc.register_service(DELETE_DATA,
+                             DeleteDataRequest,
+                             DeleteDataResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -899,6 +957,39 @@ class KVClient(object):
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
+        self.barrier()
+
+    def delete_data(self, name):
+        """Send message to kvserver to delete tensor and clear the meta data
+
+        Parameters
+        ----------
+        name : str
+            data name
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        assert name in self._data_name_list, 'data name: %s not exists.' % name
+        self.barrier()
+        part_policy = self._part_policy[name]
+        num_partitions = part_policy.partition_book.num_partitions()
+        num_clients_per_part = rpc.get_num_client() / num_partitions
+        if self._client_id % num_clients_per_part == 0:
+            # send request to every server nodes
+            request = DeleteDataRequest(name)
+            for n in range(self._group_count):
+                server_id = part_policy.part_id * self._group_count + n
+                rpc.send_request(server_id, request)
+            for _ in range(self._group_count):
+                response = rpc.recv_response()
+                assert response.msg == DELETE_MSG
+        self.barrier()
+        self._data_name_list.remove(name)
+        # TODO(chao) : remove the delete log print
+        del self._data_store[name]
+        del self._full_data_shape[name]
+        del self._part_policy[name]
+        del self._pull_handlers[name]
+        del self._push_handlers[name]
         self.barrier()
 
     def map_shared_data(self, partition_book):

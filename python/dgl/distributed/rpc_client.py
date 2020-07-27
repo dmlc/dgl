@@ -3,6 +3,7 @@
 import os
 import socket
 import multiprocessing as mp
+import atexit
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -96,6 +97,8 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
+INITIALIZED = False
+
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
 
@@ -170,6 +173,9 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
+    atexit.register(exit_client)
+    global INITIALIZED
+    INITIALIZED = True
 
 def finalize_client():
     """Release resources of this client."""
@@ -178,6 +184,8 @@ def finalize_client():
     if sampler_pool is not None:
         sampler_pool.close()
         sampler_pool.join()
+    global INITIALIZED
+    INITIALIZED = False
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -214,3 +222,16 @@ def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='so
         num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
     num_sampler_workers = num_workers
     connect_to_server(ip_config, max_queue_size, net_type)
+
+def exit_client():
+    """Register exit callback.
+    """
+    # Only client with rank_0 will send shutdown request to servers.
+    shutdown_servers()
+    finalize_client()
+    atexit.unregister(exit_client)
+
+def is_initialized():
+    """Is RPC initialized?
+    """
+    return INITIALIZED
