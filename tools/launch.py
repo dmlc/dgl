@@ -23,6 +23,7 @@ def execute_remote(cmd, ip, thread_list):
 
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
+    print("1111")
     hosts = []
     thread_list = []
     server_count_per_machine = 0
@@ -36,6 +37,7 @@ def submit_jobs(args, udf_command):
             hosts.append((ip, port))
     assert args.num_client % len(hosts) == 0
     client_count_per_machine = int(args.num_client / len(hosts))
+    print("22222")
     # launch server tasks
     server_cmd = 'DGL_ROLE=server'
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
@@ -47,6 +49,7 @@ def submit_jobs(args, udf_command):
         cmd = cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, thread_list)
+    print("3333")
     # launch client tasks
     client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
@@ -63,7 +66,7 @@ def submit_jobs(args, udf_command):
     torch_cmd = torch_cmd + ' ' + '--node_rank=' + str(0)
     torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
     torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
-
+    print("4444")
     for node_id, host in enumerate(hosts):
         ip, _ = host
         new_torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
