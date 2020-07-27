@@ -4653,7 +4653,10 @@ class DGLHeteroGraph(object):
 
     # TODO: Formats should not be specified, just saving all the materialized formats
     def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
-        """Return a copy of this graph in shared memory (without node feature or edge feature)
+        """Return a copy of this graph in shared memory, without node data or edge data.
+
+        It moves the graph index to shared memory and the returned DGLHeterograph object does not
+        contain node data or edge data.
 
         Parameters
         ----------
@@ -4665,7 +4668,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         HeteroGraph
-            The graph index in shared memory
+            The graph in shared memory
         """
         assert len(name) > 0, "The name of shared memory cannot be empty"
         assert len(formats) > 0
