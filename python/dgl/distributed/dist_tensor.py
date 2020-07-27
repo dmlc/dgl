@@ -44,14 +44,14 @@ class DistTensor:
         The dtype of the tensor
     name : string
         The name of the tensor.
-    part_policy : PartitionPolicy
-        The partition policy of the tensor
     init_func : callable
         The function to initialize data in the tensor.
+    part_policy : PartitionPolicy
+        The partition policy of the tensor
     persistent : bool
         Whether the created tensor is persistent.
     '''
-    def __init__(self, g, shape, dtype, name=None, part_policy=None, init_func=None,
+    def __init__(self, g, shape, dtype, name=None, init_func=None, part_policy=None,
                  persistent=False):
         self.kvstore = g._client
         self._shape = shape

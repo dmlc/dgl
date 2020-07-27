@@ -70,6 +70,8 @@ class DotGatConv(nn.Module):
         else:
             h_src = feat
             feat_src = feat_dst = self.fc(h_src)
+            if graph.is_block:
+                feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
         # Assign features to nodes
         graph.srcdata.update({'ft': feat_src})
