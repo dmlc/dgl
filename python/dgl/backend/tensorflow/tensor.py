@@ -73,7 +73,7 @@ def initialize_context():
 
 def as_scalar(data):
     data = data.numpy()
-    return data if np.isscalar(data) else data.asscalar()
+    return data if np.isscalar(data) else data.item()
 
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.

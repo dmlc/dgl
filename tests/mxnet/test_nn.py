@@ -79,7 +79,7 @@ def test_graph_conv(idtype):
     check_close(g.ndata['h'], 2 * F.ones((3, 1)))
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [False])
@@ -88,24 +88,33 @@ def test_graph_conv2(idtype, g, norm, weight, bias):
     conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias)
     conv.initialize(ctx=F.ctx())
     ext_w = F.randn((5, 2)).as_in_context(F.ctx())
-    nsrc = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_src_nodes()
-    ndst = g.number_of_nodes() if isinstance(g, dgl.DGLGraph) else g.number_of_dst_nodes()
+    nsrc = ndst = g.number_of_nodes()
     h = F.randn((nsrc, 5)).as_in_context(F.ctx())
-    h_dst = F.randn((ndst, 2)).as_in_context(F.ctx())
     if weight:
         h_out = conv(g, h)
     else:
         h_out = conv(g, h, ext_w)
     assert h_out.shape == (ndst, 2)
 
-    if not isinstance(g, dgl.DGLGraph) and len(g.ntypes) == 2:
-        # bipartite, should also accept pair of tensors
-        if weight:
-            h_out2 = conv(g, (h, h_dst))
-        else:
-            h_out2 = conv(g, (h, h_dst), ext_w)
-        assert h_out2.shape == (ndst, 2)
-        assert F.array_equal(h_out, h_out2)
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [False])
+def test_graph_conv2_bi(idtype, g, norm, weight, bias):
+    g = g.astype(idtype).to(F.ctx())
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias)
+    conv.initialize(ctx=F.ctx())
+    ext_w = F.randn((5, 2)).as_in_context(F.ctx())
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).as_in_context(F.ctx())
+    h_dst = F.randn((ndst, 2)).as_in_context(F.ctx())
+    if weight:
+        h_out = conv(g, (h, h_dst))
+    else:
+        h_out = conv(g, (h, h_dst), ext_w)
+    assert h_out.shape == (ndst, 2)
 
 def _S2AXWb(A, N, X, W, b):
     X1 = X * N
@@ -120,7 +129,7 @@ def _S2AXWb(A, N, X, W, b):
     return Y + b
 
 def test_tagconv():
-    g = dgl.DGLGraph(nx.path_graph(3))
+    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
     norm = mx.nd.power(g.in_degrees().astype('float32'), -0.5)
@@ -148,11 +157,10 @@ def test_tagconv():
     assert h1.shape[-1] == 2
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_gat_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
     gat = nn.GATConv(10, 20, 5) # n_heads = 5
     gat.initialize(ctx=ctx)
     print(gat)
@@ -171,19 +179,8 @@ def test_gat_conv_bi(g, idtype):
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
-    # test#3: block
-    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
-    seed_nodes = np.unique(g.edges()[1].asnumpy())
-    block = dgl.to_block(g, seed_nodes)
-    gat = nn.GATConv(5, 2, 4)
-    gat.initialize(ctx=ctx)
-    feat = F.randn((block.number_of_src_nodes(), 5))
-    h = gat(block, feat)
-    assert h.shape == (block.number_of_dst_nodes(), 4, 2)
-
-
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
 def test_sage_conv(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
@@ -208,19 +205,13 @@ def test_sage_conv_bi(idtype, g, aggre_type):
     assert h.shape[-1] == 2
     assert h.shape[0] == g.number_of_dst_nodes()
 
-    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
-    seed_nodes = np.unique(g.edges()[1].asnumpy())
-    block = dgl.to_block(g, seed_nodes)
-    sage = nn.SAGEConv(5, 10, aggre_type)
-    feat = F.randn((block.number_of_src_nodes(), 5))
-    sage.initialize(ctx=ctx)
-    h = sage(block, feat)
-    assert h.shape[0] == block.number_of_dst_nodes()
-    assert h.shape[-1] == 10
-
+@parametrize_dtype
+@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
+def test_sage_conv_bi2(idtype, aggre_type):
     # Test the case for graphs without edges
     g = dgl.bipartite([], num_nodes=(5, 3))
     g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
     sage.initialize(ctx=ctx)
@@ -236,7 +227,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
         assert h.shape[0] == 3
 
 def test_gg_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     gg_conv = nn.GatedGraphConv(10, 20, 3, 4) # n_step = 3, n_etypes = 4
@@ -250,7 +241,7 @@ def test_gg_conv():
     assert h1.shape == (20, 20)
 
 def test_cheb_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     cheb = nn.ChebConv(10, 20, 3) # k = 3
@@ -263,7 +254,7 @@ def test_cheb_conv():
     assert h1.shape == (20, 20)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_agnn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -286,15 +277,8 @@ def test_agnn_conv_bi(g, idtype):
     h = agnn_conv(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 5)
 
-    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
-    seed_nodes = np.unique(g.edges()[1].asnumpy())
-    block = dgl.to_block(g, seed_nodes)
-    feat = F.randn((block.number_of_src_nodes(), 5))
-    h = agnn_conv(block, feat)
-    assert h.shape == (block.number_of_dst_nodes(), 5)
-
 def test_appnp_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     appnp_conv = nn.APPNPConv(3, 0.1, 0)
@@ -309,7 +293,7 @@ def test_appnp_conv():
 def test_dense_cheb_conv():
     for k in range(1, 4):
         ctx = F.ctx()
-        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.3), readonly=True)
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.3)).to(F.ctx())
         adj = g.adjacency_matrix(ctx=ctx).tostype('default')
         cheb = nn.ChebConv(5, 2, k)
         dense_cheb = nn.DenseChebConv(5, 2, k)
@@ -330,7 +314,7 @@ def test_dense_cheb_conv():
 
 @parametrize_dtype
 @pytest.mark.parametrize('norm_type', ['both', 'right', 'none'])
-@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_dense_graph_conv(idtype, g, norm_type):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -349,7 +333,7 @@ def test_dense_graph_conv(idtype, g, norm_type):
     assert F.allclose(out_conv, out_dense_conv)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite', 'block-bipartite']))
 def test_dense_sage_conv(idtype, g):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -375,7 +359,7 @@ def test_dense_sage_conv(idtype, g):
     assert F.allclose(out_sage, out_dense_sage)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_edge_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -388,7 +372,7 @@ def test_edge_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
 def test_edge_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -399,15 +383,10 @@ def test_edge_conv_bi(g, idtype):
     h0 = F.randn((g.number_of_src_nodes(), 5))
     x0 = F.randn((g.number_of_dst_nodes(), 5))
     h1 = edge_conv(g, (h0, x0))
-    if not g.is_homograph() and not g.is_block:
-        # bipartite
-        h1 = edge_conv(g, (h0, h0[:10]))
-    else:
-        h1 = edge_conv(g, h0)
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
 def test_gin_conv(g, idtype, aggregator_type):
     g = g.astype(idtype).to(F.ctx())
@@ -438,16 +417,9 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
     h = gin_conv(g, feat)
     return h.shape == (g.number_of_dst_nodes(), 5)
 
-    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
-    seed_nodes = np.unique(g.edges()[1].asnumpy())
-    block = dgl.to_block(g, seed_nodes)
-    feat = F.randn((block.number_of_src_nodes(), 5))
-    h = gin_conv(block, feat)
-    assert h.shape == (block.number_of_dst_nodes(), 12)
-
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_gmm_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -473,7 +445,7 @@ def test_gmm_conv_bi(g, idtype):
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_nn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -486,7 +458,7 @@ def test_nn_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
 def test_nn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -500,7 +472,7 @@ def test_nn_conv_bi(g, idtype):
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_sg_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     sgc = nn.SGConv(5, 2, 2)
@@ -513,7 +485,7 @@ def test_sg_conv():
     assert h1.shape == (g.number_of_nodes(), 2)
 
 def test_set2set():
-    g = dgl.DGLGraph(nx.path_graph(10))
+    g = dgl.DGLGraph(nx.path_graph(10)).to(F.ctx())
     ctx = F.ctx()
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
@@ -532,7 +504,7 @@ def test_set2set():
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_glob_att_pool():
-    g = dgl.DGLGraph(nx.path_graph(10))
+    g = dgl.DGLGraph(nx.path_graph(10)).to(F.ctx())
     ctx = F.ctx()
 
     gap = nn.GlobalAttentionPooling(gluon.nn.Dense(1), gluon.nn.Dense(10))
@@ -550,7 +522,7 @@ def test_glob_att_pool():
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_simple_pool():
-    g = dgl.DGLGraph(nx.path_graph(15))
+    g = dgl.DGLGraph(nx.path_graph(15)).to(F.ctx())
 
     sum_pool = nn.SumPooling()
     avg_pool = nn.AvgPooling()
@@ -570,7 +542,7 @@ def test_simple_pool():
     assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
     # test#2: batched graph
-    g_ = dgl.DGLGraph(nx.path_graph(5))
+    g_ = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = sum_pool(bg, h0)
@@ -601,13 +573,13 @@ def test_simple_pool():
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
 def uniform_attention(g, shape):
-    a = mx.nd.ones(shape)
+    a = mx.nd.ones(shape).as_in_context(g.device)
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
     return a / g.in_degrees(g.edges()[1]).reshape(target_shape).astype('float32')
 
 def test_edge_softmax():
     # Basic
-    g = dgl.DGLGraph(nx.path_graph(3))
+    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     edata = F.ones((g.number_of_edges(), 1))
     a = nn.edge_softmax(g, edata)
     assert len(g.ndata) == 0
@@ -624,7 +596,7 @@ def test_edge_softmax():
             1e-4, 1e-4)
 
 def test_partial_edge_softmax():
-    g = dgl.DGLGraph()
+    g = dgl.DGLGraph().to(F.ctx())
     g.add_nodes(30)
     # build a complete graph
     for i in range(30):
@@ -635,8 +607,7 @@ def test_partial_edge_softmax():
     score.attach_grad()
     grad = F.randn((300, 1))
     import numpy as np
-    eids = np.random.choice(900, 300, replace=False).astype('int64')
-    eids = F.zerocopy_from_numpy(eids)
+    eids = F.tensor(np.random.choice(900, 300, replace=False), g.idtype)
     # compute partial edge softmax
     with mx.autograd.record():
         y_1 = nn.edge_softmax(g, score, eids)
@@ -644,7 +615,7 @@ def test_partial_edge_softmax():
         grad_1 = score.grad
 
     # compute edge softmax on edge subgraph
-    subg = g.edge_subgraph(eids)
+    subg = g.edge_subgraph(eids, preserve_nodes=True)
     with mx.autograd.record():
         y_2 = nn.edge_softmax(subg, score)
         y_2.backward(grad)
@@ -656,7 +627,7 @@ def test_partial_edge_softmax():
 def test_rgcn():
     ctx = F.ctx()
     etype = []
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
     # 5 etypes
     R = 5
     for i in range(g.number_of_edges()):
@@ -720,7 +691,7 @@ def test_sequential():
             e_feat += graph.edata['e']
             return n_feat, e_feat
 
-    g = dgl.DGLGraph()
+    g = dgl.DGLGraph().to(F.ctx())
     g.add_nodes(3)
     g.add_edges([0, 1, 2, 0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1, 2, 2, 2])
     net = nn.Sequential()
@@ -746,9 +717,9 @@ def test_sequential():
             n_feat += graph.ndata['h']
             return n_feat.reshape(graph.number_of_nodes() // 2, 2, -1).sum(1)
 
-    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05))
-    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2))
-    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8))
+    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05)).to(F.ctx())
+    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2)).to(F.ctx())
+    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8)).to(F.ctx())
     net = nn.Sequential()
     net.add(ExampleLayer())
     net.add(ExampleLayer())

@@ -42,7 +42,7 @@ def tensor(data, dtype=None):
         if dtype is None or data.dtype == dtype:
             return data
         else:
-            return nd.cast(data, dtype)
+            return data.astype(dtype)
     else:
         if isinstance(data, numbers.Number):
             data = [data]
@@ -130,7 +130,7 @@ def to_backend_ctx(dglctx):
 def astype(input, ty):
     if ty == np.bool:
         ty = np.int32
-    return nd.cast(input, ty)
+    return input.astype(ty)
 
 def asnumpy(input):
     return input.asnumpy()
@@ -211,7 +211,7 @@ def split(x, sizes_or_sections, dim):
 def repeat(input, repeats, dim):
     if isinstance(repeats, nd.NDArray):
         return nd.array(np.repeat(input.asnumpy(), repeats.asnumpy(), axis=dim),
-                        ctx=input.context)
+                        ctx=input.context, dtype=input.dtype)
     else:
         return nd.repeat(input, repeats, axis=dim)
 
@@ -361,7 +361,8 @@ def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = np.nonzero(tmp)[0]
-    return nd.array(tmp, ctx=input.context, dtype=tmp.dtype)
+    r = nd.array(tmp, ctx=input.context, dtype=tmp.dtype)
+    return r
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.
@@ -393,6 +394,7 @@ def zerocopy_from_numpy(np_data):
     return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
+    arr.to_dlpack_for_read()
     return dglnd.from_dlpack(arr.to_dlpack_for_read())
 
 def zerocopy_to_dgl_ndarray_for_write(arr):

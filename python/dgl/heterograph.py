@@ -4485,7 +4485,7 @@ class DGLHeteroGraph(object):
         device(type='cpu')
         """
         if device is None or self.device == device:
-            return self
+            return utils.to_int32_graph_if_on_gpu(self)
 
         ret = copy.copy(self)
 

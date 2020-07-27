@@ -5,6 +5,7 @@ import scipy.sparse as ssp
 import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
+import unittest
 
 D = 5
 reduce_msg_shapes = set()
@@ -476,6 +477,7 @@ def test_group_apply_edges():
 
 
 # GitHub issue #1036
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_group_apply_edges2():
     m = ssp.random(10, 10, 0.2)
     g = DGLGraph(m, readonly=True)

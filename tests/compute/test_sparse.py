@@ -163,6 +163,8 @@ def test_spmm(idtype, g, shp, msg, reducer):
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_lhs', 'copy_rhs'])
 @parametrize_dtype
 def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
+    if lhs_target == rhs_target:
+        return
     g = g.astype(idtype).to(F.ctx())
     if dgl.backend.backend_name == 'mxnet' and g.number_of_edges() == 0:
         pytest.skip()   # mxnet do not support zero shape tensor

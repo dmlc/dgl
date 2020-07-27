@@ -17,7 +17,7 @@ def _AXWb(A, X, W, b):
     Y = th.matmul(A, X.view(X.shape[0], -1)).view_as(X)
     return Y + b
 
-def test_graph_conv():
+def test_graph_conv0():
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
