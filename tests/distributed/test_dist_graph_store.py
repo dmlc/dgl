@@ -142,6 +142,10 @@ def check_dist_graph(g, num_nodes, num_edges):
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
         emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb2', emb_init)
+        with F.no_grad():
+            feats1 = emb(nids)
+        assert np.all(F.asnumpy(feats1) == 0)
+
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
             feats1 = emb(nids)
@@ -151,7 +155,8 @@ def check_dist_graph(g, num_nodes, num_edges):
             loss = F.sum(feats + 1, 0)
         loss.backward()
         optimizer.step()
-        feats = emb(nids)
+        with F.no_grad():
+            feats = emb(nids)
         assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
