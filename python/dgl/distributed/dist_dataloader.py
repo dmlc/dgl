@@ -28,6 +28,7 @@ def init_fn(collate_fn, queue, sig_queue):
     DGL_GLOBAL_MP_QUEUE = queue
     DGL_GLOBAL_COLLATE_FN = collate_fn
     time.sleep(1)
+    return 1
 
 
 def _exit():
@@ -75,10 +76,17 @@ class DistDataLoader:
         self.shuffle = shuffle
 
         self.pool, num_sampler_workers = get_sampler_pool()
-        assert num_sampler_workers == num_workers, "Num workers should be the same"
-        for _ in range(num_sampler_workers):
-            self.pool.apply_async(init_fn, args=(collate_fn, self.queue, self.sig_queue))
+        if self.pool is None:
+            ctx = mp.get_context("spawn")
+            self.pool = ctx.Pool(num_workers)
+        else:
+            assert num_sampler_workers == num_workers, "Num workers should be the same"
+        results = []
+        for _ in range(num_workers):
+            results.append(self.pool.apply_async(init_fn, args=(collate_fn, self.queue, self.sig_queue)))
             time.sleep(0.1)
+        for res in results:
+            res.get()
     
         self.dataset = F.tensor(dataset)
         self.expected_idxs = len(dataset) // self.batch_size
@@ -91,7 +99,7 @@ class DistDataLoader:
                 self._request_next_batch()
         self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
-            result = self.queue.get(10)
+            result = self.queue.get(timeout=9999)
             self.recv_idxs += 1
             return result
         else:
