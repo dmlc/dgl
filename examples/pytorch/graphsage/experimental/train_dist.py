@@ -21,7 +21,7 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from pyinstrument import Profiler
 
-from train_sampling import run, SAGE, compute_acc, evaluate, load_subtensor
+from train_sampling import run, SAGE, compute_acc, load_subtensor
 
 class NeighborSampler(object):
     def __init__(self, g, fanouts, sample_neighbors):
@@ -100,9 +100,25 @@ class DistSAGE(SAGE):
             g.barrier()
         return y
 
+def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
+    """
+    Evaluate the model on the validation set specified by ``val_nid``.
+    g : The entire graph.
+    inputs : The features of all the nodes.
+    labels : The labels of all the nodes.
+    val_nid : the node Ids for validation.
+    batch_size : Number of nodes to compute at the same time.
+    device : The GPU device to evaluate on.
+    """
+    model.eval()
+    with th.no_grad():
+        pred = model.inference(g, inputs, batch_size, device)
+    model.train()
+    return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid])
+
 def run(args, device, data):
     # Unpack data
-    train_nid, val_nid, in_feats, n_classes, g = data
+    train_nid, val_nid, test_nid, in_feats, n_classes, g = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
                               dgl.distributed.sample_neighbors)
@@ -204,9 +220,10 @@ def run(args, device, data):
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            eval_acc = evaluate(model.module, g, g.ndata['features'],
-                                g.ndata['labels'], val_nid, args.batch_size_eval, device)
-            print('Part {}, Eval Acc {:.4f}, time: {:.4f}'.format(g.rank(), eval_acc, time.time() - start))
+            val_acc, test_acc = evaluate(model.module, g, g.ndata['features'],
+                                         g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
+            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
+                                                                                  time.time() - start))
 
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
@@ -236,7 +253,7 @@ def main(args):
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
-    data = train_nid, val_nid, in_feats, n_classes, g
+    data = train_nid, val_nid, test_nid, in_feats, n_classes, g
     run(args, device, data)
     print("parent ends")
 
