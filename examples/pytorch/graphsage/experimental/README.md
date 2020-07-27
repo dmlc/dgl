@@ -34,7 +34,7 @@ python3 tools/copy_partitions.py --ip_config ip_config.txt \
 
 **Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
 
-Users need to copy the training script to remote machines as well.
+Users need to copy the training script to the workspace directory on remote machines as well.
 
 ### Step 3: Launch distributed jobs
 
