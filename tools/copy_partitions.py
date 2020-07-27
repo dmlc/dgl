@@ -6,26 +6,29 @@ import subprocess
 import argparse
 import signal
 import logging
-import time
+import json
+import copy
 
 def copy_file(file_name, ip, workspace):
+    print('copy {} to {}'.format(file_name, ip + ':' + workspace + '/'))
     cmd = 'scp -o StrictHostKeyChecking=no ' + file_name + ' ' + ip + ':' + workspace + '/'
     subprocess.check_call(cmd, shell = True)
 
-def exec_cmd():
+def exec_cmd(ip, cmd):
+    cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
     subprocess.check_call(cmd, shell = True)
 
 def main():
     parser = argparse.ArgumentParser(description='Copy data to the servers.')
-    parser.add_argument('--workspace', type=str,
+    parser.add_argument('--workspace', type=str, required=True,
                         help='Path of user directory of distributed tasks. \
                         This is used to specify a destination location where \
                         data are copied to on remote machines.')
-    parser.add_argument('--rel_data_path', type=str,
+    parser.add_argument('--rel_data_path', type=str, required=True,
                         help='Relative path in workspace to store the partition data.')
-    parser.add_argument('--conf_path', type=str, 
+    parser.add_argument('--part_config', type=str, required=True,
                         help='The partition config file. The path is on the local machine.')
-    parser.add_argument('--ip_config', type=str, 
+    parser.add_argument('--ip_config', type=str, required=True,
                         help='The file of IP configuration for servers. \
                         The path is on the local machine.')
     args = parser.parse_args()
@@ -39,10 +42,12 @@ def main():
     
     # We need to update the partition config file so that the paths are relative to
     # the workspace in the remote machines.
-    with open(conf_file) as conf_f:
+    with open(args.part_config) as conf_f:
         part_metadata = json.load(conf_f)
-        tmp_part_metadata = deepcopy.copy(part_metadata)
+        tmp_part_metadata = copy.deepcopy(part_metadata)
         num_parts = part_metadata['num_parts']
+        assert num_parts == len(hosts), \
+                'The number of partitions needs to be the same as the number of hosts.'
         graph_name = part_metadata['graph_name']
         node_map = part_metadata['node_map']
         edge_map = part_metadata['edge_map']
@@ -60,14 +65,17 @@ def main():
             part_files['edge_feats'] = '{}/part{}/edge_feat.dgl'.format(args.rel_data_path, part_id)
             part_files['node_feats'] = '{}/part{}/node_feat.dgl'.format(args.rel_data_path, part_id)
             part_files['part_graph'] = '{}/part{}/graph.dgl'.format(args.rel_data_path, part_id)
-    tmp_conf_file = 'tmp/{}.json'.format(graph_name)
-    with open(tmp_conf_file, 'w') as outfile:
+    tmp_part_config = '/tmp/{}.json'.format(graph_name)
+    with open(tmp_part_config, 'w') as outfile:
         json.dump(tmp_part_metadata, outfile, sort_keys=True, indent=4)
 
     # Copy ip config.
     for part_id, ip in enumerate(hosts):
+        remote_path = '{}/{}'.format(args.workspace, args.rel_data_path)
+        exec_cmd(ip, 'mkdir -p {}'.format(remote_path))
+
         copy_file(args.ip_config, ip, args.workspace)
-        copy_file(tmp_conf_file, ip, '{}/{}'.format(args.workspace, args.rel_data_path))
+        copy_file(tmp_part_config, ip, '{}/{}'.format(args.workspace, args.rel_data_path))
         node_map = part_metadata['node_map']
         edge_map = part_metadata['edge_map']
         if not isinstance(node_map, list):
