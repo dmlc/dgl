@@ -12,7 +12,7 @@ def test_random_walk():
     n_traces = 3
     n_hops = 4
 
-    g = dgl.DGLGraph(edge_list, readonly=True)
+    g = dgl.DGLGraphStale(edge_list, readonly=True)
     traces = dgl.contrib.sampling.random_walk(g, seeds, n_traces, n_hops)
     traces = F.zerocopy_to_numpy(traces)
 
@@ -31,7 +31,7 @@ def test_random_walk_with_restart():
     seeds = [0, 1]
     max_nodes = 10
 
-    g = dgl.DGLGraph(edge_list)
+    g = dgl.DGLGraphStale(edge_list)
 
     # test normal RWR
     traces = dgl.contrib.sampling.random_walk_with_restart(g, seeds, 0.2, max_nodes)

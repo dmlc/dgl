@@ -129,6 +129,8 @@ class GATConv(nn.Block):
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = self.fc(h_src).reshape(
                     -1, self._num_heads, self._out_feats)
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:

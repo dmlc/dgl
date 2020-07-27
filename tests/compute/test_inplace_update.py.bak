@@ -22,57 +22,6 @@ def generate_graph():
 
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
-def test_inplace_recv():
-    u = F.tensor([0, 0, 0, 3, 4, 9])
-    v = F.tensor([1, 2, 3, 9, 9, 0])
-
-    def message_func(edges):
-        return {'m' : edges.src['f'] + edges.dst['f']}
-
-    def reduce_func(nodes):
-        return {'f' : F.sum(nodes.mailbox['m'], 1)}
-
-    def apply_func(nodes):
-        return {'f' : 2 * nodes.data['f']}
-
-    def _test(apply_func):
-        g = generate_graph()
-        f = g.ndata['f']
-
-        # one out place run to get result
-        g.send((u, v), message_func)
-        g.recv([0,1,2,3,9], reduce_func, apply_func)
-        result = g.get_n_repr()['f']
-
-        # inplace deg bucket run
-        v1 = F.clone(f)
-        g.ndata['f'] = v1
-        g.send((u, v), message_func)
-        g.recv([0,1,2,3,9], reduce_func, apply_func, inplace=True)
-        r1 = g.get_n_repr()['f']
-        # check result
-        assert F.allclose(r1, result)
-        # check inplace
-        assert F.allclose(v1, r1)
-
-        # inplace e2v
-        v1 = F.clone(f)
-        g.ndata['f'] = v1
-        g.send((u, v), message_func)
-        g.recv([0,1,2,3,9], fn.sum(msg='m', out='f'), apply_func, inplace=True)
-        r1 = g.ndata['f']
-        # check result
-        assert F.allclose(r1, result)
-        # check inplace
-        assert F.allclose(v1, r1)
-
-    # test send_and_recv with apply_func
-    _test(apply_func)
-    # test send_and_recv without apply_func
-    _test(None)
-
-
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_snr():
     u = F.tensor([0, 0, 0, 3, 4, 9])
     v = F.tensor([1, 2, 3, 9, 9, 0])
@@ -275,7 +224,7 @@ def test_inplace_apply():
     # test apply all nodes, should not be done in place
     g.ndata['f'] = nf
     g.apply_nodes(apply_node_func, inplace=True)
-    assert F.allclose(nf, g.ndata['f']) == False
+    assert (F.allclose(nf, g.ndata['f']) == False)
 
     edges = [3, 5, 7, 10]
     ef = g.edata['e']
@@ -293,7 +242,6 @@ def test_inplace_apply():
     assert F.allclose(ef, g.edata['e']) == False
 
 if __name__ == '__main__':
-    test_inplace_recv()
     test_inplace_snr()
     test_inplace_push()
     test_inplace_pull()

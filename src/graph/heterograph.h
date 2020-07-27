@@ -187,18 +187,16 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->GetCSRMatrix(0);
   }
 
-  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
-    return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
+  SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
+    return GetRelationGraph(etype)->SelectFormat(0, preferred_formats);
   }
 
-  std::string GetRestrictFormat() const override {
-    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
-    return std::string("");
+  dgl_format_code_t GetAllowedFormats() const override {
+    return GetRelationGraph(0)->GetAllowedFormats();
   }
 
-  dgl_format_code_t GetFormatInUse() const override {
-    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
-    return 0;
+  dgl_format_code_t GetCreatedFormats() const override {
+    return GetRelationGraph(0)->GetCreatedFormats();
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
@@ -206,7 +204,7 @@ class HeteroGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
-  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 

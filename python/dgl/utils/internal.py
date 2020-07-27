@@ -1,4 +1,4 @@
-"""Utility module."""
+"""Internal utilities."""
 from __future__ import absolute_import, division
 
 from collections.abc import Mapping, Iterable
@@ -6,9 +6,9 @@ from collections import defaultdict
 from functools import wraps
 import numpy as np
 
-from .base import DGLError, dgl_warning
-from . import backend as F
-from . import ndarray as nd
+from ..base import DGLError, dgl_warning
+from .. import backend as F
+from .. import ndarray as nd
 
 
 class InconsistentDtypeException(DGLError):
@@ -550,11 +550,35 @@ def make_invmap(array, use_numpy=True):
     remapped = np.asarray([invmap[x] for x in array])
     return uniques, invmap, remapped
 
-def expand_as_pair(input_):
+def expand_as_pair(input_, g=None):
     """Return a pair of same element if the input is not a pair.
+
+    If the graph is a block, obtain the feature of destination nodes from the source nodes.
+
+    Parameters
+    ----------
+    input_ : Tensor, dict[str, Tensor], or their pairs
+        The input features
+    g : DGLHeteroGraph or DGLGraph or None
+        The graph.
+
+        If None, skip checking if the graph is a block.
+
+    Returns
+    -------
+    tuple[Tensor, Tensor] or tuple[dict[str, Tensor], dict[str, Tensor]]
+        The features for input and output nodes
     """
     if isinstance(input_, tuple):
         return input_
+    elif g is not None and g.is_block:
+        if isinstance(input_, Mapping):
+            input_dst = {
+                k: F.narrow_row(v, 0, g.number_of_dst_nodes(k))
+                for k, v in input_.items()}
+        else:
+            input_dst = F.narrow_row(input_, 0, g.number_of_dst_nodes())
+        return input_, input_dst
     else:
         return input_, input_
 
@@ -660,85 +684,6 @@ class FlattenedDict(object):
         k = self._group_keys[i]
         j = idx - self._group_offsets[i]
         return k, self._groups[k][j]
-
-
-def prepare_tensor(g, data, name):
-    """Convert the data to ID tensor and check its ID type and context.
-
-    If the data is already in tensor type, raise error if its ID type
-    and context does not match the graph's.
-    Otherwise, convert it to tensor type of the graph's ID type and
-    ctx and return.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Graph.
-    data : int, iterable of int, tensor
-        Data.
-    name : str
-        Name of the data.
-
-    Returns
-    -------
-    Tensor
-        Data in tensor object.
-    """
-    ret = None
-    if F.is_tensor(data):
-        if F.dtype(data) != g.idtype or F.context(data) != g.device:
-            raise DGLError('Expect argument "{}" to have data type {} and device '
-                           'context {}. But got {} and {}.'.format(
-                               name, g.idtype, g.device, F.dtype(data), F.context(data)))
-        ret = data
-    else:
-        ret = F.copy_to(F.tensor(data, g.idtype), g.device)
-
-    if F.ndim(ret) != 1:
-        raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
-            name, ret))
-    return ret
-
-def prepare_tensor_dict(g, data, name):
-    """Convert a dictionary of data to a dictionary of ID tensors.
-
-    If calls ``prepare_tensor`` on each key-value pair.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Graph.
-    data : dict[str, (int, iterable of int, tensor)]
-        Data dict.
-    name : str
-        Name of the data.
-
-    Returns
-    -------
-    dict[str, tensor]
-    """
-    return {key : prepare_tensor(g, val, '{}["{}"]'.format(name, key))
-            for key, val in data.items()}
-
-def check_all_same_idtype(glist, name):
-    """Check all the graphs have the same idtype."""
-    if len(glist) == 0:
-        return
-    idtype = glist[0].idtype
-    for i, g in enumerate(glist):
-        if g.idtype != idtype:
-            raise DGLError('Expect {}[{}] to have {} type ID, but got {}.'.format(
-                name, i, idtype, g.idtype))
-
-def check_all_same_device(glist, name):
-    """Check all the graphs have the same device."""
-    if len(glist) == 0:
-        return
-    device = glist[0].device
-    for i, g in enumerate(glist):
-        if g.device != device:
-            raise DGLError('Expect {}[{}] to be on device {}, but got {}.'.format(
-                name, i, device, g.device))
 
 def compensate(ids, origin_ids):
     """computing the compensate set of ids from origin_ids

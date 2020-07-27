@@ -39,6 +39,9 @@ class DGLBaseGraph(object):
     graph : graph index, optional
         Data to initialize graph.
     """
+
+    is_block = False        # for compatibility with DGLHeteroGraph
+
     def __init__(self, graph):
         self._graph = graph
 
@@ -4035,7 +4038,7 @@ class DGLGraph(DGLBaseGraph):
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
 
-    def is_homograph(self):
+    def is_homogeneous(self):
         """Return if the graph is homogeneous."""
         return True
 

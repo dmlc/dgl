@@ -104,6 +104,7 @@ def asnumpy(input):
         return input.cpu().detach().numpy()
 
 def copy_to(input, ctx, **kwargs):
+    ctx = th.device(ctx)
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
@@ -167,10 +168,7 @@ def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 
 def repeat(input, repeats, dim):
-    # return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
-    if dim < 0:
-        dim += input.dim()
-    return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
+    return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
 
 def gather_row(data, row_index):
     return th.index_select(data, 0, row_index.long())
@@ -192,7 +190,7 @@ def scatter_row(data, row_index, value):
     return data.index_copy(0, row_index.long(), value)
 
 def scatter_row_inplace(data, row_index, value):
-    data[row_index] = value
+    data[row_index.long()] = value
 
 def squeeze(input, dim):
     return th.squeeze(input, dim)

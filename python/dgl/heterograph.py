@@ -3,6 +3,7 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from contextlib import contextmanager
+import copy
 import numbers
 import networkx as nx
 import numpy as np
@@ -189,19 +190,35 @@ class DGLHeteroGraph(object):
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
     """
-    # pylint: disable=unused-argument
+    is_block = False
+
+    # pylint: disable=unused-argument, dangerous-default-value
     def __init__(self,
-                 gidx,
-                 ntypes,
-                 etypes,
+                 gidx=[],
+                 ntypes=['_U'],
+                 etypes=['_V'],
                  node_frames=None,
-                 edge_frames=None):
+                 edge_frames=None,
+                 **deprecate_kwargs):
+        if isinstance(gidx, DGLHeteroGraph):
+            raise DGLError('The input is already a DGLGraph. No need to create it again.')
+        if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
+            dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
+                        ' instead of `dgl.DGLGraph(data)`.')
+            u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
+            gidx = heterograph_index.create_unitgraph_from_coo(
+                1, num_src, num_dst, u, v, ['coo', 'csr', 'csc'])
+        if len(deprecate_kwargs) != 0:
+            dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
+                        ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
         self._init(gidx, ntypes, etypes, node_frames, edge_frames)
 
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
         """Init internal states."""
         self._graph = gidx
         self._canonical_etypes = None
+        self._batch_num_nodes = None
+        self._batch_num_edges = None
 
         # Handle node types
         if isinstance(ntypes, tuple):
@@ -270,17 +287,33 @@ class DGLHeteroGraph(object):
         self._edge_frames = edge_frames
 
     def __getstate__(self):
-        return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
+        metainfo = (self._ntypes, self._etypes, self._canonical_etypes,
+                    self._srctypes_invmap, self._dsttypes_invmap,
+                    self._is_unibipartite, self._etype2canonical, self._etypes_invmap)
+        return (self._graph, metainfo,
+                self._node_frames, self._edge_frames,
+                self._batch_num_nodes, self._batch_num_edges)
 
     def __setstate__(self, state):
         # Compatibility check
         # TODO: version the storage
-        if isinstance(state, tuple) and len(state) == 5:
-            # DGL 0.4.3+
+        if isinstance(state, tuple) and len(state) == 6:
+            # DGL >= 0.5
+            #TODO(minjie): too many states in python; should clean up and lower to C
+            (self._graph, metainfo, self._node_frames, self._edge_frames,
+             self._batch_num_nodes, self._batch_num_edges) = state
+            (self._ntypes, self._etypes, self._canonical_etypes,
+             self._srctypes_invmap, self._dsttypes_invmap,
+             self._is_unibipartite, self._etype2canonical,
+             self._etypes_invmap) = metainfo
+        elif isinstance(state, tuple) and len(state) == 5:
+            # DGL == 0.4.3
+            dgl_warning("The object is pickled with DGL == 0.4.3.  "
+                        "Some of the original attributes are ignored.")
             self._init(*state)
         elif isinstance(state, dict):
-            # DGL 0.4.2-
-            dgl_warning("The object is pickled with DGL version 0.4.2-.  "
+            # DGL <= 0.4.2
+            dgl_warning("The object is pickled with DGL <= 0.4.2.  "
                         "Some of the original attributes are ignored.")
             self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
                        state['_edge_frames'])
@@ -303,8 +336,29 @@ class DGLHeteroGraph(object):
                           for i in range(len(self.ntypes))}
             nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
-            meta = str(self.metagraph.edges())
+            meta = str(self.metagraph.edges(keys=True))
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
+
+    def __copy__(self):
+        """Shallow copy implementation."""
+        #TODO(minjie): too many states in python; should clean up and lower to C
+        cls = type(self)
+        obj = cls.__new__(cls)
+        obj._graph = self._graph
+        obj._batch_num_nodes = self._batch_num_nodes
+        obj._batch_num_edges = self._batch_num_edges
+        obj._ntypes = self._ntypes
+        obj._etypes = self._etypes
+        obj._canonical_etypes = self._canonical_etypes
+        obj._srctypes_invmap = self._srctypes_invmap
+        obj._dsttypes_invmap = self._dsttypes_invmap
+        obj._is_unibipartite = self._is_unibipartite
+        obj._etype2canonical = self._etype2canonical
+        obj._etypes_invmap = self._etypes_invmap
+        obj._nx_metagraph = self._nx_metagraph
+        obj._node_frames = self._node_frames
+        obj._edge_frames = self._edge_frames
+        return obj
 
     #################################################################
     # Mutation operations
@@ -430,7 +484,7 @@ class DGLHeteroGraph(object):
                         (num if self.get_ntype_id(c_etype[2]) == ntid else 0),
                     u,
                     v,
-                    'any')
+                    ['coo', 'csr', 'csc'])
                 relation_graphs.append(hgidx)
             else:
                 # do nothing
@@ -445,6 +499,15 @@ class DGLHeteroGraph(object):
             self._node_frames[ntid].add_rows(num)
         else:
             self._node_frames[ntid].append(data)
+        self._reset_cached_info()
+
+    def add_edge(self, u, v, data=None, etype=None):
+        """Add one edge to the graph.
+
+        DEPRECATED: please use ``add_edges``.
+        """
+        dgl_warning("DGLGraph.add_edge is deprecated. Please use DGLGraph.add_edges")
+        self.add_edges(u, v, data, etype)
 
     def add_edges(self, u, v, data=None, etype=None):
         r"""Add multiple new edges for the specified edge type
@@ -604,7 +667,7 @@ class DGLHeteroGraph(object):
                     self.number_of_nodes(v_type),
                     F.cat([old_u, u], dim=0),
                     F.cat([old_v, v], dim=0),
-                    'any')
+                    ['coo', 'csr', 'csc'])
                 relation_graphs.append(hgidx)
             else:
                 # do nothing
@@ -621,6 +684,7 @@ class DGLHeteroGraph(object):
             self._edge_frames[etid].add_rows(len(u))
         else:
             self._edge_frames[etid].append(data)
+        self._reset_cached_info()
 
     def remove_edges(self, eids, etype=None):
         r"""Remove multiple edges with the specified edge type
@@ -686,6 +750,9 @@ class DGLHeteroGraph(object):
                 raise DGLError('Edge type name must be specified if there are more than one ' \
                                'edge types.')
         eids = utils.prepare_tensor(self, eids, 'u')
+        if len(eids) == 0:
+            # no edge to delete
+            return
         assert self.number_of_edges(etype) > F.as_scalar(F.max(eids, dim=0)), \
             'The input eid {} is out of the range [0:{})'.format(
                 F.as_scalar(F.max(eids, dim=0)), self.number_of_edges(etype))
@@ -776,6 +843,9 @@ class DGLHeteroGraph(object):
                                'node types.')
 
         nids = utils.prepare_tensor(self, nids, 'u')
+        if len(nids) == 0:
+            # no node to delete
+            return
         assert self.number_of_nodes(ntype) > F.as_scalar(F.max(nids, dim=0)), \
             'The input nids {} is out of the range [0:{})'.format(
                 F.as_scalar(F.max(nids, dim=0)), self.number_of_nodes(ntype))
@@ -794,6 +864,14 @@ class DGLHeteroGraph(object):
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
+
+    def _reset_cached_info(self):
+        """Some info like batch_num_nodes may be stale after mutation
+        Clean these cached info
+        """
+        self._batch_num_nodes = None
+        self._batch_num_edges = None
+
 
     #################################################################
     # Metagraph query
@@ -1092,6 +1170,58 @@ class DGLHeteroGraph(object):
         if etid is None:
             raise DGLError('Edge type "{}" does not exist.'.format(etype))
         return etid
+
+    #################################################################
+    # Batching
+    #################################################################
+    @property
+    def batch_size(self):
+        """TBD"""
+        return len(self.batch_num_nodes(self.ntypes[0]))
+
+    def batch_num_nodes(self, ntype=None):
+        """TBD"""
+        if self._batch_num_nodes is None:
+            self._batch_num_nodes = {}
+            for ty in self.ntypes:
+                bnn = F.copy_to(F.tensor([self.number_of_nodes(ty)], F.int64), self.device)
+                self._batch_num_nodes[ty] = bnn
+        if ntype is None:
+            if len(self.ntypes) != 1:
+                raise DGLError('Node type name must be specified if there are more than one '
+                               'node types.')
+            ntype = self.ntypes[0]
+        return self._batch_num_nodes[ntype]
+
+    def set_batch_num_nodes(self, val):
+        """TBD"""
+        if not isinstance(val, Mapping):
+            if len(self.ntypes) != 1:
+                raise DGLError('Must provide a dictionary when there are multiple node types.')
+            val = {self.ntypes[0] : val}
+        self._batch_num_nodes = val
+
+    def batch_num_edges(self, etype=None):
+        """TBD"""
+        if self._batch_num_edges is None:
+            self._batch_num_edges = {}
+            for ty in self.canonical_etypes:
+                bne = F.copy_to(F.tensor([self.number_of_edges(ty)], F.int64), self.device)
+                self._batch_num_edges[ty] = bne
+        if etype is None:
+            if len(self.etypes) != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+            etype = self.canonical_etypes[0]
+        return self._batch_num_edges[etype]
+
+    def set_batch_num_edges(self, val):
+        """TBD"""
+        if not isinstance(val, Mapping):
+            if len(self.etypes) != 1:
+                raise DGLError('Must provide a dictionary when there are multiple edge types.')
+            val = {self.canonical_etypes[0] : val}
+        self._batch_num_edges = val
 
     #################################################################
     # View
@@ -1541,7 +1671,7 @@ class DGLHeteroGraph(object):
             new_etypes = [etype]
             new_eframes = [self._edge_frames[etid]]
 
-            return DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            return self.__class__(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
         else:
             flat = self._graph.flatten_relations(etypes)
             new_g = flat.graph
@@ -1563,7 +1693,7 @@ class DGLHeteroGraph(object):
             new_eframes = [combine_frames(self._edge_frames, etids)]
 
             # create new heterograph
-            new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            new_hg = self.__class__(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
 
             src = new_ntypes[0]
             dst = new_ntypes[1] if new_g.number_of_ntypes() == 2 else src
@@ -1689,6 +1819,13 @@ class DGLHeteroGraph(object):
         """
         return self._graph.number_of_edges(self.get_etype_id(etype))
 
+    def __len__(self):
+        """Deprecated: please directly call :func:`number_of_nodes`
+        """
+        dgl_warning('DGLGraph.__len__ is deprecated.'
+                    'Please directly call DGLGraph.number_of_nodes.')
+        return self.number_of_nodes()
+
     @property
     def is_multigraph(self):
         """Whether the graph is a multigraph
@@ -1702,14 +1839,17 @@ class DGLHeteroGraph(object):
 
     @property
     def is_readonly(self):
-        """Whether the graph is readonly
+        """Deprecated: DGLGraph will always be mutable.
 
         Returns
         -------
         bool
             True if the graph is readonly, False otherwise.
         """
-        return self._graph.is_readonly()
+        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
+                    'DGLGraph now always supports mutable operations like add_nodes'
+                    ' and add_edges.')
+        return False
 
     @property
     def idtype(self):
@@ -1737,6 +1877,13 @@ class DGLHeteroGraph(object):
             th.int32/th.int64 or tf.int32/tf.int64 etc.
         """
         return self._graph.dtype
+
+    def __contains__(self, vid):
+        """Deprecated: please directly call :func:`has_nodes`.
+        """
+        dgl_warning('DGLGraph.__contains__ is deprecated.'
+                    ' Please directly call has_nodes.')
+        return self.has_nodes(vid)
 
     def has_nodes(self, vid, ntype=None):
         """Whether the graph has a node with a particular id and type.
@@ -2244,7 +2391,7 @@ class DGLHeteroGraph(object):
         dsttype = self.to_canonical_etype(etype)[2]
         etid = self.get_etype_id(etype)
         if is_all(v):
-            v = self.nodes(dsttype)
+            v = self.dstnodes(dsttype)
         deg = self._graph.in_degrees(etid, utils.prepare_tensor(self, v, 'v'))
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
@@ -2301,7 +2448,7 @@ class DGLHeteroGraph(object):
         srctype = self.to_canonical_etype(etype)[0]
         etid = self.get_etype_id(etype)
         if is_all(u):
-            u = self.nodes(srctype)
+            u = self.srcnodes(srctype)
         deg = self._graph.out_degrees(etid, utils.prepare_tensor(self, u, 'u'))
         if isinstance(u, numbers.Integral):
             return F.as_scalar(deg)
@@ -2310,9 +2457,16 @@ class DGLHeteroGraph(object):
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph."""
-        # TODO(minjie): should create a utility function for feature inheritence here.
-        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes)
-        hsg.is_subgraph = True
+        node_frames = []
+        for i, ind_nodes in enumerate(induced_nodes):
+            subframe = self._node_frames[i][utils.toindex(ind_nodes, self._idtype_str)]
+            node_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_nodes))))
+        edge_frames = []
+        for i, ind_edges in enumerate(induced_edges):
+            subframe = self._edge_frames[i][utils.toindex(ind_edges, self._idtype_str)]
+            edge_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_edges))))
+
+        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
         for ntype, induced_nid in zip(self.ntypes, induced_nodes):
             ndata = hsg.nodes[ntype].data
             orig_ndata = self.nodes[ntype].data
@@ -2413,6 +2567,8 @@ class DGLHeteroGraph(object):
         --------
         edge_subgraph
         """
+        if self.is_block:
+            raise DGLError('Extracting subgraph from a block graph is not allowed.')
         if not isinstance(nodes, Mapping):
             assert len(self.ntypes) == 1, \
                 'need a dict of node type and IDs for graph with multiple node types'
@@ -2522,6 +2678,8 @@ class DGLHeteroGraph(object):
         --------
         subgraph
         """
+        if self.is_block:
+            raise DGLError('Extracting subgraph from a block graph is not allowed.')
         if not isinstance(edges, Mapping):
             assert len(self.canonical_etypes) == 1, \
                 'need a dict of edge type and IDs for graph with multiple edge types'
@@ -2752,7 +2910,7 @@ class DGLHeteroGraph(object):
         if transpose is None:
             dgl_warning(
                 "Currently adjacency_matrix() returns a matrix with destination as rows"
-                " by default.  In 0.5 the result will have source as rows"
+                " by default.\n\tIn 0.5 the result will have source as rows"
                 " (i.e. transpose=True)")
             transpose = False
 
@@ -2764,6 +2922,15 @@ class DGLHeteroGraph(object):
 
     # Alias of ``adjacency_matrix``
     adj = adjacency_matrix
+
+    def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
+        """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
+        """
+        dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
+                    'Please replace it with:\n\n\t'
+                    'DGLGraph.adjacency_matrix(transpose, scipy_fmt="{}").\n'.format(fmt))
+
+        return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
 
     def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
@@ -3004,8 +3171,9 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
             if F.context(val) != self.device:
-                raise DGLError('Expect node feature to be on device {}.'
-                               ' But got {}.'.format(self.device, F.context(val)))
+                raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
+                               ' device {}. Call DGLGraph.to() to copy the graph to the'
+                               ' same device.'.format(key, F.context(val), self.device))
 
         if is_all(u):
             for key, val in data.items():
@@ -3109,8 +3277,9 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect number of features to match number of edges.'
                                ' Got %d and %d instead.' % (nfeats, num_edges))
             if F.context(val) != self.device:
-                raise DGLError('Expect edge feature to be on device {}.'
-                               ' But got {}.'.format(self.device, F.context(val)))
+                raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
+                               ' device {}. Call DGLGraph.to() to copy the graph to the'
+                               ' same device.'.format(key, F.context(val), self.device))
 
         # set
         if is_all(eid):
@@ -3173,8 +3342,63 @@ class DGLHeteroGraph(object):
         self._edge_frames[etid].pop(key)
 
     #################################################################
+    # DEPRECATED: from the old DGLGraph
+    #################################################################
+
+    def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
+        """DEPRECATED: please use
+
+            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``
+
+        which will return a new graph created from the networkx graph.
+        """
+        raise DGLError('DGLGraph.from_networkx is deprecated. Please call the following\n\n'
+                       '\t dgl.from_networkx(nx_graph, node_attrs, edge_attrs)\n\n'
+                       ', which creates a new DGLGraph from the networkx graph.')
+
+    def from_scipy_sparse_matrix(self, spmat, multigraph=None):
+        """DEPRECATED: please use
+
+            ``dgl.from_scipy(spmat)``
+
+        which will return a new graph created from the scipy matrix.
+        """
+        raise DGLError('DGLGraph.from_scipy_sparse_matrix is deprecated. '
+                       'Please call the following\n\n'
+                       '\t dgl.from_scipy(spmat)\n\n'
+                       ', which creates a new DGLGraph from the scipy matrix.')
+
+    #################################################################
     # Message passing
     #################################################################
+
+    def register_apply_node_func(self, func):
+        """Deprecated: please directly call :func:`apply_nodes` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_apply_node_func is deprecated.'
+                       ' Please directly call apply_nodes with func as the argument.')
+
+    def register_apply_edge_func(self, func):
+        """Deprecated: please directly call :func:`apply_edges` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_apply_edge_func is deprecated.'
+                       ' Please directly call apply_edges with func as the argument.')
+
+    def register_message_func(self, func):
+        """Deprecated: please directly call :func:`update_all` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_message_func is deprecated.'
+                       ' Please directly call update_all with func as the argument.')
+
+    def register_reduce_func(self, func):
+        """Deprecated: please directly call :func:`update_all` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_reduce_func is deprecated.'
+                       ' Please directly call update_all with func as the argument.')
 
     def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
         """Apply the function on the nodes with the same type to update their
@@ -4113,65 +4337,6 @@ class DGLHeteroGraph(object):
     # Misc
     #################################################################
 
-    def to_networkx(self, node_attrs=None, edge_attrs=None):
-        """Convert this graph to networkx graph.
-
-        The edge id will be saved as the 'id' edge attribute.
-
-        Parameters
-        ----------
-        node_attrs : iterable of str, optional
-            The node attributes to be copied.
-        edge_attrs : iterable of str, optional
-            The edge attributes to be copied.
-
-        Returns
-        -------
-        networkx.DiGraph
-            The nx graph
-
-        Examples
-        --------
-
-        .. note:: Here we use pytorch syntax for demo. The general idea applies
-            to other frameworks with minor syntax change (e.g. replace
-            ``torch.tensor`` with ``mxnet.ndarray``).
-
-        >>> import torch as th
-        >>> g = DGLGraph()
-        >>> g.add_nodes(5, {'n1': th.randn(5, 10)})
-        >>> g.add_edges([0,1,3,4], [2,4,0,3], {'e1': th.randn(4, 6)})
-        >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
-
-        See Also
-        --------
-        dgl.to_networkx
-        """
-        if self.device != F.cpu():
-            raise DGLError('Cannot convert a CUDA graph to networkx. Call g.cpu() first.')
-        # TODO(minjie): multi-type support
-        assert len(self.ntypes) == 1
-        assert len(self.etypes) == 1
-        src, dst = self.edges()
-        src = F.asnumpy(src)
-        dst = F.asnumpy(dst)
-        # xiangsx: Always treat graph as multigraph
-        nx_graph = nx.MultiDiGraph()
-        nx_graph.add_nodes_from(range(self.number_of_nodes()))
-        for eid, (u, v) in enumerate(zip(src, dst)):
-            nx_graph.add_edge(u, v, id=eid)
-
-        if node_attrs is not None:
-            for nid, attr in nx_graph.nodes(data=True):
-                feat_dict = self._get_n_repr(0, nid)
-                attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
-        if edge_attrs is not None:
-            for _, _, attr in nx_graph.edges(data=True):
-                eid = attr['id']
-                feat_dict = self._get_e_repr(0, eid)
-                attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
-        return nx_graph
-
     def filter_nodes(self, predicate, nodes=ALL, ntype=None):
         """Return a tensor of node IDs with the given node type that satisfy
         the given predicate.
@@ -4262,6 +4427,12 @@ class DGLHeteroGraph(object):
                     e = utils.prepare_tensor(self, edges, 'edges')
                 return F.boolean_mask(e, mask[e])
 
+    def readonly(self, readonly_state=True):
+        """Deprecated: DGLGraph will always be mutable."""
+        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
+                    'DGLGraph now always supports mutable operations like add_nodes'
+                    ' and add_edges.')
+
     @property
     def device(self):
         """Get the device context of this graph.
@@ -4315,23 +4486,38 @@ class DGLHeteroGraph(object):
         if device is None or self.device == device:
             return self
 
-        if utils.to_dgl_context(device).device_type == 2 and self.idtype == F.int64:
-            # device_type 2 is an internal code for GPU
-            dgl_warning('Creating an int64 graph on GPU is not recommended. Please call'
-                        ' int() to convert to int32 first.')
+        ret = copy.copy(self)
 
+        # 1. Copy graph structure
+        ret._graph = self._graph.copy_to(utils.to_dgl_context(device))
+
+        # 2. Copy features
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
-            new_feats = {k : F.copy_to(feat, device) for k, feat in nframe.items()}
+            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in nframe.items()}
             new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
+        ret._node_frames = new_nframes
+
         new_eframes = []
         for eframe in self._edge_frames:
-            new_feats = {k : F.copy_to(feat, device) for k, feat in eframe.items()}
+            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in eframe.items()}
             new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
-        new_gidx = self._graph.copy_to(utils.to_dgl_context(device))
-        return DGLHeteroGraph(new_gidx, self.ntypes, self.etypes,
-                              new_nframes, new_eframes)
+        ret._edge_frames = new_eframes
+
+        # 2. Copy misc info
+        if self._batch_num_nodes is not None:
+            new_bnn = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_nodes.items()}
+            ret._batch_num_nodes = new_bnn
+        if self._batch_num_edges is not None:
+            new_bne = {k : F.copy_to(num, device, **kwargs)
+                       for k, num in self._batch_num_edges.items()}
+            ret._batch_num_edges = new_bne
+
+        ret = utils.to_int32_graph_if_on_gpu(ret)
+
+        return ret
 
     def cpu(self):
         """Return a new copy of this graph on CPU.
@@ -4355,6 +4541,11 @@ class DGLHeteroGraph(object):
         DGLHeteroGraph
             The graph object that is a clone of current graph.
         """
+        # XXX(minjie): Do a shallow copy first to clone some internal metagraph information.
+        #   Not a beautiful solution though.
+        ret = copy.copy(self)
+
+        # Clone the graph structure
         meta_edges = []
         for s_ntype, _, d_ntype in self.canonical_etypes:
             meta_edges.append((self.get_ntype_id(s_ntype), self.get_ntype_id(d_ntype)))
@@ -4364,14 +4555,14 @@ class DGLHeteroGraph(object):
         num_nodes_per_type = [self.number_of_nodes(c_ntype) for c_ntype in self.ntypes]
         relation_graphs = [self._graph.get_relation_graph(self.get_etype_id(c_etype))
                            for c_etype in self.canonical_etypes]
-        hgidx = heterograph_index.create_heterograph_from_relations(
+        ret._graph = heterograph_index.create_heterograph_from_relations(
             metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
 
-        local_node_frames = [fr.clone() for fr in self._node_frames]
-        local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        return DGLHeteroGraph(hgidx, self.ntypes, self.etypes,
-                              local_node_frames, local_edge_frames)
+        # Clone the frames
+        ret._node_frames = [fr.clone() for fr in self._node_frames]
+        ret._edge_frames = [fr.clone() for fr in self._edge_frames]
 
+        return ret
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.
@@ -4431,10 +4622,10 @@ class DGLHeteroGraph(object):
         --------
         local_var
         """
-        local_node_frames = [fr.clone() for fr in self._node_frames]
-        local_edge_frames = [fr.clone() for fr in self._edge_frames]
-        return DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
-                              local_node_frames, local_edge_frames)
+        ret = copy.copy(self)
+        ret._node_frames = [fr.clone() for fr in self._node_frames]
+        ret._edge_frames = [fr.clone() for fr in self._edge_frames]
+        return ret
 
     @contextmanager
     def local_scope(self):
@@ -4489,211 +4680,127 @@ class DGLHeteroGraph(object):
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
 
-    def is_homograph(self):
+    def is_homogeneous(self):
         """Return if the graph is homogeneous."""
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
-    def format_in_use(self, etype=None):
-        """Return the sparse formats in use of the given edge/relation type.
+    def formats(self, formats=None):
+        r"""Get a cloned graph with the specified sparse format(s) or query
+        for the usage status of sparse formats
+
+        The API copies both the graph structure and the features.
+
+        If the input graph has multiple edge types, they will have the same
+        sparse format.
 
         Parameters
         ----------
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+        formats : str or list of str or None
+
+            * If formats is None, return the usage status of sparse formats
+            * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of
+            them, specifying the sparse formats to use.
 
         Returns
         -------
-        list of str
-            Return all the formats currently in use (could be multiple).
+        dict or DGLGraph
+
+            * If formats is None, the result will be a dict recording the usage
+              status of sparse formats.
+            * Otherwise, a DGLGraph will be returned, which is a clone of the
+              original graph with the specified sparse format(s) ``formats``.
 
         Examples
         --------
-        For graph with only one edge type.
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows', restrict_format='csr')
-        >>> g.format_in_use()
-        ['csr']
+        The following example uses PyTorch backend.
 
-        For a graph with multiple types.
+        >>> import dgl
+        >>> import torch
+
+        **Homographs or Heterographs with A Single Edge Type**
+
+        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g.ndata['h'] = torch.ones(4, 1)
+        >>> # Check status of format usage
+        >>> g.formats()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> # Get a clone of the graph with 'csr' format
+        >>> csr_g = g.formats('csr')
+        >>> # Only allowed formats will be displayed in the status query
+        >>> csr_g.formats()
+        {'created': ['csr'], 'not created': []}
+        >>> # Features are copied as well
+        >>> csr_g.ndata['h']
+        tensor([[1.],
+                [1.],
+                [1.],
+                [1.]])
+
+        **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.format_in_use('develops')
-        ['coo']
-        >>> spmat = g['develops'].adjacency_matrix(
-        ...     transpose=True, scipy_fmt='csr')    // Create CSR representation.
-        >>> g.format_in_use('develops')
-        ['coo', 'csr']
-
-        which is equivalent to:
-
-        >>> g['develops'].restrict_format()
-        ['coo', 'csr']
-
-        See Also
-        --------
-        restrict_format
-        request_format
-        to_format
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.formats()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> # Get a clone of the graph with 'csr' format
+        >>> csr_g = g.formats('csr')
+        >>> # Only allowed formats will be displayed in the status query
+        >>> csr_g.formats()
+        {'created': ['csr'], 'not created': []}
         """
-        return self._graph.format_in_use(self.get_etype_id(etype))
+        if formats is None:
+            # Return the format information
+            return self._graph.formats()
+        else:
+            # Convert the graph to use another format
+            ret = copy.copy(self)
+            ret._graph = self._graph.formats(formats)
+            return ret
 
-    def restrict_format(self, etype=None):
-        """Return the allowed sparse formats of the given edge/relation type.
+    def create_format_(self):
+        r"""Create all sparse matrices allowed for the graph.
 
-        Parameters
-        ----------
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-
-        Returns
-        -------
-        str : ``'any'``, ``'coo'``, ``'csr'``, or ``'csc'``
-            ``'any'`` indicates all sparse formats are allowed in .
+        By default, we create sparse matrices for a graph only when necessary.
+        In some cases we may want to create them immediately (e.g. in a
+        multi-process data loader), which can be achieved via this API.
 
         Examples
         --------
-        For graph with only one edge type.
 
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
-        >>> g.restrict_format()
-        'csr'
+        The following example uses PyTorch backend.
 
-        For a graph with multiple types.
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.restrict_format('develops')
-        'any'
+        **Homographs or Heterographs with A Single Edge Type**
 
-        which is equivalent to:
+        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> g.create_format_()
+        >>> g.format()
+        {'created': ['coo', 'csr', 'csc'], 'not created': []}
 
-        >>> g['develops'].restrict_format()
-        'any'
-
-        See Also
-        --------
-        format_in_use
-        request_format
-        to_format
-        """
-        return self._graph.restrict_format(self.get_etype_id(etype))
-
-    def request_format(self, sparse_format, etype=None):
-        """Create a sparse matrix representation in given format immediately.
-
-        When the restrict format of the given edge type is ``any``, all formats of
-        sparse matrix representation are created in demand. In some cases user may
-        want a sparse matrix representation to be created immediately (e.g. in a
-        multi-process data loader), this API is designed for such purpose.
-
-        Parameters
-        ----------
-        sparse_format : str
-            ``'coo'``, ``'csr'``, or ``'csc'``
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-        Examples
-        --------
-        For graph with only one edge type.
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='any')
-        >>> g.format_in_use()
-        ['coo']
-        >>> g.request_format('csr')
-        >>> g.format_in_use()
-        ['coo', 'csr']
-
-        For a graph with multiple types.
+        **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='any')
-        >>> g.format_in_use('develops')
-        ['coo']
-        >>> g.request_format('csc', etype='develops')
-        >>> g.format_in_use('develops')
-        ['coo', 'csc']
-
-        Another way to request format for a given etype is:
-        >>> g['plays'].request_format('csr')
-        >>> g['plays'].format_in_use()
-        ['coo', 'csr']
-
-        See Also
-        --------
-        format_in_use
-        restrict_format
-        to_format
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.format()
+        {'created': ['coo'], 'not created': ['csr', 'csc']}
+        >>> g.create_format_()
+        >>> g.format()
+        {'created': ['coo', 'csr', 'csc'], 'not created': []}
         """
-        if self.restrict_format(etype) != 'any':
-            raise KeyError("request_format is only available for "
-                           "graph whose restrict_format is 'any'")
-        if not sparse_format in ['coo', 'csr', 'csc']:
-            raise KeyError("can only request coo/csr/csr.")
-        return self._graph.request_format(sparse_format, self.get_etype_id(etype))
-
-
-    def to_format(self, restrict_format):
-        """Return a cloned graph but stored in the given restrict format.
-
-        If ``'any'`` is given, the restrict formats of the returned graph is relaxed.
-        The returned graph share the same node/edge data of the original graph.
-
-        Parameters
-        ----------
-        restrict_format : str
-            Desired restrict format (``'any'``, ``'coo'``, ``'csr'``, ``'csc'``).
-
-        Returns
-        -------
-        A new graph.
-
-        Examples
-        --------
-        For a graph with single edge type:
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', restrict_format='csr')
-        >>> g.ndata['h'] = th.ones(3, 3)
-        >>> g.restrict_format()
-        'csr'
-        >>> g1 = g.to_format('coo')
-        >>> g1.ndata
-        {'h': tensor([[1., 1., 1.],
-                [1., 1., 1.],
-                [1., 1., 1.]])}
-        >>> g1.restrict_format()
-        'coo'
-
-        For a graph with multiple edge types:
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-        ...     }, restrict_format='coo')
-        >>> g.restrict_format('develops')
-        'coo'
-        >>> g1 = g.to_format('any')
-        >>> g1.restrict_format('plays')
-        'any'
-
-        See Also
-        --------
-        format_in_use
-        restrict_format
-        request_format
-        """
-        return DGLHeteroGraph(self._graph.to_format(restrict_format), self.ntypes, self.etypes,
-                              self._node_frames,
-                              self._edge_frames)
+        return self._graph.create_format_()
 
     def astype(self, idtype):
         """Cast this graph to use another ID type.
@@ -4710,14 +4817,16 @@ class DGLHeteroGraph(object):
         DGLHeteroGraph
             Graph in the new ID type.
         """
+        if idtype is None:
+            return self
         if not idtype in (F.int32, F.int64):
             raise DGLError("ID type must be int32 or int64, but got {}.".format(idtype))
         if self.idtype == idtype:
             return self
         bits = 32 if idtype == F.int32 else 64
-        return DGLHeteroGraph(self._graph.asbits(bits), self.ntypes, self.etypes,
-                              self._node_frames,
-                              self._edge_frames)
+        ret = copy.copy(self)
+        ret._graph = self._graph.asbits(bits)
+        return ret
 
     def long(self):
         """Cast this graph to use int64 IDs.
@@ -5117,5 +5226,35 @@ def check_idtype_dict(graph_dtype, tensor_dict):
     """check whether the dtypes of tensors in dict are consistent with graph's dtype"""
     for _, v in tensor_dict.items():
         check_same_dtype(graph_dtype, v)
+
+class DGLBlock(DGLHeteroGraph):
+    """Subclass that signifies the graph is a block created from
+    :func:`dgl.to_block`.
+    """
+    # (BarclayII) I'm making a subclass because I don't want to make another version of
+    # serialization that contains the is_block flag.
+    is_block = True
+
+    def __repr__(self):
+        if len(self.srctypes) == 1 and len(self.dsttypes) == 1 and len(self.etypes) == 1:
+            ret = 'Block(num_src_nodes={srcnode}, num_dst_nodes={dstnode}, num_edges={edge})'
+            return ret.format(
+                srcnode=self.number_of_src_nodes(),
+                dstnode=self.number_of_dst_nodes(),
+                edge=self.number_of_edges())
+        else:
+            ret = ('Block(num_src_nodes={srcnode},\n'
+                   '      num_dst_nodes={dstnode},\n'
+                   '      num_edges={edge},\n'
+                   '      metagraph={meta})')
+            nsrcnode_dict = {ntype : self.number_of_src_nodes(ntype)
+                             for ntype in self.srctypes}
+            ndstnode_dict = {ntype : self.number_of_dst_nodes(ntype)
+                             for ntype in self.dsttypes}
+            nedge_dict = {etype : self.number_of_edges(etype)
+                          for etype in self.canonical_etypes}
+            meta = str(self.metagraph.edges(keys=True))
+            return ret.format(
+                srcnode=nsrcnode_dict, dstnode=ndstnode_dict, edge=nedge_dict, meta=meta)
 
 _init_api("dgl.heterograph")

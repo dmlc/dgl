@@ -72,7 +72,7 @@ def test_graph_conv():
     # assert not F.allclose(old_weight, new_weight)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo', 'block'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
@@ -377,13 +377,14 @@ def test_sage_conv(idtype, g, aggre_type):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
 def test_sage_conv(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv(5, 10, aggre_type)
     dst_dim = 5 if aggre_type != 'gcn' else 10
     sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
+    assert False
     feat = (F.randn((g.number_of_src_nodes(), 10)), F.randn((g.number_of_dst_nodes(), dst_dim)))
     h = sage(g, feat)
     assert h.shape[-1] == 2
@@ -455,6 +456,17 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     h = gin(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 12)
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].numpy())
+    block = dgl.to_block(g, seed_nodes)
+    gin = nn.GINConv(
+        tf.keras.layers.Dense(12),
+        aggregator_type
+    )
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    h = gin(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 12)
 
 def myagg(alist, dsttype):
     rst = alist[0]

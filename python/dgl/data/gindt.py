@@ -14,7 +14,8 @@ from .. import backend as F
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from ..convert import graph
+from .. import backend as F
 
 _url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
 
@@ -23,10 +24,10 @@ class GINDataset(object):
     """Datasets for Graph Isomorphism Network (GIN)
     Adapted from https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip.
 
-    The dataset contains the compact format of popular graph kernel datasets, which includes: 
+    The dataset contains the compact format of popular graph kernel datasets, which includes:
     MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
 
-    This datset class processes all data sets listed above. For more graph kernel datasets, 
+    This datset class processes all data sets listed above. For more graph kernel datasets,
     see :class:`TUDataset`
 
     Paramters
@@ -144,7 +145,7 @@ class GINDataset(object):
 
                 self.labels.append(self.glabel_dict[glabel])
 
-                g = DGLGraph()
+                g = graph([])
                 g.add_nodes(n_nodes)
 
                 nlabels = []  # node labels
@@ -178,30 +179,30 @@ class GINDataset(object):
                     m_edges += nrow[1]
                     g.add_edges(j, nrow[2:])
 
-                    # add self loop
-                    if self.self_loop:
-                        m_edges += 1
-                        g.add_edge(j, j)
-
                     if (j + 1) % 10 == 0 and self.verbosity is True:
                         print(
                             'processing node {} of graph {}...'.format(
                                 j + 1, i + 1))
                         print('this node has {} edgs.'.format(
                             nrow[1]))
+                
+                # Add self loops
+                if self.self_loop:
+                    m_edges += n_nodes
+                    g.add_edges(F.arange(0, n_nodes), F.arange(0, n_nodes))
 
                 if nattrs != []:
                     nattrs = np.stack(nattrs)
-                    g.ndata['attr'] = nattrs
+                    g.ndata['attr'] = F.tensor(nattrs)
                     self.nattrs_flag = True
                 else:
                     nattrs = None
 
-                g.ndata['label'] = np.asarray(nlabels)
+                g.ndata['label'] = F.tensor(np.asarray(nlabels))
                 if len(self.nlabel_dict) > 1:
                     self.nlabels_flag = True
 
-                assert len(g) == n_nodes
+                assert g.number_of_nodes() == n_nodes
 
                 # update statistics of graphs
                 self.n += n_nodes
@@ -238,8 +239,8 @@ class GINDataset(object):
                 label2idx = self.nlabel_dict
 
             for g in self.graphs:
-                g.ndata['attr'] = np.zeros((
-                    g.number_of_nodes(), len(label2idx)))
+                g.ndata['attr'] = F.tensor(np.zeros((
+                    g.number_of_nodes(), len(label2idx))))
                 g.ndata['attr'][range(g.number_of_nodes()), [label2idx[F.as_scalar(nl)] for nl in g.ndata['label']]] = 1
 
         # after load, get the #classes and #dim

@@ -218,8 +218,8 @@ def test_load_old_files2():
 
 def create_heterographs(idtype):
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', idtype=idtype, restrict_format='any')
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype, restrict_format='csr')
+                    'follows', idtype=idtype)
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
     g_x.nodes['user'].data['h'] = F.randn((4, 3))
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
     g_y.nodes['user'].data['hh'] = F.ones((4, 5))
@@ -229,8 +229,8 @@ def create_heterographs(idtype):
 
 def create_heterographs2(idtype):
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', idtype=idtype, restrict_format='any')
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype, restrict_format='csr')
+                    'follows', idtype=idtype)
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
     g_z = dgl.bipartite(([0, 1, 3], [2, 3, 4]), 'user', 'knows', 'knowledge', idtype=idtype)
     g_x.nodes['user'].data['h'] = F.randn((4, 3))
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
@@ -276,8 +276,9 @@ def test_serialize_heterograph():
     for i in range(len(g_list0)):
         for j, etypes in enumerate(g_list0[i].canonical_etypes):
             assert g_list[i].canonical_etypes[j] == etypes
-    assert g_list[1].restrict_format() == 'any'
-    assert g_list[2].restrict_format() == 'csr'
+    #assert g_list[1].restrict_format() == 'any'
+    #assert g_list[2].restrict_format() == 'csr'
+
     assert g_list[4].idtype == F.int32
     assert np.allclose(
         F.asnumpy(g_list[2].nodes['user'].data['hh']), np.ones((4, 5)))
@@ -305,7 +306,7 @@ def test_serialize_heterograph_s3():
 
     g_list = load_graphs(path, [0, 2, 5])
     assert g_list[0].idtype == F.int64
-    assert g_list[1].restrict_format() == 'csr'
+    #assert g_list[1].restrict_format() == 'csr'
     assert np.allclose(
         F.asnumpy(g_list[1].nodes['user'].data['hh']), np.ones((4, 5)))
     assert np.allclose(

@@ -112,8 +112,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
         subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=['_N'], etypes=['_E'])
-        subg1.ndata[NID] = induced_nodes[0].tousertensor()
-        subg1.edata[EID] = induced_edges[0].tousertensor()
+        subg1.ndata[NID] = induced_nodes[0]
+        subg1.edata[EID] = induced_edges[0]
         return subg1
 
     for i, subg in enumerate(subgs):
@@ -202,7 +202,14 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
 
     # When balancing edges in partitions, we use in-degree as one of the weights.
     if balance_edges:
-        vwgt.append(F.astype(g.in_degrees(), F.int64))
+        if balance_ntypes is None:
+            vwgt.append(F.astype(g.in_degrees(), F.int64))
+        else:
+            for ntype in uniq_ntypes:
+                nids = F.asnumpy(F.nonzero_1d(balance_ntypes == ntype))
+                degs = np.zeros((g.number_of_nodes(),), np.int64)
+                degs[nids] = F.asnumpy(g.in_degrees(nids))
+                vwgt.append(F.zerocopy_from_numpy(degs))
 
     # The vertex weights have to be stored in a vector.
     if len(vwgt) > 0:

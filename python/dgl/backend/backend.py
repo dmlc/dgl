@@ -616,6 +616,11 @@ def split(input, sizes_or_sections, dim):
     Parameters
     ----------
     input : Tensor
+        Tensor to split.
+    sizes_or_sections : int, list[int]
+        Split sizes or sections.
+    dim : int
+        The dimension to split on.
 
     Returns
     -------
@@ -631,7 +636,7 @@ def repeat(input, repeats, dim):
     ----------
     input : Tensor
         Input data array
-    repeats : int
+    repeats : int, Tensor
         The number of repetitions for each element
     dim : int
         The dim along which to repeat values.

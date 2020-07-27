@@ -79,7 +79,7 @@ def test_graph_conv(idtype):
     check_close(g.ndata['h'], 2 * F.ones((3, 1)))
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'small'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'homo'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [False])
@@ -171,6 +171,16 @@ def test_gat_conv_bi(g, idtype):
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
+    # test#3: block
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].asnumpy())
+    block = dgl.to_block(g, seed_nodes)
+    gat = nn.GATConv(5, 2, 4)
+    gat.initialize(ctx=ctx)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    h = gat(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 4, 2)
+
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo']))
@@ -197,6 +207,16 @@ def test_sage_conv_bi(idtype, g, aggre_type):
     h = sage(g, feat)
     assert h.shape[-1] == 2
     assert h.shape[0] == g.number_of_dst_nodes()
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].asnumpy())
+    block = dgl.to_block(g, seed_nodes)
+    sage = nn.SAGEConv(5, 10, aggre_type)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    sage.initialize(ctx=ctx)
+    h = sage(block, feat)
+    assert h.shape[0] == block.number_of_dst_nodes()
+    assert h.shape[-1] == 10
 
     # Test the case for graphs without edges
     g = dgl.bipartite([], num_nodes=(5, 3))
@@ -265,6 +285,13 @@ def test_agnn_conv_bi(g, idtype):
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     h = agnn_conv(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 5)
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].asnumpy())
+    block = dgl.to_block(g, seed_nodes)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    h = agnn_conv(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 5)
 
 def test_appnp_conv():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
@@ -361,7 +388,7 @@ def test_edge_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
 def test_edge_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -372,6 +399,11 @@ def test_edge_conv_bi(g, idtype):
     h0 = F.randn((g.number_of_src_nodes(), 5))
     x0 = F.randn((g.number_of_dst_nodes(), 5))
     h1 = edge_conv(g, (h0, x0))
+    if not g.is_homograph() and not g.is_block:
+        # bipartite
+        h1 = edge_conv(g, (h0, h0[:10]))
+    else:
+        h1 = edge_conv(g, h0)
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 @parametrize_dtype
@@ -405,6 +437,13 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     h = gin_conv(g, feat)
     return h.shape == (g.number_of_dst_nodes(), 5)
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = np.unique(g.edges()[1].asnumpy())
+    block = dgl.to_block(g, seed_nodes)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    h = gin_conv(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 12)
 
 
 @parametrize_dtype
@@ -447,7 +486,7 @@ def test_nn_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
 def test_nn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()

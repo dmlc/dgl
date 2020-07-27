@@ -8,8 +8,9 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
-from dgl.heterograph_index import joint_union
-from utils import parametrize_dtype
+import test_utils
+from test_utils import parametrize_dtype, get_cases
+from scipy.sparse import rand
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -60,13 +61,12 @@ def create_test_heterograph2(idtype):
     wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
     wishes_nx.add_edge('u0', 'g1', id=0)
     wishes_nx.add_edge('u2', 'g0', id=1)
-    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
 
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): plays_spmat,
         ('user', 'wishes', 'game'): wishes_nx,
-        ('developer', 'develops', 'game'): develops_g,
+        ('developer', 'develops', 'game'): (F.tensor([0, 1]), F.tensor([0, 1])),
         }, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
@@ -82,13 +82,13 @@ def create_test_heterograph3(idtype):
     wishes_nx.add_edge('u2', 'g0', id=1)
 
     follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows',
-            restrict_format='coo', idtype=idtype, device=device)
+            idtype=idtype, device=device).formats('coo')
     plays_g = dgl.bipartite([(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game',
-            restrict_format='coo', idtype=idtype, device=device)
+            idtype=idtype, device=device).formats('coo')
     wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game',
-            restrict_format='coo', idtype=idtype, device=device)
+            idtype=idtype, device=device).formats('coo')
     develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game',
-            restrict_format='coo', idtype=idtype, device=device)
+            idtype=idtype, device=device).formats('coo')
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     assert g.idtype == idtype
     assert g.device == device
@@ -196,6 +196,16 @@ def test_create(idtype):
     _test_validate_bipartite((3, 3))
     _test_validate_bipartite((2, 4))
 
+    # test from_scipy
+    num_nodes = 10
+    density = 0.25
+    for fmt in ['csr', 'coo', 'csc']:
+        adj = rand(num_nodes, num_nodes, density=density, format=fmt)
+        g = dgl.from_scipy(adj, eweight_name='w', idtype=idtype)
+        assert g.idtype == idtype
+        assert g.device == F.cpu()
+        assert F.array_equal(g.edata['w'], F.copy_to(F.tensor(adj.data), F.cpu()))
+
 @parametrize_dtype
 def test_query(idtype):
     g = create_test_heterograph(idtype)
@@ -242,7 +252,6 @@ def test_query(idtype):
                 F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
 
         assert not g.is_multigraph
-        assert g.is_readonly
 
         for etype in etypes:
             srcs, dsts = edges[etype]
@@ -572,7 +581,7 @@ def test_view(idtype):
     g.nodes['user'].data['h'] = f1       # ok
     f2 = g.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.nodes('user')), F.arange(0, 3))
+    assert F.array_equal(g.nodes('user'), F.arange(0, 3, idtype))
     g.nodes['user'].data.pop('h')
 
     # multi type ndata
@@ -605,7 +614,7 @@ def test_view(idtype):
     f5 = g.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
     assert F.array_equal(f3, f5)
-    assert F.array_equal(F.tensor(g.edges(etype='follows', form='eid')), F.arange(0, 2))
+    assert F.array_equal(g.edges(etype='follows', form='eid'), F.arange(0, 2, idtype))
     g.edges['follows'].data.pop('h')
 
     f3 = F.randn((2, 4))
@@ -633,7 +642,7 @@ def test_view(idtype):
     g.srcnodes['user'].data['h'] = f1       # ok
     f2 = g.srcnodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.srcnodes('user')), F.arange(0, 3))
+    assert F.array_equal(g.srcnodes('user'), F.arange(0, 3, idtype))
     g.srcnodes['user'].data.pop('h')
 
     # multi type ndata
@@ -663,7 +672,7 @@ def test_view(idtype):
     g.dstnodes['user'].data['h'] = f1       # ok
     f2 = g.dstnodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.dstnodes('user')), F.arange(0, 3))
+    assert F.array_equal(g.dstnodes('user'), F.arange(0, 3, idtype))
     g.dstnodes['user'].data.pop('h')
 
     # multi type ndata
@@ -809,13 +818,13 @@ def test_view1(idtype):
     g.ndata['h'] = f1       # ok
     f2 = HG.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(F.tensor(g.nodes()), F.arange(0, 3))
+    assert F.array_equal(g.nodes(), F.arange(0, 3, g.idtype))
 
     f3 = F.randn((2, 4))
     g.edata['h'] = f3
     f4 = HG.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
-    assert F.array_equal(F.tensor(g.edges(form='eid')), F.arange(0, 2))
+    assert F.array_equal(g.edges(form='eid'), F.arange(0, 2, g.idtype))
 
     # multiple types
     ndata = HG.ndata['h']
@@ -936,6 +945,8 @@ def test_flatten(idtype):
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @parametrize_dtype
 def test_to_device(idtype):
+    # TODO: rewrite this test case to accept different graphs so we
+    #  can test reverse graph and batched graph
     g = create_test_heterograph(idtype)
     g.nodes['user'].data['h'] = F.ones((3, 5))
     g.nodes['game'].data['i'] = F.ones((2, 5))
@@ -946,19 +957,46 @@ def test_to_device(idtype):
     assert F.context(g.nodes['user'].data['h']) == F.cpu()
     assert F.context(g.nodes['game'].data['i']) == F.cpu()
     assert F.context(g.edges['plays'].data['e']) == F.cpu()
+    for ntype in g.ntypes:
+        assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
+    for etype in g.canonical_etypes:
+        assert F.context(g.batch_num_edges(etype)) == F.cpu()
+
     if F.is_cuda_available():
         g1 = g.to(F.cuda())
         assert g1.device == F.cuda()
         assert F.context(g1.nodes['user'].data['h']) == F.cuda()
         assert F.context(g1.nodes['game'].data['i']) == F.cuda()
         assert F.context(g1.edges['plays'].data['e']) == F.cuda()
+        for ntype in g1.ntypes:
+            assert F.context(g1.batch_num_nodes(ntype)) == F.cuda()
+        for etype in g1.canonical_etypes:
+            assert F.context(g1.batch_num_edges(etype)) == F.cuda()
         assert F.context(g.nodes['user'].data['h']) == F.cpu()
         assert F.context(g.nodes['game'].data['i']) == F.cpu()
         assert F.context(g.edges['plays'].data['e']) == F.cpu()
+        for ntype in g.ntypes:
+            assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
+        for etype in g.canonical_etypes:
+            assert F.context(g.batch_num_edges(etype)) == F.cpu()
         with pytest.raises(DGLError):
             g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
         with pytest.raises(DGLError):
             g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
+
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['block']))
+def test_to_device2(g, idtype):
+    g = g.astype(idtype)
+    g = g.to(F.cpu())
+    assert g.device == F.cpu()
+    if F.is_cuda_available():
+        g1 = g.to(F.cuda())
+        assert g1.device == F.cuda()
+        assert g1.ntypes == g.ntypes
+        assert g1.etypes == g.etypes
+        assert g1.canonical_etypes == g.canonical_etypes
 
 @parametrize_dtype
 def test_convert_bound(idtype):
@@ -1117,15 +1155,15 @@ def test_subgraph_mask(idtype):
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
         assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([1, 2], F.int64))
+                             F.tensor([1, 2], idtype))
         assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                             F.tensor([0], F.int64))
+                             F.tensor([0], idtype))
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], idtype))
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], idtype))
         assert F.array_equal(F.tensor(sg.edges['wishes'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], idtype))
         assert sg.number_of_nodes('developer') == 0
         assert sg.number_of_edges('develops') == 0
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
@@ -1159,15 +1197,15 @@ def test_subgraph(idtype):
         assert sg.etypes == g.etypes
         assert sg.canonical_etypes == g.canonical_etypes
         assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                             F.tensor([1, 2], F.int64))
+                             F.tensor([1, 2], g.idtype))
         assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                             F.tensor([0], F.int64))
+                             F.tensor([0], g.idtype))
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
         assert F.array_equal(F.tensor(sg.edges['wishes'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
         assert sg.number_of_nodes('developer') == 0
         assert sg.number_of_edges('develops') == 0
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
@@ -1211,13 +1249,13 @@ def test_subgraph(idtype):
 
         if not preserve_nodes:
             assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                                 F.tensor([1, 2], F.int64))
+                                 F.tensor([1, 2], g.idtype))
         else:
             for ntype in sg.ntypes:
                 assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
 
         assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
-                             F.tensor([1], F.int64))
+                             F.tensor([1], g.idtype))
 
         if not preserve_nodes:
             assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
@@ -1230,15 +1268,15 @@ def test_subgraph(idtype):
 
         if not preserve_nodes:
             assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
-                                 F.tensor([0, 1], F.int64))
+                                 F.tensor([0, 1], g.idtype))
             assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
-                                 F.tensor([0], F.int64))
+                                 F.tensor([0], g.idtype))
         else:
             for ntype in sg.ntypes:
                 assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
 
         assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
-                             F.tensor([0, 1], F.int64))
+                             F.tensor([0, 1], g.idtype))
 
     sg1_graph = g_graph.subgraph([1, 2])
     _check_subgraph_single_ntype(g_graph, sg1_graph)
@@ -1294,7 +1332,7 @@ def test_subgraph(idtype):
     if F._default_context_str != 'gpu':
         # TODO(minjie): enable this later
         for fmt in ['csr', 'csc', 'coo']:
-            g = dgl.graph([(0, 1), (1, 2)], restrict_format=fmt)
+            g = dgl.graph([(0, 1), (1, 2)]).formats(fmt)
             sg = g.subgraph({g.ntypes[0]: [1, 0]})
             nids = F.asnumpy(sg.ndata[dgl.NID])
             assert np.array_equal(nids, np.array([1, 0]))
@@ -1823,59 +1861,45 @@ def test_dtype_cast(idtype):
     else:
         g_cast = g.int()
         assert g_cast.idtype == F.int32
-    assert "feat" in g_cast.ndata
-    assert "h" in g_cast.edata
-    assert F.array_equal(g.ndata["feat"], g_cast.ndata["feat"])
-    assert F.array_equal(g.edata["h"], g_cast.edata["h"])
+    test_utils.check_graph_equal(g, g_cast, check_idtype=False)
 
 @parametrize_dtype
 def test_format(idtype):
     # single relation
-    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], restrict_format='coo', idtype=idtype, device=F.ctx())
-    assert g.restrict_format() == 'coo'
-    assert g.format_in_use() == ['coo']
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx()).formats('coo')
+    assert g.formats()['created'] == ['coo']
+    assert len(g.formats()['not created']) == 0
     try:
         spmat = g.adjacency_matrix(scipy_fmt="csr")
     except:
-        print('test passed, graph with restrict_format coo should not create csr matrix.')
+        print('test passed, graph with allowed format coo should not create csr matrix.')
     else:
-        assert False, 'cannot create csr when restrict_format is coo'
-    g1 = g.to_format('any')
-    assert g1.restrict_format() == 'any'
-    g1.request_format('coo')
-    g1.request_format('csr')
-    g1.request_format('csc')
-    assert len(g1.format_in_use()) == 3
-    assert g.restrict_format() == 'coo'
-    assert g.format_in_use() == ['coo']
+        assert False, 'cannot create csr when allowed format is coo'
+    g1 = g.formats(['coo', 'csr', 'csc'])
+    assert len(g1.formats()['created']) + len(g1.formats()['not created']) == 3
+    g1.create_format_()
+    assert len(g1.formats()['created']) == 3
+    assert g.formats()['created'] == ['coo']
 
     # multiple relation
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
         ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-        }, restrict_format='csr', idtype=idtype, device=F.ctx())
+        }, idtype=idtype, device=F.ctx()).formats('csr')
     user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
     g['follows'].srcdata['h'] = user_feat
-    for rel_type in ['follows', 'plays', 'develops']:
-        assert g.restrict_format(rel_type) == 'csr'
-        assert g.format_in_use(rel_type) == ['csr']
-        try:
-            g[rel_type].request_format('coo')
-        except:
-            print('test passed, graph with restrict_format csr should not create coo matrix')
-        else:
-            assert False, 'cannot create coo when restrict_format is csr'
+    assert g.formats()['created'] == ['csr']
+    assert len(g.formats()['not created']) == 0
 
-    g1 = g.to_format('csc')
+    g1 = g.formats('csc')
     # test frame
     assert F.array_equal(g1['follows'].srcdata['h'], user_feat)
     # test each relation graph
-    for rel_type in ['follows', 'plays', 'develops']:
-        assert g1.restrict_format(rel_type) == 'csc'
-        assert g1.format_in_use(rel_type) == ['csc']
-        assert g.restrict_format(rel_type) == 'csr'
-        assert g.format_in_use(rel_type) == ['csr']
+    assert g1.formats()['created'] == ['csc']
+    assert len(g1.formats()['not created']) == 0
+    assert g.formats()['created'] == ['csr']
+    assert len(g.formats()['not created']) == 0
 
 @parametrize_dtype
 def test_edges_order(idtype):
@@ -1885,6 +1909,7 @@ def test_edges_order(idtype):
         np.array([2, 2, 1, 1, 1])
     ), idtype=idtype, device=F.ctx())
 
+    print(g.formats())
     src, dst = g.all_edges(order='srcdst')
     assert F.array_equal(src, F.tensor([0, 0, 0, 1, 2], dtype=idtype))
     assert F.array_equal(dst, F.tensor([1, 1, 2, 2, 1], dtype=idtype))
@@ -1905,11 +1930,11 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csr'
-    gidx = gidx.to_format('csr')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csr')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
-    assert gidx.format_in_use(0)[0] == 'csr'
-    assert r_gidx.format_in_use(0)[0] == 'csc'
+    assert 'csr' in gidx.formats()['created']
+    assert 'csc' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
     g_s, g_d, _ = gidx.edges(0)
@@ -1918,11 +1943,11 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csc'
-    gidx = gidx.to_format('csc')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csc')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
-    assert gidx.format_in_use(0)[0] == 'csc'
-    assert r_gidx.format_in_use(0)[0] == 'csr'
+    assert 'csc' in gidx.formats()['created']
+    assert 'csr' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_edges(0) == r_gidx.number_of_edges(0)
     g_s, g_d, _ = gidx.edges(0)
@@ -1965,16 +1990,12 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csr'
-    gidx = gidx.to_format('csr')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csr')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
     # three node types and three edge types
-    assert gidx.format_in_use(0)[0] == 'csr'
-    assert r_gidx.format_in_use(0)[0] == 'csc'
-    assert gidx.format_in_use(1)[0] == 'csr'
-    assert r_gidx.format_in_use(1)[0] == 'csc'
-    assert gidx.format_in_use(2)[0] == 'csr'
-    assert r_gidx.format_in_use(2)[0] == 'csc'
+    assert 'csr' in gidx.formats()['created']
+    assert 'csc' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
     assert gidx.number_of_nodes(2) == r_gidx.number_of_nodes(2)
@@ -1995,16 +2016,12 @@ def test_reverse(idtype):
     assert F.array_equal(g_d, rg_s)
 
     # force to start with 'csc'
-    gidx = gidx.to_format('csc')
-    gidx = gidx.to_format('any')
+    gidx = gidx.formats('csc')
+    gidx = gidx.formats(['coo', 'csr', 'csc'])
     r_gidx = gidx.reverse()
     # three node types and three edge types
-    assert gidx.format_in_use(0)[0] == 'csc'
-    assert r_gidx.format_in_use(0)[0] == 'csr'
-    assert gidx.format_in_use(1)[0] == 'csc'
-    assert r_gidx.format_in_use(1)[0] == 'csr'
-    assert gidx.format_in_use(2)[0] == 'csc'
-    assert r_gidx.format_in_use(2)[0] == 'csr'
+    assert 'csc' in gidx.formats()['created']
+    assert 'csr' in r_gidx.formats()['created']
     assert gidx.number_of_nodes(0) == r_gidx.number_of_nodes(0)
     assert gidx.number_of_nodes(1) == r_gidx.number_of_nodes(1)
     assert gidx.number_of_nodes(2) == r_gidx.number_of_nodes(2)
@@ -2285,6 +2302,7 @@ def test_add_nodes(idtype):
     assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
 
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet has error with (0,) shape tensor.")
 @parametrize_dtype
 def test_remove_edges(idtype):
     # homogeneous Graphs
