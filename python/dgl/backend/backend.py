@@ -1485,6 +1485,11 @@ def is_no_grad(x):
     """
     pass
 
+def is_recording():
+    """ Test if the execution is recording gradients.
+    """
+    pass
+
 class record_grad(object):
     """Context manager that records the gradients"""
     def __init__(self):
