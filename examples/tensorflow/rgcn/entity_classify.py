@@ -49,7 +49,6 @@ def acc(logits, labels, mask):
 
 def main(args):
     # load graph data
-    # load graph data
     if args.dataset == 'aifb':
         dataset = AIFBDataset()
     elif args.dataset == 'mutag':
