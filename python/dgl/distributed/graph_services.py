@@ -219,7 +219,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     g : DistGraph
         The distributed graph.
     nodes : tensor or dict
-        Node ids to sample neighbors from.
+        Node ids to sample neighbors from. If it's a dict, it should contain only
+        one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
     fanout : int
         The number of sampled neighbors for each node.
     edge_dir : str, optional
