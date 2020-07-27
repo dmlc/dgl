@@ -135,8 +135,13 @@ class HeteroGraphConv(nn.Module):
         if mod_kwargs is None:
             mod_kwargs = {}
         outputs = {nty : [] for nty in g.dsttypes}
-        if isinstance(inputs, tuple):
-            src_inputs, dst_inputs = inputs
+        if isinstance(inputs, tuple) or g.is_block:
+            if isinstance(inputs, tuple):
+                src_inputs, dst_inputs = inputs
+            else:
+                src_inputs = inputs
+                dst_inputs = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
+
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
                 if rel_graph.number_of_edges() == 0:
