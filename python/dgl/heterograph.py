@@ -4662,7 +4662,8 @@ class DGLHeteroGraph(object):
         """Return a copy of this graph in shared memory, without node data or edge data.
 
         It moves the graph index to shared memory and returns a DGLHeterograph object which
-        does not contain node data or edge data.
+        has the same graph structure, node types and edge types but does not contain node data
+        or edge data.
 
         Parameters
         ----------
