@@ -612,6 +612,9 @@ def grad(x):
 def is_no_grad(x):
     return (x != 0).sum() == 0
 
+def is_recording():
+    return mx.autograd.is_recording()
+
 record_grad = mx.autograd.record
 
 class no_grad(object):
