@@ -5,28 +5,13 @@ import multiprocessing as mp
 import time
 import os
 
-from . import shutdown_servers, finalize_client
+from . import exit_client
 from ..backend import backend_name
 from .rpc_client import get_sampler_pool
+from .rpc import get_rank
 from .. import backend as F
 
 __all__ = ["DistDataLoader"]
-
-def deregister_torch_ipc():
-    """
-    Deregister pytorch's multiprocessing communication optimization.
-    Currently dgl will meet error without this function
-    """
-    from multiprocessing.reduction import ForkingPickler
-    import torch
-    ForkingPickler._extra_reducers.pop(torch.cuda.Event)
-    for t in torch._storage_classes:
-        ForkingPickler._extra_reducers.pop(t)
-    for t in torch._tensor_classes:
-        ForkingPickler._extra_reducers.pop(t)
-    ForkingPickler._extra_reducers.pop(torch.Tensor)
-    ForkingPickler._extra_reducers.pop(torch.nn.parameter.Parameter)
-
 
 def call_collate_fn(next_data):
     """Call collate function"""
@@ -34,14 +19,20 @@ def call_collate_fn(next_data):
     DGL_GLOBAL_MP_QUEUE.put(result)
     return 1
 
-def init_fn(collate_fn, queue):
+def init_fn(collate_fn, queue, sig_queue):
     """Initialize setting collate function and mp.Queue in the subprocess"""
     global DGL_GLOBAL_COLLATE_FN
     global DGL_GLOBAL_MP_QUEUE
+    global DGL_SIG_QUEUE
+    DGL_SIG_QUEUE = sig_queue
     DGL_GLOBAL_MP_QUEUE = queue
     DGL_GLOBAL_COLLATE_FN = collate_fn
     time.sleep(1)
 
+
+def _exit():
+    exit_client()
+    time.sleep(1)
 
 class DistDataLoader:
     """DGL customized multiprocessing dataloader"""
@@ -76,6 +67,7 @@ class DistDataLoader:
         self.num_workers = num_workers
         self.m = mp.Manager()
         self.queue = self.m.Queue(maxsize=queue_size)
+        self.sig_queue = self.m.Queue(maxsize=num_workers)
         self.drop_last = drop_last
         self.send_idxs = 0
         self.recv_idxs = 0
@@ -83,8 +75,10 @@ class DistDataLoader:
         self.shuffle = shuffle
 
         self.pool, num_sampler_workers = get_sampler_pool()
-        for i in range(num_sampler_workers):
-            self.pool.apply_async(init_fn, args=(collate_fn, self.queue))
+        assert num_sampler_workers == num_workers, "Num workers should be the same"
+        for _ in range(num_sampler_workers):
+            self.pool.apply_async(init_fn, args=(collate_fn, self.queue, self.sig_queue))
+            time.sleep(0.1)
     
         self.dataset = F.tensor(dataset)
         self.expected_idxs = len(dataset) // self.batch_size
@@ -97,7 +91,7 @@ class DistDataLoader:
                 self._request_next_batch()
         self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
-            result = self.queue.get()
+            result = self.queue.get(10)
             self.recv_idxs += 1
             return result
         else:
@@ -135,7 +129,10 @@ class DistDataLoader:
         ret = self.dataset[self.current_pos:end_pos]
         self.current_pos = end_pos
         return ret
+    
+    def close(self):
+        for _ in range(self.num_workers):
+            self.pool.apply_async(_exit)
+            time.sleep(0.1)
+        self.pool.close()
 
-if backend_name == 'pytorch':
-    pass
-    # deregister_torch_ipc()

@@ -68,15 +68,14 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
         num_workers=4) 
     
     dist_graph._init()
+    for epoch in range(3):
+        for idx, blocks in enumerate(dataloader):
+            print(blocks)
+            print(blocks[1].edges())
+            print(idx)
 
-    for idx, block in enumerate(dataloader):
-        print(block)
-        print(idx)
-    
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
-
-
+    dataloader.close()
+    dgl.distributed.exit_client()
 
 def main(tmpdir, num_server):
     ip_config = open("mp_ip_config.txt", "w")

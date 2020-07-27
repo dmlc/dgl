@@ -189,14 +189,15 @@ def finalize_client():
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
-
     Raises
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    req = rpc.ShutDownRequest(rpc.get_rank())
-    for server_id in range(rpc.get_num_server()):
-        rpc.send_request(server_id, req)
+    if rpc.get_rank() == 0: # Only client_0 issue this command
+        print("shshshshshshs")
+        req = rpc.ShutDownRequest(rpc.get_rank())
+        for server_id in range(rpc.get_num_server()):
+            rpc.send_request(server_id, req)
 
 sampler_pool = None
 num_sampler_workers = 0
@@ -209,7 +210,7 @@ def _close():
 def _init_rpc(ip_config, max_queue_size, net_type):
     connect_to_server(ip_config, max_queue_size, net_type)
     import atexit
-    atexit.register(_close)
+    # atexit.register(_close)
 
 def get_sampler_pool():
     return sampler_pool, num_sampler_workers
