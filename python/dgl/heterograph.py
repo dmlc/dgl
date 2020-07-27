@@ -4655,8 +4655,8 @@ class DGLHeteroGraph(object):
     def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory, without node data or edge data.
 
-        It moves the graph index to shared memory and the returned DGLHeterograph object does not
-        contain node data or edge data.
+        It moves the graph index to shared memory and returns a DGLHeterograph object which
+        does not contain node data or edge data.
 
         Parameters
         ----------
