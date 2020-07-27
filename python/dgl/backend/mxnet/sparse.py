@@ -133,12 +133,12 @@ class GSpMM(mx.autograd.Function):
         if op != 'copy_lhs':
             if reduce_op == 'sum':
                 if op == 'mul' and _need_reduce_last_dim(X, Y):
-                    dY = _gsddmm(gidx, 'dot', X, dZ)
+                    dY = _gsddmm(gidx, 'dot', X, dZ, 'u', 'v')
                 elif op in ['mul', 'div']:
-                    dY = _gsddmm(gidx, 'mul', X, dZ)
+                    dY = _gsddmm(gidx, 'mul', X, dZ, 'u', 'v')
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
-                    dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
+                    dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ), 'u', 'v')
             else:
                 if op in ['mul',  'div']:
                     dY = _scatter_nd(
