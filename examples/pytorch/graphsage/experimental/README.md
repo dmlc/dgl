@@ -27,7 +27,7 @@ The data is copied to `~/graphsage/ogb-product` on each of the remote machines. 
 specifies the location of the partitioned data in the local machine (a user only needs to specify
 the location of the partition configuration file).
 ```bash
-python3 tools/copy_partitions.py --ip_config ip_config.txt \
+python3 ~/dgl/tools/copy_partitions.py --ip_config ip_config.txt \
 			--workspace ~/graphsage --rel_data_path ogb-product \
 			--part_config ~/path_to_partitioned_data/data/ogb-product.json 
 ```
