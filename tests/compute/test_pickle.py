@@ -157,6 +157,7 @@ def test_pickling_graph(g, idtype):
     new_g = _reconstruct_pickle(g)
     test_utils.check_graph_equal(g, new_g, check_feature=True)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_pickling_batched_heterograph():
     # copied from test_heterograph.create_test_heterograph()
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
@@ -182,8 +183,7 @@ def test_pickling_batched_heterograph():
 
     bg = dgl.batch_hetero([g, g2])
     new_bg = _reconstruct_pickle(bg)
-    _assert_is_identical_batchedhetero(bg, new_bg)
->>>>>>> ec2e24be6dcc3bcc3d4ad5dff78212735f9db00f
+    test_utils.check_graph_equal(bg, new_bg)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")

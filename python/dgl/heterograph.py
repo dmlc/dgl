@@ -300,6 +300,7 @@ class DGLHeteroGraph(object):
         if isinstance(state, tuple) and len(state) == 6:
             # DGL >= 0.5
             #TODO(minjie): too many states in python; should clean up and lower to C
+            self._nx_metagraph = None
             (self._graph, metainfo, self._node_frames, self._edge_frames,
              self._batch_num_nodes, self._batch_num_edges) = state
             (self._ntypes, self._etypes, self._canonical_etypes,
