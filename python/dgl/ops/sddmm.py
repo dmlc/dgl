@@ -1,8 +1,8 @@
+"""dgl sddmm operator module."""
 from itertools import product
 import sys
 
 from ..backend import gsddmm
-from .utils import _notes_docstring
 
 __all__ = ['gsddmm', 'copy_u', 'copy_v']
 
@@ -32,9 +32,18 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     -------
     tensor
         The result tensor.
-    {}""".format(binary_op, lhs_str, rhs_str,
-                 lhs_str, rhs_str,
-                 _notes_docstring)
+
+    Notes
+    -----
+    This function supports autograd (computing input gradients given the output gradient). If the
+    feature shape of two input operands do not match, we first broadcasts the features to a unified
+    shape (note that the memory usage will not increase accordingly) and then performs the operation.
+
+    Broadcasting follows NumPy semantics. Please see
+    https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
+    for more details about the NumPy broadcasting semantics.
+    """.format(binary_op, lhs_str, rhs_str,
+               lhs_str, rhs_str)
 
     def func(g, x, y):
         return gsddmm(g, binary_op, x, y,

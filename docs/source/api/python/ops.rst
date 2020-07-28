@@ -1,8 +1,8 @@
 .. _apibackend:
 
-.. currentmodule:: dgl.operator
+.. currentmodule:: dgl.ops
 
-dgl.operator
+dgl.ops
 ==================================
 
 Frame-agnostic operators for message passing on graphs.
@@ -36,7 +36,7 @@ here, you can enjoy the same convenience on other frameworks by similar usage):
 
    >>> import dgl
    >>> import torch as th
-   >>> import dgl.operator as F
+   >>> import dgl.ops as F
    >>> g = dgl.graph(([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2]))  # 3 nodes, 6 edges
    >>> x = th.ones(3, 2, requires_grad=True)
    >>> x
@@ -130,7 +130,7 @@ The following is an example showing how GSDDMM works:
 
    >>> import dgl
    >>> import torch as th
-   >>> import dgl.operator as F
+   >>> import dgl.ops as F
    >>> g = dgl.graph(([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2]))  # 3 nodes, 6 edges
    >>> x = th.ones(3, 2, requires_grad=True)
    >>> x

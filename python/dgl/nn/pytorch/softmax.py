@@ -3,7 +3,7 @@
 import torch as th
 
 from ...base import ALL, is_all
-from ... import operator as F
+from ... import ops as F
 
 __all__ = ['edge_softmax']
 
