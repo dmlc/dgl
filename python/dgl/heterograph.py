@@ -4827,6 +4827,34 @@ class DGLHeteroGraph(object):
         ret._graph = self._graph.asbits(bits)
         return ret
 
+    # TODO: Formats should not be specified, just saving all the materialized formats
+    def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
+        """Return a copy of this graph in shared memory, without node data or edge data.
+
+        It moves the graph index to shared memory and returns a DGLHeterograph object which
+        has the same graph structure, node types and edge types but does not contain node data
+        or edge data.
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory.
+        formats : list of str (optional)
+            Desired formats to be materialized.
+
+        Returns
+        -------
+        HeteroGraph
+            The graph in shared memory
+        """
+        assert len(name) > 0, "The name of shared memory cannot be empty"
+        assert len(formats) > 0
+        for fmt in formats:
+            assert fmt in ("coo", "csr", "csc")
+        gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
+        return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
+
+
     def long(self):
         """Cast this graph to use int64 IDs.
 

@@ -7,6 +7,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
+#include <set>
 
 #include "../c_api_common.h"
 #include "./heterograph.h"
@@ -454,6 +455,45 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     ctx.device_id = device_id;
     HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
     *rv = HeteroGraphRef(hg_new);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    std::string name = args[1];
+    List<Value> ntypes = args[2];
+    List<Value> etypes = args[3];
+    List<Value> fmts = args[4];
+    auto ntypes_vec = ListValueToVector<std::string>(ntypes);
+    auto etypes_vec = ListValueToVector<std::string>(etypes);
+    std::set<std::string> fmts_set;
+    for (const auto &fmt : fmts) {
+      std::string fmt_data = fmt->data;
+      fmts_set.insert(fmt_data);
+    }
+    auto hg_share = HeteroGraph::CopyToSharedMem(
+        hg.sptr(), name, ntypes_vec, etypes_vec, fmts_set);
+    *rv = HeteroGraphRef(hg_share);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFromSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string name = args[0];
+    HeteroGraphPtr hg;
+    std::vector<std::string> ntypes;
+    std::vector<std::string> etypes;
+    std::tie(hg, ntypes, etypes) = HeteroGraph::CreateFromSharedMem(name);
+    List<Value> ntypes_list;
+    List<Value> etypes_list;
+    for (const auto &ntype : ntypes)
+      ntypes_list.push_back(Value(MakeValue(ntype)));
+    for (const auto &etype : etypes)
+      etypes_list.push_back(Value(MakeValue(etype)));
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(hg));
+    ret.push_back(ntypes_list);
+    ret.push_back(etypes_list);
+    *rv = ret;
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")
