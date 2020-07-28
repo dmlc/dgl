@@ -160,4 +160,3 @@ cscope.*
 
 config.cmake
 .ycm_extra_conf.py
-examples/pytorch/graphsage/experimental/*
