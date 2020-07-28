@@ -181,9 +181,9 @@ def finalize_client():
     """Release resources of this client."""
     rpc.finalize_sender()
     rpc.finalize_receiver()
-    if sampler_pool is not None:
-        sampler_pool.close()
-        sampler_pool.join()
+    if SAMPLER_POOL is not None:
+        SAMPLER_POOL.close()
+        SAMPLER_POOL.join()
     global INITIALIZED
     INITIALIZED = False
 
@@ -199,8 +199,8 @@ def shutdown_servers():
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
 
-sampler_pool = None
-num_sampler_workers = 0
+SAMPLER_POOL = None
+NUM_SAMPLER_WORKERS = 0
 
 def _close():
     """Finalize client and close servers when finished"""
@@ -209,19 +209,19 @@ def _close():
 
 def _init_rpc(ip_config, max_queue_size, net_type):
     connect_to_server(ip_config, max_queue_size, net_type)
-    import atexit
-    # atexit.register(_close)
 
 def get_sampler_pool():
-    return sampler_pool, num_sampler_workers
+    """Return the sampler pool and num_workers"""
+    return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+    """Init rpc service"""
     ctx = mp.get_context("spawn")
-    global sampler_pool
-    global num_sampler_workers
-    sampler_pool = ctx.Pool(
+    global SAMPLER_POOL
+    global NUM_SAMPLER_WORKERS
+    SAMPLER_POOL = ctx.Pool(
         num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
-    num_sampler_workers = num_workers
+    NUM_SAMPLER_WORKERS = num_workers
     connect_to_server(ip_config, max_queue_size, net_type)
 
 def exit_client():
