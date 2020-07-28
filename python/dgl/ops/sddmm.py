@@ -2,10 +2,45 @@
 from itertools import product
 import sys
 
-from ..backend import gsddmm
+from ..backend import gsddmm as gsddmm_internal
 
 __all__ = ['gsddmm', 'copy_u', 'copy_v']
 
+def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+    It computes edge features by :attr:`op` lhs features and rhs features.
+
+    .. math::
+        x_{e} = \phi(x_{lhs}, x_{rhs}), \forall (u,e,v)\in \mathcal{G}
+
+    where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
+    :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
+    is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
+    we apply gsddmm on: :attr:`g`. $lhs$ and $rhs$ are one of $u,v,e$'s.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``.
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by op.
+    lhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for left operand.
+    rhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for right operand.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
+    return gsddmm_internal(
+        g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)

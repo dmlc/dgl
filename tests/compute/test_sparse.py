@@ -1,4 +1,4 @@
-from dgl.backend import gspmm, gsddmm
+from dgl.ops import gspmm, gsddmm
 from utils import parametrize_dtype
 import dgl
 import random

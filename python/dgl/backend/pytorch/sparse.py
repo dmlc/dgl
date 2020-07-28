@@ -50,8 +50,7 @@ def _addsub(op, x):
 
 class GSpMM(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, op, reduce_op, X, Y):
-        gidx = g._graph
+    def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
         ctx.save_for_backward(X, Y, argX, argY)
@@ -65,11 +64,11 @@ class GSpMM(th.autograd.Function):
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
-                    dX = _gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))[0]
+                    dX = gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))
                 elif op in ['add', 'sub']:
-                    dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)[0]
+                    dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)
                 elif op == 'copy_lhs':
-                    dX = _gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)[0]
+                    dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
             else:
                 dX = th.zeros((X.shape[0],) + dZ.shape[1:], dtype=X.dtype, device=X.device)
                 if op in ['mul', 'div']:
@@ -83,12 +82,12 @@ class GSpMM(th.autograd.Function):
         if op != 'copy_lhs' and ctx.needs_input_grad[4]:
             if reduce_op == 'sum':
                 if op == 'mul' and _need_reduce_last_dim(X, Y):
-                    dY = _gsddmm(gidx, 'dot', X, dZ)
+                    dY = gsddmm(gidx, 'dot', X, dZ)
                 elif op in ['mul', 'div']:
-                    dY = _gsddmm(gidx, 'mul', X, dZ)
+                    dY = gsddmm(gidx, 'mul', X, dZ)
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
-                    dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
+                    dY = gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
                 dY = th.zeros((Y.shape[0],) + dZ.shape[1:], dtype=Y.dtype, device=Y.device)
                 if op in ['mul',  'div']:
@@ -104,8 +103,7 @@ class GSpMM(th.autograd.Function):
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, op, X, Y, lhs_target, rhs_target):
-        gidx = g._graph
+    def forward(ctx, gidx, op, X, Y, lhs_target, rhs_target):
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
         ctx.backward_cache = gidx, op, lhs_target, rhs_target
         ctx.save_for_backward(X, Y)
@@ -119,19 +117,19 @@ class GSDDMM(th.autograd.Function):
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if lhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_lhs']:
-                    dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0]
+                    dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)
                 else:  # mul, div, dot
                     if rhs_target == lhs_target:
-                        dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0] * _muldiv(op, Y)
+                        dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ) * _muldiv(op, Y)
                     elif rhs_target == 'e':
-                        dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * _muldiv(op, Y))[0]
+                        dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * _muldiv(op, Y))
                     else:  # rhs_target = !lhs_target
-                        dX = _gspmm(_gidx, 'mul', 'sum', _muldiv(op, Y), dZ)[0]
+                        dX = gspmm(_gidx, 'mul', 'sum', _muldiv(op, Y), dZ)
             else:  # lhs_target == 'e'
                 if op in ['add', 'sub', 'copy_lhs']:
                     dX = dZ
                 else:  # mul, div, dot
-                    dX = _gsddmm(gidx, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
+                    dX = gsddmm(gidx, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
             dX = _reduce_grad(dX, X.shape)
         else:
             dX = None
@@ -139,29 +137,31 @@ class GSDDMM(th.autograd.Function):
             if rhs_target in ['u', 'v']:
                 _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_rhs']:
-                    dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))[0]
+                    dY = gspmm(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))
                 else:  # mul, div, dot
                     if lhs_target == rhs_target:
-                        dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0] * X
+                        dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ) * X
                     elif lhs_target == 'e':
-                        dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)[0]
+                        dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)
                     else:  # rhs_target = !lhs_target
-                        dY = _gspmm(_gidx, 'mul', 'sum', X, dZ)[0]
-                    if op == 'div': dY = -dY / (Y ** 2)
+                        dY = gspmm(_gidx, 'mul', 'sum', X, dZ)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
             else:
                 if op in ['add', 'sub', 'copy_rhs']:
                     dY = _addsub(op, dZ)
                 else:  # mul, div, dot
-                    dY = _gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    dY = gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
             dY = _reduce_grad(dY, Y.shape)
         else:
             dY = None
         return None, None, dX, dY, None, None
 
-def gspmm(g, op, reduce_op, lhs_data, rhs_data):
-    return GSpMM.apply(g, op, reduce_op, lhs_data, rhs_data)
+def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
+    return GSpMM.apply(gidx, op, reduce_op, lhs_data, rhs_data)
 
-def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
-    return GSDDMM.apply(g, op, lhs_data, rhs_data, lhs_target, rhs_target)
+def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
+    return GSDDMM.apply(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
 
