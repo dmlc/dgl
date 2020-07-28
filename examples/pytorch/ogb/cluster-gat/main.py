@@ -135,11 +135,12 @@ def run(args, device, data):
         # blocks.
         tic_start = time.time()
         for step, cluster in enumerate(cluster_iterator):
-            mask = cluster.ndata['train_mask'].to(device)
+            cluster = cluster.to(device)
+            mask = cluster.ndata['train_mask']
             if mask.sum() == 0:
                 continue
-            feat = cluster.ndata['feat'].to(device)
-            batch_labels = cluster.ndata['labels'].to(device)
+            feat = cluster.ndata['feat']
+            batch_labels = cluster.ndata['labels']
             tic_step = time.time()
 
             # Compute loss and prediction
