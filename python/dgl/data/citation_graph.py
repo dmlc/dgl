@@ -360,8 +360,8 @@ class CoraBinary(object):
         return (self.graphs[i], self.pmpds[i], self.labels[i])
 
     @staticmethod
-    def collate_fn(batch):
-        graphs, pmpds, labels = zip(*batch)
+    def collate_fn(cur):
+        graphs, pmpds, labels = zip(*cur)
         batched_graphs = batch.batch(graphs)
         batched_pmpds = sp.block_diag(pmpds)
         batched_labels = np.concatenate(labels, axis=0)
