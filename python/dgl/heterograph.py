@@ -2129,11 +2129,7 @@ class DGLHeteroGraph(object):
             return_uv = force_multi
 
         if return_uv:
-            src, dst, eid = self._graph.edge_ids_all(self.get_etype_id(etype), u, v)
-            if is_int:
-                return F.as_scalar(src), F.as_scalar(dst), F.as_scalar(eid)
-            else:
-                return src, dst, eid
+            return self._graph.edge_ids_all(self.get_etype_id(etype), u, v)
         else:
             eid = self._graph.edge_ids_one(self.get_etype_id(etype), u, v)
             is_neg_one = F.equal(eid, -1)
