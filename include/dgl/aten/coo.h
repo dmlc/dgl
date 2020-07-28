@@ -12,6 +12,7 @@
 #include <vector>
 #include <utility>
 #include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"

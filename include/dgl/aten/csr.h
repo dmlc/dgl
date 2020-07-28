@@ -10,6 +10,7 @@
 #include <dmlc/serializer.h>
 #include <vector>
 #include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
