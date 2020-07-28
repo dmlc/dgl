@@ -1,7 +1,6 @@
 """Server data"""
 
 from .._ffi.function import _init_api
-from ..graph import DGLGraph
 
 # Remove C++ bindings for now, since not used
 
