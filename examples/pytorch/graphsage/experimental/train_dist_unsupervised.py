@@ -322,6 +322,10 @@ def run(args, device, data):
         eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
         print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
 
+    # sync for eval and test
+    if not args.standalone
+        th.distributed.barrier()
+
     if not args.standalone:
         g._client.barrier()
 
