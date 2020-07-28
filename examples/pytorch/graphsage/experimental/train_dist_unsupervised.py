@@ -79,6 +79,83 @@ class NeighborSampler(object):
         # Pre-generate CSR format that it can be used in training directly
         return pos_graph, neg_graph, blocks
 
+class PosNeighborSampler(object):
+    def __init__(self, g, fanouts, sample_neighbors):
+        self.g = g
+        self.fanouts = fanouts
+        self.sample_neighbors = sample_neighbors
+
+    def sample_blocks(self, seeds):
+        seeds = th.LongTensor(np.asarray(seeds))
+        blocks = []
+        for fanout in self.fanouts:
+            # For each seed node, sample ``fanout`` neighbors.
+            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
+            # Then we compact the frontier into a bipartite graph for message passing.
+            block = dgl.to_block(frontier, seeds)
+            # Obtain the seed nodes for next layer.
+            seeds = block.srcdata[dgl.NID]
+
+            blocks.insert(0, block)
+        return blocks
+
+class DistSAGE(SAGE):
+    def __init__(self, in_feats, n_hidden, n_classes, n_layers,
+                 activation, dropout):
+        super(DistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers,
+                                       activation, dropout)
+
+    def inference(self, g, x, batch_size, device):
+        """
+        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
+        g : the entire graph.
+        x : the input of entire node set.
+
+        The inference code is written in a fashion that it could handle any number of nodes and
+        layers.
+        """
+        # During inference with sampling, multi-layer blocks are very inefficient because
+        # lots of computations in the first few layers are repeated.
+        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
+        # on each layer are of course splitted in batches.
+        # TODO: can we standardize this?
+        nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
+                                           g.get_partition_book(), force_even=True)
+        y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_hidden), th.float32, 'h',
+                                       persistent=True)
+        for l, layer in enumerate(self.layers):
+            if l == len(self.layers) - 1:
+                y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_classes),
+                                               th.float32, 'h_last', persistent=True)
+
+            sampler = PosNeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
+            print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
+            # Create PyTorch DataLoader for constructing blocks
+            dataloader = DataLoader(
+                dataset=nodes,
+                batch_size=batch_size,
+                collate_fn=sampler.sample_blocks,
+                shuffle=False,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
+                input_nodes = block.srcdata[dgl.NID]
+                output_nodes = block.dstdata[dgl.NID]
+                h = x[input_nodes].to(device)
+                h_dst = h[:block.number_of_dst_nodes()]
+                h = layer(block, (h, h_dst))
+                if l != len(self.layers) - 1:
+                    h = self.activation(h)
+                    h = self.dropout(h)
+
+                y[output_nodes] = h.cpu()
+
+            x = y
+            g.barrier()
+        return y
+
 def load_subtensor(g, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
@@ -112,7 +189,7 @@ def generate_emb(model, g, inputs, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.module.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, inputs, batch_size, device)
 
     return pred
 
@@ -236,7 +313,10 @@ def run(args, device, data):
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
         epoch += 1
 
-    pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
+    if args.standalone:
+        pred = generate_emb(model,  g, g.ndata['features'], args.batch_size_eval, device)
+    else:
+        pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
     if g.rank() == 0:
         compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
 
