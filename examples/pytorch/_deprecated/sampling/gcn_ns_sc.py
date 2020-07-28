@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from functools import partial
 import dgl
 import dgl.function as fn
-from dgl import DGLGraph
+from dgl import DGLGraphStale
 from dgl.data import register_data_args, load_data
 
 
@@ -148,7 +148,7 @@ def main(args):
               n_test_samples))
 
     # create GCN model
-    g = DGLGraph(data.graph, readonly=True)
+    g = DGLGraphStale(data.graph, readonly=True)
     norm = 1. / g.in_degrees().float().unsqueeze(1)
 
     if args.gpu < 0:
@@ -240,7 +240,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+    parser = argparse.ArgumentParser(description='GCN neighbor sampling')
     register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")

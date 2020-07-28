@@ -269,7 +269,7 @@ class MovieLens(object):
                 x = x.numpy().astype('float32')
                 x[x == 0.] = np.inf
                 x = th.FloatTensor(1. / np.sqrt(x))
-                return x.to(self._device).unsqueeze(1)
+                return x.unsqueeze(1)
             user_ci = []
             user_cj = []
             movie_ci = []
@@ -290,8 +290,8 @@ class MovieLens(object):
                 user_cj = _calc_norm(sum(user_cj))
                 movie_cj = _calc_norm(sum(movie_cj))
             else:
-                user_cj = th.ones(self.num_user,).to(self._device)
-                movie_cj = th.ones(self.num_movie,).to(self._device)
+                user_cj = th.ones(self.num_user,)
+                movie_cj = th.ones(self.num_movie,)
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 

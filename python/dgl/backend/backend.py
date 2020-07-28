@@ -59,9 +59,15 @@ def cpu():
 def tensor(data, dtype=None):
     """Create a tensor given the data and data type.
 
+    If the input is already a tensor and has the same dtype,
+    directly return.
+
+    Scalar input is converted to a array of one element instead of
+    a 0-dim tensor to avoid certain issues with some backends.
+
     Parameters
     ----------
-    data : input data
+    data : int, iterable, Tensor
         The interface should at least support list and numpy array.
         The data is copied to a newly-allocated tensor.
     dtype : data type, optional
@@ -610,6 +616,11 @@ def split(input, sizes_or_sections, dim):
     Parameters
     ----------
     input : Tensor
+        Tensor to split.
+    sizes_or_sections : int, list[int]
+        Split sizes or sections.
+    dim : int
+        The dimension to split on.
 
     Returns
     -------
@@ -625,7 +636,7 @@ def repeat(input, repeats, dim):
     ----------
     input : Tensor
         Input data array
-    repeats : int
+    repeats : int, Tensor
         The number of repetitions for each element
     dim : int
         The dim along which to repeat values.
@@ -917,7 +928,7 @@ def uniform(shape, dtype, ctx, low, high):
     pass
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
-    """Pads a packed batch of variable length tensors with given value.
+    r"""Pads a packed batch of variable length tensors with given value.
 
     Parameters
     ----------
@@ -941,7 +952,7 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     pass
 
 def pack_padded_tensor(input, lengths):
-    """Packs a tensor containing padded sequence of variable length.
+    r"""Packs a tensor containing padded sequence of variable length.
 
     Parameters
     ----------
@@ -1040,7 +1051,7 @@ def equal(x, y):
 
     Returns
     -------
-    Boolean tensor
+    Boolean or integer tensor
         The result, with the same shape as input.
     """
     pass
@@ -1471,6 +1482,11 @@ def grad(x):
 
 def is_no_grad(x):
     """ Test if the input tensor has gradient
+    """
+    pass
+
+def is_recording():
+    """ Test if the execution is recording gradients.
     """
     pass
 

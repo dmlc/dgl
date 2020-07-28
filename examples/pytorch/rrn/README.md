@@ -15,7 +15,7 @@ application on sudoku solving.
 
 ## Usage
 
-- To train the RNN for sudoku, run the following
+- To train the RRN for sudoku, run the following
 ```
 python3 train_sudoku.py --output_dir out/ --do_train --do_eval
 ```

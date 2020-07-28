@@ -1,5 +1,7 @@
 # Stochastic Training for Graph Convolutional Networks
 
+DEPRECATED!!
+
 * Paper: [Control Variate](https://arxiv.org/abs/1710.10568)
 * Paper: [Skip Connection](https://arxiv.org/abs/1809.05343)
 * Author's code: [https://github.com/thu-ml/stochastic_gcn](https://github.com/thu-ml/stochastic_gcn)

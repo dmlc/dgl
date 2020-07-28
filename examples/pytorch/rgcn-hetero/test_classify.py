@@ -33,6 +33,7 @@ def main(args):
         th.cuda.set_device(args.gpu)
         labels = labels.cuda()
         test_idx = test_idx.cuda()
+        g = g.to('cuda:%d' % args.gpu)
 
     # create model
     model = EntityClassify(g,
