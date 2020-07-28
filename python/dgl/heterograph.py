@@ -3249,7 +3249,6 @@ class DGLHeteroGraph(object):
             (Default: False)
         """
         # parse argument
-        print('edges', edges)
         if is_all(edges):
             eid = ALL
         elif isinstance(edges, tuple):
