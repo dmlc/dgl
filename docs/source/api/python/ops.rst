@@ -87,6 +87,7 @@ graph.
 .. autosummary::
     :toctree: ../../generated/
 
+    gspmm
     u_add_e_sum
     u_sub_e_sum
     u_mul_e_sum
@@ -193,6 +194,7 @@ The following is an example showing how GSDDMM works:
 .. autosummary::
     :toctree: ../../generated/
 
+    gsddmm
     u_add_v
     u_sub_v
     u_mul_v
