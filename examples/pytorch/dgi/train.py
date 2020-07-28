@@ -55,6 +55,8 @@ def main(args):
     g = DGLGraph(g)
     n_edges = g.number_of_edges()
 
+    if args.gpu >= 0:
+        g = g.to(args.gpu)
     # create DGI model
     dgi = DGI(g,
               in_feats,

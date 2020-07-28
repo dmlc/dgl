@@ -181,7 +181,7 @@ class RelGraphConv(gluon.Block):
         mx.ndarray.NDArray
             New node features.
         """
-        assert g.is_homograph(), \
+        assert g.is_homogeneous(), \
             "not a homograph; convert it with to_homo and pass in the edge type as argument"
         with g.local_scope():
             g.ndata['h'] = x

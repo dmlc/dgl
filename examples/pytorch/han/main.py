@@ -48,6 +48,7 @@ def main(args):
                     out_size=num_classes,
                     num_heads=args['num_heads'],
                     dropout=args['dropout']).to(args['device'])
+        g = g.to(args['device'])
     else:
         from model import HAN
         model = HAN(num_meta_paths=len(g),
@@ -56,6 +57,7 @@ def main(args):
                     out_size=num_classes,
                     num_heads=args['num_heads'],
                     dropout=args['dropout']).to(args['device'])
+        g = [graph.to(args['device']) for graph in g]
 
     stopper = EarlyStopping(patience=args['patience'])
     loss_fcn = torch.nn.CrossEntropyLoss()
