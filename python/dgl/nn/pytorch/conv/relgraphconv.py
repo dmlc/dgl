@@ -34,7 +34,7 @@ class RelGraphConv(nn.Module):
 
     The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
     number of block diagonal matrices. We refer :math:`B` as the number of bases.
-    
+
     The block regularization decomposes :math:`W_r` by:
 
     .. math::
@@ -73,13 +73,14 @@ class RelGraphConv(nn.Module):
         Add layer norm. Default: False
     
     Example
-    -------
+    -----
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import RelGraphConv
+    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import RelGraphConv
     >>> conv = RelGraphConv(10, 2, 3, regularizer='basis', num_bases=2)
     >>> conv.weight.shape
     torch.Size([2, 10, 2])
@@ -92,7 +93,8 @@ class RelGraphConv(nn.Module):
             [ 0.7081,  1.2584],
             [-1.5015,  0.9176],
             [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
-    >>> # One-hot input
+
+    # One-hot input
     >>> one_hot_feat = th.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
     >>> res = conv(g, one_hot_feat, etype)
     >>> res

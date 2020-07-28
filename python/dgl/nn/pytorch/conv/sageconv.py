@@ -46,16 +46,17 @@ class SAGEConv(nn.Module):
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    
-    Example:
-    --------
+
+    Example
+    -------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
-    >>> # Homogeneous graph
+    >>> from dgl.nn import SAGEConv
+
+    Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import SAGEConv
     >>> conv = SAGEConv(10, 2, 'gcn')
     >>> res = conv(g, feat)
     >>> res
@@ -65,12 +66,13 @@ class SAGEConv(nn.Module):
             [0.1909, 1.2743],
             [0.1909, 1.2743],
             [0.1909, 1.2743]], grad_fn=<AddmmBackward>)
-    >>> # Unidirectional bipartite graph
+
+    Case 2: Unidirectional bipartite graph
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
     >>> g = dgl.bipartite((u, v))
-    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
-    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> u_fea = th.rand(2, 5)
+    >>> v_fea = th.rand(4, 10)
     >>> conv = SAGEConv((5, 10), 2, 'mean')
     >>> res = conv(g, (u_fea, v_fea))
     >>> res

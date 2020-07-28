@@ -40,15 +40,16 @@ class ChebConv(nn.Module):
     Note
     ----
     ChebConv only support DGLGraph as input for now. Heterograph will report error. To be fixed.
-    
+
     Example
     -------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import ChebConv
+    >>
     >>> g = dgl.DGLGraph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import ChebConv
     >>> conv = ChebConv(10, 2, 2)
     >>> res = conv(g, feat)
     >>> res

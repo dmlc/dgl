@@ -23,6 +23,17 @@ class AGNNConv(nn.Module):
     .. math::
         P_{ij} = \mathrm{softmax}_i ( \beta \cdot \cos(h_i^l, h_j^l))
 
+    Notes
+    -----
+    Zero in degree nodes could lead to invalid normalizer. A common practice
+    to avoid this is to add a self-loop for each node in the graph, which
+    can be achieved by:
+
+    >>> g = ... # some DGLGraph
+    >>> dgl.add_self_loop(g)
+
+    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+
     Parameters
     ----------
     init_beta : float, optional
@@ -40,9 +51,10 @@ class AGNNConv(nn.Module):
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import AGNNConv
+    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import AGNNConv
     >>> conv = AGNNConv()
     >>> res = conv(g, feat)
     >>> res

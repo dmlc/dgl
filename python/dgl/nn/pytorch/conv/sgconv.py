@@ -16,6 +16,17 @@ class SGConv(nn.Module):
 
     where :math:`\tilde{A}` is :math:`A` + :math:`I`. Thus the graph input is expected to have self-loop edges added.
 
+    Notes
+    -----
+    Zero in degree nodes could lead to invalid normalizer. A common practice
+    to avoid this is to add a self-loop for each node in the graph, which
+    can be achieved by:
+
+    >>> g = ... # some DGLGraph
+    >>> dgl.add_self_loop(g)
+
+    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+
     Parameters
     ----------
     in_feats : int
@@ -47,9 +58,10 @@ class SGConv(nn.Module):
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import SGConv
+    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import SGConv
     >>> conv = SGConv(10, 2, k=2, cached=True)
     >>> res = conv(g, feat)
     >>> res

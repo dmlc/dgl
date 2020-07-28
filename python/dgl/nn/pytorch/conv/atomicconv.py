@@ -189,23 +189,23 @@ class AtomicConv(nn.Module):
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import AtomicConv
+
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 1)
     >>> edist = th.ones(6, 1)
-    >>> interaction_cutoffs = th.ones(3)
-    >>> interaction_cutoffs = th.ones(3).float()
+    >>> interaction_cutoffs = th.ones(3).float() * 2
     >>> rbf_kernel_means = th.ones(3).float()
     >>> rbf_kernel_scaling = th.ones(3).float()
-    >>> from dgl.nn import AtomicConv
     >>> conv = AtomicConv(interaction_cutoffs, rbf_kernel_means, rbf_kernel_scaling)
     >>> res = conv(g, feat, edist)
     >>> res
-    tensor([[0., 0., 0.],
-            [0., 0., 0.],
-            [0., 0., 0.],
-            [0., 0., 0.],
-            [0., 0., 0.],
-            [0., 0., 0.]], grad_fn=<ViewBackward>)
+    tensor([[0.5000, 0.5000, 0.5000],
+                [0.5000, 0.5000, 0.5000],
+                [0.5000, 0.5000, 0.5000],
+                [1.0000, 1.0000, 1.0000],
+                [0.5000, 0.5000, 0.5000],
+                [0.0000, 0.0000, 0.0000]], grad_fn=<ViewBackward>)
     """
     def __init__(self, interaction_cutoffs, rbf_kernel_means,
                  rbf_kernel_scaling, features_to_use=None):

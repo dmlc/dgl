@@ -18,6 +18,17 @@ class EdgeConv(nn.Module):
 
     where :math:`\mathcal{N}(i)` is the neighbor of :math:`i`.
 
+    Notes
+    -----
+    Zero in degree nodes could lead to invalid output. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it's homogeneous,
+    which can be achieved by:
+
+    >>> g = ... # some homogeneous graph
+    >>> dgl.add_self_loop(g)
+
+    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
+
     Parameters
     ----------
     in_feat : int
@@ -29,11 +40,14 @@ class EdgeConv(nn.Module):
 
     Example
     -------
+    >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import EdgeConv
+
+    Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import EdgeConv
     >>> conv = EdgeConv(10, 2)
     >>> res = conv(g, feat)
     >>> res
@@ -43,12 +57,13 @@ class EdgeConv(nn.Module):
             [-3.2300e-01,  9.0517e-01],
             [-3.2300e-01,  9.0517e-01],
             [-3.4028e+38, -3.4028e+38]], grad_fn=<CopyReduceBackward>)
-    >>> # Unidirectional bipartite graph
+
+    Case 2: Unidirectional bipartite graph
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
     >>> g = dgl.bipartite((u, v))
-    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
-    >>> v_fea = th.tensor(np.random.rand(4, 5).astype(np.float32))
+    >>> u_fea = th.rand(2, 5)
+    >>> v_fea = th.rand(4, 5)
     >>> conv = EdgeConv(5, 2, 3)
     >>> res = conv(g, (u_fea, v_fea))
     >>> res

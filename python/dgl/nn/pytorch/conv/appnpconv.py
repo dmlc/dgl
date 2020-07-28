@@ -37,9 +37,10 @@ class APPNPConv(nn.Module):
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import APPNPConv
+    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import APPNPConv
     >>> conv = APPNPConv(k=3, alpha=0.5)
     >>> res = conv(g, feat)
     >>> res

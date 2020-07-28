@@ -14,7 +14,7 @@ class TAGConv(nn.Module):
         \mathbf{X}^{\prime} = \sum_{k=0}^K (\mathbf{D}^{-1/2} \mathbf{A}
         \mathbf{D}^{-1/2})^{k}\mathbf{X} \mathbf{\Theta}_{k},
 
-    where :math:`\mathbf{A}` denotes the adjacency matrix, 
+    where :math:`\mathbf{A}` denotes the adjacency matrix,
     :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix,
     :math:`\mathbf{\Theta}_{k}` denotes the linear weights to sum the results of different hops together.
 
@@ -42,9 +42,10 @@ class TAGConv(nn.Module):
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import TAGConv
+    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import TAGConv
     >>> conv = TAGConv(10, 2, k=2)
     >>> res = conv(g, feat)
     >>> res

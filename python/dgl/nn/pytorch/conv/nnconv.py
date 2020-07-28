@@ -4,7 +4,6 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
-from .... import transform
 from .... import function as fn
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -19,6 +18,17 @@ class NNConv(nn.Module):
         f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i) \right\}\right)
 
     where :math:`e_{ij}` is the edge feature, :math:`f_\Theta` is a function with learnable parameters.
+
+    Notes
+    -----
+    Zero in degree nodes could lead to invalid output. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it's homogeneous,
+    which can be achieved by:
+
+    >>> g = ... # some homogeneous graph
+    >>> dgl.add_self_loop(g)
+
+    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -42,20 +52,17 @@ class NNConv(nn.Module):
         If True, use residual connection. Default: ``False``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
-    add_self_loop: bool, optional
-        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
-        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
-        can to set add_self_loop to ``True`` here.
 
     Example
     -------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
-    >>> # Homogeneous graph
+    >>> from dgl.nn import NNConv
+
+    Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import NNConv
     >>> lin = th.nn.Linear(5, 20)
     >>> def edge_func(efeat):
     ...     return lin(efeat)
@@ -69,15 +76,16 @@ class NNConv(nn.Module):
             [0.5983, 1.7884],
             [0.5983, 1.7884],
             [0.0000, 0.0000]], grad_fn=<AddBackward0>)
-    >>> # Unidirectional bipartite graph
+
+    Case 2: Unidirectional bipartite graph
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
     >>> g = dgl.bipartite((u, v))
-    >>> u_fea = th.tensor(np.random.rand(2, 10).astype(np.float32))
-    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> u_feat = th.tensor(np.random.rand(2, 10).astype(np.float32))
+    >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
     >>> conv = NNConv(10, 2, edge_func, 'mean')
     >>> efeat = th.ones(3, 5)
-    >>> res = conv(g, (u_fea, v_fea), efeat)
+    >>> res = conv(g, (u_feat, v_feat), efeat)
     >>> res
     tensor([[0.0000, 0.0000],
             [0.0000, 0.0000],
@@ -88,14 +96,13 @@ class NNConv(nn.Module):
                  in_feats,
                  out_feats,
                  edge_func,
-                 aggregator_type,
+                 aggregator_type='mean',
                  residual=False,
-                 bias=True,
-                 add_self_loop=False):
+                 bias=True):
         super(NNConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        self.edge_nn = edge_func
+        self.edge_func = edge_func
         if aggregator_type == 'sum':
             self.reducer = fn.sum
         elif aggregator_type == 'mean':
@@ -116,7 +123,6 @@ class NNConv(nn.Module):
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_buffer('bias', None)
-        self._add_self_loop = add_self_loop
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -140,7 +146,7 @@ class NNConv(nn.Module):
             input feature size.
         efeat : torch.Tensor
             The edge feature of shape :math:`(N, *)`, should fit the input
-            shape requirement of ``edge_nn``.
+            shape requirement of ``edge_func``.
 
         Returns
         -------
@@ -157,7 +163,7 @@ class NNConv(nn.Module):
             # (n, d_in, 1)
             graph.srcdata['h'] = feat_src.unsqueeze(-1)
             # (n, d_in, d_out)
-            graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_src_feats, self._out_feats)
+            graph.edata['w'] = self.edge_func(efeat).view(-1, self._in_src_feats, self._out_feats)
             # (n, d_in, d_out)
             graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
             rst = graph.dstdata['neigh'].sum(dim=1) # (n, d_out)

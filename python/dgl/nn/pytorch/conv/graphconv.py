@@ -38,7 +38,7 @@ class GraphConv(nn.Module):
     >>> g = ... # some DGLGraph
     >>> dgl.add_self_loop(g)
 
-    If we can't do the above in advance, we need to set add_self_loop to ``True``.
+    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
 
     Parameters
     ----------
@@ -73,31 +73,33 @@ class GraphConv(nn.Module):
         The learnable bias tensor.
 
     Example
-    -------
+    -----
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import GraphConv
+    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import GraphConv
     >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True)
     >>> res = conv(g, feat)
     >>> print(res)
-    tensor([[0.8614, 0.3694],
-            [1.2182, 0.5224],
-            [1.2182, 0.5224],
-            [1.4704, 0.6306],
-            [1.2182, 0.5224],
-            [0.0000, 0.0000]], grad_fn=<AddBackward0>)
+    tensor([[ 0.6438, -0.3395],
+            [ 0.9104, -0.4801],
+            [ 0.9104, -0.4801],
+            [ 1.0990, -0.5795],
+            [ 0.9104, -0.4801],
+            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
+    >>> # Add self-loop example
     >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True, add_self_loop=True)
     >>> res = conv(g, feat)
-    >>> res
-    tensor([[-1.9068, -0.9860],
-            [-2.0994, -1.0857],
-            [-1.9068, -0.9860],
-            [-2.4140, -1.2483],
-            [-2.5342, -1.3105],
-            [-1.4845, -0.7677]], grad_fn=<AddBackward0>)
+    >>> print(res)
+    tensor([[-2.5718,  0.0102],
+            [-2.8316,  0.0113],
+            [-2.5718,  0.0102],
+            [-3.2559,  0.0129],
+            [-3.4180,  0.0136],
+            [-2.0022,  0.0080]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,

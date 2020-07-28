@@ -23,6 +23,17 @@ class GMMConv(nn.Module):
 
     where :math:`\mu` denotes the pseudo-coordinates between a vertex and one of its neighbor, :math:`\Sigma_k^{-1}` and :math:`\mu_k` are learnable parameters representing the covariance matrix and mean vector of a Gaussian kernel.
 
+    Notes
+    -----
+    Zero in degree nodes could lead to invalid output. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it's homogeneous,
+    which can be achieved by:
+
+    >>> g = ... # some homogeneous graph
+    >>> dgl.add_self_loop(g)
+
+    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
+
     Parameters
     ----------
     in_feats : int
@@ -39,21 +50,17 @@ class GMMConv(nn.Module):
         If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
-    add_self_loop: bool, optional
-        Add self-loop to graph when compute Conv. If no self-loop is added, the feature for a node with zero
-        in-degree will be all zero after Conv. This is harmful for some applications. We recommend adding
-        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
-        need to set add_self_loop to ``True`` here.
 
     Example
     -------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
-    >>> # Homogeneous graph
+    >>> from dgl.nn import GMMConv
+
+    Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import GMMConv
     >>> conv = GMMConv(10, 2, 3, 2, 'mean')
     >>> pseudo = th.ones(6, 3)
     >>> res = conv(g, feat, pseudo)
@@ -64,12 +71,13 @@ class GMMConv(nn.Module):
             [0.1388, 0.7694],
             [0.1388, 0.7694],
             [0.0000, 0.0000]], grad_fn=<AddBackward0>)
-    >>> # Unidirectional bipartite graph
+
+    Case 2: Unidirectional bipartite graph
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
     >>> g = dgl.bipartite((u, v))
-    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
-    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> u_fea = th.rand(2, 5)
+    >>> v_fea = th.rand(4, 10)
     >>> pseudo = th.ones(3, 3)
     >>> conv = GMMConv((10, 5), 2, 3, 2, 'mean')
     >>> res = conv(g, (u_fea, v_fea), pseudo)
@@ -86,14 +94,12 @@ class GMMConv(nn.Module):
                  n_kernels,
                  aggregator_type='sum',
                  residual=False,
-                 bias=True,
-                 add_self_loop=False):
+                 bias=True):
         super(GMMConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
-        self._add_self_loop = add_self_loop
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'mean':

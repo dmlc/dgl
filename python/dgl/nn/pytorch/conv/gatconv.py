@@ -3,7 +3,6 @@
 import torch as th
 from torch import nn
 
-from .... import transform
 from .... import function as fn
 from ....ops import edge_softmax
 from ..utils import Identity
@@ -24,6 +23,17 @@ class GATConv(nn.Module):
         \alpha_{ij}^{l} = \mathrm{softmax_i} (e_{ij}^{l})
 
         e_{ij}^{l} = \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
+
+    Notes
+    -----
+    Zero in degree nodes could lead to invalid output. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it's homogeneous,
+    which can be achieved by:
+
+    >>> g = ... # some homogeneous graph
+    >>> dgl.add_self_loop(g)
+
+    For Unidirectional bipartite graph, we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -49,22 +59,19 @@ class GATConv(nn.Module):
     activation : callable activation function/layer or None, optional.
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    add_self_loop: bool, optional
-        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
-        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
-        can to set add_self_loop to ``True`` here.
 
-    Example:
-    --------
+    Example
+    -------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
-    >>> # Homogeneous graph
+    >>> from dgl.nn import GATConv
+
+    Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import GATConv
-    >>> conv = GATConv(10, 2, 3)
-    >>> res = conv(g, feat)
+    >>> gatconv = GATConv(10, 2, num_heads=3)
+    >>> res = gatconv(g, feat)
     >>> res
     tensor([[[ 0.6757,  1.9971],
             [ 1.6249,  0.8834],
@@ -89,14 +96,15 @@ class GATConv(nn.Module):
             [[ 0.0000,  0.0000],
             [ 0.0000,  0.0000],
             [ 0.0000,  0.0000]]], grad_fn=<BinaryReduceBackward>)
-    >>> # Unidirectional bipartite graph
+
+    Case 2: Unidirectional bipartite graph
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
     >>> g = dgl.bipartite((u, v))
-    >>> u_fea = th.tensor(np.random.rand(2, 5).astype(np.float32))
-    >>> v_fea = th.tensor(np.random.rand(4, 10).astype(np.float32))
-    >>> conv = GATConv((5,10), 2, 3)
-    >>> res = conv(g, (u_fea, v_fea))
+    >>> u_feat = th.tensor(np.random.rand(2, 5).astype(np.float32))
+    >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> gatconv = GATConv((5,10), 2, 3)
+    >>> res = gatconv(g, (u_feat, v_feat))
     >>> res
     tensor([[[ 0.0000,  0.0000],
             [ 0.0000,  0.0000],
@@ -122,8 +130,7 @@ class GATConv(nn.Module):
                  attn_drop=0.,
                  negative_slope=0.2,
                  residual=False,
-                 activation=None,
-                 add_self_loop=False):
+                 activation=None):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)

@@ -36,11 +36,12 @@ class GatedGraphConv(nn.Module):
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
+    >>> from dgl.nn import GatedGraphConv
+    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> from dgl.nn import GatedGraphConv
     >>> conv = GatedGraphConv(10, 10, 2, 3)
-    >>> etype = th.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>> etype = th.tensor([0,1,2,0,1,2])
     >>> res = conv(g, feat, etype)
     >>> res
     tensor([[ 0.4652,  0.4458,  0.5169,  0.4126,  0.4847,  0.2303,  0.2757,  0.7721,
