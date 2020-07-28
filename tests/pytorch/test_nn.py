@@ -5,7 +5,8 @@ import dgl.nn.pytorch as nn
 import dgl.function as fn
 import backend as F
 import pytest
-from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
+from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph, \
+    random_block
 from copy import deepcopy
 
 import numpy as np
@@ -69,7 +70,7 @@ def test_graph_conv():
     new_weight = conv.weight.data
     assert not F.allclose(old_weight, new_weight)
 
-@pytest.mark.parametrize('g', get_cases(['path', 'bipartite', 'small'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['path', 'bipartite', 'small', 'block'], exclude=['zero-degree']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
@@ -452,6 +453,15 @@ def test_gat_conv():
     h = gat(g, feat)
     assert h.shape == (200, 4, 2)
 
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = th.unique(g.edges()[1])
+    block = dgl.to_block(g, seed_nodes)
+    gat = nn.GATConv(5, 2, 4)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    gat = gat.to(ctx)
+    h = gat(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 4, 2)
+
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv(aggre_type):
     ctx = F.ctx()
@@ -477,6 +487,16 @@ def test_sage_conv(aggre_type):
     h = sage(g, feat)
     assert h.shape[-1] == 2
     assert h.shape[0] == 200
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = th.unique(g.edges()[1])
+    block = dgl.to_block(g, seed_nodes)
+    sage = nn.SAGEConv(5, 10, aggre_type)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    sage = sage.to(ctx)
+    h = sage(block, feat)
+    assert h.shape[0] == block.number_of_dst_nodes()
+    assert h.shape[-1] == 10
 
     # Test the case for graphs without edges
     g = dgl.bipartite([], num_nodes=(5, 3))
@@ -546,6 +566,15 @@ def test_gin_conv(aggregator_type):
     h = gin(g, feat)
     assert h.shape == (200, 12)
 
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = th.unique(g.edges()[1])
+    block = dgl.to_block(g, seed_nodes)
+    gin = nn.GINConv(th.nn.Linear(5, 12), aggregator_type)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    gin = gin.to(ctx)
+    h = gin(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 12)
+
 def test_agnn_conv():
     ctx = F.ctx()
     g = dgl.graph(sp.sparse.random(100, 100, density=0.1))
@@ -561,6 +590,15 @@ def test_agnn_conv():
     agnn = agnn.to(ctx)
     h = agnn(g, feat)
     assert h.shape == (200, 5)
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = th.unique(g.edges()[1])
+    block = dgl.to_block(g, seed_nodes)
+    agnn = nn.AGNNConv(1)
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    agnn = agnn.to(ctx)
+    h = agnn(block, feat)
+    assert h.shape == (block.number_of_dst_nodes(), 5)
 
 def test_gated_graph_conv():
     ctx = F.ctx()
@@ -608,6 +646,18 @@ def test_nn_conv():
     # currently we only do shape check
     assert h.shape[-1] == 10
 
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = th.unique(g.edges()[1])
+    block = dgl.to_block(g, seed_nodes)
+    edge_func = th.nn.Linear(4, 5 * 10)
+    nnconv = nn.NNConv(5, 10, edge_func, 'mean')
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    efeat = F.randn((block.number_of_edges(), 4))
+    nnconv = nnconv.to(ctx)
+    h = nnconv(block, feat, efeat)
+    assert h.shape[0] == block.number_of_dst_nodes()
+    assert h.shape[-1] == 10
+
 def test_gmm_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
@@ -636,6 +686,17 @@ def test_gmm_conv():
     gmmconv = gmmconv.to(ctx)
     h = gmmconv(g, (feat, feat_dst), pseudo)
     # currently we only do shape check
+    assert h.shape[-1] == 10
+
+    g = dgl.graph(sp.sparse.random(100, 100, density=0.001))
+    seed_nodes = th.unique(g.edges()[1])
+    block = dgl.to_block(g, seed_nodes)
+    gmmconv = nn.GMMConv(5, 10, 3, 4, 'mean')
+    feat = F.randn((block.number_of_src_nodes(), 5))
+    pseudo = F.randn((block.number_of_edges(), 3))
+    gmmconv = gmmconv.to(ctx)
+    h = gmmconv(block, feat, pseudo)
+    assert h.shape[0] == block.number_of_dst_nodes()
     assert h.shape[-1] == 10
 
 @pytest.mark.parametrize('norm_type', ['both', 'right', 'none'])
@@ -676,7 +737,7 @@ def test_dense_sage_conv(g):
     out_dense_sage = dense_sage(adj, feat)
     assert F.allclose(out_sage, out_dense_sage), g
 
-@pytest.mark.parametrize('g', [random_dglgraph(20), random_graph(20), random_bipartite(20, 10)])
+@pytest.mark.parametrize('g', [random_dglgraph(20), random_graph(20), random_bipartite(20, 10), random_block(20)])
 def test_edge_conv(g):
     ctx = F.ctx()
 
@@ -685,7 +746,7 @@ def test_edge_conv(g):
 
     # test #1: basic
     h0 = F.randn((g.number_of_src_nodes(), 5))
-    if not g.is_homograph():
+    if not g.is_homograph() and not g.is_block:
         # bipartite
         h1 = edge_conv(g, (h0, h0[:10]))
     else:
