@@ -23,18 +23,17 @@ def extract_embed(node_embed, input_nodes):
         emb[ntype] = node_embed[ntype][nid]
     return emb
 
-def evaluate(model, loader, node_embed, labels, category, use_cuda):
+def evaluate(model, loader, node_embed, labels, category, device):
     model.eval()
     total_loss = 0
     total_acc = 0
     count = 0
     for input_nodes, seeds, blocks in loader:
+        blocks = [blk.to(device) for blk in blocks]
         seeds = seeds[category]
         emb = extract_embed(node_embed, input_nodes)
-        lbl = labels[seeds]
-        if use_cuda:
-            emb = {k : e.cuda() for k, e in emb.items()}
-            lbl = lbl.cuda()
+        emb = {k : e.to(device) for k, e in emb.items()}
+        lbl = labels[seeds].to(device)
         logits = model(emb, blocks)[category]
         loss = F.cross_entropy(logits, lbl)
         acc = th.sum(logits.argmax(dim=1) == lbl).item()
@@ -71,9 +70,11 @@ def main(args):
         val_idx = train_idx
 
     # check cuda
+    device = 'cpu'
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
+        device = 'cuda:%d' % args.gpu
 
     train_label = labels[train_idx]
     val_label = labels[val_idx]
@@ -127,6 +128,7 @@ def main(args):
             t0 = time.time()
 
         for i, (input_nodes, seeds, blocks) in enumerate(loader):
+            blocks = [blk.to(device) for blk in blocks]
             seeds = seeds[category]     # we only predict the nodes with type "category"
             batch_tic = time.time()
             emb = extract_embed(node_embed, input_nodes)
@@ -146,7 +148,7 @@ def main(args):
         if epoch > 3:
             dur.append(time.time() - t0)
 
-        val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, use_cuda)
+        val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, device)
         print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
               format(epoch, val_acc, val_loss, np.average(dur)))
     print()

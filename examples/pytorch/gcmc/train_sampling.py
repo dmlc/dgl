@@ -51,7 +51,7 @@ class GCMCSampler:
 
         The input ``seeds`` represents the edges to compute prediction for. The sampling
         algorithm works as follows:
-        
+
           1. Get the head and tail nodes of the provided seed edges.
           2. For each head and tail node, extract the entire in-coming neighborhood.
           3. Copy the node features/embeddings from the full graph to the sampled subgraphs.
@@ -170,6 +170,7 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
         compact_g, frontier, head_feat, tail_feat, \
                 _, true_relation_ratings = sample_data
 
+        frontier = frontier.to(dev_id)
         head_feat = head_feat.to(dev_id)
         tail_feat = tail_feat.to(dev_id)
         with th.no_grad():
@@ -352,11 +353,12 @@ def run(proc_id, n_gpus, args, devices, dataset):
         if epoch > 1:
             t0 = time.time()
         net.train()
-        for step, sample_data in enumerate(dataloader):           
+        for step, sample_data in enumerate(dataloader):
             compact_g, frontier, head_feat, tail_feat, \
                 true_relation_labels, true_relation_ratings = sample_data
             head_feat = head_feat.to(dev_id)
             tail_feat = tail_feat.to(dev_id)
+            frontier = frontier.to(dev_id)
 
             pred_ratings = net(compact_g, frontier, head_feat, tail_feat, dataset.possible_rating_values)
             loss = rating_loss_net(pred_ratings, true_relation_labels.to(dev_id)).mean()

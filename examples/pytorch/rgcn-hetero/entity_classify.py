@@ -47,6 +47,7 @@ def main(args):
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
+        g = g.to('cuda:%d' % args.gpu)
         labels = labels.cuda()
         train_idx = train_idx.cuda()
         test_idx = test_idx.cuda()

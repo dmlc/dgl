@@ -13,8 +13,9 @@ import os, sys
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
-from ..graph import batch as graph_batch
+from .. import convert
+from .. import batch
+from .. import backend as F
 
 _urls = {
     'cora_v2' : 'dataset/cora_v2.zip',
@@ -133,12 +134,12 @@ class CitationGraphDataset(object):
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
-        g = DGLGraph(self.graph)
-        g.ndata['train_mask'] = self.train_mask
-        g.ndata['val_mask'] = self.val_mask
-        g.ndata['test_mask'] = self.test_mask
-        g.ndata['label'] = self.labels
-        g.ndata['feat'] = self.features
+        g = convert.graph(self.graph)
+        g.ndata['train_mask'] = F.tensor(self.train_mask, F.bool)
+        g.ndata['val_mask'] = F.tensor(self.val_mask, F.bool)
+        g.ndata['test_mask'] = F.tensor(self.test_mask, F.bool)
+        g.ndata['label'] = F.tensor(self.labels, F.int64)
+        g.ndata['feat'] = F.tensor(self.features, F.float32)
         return g
 
     def __len__(self):
@@ -327,13 +328,13 @@ class CoraBinary(object):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(DGLGraph(elist))
+                        self.graphs.append(convert.graph(elist))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(DGLGraph(elist))
+                self.graphs.append(convert.graph(elist))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
             self.pmpds = _pickle_load(f)
         self.labels = []
@@ -359,9 +360,9 @@ class CoraBinary(object):
         return (self.graphs[i], self.pmpds[i], self.labels[i])
 
     @staticmethod
-    def collate_fn(batch):
-        graphs, pmpds, labels = zip(*batch)
-        batched_graphs = graph_batch(graphs)
+    def collate_fn(cur):
+        graphs, pmpds, labels = zip(*cur)
+        batched_graphs = batch.batch(graphs)
         batched_pmpds = sp.block_diag(pmpds)
         batched_labels = np.concatenate(labels, axis=0)
         return batched_graphs, batched_pmpds, batched_labels

@@ -1,4 +1,4 @@
-"""Utility module."""
+"""Internal utilities."""
 from __future__ import absolute_import, division
 
 from collections.abc import Mapping, Iterable
@@ -6,9 +6,9 @@ from collections import defaultdict
 from functools import wraps
 import numpy as np
 
-from .base import DGLError, dgl_warning
-from . import backend as F
-from . import ndarray as nd
+from ..base import DGLError, dgl_warning
+from .. import backend as F
+from .. import ndarray as nd
 
 
 class InconsistentDtypeException(DGLError):
@@ -684,3 +684,27 @@ class FlattenedDict(object):
         k = self._group_keys[i]
         j = idx - self._group_offsets[i]
         return k, self._groups[k][j]
+
+def compensate(ids, origin_ids):
+    """computing the compensate set of ids from origin_ids
+
+    Note: ids should be a subset of origin_ids.
+    Any of ids and origin_ids can be non-consecutive,
+    and origin_ids should be sorted.
+
+    Example:
+    >>> ids = th.Tensor([0, 2, 4])
+    >>> origin_ids = th.Tensor([0, 1, 2, 4, 5])
+    >>> compensate(ids, origin_ids)
+    th.Tensor([1, 5])
+    """
+    # trick here, eid_0 or nid_0 can be 0.
+    mask = F.scatter_row(origin_ids,
+                         F.copy_to(F.tensor(0, dtype=F.int64),
+                                   F.context(origin_ids)),
+                         F.copy_to(F.tensor(1, dtype=F.dtype(origin_ids)),
+                                   F.context(origin_ids)))
+    mask = F.scatter_row(mask,
+                         ids,
+                         F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids)))
+    return F.tensor(F.nonzero_1d(mask), dtype=F.dtype(ids))

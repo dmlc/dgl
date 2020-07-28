@@ -67,8 +67,10 @@ def from_np(f, *args):
 @from_np
 def step(i, j, g, lg, deg_g, deg_lg, pm_pd):
     """ One step of training. """
-    deg_g = deg_g.to(dev)
-    deg_lg = deg_lg.to(dev)
+    g = g.to(dev)
+    lg = lg.to(dev)
+    deg_g = deg_g.to(dev).unsqueeze(1)
+    deg_lg = deg_lg.to(dev).unsqueeze(1)
     pm_pd = pm_pd.to(dev)
     t0 = time.time()
     z = model(g, lg, deg_g, deg_lg, pm_pd)
@@ -88,8 +90,10 @@ def step(i, j, g, lg, deg_g, deg_lg, pm_pd):
 
 @from_np
 def inference(g, lg, deg_g, deg_lg, pm_pd):
-    deg_g = deg_g.to(dev)
-    deg_lg = deg_lg.to(dev)
+    g = g.to(dev)
+    lg = lg.to(dev)
+    deg_g = deg_g.to(dev).unsqueeze(1)
+    deg_lg = deg_lg.to(dev).unsqueeze(1)
     pm_pd = pm_pd.to(dev)
 
     z = model(g, lg, deg_g, deg_lg, pm_pd)

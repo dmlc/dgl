@@ -47,8 +47,10 @@ class DistEmbedding:
 
     def __call__(self, idx):
         idx = utils.toindex(idx).tousertensor()
-        emb = F.attach_grad(self._tensor[idx])
-        self._trace.append((idx, emb))
+        emb = self._tensor[idx]
+        if F.is_recording():
+            emb = F.attach_grad(emb)
+            self._trace.append((idx, emb))
         return emb
 
 class SparseAdagradUDF:

@@ -142,6 +142,10 @@ def check_dist_graph(g, num_nodes, num_edges):
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
         emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb2', emb_init)
+        with F.no_grad():
+            feats1 = emb(nids)
+        assert np.all(F.asnumpy(feats1) == 0)
+
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
             feats1 = emb(nids)
@@ -151,7 +155,8 @@ def check_dist_graph(g, num_nodes, num_edges):
             loss = F.sum(feats + 1, 0)
         loss.backward()
         optimizer.step()
-        feats = emb(nids)
+        with F.no_grad():
+            feats = emb(nids)
         assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
@@ -257,15 +262,15 @@ def test_split():
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
-        nodes2 = node_split(node_mask, gpb, i)
+        nodes2 = node_split(node_mask, gpb, i, force_even=False)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes2)))
         local_nids = F.asnumpy(local_nids)
         for n in nodes1:
             assert n in local_nids
 
         dgl.distributed.set_num_client(num_parts * 2)
-        nodes3 = node_split(node_mask, gpb, i * 2)
-        nodes4 = node_split(node_mask, gpb, i * 2 + 1)
+        nodes3 = node_split(node_mask, gpb, i * 2, force_even=False)
+        nodes4 = node_split(node_mask, gpb, i * 2 + 1, force_even=False)
         nodes5 = F.cat([nodes3, nodes4], 0)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes5)))
 
@@ -273,15 +278,15 @@ def test_split():
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
-        edges2 = edge_split(edge_mask, gpb, i)
+        edges2 = edge_split(edge_mask, gpb, i, force_even=False)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges2)))
         local_eids = F.asnumpy(local_eids)
         for e in edges1:
             assert e in local_eids
 
         dgl.distributed.set_num_client(num_parts * 2)
-        edges3 = edge_split(edge_mask, gpb, i * 2)
-        edges4 = edge_split(edge_mask, gpb, i * 2 + 1)
+        edges3 = edge_split(edge_mask, gpb, i * 2, force_even=False)
+        edges4 = edge_split(edge_mask, gpb, i * 2 + 1, force_even=False)
         edges5 = F.cat([edges3, edges4], 0)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
