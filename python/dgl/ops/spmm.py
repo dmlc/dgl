@@ -8,13 +8,14 @@ __all__ = ['gspmm']
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     r""" Generalized Sparse Matrix Multiplication interface.
     It fuses two steps into one kernel.
-    (1) Computes messages by :attr:`op` source node and edge features.
-    (2) Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
+
+    1. Computes messages by :attr:`op` source node and edge features.
+    2. Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
 
     .. math::
         x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
 
-    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    where :math:`x_v` is the returned feature on destination nodes, and :math:`x_u`,
     :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
     operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
     :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.

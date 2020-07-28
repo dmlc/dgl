@@ -16,7 +16,8 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
     :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
     is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
-    we apply gsddmm on: :attr:`g`. $lhs$ and $rhs$ are one of $u,v,e$'s.
+    we apply gsddmm on: :attr:`g`. :math:`lhs` and :math:`rhs` are one of
+    :math:`u,v,e`'s.
 
     Parameters
     ----------
