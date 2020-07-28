@@ -60,43 +60,54 @@ def main(args):
     else:
         raise ValueError()
 
-    # Load from hetero-graph
-    hg = dataset[0]
+    # preprocessing in cpu
+    with tf.device("/cpu:0"):
+        # Load from hetero-graph
+        hg = dataset[0]
 
-    num_rels = len(hg.canonical_etypes)
-    num_of_ntype = len(hg.ntypes)
-    category = dataset.predict_category
-    num_classes = dataset.num_classes
-    train_mask = hg.nodes[category].data.pop('train_mask')
-    test_mask = hg.nodes[category].data.pop('test_mask')
-    train_idx = tf.squeeze(tf.where(train_mask))
-    test_idx = tf.squeeze(tf.where(test_mask))
-    labels = hg.nodes[category].data.pop('labels')
+        num_rels = len(hg.canonical_etypes)
+        num_of_ntype = len(hg.ntypes)
+        category = dataset.predict_category
+        num_classes = dataset.num_classes
+        train_mask = hg.nodes[category].data.pop('train_mask')
+        test_mask = hg.nodes[category].data.pop('test_mask')
+        train_idx = tf.squeeze(tf.where(train_mask))
+        test_idx = tf.squeeze(tf.where(test_mask))
+        labels = hg.nodes[category].data.pop('labels')
 
-    # split dataset into train, validate, test
-    if args.validation:
-        val_idx = train_idx[:len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5:]
+        # split dataset into train, validate, test
+        if args.validation:
+            val_idx = train_idx[:len(train_idx) // 5]
+            train_idx = train_idx[len(train_idx) // 5:]
+        else:
+            val_idx = train_idx
+
+        # calculate norm for each edge type and store in edge
+        for canonical_etypes in hg.canonical_etypes:
+            u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
+            _, inverse_index, count = tf.unique_with_counts(v)
+            degrees = tf.gather(count, inverse_index)
+            norm = tf.ones(eid.shape[0]) / tf.cast(degrees, tf.float32)
+            norm = tf.expand_dims(norm, 1)
+            hg.edges[canonical_etypes].data['norm'] = norm
+
+        # get target category id
+        category_id = len(hg.ntypes)
+        for i, ntype in enumerate(hg.ntypes):
+            if ntype == category:
+                category_id = i
+
+        # edge type and normalization factor
+        g = dgl.to_homo(hg)
+
+    # check cuda
+    if args.gpu < 0:
+        device = "/cpu:0"
+        use_cuda = False
     else:
-        val_idx = train_idx
-
-    # calculate norm for each edge type and store in edge
-    for canonical_etypes in hg.canonical_etypes:
-        u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
-        _, inverse_index, count = tf.unique_with_counts(v)
-        degrees = tf.gather(count, inverse_index)
-        norm = tf.ones(eid.shape[0]) / tf.cast(degrees, tf.float32)
-        norm = tf.expand_dims(norm, 1)
-        hg.edges[canonical_etypes].data['norm'] = norm
-
-    # get target category id
-    category_id = len(hg.ntypes)
-    for i, ntype in enumerate(hg.ntypes):
-        if ntype == category:
-            category_id = i
-
-    # edge type and normalization factor
-    g = dgl.to_homo(hg)
+        device = "/gpu:{}".format(args.gpu)
+        g = g.to(device)
+        use_cuda = True
     num_nodes = g.number_of_nodes()
     node_ids = tf.range(num_nodes, dtype=tf.int64)
     edge_norm = g.edata['norm']
@@ -109,15 +120,6 @@ def main(args):
 
     # since the nodes are featureless, the input feature is then the node id.
     feats = tf.range(num_nodes, dtype=tf.int64)
-
-    # check cuda
-    if args.gpu < 0:
-        device = "/cpu:0"
-        use_cuda = False
-    else:
-        device = "/gpu:{}".format(args.gpu)
-        g = g.to(device)
-        use_cuda = True
 
     with tf.device(device):
         # create model
