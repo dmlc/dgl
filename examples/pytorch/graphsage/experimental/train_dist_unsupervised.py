@@ -323,7 +323,7 @@ def run(args, device, data):
         print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
 
     # sync for eval and test
-    if not args.standalone:
+    if not args.standalone
         th.distributed.barrier()
 
     if not args.standalone:
