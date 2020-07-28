@@ -2,6 +2,7 @@
 """Multiprocess dataloader for distributed training"""
 import multiprocessing as mp
 import time
+import traceback
 
 from . import exit_client
 from .rpc_client import get_sampler_pool
@@ -12,8 +13,13 @@ __all__ = ["DistDataLoader"]
 
 def call_collate_fn(next_data):
     """Call collate function"""
-    result = DGL_GLOBAL_COLLATE_FN(next_data)
-    DGL_GLOBAL_MP_QUEUE.put(result)
+    try:
+        result = DGL_GLOBAL_COLLATE_FN(next_data)
+        DGL_GLOBAL_MP_QUEUE.put(result)
+    except Exception as e:
+        traceback.print_exc()
+        print(e)
+        raise e
     return 1
 
 
