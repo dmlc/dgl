@@ -17,6 +17,7 @@ from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import NODE_PART_POLICY, EDGE_PART_POLICY
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
+from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
 from .dist_tensor import DistTensor, _get_data_name
@@ -295,9 +296,6 @@ class DistGraph:
         The partition config file. It's used in the standalone mode.
     '''
     def __init__(self, ip_config, graph_name, gpb=None, conf_file=None):
-        self.ip_config = ip_config
-        self.graph_name = graph_name
-        self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert conf_file is not None, \
                     'When running in the standalone model, the partition config file is required'
@@ -315,39 +313,22 @@ class DistGraph:
                 self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
             rpc.set_num_client(1)
         else:
-            self._init()
+            connect_to_server(ip_config=ip_config)
+            self._client = KVClient(ip_config)
+            g = _get_graph_from_shared_mem(graph_name)
+            if g is not None:
+                self._g = as_heterograph(g)
+            else:
+                self._g = None
+            self._gpb = get_shared_mem_partition_book(graph_name, self._g)
+            if self._gpb is None:
+                self._gpb = gpb
+            self._client.barrier()
+            self._client.map_shared_data(self._gpb)
 
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
 
-        self._num_nodes = 0
-        self._num_edges = 0
-        for part_md in self._gpb.metadata():
-            self._num_nodes += int(part_md['num_nodes'])
-            self._num_edges += int(part_md['num_edges'])
-
-    def _init(self):
-        ip_config, graph_name, gpb = self.ip_config, self.graph_name, self._gpb_input
-        self._client = KVClient(ip_config)
-        g = _get_graph_from_shared_mem(graph_name)
-        if g is not None:
-            self._g = as_heterograph(g)
-        else:
-            self._g = None
-        self._gpb = get_shared_mem_partition_book(graph_name, self._g)
-        if self._gpb is None:
-            self._gpb = gpb
-        self._client.map_shared_data(self._gpb)
-
-    def __getstate__(self):
-        return self.ip_config, self.graph_name, self._gpb_input
-
-    def __setstate__(self, state):
-        self.ip_config, self.graph_name, self._gpb_input = state
-        self._init()
-
-        self._ndata = NodeDataView(self)
-        self._edata = EdgeDataView(self)
         self._num_nodes = 0
         self._num_edges = 0
         for part_md in self._gpb.metadata():
