@@ -1,23 +1,21 @@
 # pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
-import numpy as np
 import multiprocessing as mp
 import time
-import os
 
 from . import exit_client
-from ..backend import backend_name
 from .rpc_client import get_sampler_pool
-from .rpc import get_rank
 from .. import backend as F
 
 __all__ = ["DistDataLoader"]
+
 
 def call_collate_fn(next_data):
     """Call collate function"""
     result = DGL_GLOBAL_COLLATE_FN(next_data)
     DGL_GLOBAL_MP_QUEUE.put(result)
     return 1
+
 
 def init_fn(collate_fn, queue, sig_queue):
     """Initialize setting collate function and mp.Queue in the subprocess"""
@@ -34,6 +32,7 @@ def init_fn(collate_fn, queue, sig_queue):
 def _exit():
     exit_client()
     time.sleep(1)
+
 
 class DistDataLoader:
     """DGL customized multiprocessing dataloader"""
@@ -83,11 +82,12 @@ class DistDataLoader:
             assert num_sampler_workers == num_workers, "Num workers should be the same"
         results = []
         for _ in range(num_workers):
-            results.append(self.pool.apply_async(init_fn, args=(collate_fn, self.queue, self.sig_queue)))
+            results.append(self.pool.apply_async(
+                init_fn, args=(collate_fn, self.queue, self.sig_queue)))
             time.sleep(0.1)
         for res in results:
             res.get()
-    
+
         self.dataset = F.tensor(dataset)
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
@@ -137,10 +137,9 @@ class DistDataLoader:
         ret = self.dataset[self.current_pos:end_pos]
         self.current_pos = end_pos
         return ret
-    
+
     def close(self):
         for _ in range(self.num_workers):
             self.pool.apply_async(_exit)
             time.sleep(0.1)
         self.pool.close()
-
