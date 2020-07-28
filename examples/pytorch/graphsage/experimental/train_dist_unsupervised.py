@@ -198,16 +198,14 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
     """
-    emb = emb[np.arange(emb.shape[0])].cpu().numpy()
+
+    emb = emb[np.arange(labels.shape[0])].cpu().numpy()
     train_nids = train_nids.cpu().numpy()
-    train_labels = labels[train_nids].cpu().numpy()
     val_nids = val_nids.cpu().numpy()
-    val_labels = labels[val_nids].cpu().numpy()
     test_nids = test_nids.cpu().numpy()
-    test_labels = labels[test_nids].cpu().numpy()
+    labels = labels.cpu().numpy()
 
     emb = (emb - emb.mean(0, keepdims=True)) / emb.std(0, keepdims=True)
-
     lr = lm.LogisticRegression(multi_class='multinomial', max_iter=10000)
     lr.fit(emb[train_nids], labels[train_nids])
 
@@ -321,22 +319,20 @@ def run(args, device, data):
     else:
         pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
     if g.rank() == 0:
-        compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
+        eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
+        print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
 
     if not args.standalone:
         g._client.barrier()
 
         # save features into file
         if g.rank() == 0:
-            feat = g.ndata['features']
-            th.save(feat, 'feat.pt')
             th.save(pred, 'emb.pt')
 
         dgl.distributed.shutdown_servers()
         dgl.distributed.finalize_client()
     else:
         feat = g.ndata['features']
-        th.save(feat, 'feat.pt')
         th.save(pred, 'emb.pt')
 
 def main(args):
