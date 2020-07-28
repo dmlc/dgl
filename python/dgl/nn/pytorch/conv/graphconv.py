@@ -61,11 +61,10 @@ class GraphConv(nn.Module):
     activation: callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    add_self_loop: bool, optional
-        Add self-loop to graph when compute Conv. If no self-loop is added, the feature for a node with zero
-        in-degree will be all zero after Conv. This is harmful for some applications. We recommend adding
-        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
-        need to set add_self_loop to ``True`` here.
+    allow_zero_in_degree: bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid (all zeros in our implementation).
+        This is harmful for some applications causing silent performance regression. Thus we will let the code break if
+        we detect 0-in-degree nodes. However, we provide the flexibilty to suppress this check by setting ``True`` to this param.
 
     Attributes
     ----------
@@ -74,7 +73,7 @@ class GraphConv(nn.Module):
     bias : torch.Tensor
         The learnable bias tensor.
 
-    Example
+    Examples
     -----
     >>> import dgl
     >>> import numpy as np
@@ -125,7 +124,7 @@ class GraphConv(nn.Module):
                  weight=True,
                  bias=True,
                  activation=None,
-                 add_self_loop=False):
+                 allow_zero_in_degree=False):
         super(GraphConv, self).__init__()
         if norm not in ('none', 'both', 'right'):
             raise DGLError('Invalid norm value. Must be either "none", "both" or "right".'
@@ -133,7 +132,7 @@ class GraphConv(nn.Module):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._add_self_loop = add_self_loop
+        self._allow_zero_in_degree = allow_zero_in_degree
 
         if weight:
             self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
@@ -189,10 +188,15 @@ class GraphConv(nn.Module):
             The output feature
         """
         with graph.local_scope():
-            if self._add_self_loop:
-                graph = transform.add_self_loop(graph)
+            if not self._allow_zero_in_degree:
+                if (graph.in_degrees() == 0).any():
+                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
+                                   'This is harmful for some applications, causing silent performance regression.'
+                                   'We suggest adding self-loop on the input graph by calling `g = transform.add_self_loop(g)`.'
+                                   'If we want to suppress this check, we can assign allow_zero_in_degree to be `True` when constructing this module.')
 
-            feat_src, feat_dst = expand_as_pair(feat)
+            # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
+            feat_src, feat_dst = expand_as_pair(feat, graph)
             if self._norm == 'both':
                 degs = graph.out_degrees().float().clamp(min=1)
                 norm = th.pow(degs, -0.5)
