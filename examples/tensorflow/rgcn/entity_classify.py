@@ -202,8 +202,6 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
-    parser.add_argument("--relabel", default=False, action='store_true',
-            help="remove untouched nodes and relabel")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
     fp = parser.add_mutually_exclusive_group(required=False)
