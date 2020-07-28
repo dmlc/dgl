@@ -133,7 +133,7 @@ def merge_graphs(res_list, num_nodes):
         dst_tensor = res_list[0].global_dst
         eid_tensor = res_list[0].global_eids
     g = graph((src_tensor, dst_tensor),
-              restrict_format='coo', num_nodes=num_nodes)
+              formats=('coo',), num_nodes=num_nodes)
     g.edata[EID] = eid_tensor
     return g
 
