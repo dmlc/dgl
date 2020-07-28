@@ -17,16 +17,16 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     lhs_str = target_dict[lhs_target]
     rhs_str = target_dict[rhs_target]
     docstring = r"""Generalized SDDMM function.
-    It computes edge features by {} {} features and {} features.
+    It computes edge features by {op} {lhs} features and {rhs} features.
 
     Parameters
     ----------
     g : DGLHeteroGraph
         The input graph
     x : tensor
-        The {} features.
+        The {lhs} features.
     y : tensor
-        The {} features.
+        The {rhs} features.
 
     Returns
     -------
@@ -42,8 +42,7 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     Broadcasting follows NumPy semantics. Please see
     https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
     for more details about the NumPy broadcasting semantics.
-    """.format(binary_op, lhs_str, rhs_str,
-               lhs_str, rhs_str)
+    """.format(op=binary_op, lhs=lhs_str, rhs=rhs_str)
 
     def func(g, x, y):
         return gsddmm(g, binary_op, x, y,
