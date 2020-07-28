@@ -78,6 +78,8 @@ def main(args):
     g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
+    if cuda:
+        g = g.to(args.gpu)
     n_edges = g.number_of_edges()
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]

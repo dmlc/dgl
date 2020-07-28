@@ -12,7 +12,7 @@ import numpy as np
 import os
 
 from .. import backend as F
-from ..graph import DGLGraph
+from ..convert import from_networkx
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 from ..utils import retry_method_with_fix
 
@@ -121,8 +121,7 @@ class SST(object):
         # add root
         g.add_node(0, x=SST.PAD_WORD, y=int(root.label()), mask=0)
         _rec_build(0, root)
-        ret = DGLGraph()
-        ret.from_networkx(g, node_attrs=['x', 'y', 'mask'])
+        ret = from_networkx(g, node_attrs=['x', 'y', 'mask'])
         return ret
 
     def __getitem__(self, idx):

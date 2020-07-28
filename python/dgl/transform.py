@@ -7,43 +7,43 @@ import numpy as np
 from scipy import sparse
 
 from ._ffi.function import _init_api
-from .graph import DGLGraph
+from .base import EID, NID, dgl_warning, DGLError, is_internal_column
+from . import convert
 from .heterograph import DGLHeteroGraph, DGLBlock
 from . import ndarray as nd
 from . import backend as F
-from .graph_index import from_coo
-from .graph_index import _get_halo_subgraph_inner_node
-from .graph import unbatch
-from .convert import graph, bipartite, heterograph
-from . import utils
-from .base import EID, NID, DGLError, is_internal_column
-from . import ndarray as nd
+from . import utils, batch
 from .partition import metis_partition_assignment as hetero_metis_partition_assignment
 from .partition import partition_graph_with_halo as hetero_partition_graph_with_halo
 from .partition import metis_partition as hetero_metis_partition
 
+# TO BE DEPRECATED
+from .graph import DGLGraph as DGLGraphStale
+from .graph_index import _get_halo_subgraph_inner_node
+
 __all__ = [
     'line_graph',
-    'line_heterograph',
     'khop_adj',
     'khop_graph',
     'reverse',
-    'reverse_heterograph',
-    'to_simple_graph',
     'to_bidirected',
     'to_bidirected_stale',
     'laplacian_lambda_max',
     'knn_graph',
     'segmented_knn_graph',
+    'add_edges',
+    'add_nodes',
+    'remove_edges',
+    'remove_nodes',
     'add_self_loop',
     'remove_self_loop',
     'metapath_reachable_graph',
     'compact_graphs',
     'to_block',
     'to_simple',
+    'to_simple_graph',
     'in_subgraph',
     'out_subgraph',
-    'remove_edges',
     'as_immutable_graph',
     'as_heterograph']
 
@@ -102,8 +102,7 @@ def knn_graph(x, k):
         (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
         shape=(n_samples * n_points, n_samples * n_points))
 
-    g = DGLGraph(adj, readonly=True)
-    return g
+    return convert.graph(adj)
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs):
@@ -145,7 +144,7 @@ def segmented_knn_graph(x, k, segs):
     src = F.reshape(src, (-1,))
     adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
 
-    g = DGLGraph(adj, readonly=True)
+    g = convert.graph(adj)
     return g
 
 def to_bidirected(g, readonly=None, copy_ndata=True,
@@ -262,7 +261,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
             u, v = g.edges(form='uv', order='eid', etype=c_etype)
             subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = heterograph(subgs)
+        new_g = convert.heterograph(subgs)
     else:
         subgs = {}
         for c_etype in canonical_etypes:
@@ -273,7 +272,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
                 u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = heterograph(subgs)
+        new_g = convert.heterograph(subgs)
 
     # handle features
     if copy_ndata:
@@ -299,27 +298,6 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
-    Parameters
-    ----------
-    g : dgl.DGLGraph
-        The input graph.
-    backtracking : bool, optional
-        Whether the returned line graph is backtracking.
-    shared : bool, optional
-        Whether the returned line graph shares representations with `self`.
-
-    Returns
-    -------
-    DGLGraph
-        The line graph of this graph.
-    """
-    graph_data = g._graph.line_graph(backtracking)
-    node_frame = g._edge_frame if shared else None
-    return DGLGraph(graph_data, node_frame)
-
-def line_heterograph(g, backtracking=True):
-    """Return the line graph of this graph.
-
     The graph should be an directed homogeneous graph. Aother type of graphs
     are not supported right now.
 
@@ -327,8 +305,13 @@ def line_heterograph(g, backtracking=True):
 
     Parameters
     ----------
-    backtracking : bool
+    g : DGLGraph
+        Input graph.
+    backtracking : bool, optional
         Whether the pair of (v, u) (u, v) edges are treated as linked. Default True.
+    shared : bool, optional
+        Whether to copy the edge features of the original graph as the node features
+        of the result line graph.
 
     Returns
     -------
@@ -357,12 +340,15 @@ def line_heterograph(g, backtracking=True):
     ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
 
     """
-    assert g.is_homograph(), \
+    assert g.is_homogeneous(), \
         'line_heterograph only support directed homogeneous graph right now'
+    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
+    if shared:
+        # copy edge features
+        lg.ndata.update(g.edata)
+    return lg
 
-    hgidx = _CAPI_DGLHeteroLineGraph(g._graph, backtracking)
-    hg = DGLHeteroGraph(hgidx, g._etypes, g._ntypes)
-    return hg
+DGLHeteroGraph.line_graph = line_graph
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
@@ -456,82 +442,9 @@ def khop_graph(g, k):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    return DGLGraph(from_coo(n, row, col, True))
+    return convert.graph((row, col), num_nodes=n)
 
-def reverse(g, copy_ndata=False, copy_edata=False):
-    """Return the reverse of a graph
-    The reverse (also called converse, transpose) of a directed graph is another directed
-    graph on the same nodes with edges reversed in terms of direction.
-    Given a :class:`dgl.DGLGraph` object, we return another :class:`dgl.DGLGraph` object
-    representing its reverse.
-
-    Parameters
-    ----------
-    g : dgl.DGLGraph
-        The input graph.
-    copy_ndata: bool, optional
-        If True, node attributes are copied from the original graph to the reversed graph.
-        Otherwise the reversed graph will not be initialized with node attributes.
-    copy_edata: bool, optional
-        If True, edge attributes are copied from the original graph to the reversed graph.
-        Otherwise the reversed graph will not have edge attributes.
-
-    Return
-    ------
-    dgl.DGLGraph
-        The reversed graph.
-
-    Notes
-    -----
-    * We do not dynamically update the topology of a graph once that of its reverse changes.
-      This can be particularly problematic when the node/edge attrs are shared. For example,
-      if the topology of both the original graph and its reverse get changed independently,
-      you can get a mismatched node/edge feature.
-
-    Examples
-    --------
-    Create a graph to reverse.
-    >>> import dgl
-    >>> import torch as th
-    >>> g = dgl.DGLGraph()
-    >>> g.add_nodes(3)
-    >>> g.add_edges([0, 1, 2], [1, 2, 0])
-    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
-    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
-    Reverse the graph and examine its structure.
-    >>> rg = g.reverse(copy_ndata=True, copy_edata=True)
-    >>> print(rg)
-    DGLGraph with 3 nodes and 3 edges.
-    Node data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-    Edge data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-    The edges are reversed now.
-    >>> rg.has_edges_between([1, 2, 0], [0, 1, 2])
-    tensor([1, 1, 1])
-    Reversed edges have the same feature as the original ones.
-    >>> g.edges[[0, 2], [1, 0]].data['h'] == rg.edges[[1, 0], [0, 2]].data['h']
-    tensor([[1],
-            [1]], dtype=torch.uint8)
-    The node/edge features of the reversed graph share memory with the original
-    graph, which is helpful for both forward computation and back propagation.
-    >>> g.ndata['h'] = g.ndata['h'] + 1
-    >>> rg.ndata['h']
-    tensor([[1.],
-            [2.],
-            [3.]])
-    """
-    g_reversed = DGLGraph()
-    g_reversed.add_nodes(g.number_of_nodes())
-    g_edges = g.all_edges(order='eid')
-    g_reversed.add_edges(g_edges[1], g_edges[0])
-    g_reversed._batch_num_nodes = g._batch_num_nodes
-    g_reversed._batch_num_edges = g._batch_num_edges
-    if copy_ndata:
-        g_reversed._node_frame = g._node_frame
-    if copy_edata:
-        g_reversed._edge_frame = g._edge_frame
-    return g_reversed
-
-def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
+def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_edata=None):
     r"""Return the reverse of a graph.
 
     The reverse (also called converse, transpose) of a graph with edges
@@ -649,6 +562,14 @@ def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
     >>> rg.edges['plays'].data
     {}
     """
+    if share_ndata is not None:
+        dgl_warning('share_ndata argument has been renamed to copy_ndata.')
+        copy_ndata = share_ndata
+    if share_edata is not None:
+        dgl_warning('share_edata argument has been renamed to copy_edata.')
+        copy_edata = share_edata
+    if g.is_block:
+        raise DGLError('Reversing a block graph is not allowed.')
     # TODO(0.5 release, xiangsx) need to handle BLOCK
     # currently reversing a block results in undefined behavior
     gidx = g._graph.reverse()
@@ -672,12 +593,12 @@ def reverse_heterograph(g, copy_ndata=True, copy_edata=False):
 
     return new_g
 
-DGLHeteroGraph.reverse = reverse_heterograph
+DGLHeteroGraph.reverse = reverse
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
 
-    The function generates a new *readonly* graph with no node/edge feature.
+    DEPRECATED: renamed to dgl.to_simple
 
     Parameters
     ----------
@@ -689,8 +610,8 @@ def to_simple_graph(g):
     DGLGraph
         A simple graph.
     """
-    gidx = _CAPI_DGLToSimpleGraph(g._graph)
-    return DGLGraph(gidx, readonly=True)
+    dgl_warning('dgl.to_simple_graph is renamed to dgl.to_simple in v0.5.')
+    return to_simple(g)
 
 def to_bidirected_stale(g, readonly=True):
     """Convert the graph to a bidirected graph.
@@ -733,7 +654,7 @@ def to_bidirected_stale(g, readonly=True):
         newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
     else:
         newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
-    return DGLGraph(newgidx)
+    return DGLGraphStale(newgidx)
 
 def laplacian_lambda_max(g):
     """Return the largest eigenvalue of the normalized symmetric laplacian of g.
@@ -762,7 +683,7 @@ def laplacian_lambda_max(g):
     >>> dgl.laplacian_lambda_max(g)
     [1.809016994374948]
     """
-    g_arr = unbatch(g)
+    g_arr = batch.unbatch(g)
     rst = []
     for g_i in g_arr:
         n = g_i.number_of_nodes()
@@ -803,7 +724,6 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or bipartite graph.
     """
     adj = 1
-    index_dtype = g._idtype_str
     for etype in metapath:
         adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
@@ -812,82 +732,489 @@ def metapath_reachable_graph(g, metapath):
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     if srctype == dsttype:
         assert adj.shape[0] == adj.shape[1]
-        new_g = graph(adj, ntype=srctype, index_dtype=index_dtype)
+        new_g = convert.graph(adj, ntype=srctype, idtype=g.idtype, device=g.device)
     else:
-        new_g = bipartite(adj, utype=srctype, vtype=dsttype, index_dtype=index_dtype)
+        new_g = convert.bipartite(adj, utype=srctype, vtype=dsttype,
+                                  idtype=g.idtype, device=g.device)
 
+    # copy srcnode features
     for key, value in g.nodes[srctype].data.items():
         new_g.nodes[srctype].data[key] = value
+    # copy dstnode features
     if srctype != dsttype:
         for key, value in g.nodes[dsttype].data.items():
             new_g.nodes[dsttype].data[key] = value
 
     return new_g
 
-def add_self_loop(g):
-    """Return a new graph containing all the edges in the input graph plus self loops
-    of every nodes.
-    No duplicate self loop will be added for nodes already having self loops.
-    Self-loop edges id are not preserved. All self-loop edges would be added at the end.
+def add_nodes(g, num, data=None, ntype=None):
+    r"""Add new nodes of the same node type.
+    A new graph with newly added nodes is returned.
+
+    Parameters
+    ----------
+    num : int
+        Number of nodes to add.
+    data : dict, optional
+        Feature data of the added nodes.
+    ntype : str, optional
+        The type of the new nodes. Can be omitted if there is
+        only one node type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with newly added nodes.
+
+    Notes
+    -----
+
+    * If the key of ``data`` does not contain some existing feature fields,
+    those features for the new nodes will be filled with zeros).
+    * If the key of ``data`` contains new feature fields, those features for
+    the old nodes will be filled zeros).
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+    >>> g.num_nodes()
+    3
+    >>> g = dgl.add_nodes(g, 2)
+    >>> g.num_nodes()
+    5
+
+    If the graph has some node features and new nodes are added without
+    features, their features will be created by initializers defined
+    with :func:`set_n_initializer`.
+
+    >>> g.ndata['h'] = torch.ones(5, 1)
+    >>> g = dgl.add_nodes(g, 1)
+    >>> g.ndata['h']
+    tensor([[1.], [1.], [1.], [1.], [1.], [0.]])
+
+    We can also assign features for the new nodes in adding new nodes.
+
+    >>> g = dgl.add_nodes(g, 1, {'h': torch.ones(1, 1), 'w': torch.ones(1, 1)})
+    >>> g.ndata['h']
+    tensor([[1.], [1.], [1.], [1.], [1.], [0.], [1.]])
+
+    Since ``data`` contains new feature fields, the features for old nodes
+    will be created by initializers defined with :func:`set_n_initializer`.
+
+    >>> g.ndata['w']
+    tensor([[0.], [0.], [0.], [0.], [0.], [0.], [1.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.add_nodes(g, 2)
+    DGLError: Node type name must be specified
+    if there are more than one node types.
+    >>> g.num_nodes('user')
+    3
+    >>> g = dgl.add_nodes(g, 2, ntype='user')
+    >>> g.num_nodes('user')
+    5
+
+    See Also
+    --------
+    remove_nodes
+    add_edges
+    remove_edges
+    """
+    g = g.clone()
+    g.add_nodes(num, data=data, ntype=ntype)
+    return g
+
+def add_edges(g, u, v, data=None, etype=None):
+    r"""Add multiple new edges for the specified edge type.
+    A new graph with newly added edges is returned.
+
+    The i-th new edge will be from ``u[i]`` to ``v[i]``.
+
+    Parameters
+    ----------
+    u : int, tensor, numpy.ndarray, list
+        Source node IDs, ``u[i]`` gives the source node for the i-th new edge.
+    v : int, tensor, numpy.ndarray, list
+        Destination node IDs, ``v[i]`` gives the destination node for the i-th new edge.
+    data : dict, optional
+        Feature data of the added edges. The i-th row of the feature data
+        corresponds to the i-th new edge.
+    etype : str or tuple of str, optional
+        The type of the new edges. Can be omitted if there is
+        only one edge type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with newly added edges.
+
+    Notes
+    -----
+    * If end nodes of adding edges does not exists, add_nodes is invoked
+    to add new nodes. The node features of the new nodes will be created
+    by initializers defined with :func:`set_n_initializer` (default
+    initializer fills zeros). In certain cases, it is recommanded to
+    add_nodes first and then add_edges.
+    * If the key of ``data`` does not contain some existing feature fields,
+    those features for the new edges will be created by initializers
+    defined with :func:`set_n_initializer` (default initializer fills zeros).
+    * If the key of ``data`` contains new feature fields, those features for
+    the old edges will be created by initializers defined with
+    :func:`set_n_initializer` (default initializer fills zeros).
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+    >>> import dgl
+    >>> import torch
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
+    >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+    >>> g.num_edges()
+    2
+    >>> g = dgl.add_edges(g, torch.tensor([1, 3]), torch.tensor([0, 1]))
+    >>> g.num_edges()
+    4
+    Since ``u`` or ``v`` contains a non-existing node ID, the nodes are
+    added implicitly.
+    >>> g.num_nodes()
+    4
+
+    If the graph has some edge features and new edges are added without
+    features, their features will be created by initializers defined
+    with :func:`set_n_initializer`.
+
+    >>> g.edata['h'] = torch.ones(4, 1)
+    >>> g = dgl.add_edges(g, torch.tensor([1]), torch.tensor([1]))
+    >>> g.edata['h']
+    tensor([[1.], [1.], [1.], [1.], [0.]])
+
+    We can also assign features for the new edges in adding new edges.
+
+    >>> g = dgl.add_edges(g, torch.tensor([0, 0]), torch.tensor([2, 2]),
+    >>>                   {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
+    >>> g.edata['h']
+    tensor([[1.], [1.], [1.], [1.], [0.], [1.], [2.]])
+    Since ``data`` contains new feature fields, the features for old edges
+    will be created by initializers defined with :func:`set_n_initializer`.
+    >>> g.edata['w']
+    tensor([[0.], [0.], [0.], [0.], [0.], [1.], [1.]])
+
+    **Heterogeneous Graphs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.add_edges(g, torch.tensor([3]), torch.tensor([3]))
+    DGLError: Edge type name must be specified
+    if there are more than one edge types.
+    >>> g.number_of_edges('plays')
+    4
+    >>> g = dgl.add_edges(g, torch.tensor([3]), torch.tensor([3]), etype='plays')
+    >>> g.number_of_edges('plays')
+    5
+
+    See Also
+    --------
+    add_nodes
+    remove_nodes
+    remove_edges
+    """
+    g = g.clone()
+    g.add_edges(u, v, data=data, etype=etype)
+    return g
+
+def remove_edges(g, eids, etype=None):
+    r"""Remove multiple edges with the specified edge type.
+    A new graph with certain edges deleted is returned.
+
+    Nodes will not be removed. After removing edges, the rest
+    edges will be re-indexed using consecutive integers from 0,
+    with their relative order preserved.
+    The features for the removed edges will be removed accordingly.
+
+    Parameters
+    ----------
+    eids : int, tensor, numpy.ndarray, list
+        IDs for the edges to remove.
+    etype : str or tuple of str, optional
+        The type of the edges to remove. Can be omitted if there is
+        only one edge type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with edges deleted.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+    >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g = dgl.remove_edges(g, torch.tensor([0, 1]))
+    >>> g
+    Graph(num_nodes=3, num_edges=1,
+        ndata_schemes={}
+        edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+    >>> g.edges('all')
+    (tensor([2]), tensor([2]), tensor([0]))
+    >>> g.edata['he']
+    tensor([[2.]])
+
+    **Heterogeneous Graphs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.remove_edges(g, torch.tensor([0, 1]))
+    DGLError: Edge type name must be specified
+    if there are more than one edge types.
+    >>> g = dgl.remove_edges(g, torch.tensor([0, 1]), 'plays')
+    >>> g.edges('all', etype='plays')
+    (tensor([0, 1]), tensor([0, 0]), tensor([0, 1]))
+    See Also
+    --------
+    add_nodes
+    add_edges
+    remove_nodes
+    """
+    g = g.clone()
+    g.remove_edges(eids, etype=etype)
+    return g
+
+
+def remove_nodes(g, nids, ntype=None):
+    r"""Remove multiple nodes with the specified node type.
+    A new graph with certain nodes deleted is returned.
+
+    Edges that connect to the nodes will be removed as well. After removing
+    nodes and edges, the rest nodes and edges will be re-indexed using
+    consecutive integers from 0, with their relative order preserved.
+    The features for the removed nodes/edges will be removed accordingly.
+
+    The features for the removed nodes/edges will be removed accordingly.
+
+    Parameters
+    ----------
+    nids : int, tensor, numpy.ndarray, list
+        Nodes to remove.
+    ntype : str, optional
+        The type of the nodes to remove. Can be omitted if there is
+        only one node type in the graph.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with nodes deleted.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+    >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g = dgl.remove_nodes(g, torch.tensor([0, 1]))
+    >>> g
+    Graph(num_nodes=1, num_edges=1,
+        ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
+        edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+    >>> g.ndata['hv']
+    tensor([[2.]])
+    >>> g.edata['he']
+    tensor([[2.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1])),
+    >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.remove_nodes(g, torch.tensor([0, 1]))
+    DGLError: Node type name must be specified
+    if there are more than one node types.
+    >>> g = dgl.remove_nodes(g, torch.tensor([0, 1]), ntype='game')
+    >>> g.num_nodes('user')
+    3
+    >>> g.num_nodes('game')
+    0
+    >>> g.num_edges('plays')
+    0
+
+    See Also
+    --------
+    add_nodes
+    add_edges
+    remove_edges
+    """
+    g = g.clone()
+    g.remove_nodes(nids, ntype=ntype)
+    return g
+
+def add_self_loop(g, etype=None):
+    r""" Add self loop for each node in the graph.
+    A new graph with self-loop is returned.
+
+    Since **selfloop is not well defined for unidirectional
+    bipartite graphs**, we simply skip the nodes corresponding
+    to unidirectional bipartite graphs.
+
+    Return
+    ------
+    DGLHeteroGraph
+        The graph with self-loop.
+
+    Notes
+    -----
+    * It is recommanded to ``remove_self_loop`` before invoking
+    ``add_self_loop``.
+    * Features for the new edges (self-loop edges) will be created
+    by initializers defined with :func:`set_n_initializer`
+    (default initializer fills zeros).
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
+
+    >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([2, 1, 0])))
+    >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
+    >>> g = dgl.add_self_loop(g)
+    >>> g
+    Graph(num_nodes=3, num_edges=6,
+            ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
+            edata_schemes={'he': Scheme(shape=(1,), dtype=torch.float32)})
+    >>> g.edata['he']
+    tensor([[0.],
+            [1.],
+            [2.],
+            [0.],
+            [0.],
+            [0.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+            ('user', 'follows', 'user'): (torch.tensor([1, 2]),
+                                        torch.tensor([0, 1])),
+            ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+                                        torch.tensor([0, 1]))})
+    >>> g = dgl.add_self_loop(g, etype='follows')
+    >>> g
+    Graph(num_nodes={'user': 3, 'game': 2},
+        num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 5},
+        metagraph=[('user', 'user'), ('user', 'game')])
+    """
+    etype = g.to_canonical_etype(etype)
+    if etype[0] != etype[2]:
+        raise DGLError(
+            'add_self_loop does not support unidirectional bipartite graphs: {}.' \
+            'Please make sure the types of head node and tail node are identical.' \
+            ''.format(etype))
+    nodes = g.nodes(etype[0])
+    new_g = add_edges(g, nodes, nodes, etype=etype)
+    return new_g
+
+DGLHeteroGraph.add_self_loop = add_self_loop
+
+def remove_self_loop(g, etype=None):
+    r""" Remove self loops for each node in the graph.
+    A new graph with self-loop removed is returned.
+
+    If there are multiple self loops for a certain node,
+    all of them will be removed.
+
+    Parameters
+    ----------
+    etype : str or tuple of str, optional
+        The type of the edges to remove. Can be omitted if there is
+        only one edge type in the graph.
 
     Examples
     ---------
 
-    >>> g = DGLGraph()
-    >>> g.add_nodes(5)
-    >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> new_g = dgl.transform.add_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
-    >>> new_g.edges()
-    (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
+    >>> import dgl
+    >>> import torch
 
-    Parameters
-    ------------
-    g: DGLGraph
+    **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
 
-    Returns
+    >>> g = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([1, 0, 0, 2])),
+                        idtype=idtype, device=F.ctx())
+    >>> g.edata['he'] = torch.arange(4).float().reshape(-1, 1)
+    >>> g = dgl.remove_self_loop(g)
+    >>> g
+    Graph(num_nodes=3, num_edges=2,
+        edata_schemes={'he': Scheme(shape=(2,), dtype=torch.float32)})
+    >>> g.edata['he']
+    tensor([[0.],[3.]])
+
+    **Heterogeneous Graphs with Multiple Node Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1, 1, 1, 2]),
+    >>>                                 torch.tensor([0, 0, 1, 1, 1])),
+    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+    >>>                                         torch.tensor([0, 1]))
+    >>>     })
+    >>> g = dgl.remove_self_loop(g)
+    >>> g.num_nodes('user')
+    3
+    >>> g.num_nodes('game')
+    2
+    >>> g.num_edges('follows')
+    2
+    >>> g.num_edges('plays')
+    2
+
+    See Also
     --------
-    DGLGraph
+    add_self_loop
     """
-    new_g = DGLGraph()
-    new_g.add_nodes(g.number_of_nodes())
-    src, dst = g.all_edges(order="eid")
-    src = F.zerocopy_to_numpy(src)
-    dst = F.zerocopy_to_numpy(dst)
-    non_self_edges_idx = src != dst
-    nodes = np.arange(g.number_of_nodes())
-    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
-    new_g.add_edges(nodes, nodes)
+    etype = g.to_canonical_etype(etype)
+    if etype[0] != etype[2]:
+        raise DGLError(
+            'remove_self_loop does not support unidirectional bipartite graphs: {}.' \
+            'Please make sure the types of head node and tail node are identical.' \
+            ''.format(etype))
+    u, v = g.edges(form='uv', order='eid', etype=etype)
+    self_loop_eids = F.tensor(F.nonzero_1d(u == v), dtype=F.dtype(u))
+    new_g = remove_edges(g, self_loop_eids, etype=etype)
     return new_g
 
-def remove_self_loop(g):
-    """Return a new graph with all self-loop edges removed
-
-    Examples
-    ---------
-
-    >>> g = DGLGraph()
-    >>> g.add_nodes(5)
-    >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> new_g = dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
-    >>> new_g.edges()
-    (tensor([0]), tensor([1]))
-
-    Parameters
-    ------------
-    g: DGLGraph
-
-    Returns
-    --------
-    DGLGraph
-    """
-    new_g = DGLGraph()
-    new_g.add_nodes(g.number_of_nodes())
-    src, dst = g.all_edges(order="eid")
-    src = F.zerocopy_to_numpy(src)
-    dst = F.zerocopy_to_numpy(dst)
-    non_self_edges_idx = src != dst
-    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
-    return new_g
+DGLHeteroGraph.remove_self_loop = remove_self_loop
 
 def reorder_nodes(g, new_node_ids):
     """ Generate a new graph with new node Ids.
@@ -914,7 +1241,7 @@ def reorder_nodes(g, new_node_ids):
             and F.asnumpy(sorted_ids[-1]) == g.number_of_nodes() - 1, \
             "The new node Ids are incorrect."
     new_gidx = _CAPI_DGLReorderGraph(g._graph, new_node_ids.todgltensor())
-    new_g = DGLGraph(new_gidx)
+    new_g = DGLGraphStale(new_gidx)
     new_g.ndata['orig_id'] = idx
     return new_g
 
@@ -981,7 +1308,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
 
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
-        subg1 = DGLGraph(graph_data=subg.graph, readonly=True)
+        subg1 = DGLGraphStale(graph_data=subg.graph, readonly=True)
         subg1.ndata[NID] = induced_nodes.tousertensor()
         subg1.edata[EID] = induced_edges.tousertensor()
         return subg1
@@ -1246,20 +1573,22 @@ def compact_graphs(graphs, always_preserve=None):
         return_single = True
     if len(graphs) == 0:
         return []
+    if graphs[0].is_block:
+        raise DGLError('Compacting a block graph is not allowed.')
 
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
-    graph_dtype = graphs[0]._idtype_str
-    graph_ctx = graphs[0]._graph.ctx
+    idtype = graphs[0].idtype
+    device = graphs[0].device
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
              ntypes, g.ntypes)
-        assert graph_dtype == g._idtype_str, "Expect graph data type to be {}, but got {}".format(
-            graph_dtype, g._idtype_str)
-        assert graph_ctx == g._graph.ctx, "Expect graph device to be {}, but got {}".format(
-            graph_ctx, g._graph.ctx)
+        assert idtype == g.idtype, "Expect graph data type to be {}, but got {}".format(
+            idtype, g.idtype)
+        assert device == g.device, "Expect graph device to be {}, but got {}".format(
+            device, g.device)
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:
@@ -1269,19 +1598,18 @@ def compact_graphs(graphs, always_preserve=None):
             raise ValueError("Node type must be given if multiple node types exist.")
         always_preserve = {ntypes[0]: always_preserve}
 
+    always_preserve = utils.prepare_tensor_dict(graphs[0], always_preserve, 'always_preserve')
     always_preserve_nd = []
     for ntype in ntypes:
         nodes = always_preserve.get(ntype, None)
         if nodes is None:
-            nodes = nd.empty([0], graph_dtype, graph_ctx)
-        else:
-            nodes = F.zerocopy_to_dgl_ndarray(nodes)
-        always_preserve_nd.append(nodes)
+            nodes = F.copy_to(F.tensor([], idtype), device)
+        always_preserve_nd.append(F.to_dgl_nd(nodes))
 
     # Compact and construct heterographs
     new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs(
         [g._graph for g in graphs], always_preserve_nd)
-    induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes) for nodes in induced_nodes]
+    induced_nodes = [F.from_dgl_nd(nodes) for nodes in induced_nodes]
 
     new_graphs = [
         DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
@@ -1446,7 +1774,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
         g._graph, dst_nodes_nd, include_dst_in_src)
 
     # The new graph duplicates the original node types to SRC and DST sets.
-    new_ntypes = ([ntype for ntype in g.ntypes], [ntype for ntype in g.ntypes])
+    new_ntypes = (g.ntypes, g.ntypes)
     new_graph = DGLBlock(new_graph_index, new_ntypes, g.etypes)
     assert new_graph.is_unibipartite  # sanity check
 
@@ -1494,55 +1822,6 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
 
     return new_graph
 
-def remove_edges(g, edge_ids):
-    """Return a new graph with given edge IDs removed.
-
-    The nodes are preserved.
-
-    Parameters
-    ----------
-    graph : DGLHeteroGraph
-        The graph
-    edge_ids : Tensor or dict[etypes, Tensor]
-        The edge IDs for each edge type.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The new graph.
-        The edge ID mapping from the new graph to the original graph is stored as
-        ``dgl.EID`` on edge features.
-    """
-    if not isinstance(edge_ids, Mapping):
-        if len(g.etypes) != 1:
-            raise ValueError(
-                "Graph has more than one edge type; specify a dict for edge_id instead.")
-        edge_ids = {g.canonical_etypes[0]: edge_ids}
-
-    edge_ids_nd = [nd.NULL[g._idtype_str]] * len(g.etypes)
-    for key, value in edge_ids.items():
-        if value.dtype != g.idtype:
-            # if didn't check, this function still works, but returns wrong result
-            raise utils.InconsistentDtypeException("Expect edge id tensors({}) to have \
-         the same index type as graph({})".format(value.dtype, g.idtype))
-        edge_ids_nd[g.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
-    new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(g._graph, edge_ids_nd)
-
-    new_graph = DGLHeteroGraph(new_graph_index, g.ntypes, g.etypes)
-    for i, canonical_etype in enumerate(g.canonical_etypes):
-        data = induced_eids_nd[i]
-        if len(data) == 0:
-            # Empty means that either
-            # (1) no edges are removed and edges are not shuffled.
-            # (2) all edges are removed.
-            # The following statement deals with both cases.
-            new_graph.edges[canonical_etype].data[EID] = F.arange(
-                0, new_graph.number_of_edges(canonical_etype))
-        else:
-            new_graph.edges[canonical_etype].data[EID] = F.zerocopy_from_dgl_ndarray(data)
-
-    return new_graph
-
 def in_subgraph(g, nodes):
     """Extract the subgraph containing only the in edges of the given nodes.
 
@@ -1564,14 +1843,17 @@ def in_subgraph(g, nodes):
     DGLHeteroGraph
         The subgraph.
     """
+    if g.is_block:
+        raise DGLError('Extracting subgraph of a block graph is not allowed.')
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
+            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
         else:
             nodes_all_types.append(nd.NULL[g._idtype_str])
 
@@ -1579,7 +1861,7 @@ def in_subgraph(g, nodes):
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+        ret.edges[etype].data[EID] = induced_edges[i]
     return ret
 
 def out_subgraph(g, nodes):
@@ -1603,14 +1885,17 @@ def out_subgraph(g, nodes):
     DGLHeteroGraph
         The subgraph.
     """
+    if g.is_block:
+        raise DGLError('Extracting subgraph of a block graph is not allowed.')
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
+            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
         else:
             nodes_all_types.append(nd.NULL[g._idtype_str])
 
@@ -1618,7 +1903,7 @@ def out_subgraph(g, nodes):
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+        ret.edges[etype].data[EID] = induced_edges[i]
     return ret
 
 def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True, copy_edata=False):
@@ -1775,6 +2060,8 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     {('user', 'wins', 'user'): tensor([1, 2, 1, 1])
      ('user', 'plays', 'game'): tensor([1, 1, 1])}
     """
+    if g.is_block:
+        raise DGLError('Cannot convert a block graph to a simple graph.')
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
     simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
     counts = [F.zerocopy_from_dgl_ndarray(count) for count in counts]
@@ -1814,50 +2101,24 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
 
 DGLHeteroGraph.to_simple = to_simple
 
-def as_heterograph(g, ntype='_U', etype='_E'):
+def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
 
-    Node and edge features are preserved. Returns 64 bits graph
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The graph
-    ntype : str, optional
-        The node type name
-    etype : str, optional
-        The edge type name
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The heterograph.
+    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
+                do nothing and can be removed safely in all cases.
     """
-    hgi = _CAPI_DGLAsHeteroGraph(g._graph)
-    hg = DGLHeteroGraph(hgi, [ntype], [etype])
-    hg.ndata.update(g.ndata)
-    hg.edata.update(g.edata)
-    return hg
+    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
+                '\tdgl.as_heterograph will do nothing and can be removed safely in all cases.')
+    return g
 
 def as_immutable_graph(hg):
     """Convert a DGLHeteroGraph with one node and edge type into a DGLGraph.
 
-    Node and edge features are preserved.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        The heterograph
-
-    Returns
-    -------
-    DGLGraph
-        The graph.
+    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
+                do nothing and can be removed safely in all cases.
     """
-    gidx = _CAPI_DGLAsImmutableGraph(hg._graph)
-    g = DGLGraph(gidx)
-    g.ndata.update(hg.ndata)
-    g.edata.update(hg.edata)
-    return g
+    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
+                '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
+    return hg
 
 _init_api("dgl.transform")

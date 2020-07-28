@@ -28,15 +28,13 @@ namespace aten {
  * \param out_aux A list of NDArray's that contains auxiliary information such
  *        as the argmax on source nodes and edges for reduce operators such as
  *        `min` and `max`.
- * \param format The format of sparse matrix.
  */
 void SpMM(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
           NDArray ufeat,
           NDArray efeat,
           NDArray out,
-          std::vector<NDArray> out_aux,
-          SparseFormat format = SparseFormat::kAny);
+          std::vector<NDArray> out_aux);
 
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication.
@@ -46,14 +44,12 @@ void SpMM(const std::string& op, const std::string& reduce,
  * \param ufeat The source node feature.
  * \param vfeat The destination node feature.
  * \param out The output feature on edge.
- * \param format The format of sparse matrix.
  */
 void SDDMM(const std::string& op,
            HeteroGraphPtr graph,
            NDArray ufeat,
            NDArray efeat,
-           NDArray out,
-           SparseFormat format = SparseFormat::kAny);
+           NDArray out);
 
 }  // namespace aten
 }  // namespace dgl

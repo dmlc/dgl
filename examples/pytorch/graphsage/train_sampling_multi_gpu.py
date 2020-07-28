@@ -78,6 +78,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
 
+                block = block.to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
@@ -150,7 +151,7 @@ def run(proc_id, n_gpus, args, devices, data):
     in_feats, n_classes, train_g, val_g, test_g = data
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
-    test_mask = ~(train_g.ndata['train_mask'] | val_g.ndata['val_mask'])
+    test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
     train_nid = train_mask.nonzero()[:, 0]
     val_nid = val_mask.nonzero()[:, 0]
     test_nid = test_mask.nonzero()[:, 0]
@@ -193,7 +194,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_g, train_g.ndata['labels'], seeds, input_nodes, dev_id)
-
+            blocks = [block.to(dev_id) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
