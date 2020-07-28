@@ -214,7 +214,7 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     f1_micro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='micro')
     f1_macro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='macro')
     f1_macro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='macro')
-    return f1_micro_eval, f1_micro_test
+    return f1_micro_eval, f1_micro_test, f1_macro_eval, f1_macro_test
 
 def run(args, device, data):
     # Unpack data
@@ -308,23 +308,22 @@ def run(args, device, data):
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
-            if step > 1000:
-                break
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
         epoch += 1
 
-    if args.standalone:
-        pred = generate_emb(model,  g, g.ndata['features'], args.batch_size_eval, device)
-    else:
-        pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
-    if g.rank() == 0:
-        eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
-        print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
+        if args.standalone:
+            pred = generate_emb(model,  g, g.ndata['features'], args.batch_size_eval, device)
+        else:
+            pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
+        if g.rank() == 0:
+            f1_micro_eval, f1_micro_test, f1_macro_eval, f1_macro_test = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
+            print('f1 micro eval {:.4f} f1 micro test {:.4f}, f1 macro eval {:.4f} f1 macro test {:.4f}'.format(
+                f1_micro_eval, f1_micro_test, f1_macro_eval, f1_macro_test))
 
-    # sync for eval and test
-    if not args.standalone:
-        th.distributed.barrier()
+        # sync for eval and test
+        if not args.standalone:
+            th.distributed.barrier()
 
     if not args.standalone:
         g._client.barrier()
