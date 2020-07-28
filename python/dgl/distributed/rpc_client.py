@@ -2,6 +2,7 @@
 
 import os
 import socket
+import multiprocessing as mp
 import atexit
 
 from . import rpc
@@ -180,12 +181,14 @@ def finalize_client():
     """Release resources of this client."""
     rpc.finalize_sender()
     rpc.finalize_receiver()
+    if SAMPLER_POOL is not None:
+        SAMPLER_POOL.close()
+        SAMPLER_POOL.join()
     global INITIALIZED
     INITIALIZED = False
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
-
     Raises
     ------
     ConnectionError : If anything wrong with the connection.
@@ -194,6 +197,31 @@ def shutdown_servers():
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
+
+SAMPLER_POOL = None
+NUM_SAMPLER_WORKERS = 0
+
+def _close():
+    """Finalize client and close servers when finished"""
+    rpc.finalize_sender()
+    rpc.finalize_receiver()
+
+def _init_rpc(ip_config, max_queue_size, net_type):
+    connect_to_server(ip_config, max_queue_size, net_type)
+
+def get_sampler_pool():
+    """Return the sampler pool and num_workers"""
+    return SAMPLER_POOL, NUM_SAMPLER_WORKERS
+
+def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+    """Init rpc service"""
+    ctx = mp.get_context("spawn")
+    global SAMPLER_POOL
+    global NUM_SAMPLER_WORKERS
+    SAMPLER_POOL = ctx.Pool(
+        num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+    NUM_SAMPLER_WORKERS = num_workers
+    connect_to_server(ip_config, max_queue_size, net_type)
 
 def exit_client():
     """Register exit callback.
