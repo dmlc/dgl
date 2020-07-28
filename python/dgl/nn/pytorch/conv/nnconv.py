@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
+from .... import transform
 from .... import function as fn
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -41,6 +42,10 @@ class NNConv(nn.Module):
         If True, use residual connection. Default: ``False``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        can to set add_self_loop to ``True`` here.
 
     Example
     -------
@@ -85,7 +90,8 @@ class NNConv(nn.Module):
                  edge_func,
                  aggregator_type,
                  residual=False,
-                 bias=True):
+                 bias=True,
+                 add_self_loop=False):
         super(NNConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
@@ -110,6 +116,7 @@ class NNConv(nn.Module):
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_buffer('bias', None)
+        self._add_self_loop = add_self_loop
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -142,6 +149,9 @@ class NNConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
+            if self._add_self_loop:
+                graph = transform.add_self_loop(graph)
+
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
             # (n, d_in, 1)

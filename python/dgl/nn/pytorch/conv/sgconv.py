@@ -3,6 +3,7 @@
 import torch as th
 from torch import nn
 
+from .... import transform
 from .... import function as fn
 
 
@@ -14,7 +15,7 @@ class SGConv(nn.Module):
         H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta^{l}
 
     where :math:`\tilde{A}` is :math:`A` + :math:`I`. Thus the graph input is expected to have self-loop edges added.
-    
+
     Parameters
     ----------
     in_feats : int
@@ -35,6 +36,11 @@ class SGConv(nn.Module):
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
         If not None, applies normalization to the updated node features.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. If no self-loop is added, the feature for a node with zero
+        in-degree will be all zero after Conv. This is harmful for some applications. We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        need to set add_self_loop to ``True`` here.
 
     Example
     -------
@@ -60,13 +66,15 @@ class SGConv(nn.Module):
                  k=1,
                  cached=False,
                  bias=True,
-                 norm=None):
+                 norm=None,
+                 add_self_loop=False):
         super(SGConv, self).__init__()
         self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self._cached = cached
         self._cached_h = None
         self._k = k
         self.norm = norm
+        self._add_self_loop = add_self_loop
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -98,6 +106,9 @@ class SGConv(nn.Module):
         training, or you will get wrong results.
         """
         with graph.local_scope():
+            if self._add_self_loop:
+                graph = transform.add_self_loop(graph)
+
             if self._cached_h is not None:
                 feat = self._cached_h
             else:

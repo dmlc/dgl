@@ -3,6 +3,7 @@
 import torch as th
 from torch import nn
 
+from .... import transform
 from .... import function as fn
 from ....ops import edge_softmax
 from ..utils import Identity
@@ -48,7 +49,11 @@ class GATConv(nn.Module):
     activation : callable activation function/layer or None, optional.
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        can to set add_self_loop to ``True`` here.
+
     Example:
     --------
     >>> import dgl
@@ -117,13 +122,21 @@ class GATConv(nn.Module):
                  attn_drop=0.,
                  negative_slope=0.2,
                  residual=False,
-                 activation=None):
+                 activation=None,
+                 add_self_loop=False):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        self.fc = nn.Linear(
-            self._in_src_feats, out_feats * num_heads, bias=False)
+        self._add_self_loop = add_self_loop
+        if isinstance(in_feats, tuple):
+            self.fc_src = nn.Linear(
+                self._in_src_feats, out_feats * num_heads, bias=False)
+            self.fc_dst = nn.Linear(
+                self._in_dst_feats, out_feats * num_heads, bias=False)
+        else:
+            self.fc = nn.Linear(
+                self._in_src_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.feat_drop = nn.Dropout(feat_drop)
@@ -169,6 +182,9 @@ class GATConv(nn.Module):
             is the number of heads, and :math:`D_{out}` is size of output feature.
         """
         with graph.local_scope():
+            if self._add_self_loop:
+                graph = transform.add_self_loop(graph)
+
             if isinstance(feat, tuple):
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])

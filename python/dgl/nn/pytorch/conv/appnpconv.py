@@ -3,6 +3,7 @@
 import torch as th
 from torch import nn
 
+from .... import transform
 from .... import function as fn
 
 
@@ -26,6 +27,10 @@ class APPNPConv(nn.Module):
     edge_drop : float, optional
         Dropout rate on edges that controls the
         messages received by each node. Default: ``0``.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        can to set add_self_loop to ``True`` here.
 
     Example
     -------
@@ -54,10 +59,12 @@ class APPNPConv(nn.Module):
     def __init__(self,
                  k,
                  alpha,
-                 edge_drop=0.):
+                 edge_drop=0.,
+                 add_self_loop=False):
         super(APPNPConv, self).__init__()
         self._k = k
         self._alpha = alpha
+        self._add_self_loop = add_self_loop
         self.edge_drop = nn.Dropout(edge_drop)
 
     def forward(self, graph, feat):
@@ -78,6 +85,8 @@ class APPNPConv(nn.Module):
             should be the same as input shape.
         """
         with graph.local_scope():
+            if self._add_self_loop:
+                graph = transform.add_self_loop(graph)
             norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)
             norm = th.reshape(norm, shp).to(feat.device)

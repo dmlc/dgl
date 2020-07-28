@@ -60,7 +60,8 @@ class TAGConv(nn.Module):
                  out_feats,
                  k=2,
                  bias=True,
-                 activation=None):
+                 activation=None,
+                 ):
         super(TAGConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -111,7 +112,9 @@ class TAGConv(nn.Module):
                 rst = graph.ndata['h']
                 rst = rst * norm
                 fstack.append(rst)
+                print (rst)
 
+            print (th.cat(fstack, dim=-1))
             rst = self.lin(th.cat(fstack, dim=-1))
 
             if self._activation is not None:

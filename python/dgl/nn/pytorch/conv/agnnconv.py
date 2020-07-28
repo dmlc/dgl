@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 from torch.nn import functional as F
 
+from .... import transform
 from .... import function as fn
 from ....ops import edge_softmax
 from ....utils import expand_as_pair
@@ -28,6 +29,11 @@ class AGNNConv(nn.Module):
         The :math:`\beta` in the formula.
     learn_beta : bool, optional
         If True, :math:`\beta` will be learnable parameter.
+    add_self_loop: bool, optional
+        Add self-loop to graph when compute Conv. If no self-loop is added, the feature for a node with zero
+        in-degree will be all zero after Conv. This is harmful for some applications. We recommend adding
+        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
+        need to set add_self_loop to ``True`` here.
 
     Example
     -------
@@ -50,8 +56,10 @@ class AGNNConv(nn.Module):
     """
     def __init__(self,
                  init_beta=1.,
-                 learn_beta=True):
+                 learn_beta=True,
+                 add_self_loop=False):
         super(AGNNConv, self).__init__()
+        self._add_self_loop = add_self_loop
         if learn_beta:
             self.beta = nn.Parameter(th.Tensor([init_beta]))
         else:
@@ -78,7 +86,13 @@ class AGNNConv(nn.Module):
             should be the same as input shape.
         """
         with graph.local_scope():
+            if self._add_self_loop:
+                graph = transform.add_self_loop(graph)
+
+
             feat_src, feat_dst = expand_as_pair(feat, graph)
+
+
             graph.srcdata['h'] = feat_src
             graph.srcdata['norm_h'] = F.normalize(feat_src, p=2, dim=-1)
             if isinstance(feat, tuple) or graph.is_block:
