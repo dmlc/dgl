@@ -139,6 +139,7 @@ class DistDataLoader:
         return ret
 
     def close(self):
+        """Finalize the connection with server and close pool"""
         for _ in range(self.num_workers):
             self.pool.apply_async(_exit)
             time.sleep(0.1)
