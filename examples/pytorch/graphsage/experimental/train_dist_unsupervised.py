@@ -5,6 +5,8 @@ import argparse, time, math
 import numpy as np
 from functools import wraps
 import tqdm
+import sklearn.linear_model as lm
+import sklearn.metrics as skm
 
 import dgl
 from dgl import DGLGraph
@@ -20,8 +22,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 #from pyinstrument import Profiler
-
-from model import DistSAGE
+from train_sampling import SAGE
 
 class NegativeSampler(object):
     def __init__(self, g, neg_nseeds):
@@ -197,7 +198,7 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
     """
-    emb = emb.cpu().numpy()
+    emb = emb[np.arange(emb.shape[0])].cpu().numpy()
     train_nids = train_nids.cpu().numpy()
     train_labels = labels[train_nids].cpu().numpy()
     val_nids = val_nids.cpu().numpy()
@@ -309,6 +310,8 @@ def run(args, device, data):
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
+            if step > 1000:
+                break
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
         epoch += 1
@@ -345,9 +348,9 @@ def main(args):
 
     train_eids = dgl.distributed.edge_split(th.arange(g.number_of_edges()), g.get_partition_book(), force_even=True)
     train_nids = dgl.distributed.node_split(th.arange(g.number_of_nodes()), g.get_partition_book())
-    global_train_nid = g.ndata['train_mask']
-    global_valid_nid = g.ndata['val_mask']
-    global_test_nid = g.ndata['test_mask']
+    global_train_nid = g.ndata['train_mask'][np.arange(g.number_of_nodes())]
+    global_valid_nid = g.ndata['val_mask'][np.arange(g.number_of_nodes())]
+    global_test_nid = g.ndata['test_mask'][np.arange(g.number_of_nodes())]
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     device = th.device('cpu')
 
