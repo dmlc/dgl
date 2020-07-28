@@ -86,7 +86,8 @@ class GatedGraphConv(nn.Block):
                 graph.ndata['h'] = feat
                 for i in range(self._n_etypes):
                     eids = (etypes.asnumpy() == i).nonzero()[0]
-                    eids = nd.from_numpy(eids, zero_copy=True)
+                    eids = nd.from_numpy(eids, zero_copy=True).as_in_context(
+                        feat.context).astype(graph.idtype)
                     if len(eids) > 0:
                         graph.apply_edges(
                             lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},

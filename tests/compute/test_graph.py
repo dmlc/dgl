@@ -1,4 +1,5 @@
 import math
+import numbers
 import numpy as np
 import scipy.sparse as sp
 import networkx as nx
@@ -207,7 +208,7 @@ def test_query():
         eids = g.edge_ids([4,0], [4,9])
         assert eids.shape[0] == 2
         eid = g.edge_id(4, 4)
-        assert isinstance(eid, int)
+        assert isinstance(eid, numbers.Number)
         with pytest.raises(DGLError):
             eids = g.edge_ids([9,0], [4,9])
 

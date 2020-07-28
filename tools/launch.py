@@ -63,11 +63,15 @@ def submit_jobs(args, udf_command):
     torch_cmd = torch_cmd + ' ' + '--node_rank=' + str(0)
     torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
     torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
-
     for node_id, host in enumerate(hosts):
         ip, _ = host
         new_torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
-        new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
+        if 'python3' in udf_command:
+            new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
+        elif 'python2' in udf_command:
+            new_udf_command = udf_command.replace('python2', 'python2 ' + new_torch_cmd)
+        else:
+            new_udf_command = udf_command.replace('python', 'python ' + new_torch_cmd)
         cmd = client_cmd + ' ' + new_udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, thread_list)
@@ -84,16 +88,15 @@ def main():
     parser.add_argument('--num_client', type=int, 
                         help='Total number of client processes in the cluster')
     parser.add_argument('--conf_path', type=str, 
-                        help='The path to the partition config file. This path can be \
-                        a remote path like s3 and dgl will download this file automatically')
+                        help='The file (in workspace) of the partition config file')
     parser.add_argument('--ip_config', type=str, 
-                        help='The file for IP configuration for server processes')
+                        help='The file (in workspace) of IP configuration for server processes')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_client > 0, '--num_client must be a positive number.'
     udf_command = str(udf_command[0])
     if 'python' not in udf_command:
-        raise RuntimeError("DGL launch can only support: python ...")
+        raise RuntimeError("DGL launching script can only support Python executable file.")
     submit_jobs(args, udf_command)
 
 def signal_handler(signal, frame):

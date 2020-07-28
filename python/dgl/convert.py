@@ -923,9 +923,8 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
     """
     if g.device != F.cpu():
         raise DGLError('Cannot convert a CUDA graph to networkx. Call g.cpu() first.')
-    # TODO(minjie): multi-type support
-    assert len(g.ntypes) == 1
-    assert len(g.etypes) == 1
+    if not g.is_homogeneous():
+        raise DGLError('dgl.to_networkx only supports homogeneous graphs.')
     src, dst = g.edges()
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)

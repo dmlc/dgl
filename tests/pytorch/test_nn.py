@@ -17,7 +17,7 @@ def _AXWb(A, X, W, b):
     Y = th.matmul(A, X.view(X.shape[0], -1)).view_as(X)
     return Y + b
 
-def test_graph_conv():
+def test_graph_conv0():
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
@@ -71,7 +71,7 @@ def test_graph_conv():
     assert not F.allclose(old_weight, new_weight)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'bipartitie', 'block-bipartite'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
@@ -90,7 +90,7 @@ def test_graph_conv(idtype, g, norm, weight, bias):
     assert h_out.shape == (ndst, 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite', 'block-bipartite'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
@@ -515,7 +515,7 @@ def test_sage_conv(idtype, g, aggre_type):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv_bi(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
@@ -580,7 +580,7 @@ def test_appnp_conv():
     assert h.shape[-1] == 5
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
 def test_gin_conv(g, idtype, aggregator_type):
     g = g.astype(idtype).to(F.ctx())
@@ -610,7 +610,7 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_agnn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -621,7 +621,7 @@ def test_agnn_conv(g, idtype):
     assert h.shape == (g.number_of_nodes(), 5)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
 def test_agnn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -646,7 +646,7 @@ def test_gated_graph_conv():
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_nn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -689,7 +689,7 @@ def test_gmm_conv(g, idtype):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block-bipartite']))
 def test_gmm_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -745,7 +745,7 @@ def test_dense_sage_conv(g, idtype):
     assert F.allclose(out_sage, out_dense_sage), g
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_edge_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -756,7 +756,7 @@ def test_edge_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'block']))
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
 def test_edge_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -764,12 +764,7 @@ def test_edge_conv_bi(g, idtype):
     print(edge_conv)
     h0 = F.randn((g.number_of_src_nodes(), 5))
     x0 = F.randn((g.number_of_dst_nodes(), 5))
-    if not g.is_homograph() and not g.is_block:
-        # bipartite
-        assert False
-        h1 = edge_conv(g, (h0, h0[:10]))
-    else:
-        h1 = edge_conv(g, (h0, x0))
+    h1 = edge_conv(g, (h0, x0))
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_dense_cheb_conv():

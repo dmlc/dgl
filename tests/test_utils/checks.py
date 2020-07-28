@@ -15,6 +15,11 @@ def check_graph_equal(g1, g2, *,
     assert g1.dsttypes == g2.dsttypes
     assert g1.canonical_etypes == g2.canonical_etypes
     assert g1.batch_size == g2.batch_size
+
+    # check if two metagraphs are identical
+    for edges, features in g1.metagraph.edges(keys=True).items():
+        assert g2.metagraph.edges(keys=True)[edges] == features
+
     for nty in g1.ntypes:
         assert g1.number_of_nodes(nty) == g2.number_of_nodes(nty)
         assert F.allclose(g1.batch_num_nodes(nty), g2.batch_num_nodes(nty))
