@@ -2,7 +2,6 @@
 
 from .._ffi.function import _init_api
 from ..graph import DGLGraph
-from ..transform import as_heterograph
 
 # Remove C++ bindings for now, since not used
 
@@ -63,10 +62,7 @@ class ServerState:
 
     @graph.setter
     def graph(self, graph):
-        if isinstance(graph, DGLGraph):
-            self._graph = as_heterograph(graph)
-        else:
-            self._graph = graph
+        self._graph = graph
 
 
 _init_api("dgl.distributed.server_state")
