@@ -21,6 +21,8 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 #from pyinstrument import Profiler
 
+from model import DistSAGE
+
 class NegativeSampler(object):
     def __init__(self, g, neg_nseeds):
         self.neg_nseeds = neg_nseeds
@@ -84,42 +86,6 @@ def load_subtensor(g, input_nodes, device):
     batch_inputs = g.ndata['features'][input_nodes].to(device)
     return batch_inputs
 
-class SAGE(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout):
-        super().__init__()
-        self.n_layers = n_layers
-        self.n_hidden = n_hidden
-        self.n_classes = n_classes
-        self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
-        for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
-        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
-
-    def forward(self, blocks, x):
-        h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            # We need to first copy the representation of nodes on the RHS from the
-            # appropriate nodes on the LHS.
-            # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
-            # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
-            # Then we compute the updated representation on the RHS.
-            # The shape of h now becomes (num_nodes_RHS, D)
-            h = layer(block, (h, h_dst))
-            if l != len(self.layers) - 1:
-                h = self.activation(h)
-                h = self.dropout(h)
-        return h
-
 class CrossEntropyLoss(nn.Module):
     def forward(self, block_outputs, pos_graph, neg_graph):
         with pos_graph.local_scope():
@@ -136,9 +102,47 @@ class CrossEntropyLoss(nn.Module):
         loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
 
+def generate_emb(model, g, inputs, batch_size, device):
+    """
+    Generate embeddings for each node
+    g : The entire graph.
+    inputs : The features of all the nodes.
+    batch_size : Number of nodes to compute at the same time.
+    device : The GPU device to evaluate on.
+    """
+    model.eval()
+    with th.no_grad():
+        pred = model.module.inference(g, inputs, batch_size, device)
+
+    return pred
+
+def compute_acc(emb, labels, train_nids, val_nids, test_nids):
+    """
+    Compute the accuracy of prediction given the labels.
+    """
+    emb = emb.cpu().numpy()
+    train_nids = train_nids.cpu().numpy()
+    train_labels = labels[train_nids].cpu().numpy()
+    val_nids = val_nids.cpu().numpy()
+    val_labels = labels[val_nids].cpu().numpy()
+    test_nids = test_nids.cpu().numpy()
+    test_labels = labels[test_nids].cpu().numpy()
+
+    emb = (emb - emb.mean(0, keepdims=True)) / emb.std(0, keepdims=True)
+
+    lr = lm.LogisticRegression(multi_class='multinomial', max_iter=10000)
+    lr.fit(emb[train_nids], labels[train_nids])
+
+    pred = lr.predict(emb)
+    f1_micro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='micro')
+    f1_micro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='micro')
+    f1_macro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='macro')
+    f1_macro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='macro')
+    return f1_micro_eval, f1_micro_test
+
 def run(args, device, data):
     # Unpack data
-    train_eids, train_nids, in_feats, g = data
+    train_eids, train_nids, in_feats, g, global_train_nid, global_valid_nid, global_test_nid, labels = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], train_nids,
                               dgl.distributed.sample_neighbors, args.num_negs)
@@ -153,7 +157,7 @@ def run(args, device, data):
         num_workers=args.num_workers)
 
     # Define model and optimizer
-    model = SAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
+    model = DistSAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
         model = th.nn.parallel.DistributedDataParallel(model)
@@ -232,6 +236,10 @@ def run(args, device, data):
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
         epoch += 1
 
+    pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
+    if g.rank() == 0:
+        compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
+
     if not args.standalone:
         g._client.barrier()
 
@@ -239,12 +247,14 @@ def run(args, device, data):
         if g.rank() == 0:
             feat = g.ndata['features']
             th.save(feat, 'feat.pt')
+            th.save(pred, 'emb.pt')
 
         dgl.distributed.shutdown_servers()
         dgl.distributed.finalize_client()
     else:
         feat = g.ndata['features']
         th.save(feat, 'feat.pt')
+        th.save(pred, 'emb.pt')
 
 def main(args):
     if not args.standalone:
@@ -255,11 +265,15 @@ def main(args):
 
     train_eids = dgl.distributed.edge_split(th.arange(g.number_of_edges()), g.get_partition_book(), force_even=True)
     train_nids = dgl.distributed.node_split(th.arange(g.number_of_nodes()), g.get_partition_book())
+    global_train_nid = g.ndata['train_mask']
+    global_valid_nid = g.ndata['val_mask']
+    global_test_nid = g.ndata['test_mask']
+    labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     device = th.device('cpu')
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
-    data = train_eids, train_nids, in_feats, g
+    data = train_eids, train_nids, in_feats, g, global_train_nid, global_valid_nid, global_test_nid, labels
     run(args, device, data)
     print("parent ends")
 
@@ -279,6 +293,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-layers', type=int, default=2)
     parser.add_argument('--fan-out', type=str, default='10,25')
     parser.add_argument('--batch-size', type=int, default=1000)
+    parser.add_argument('--batch-size-eval', type=int, default=100000)
     parser.add_argument('--log-every', type=int, default=20)
     parser.add_argument('--eval-every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
