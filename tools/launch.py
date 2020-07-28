@@ -71,7 +71,7 @@ def submit_jobs(args, udf_command):
         elif 'python2' in udf_command:
             new_udf_command = udf_command.replace('python2', 'python2 ' + new_torch_cmd)
         else:
-            new_udf_command = udf_command.replace('python', 'python ' + new_torch_cmd)
+            new_udf_command = udf_command.replace('python python', 'python python ' + new_torch_cmd)
         cmd = client_cmd + ' ' + new_udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, thread_list)
