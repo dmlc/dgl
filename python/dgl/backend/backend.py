@@ -1428,7 +1428,7 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
 
     Parameters
     ----------
-    g : HeteroGraphIndex
+    gidx : HeteroGraphIndex
         The input graph.
     op : str
         Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
