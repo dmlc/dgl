@@ -183,6 +183,9 @@ class Column(object):
         else:
             return Column(data)
 
+    def __repr__(self):
+        return repr(self.data)
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
@@ -493,6 +496,10 @@ class Frame(MutableMapping):
         """Return the keys."""
         return self._columns.keys()
 
+    def values(self):
+        """Return the values."""
+        return self._columns.values()
+
     def clone(self):
         """Return a clone of this frame.
 
@@ -635,6 +642,10 @@ class FrameRef(MutableMapping):
     def keys(self):
         """Return the keys."""
         return self._frame.keys()
+
+    def values(self):
+        """Return the values."""
+        return self._frame.values()
 
     def __getitem__(self, key):
         """Get data from the frame.

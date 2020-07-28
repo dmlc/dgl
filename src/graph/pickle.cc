@@ -10,6 +10,7 @@
 #include <dmlc/memory_io.h>
 #include "./heterograph.h"
 #include "../c_api_common.h"
+#include "unit_graph.h"
 
 using namespace dgl::runtime;
 
@@ -22,7 +23,7 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
   strm->Write(graph->NumVerticesPerType());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kAny);
+    SparseFormat fmt = graph->SelectFormat(etype, all_code);
     switch (fmt) {
       case SparseFormat::kCOO: {
         strm->Write(SparseFormat::kCOO);
@@ -82,7 +83,8 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
         CHECK(strm->Read(&rsorted)) << "Invalid flag 'rsorted'";
         CHECK(strm->Read(&csorted)) << "Invalid flag 'csorted'";
         auto coo = aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
-        relgraph = CreateFromCOO(num_vtypes, coo);
+        // TODO(zihao) fix
+        relgraph = CreateFromCOO(num_vtypes, coo, all_code);
         break;
       }
       case SparseFormat::kCSR: {
@@ -93,7 +95,8 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
         bool sorted;
         CHECK(strm->Read(&sorted)) << "Invalid flag 'sorted'";
         auto csr = aten::CSRMatrix(num_src, num_dst, indptr, indices, edge_id, sorted);
-        relgraph = CreateFromCSR(num_vtypes, csr);
+        // TODO(zihao) fix
+        relgraph = CreateFromCSR(num_vtypes, csr, all_code);
         break;
       }
       case SparseFormat::kCSC:

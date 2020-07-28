@@ -145,7 +145,7 @@ class SortPooling(nn.Module):
             feat, _ = feat.sort(dim=-1)
             graph.ndata['h'] = feat
             # Sort nodes according to their last features.
-            ret = topk_nodes(graph, 'h', self.k, idx=-1)[0].view(
+            ret = topk_nodes(graph, 'h', self.k, sortby=-1)[0].view(
                 -1, self.k * feat.shape[-1])
             return ret
 
@@ -564,7 +564,7 @@ class SetTransformerEncoder(nn.Module):
         torch.Tensor
             The output feature with shape :math:`(N, D)`.
         """
-        lengths = graph.batch_num_nodes
+        lengths = graph.batch_num_nodes()
         for layer in self.layers:
             feat = layer(feat, lengths)
         return feat
@@ -626,7 +626,7 @@ class SetTransformerDecoder(nn.Module):
             The output feature with shape :math:`(B, D)`, where
             :math:`B` refers to the batch size.
         """
-        len_pma = graph.batch_num_nodes
+        len_pma = graph.batch_num_nodes()
         len_sab = [self.k] * graph.batch_size
         feat = self.pma(feat, len_pma)
         for layer in self.layers:

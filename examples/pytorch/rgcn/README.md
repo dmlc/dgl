@@ -48,10 +48,6 @@ MUTAG: accuracy avg(5 runs) 67.06%, best 80.88% (DGL)
 python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 256 --use-self-loop --n-epochs 40 --dropout=0.3
 ```
 
-```
-python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout 40 --n-epochs=40 --batch-size=128
-```
-
 BGS: accuracy avg(5 runs) 84.14%, best 89.66% (DGL)
 
 ```

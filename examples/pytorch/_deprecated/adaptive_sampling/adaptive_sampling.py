@@ -24,8 +24,8 @@ train_nodes = np.arange(1208)
 test_nodes = np.arange(1708, 2708)
 train_adj = adj[train_nodes, :][:, train_nodes]
 test_adj = adj[test_nodes, :][:, test_nodes]
-trainG = dgl.DGLGraph(train_adj)
-allG = dgl.DGLGraph(adj)
+trainG = dgl.DGLGraphStale(train_adj)
+allG = dgl.DGLGraphStale(adj)
 h = torch.tensor(data.features[train_nodes], dtype=torch.float32)
 test_h = torch.tensor(data.features[test_nodes], dtype=torch.float32)
 all_h = torch.tensor(data.features, dtype=torch.float32)
@@ -250,7 +250,8 @@ class AdaptGenerator(object):
         has_edge_ids = torch.where(has_edges)[0]
         all_ids = torch.where(loops_or_edges)[0]
         edges_ids_map = torch.where(has_edge_ids[:, None] == all_ids[None, :])[1]
-        eids[edges_ids_map] = self.graph.edge_ids(cand_padding, curr_padding)
+        u, v, e = self.graph.edge_ids(cand_padding, curr_padding, return_uv=True)
+        eids[edges_ids_map] = e
 
         return sample_neighbor, eids, num_neighbors, q_prob
 

@@ -15,7 +15,7 @@ For evaluatation we follow the code mlp.py provided by ogb [here](https://github
 ## Used config
 ogbl-collab
 ```
-python3 deepwalk.py --ogbl_name ogbl-collab --load_from_ogbl --save_in_pt --output_emb_file embedding.pt --num_walks 50 --window_size 20 --walk_length 40 --lr 0.1 --negative 1 --neg_weight 1 --lap_norm 0.005 --mix --adam --gpus 0 --num_threads 4 --print_interval 2000 --print_loss --batch_size 32
+python3 deepwalk.py --ogbl_name ogbl-collab --load_from_ogbl --save_in_pt --output_emb_file embedding.pt --num_walks 50 --window_size 20 --walk_length 40 --lr 0.1 --negative 1 --neg_weight 1 --lap_norm 0.005 --mix --gpus 0 --num_threads 4 --print_interval 2000 --print_loss --batch_size 32
 cd ./ogb/blob/master/examples/linkproppred/collab/
 cp embedding_pt_file_path ./
 python3 mlp.py --device 0 --runs 10 --use_node_embedding
@@ -23,7 +23,7 @@ python3 mlp.py --device 0 --runs 10 --use_node_embedding
 
 ogbl-ddi
 ```
-python3 deepwalk.py --ogbl_name ogbl-ddi --load_from_ogbl --save_in_pt --output_emb_file ddi-embedding.pt --num_walks 50 --window_size 2 --walk_length 80 --lr 0.1 --negative 1 --neg_weight 1 --lap_norm 0.05 --only_gpu --adam --gpus 0 --num_threads 4 --print_interval 2000 --print_loss --batch_size 16 --use_context_weight
+python3 deepwalk.py --ogbl_name ogbl-ddi --load_from_ogbl --save_in_pt --output_emb_file ddi-embedding.pt --num_walks 50 --window_size 2 --walk_length 80 --lr 0.1 --negative 1 --neg_weight 1 --lap_norm 0.05 --only_gpu --gpus 0 --num_threads 4 --print_interval 2000 --print_loss --batch_size 16 --use_context_weight
 cd ./ogb/blob/master/examples/linkproppred/ddi/
 cp embedding_pt_file_path ./
 python3 mlp.py --device 0 --runs 10 --epochs 100
@@ -31,14 +31,14 @@ python3 mlp.py --device 0 --runs 10 --epochs 100
 
 ogbl-ppa
 ```
-python3 deepwalk.py --ogbl_name ogbl-ppa --load_from_ogbl --save_in_pt --output_emb_file ppa-embedding.pt --negative 1 --neg_weight 1 --batch_size 64 --print_interval 2000 --print_loss --window_size 2 --num_walks 30 --walk_length 80 --lr 0.1 --lap_norm 0.02 --adam --mix --gpus 0 --use_context_weight --num_threads 4
+python3 deepwalk.py --ogbl_name ogbl-ppa --load_from_ogbl --save_in_pt --output_emb_file ppa-embedding.pt --negative 1 --neg_weight 1 --batch_size 64 --print_interval 2000 --print_loss --window_size 1 --num_walks 30 --walk_length 80 --lr 0.1 --lap_norm 0.02 --mix --gpus 0 --num_threads 4
 cp embedding_pt_file_path ./
 python3 mlp.py --device 2 --runs 10
 ```
 
 ogbl-citation
 ```
-python3 deepwalk.py --ogbl_name ogbl-citation --load_from_ogbl --save_in_pt --output_emb_file embedding.pt --window_size 2 --num_walks 10 --negative 1 --neg_weight 1 --walk_length 80 --batch_size 128 --print_loss --print_interval 1000 --mix --adam --gpus 0 --use_context_weight --num_threads 4 --lap_norm 0.05 --lr 0.1
+python3 deepwalk.py --ogbl_name ogbl-citation --load_from_ogbl --save_in_pt --output_emb_file embedding.pt --window_size 2 --num_walks 10 --negative 1 --neg_weight 1 --walk_length 80 --batch_size 128 --print_loss --print_interval 1000 --mix --gpus 0 --use_context_weight --num_threads 4 --lap_norm 0.05 --lr 0.1
 cp embedding_pt_file_path ./
 python3 mlp.py --device 2 --runs 10 --use_node_embedding
 ```
@@ -64,45 +64,45 @@ ogbl-collab
 
 <br>obgl-ddi
 <br>#params: 1444840(model) + 99073(mlp) = 1543913
-<br>&emsp;Hits@10
-<br>&emsp;Highest Train: 36.09 ± 2.47
-<br>&emsp;Highest Valid: 32.83 ± 2.30
-<br>&emsp;&emsp;Final Train: 36.06 ± 2.45
-<br>&emsp;&emsp;Final Test: 11.76 ± 3.91
-<br>&emsp;Hits@20
-<br>&emsp;Highest Train: 45.59 ± 2.45
-<br>&emsp;Highest Valid: 42.00 ± 2.36
-<br>&emsp;&emsp;Final Train: 45.56 ± 2.50
-<br>&emsp;&emsp;Final Test: 22.46 ± 2.90
-<br>&emsp;Hits@30
-<br>&emsp;Highest Train: 51.58 ± 2.41
-<br>&emsp;Highest Valid: 47.82 ± 2.19
-<br>&emsp;&emsp;Final Train: 51.58 ± 2.42
-<br>&emsp;&emsp;Final Test: 30.17 ± 3.39
+<br>Hits@10
+<br>&emsp;Highest Train: 33.91 ± 2.01
+<br>&emsp;Highest Valid: 30.96 ± 1.89
+<br>&emsp;&emsp;Final Train: 33.90 ± 2.00
+<br>&emsp;&emsp;Final Test: 15.16 ± 4.28
+<br>Hits@20
+<br>&emsp;Highest Train: 44.64 ± 1.71
+<br>&emsp;Highest Valid: 41.32 ± 1.69
+<br>&emsp;&emsp;Final Train: 44.62 ± 1.69
+<br>&emsp;&emsp;Final Test: 26.42 ± 6.10
+<br>Hits@30
+<br>&emsp;Highest Train: 51.01 ± 1.72
+<br>&emsp;Highest Valid: 47.64 ± 1.71
+<br>&emsp;&emsp;Final Train: 50.99 ± 1.72
+<br>&emsp;&emsp;Final Test: 33.56 ± 3.95
 
 
 <br>ogbl-ppa
 <br>#params: 150024820(model) + 113921(mlp) = 150138741
 <br>Hits@10
-<br>&emsp;Highest Train: 3.58 ± 0.90
-<br>&emsp;Highest Valid: 2.88 ± 0.76
-<br>&emsp;&emsp;Final Train: 3.58 ± 0.90
-<br>&emsp;&emsp;Final Test: 1.45 ± 0.65
-<br>&emsp;Hits@50
-<br>&emsp;Highest Train: 18.21 ± 2.29
-<br>&emsp;Highest Valid: 15.75 ± 2.10
-<br>&emsp;&emsp;Final Train: 18.21 ± 2.29
-<br>&emsp;&emsp;Final Test: 11.70 ± 0.97
-<br>&emsp;Hits@100
-<br>&emsp;Highest Train: 31.16 ± 2.23
-<br>&emsp;Highest Valid: 27.52 ± 2.07
-<br>&emsp;&emsp;Final Train: 31.16 ± 2.23
-<br>&emsp;&emsp;Final Test: 23.02 ± 1.63
+<br>&emsp;Highest Train: 4.78 ± 0.73
+<br>&emsp;Highest Valid: 4.30 ± 0.68
+<br>&emsp;&emsp;Final Train: 4.77 ± 0.73
+<br>&emsp;&emsp;Final Test: 2.67 ± 0.42
+<br>Hits@50
+<br>&emsp;Highest Train: 18.82 ± 1.07
+<br>&emsp;Highest Valid: 17.26 ± 1.01
+<br>&emsp;&emsp;Final Train: 18.82 ± 1.07
+<br>&emsp;&emsp;Final Test: 17.34 ± 2.09
+<br>Hits@100
+<br>&emsp;Highest Train: 31.29 ± 2.11
+<br>&emsp;Highest Valid: 28.97 ± 1.92
+<br>&emsp;&emsp;Final Train: 31.28 ± 2.12
+<br>&emsp;&emsp;Final Test: 28.88 ± 1.53
 
 <br>ogbl-citation
 <br>#params: 757811178(model) + 131841(mlp) = 757943019
 <br>MRR
-<br>&emsp;Highest Train: 0.8797 ± 0.0007
-<br>&emsp;Highest Valid: 0.8139 ± 0.0005
-<br>&emsp;&emsp;Final Train: 0.8792 ± 0.0008
-<br>&emsp;&emsp;Final Test: 0.8148 ± 0.0004
+<br>&emsp;Highest Train: 0.8994 ± 0.0004
+<br>&emsp;Highest Valid: 0.8271 ± 0.0003
+<br>&emsp;&emsp;Final Train: 0.8991 ± 0.0007
+<br>&emsp;&emsp;Final Test: 0.8284 ± 0.0005

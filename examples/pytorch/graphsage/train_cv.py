@@ -109,6 +109,7 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
+                block = block.to(device)
                 induced_nodes = block.srcdata[dgl.NID]
 
                 h = x[induced_nodes].to(device)
@@ -185,20 +186,27 @@ def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    blocks[0].srcdata['features'] = g.ndata['features'][blocks[0].srcdata[dgl.NID]].to(dev_id)
-    blocks[-1].dstdata['label'] = labels[blocks[-1].dstdata[dgl.NID]].to(dev_id)
+    blocks[0].srcdata['features'] = g.ndata['features'][blocks[0].srcdata[dgl.NID]]
+    blocks[-1].dstdata['label'] = labels[blocks[-1].dstdata[dgl.NID]]
+    ret_blocks = [] 
+    ret_hist_blocks = []
     for i, (block, hist_block) in enumerate(zip(blocks, hist_blocks)):
         hist_col = 'features' if i == 0 else 'hist_%d' % i
-        block.srcdata['hist'] = g.ndata[hist_col][block.srcdata[dgl.NID]].to(dev_id)
+        block.srcdata['hist'] = g.ndata[hist_col][block.srcdata[dgl.NID]]
 
         # Aggregate history
         hist_block.srcdata['hist'] = g.ndata[hist_col][hist_block.srcdata[dgl.NID]]
         if aggregation_on_device:
-            hist_block.srcdata['hist'] = hist_block.srcdata['hist'].to(dev_id)
+            hist_block = hist_block.to(dev_id)
         hist_block.update_all(fn.copy_u('hist', 'm'), fn.mean('m', 'agg_hist'))
-        block.dstdata['agg_hist'] = hist_block.dstdata['agg_hist']
+
+        block = block.to(dev_id)
         if not aggregation_on_device:
-            block.dstdata['agg_hist'] = block.dstdata['agg_hist'].to(dev_id)
+            hist_block = hist_block.to(dev_id)
+        block.dstdata['agg_hist'] = hist_block.dstdata['agg_hist']
+        ret_blocks.append(block)
+        ret_hist_blocks.append(hist_block)
+    return ret_blocks, ret_hist_blocks
 
 def init_history(g, model, dev_id):
     with th.no_grad():
@@ -211,7 +219,7 @@ def init_history(g, model, dev_id):
 def update_history(g, blocks):
     with th.no_grad():
         for i, block in enumerate(blocks):
-            ids = block.dstdata[dgl.NID]
+            ids = block.dstdata[dgl.NID].cpu()
             hist_col = 'hist_%d' % (i + 1)
 
             h_new = block.dstdata['h_new'].cpu()
@@ -269,7 +277,7 @@ def run(args, dev_id, data):
             input_nodes = blocks[0].srcdata[dgl.NID]
             seeds = blocks[-1].dstdata[dgl.NID]
 
-            load_subtensor(g, labels, blocks, hist_blocks, dev_id, True)
+            blocks, hist_blocks = load_subtensor(g, labels, blocks, hist_blocks, dev_id, True)
 
             # forward
             batch_pred = model(blocks)

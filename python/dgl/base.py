@@ -16,10 +16,22 @@ NID = '_ID'
 ETYPE = '_TYPE'
 EID = '_ID'
 
+_INTERNAL_COLUMNS = {NTYPE, NID, ETYPE, EID}
+
+def is_internal_column(name):
+    """Return true if the column name is reversed by DGL."""
+    return name in _INTERNAL_COLUMNS
+
 def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""
     return isinstance(arg, str) and arg == ALL
 
+# pylint: disable=unused-argument
+def dgl_warning_format(message, category, filename, lineno, file=None, line=None):
+    """Format DGL warnings."""
+    return "DGL Warning: {}\n".format(message)
+
+warnings.formatwarning = dgl_warning_format
 dgl_warning = warnings.warn  # pylint: disable=invalid-name
 
 _init_internal_api()

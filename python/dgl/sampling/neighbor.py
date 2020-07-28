@@ -59,10 +59,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
+            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
@@ -75,7 +76,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         fanout_array = [None] * len(g.etypes)
         for etype, value in fanout.items():
             fanout_array[g.get_etype_id(etype)] = value
-    fanout_array = utils.toindex(fanout_array).todgltensor()
+    fanout_array = F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64))
 
     if prob is None:
         prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
@@ -83,7 +84,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         prob_arrays = []
         for etype in g.canonical_etypes:
             if prob in g.edges[etype].data:
-                prob_arrays.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[prob]))
+                prob_arrays.append(F.to_dgl_nd(g.edges[etype].data[prob]))
             else:
                 prob_arrays.append(nd.array([], ctx=nd.cpu()))
 
@@ -92,7 +93,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+        ret.edges[etype].data[EID] = induced_edges[i]
     return ret
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
@@ -140,10 +141,11 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         nodes = {g.ntypes[0] : nodes}
 
     # Parse nodes into a list of NDArrays.
+    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
-            nodes_all_types.append(utils.toindex(nodes[ntype], g._idtype_str).todgltensor())
+            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
@@ -156,12 +158,12 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         k_array = [None] * len(g.etypes)
         for etype, value in k.items():
             k_array[g.get_etype_id(etype)] = value
-    k_array = utils.toindex(k_array).todgltensor()
+    k_array = F.to_dgl_nd(F.tensor(k_array, dtype=F.int64))
 
     weight_arrays = []
     for etype in g.canonical_etypes:
         if weight in g.edges[etype].data:
-            weight_arrays.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[weight]))
+            weight_arrays.append(F.to_dgl_nd(g.edges[etype].data[weight]))
         else:
             raise DGLError('Edge weights "{}" do not exist for relation graph "{}".'.format(
                 weight, etype))
@@ -171,7 +173,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+        ret.edges[etype].data[EID] = induced_edges[i]
     return ret
 
 

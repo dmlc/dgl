@@ -90,6 +90,26 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
+def cast_to_signed(arr):
+    """Cast this NDArray from unsigned integer to signed one.
+
+    uint64 -> int64
+    uint32 -> int32
+
+    Useful for backends with poor signed integer support (e.g., TensorFlow).
+
+    Parameters
+    ----------
+    arr : NDArray
+        Input array
+
+    Returns
+    -------
+    NDArray
+        Cased array
+    """
+    return _CAPI_DGLArrayCastToSigned(arr)
+
 def exist_shared_mem_array(name):
     """ Check the existence of shared-memory array.
 
@@ -162,7 +182,6 @@ class SparseMatrix(ObjectBase):
         """
         ret = [_CAPI_DGLSparseMatrixGetIndices(self, i) for i in range(3)]
         return [F.zerocopy_from_dgl_ndarray(arr) for arr in ret]
-        #return [F.zerocopy_from_dgl_ndarray(v.data) for v in ret]
 
     @property
     def flags(self):
@@ -172,7 +191,7 @@ class SparseMatrix(ObjectBase):
         -------
         list of boolean
         """
-        return [v for v in _CAPI_DGLSparseMatrixGetFlags(self)]
+        return _CAPI_DGLSparseMatrixGetFlags(self)
 
     def __getstate__(self):
         return self.format, self.num_rows, self.num_cols, self.indices, self.flags
